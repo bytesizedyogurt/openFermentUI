@@ -218,11 +218,18 @@ def _program(product: str, entry: dict[str, Any] | None, host: dict[str, Any],
              include_archived: bool) -> tuple[str, str | None]:
     """The train's program: the product entry's, the host's (they must agree),
     else the one active program (and words saying so); refused with the
-    switch's words when it is archived and the switch is off."""
+    switch's words when it is archived and the switch is off. A product or a
+    host of an archived program is said to be hidden first, whatever the
+    other names (OF-BLD-020 §7.R), so with the switch off no refusal names
+    what it holds as anything but hidden."""
     from .. import programs
 
     mine = entry.get("program") if entry else None
     theirs = host.get("program")
+    for what, named, of in (("product", product, mine), ("host", host["id"], theirs)):
+        if of and programs.hides(of, include_archived):
+            p = programs.program_by_id(of)
+            raise ProposeRefused(f"{what} {named} belongs to {p.name if p else of}, archived (hidden). {programs.SWITCH}")
     if mine and theirs and mine != theirs:
         raise ProposeRefused(f"product {product} belongs to the {mine} program and host {host['id']} to the {theirs} "
                              "program: a train is one program's")

@@ -185,8 +185,28 @@ def test_evidence_is_one_value_a_property_with_the_artifacts_basis(store):
     assert [e.id for e in ev] == [f"{art.id}:{k}" for k, _ in protparam.PROPERTIES]
     assert all(e.basis.artifactId == art.id and e.provenance == "computed" for e in ev)
     assert ev[0].unit == "Da" and ev[0].value == _library(INSULIN_B).molecular_weight()
-    # A label is built by code and carries no number of the answer's.
-    assert all(not any(ch.isdigit() for ch in e.label.replace(protparam.output_of(art).library, "")) for e in ev)
+    # A label is built by code and carries no digit at all: not the answer's
+    # numbers, and not the library's version (OF-BLD-020 §7.R, finding 33).
+    assert all(not any(ch.isdigit() for ch in e.label) for e in ev), [e.label for e in ev]
+
+
+def test_a_label_names_the_library_and_never_its_version_so_a_claim_may_copy_it(store, seed):
+    """OF-BLD-020 §7.R, finding 33: a claim that copies a property's label word
+    for word is not dropped by the digit rule. The library is named; its
+    version is the basis's `library` input, which the evidence carries."""
+    from importlib.metadata import version
+
+    from openferment_core.validate import find_number
+
+    record = {"id": "r-seq-1", "provenance": "unverified"}
+    answers = [protparam.protparam(INSULIN_B, source=SOURCE), protparam.of_product("insulin-b-chain"),
+               protparam.protparam(INSULIN_B, source=BasisSource(kind="record", id="r-seq-1"),
+                                   records_by_id={"r-seq-1": record})]
+    for art in answers:
+        for e in protparam.evidence_of(art):
+            assert find_number(e.label) is None, e.label
+            assert e.label.endswith(", as Biopython's ProtParam computes it"), e.label
+            assert {i.name: i.value for i in e.basis.inputs}["library"] == f"Biopython {version('biopython')}"
 
 
 # ── the endpoints ────────────────────────────────────────────────────────

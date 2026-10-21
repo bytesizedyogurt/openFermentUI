@@ -197,7 +197,7 @@
         },
         "status": 422,
         "body": {
-          "detail": "product phb with host c-necator-h16 belongs to PHA, archived (hidden). Settings → Programs has the switch that shows archived programs; turn it on to include them."
+          "detail": "product phb belongs to PHA, archived (hidden). Settings → Programs has the switch that shows archived programs; turn it on to include them."
         }
       }
     ]

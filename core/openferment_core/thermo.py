@@ -57,6 +57,7 @@ in the basis). A chemical the library lacks is refused in words naming it
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from .models import Artifact, BasisInput, BasisSource, Evidence, ThermoProps, ThermoPropsRequest, Volatility
@@ -83,6 +84,11 @@ PROPERTIES = (
 )
 BEER_LEAVES_OUT = ("the beer here is water and ethanol at the record's titre: its cells, residual sugar and dissolved "
                    "CO2 are not in it")
+# The version that ends the library's words in an answer (`thermosteam
+# 0.54.2`, as the worker writes them): a label leaves it out, since the basis's
+# `library` input carries it and a label is what a claim may copy word for word,
+# which holds no number (OF-BLD-020 §7.R, finding 33).
+_TRAILING_VERSION = re.compile(r"\s+v?\d[\w.+!-]*$")
 
 
 class ThermoRefused(ValueError):
@@ -101,6 +107,12 @@ def _installed(dist: str) -> str:
 
 def version() -> str:
     return f"{VERSION_WORDS} · thermosteam {_installed('thermosteam')}"
+
+
+def library_named(library: str) -> str:
+    """The library an answer names, as a label names it: its words without
+    the version that ends them (the basis's `library` input keeps that)."""
+    return _TRAILING_VERSION.sub("", library or "").strip() or library
 
 
 def _library_input() -> BasisInput:
@@ -346,7 +358,8 @@ def output_of(art: Artifact) -> ThermoProps:
 def evidence_of(art: Artifact) -> list[Evidence]:
     """One Evidence a property the library answered, each citable by its own
     id (`<artifact id>:<property>`) and each carrying the artifact's basis, so
-    a claim cites the one value it rests on."""
+    a claim cites the one value it rests on. Its label names the library and
+    not its version, which the basis holds."""
     from . import artifacts
 
     o = output_of(art)
@@ -358,7 +371,8 @@ def evidence_of(art: Artifact) -> list[Evidence]:
             continue
         out.append(Evidence(
             id=f"{art.id}:{key}",
-            label=f"{what} of {o.subject}, {where.get(key, 'at its temperature and pressure')}, as {o.library} computes it",
+            label=(f"{what} of {o.subject}, {where.get(key, 'at its temperature and pressure')}, as "
+                   f"{library_named(o.library)} computes it"),
             value=v, unit=o.units.get(key, ""), provenance=art.provenance, basis=artifacts.basis_of(art), figure=None))
     return out
 
@@ -505,7 +519,8 @@ def volatility_evidence(art: Artifact) -> list[Evidence]:
     """One Evidence a property the library answered (`<artifact id>:<key>`),
     each carrying the artifact's basis. Whether an azeotrope was found is its
     own evidence, its value the words `found` or `none found`; a property the
-    library could not give is no evidence."""
+    library could not give is no evidence. A label names the library and not
+    its version, which the basis holds, so a claim may copy it word for word."""
     from . import artifacts
 
     o = volatility_of(art)
@@ -522,6 +537,6 @@ def volatility_evidence(art: Artifact) -> list[Evidence]:
             of = f"{o.chemical} (product {o.product}) and {o.partner}, " + (
                 "at its pressure" if o.PSource == "given" else "at the library's default pressure")
         out.append(Evidence(
-            id=f"{art.id}:{key}", label=f"{what} of {of}, as {o.library} computes it", value=v,
+            id=f"{art.id}:{key}", label=f"{what} of {of}, as {library_named(o.library)} computes it", value=v,
             unit=o.units.get(key, ""), provenance=art.provenance, basis=artifacts.basis_of(art), figure=None))
     return out

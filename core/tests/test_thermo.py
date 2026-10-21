@@ -55,9 +55,9 @@ class StandIn:
     """The worker's `thermo_props` op, in its shape, with invented numbers;
     `refuse` names chemicals to refuse as the worker refuses them."""
 
-    def __init__(self, refuse=()):
+    def __init__(self, refuse=(), library=STANDIN):
         self.calls: list[dict] = []
-        self.refuse = set(refuse)
+        self.refuse, self.library = set(refuse), library
 
     def __call__(self, op, args):
         assert op == "thermo_props"
@@ -68,7 +68,7 @@ class StandIn:
             raise WorkerError(f"Refused: thermosteam's chemical library has no chemical named {', '.join(lacking)}")
         if "boom" in names:
             raise WorkerError("RuntimeError: something else went wrong")
-        return {"library": STANDIN, "T": args.get("T") or 298.15, "P": args.get("P") or 101325.0,
+        return {"library": self.library, "T": args.get("T") or 298.15, "P": args.get("P") or 101325.0,
                 "phase": args.get("phase") or "l", "TSource": "given" if args.get("T") is not None else thermo.LIBRARY_DEFAULT,
                 "PSource": "given" if args.get("P") is not None else thermo.LIBRARY_DEFAULT,
                 "massFractions": {n: 1.0 / len(names) for n in names}, "density": 1.5, "Cp": 2.5, "viscosity": None,
@@ -432,9 +432,9 @@ class VolatilityStandIn:
     `refuse` names chemicals to refuse as the worker refuses them, and
     `none` the chemicals it answers with no azeotrope."""
 
-    def __init__(self, refuse=(), none=()):
+    def __init__(self, refuse=(), none=(), library=STANDIN):
         self.calls: list[dict] = []
-        self.refuse, self.none = set(refuse), set(none)
+        self.refuse, self.none, self.library = set(refuse), set(none), library
 
     def __call__(self, op, args):
         assert op == "volatility"
@@ -444,7 +444,7 @@ class VolatilityStandIn:
         if args["chemical"] == "boom":
             raise WorkerError("RuntimeError: something else went wrong")
         found = args["chemical"] not in self.none
-        return {"library": STANDIN, "chemical": args["chemical"], "partner": args["partner"], "P": 101325.0,
+        return {"library": self.library, "chemical": args["chemical"], "partner": args["partner"], "P": 101325.0,
                 "PSource": thermo.LIBRARY_DEFAULT, "boilingPoint": 350.0, "partnerBoilingPoint": 370.0,
                 "lighter": args["chemical"], "azeotrope": found, "azeotropeMoleFraction": 0.9 if found else None,
                 "azeotropeMassFraction": 0.95 if found else None, "azeotropeT": 349.0 if found else None,
@@ -534,6 +534,32 @@ def test_each_volatility_property_is_its_own_evidence(store, vworker):
     assert all(not any(c.isdigit() for c in e.label.replace(STANDIN, "")) for e in ev.values())
 
 
+def test_a_property_label_names_thermosteam_and_never_its_version(store, monkeypatch):
+    """OF-BLD-020 §7.R, finding 33: the worker answers with the library's
+    name and version (`thermosteam <v>`, as the real one does), and a label a
+    claim may copy word for word holds no number: the version is the basis's
+    `library` input, which every evidence carries."""
+    from importlib.metadata import version
+
+    from openferment_core.validate import find_number
+
+    words = f"thermosteam {version('thermosteam')}"
+    vol, props = VolatilityStandIn(none={"Methanol"}, library=words), StandIn(library=words)
+    monkeypatch.setattr(proforma, "call", lambda op, args: (vol if op == "volatility" else props)(op, args))
+    monkeypatch.setattr(thermo, "CHEMICALS", {**thermo.CHEMICALS, "methanol-product": "Methanol"})
+    found, none = thermo.volatility("ethanol"), thermo.volatility("methanol-product")
+    for e in thermo.volatility_evidence(found) + thermo.volatility_evidence(none):
+        assert not any(ch.isdigit() for ch in e.label), e.label
+        assert find_number(e.label) is None and e.label.endswith(", as thermosteam computes it"), e.label
+        assert {i.name: i.value for i in e.basis.inputs}["library"] == words
+    # thermo_props' evidence names the library the same way. (A run's stream
+    # names its run by id, which this run's id holds as an identifier.)
+    for req in (ThermoPropsRequest(preset="ethanol-water-azeotrope"), ThermoPropsRequest(artifactId=RUN_ID, streamId="beer")):
+        for e in thermo.evidence_of(thermo.props(req)):
+            assert find_number(e.label) is None and e.label.endswith(", as thermosteam computes it"), e.label
+            assert version("thermosteam") not in e.label
+
+
 def test_volatility_of_refuses_an_artifact_of_another_tool(store, worker):
     with pytest.raises(thermo.ThermoRefused, match="not a volatility answer"):
         thermo.volatility_of(thermo.props(ThermoPropsRequest(preset="ethanol-water-azeotrope")))
@@ -582,6 +608,10 @@ def test_ethanols_volatility_finds_the_azeotrope_and_names_the_librarys_tb(warm,
     assert o.azeotropeMoleFraction == az.solved["moleFraction"]
     assert o.azeotropeMassFraction == pytest.approx(az.massFractions["Ethanol"], rel=1e-12)
     assert art.provenance == "computed" and o.searched["of"] == "Ethanol" and o.notes == []
+    # A label a claim may copy holds no number: the library is named, its version is in the basis (§7.R).
+    from openferment_core.validate import find_number
+
+    assert all(find_number(e.label) is None for e in thermo.volatility_evidence(art))
 
 
 @pytest.mark.sim

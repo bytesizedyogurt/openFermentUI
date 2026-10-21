@@ -49,6 +49,9 @@ from .models import Artifact, BasisInput, BasisSource, Evidence, ProtParam
 TOOL = "protparam"
 VERSION_WORDS = "protparam 1"
 LIBRARY = "biopython"
+# The library's own name, as the basis's `library` input and every label
+# write it; the input adds the installed version, a label never does.
+LIBRARY_NAME = "Biopython"
 # The unit each of ProtParam's numbers is read in: daltons (grams per mole)
 # for the mass, per molar per centimetre for the extinction coefficients at
 # 280 nm, and none for the isoelectric point (a pH) and GRAVY (a mean over a
@@ -65,7 +68,11 @@ HOW = {
     "gravy": "ProteinAnalysis.gravy on the hydropathy scale the basis names",
 }
 # What the evidence of an answer names, in the order a page shows them. A
-# label is words alone, so a claim that copies one copies no number.
+# label is words and ids alone: the library by its name, never its version
+# (the basis's `library` input carries that, and every evidence carries the
+# basis), and the subject a product's or a record's id. So a claim that copies
+# a label word for word copies no number (validate.find_number finds none;
+# OF-BLD-020 §7.R, finding 33).
 PROPERTIES = (
     ("molecularWeight", "Molecular weight"),
     ("isoelectricPoint", "Isoelectric point"),
@@ -154,7 +161,7 @@ def _named(inputs: list[BasisInput], name: str) -> BasisInput | None:
 
 def _library_input() -> BasisInput:
     v = library_version()
-    return BasisInput(name="library", value=f"Biopython {v}", unit="", source=BasisSource(
+    return BasisInput(name="library", value=f"{LIBRARY_NAME} {v}", unit="", source=BasisSource(
         kind="model", id=f"biopython@{v}",
         note="Bio.SeqUtils.ProtParam.ProteinAnalysis, as shipped: its masses, its charge model and its scales"))
 
@@ -301,11 +308,12 @@ def output_of(art: Artifact) -> ProtParam:
 
 def evidence_of(art: Artifact) -> list[Evidence]:
     """One Evidence a property (`<artifact id>:<key>`), each carrying the
-    artifact's basis, so a reason or a claim cites the one value it reads."""
+    artifact's basis, so a reason or a claim cites the one value it reads.
+    Its label names the library and not its version, which the basis holds."""
     from . import artifacts
 
     o = output_of(art)
-    return [Evidence(id=f"{art.id}:{key}", label=f"{what} of {o.subject}, as {o.library}'s ProtParam computes it",
+    return [Evidence(id=f"{art.id}:{key}", label=f"{what} of {o.subject}, as {LIBRARY_NAME}'s ProtParam computes it",
                      value=getattr(o, key), unit=o.units.get(key, ""), provenance=art.provenance,
                      basis=artifacts.basis_of(art), figure=None)
             for key, what in PROPERTIES]

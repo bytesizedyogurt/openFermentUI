@@ -38,9 +38,10 @@ class VolatilityStandIn:
     chemical boils first, `none` the chemicals with no azeotrope, `unsaid` the
     ones whose answer cannot say, `refuse` those the library lacks."""
 
-    def __init__(self, heavier=(), none=(), unsaid=(), refuse=()):
+    def __init__(self, heavier=(), none=(), unsaid=(), refuse=(), library=STANDIN):
         self.calls: list[dict] = []
         self.heavier, self.none, self.unsaid, self.refuse = set(heavier), set(none), set(unsaid), set(refuse)
+        self.library = library
 
     def __call__(self, op, args):
         assert op == "volatility", op
@@ -51,7 +52,7 @@ class VolatilityStandIn:
         if chem == "boom":
             raise WorkerError("RuntimeError: something else went wrong")
         found = None if chem in self.unsaid else chem not in self.none
-        return {"library": STANDIN, "chemical": chem, "partner": args["partner"], "P": 101325.0,
+        return {"library": self.library, "chemical": chem, "partner": args["partner"], "P": 101325.0,
                 "PSource": thermo.LIBRARY_DEFAULT, "boilingPoint": 351.0, "partnerBoilingPoint": 373.0,
                 "lighter": args["partner"] if chem in self.heavier else chem, "azeotrope": found,
                 "azeotropeMoleFraction": 0.9 if found else None, "azeotropeMassFraction": 0.95 if found else None,
@@ -289,6 +290,23 @@ def test_an_archived_program_is_refused_with_the_switch_off_and_proposed_with_it
     assert p.program == "pha" and p.train is None and [m.property for m in p.missing] == ["location"]
 
 
+def test_with_the_switch_off_a_hidden_product_or_host_is_said_hidden_before_anything_else(store, seed, worker):
+    """OF-BLD-020 §7.R: a product or host of an archived program, named with
+    the switch off, is refused as hidden, in the switch's words, whatever the
+    other names; never as two programs' train, which names the archived one."""
+    hidden = "belongs to PHA, archived \\(hidden\\)\\. Settings → Programs"
+    with pytest.raises(pureos.ProposeRefused, match=f"^product phb {hidden}"):
+        pureos.propose("phb", YEAST)
+    with pytest.raises(pureos.ProposeRefused, match=f"^host c-necator-h16 {hidden}"):
+        pureos.propose("ethanol", "c-necator-h16")
+    with pytest.raises(pureos.ProposeRefused, match="^product beta-lactoglobulin belongs to Casein, archived"):
+        pureos.propose("beta-lactoglobulin", "c-necator-h16")
+    assert worker.calls == [] and artifacts.all_artifacts() == []
+    # With the switch on, two programs are still two.
+    with pytest.raises(pureos.ProposeRefused, match="a train is one program's"):
+        pureos.propose("phb", YEAST, include_archived=True)
+
+
 def test_a_product_and_a_host_of_two_programs_are_refused(store, seed, worker):
     with pytest.raises(pureos.ProposeRefused, match="a train is one program's"):
         pureos.propose("beta-lactoglobulin", YEAST, include_archived=True)
@@ -459,6 +477,30 @@ def test_a_claim_may_cite_a_property_the_tool_returned(store, seed, worker):
     seen = SeenSet()
     seen.add(r)
     assert all(e.id in seen.evidence for e in r.evidence) and r.evidence
+
+
+def test_a_claim_that_copies_a_property_label_word_for_word_is_kept(store, seed, monkeypatch):
+    """OF-BLD-020 §7.R, finding 33: every property the tool returns is labelled
+    in words a claim may copy, so validate's digit rule keeps such a claim
+    (thermosteam's answer here carries the real worker's library words, its
+    name and version, and ProtParam's is Biopython's own)."""
+    from importlib.metadata import version
+    from types import SimpleNamespace
+
+    from openferment_core.validate import SeenSet, validate_plan
+
+    monkeypatch.setattr(proforma, "call", VolatilityStandIn(library=f"thermosteam {version('thermosteam')}"))
+    seen, evidence = SeenSet(), []
+    for product in ("ethanol", "insulin-b-chain"):
+        r = tools.run("pureos_propose", {"product": product, "host": YEAST})
+        assert r.error is None and r.evidence, r.error
+        seen.add(r)
+        evidence += r.evidence
+    assert {e.basis.tool for e in evidence} == {"volatility", "protparam"}
+    claims = [{"id": f"c{n}", "text": e.label, "recordIds": [], "support": "direct", "passages": [],
+               "evidenceIds": [e.id], "moduleRefs": []} for n, e in enumerate(evidence, start=1)]
+    out = validate_plan(claims, seen, SimpleNamespace(record=lambda rid: None))
+    assert out.reasons == [] and [c.text for c in out.claims] == [e.label for e in evidence]
 
 
 # ── the real worker ──────────────────────────────────────────────────────
