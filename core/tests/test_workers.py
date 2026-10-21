@@ -77,6 +77,34 @@ def test_serve_answers_ping_and_times_each_response():
     assert lines[2]["ok"] is False and "ms" in lines[2]
 
 
+def test_no_worker_starts_able_to_stop_in_a_debugger(monkeypatch):
+    """OF-BLD-020 §4.1: BioSTEAM 2.54.0's AeratedBioreactor answers a failure
+    of its bubble-column correlation with a bare `breakpoint()`, which would
+    open pdb on a worker's JSON channel and hang it. Every worker, the
+    Proforma worker first, starts with PYTHONBREAKPOINT=0."""
+    import subprocess
+
+    from openferment_core import workers
+
+    seen = {}
+
+    class Stop(Exception):
+        pass
+
+    def popen(args, **kwargs):
+        seen.update(args=args, env=kwargs.get("env") or {})
+        raise Stop
+
+    monkeypatch.setenv("PYTHONBREAKPOINT", "pdb.set_trace")
+    monkeypatch.setattr(subprocess, "Popen", popen)
+    w = SimWorker("openferment_core.workers.proforma_worker", timeout_s=1)
+    with pytest.raises(Stop):
+        w.ping()
+    assert seen["args"][-1] == "openferment_core.workers.proforma_worker"
+    assert seen["env"]["PYTHONBREAKPOINT"] == "0"
+    assert workers.SimWorker is SimWorker
+
+
 # Part G, rule 8: cobra in the geneOS worker alone; biosteam in the Proforma
 # worker and flowsheets/ alone. Neither exists yet; this holds the line from
 # the first import on.

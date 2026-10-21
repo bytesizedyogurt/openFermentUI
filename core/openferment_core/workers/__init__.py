@@ -80,6 +80,10 @@ class SimWorker:
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(p for p in (str(_CORE), env.get("PYTHONPATH", "")) if p)
         env["PYTHONUNBUFFERED"] = "1"
+        # No worker stops in a debugger on its JSON channel (OF-BLD-020 §4.1):
+        # BioSTEAM 2.54.0 answers one failure with a bare `breakpoint()`, and
+        # with this set it returns at once and the request fails in words.
+        env["PYTHONBREAKPOINT"] = "0"
         self._out = queue.Queue()
         self._err = collections.deque(maxlen=STDERR_LINES)
         self._proc = subprocess.Popen(

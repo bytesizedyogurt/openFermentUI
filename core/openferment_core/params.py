@@ -42,14 +42,17 @@ served; no screen writes a form for a parameter of its own.
                               boundsReason (D4); `pnpm check:seed` runs
                               `python -m openferment_core.params --check`
 
-This step registers the `proforma` provider. Its scope is
+This module registers the `proforma` provider; vessel.py registers
+`fermos-vessel` (OF-BLD-020 §4.1), imported on first need
+(`PROVIDER_MODULES`). The vessel scope's values are BioSTEAM's own defaults,
+read in the Proforma worker, so a read of it starts the worker when it is
+cold (and keeps its answer for the process's life). Its scope is
 `proforma:<scenario id>`: a seed BioSTEAM scenario, whose flowsheet
 `proforma.seed_scenarios` names, or a scenario made in a browser, which names
 its shelf flowsheet in the request. Its specs are the flowsheet's
 `FlowsheetInput`s; its values are what `proforma.bound` binds (records
 through the aggregate gate, the fermOS fits a person chose), called, never
-copied. Later steps register `fermos-family`, `fermos-vessel` and
-`pureos-unit`.
+copied. Later steps register `fermos-family` and `pureos-unit`.
 
 Rule 1 holds here: no value in this file. A bound is a convention with its
 reason written beside it (an ontology plausibility range read from
@@ -161,11 +164,26 @@ def register(kind: str, provider: Provider, static: Static | None = None) -> Non
         _STATIC[kind] = static
 
 
+# The modules that register a provider beside this one (they import this
+# module, so they are imported here on first need, never at the top):
+# fermOS's vessel (OF-BLD-020 §4.1).
+PROVIDER_MODULES = ("vessel",)
+
+
+def _load_providers() -> None:
+    from importlib import import_module
+
+    for name in PROVIDER_MODULES:
+        import_module(f"{__package__}.{name}")
+
+
 def providers() -> list[str]:
+    _load_providers()
     return list(_PROVIDERS)
 
 
 def _provided(scope: str, req: ParamResolveRequest) -> tuple[str, Provided]:
+    _load_providers()
     kind, ids = parse_scope(scope)
     provider = _PROVIDERS.get(kind)
     if provider is None:
@@ -541,6 +559,7 @@ def check() -> tuple[int, list[str]]:
     written boundsReason (D4), a known source rule, min no greater than max,
     and a key of its own in its scope. Returns the count read and the
     problems, in words."""
+    _load_providers()
     problems: list[str] = []
     n = 0
     for kind, static in _STATIC.items():
@@ -572,10 +591,15 @@ def main(argv: list[str] | None = None) -> int:
     if args != ["--check"]:
         print("usage: python -m openferment_core.params --check", file=sys.stderr)
         return 2
-    n, problems = check()
+    # Run as `python -m`, this file is `__main__`, a module apart from the
+    # `params` the provider modules register with: check through that one.
+    from importlib import import_module
+
+    module = import_module(f"{__package__}.params")
+    n, problems = module.check()
     for p in problems:
         print(f"✗ {p}")
-    print(f"  parameters        {n} declared across {', '.join(sorted(_STATIC))}; "
+    print(f"  parameters        {n} declared across {', '.join(sorted(module._STATIC))}; "
           f"{'every one has' if not problems else f'{len(problems)} problem(s), and not every one has'} a written bounds reason")
     return 1 if problems else 0
 

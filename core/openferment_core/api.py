@@ -56,6 +56,8 @@ from .models import (
     ParamResolveRequest,
     ProformaRunRequest,
     ThermoPropsRequest,
+    VesselDesign,
+    VesselRequest,
     ForecastResult,
     GeneosModelInfo,
     GeneosResult,
@@ -556,23 +558,31 @@ def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
 
 
 @app.get("/api/params/{scope:path}")
-def params_scope(scope: str, flowsheet: str | None = None, host: str | None = None, fits: str | None = None) -> dict:
+def params_scope(scope: str, flowsheet: str | None = None, host: str | None = None, fits: str | None = None,
+                 vesselType: str | None = None) -> dict:  # noqa: N803 (the wire name)
     """A scope's parameters (`ParamScope`): every spec with its bounds and
     their reason, and its value as the service binds it now, with its
     source. `proforma:<scenario id>` is a seed scenario, or with
     `?flowsheet=` a scenario made in a browser; `?host=` and `?fits=` (JSON)
     bind as `/api/proforma/bind` does. Binding only: it starts no worker,
-    integrates nothing and keeps nothing. 404 for a scope no provider here
-    knows; 422 in words for a malformed one or a refused binding."""
+    integrates nothing and keeps nothing. `fermos:vessel:<id>` (with
+    `?vesselType=`) reads its class's defaults through the Proforma worker,
+    which a read starts when it is cold (OF-BLD-020 §4.1). 404 for a scope no
+    provider here knows; 422 in words for a malformed one or a refused
+    binding; 503 when the worker cannot answer."""
     from . import params
 
-    req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits))
+    if vesselType not in (None, "stirred-tank", "bubble-column"):
+        raise HTTPException(status_code=422, detail=f"a vessel type is stirred-tank or bubble-column; {vesselType!r} is neither")
+    req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits), vesselType=vesselType)
     try:
         return params.scope(scope, req).model_dump(mode="json")
     except params.ScopeUnknown as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except params.ParamRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
 
 
 @app.post("/api/params/{scope:path}/resolve")
@@ -590,6 +600,73 @@ def params_resolve(scope: str, req: ParamResolveRequest) -> dict:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except params.ParamRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
+
+
+# ── fermOS sizes the vessel on BioSTEAM (OF-BLD-020 §4.1, D7) ──────────
+
+
+@app.get("/api/fermos/vessel/specs")
+def fermos_vessel_specs(simulation: str | None = None, fit: str | None = None,
+                        vesselType: str | None = None) -> dict:  # noqa: N803 (the wire name)
+    """The vessel scope `fermos:vessel:<simulation or fit id>` (a
+    `ParamScope`): every design parameter of Appendix 2 §C with its bounds
+    and their reason, and its value with its source: BioSTEAM's own default
+    for the class, read in the worker (which this starts when it is cold), the
+    simulation's harvest hour and oxygen uptake, or waiting for a named person
+    (plant scale or batch volume). 404 for an artifact not on file; 422 in
+    words for one no vessel is designed for; 503 when the worker cannot
+    answer."""
+    from . import artifacts, vessel
+
+    named = [x for x in (simulation, fit) if x]
+    if len(named) != 1:
+        raise HTTPException(status_code=422, detail="name one simulation (?simulation=) or one fit (?fit=)")
+    if vesselType not in (None, "stirred-tank", "bubble-column"):
+        raise HTTPException(status_code=422, detail=f"a vessel type is stirred-tank or bubble-column; {vesselType!r} is neither")
+    from . import params
+
+    try:
+        return vessel.scope(named[0], vesselType).model_dump(mode="json")
+    except params.ScopeUnknown as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except params.ParamRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
+
+
+@app.post("/api/fermos/vessel", response_model=VesselDesign)
+def fermos_vessel(req: VesselRequest) -> VesselDesign:
+    """Design the vessel a simulation (or, anaerobic only, a fit) needs, in
+    the Proforma worker on BioSTEAM: one `fermos.vessel` artifact, computed
+    or returned as kept for the same basis. 422 in words for a design that
+    cannot be made as asked (no plant scale and no batch volume, a fit asked
+    for an aerobic design, an artifact not on file, an override that cannot
+    stand, BioSTEAM's own refusal); 409 for a file damaged on disk; 503 when
+    the worker cannot answer."""
+    from . import artifacts, vessel
+
+    try:
+        return vessel.design(req)
+    except (vessel.VesselRefused, vessel.VesselNotFound) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
+
+
+@app.get("/api/fermos/vessels")
+def fermos_vessels() -> list[dict]:
+    """Every kept vessel design, newest first (`VesselSummary`): a read,
+    which starts no simulator."""
+    from . import vessel
+
+    return [v.model_dump(mode="json") for v in vessel.designs()]
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────

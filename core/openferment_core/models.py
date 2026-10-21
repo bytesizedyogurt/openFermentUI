@@ -2373,6 +2373,9 @@ class ParamResolveRequest(BaseModel):
     # The fermOS fits a person chose, by parameter key (artifact ids), as
     # ProformaRunRequest.fits carries them.
     fits: dict[str, str] = Field(default_factory=dict)
+    # fermOS's vessel scope (OF-BLD-020 §4.1): the aerated design a scope is
+    # for; None is BioSTEAM's own default design. An anaerobic design takes none.
+    vesselType: Literal["stirred-tank", "bubble-column"] | None = None
 
 
 class ParamResolveResult(BaseModel):
@@ -2386,6 +2389,158 @@ class ParamResolveResult(BaseModel):
     warnings: list[str]
     # What the scope's provider says of its values (as ParamScope.notes).
     notes: list[str] = Field(default_factory=list)
+
+
+# ── fermOS's vessel on BioSTEAM (OF-BLD-020 §4.1, D7) ──────────────────
+#
+# A vessel is designed for a kept simulation (or, anaerobic only, a kinetic
+# fit or forecast) in the Proforma worker: BioSTEAM's AeratedBioreactor or
+# NRELAnaerobicBatchBioreactor, every design parameter a ParameterValue with
+# its source, and one `fermos.vessel` artifact.
+
+
+class VesselRequest(BaseModel):
+    """POST /api/fermos/vessel. Exactly one of `simulation` and `fit`."""
+
+    # A `fermos.simulation` artifact id.
+    simulation: str | None = None
+    # A `kinetic_fit` or `growth_forecast` artifact id, read through
+    # proforma.fit_info for titre, yield and batch time: anaerobic only.
+    fit: str | None = None
+    # The aerated design; None is BioSTEAM's own default. An anaerobic
+    # design takes none.
+    vesselType: Literal["stirred-tank", "bubble-column"] | None = None
+    # A person's changes, each a named assumption (D3), scope
+    # `fermos:vessel:<simulation or fit id>`.
+    overrides: list[Override] = Field(default_factory=list)
+    includeArchived: bool = False
+
+
+class VesselDesignRow(BaseModel):
+    """One line of the design table, read from BioSTEAM's objects."""
+
+    label: str
+    value: float | str | bool | None
+    # BioSTEAM's unit for it ('m3', 'hr', 'kW', 'kJ/hr'); empty for a count or a word.
+    unit: str
+    # Where it was read: a design_results key, an auxiliary unit, an attribute.
+    readFrom: str
+
+
+class VesselOxygen(BaseModel):
+    """The oxygen balance over the batch: the simulated uptake against the
+    transfer the vessel BioSTEAM sized gives (D7)."""
+
+    # Hours, and the simulated uptake at each, in `unit`.
+    t: list[float]
+    our: list[float]
+    # The transfer while the vessel reacts: kLa times the log-mean driving
+    # force the class sizes with, in `unit`.
+    otr: float
+    unit: str
+    # [[from, to], …] hours the simulated uptake rises above `otr`.
+    short: list[list[float]]
+    # kLa achieved and what the peak would need, in `kLaUnit`; None with no aeration.
+    kLa: float | None
+    kLaNeededAtPeak: float | None
+    kLaUnit: str
+    # BioSTEAM's correlation, by its registered name ('Riet', 'Dewes').
+    method: str | None
+    aerated: bool
+    # 'peak' or 'batch-average': what the air was sized for.
+    oxygenBasis: str | None = None
+    # The uptake the air was sized for, and the one the reaction's yields
+    # balance (before the scale), per working volume, in `unit`.
+    targetUptake: float | None = None
+    sized: float | None = None
+    balancedUptake: float | None = None
+    # The factor the reaction's oxygen was scaled by.
+    scale: float
+    # Oxygen saturation at the sparged gas, the broth at θ of it, and the
+    # log-mean driving force, mmol L⁻¹.
+    cStar: float | None = None
+    cL: float | None = None
+    drivingForce: float | None = None
+    # The reaction's oxygen as its yields balance it, kmol h⁻¹.
+    reactionO2KmolPerH: float | None = None
+
+
+class VesselHeat(BaseModel):
+    """The vessel's duty, BioSTEAM's from the heats of formation, beside a
+    cross-check from the oxygen consumed at a stated convention."""
+
+    bst: float
+    convention: float | None = None
+    conventionNote: str
+    unit: str = "kJ/hr"
+
+
+class VesselCostItem(BaseModel):
+    purchase: float
+    installed: float
+
+
+class VesselCost(BaseModel):
+    """BioSTEAM's own cost correlations, read; nothing summed here."""
+
+    purchase: float
+    installed: float
+    byItem: dict[str, VesselCostItem]
+    # USD per hour.
+    utility: float
+    costIndex: float
+    # The year BioSTEAM's source says its default index is of; None when the
+    # index set is not that default.
+    costIndexYear: int | None = None
+    note: str
+
+
+class VesselDesign(BaseModel):
+    """POST /api/fermos/vessel: one `fermos.vessel` artifact, read."""
+
+    artifactId: str
+    provenance: Provenance
+    createdAt: str
+    # The simulation or fit the vessel was designed for, and its tool.
+    source: str
+    sourceTool: str
+    aerobic: bool
+    # BioSTEAM's class, and the unit id it was built under.
+    unitClass: str
+    unitId: str
+    # 'stirred-tank' or 'bubble-column' for an aerated vessel; None anaerobic.
+    vesselType: str | None = None
+    design: list[VesselDesignRow]
+    # None for an anaerobic vessel, and `oxygenNote` says so.
+    oxygen: VesselOxygen | None = None
+    oxygenNote: str | None = None
+    heat: VesselHeat
+    cost: VesselCost
+    # Every design parameter with its source (D2).
+    parameters: list[ParameterValue]
+    # What the unit held when it was simulated, read back.
+    used: dict[str, float | str | bool | None]
+    # How the broth fed per hour was found (plant scale or batch volume).
+    scale: dict[str, Any]
+    # The reaction set built from what the batch made.
+    reaction: dict[str, Any]
+    flags: list[str] = Field(default_factory=list)
+    versions: dict[str, str]
+
+
+class VesselSummary(BaseModel):
+    """GET /api/fermos/vessels: one kept `fermos.vessel` artifact."""
+
+    artifactId: str
+    provenance: Provenance
+    createdAt: str
+    source: str
+    sourceTool: str
+    unitClass: str
+    vesselType: str | None = None
+    vessels: float | None = None
+    volume: float | None = None
+    installed: float | None = None
 
 
 # Claim and AnswerPlan name Passage and Evidence, which are defined further

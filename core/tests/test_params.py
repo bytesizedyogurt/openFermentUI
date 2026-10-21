@@ -228,7 +228,10 @@ def test_a_spec_without_a_bounds_reason_or_with_an_unknown_source_is_refused():
 def test_the_check_reads_every_declared_spec_and_names_one_with_no_reason(monkeypatch, capsys):
     n, problems = params.check()
     assert problems == []
-    assert n == sum(len(info.inputs) for info in shelf.SHELF.values())
+    from openferment_core import vessel
+
+    # The shelf's inputs and fermOS's vessel declarations (OF-BLD-020 §4.1).
+    assert n == sum(len(info.inputs) for info in shelf.SHELF.values()) + sum(len(s) for _, s in vessel._static())
     assert params.main(["--check"]) == 0 and "every one has a written bounds reason" in capsys.readouterr().out
     unreasoned = ParameterSpec.model_construct(**{**spec().model_dump(), "boundsReason": " "})
     monkeypatch.setitem(params._STATIC, "fermos-family", lambda: [("a STAND-IN family", [spec(), unreasoned])])

@@ -3383,6 +3383,8 @@ export interface ParamResolveRequest {
   host?: string | null;
   /** The fermOS fits a person chose, by parameter key (artifact ids). */
   fits?: Record<string, string>;
+  /** fermOS's vessel scope (OF-BLD-020 §4.1): the aerated design; null is BioSTEAM's own default. */
+  vesselType?: 'stirred-tank' | 'bubble-column' | null;
 }
 
 export interface ParamResolveResult {
@@ -3395,4 +3397,117 @@ export interface ParamResolveResult {
   warnings: string[];
   /** What the scope's provider says of its values. */
   notes: string[];
+}
+
+// ── fermOS's vessel on BioSTEAM (OF-BLD-020 §4.1, D7) ──────────────────
+
+/** POST /api/fermos/vessel. Exactly one of `simulation` and `fit`. */
+export interface VesselRequest {
+  /** A `fermos.simulation` artifact id. */
+  simulation?: string | null;
+  /** A `kinetic_fit` or `growth_forecast` artifact id: anaerobic only. */
+  fit?: string | null;
+  /** The aerated design; null is BioSTEAM's own default. */
+  vesselType?: 'stirred-tank' | 'bubble-column' | null;
+  /** A person's changes, each a named assumption, scope `fermos:vessel:<id>`. */
+  overrides: Override[];
+  includeArchived?: boolean;
+}
+
+/** One line of the design table, read from BioSTEAM's objects. */
+export interface VesselDesignRow {
+  label: string;
+  value: number | string | boolean | null;
+  /** BioSTEAM's unit for it; empty for a count or a word. */
+  unit: string;
+  /** Where it was read: a design_results key, an auxiliary unit, an attribute. */
+  readFrom: string;
+}
+
+/** The oxygen balance over the batch: the simulated uptake against the vessel's transfer. */
+export interface VesselOxygen {
+  t: number[];
+  our: number[];
+  otr: number;
+  unit: string;
+  /** [[from, to], …] hours the simulated uptake rises above `otr`. */
+  short: number[][];
+  kLa: number | null;
+  kLaNeededAtPeak: number | null;
+  kLaUnit: string;
+  method: string | null;
+  aerated: boolean;
+  oxygenBasis: string | null;
+  targetUptake: number | null;
+  sized: number | null;
+  balancedUptake: number | null;
+  scale: number;
+  cStar: number | null;
+  cL: number | null;
+  drivingForce: number | null;
+  reactionO2KmolPerH: number | null;
+}
+
+/** BioSTEAM's duty beside a cross-check from the oxygen consumed at a stated convention. */
+export interface VesselHeat {
+  bst: number;
+  convention: number | null;
+  conventionNote: string;
+  unit: string;
+}
+
+export interface VesselCostItem {
+  purchase: number;
+  installed: number;
+}
+
+/** BioSTEAM's own cost correlations, read; nothing summed here. */
+export interface VesselCost {
+  purchase: number;
+  installed: number;
+  byItem: Record<string, VesselCostItem>;
+  /** USD per hour. */
+  utility: number;
+  costIndex: number;
+  costIndexYear: number | null;
+  note: string;
+}
+
+/** POST /api/fermos/vessel: one `fermos.vessel` artifact, read. */
+export interface VesselDesign {
+  artifactId: string;
+  provenance: Provenance;
+  createdAt: string;
+  source: string;
+  sourceTool: string;
+  aerobic: boolean;
+  unitClass: string;
+  unitId: string;
+  vesselType: string | null;
+  design: VesselDesignRow[];
+  /** null for an anaerobic vessel, and `oxygenNote` says so. */
+  oxygen: VesselOxygen | null;
+  oxygenNote: string | null;
+  heat: VesselHeat;
+  cost: VesselCost;
+  parameters: ParameterValue[];
+  used: Record<string, number | string | boolean | null>;
+  scale: Record<string, unknown>;
+  reaction: Record<string, unknown>;
+  flags: string[];
+  versions: Record<string, string>;
+}
+
+/** GET /api/fermos/vessels: one kept `fermos.vessel` artifact. */
+export interface VesselSummary {
+  artifactId: string;
+  provenance: Provenance;
+  createdAt: string;
+  source: string;
+  sourceTool: string;
+  unitClass: string;
+  vesselType: string | null;
+  vessels: number | null;
+  volume: number | null;
+  installed: number | null;
 }

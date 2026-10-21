@@ -27,6 +27,20 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 a Stream on the library's own chemicals at T and P, and its
                 density, heat capacity, viscosity, bubble and dew points;
                 thermo.py keeps it as one artifact
+    vessel_specs  what fermOS's vessel class takes and its own defaults,
+                read from BioSTEAM at import (OF-BLD-020 §4.1, E.3‴):
+                `flowsheets/vessel.py`'s `specs`
+    vessel_design one vessel designed for a simulation (OF-BLD-020 §4.1, D7):
+                `AeratedBioreactor` or `NRELAnaerobicBatchBioreactor`, built
+                afresh inside `package_defaults()`, its design, costs and the
+                oxygen balance read; vessel.py keeps it as one artifact
+
+NO WORKER STOPS IN A DEBUGGER. BioSTEAM 2.54.0's AeratedBioreactor answers a
+failure of its bubble-column correlation with a bare `breakpoint()`, which
+would open pdb on this process's JSON channel and hang it. `SimWorker` starts
+every worker with PYTHONBREAKPOINT=0, and this module also sets
+`sys.breakpointhook` to raise in words, so the request fails and the worker
+answers the next one.
 
 THE WARM WORKER KEEPS NO PLANT'S SETTINGS (OF-BLD-019 §2.R). BioSTEAM keeps
 process-wide state a plant can change: the utility prices and the plant cost
@@ -77,6 +91,15 @@ from . import serve
 from .dot_names import stable_names
 
 _BUILT: dict[str, Any] = {}
+
+
+def _no_debugger(*args: Any, **kwargs: Any) -> None:
+    raise RuntimeError("BioSTEAM reached breakpoint() inside its own code (in 2.54.0, AeratedBioreactor's bubble-column "
+                       "correlation, when it cannot read the broth's viscosity or the gas's density); the worker does not "
+                       "stop in a debugger, so this request fails")
+
+
+sys.breakpointhook = _no_debugger
 
 
 class Refused(ValueError):
@@ -768,8 +791,21 @@ def _op_benchmark(args):
         return cornstover_benchmark.run()
 
 
+def _op_vessel_specs(args):
+    from ..flowsheets import vessel
+
+    return vessel.specs(str(args.get("kind") or ""))
+
+
+def _op_vessel_design(args):
+    from ..flowsheets import vessel
+
+    return vessel.design(dict(args))
+
+
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
-            "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props}
+            "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
+            "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design}
 
 if __name__ == "__main__":
     serve(HANDLERS, name="proforma")

@@ -225,6 +225,15 @@ const PAIRS = [
   ['ParamScope', 'ParamScope'],
   ['ParamResolveRequest', 'ParamResolveRequest'],
   ['ParamResolveResult', 'ParamResolveResult'],
+  // OF-BLD-020 §4.1 — fermOS's vessel, designed by BioSTEAM in the worker.
+  ['VesselRequest', 'VesselRequest'],
+  ['VesselDesignRow', 'VesselDesignRow'],
+  ['VesselOxygen', 'VesselOxygen'],
+  ['VesselHeat', 'VesselHeat'],
+  ['VesselCostItem', 'VesselCostItem'],
+  ['VesselCost', 'VesselCost'],
+  ['VesselDesign', 'VesselDesign'],
+  ['VesselSummary', 'VesselSummary'],
 ];
 
 let compared = 0;
