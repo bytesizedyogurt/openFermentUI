@@ -89,7 +89,7 @@ id.
 
 | Tool | In | Out |
 |---|---|---|
-| `fermos_simulate` | a model family's id (`batch_v1`, `fedbatch_v1`, `chemostat_v1`; `storage_v1` with the switch on; `light_v1` refuses in words), a strain, a product and a sugar by their ids (each may be empty), `recordsByParam` (a parameter's key to the record ids that bind it, exactly those records), a kept fit's artifact id, `startFrom` (`records`, `fit` or `simulation:<artifact id>`) and `durationPreset` (`until-sugar-runs-out` or `fit-length`) | runs `fermos.simulate` as the service binds the family's parameters, keeps one `fermos.simulation` artifact and returns its evidence id (the artifact id; its value the product's titre at harvest), what bound each parameter in words and counts (never the value, which the artifact holds), the end state, the ceiling rows beside Yp/s in words, and the flags; or refuses with `fermos.simulate`'s own words (the 422's) naming each parameter that waits and the field that would bind it |
+| `fermos_simulate` | a model family's id (`batch_v1`, `fedbatch_v1`, `chemostat_v1`; `storage_v1` with the switch on; `light_v1` refuses in words), a strain, a product and a sugar by their ids (each may be empty), `recordsByParam` (a parameter's key to the record ids that bind it, exactly those records), a kept fit's artifact id, `startFrom` (`records`, `fit` or `simulation:<artifact id>`) and `durationPreset` (`until-sugar-runs-out` or `fit-length`) | runs `fermos.simulate` as the service binds the family's parameters, keeps one `fermos.simulation` artifact and returns its evidence id (the artifact id; its value the product's titre at harvest), what bound each parameter in words and counts (never the value, which the artifact holds), the end state, the ceiling rows beside Yp/s in words, and the flags (a value outside its bounds by its key alone, the value and its bounds left to the artifact; a long flag cut at a sentence or clause and said to be cut; each ending at a full stop, OF-BLD-020 §3.R); or refuses with `fermos.simulate`'s own words (the 422's) naming each parameter that waits and the field that would bind it, and, with the switch off, a start from a kept simulation, a fit or a forecast of an archived program (a storage_v1 simulation is PHA's, as is one built on it) |
 
 Offered loose, as the module tools are. Ids and words only (D13): a JSON
 number anywhere refuses the call, as for every tool, and no field of its
@@ -133,7 +133,9 @@ artifact id.
 Proforma's to a `fermos.simulation`, a `fermos.vessel` and a
 `pureos.train_run` artifact: every function that keeps one is found by the
 same call-graph walk, never listed, and no tool file but `tools/writes.py`
-reaches one. Rule 6 is E.4‴: no tool named `fermos_*` or `pureos_*` has a
+reaches one. A tool file may not reach a module by name at run time either:
+`__import__`, `importlib`, `sys.modules`, `vars()`, `globals()`, `locals()`
+or a module's `__dict__` each fail the rule (OF-BLD-020 §3.R). Rule 6 is E.4‴: no tool named `fermos_*` or `pureos_*` has a
 numeric field (`number` or `integer` anywhere in its input schema, a numeric
 `enum` or `const` included); the registry's two count fields, `k` and
 `limit`, at the top of an input stand aside, as `tools.numbers_in` lets them

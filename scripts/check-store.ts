@@ -1153,5 +1153,39 @@ await (async () => {
       /if \(!down\) refusedRef\.current\?\.\(words\)/.test(panelText) && /refusedRef\.current\?\.\(null\)/.test(panelText));
 }
 
+// OF-BLD-020 \u00a73.R (part B) \u2014 the Phase 3 review's screen findings, held by
+// the pure function and the pages' source (test_fermos_3r holds the service).
+await (async () => {
+  const fl = (await import('../src/lib/fermos')) as unknown as Record<string, any>;
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const typedAs = (key: string, value: number, by: string) => ({ scope: 'fermos:forecast:0000000000000000', key, value, low: null, high: null, by, at: '2026-10-21', note: null });
+  // (7, 11) A forecast length typed in the panel goes with its person's name.
+  const alone = typeof fl.forecastAsk === 'function' ? fl.forecastAsk([typedAs('t_end', 12, 'Alice Example')]) : null;
+  check('a forecast length typed in the panel goes with the name of the person who typed it',
+    alone?.durationH === 12 && alone?.durationBy === 'Alice Example' && alone?.changedBy === null, alone);
+  const both = typeof fl.forecastAsk === 'function' ? fl.forecastAsk([typedAs('s0', 80, 'Bob Example'), typedAs('t_end', 12, 'Alice Example')]) : null;
+  check('\u2026and a changed start and a changed length each name who typed them', both?.changedBy === 'Bob Example' && both?.durationBy === 'Alice Example', both);
+  const forecastPage = read('../src/screens/FermOSForecast.tsx');
+  check('fermOS \u2192 Forecast sends who set the length with the forecast', /durationBy: a\.durationBy/.test(forecastPage));
+  // (4, 15) A batch fit's simulation sends only what its panel shows, and waits in words.
+  check('fermOS \u2192 Forecast sends a batch fit\u2019s simulation only the overrides of the keys its panel shows',
+    /scoped\.filter\(\(o\) => shownKeys\.has\(o\.key\)\)/.test(forecastPage) && /fermosSimulate\(batchAsk, overrides\)/.test(forecastPage));
+  check('\u2026and holds Simulate from this fit while anything waits, naming it',
+    /disabled=\{busy \|\| !fit \|\| held\}/.test(forecastPage) && /data-testid="forecast-waiting"/.test(forecastPage) && /setElsewhere\(d\.waiting\.filter/.test(forecastPage));
+  // (10, 12) Every fits list carries the program switch.
+  for (const [name, path] of [['the scenario page', '../src/screens/ProformaScenario.tsx'], ['Simulate', '../src/screens/FermOSSimulate.tsx'], ['Vessel', '../src/screens/FermOSVessel.tsx']]) {
+    const text = read(path);
+    const calls = text.match(/fermosFits\([^)]*\)/g) ?? [];
+    check(`${name} asks for the fits with the program switch`, calls.length > 0 && calls.every((c) => /, showArchived, /.test(c)), calls);
+  }
+  // (14) None named stays chosen, and a store family names no product by default.
+  const simulatePage = read('../src/screens/FermOSSimulate.tsx');
+  check('fermOS \u2192 Simulate keeps None named once chosen, and names no product by default for a family whose product is a store',
+    /product === '' \? ''/.test(simulatePage) && /chosen\.states\.includes\('P'\)/.test(simulatePage) && /useState<string \| null>\(route\.query\.get\('product'\)\)/.test(simulatePage));
+  // (16) What the other values leave unread is said so, never waiting.
+  const row = read('../src/components/ParameterRow.tsx');
+  check('a parameter its other values leave unread shows as not read here, never as waiting', /case 'not-read':/.test(row) && /not read here/.test(row));
+})();
+
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

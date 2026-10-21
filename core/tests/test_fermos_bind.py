@@ -303,16 +303,19 @@ def test_yps_binds_from_a_fit_with_its_interval_and_identified_and_the_fit_comes
     # The fit comes before the records it stands in place of.
     assert v["mu_max"].origin == "fit" and not v["mu_max"].recordIds
     assert v["x0"].origin == "fit" and v["p0"].origin == "fit" and v["s0"].origin == "fit"
-    # What one batch's readings cannot pin binds as its spec says: Pmax from its record.
-    assert v["p_max"].origin == "record" and waiting == []
-    # With nothing typed the simulation rests on the fit and the records: unverified, not demo (D1).
+    # What one batch's readings cannot pin binds as the fit held it (OF-BLD-020 §3.R, finding 4): Pmax off, from
+    # the fit, ahead of its record, so a simulation from the fit is the model that was fitted.
+    assert v["p_max"].origin == "fit" and v["p_max"].value == kinetics.OFF and v["p_max"].source.id == fit_id
+    assert waiting == []
+    # With nothing typed the simulation rests on the fit alone, its held terms included (§3.R): computed, not
+    # demo (D1); a value bound to records would make it unverified, as the records-only case above is.
     r = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", fitArtifact=fit_id),
                         by_pool=pool)
-    assert r.provenance == "unverified"
+    assert r.provenance == "computed" and not [v for v in r.parameters + r.start if v.origin == "record"]
     named = {i.name: i for i in artifacts.get(r.artifactId).inputs}
     assert named["yps origin"].value == "fit" and named["yps"].source.id == fit_id
     p = by_key(r.parameters)
-    assert p["yps"].origin == "fit" and p["yps"].identified is True and p["p_max"].origin == "record"
+    assert p["yps"].origin == "fit" and p["yps"].identified is True and p["p_max"].origin == "fit"
     # The fit-length preset runs as long as the fit's run.
     v, _ = bind(pool, fit=fit_id, preset="fit-length")
     assert v["t_end"].origin == "fit" and v["t_end"].value == TIMES[-1]

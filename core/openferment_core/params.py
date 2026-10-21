@@ -167,6 +167,10 @@ class Provided(NamedTuple):
     sources: dict[str, dict[str, ParameterValue | None]]
     notes: list[str]
     basis: list[BasisInput] | None = None
+    # The keys the resolved values leave unread, each with why in words (a
+    # fed-batch's mu_set under a constant feed): such a key waits for
+    # nothing, and is served `not-read` (OF-BLD-020 §3.R, finding 16).
+    unread: Callable[[list[ParameterValue]], dict[str, str]] | None = None
 
 
 Provider = Callable[[tuple[str, ...], ParamResolveRequest], Provided]
@@ -213,12 +217,23 @@ def _provided(scope: str, req: ParamResolveRequest) -> tuple[str, Provided]:
     return kind, Provided(*provider(ids, req))
 
 
+def _not_read(got: Provided, values: list[ParameterValue]) -> list[ParameterValue]:
+    """The values with each waiting one the others leave unread served as
+    `not-read`, saying why, so a panel never marks it waiting while a run
+    would not refuse for it (OF-BLD-020 §3.R, finding 16)."""
+    if got.unread is None:
+        return values
+    unread = got.unread(values)
+    return [v.model_copy(update={"origin": "not-read", "detail": unread[v.key]})
+            if v.origin == "waiting" and v.key in unread else v for v in values]
+
+
 def scope(name: str, req: ParamResolveRequest | None = None) -> ParamScope:
     """GET /api/params/{scope}: the scope's specs and their values as the
     service binds them now, with no override (the service keeps none)."""
     req = (req or ParamResolveRequest()).model_copy(update={"overrides": []})
     kind, got = _provided(name, req)
-    values = resolve(got.specs, got.sources, [])
+    values = _not_read(got, resolve(got.specs, got.sources, []))
     return ParamScope(scope=name, kind=kind, title=got.title, specs=got.specs, values=values,
                       waiting=[v.key for v in values if v.origin == "waiting"], notes=got.notes)
 
@@ -231,7 +246,7 @@ def resolve_scope(name: str, req: ParamResolveRequest) -> ParamResolveResult:
     if stray:
         raise ParamRefused(f"an override names the scope it changes, and these were sent to {name}: {', '.join(stray)}")
     _, got = _provided(name, req)
-    values = resolve(got.specs, got.sources, req.overrides)
+    values = _not_read(got, resolve(got.specs, got.sources, req.overrides))
     added = got.basis if got.basis is not None else basis_inputs(got.specs, [v for v in values if v.overriddenBy])
     return ParamResolveResult(
         scope=name, values=values, waiting=[v.key for v in values if v.origin == "waiting"],

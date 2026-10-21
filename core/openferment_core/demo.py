@@ -455,6 +455,7 @@ def _rebuild_prototype(out: Path, real_worker: bool | None = None) -> list[Path]
         *prototype_fermos().items(),
         *bridge.items(),
         *simulate_fixtures.items(),
+        *prototype_fermos_chemostat().items(),
         *proforma_fixtures.items(),
         *prototype_ceiling_check().items(),
         *prototype_pureos().items(),
@@ -864,6 +865,43 @@ def prototype_fermos_simulate() -> tuple[dict[str, Any], list[Any]]:
                                       "simulate": {"request": request.model_dump(mode="json"),
                                                    "body": result.model_dump(mode="json")},
                                       "simulations": listed}}, [art])
+
+
+# OF-BLD-020 §3.R (finding 17): one chemostat_v1 simulation run by the real
+# kinetics.py on values a person would type (STAND-INs, named as such, not a
+# culture of anything), over an empty pool, in a scratch store: the smoke
+# answers Simulate with it once to hold the end-state card to the steady
+# state the service computed (its X, S, P and D·P). The double does not
+# serve it; nothing else reads it.
+CHEMO_TYPED = (("mu_max", 0.4), ("ks", 0.2), ("yxs", 0.15), ("alpha", 2.0), ("yps", 0.45), ("p_max", 90.0),
+               ("dilution_rate", 0.1), ("feed_conc", 20.0), ("x0", 0.5), ("s0", 10.0), ("p0", 0.0),
+               ("t_end", 400.0))
+
+
+def prototype_fermos_chemostat() -> dict[str, Any]:
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import fermos
+    from . import intake as _intake
+    from .models import Override, SimulationRequest
+
+    empty = SimpleNamespace(records=[], records_by_id={}, hidden={})
+    typed = [Override(scope=fermos.family_scope("chemostat_v1"), key=k, value=v, by="openFerment test fixture",
+                      at="2026-10-21T07:00:00Z", note=SIM_STANDIN) for k, v in CHEMO_TYPED]
+    request = SimulationRequest(family="chemostat_v1", product=SIM_PRODUCT, sugar=SIM_SUGAR, overrides=typed)
+    saved = _intake.DATA_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            with _PoolLoaded(empty):
+                result = fermos.simulate(request, by_pool=empty)
+        finally:
+            _intake.DATA_DIR = saved
+    result.basis.at = AT
+    assert result.steadyState is not None and not result.steadyState.washout, "the stand-in no longer holds a culture"
+    return {"fermos-chemostat.json": {"note": SIM_STANDIN, "request": request.model_dump(mode="json"),
+                                      "body": result.model_dump(mode="json")}}
 
 
 # OF-BLD-019 §5.1: a fermOS fit feeds the fermenter. The sample time course

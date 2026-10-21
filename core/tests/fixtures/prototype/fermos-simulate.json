@@ -2813,7 +2813,7 @@
                 "assumption"
               ],
               "note": null,
-              "boundsReason": "a physical limit: no negative rate; above the washout rate the cells wash out, which the simulation computes and shows",
+              "boundsReason": "a physical limit: above zero, since at zero nothing flows in or out and the culture is a batch, which the simulation refuses in words; past the most μ − kd reaches the cells wash out, which the simulation computes and shows",
               "choices": null,
               "convention": null
             },

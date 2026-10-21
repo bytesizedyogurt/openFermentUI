@@ -166,20 +166,41 @@ export const simulateFromFitPath = (family: string, fitId: string) =>
  * A forecast's start values and length from its scope's overrides
  * (`fermos:forecast:<fit id>`): renamed to the forecast request's fields,
  * never computed. Unset ones are the run's own; a changed start names the
- * person who typed it.
+ * person who typed it, and a changed length the person who typed that
+ * (`durationBy`, OF-BLD-020 §3.R): the service keeps each an assumption by
+ * name, and the forecast is demo.
  */
-export function forecastAsk(overrides: Override[]): { start: Partial<StartValues>; changedBy: string | null; durationH: number | null } {
+export function forecastAsk(overrides: Override[]): {
+  start: Partial<StartValues>;
+  changedBy: string | null;
+  durationH: number | null;
+  durationBy: string | null;
+} {
   const num = (key: string) => {
     const v = overrides.find((o) => o.key === key)?.value;
     return typeof v === 'number' ? v : null;
   };
   const start = { X0: num('x0'), S0: num('s0'), P0: num('p0') };
   const names = [...new Set(overrides.filter((o) => ['x0', 's0', 'p0'].includes(o.key)).map((o) => o.by.trim()))];
-  return { start, changedBy: names.length ? names.join(' and ') : null, durationH: num('t_end') };
+  const length = overrides.find((o) => o.key === 't_end' && typeof o.value === 'number');
+  return {
+    start,
+    changedBy: names.length ? names.join(' and ') : null,
+    durationH: num('t_end'),
+    durationBy: length ? length.by.trim() : null,
+  };
 }
 
 export const fermosForecast = (
-  req: { fitArtifactId?: string | null; fit?: KineticFit | null; start?: Partial<StartValues>; changedBy?: string | null; durationH?: number | null; sample?: boolean },
+  req: {
+    fitArtifactId?: string | null;
+    fit?: KineticFit | null;
+    start?: Partial<StartValues>;
+    changedBy?: string | null;
+    durationH?: number | null;
+    durationBy?: string | null;
+    sample?: boolean;
+  },
   signal?: AbortSignal,
 ) =>
   post<ForecastResult>(
@@ -190,6 +211,7 @@ export const fermosForecast = (
       start: { X0: req.start?.X0 ?? null, P0: req.start?.P0 ?? null, S0: req.start?.S0 ?? null },
       changedBy: req.changedBy ?? null,
       durationH: req.durationH ?? null,
+      durationBy: req.durationBy ?? null,
       sample: req.sample ?? false,
     },
     signal,

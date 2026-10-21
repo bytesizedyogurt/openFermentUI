@@ -18,6 +18,14 @@
 // run's own readings as filled points. Either way this screen renders no
 // number box of its own: every value comes from the service or the person.
 //
+// OF-BLD-020 §3.R (findings 4, 7, 11, 15): the service binds what the fit
+// held (Pmax off among them), so a batch fit's simulation is the model that
+// was fitted and nothing waits for a Pmax; this screen sends only the
+// overrides of the keys its panel shows, so a value typed on Simulate for the
+// family's other parameters never runs here unseen; Simulate from this fit is
+// held while anything waits, and the keys are named; a forecast's length a
+// person typed goes with that person's name (`durationBy`).
+//
 // Send to Proforma (OF-BLD-019 §5.1, D10): the fit in hand, the forecast
 // just made from it, or the simulation, goes to a Proforma scenario of the
 // active program, or to a new one made in the New scenario chooser, whose
@@ -123,6 +131,8 @@ export default function FermOSForecast() {
   const [busy, setBusy] = useState(false);
   const [scopeData, setScopeData] = useState<ParamScope | null>(null);
   const [scopeProblem, setScopeProblem] = useState<string | null>(null);
+  // What waits among the family's parameters this panel does not show (a batch fit's simulation).
+  const [elsewhere, setElsewhere] = useState<string[]>([]);
   const fit = fits[chosen];
   const model = fit?.kinetic?.model ?? LOGISTIC;
   const fitId = fit?.kineticArtifactId ?? null;
@@ -131,7 +141,12 @@ export default function FermOSForecast() {
       ? { family: model, strain: null, product: null, sugar: null, fitArtifact: fitId, startFrom: 'fit', durationPreset: FIT_LENGTH, includeArchived: showArchived }
       : null;
   const scope = !fitId ? '' : model === LOGISTIC ? forecastScope(fitId) : familyScope(model);
-  const overrides = useStore(overridesFor(scope));
+  const scoped = useStore(overridesFor(scope));
+  // A batch fit's simulation sends only the overrides of the keys its panel shows.
+  const shownKeys = new Set((scopeData?.specs ?? []).map((s) => s.key));
+  const overrides = batchAsk ? scoped.filter((o) => shownKeys.has(o.key)) : scoped;
+  const waitingShown = batchAsk ? (scopeData?.waiting ?? []).filter((k) => !overrides.some((o) => o.key === k)) : [];
+  const held = batchAsk !== null && (elsewhere.length > 0 || waitingShown.length > 0);
   const askKey = JSON.stringify(batchAsk);
 
   const seriesFor = (id: string) => {
@@ -144,6 +159,7 @@ export default function FermOSForecast() {
   useEffect(() => {
     setScopeData(null);
     setScopeProblem(null);
+    setElsewhere([]);
     setResult(null);
     setSim(null);
     if (!scope) return;
@@ -153,6 +169,7 @@ export default function FermOSForecast() {
         if (!batchAsk) return setScopeData(d);
         // A batch fit's forecast shows its family's start values and run length alone.
         const keys = new Set(d.specs.filter((s) => FORECAST_GROUPS.includes(s.group)).map((s) => s.key));
+        setElsewhere(d.waiting.filter((k) => !keys.has(k)));
         setScopeData({ ...d, specs: d.specs.filter((s) => keys.has(s.key)), values: d.values.filter((v) => keys.has(v.key)), waiting: d.waiting.filter((k) => keys.has(k)) });
       })
       .catch((e: unknown) => !ctrl.signal.aborted && setScopeProblem(problemOf(e)));
@@ -178,7 +195,7 @@ export default function FermOSForecast() {
       return;
     }
     const a = forecastAsk(overrides);
-    fermosForecast({ fitArtifactId: fitId, fit: null, start: a.start, changedBy: a.changedBy, durationH: a.durationH, sample: false })
+    fermosForecast({ fitArtifactId: fitId, fit: null, start: a.start, changedBy: a.changedBy, durationH: a.durationH, durationBy: a.durationBy, sample: false })
       .then((r) => {
         setResult(r);
         setSim(null);
@@ -231,19 +248,20 @@ export default function FermOSForecast() {
             ))}
           </select>
         </label>
-        <Button variant="primary" onClick={run} disabled={busy || !fit}>
+        <Button variant="primary" onClick={run} disabled={busy || !fit || held} data-testid="forecast-run">
           {busy ? (batchAsk ? 'Simulating…' : 'Forecasting…') : batchAsk ? 'Simulate from this fit' : 'Forecast'}
         </Button>
       </div>
       {batchAsk ? (
         <p className="text-caption text-ink-soft">
-          A {model} fit is simulated from, not drawn from its covariance: the curves are its central values, its parameters&rsquo;
-          intervals are in the fit&rsquo;s table, and what it held as conventions binds as the family&rsquo;s specs say. The start values
-          and run length below are the family&rsquo;s, started from the fit and as long as its run; the rest of its parameters are on{' '}
+          A {model} fit is simulated from, not drawn from its covariance: the curves are its central values and what it held as
+          conventions, under the start values and run length below; its parameters&rsquo; intervals are in the fit&rsquo;s table.
+          The start values and run length are the family&rsquo;s, started from the fit and as long as its run; a value typed for
+          its other parameters on{' '}
           <a className="text-accent hover:underline" href={href(simulateFromFitPath(model, fitId!))}>
             fermOS → Simulate
-          </a>
-          .
+          </a>{' '}
+          is not sent from here.
         </p>
       ) : (
         <p className="text-caption text-ink-soft">
@@ -258,6 +276,19 @@ export default function FermOSForecast() {
         </section>
       )}
       {!fitId && <p className="text-caption text-ink-soft">This fit is not kept as an artifact, so its conditions cannot be changed here.</p>}
+      {held && fitId && (
+        <p className="text-caption text-signal-warn" data-testid="forecast-waiting">
+          Simulate from this fit waits for {[...waitingShown, ...elsewhere].join(', ')}:{' '}
+          {waitingShown.length > 0 && 'type what waits below'}
+          {waitingShown.length > 0 && elsewhere.length > 0 && ', and '}
+          {elsewhere.length > 0 && (
+            <a className="text-accent hover:underline" href={href(simulateFromFitPath(model, fitId))}>
+              give the rest a source on fermOS → Simulate
+            </a>
+          )}
+          .
+        </p>
+      )}
       {problem && <Callout kind="warn">{problem}</Callout>}
       {problem && batchAsk && fitId && (
         <p className="text-caption">

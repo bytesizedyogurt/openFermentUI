@@ -76,11 +76,19 @@ each as this step's choice)
    at 0.079 h⁻¹ against a μset of 0.15 (0.151 with the whole demand).
    The `steps` profile waits: a ParameterSpec holds one number or one word,
    not a table. The feed carries sugar alone.
-6. Washout is D ≥ μ(Sf, P = 0) − kd, which is D5's μmax·Sf/(Ks + Sf) when
-   kd and Ki are off; both are reported. With kd or Ki set D5's expression
-   is optimistic (0.396 against 0.339 h⁻¹ on the spike's stand-in). The
-   steady state is solved by root-finding on S, the low-S root taken when a
-   Haldane μ crosses twice.
+6. A steady culture is the low-S root of μ(S, P(S)) = D + kd, found by
+   scanning S from 0 to Sf and refined by root-finding; with no root the
+   cells wash out. Washout is decided by that scan, never by μ at the feed's
+   sugar alone (OF-BLD-020 §3.R, finding 1): a Haldane μ can rise above
+   D + kd at low sugar while μ(Sf, P = 0) − kd is under D, and then the
+   culture and washout are both stable, which one a run reaches set by
+   where it starts (`reached`). μ(Sf, P = 0) − kd is the rate above which
+   washout is stable, and D5's μmax·Sf/(Ks + Sf) when kd and Ki are off;
+   both are reported, with the most μ − kd reaches over 0 to Sf with no
+   product (dWashoutMax: a culture needs D under it). With kd or Ki set D5's
+   expression is optimistic (0.396 against 0.339 h⁻¹ on the spike's
+   stand-in). A dilution rate of zero is refused in words: nothing flows,
+   and the culture is a batch.
 7. A feed's start and end split the integration, so LSODA never steps over
    a change of feed.
 8. storage_v1, where Appendix 2 §A is silent: Yps is the store's yield on S
@@ -102,6 +110,15 @@ each as this step's choice)
    run at rtol 1e-12. Within BALANCE_TOL, or the result carries a flag.
 10. OUR's peak is read on the solver's own steps: a display grid misses it
    (1.170 against 1.192 on the spike's stand-in).
+11. A fit keeps why each parameter it reports unidentified is so
+   (FitResult.why, UNIDENTIFIED): its interval reaches zero, it lies in the
+   Jacobian's null space, the optimizer stopped at its budget, or the run
+   has no biomass series (μmax, by rule). Every reader says the reason the
+   fit kept, never one the interval beside it contradicts (OF-BLD-020 §3.R,
+   finding 3).
+12. Pmax gates β in every family with a product, and each family's
+   equations, which fermOS → Simulate shows, write it so: β·fP with
+   fP = (1 − P/Pmax)ⁿ (OF-BLD-020 §3.R, finding 5).
 """
 from __future__ import annotations
 
@@ -114,7 +131,7 @@ from typing import Any, Callable
 import numpy as np
 import scipy
 from scipy.integrate import solve_ivp
-from scipy.optimize import brentq, least_squares
+from scipy.optimize import brentq, least_squares, minimize_scalar
 from scipy.stats import t as student_t
 
 from .models import ParameterSpec
@@ -140,6 +157,7 @@ FIT_MAX_NFEV = 200
 RANK_TOL = 1e-8
 NULL_WEIGHT = 1e-3
 FAILED_RESIDUAL = 1e6
+SETTLED_SHARE = 1e-3
 
 SETTINGS: dict[str, str] = {
     "RTOL": "the integrator's relative tolerance, as OF-BLD-020 D5 and §3.1 set it",
@@ -169,6 +187,20 @@ SETTINGS: dict[str, str] = {
     "NULL_WEIGHT": "the weight in a null direction past which a parameter is unidentified",
     "FAILED_RESIDUAL": "the residual a simulation that cannot run returns inside a fit: residuals are scaled by each "
                        "series' range, so a fit's own are of order one",
+    "SETTLED_SHARE": "the share of a chemostat's steady culture within which its integrated path counts as having "
+                     "reached it, and under which its cells count as washed out (of the culture's, or of the start's "
+                     "when no culture holds): a thousandth, as the run-out share",
+}
+
+# Why a fit reports a parameter unidentified (FitResult.why), in the order a
+# reader names them. Family.fit decides these four; fermos.family_fit adds
+# the gauge of a run with no biomass series.
+UNIDENTIFIED: dict[str, str] = {
+    "rule": "the run has no biomass series, and μmax is then unidentified by rule (OF-BLD-018 D4)",
+    "budget": "the optimizer stopped at its evaluation budget before it converged",
+    "null-space": ("it lies in the Jacobian's null space, so the run does not pin it, and its interval understates "
+                   "how far it can move"),
+    "interval": "its interval reaches zero",
 }
 
 
@@ -696,6 +728,9 @@ class FitResult:
     simulations: int
     nfev: int
     seconds: float
+    # Why each key reported unidentified is so, as UNIDENTIFIED names the
+    # reasons, in its order; an identified key is absent.
+    why: dict[str, list[str]] = field(default_factory=dict)
 
 
 class Family:
@@ -825,6 +860,7 @@ class Family:
         parameters' own units and Student's t; a parameter in the
         Jacobian's null space is unidentified. With no X series μmax is
         reported unidentified by rule (OF-BLD-018 D4), the numbers noted.
+        Each unidentified key keeps why (`why`, UNIDENTIFIED's codes).
         A key in `unbounded` keeps FIT_BOX alone, not its spec's bounds: a
         yield read against a gauge is no physical yield."""
         started = time.perf_counter()
@@ -912,29 +948,38 @@ class Family:
         cov = np.linalg.pinv(J.T @ J) * s2
         tcrit = float(student_t.ppf((1 + CONFIDENCE) / 2, dof))
         values, low, high, ident = {}, {}, {}, {}
+        why: dict[str, list[str]] = {}
+
+        def unidentified(key: str, reason: str) -> None:
+            ident[key] = False
+            if reason not in why.setdefault(key, []):
+                why[key].append(reason)
+
         notes: list[str] = []
         for k, key in enumerate(keys):
             se = math.sqrt(max(float(cov[k, k]), 0.0))
             values[key] = float(q[k])
             low[key], high[key] = float(q[k] - tcrit * se), float(q[k] + tcrit * se)
-            ident[key] = low[key] > 0
+            ident[key] = True
+            if not low[key] > 0:
+                unidentified(key, "interval")
         if rank < len(keys):
             _, _, vt = np.linalg.svd(J)
             null = vt[rank:]
             lost = [key for k, key in enumerate(keys) if np.abs(null[:, k]).max() > NULL_WEIGHT]
             for key in lost:
-                ident[key] = False
+                unidentified(key, "null-space")
             notes.append(f"The Jacobian has rank {rank} of {len(keys)}: {', '.join(lost)} lie in its null space, so "
                          "the run does not pin them; they are unidentified, and their intervals, read through the "
                          "pseudo-inverse, understate how far they can move.")
         by_numbers = dict(ident)
         if res.status == 0:
             for key in keys:
-                ident[key] = False
+                unidentified(key, "budget")
             notes.append(f"The optimizer stopped at its budget of {FIT_MAX_NFEV} evaluations before it converged, so "
                          "no parameter is reported identified.")
         if "X" not in data and "mu_max" in ident:
-            ident["mu_max"] = False
+            unidentified("mu_max", "rule")
             notes.append(f"No biomass series: μmax is reported unidentified by rule (OF-BLD-018 D4); the product and "
                          f"substrate alone gave {low['mu_max']:.4g} to {high['mu_max']:.4g} h⁻¹, because the curves' "
                          "shape carries it while the scale of the cells is free.")
@@ -951,7 +996,8 @@ class Family:
                          covariance=[[float(x) for x in row] for row in cov], rank=rank,
                          singular_values=[float(x) for x in sv], quality=quality, notes=notes,
                          start={k: float(p0[k]) for k in keys}, simulations=sims[0], nfev=int(first.nfev + res.nfev),
-                         seconds=time.perf_counter() - started)
+                         seconds=time.perf_counter() - started,
+                         why={k: sorted(v, key=list(UNIDENTIFIED).index) for k, v in why.items()})
 
 
 def _number(x: Any) -> bool:
@@ -975,8 +1021,10 @@ class BatchV1(Family):
     OUR(t) = qO2·X
 
     As built: β·X is gated by (1 − P/Pmax)ⁿ too, so no product forms at
-    Pmax; when S reaches zero the culture is starved (S held at zero, β·X and
-    m·X cut to nothing); Ki absent is the Haldane term off.
+    Pmax:
+    dP/dt = (α·μ + β·fP)·X,  fP = (1 − P/Pmax)ⁿ
+    when S reaches zero the culture is starved (S held at zero, β·X and m·X
+    cut to nothing); Ki absent is the Haldane term off.
     """
 
     id = "batch_v1"
@@ -997,14 +1045,15 @@ class FedBatchV1(Family):
 
     dX/dt = μ·X − kd·X − (F/V)·X
     μ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ
-    dP/dt = (α·μ + β)·X − (F/V)·P
-    dS/dt = (F/V)·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β)·X − m·X
+    dP/dt = (α·μ + β·fP)·X − (F/V)·P,  fP = (1 − P/Pmax)ⁿ
+    dS/dt = (F/V)·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β·fP)·X − m·X
     dV/dt = F(t)
     states X, S, P, V
     qO2 = μ/Yxo + mo
     OUR(t) = qO2·X
 
-    As built: the exponential feed pays for the whole demand at μset,
+    As built: β·X is gated by fP, so no product forms at Pmax; the
+    exponential feed pays for the whole demand at μset,
     F = (μset/Yxs + (α·μset + β)/Yps + m)·X·V/(Sf − S); the steps profile
     waits for a parameter that holds a table; the feed carries sugar alone;
     its start and end split the integration; when S reaches zero and the
@@ -1047,15 +1096,20 @@ class ChemostatV1(Family):
 
     dX/dt = μ·X − kd·X − D·X
     μ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ
-    dP/dt = (α·μ + β)·X − D·P
-    dS/dt = D·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β)·X − m·X
+    dP/dt = (α·μ + β·fP)·X − D·P,  fP = (1 − P/Pmax)ⁿ
+    dS/dt = D·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β·fP)·X − m·X
     states X, S, P
     qO2 = μ/Yxo + mo
     OUR(t) = qO2·X
 
-    As built: washout is D ≥ μ(Sf, P = 0) − kd, which is D5's expression
-    when kd and Ki are off, and both are reported; the steady state is the
-    low-S root of μ(S, P(S)) = D + kd.
+    As built: β·X is gated by fP, so no product forms at Pmax. The steady
+    culture is the low-S root of μ(S, P(S)) = D + kd, found by scanning S
+    from 0 to Sf; with no root the cells wash out, and D must be above zero
+    (with none nothing flows: a batch). μ(Sf, P = 0) − kd, which is D5's
+    expression when kd and Ki are off, is the rate above which washout is
+    stable; both are reported. A Haldane μ can rise above D + kd at low
+    sugar while μ(Sf) − kd is under D: then the culture and washout are both
+    stable, and which one a run reaches depends on where it starts.
     """
 
     id = "chemostat_v1"
@@ -1067,8 +1121,9 @@ class ChemostatV1(Family):
     def specs(self) -> list[ParameterSpec]:
         dilution = _spec("dilution_rate", "dilution rate", "D", "feed flow over working volume", "rate", "h⁻¹",
                          "Dilution", ["assumption"],
-                         reason=("a physical limit: no negative rate; above the washout rate the cells wash out, "
-                                 "which the simulation computes and shows"))
+                         reason=("a physical limit: above zero, since at zero nothing flows in or out and the "
+                                 "culture is a batch, which the simulation refuses in words; past the most μ − kd "
+                                 "reaches the cells wash out, which the simulation computes and shows"))
         return [*_growth(), *_product(), *_inhibition(), *_oxygen(), dilution, _feed_conc("Dilution"),
                 *_start(volume=False), _run_length(until_run_out=False)]
 
@@ -1076,24 +1131,56 @@ class ChemostatV1(Family):
         if t_end is None:
             raise FamilyRefused("chemostat_v1 needs a run length for its dynamic path: the sugar is fed continuously")
         super().check(v, t_end)
+        self._flowing(v)
+
+    @staticmethod
+    def _flowing(v: dict[str, Any]) -> None:
+        """A dilution rate of zero is refused in words (OF-BLD-020 §3.R,
+        finding 2): nothing flows, and the steady state would divide nothing
+        by nothing."""
+        if not v["dilution_rate"] > 0:
+            raise FamilyRefused("a chemostat needs a dilution rate above zero: at zero nothing flows in or out, so "
+                                "the culture is a batch (batch_v1 simulates one)")
 
     def washout(self, p: dict[str, Any]) -> dict[str, Any]:
-        """The dilution rate at which the cells wash out: D5's expression
-        and the general one, μ(Sf, P = 0) − kd."""
+        """The rates that decide washout: D5's expression, μmax·Sf/(Ks + Sf);
+        μ(Sf, P = 0) − kd, above which washout is a stable state
+        (`washoutStable`); and the most μ(S, P = 0) − kd reaches over S from
+        0 to Sf (`dWashoutMax`), at or above which no culture holds. With no
+        Haldane term μ rises all the way to Sf, and the last two are one.
+        Product inhibition can only lower μ, so a culture needs D under
+        dWashoutMax; whether one holds is steady_state's scan."""
         v = self._prepared(p)
-        d5 = v["mu_max"] * v["feed_conc"] / (v["ks"] + v["feed_conc"])
-        general = _mu_of(self, v, v["feed_conc"], 0.0, 0.0) - v["kd"]
-        return {"dWashoutD5": d5, "dWashout": general, "washout": v["dilution_rate"] >= general}
+        self._flowing(v)
+        sf, kd = v["feed_conc"], v["kd"]
+        d5 = v["mu_max"] * sf / (v["ks"] + sf)
+        general = _mu_of(self, v, sf, 0.0, 0.0) - kd
+
+        def neg(S: float) -> float:
+            return -_mu_of(self, v, S, 0.0, 0.0)
+
+        grid = np.linspace(0.0, sf, SCAN_POINTS)
+        mus = [-neg(float(S)) for S in grid]
+        k = int(np.argmax(mus))
+        top = mus[k]
+        if 0 < k < len(grid) - 1:
+            found = minimize_scalar(neg, bounds=(float(grid[k - 1]), float(grid[k + 1])), method="bounded",
+                                    options={"xatol": ROOT_TOL})
+            top = max(top, -float(found.fun))
+        return {"dWashoutD5": d5, "dWashout": general, "dWashoutMax": top - kd,
+                "washoutStable": v["dilution_rate"] >= general}
 
     def steady_state(self, p: dict[str, Any]) -> dict[str, Any]:
-        """X, S and P where every derivative is zero, or washout."""
+        """X, S and P where every derivative is zero: the low-S root of
+        μ(S, P(S)) = D + kd, scanned for from 0 to Sf whatever μ(Sf) says
+        (OF-BLD-020 §3.R, finding 1); with no root, washout. `bistable`: a
+        culture holds and washout is stable too (D ≥ μ(Sf, P = 0) − kd), so
+        which one a run reaches depends on where it starts (`reached`)."""
         v = self._prepared(p)
         w = self.washout(v)
         D, sf, kd = v["dilution_rate"], v["feed_conc"], v["kd"]
         out = {"washout": True, "X": 0.0, "S": sf, "P": 0.0, "dWashout": w["dWashout"], "dWashoutD5": w["dWashoutD5"],
-               "dilutionRate": D}
-        if w["washout"]:
-            return out
+               "dWashoutMax": w["dWashoutMax"], "dilutionRate": D, "bistable": False}
         mu_s = D + kd
 
         def x_of(S: float, P: float) -> tuple[float, float]:
@@ -1128,7 +1215,20 @@ class ChemostatV1(Family):
             return out
         P = p_of(root)
         X, _ = x_of(root, P)
-        return {**out, "washout": False, "X": float(X), "S": float(root), "P": float(P), "mu": mu_s}
+        return {**out, "washout": False, "X": float(X), "S": float(root), "P": float(P), "mu": mu_s,
+                "bistable": bool(w["washoutStable"])}
+
+    def reached(self, ss: dict[str, Any], traj: Trajectory) -> str | None:
+        """Which steady state the integrated path ended at: "culture" within
+        SETTLED_SHARE of the culture's cells, "washout" with its cells under
+        that share of the culture's (of its start's when no culture holds),
+        else None: on its way to one at the run's end."""
+        x_end = float(traj.y_final[_X])
+        if not ss["washout"]:
+            if abs(x_end - ss["X"]) <= SETTLED_SHARE * ss["X"]:
+                return "culture"
+            return "washout" if x_end <= SETTLED_SHARE * ss["X"] else None
+        return "washout" if x_end <= SETTLED_SHARE * max(float(traj.y0[_X]), 0.0) else None
 
 
 class StorageV1(Family):

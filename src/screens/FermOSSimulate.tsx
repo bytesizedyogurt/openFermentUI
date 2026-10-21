@@ -22,7 +22,10 @@
 //
 // THE RESULT. The time course (every state; the volume where it varies; the
 // oxygen uptake rate on the second axis), the end state (final titre, yield
-// achieved, productivity, the hour the sugar runs out), the ceiling card (Yp/s
+// achieved, productivity, the hour the sugar runs out; for a chemostat its
+// steady state too: X, S, P and D·P, or washout, whether washout is a second
+// stable state, and which one the run reached, each the service's number,
+// OF-BLD-020 §3.R findings 1 and 17), the ceiling card (Yp/s
 // beside each geneOS ceiling the service read for the strain's host models:
 // flagged when above, never clamped, D11), the parameters with their sources
 // and intervals, and the basis. From there: Fit this family to a deposition
@@ -34,7 +37,7 @@
 // the person's override; the CSVs export the artifact's own numbers. No
 // numeric control is rendered here: every parameter is the panel's (E.1‴).
 import { useEffect, useMemo, useState } from 'react';
-import type { FamilyInfo, FermosBinding, FermosFitInfo, ParameterSpec, ParameterValue, ParamScope, SimulationResult, SimulationSummary } from '@/data/types';
+import type { FamilyInfo, FermosBinding, FermosFitInfo, ParameterSpec, ParameterValue, ParamScope, SimulationResult, SimulationSummary, SteadyState } from '@/data/types';
 import { activePrograms, overridesFor, useProgramFilter, useStore } from '@/store';
 import { href, useRoute } from '@/router';
 import { Button, Callout, SectionTitle } from '@/components/ui';
@@ -160,6 +163,40 @@ function BuiltFrom({ r }: { r: SimulationResult }) {
   );
 }
 
+/** A chemostat's steady state: the service's X, S, P and D·P, or washout, in its own words. */
+function SteadyStateCard({ ss, units }: { ss: SteadyState; units: Record<string, string> }) {
+  const conc = units.P ?? units.X ?? '';
+  const rows: [string, string, number | null, string][] = [
+    ['X', 'Cells', ss.X, units.X ?? conc],
+    ['S', 'Sugar', ss.S, units.S ?? conc],
+    ['P', 'Product', ss.P, conc],
+    ['productivity', 'Productivity, D·P', ss.productivity, `${conc} h⁻¹`],
+  ];
+  return (
+    <div
+      className="mt-2 border-t border-line/60 pt-2"
+      data-testid="simulation-steady"
+      data-washout={ss.washout ? 'true' : 'false'}
+      data-bistable={ss.bistable ? 'true' : 'false'}
+      data-reached={ss.reached ?? ''}
+    >
+      <h4 className={`font-medium text-body ${ss.washout ? 'text-signal-warn' : ''}`}>
+        {ss.washout ? 'No steady culture: the cells wash out' : `At steady state, D = ${fmt(ss.dilutionRate, 4)} h⁻¹`}
+      </h4>
+      {!ss.washout && (
+        <ul className="text-body space-y-0.5">
+          {rows.map(([key, label, value, unit]) => (
+            <li key={key} data-testid="steady-value" data-key={key} data-value={value == null ? '' : String(value)}>
+              {label}: <span className="font-num">{value == null ? '—' : fmt(value, 4)}</span> {unit}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className={`text-caption mt-1 ${ss.washout || (ss.bistable && ss.reached === 'washout') ? 'text-signal-warn' : 'text-ink-soft'}`}>{ss.words}</p>
+    </div>
+  );
+}
+
 function EndState({ r }: { r: SimulationResult }) {
   const u = r.units;
   const conc = u.P ?? u.Q ?? u.X ?? '';
@@ -174,8 +211,9 @@ function EndState({ r }: { r: SimulationResult }) {
           Yield achieved: <span className="font-num" data-testid="simulation-yield">{r.yieldAchieved == null ? '—' : fmt(r.yieldAchieved, 4)}</span> g g⁻¹, product made over
           sugar used
         </li>
-        <li>
-          Productivity: <span className="font-num">{r.productivity == null ? '—' : fmt(r.productivity, 4)}</span> {conc} h⁻¹, the titre over the harvest hour
+        <li data-testid="simulation-productivity">
+          Productivity: <span className="font-num">{r.productivity == null ? '—' : fmt(r.productivity, 4)}</span> {conc} h⁻¹,{' '}
+          {r.steadyState ? "the final titre over the run's hours, a batch's measure: a chemostat's is D·P at its steady state, below" : 'the titre over the harvest hour'}
         </li>
         <li data-testid="simulation-runs-out">
           {r.sugarRunsOutH != null ? (
@@ -189,11 +227,7 @@ function EndState({ r }: { r: SimulationResult }) {
         </li>
       </ul>
       <p className={`text-caption mt-1 ${r.massBalance.ok ? 'text-ink-soft' : 'text-signal-warn'}`}>{r.massBalance.note}</p>
-      {r.steadyState && (
-        <p className={`text-caption mt-1 ${r.steadyState.washout ? 'text-signal-warn' : ''}`} data-testid="simulation-steady">
-          {r.steadyState.words}
-        </p>
-      )}
+      {r.steadyState && <SteadyStateCard ss={r.steadyState} units={u} />}
       {r.flags.map((f) => (
         <p key={f} className="text-caption text-signal-warn" data-testid="simulation-flag">
           {f}
@@ -327,7 +361,8 @@ export default function FermOSSimulate() {
   const [strain, setStrain] = useState<string>(route.query.get('strain') ?? '');
   const strains = useMemo(() => strainsAll.filter((s) => s.program && shows('strain', s.id)), [strainsAll, shows]);
   const products = useMemo(() => Object.keys(PRODUCT_WORDS).filter((p) => shows('product', p)), [shows]);
-  const [product, setProduct] = useState<string>(route.query.get('product') ?? '');
+  // null: nobody has chosen, so the family's own default; '': None named, chosen (OF-BLD-020 §3.R, finding 14).
+  const [product, setProduct] = useState<string | null>(route.query.get('product'));
   const [sugar, setSugar] = useState<string>(route.query.get('sugar') ?? 'glucose');
   const queryStart = route.query.get('start');
   const [start, setStart] = useState<Start>(queryStart === 'fit' || queryStart === 'simulation' ? queryStart : 'records');
@@ -357,7 +392,11 @@ export default function FermOSSimulate() {
 
   const runnable = (families ?? []).filter((f) => !f.socket);
   const chosen = runnable.find((f) => f.id === family) ?? runnable.find((f) => f.id === 'batch_v1') ?? runnable[0] ?? null;
-  const productChosen = product && products.includes(product) ? product : products.includes('ethanol') ? 'ethanol' : (products[0] ?? '');
+  // A family whose product is a store inside the cells (storage_v1's Q) names no product by default: a store is
+  // not a product in the broth, and None named stays chosen once a person chose it.
+  const freeProduct = !!chosen && chosen.states.includes('P');
+  const productDefault = freeProduct ? (products.includes('ethanol') ? 'ethanol' : (products[0] ?? '')) : '';
+  const productChosen = product === '' ? '' : product && products.includes(product) ? product : productDefault;
   const strainChosen = strains.some((s) => s.id === strain) ? strain : '';
   const ready = start === 'records' || (start === 'fit' && !!fit) || (start === 'simulation' && !!kept);
   const ask: SimulateAsk | null = chosen
@@ -389,7 +428,7 @@ export default function FermOSSimulate() {
             // the first one the switch shows; the fits are the same for any.
             const flowsheet = shelf.find((f) => !f.reference && (!f.program || showArchived || activePrograms().some((p) => p.id === f.program)));
             if (!flowsheet) throw new FermosRefused(422, 'No flowsheet on the shelf is of an active program, so the fits list cannot be read.');
-            return fermosFits(flowsheet.id, ctrl.signal).then((all) => setFits(all.filter((x) => x.tool !== 'fermos.simulation')));
+            return fermosFits(flowsheet.id, showArchived, ctrl.signal).then((all) => setFits(all.filter((x) => x.tool !== 'fermos.simulation')));
           })
         : fermosSimulations(showArchived, ctrl.signal).then(setSims);
     load.catch((e: unknown) => !ctrl.signal.aborted && setListProblem(problemOf(e)));

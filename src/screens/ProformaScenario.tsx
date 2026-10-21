@@ -765,16 +765,18 @@ function FermosFitSlot({
   const [fits, setFits] = useState<FermosFitInfo[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [arrived, setArrived] = useState<string | null>(null);
+  const showArchived = useStore((s) => s.showArchived);
 
   useEffect(() => {
     const ctrl = new AbortController();
     setFits(null);
     setProblem(null);
-    fermosFits(flowsheetId, ctrl.signal)
+    // The switch rides along: an archived program's simulation is not offered with it off (OF-BLD-020 §3.R).
+    fermosFits(flowsheetId, showArchived, ctrl.signal)
       .then(setFits)
       .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [flowsheetId]);
+  }, [flowsheetId, showArchived]);
 
   // A fit sent from fermOS → Forecast: attached once, for the inputs it can
   // feed, then the address loses its ?fit= so a reload attaches nothing.

@@ -182,6 +182,13 @@ export function SourceChip({ value, records }: { value: ParameterValue | null; r
           library default
         </span>
       );
+    case 'not-read':
+      // The other values leave it unread (a fed-batch's μset under a constant feed): it waits for nothing (OF-BLD-020 §3.R).
+      return (
+        <span className="chip text-ink-soft" data-testid="param-chip" data-origin="not-read">
+          not read here
+        </span>
+      );
     default:
       return (
         <span className="chip text-signal-warn" data-testid="param-chip" data-origin="waiting">

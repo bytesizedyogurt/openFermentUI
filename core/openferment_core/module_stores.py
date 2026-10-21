@@ -266,6 +266,36 @@ SIMULATION = "fermos.simulation"
 # A Proforma run: a scenario's (`proforma.run`) or a reference biorefinery's
 # (`proforma.reference`). Its program is decided by one rule (OF-BLD-019 §6.R).
 RUN_TOOLS = ("proforma.run", "proforma.reference")
+# A simulation and a vessel (OF-BLD-020 §3.R): a family belongs to a program
+# (storage_v1 is PHA's) and a simulation may start from another, or a vessel
+# rest on one, so their program is read from those as well as their inputs.
+FERMOS_RUNS = (SIMULATION, "fermos.vessel")
+
+
+def _fermos_program(a: Any, record_lookup: Any, seen: frozenset[str]) -> str | None:
+    """A simulation's or a vessel's program (OF-BLD-020 §3.R, finding 6, 12,
+    18, 19): what its inputs name (`programs.program_of_artifact`), its
+    model family's (`kinetics.FAMILIES[...].program`, so a storage_v1
+    simulation naming no strain or product is PHA's), and the program of
+    each kept simulation or vessel its basis rests on, an archived program
+    winning, so what is built on an archived simulation hides with it. A
+    file not on file or damaged adds nothing here; its own reader says so."""
+    from . import artifacts, kinetics
+
+    found = [programs.program_of_artifact(a, record_lookup)]
+    for i in getattr(a, "inputs", None) or []:
+        if i.name == "family" and isinstance(i.value, str) and i.value in kinetics.FAMILIES:
+            found.append(kinetics.FAMILIES[i.value].program)
+        src = i.source
+        if src.kind == "artifact" and src.id and src.id not in seen and src.id != getattr(a, "id", None):
+            try:
+                up = artifacts.get(src.id)
+            except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged):
+                continue
+            if up.tool in FERMOS_RUNS:
+                found.append(_fermos_program(up, record_lookup, seen | {getattr(a, "id", "")}))
+    found = [p for p in found if p]
+    return next((p for p in found if programs.is_archived(p)), found[0] if found else None)
 
 
 def artifact_program(a: Any, record_lookup: Any = None, scenarios: Iterable[dict[str, Any]] | None = None) -> str | None:
@@ -280,6 +310,8 @@ def artifact_program(a: Any, record_lookup: Any = None, scenarios: Iterable[dict
     from . import pureos
 
     tool = getattr(a, "tool", None)
+    if tool in FERMOS_RUNS:
+        return _fermos_program(a, record_lookup, frozenset())
     if tool not in RUN_TOOLS:
         return programs.program_of_artifact(a, record_lookup)
     scenarios = list(pureos.seed_scenarios() if scenarios is None else scenarios)

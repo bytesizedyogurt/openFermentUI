@@ -1281,6 +1281,14 @@ class FitParam(BaseModel):
     # includes zero, so the run cannot tell it from nothing.
     identified: bool | None = None
     indistinguishableFromZero: bool | None = None
+    # Why a kinetics family's fit reports it unidentified (OF-BLD-020 §3.R,
+    # finding 3), in the order a reader names them: the run's lack of a
+    # biomass series held X0 at a gauge it scales with ("gauge"), μmax by rule
+    # ("rule"), the optimizer's budget ("budget"), the Jacobian's null space
+    # ("null-space"), the interval reaching zero ("interval"). Left out of a
+    # parameter it does not apply to, so a logistic fit's file is unchanged.
+    unidentifiedBy: list[Literal["gauge", "rule", "budget", "null-space", "interval"]] | None = Field(
+        default=None, exclude_if=lambda v: v is None)
 
 
 class GrowthFit(BaseModel):
@@ -1353,6 +1361,9 @@ class ForecastRequest(BaseModel):
     changedBy: str | None = None
     # Hours; unset is the fitted run's own length.
     durationH: float | None = None
+    # Who set the length; a length a person set is that person's assumption
+    # (OF-BLD-020 §3.R). Unset: the one who changed a starting value, if any.
+    durationBy: str | None = None
     sample: bool = False
 
 
@@ -2263,7 +2274,11 @@ class RunbookDraft(BaseModel):
 
 # The chip a value shows: finer than BasisSource.kind, because a fit and a
 # simulation are both artifacts and a library's default is a model source.
-ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "convention", "library-default", "waiting"]
+# `not-read`: a parameter the request's other choices leave unread (a
+# fed-batch's mu_set under a constant feed), which waits for nothing
+# (OF-BLD-020 §3.R, finding 16).
+ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "convention", "library-default", "waiting",
+                      "not-read"]
 # What a scope parameterises: a fermOS model family, a vessel designed for
 # a simulation, one unit of a pureOS train, or a Proforma scenario.
 ParamScopeKind = Literal["fermos-family", "fermos-vessel", "fermos-forecast", "pureos-unit", "proforma"]
@@ -2748,6 +2763,14 @@ class SteadyState(BaseModel):
     # D·P at the steady state, g L⁻¹ h⁻¹; None at washout.
     productivity: float | None = None
     words: str
+    # OF-BLD-020 §3.R (finding 1): the most μ(S, P = 0) − kd reaches over S
+    # from 0 to Sf, at or above which no culture holds; whether a culture
+    # holds and washout is stable too (D ≥ dWashout), so a run reaches one or
+    # the other by where it starts; and which one this run's path reached
+    # by its end (None: still on its way to one).
+    dWashoutMax: float | None = None
+    bistable: bool = False
+    reached: Literal["culture", "washout"] | None = None
 
 
 class SimulationResult(BaseModel):

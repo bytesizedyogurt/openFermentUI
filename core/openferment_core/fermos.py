@@ -51,6 +51,17 @@ conventions named in the basis (no death, no maintenance, Ki and Pmax off,
 anaerobic). It keeps a `kinetic_fit` whose `model` is the family; with no
 biomass series μmax is reported unidentified (OF-BLD-018 D4).
 
+THE GAUGE (OF-BLD-020 §3.R, findings 0 and 8). With no biomass series the
+scale of the cells is free: X0, Yx/s, α and β are known only together. The
+fit holds X0 at a gauge, X0_GAUGE, named as a convention in its basis, and
+keeps it among its parameters (identified false, said a gauge), so a
+simulation started from the fit starts from it and reproduces the run. A
+person who gives the run's own X0 in its place gets Yx/s multiplied and α
+and β divided by X0 over the gauge, each one's source saying so: the sugar
+and product are the fit's, the cells the person's scale. Each parameter the
+fit reports unidentified carries why (FitParam.unidentifiedBy), and every
+reader says that reason, never one the interval beside it contradicts.
+
 BINDING (OF-BLD-020 §3.2, D6). `bind_parameters` gives each spec its value
 by its `sourceRule`, in order: the parameter of the fit a person chose (a
 `kinetic_fit` of the same family, or a `logistic_v0` fit or its forecast for
@@ -408,11 +419,52 @@ FIT_HELD = (
 # With no biomass series these scale with X0 (X → cX, Yx/s → cYx/s,
 # α → α/c, β → β/c leaves S and P unchanged when kd and m are held at zero).
 SCALED_WITH_X = ("yxs", "alpha", "beta")
+# What a simulation started from a family fit takes from it as the fit held
+# it (OF-BLD-020 §3.R, finding 4): every held term that shapes X, S or P, so
+# the simulation is the model that was fitted (with Pmax off, nothing waits
+# for one). Yx/o and mO shape only the oxygen uptake, which no fit reads.
+HELD_INTO_SIMULATION = ("kd", "maintenance", "ki_substrate", "p_max", "n_inhibition")
+# The gauge X0 is held at when a run has no biomass series (a convention the
+# fit's basis names): one gram per litre, so a gauged Yx/s, α and β read as
+# per gram of cells per litre of the gauge. Any value would do; this one
+# keeps them at the scale of a culture's own.
+X0_GAUGE = 1.0
+X0_GAUGE_NOTE = ("the gauge X0 is held at: the run has no biomass series, so the scale of the cells is free and X0, "
+                 "Yx/s, α and β are known only together; one gram per litre, not a reading (OF-BLD-020 §3.R)")
 FIT_GAUGE_NOTE = ("No biomass series: the scale of the cells is free, so X0, Yx/s, α and β are known only together; "
                   "X0 is held at one gram per litre, a gauge, not a reading.")
+# Why a family fit reports a parameter unidentified, in the order a reader
+# names them: the gauge (family_fit's), then kinetics.Family.fit's own.
+UNIDENTIFIED_WORDS = {
+    "gauge": "the run has no biomass series, so it scales with X0, which the fit held at a gauge",
+    **kinetics.UNIDENTIFIED,
+}
+X0_GAUGE_WORDS = "the run has no biomass series, so X0 is a gauge the fit held, not a reading"
+# How a binding says a fitted value was not identified; the simulation's
+# flag reads the reason back after it, from the value's own source.
+NOT_IDENTIFIED = "its run did not identify it: "
 
 
-def _held_inputs(family: str) -> list[BasisInput]:
+def unidentified_words(p: FitParam) -> str:
+    """Why a fit reports `p` unidentified, in words: the reasons the fit
+    kept (FitParam.unidentifiedBy); for a fit that kept none (a logistic
+    fit, or one kept before reasons were), its interval reaching zero when it
+    does, else that the fit gave no reason. Never a reason the interval
+    contradicts (OF-BLD-020 §3.R, finding 3)."""
+    if p.unidentifiedBy:
+        return "; ".join(X0_GAUGE_WORDS if r == "gauge" and p.name == "x0" else UNIDENTIFIED_WORDS[r]
+                         for r in p.unidentifiedBy)
+    if p.low <= 0:
+        return UNIDENTIFIED_WORDS["interval"]
+    return "the fit kept no reason (it was kept before fits did)"
+
+
+def _gauged(series: list[FermosSeries]) -> bool:
+    """A family fit's X is free of scale: no biomass series of two readings."""
+    return not any(s.role == "biomass" and len(s.points) >= 2 for s in series)
+
+
+def _held_inputs(family: str, gauged: bool = False) -> list[BasisInput]:
     specs = {s.key: s for s in kinetics.family(family).specs()}
     out = [BasisInput(name="model", value=family, unit="",
                       source=BasisSource(kind="convention", note=f"the model family fitted: {kinetics.family(family).title} "
@@ -420,11 +472,14 @@ def _held_inputs(family: str) -> list[BasisInput]:
     for key, value, why in FIT_HELD:
         out.append(BasisInput(name=key, value=value, unit=specs[key].unit if key in specs else "",
                               source=BasisSource(kind="convention", note=why)))
+    if gauged:
+        out.append(BasisInput(name="x0", value=X0_GAUGE, unit=specs["x0"].unit,
+                              source=BasisSource(kind="convention", note=X0_GAUGE_NOTE)))
     return out
 
 
 def _held_of(inputs: list[BasisInput]) -> dict[str, Any]:
-    keys = {k for k, _, _ in FIT_HELD}
+    keys = {k for k, _, _ in FIT_HELD} | {"x0"}
     return {i.name: (None if isinstance(i.value, str) else float(i.value)) for i in inputs
             if i.name in keys and i.source.kind == "convention"}
 
@@ -455,7 +510,8 @@ def _trapz(t: np.ndarray, y: np.ndarray) -> np.ndarray:
     return out
 
 
-def _batch_start(data: dict[str, tuple[np.ndarray, np.ndarray]]) -> tuple[dict[str, float], list[str]]:
+def _batch_start(data: dict[str, tuple[np.ndarray, np.ndarray]],
+                 gauge: float = X0_GAUGE) -> tuple[dict[str, float], list[str]]:
     """Where a batch_v1 fit starts: the logistic fit's own first estimates,
     read off the readings (kinetic_fit's steps 1 and 2), never its final
     curve, which starts a Monod fit far off (on test_fermos' stand-in the
@@ -467,7 +523,8 @@ def _batch_start(data: dict[str, tuple[np.ndarray, np.ndarray]]) -> tuple[dict[s
     zero has no logarithm, and starts at RUN_OUT_SHARE of the most it could
     be.
 
-    With no biomass series X0 is a gauge, one gram per litre; μmax is the
+    With no biomass series X0 is the gauge (X0_GAUGE, or the one the fit's
+    basis names); μmax is the
     rate at which the sugar's consumption grows; X is read as growing by
     e^(μmax·t) to the hour of the lowest sugar reading, in step with the sugar
     used; half the sugar used is read as going to growth and half to the
@@ -481,7 +538,7 @@ def _batch_start(data: dict[str, tuple[np.ndarray, np.ndarray]]) -> tuple[dict[s
     span = float(max(tS.max(), tP.max()))
     start: dict[str, float] = {"ks": s0 / 2, "s0": s0, "p0": p0}
     if "X" not in data:
-        x0 = 1.0
+        x0 = gauge
         notes.append(FIT_GAUGE_NOTE)
         mu = _window_rate(tS, s0 - S) or 1 / span
         t_low = float(tS[int(np.argmin(S))])
@@ -526,11 +583,12 @@ def family_fit(family: str, series: list[FermosSeries], held: dict[str, Any]) ->
     except FitRefused as e:
         return KineticFit(model=family, reason=str(e))
     data = {STATE_OF_ROLE[s.role]: _arrays(s) for s in converted}
-    start, notes = _batch_start(data)
+    gauged = "X" not in data
+    gauge = held.get("x0") if gauged and isinstance(held.get("x0"), float) else X0_GAUGE
+    start, notes = _batch_start(data, gauge)
     keys = ["mu_max", "ks", "yxs", "yps", "alpha", "beta", "x0", "s0", "p0"]
     fixed: dict[str, Any] = {k: v for k, v in held.items() if k in specs}
     fixed["v0"] = None
-    gauged = "X" not in data
     if gauged:
         # The scale of X is free: hold X0 at the gauge, so the optimizer has
         # no null direction to wander along, and report what scales with it
@@ -541,23 +599,33 @@ def family_fit(family: str, series: list[FermosSeries], held: dict[str, Any]) ->
         r = fam.fit(data, {k: start[k] for k in keys}, fixed, unbounded=SCALED_WITH_X if gauged else ())
     except kinetics.FamilyRefused as e:
         return KineticFit(model=family, reason=str(e))
+    why = {k: list(v) for k, v in r.why.items()}
     if gauged:
         for k in SCALED_WITH_X:
             r.identified[k] = False
+            why[k] = ["gauge", *(x for x in why.get(k, []) if x != "gauge")]
         notes.append("Yx/s, α and β scale with the gauge X0, so they are reported unidentified, whatever their "
                      "intervals say.")
     fparams = []
     for k in r.keys:
         fp = FitParam(name=k, value=r.values[k], low=r.low[k], high=r.high[k], unit=specs[k].unit,
-                      identified=r.identified[k])
+                      identified=r.identified[k], unidentifiedBy=why.get(k) or None)
         if k in ("alpha", "beta"):
             fp.indistinguishableFromZero = r.low[k] <= 0 <= r.high[k] or r.values[k] == 0
         fparams.append(fp)
+    covariance = r.covariance
+    if gauged:
+        # The gauge is the fit's X0, held: a parameter with no spread, so its
+        # row and column of the covariance are zero and the covariance stays
+        # the params' own, in their order.
+        fparams.append(FitParam(name="x0", value=gauge, low=gauge, high=gauge, unit=specs["x0"].unit,
+                                identified=False, unidentifiedBy=["gauge"]))
+        covariance = [[*row, 0.0] for row in r.covariance] + [[0.0] * (len(r.covariance) + 1)]
     quality = [SeriesFitQuality(measureId=s.measureId, role=s.role, r2=r.quality[STATE_OF_ROLE[s.role]]["r2"],
                                 scatter=r.quality[STATE_OF_ROLE[s.role]]["scatter"],
                                 residuals=r.quality[STATE_OF_ROLE[s.role]]["residuals"])
                for s in present if STATE_OF_ROLE[s.role] in r.quality]
-    return KineticFit(params=fparams, quality=quality, covariance=r.covariance, series=present, model=family,
+    return KineticFit(params=fparams, quality=quality, covariance=covariance, series=present, model=family,
                       notes=notes + r.notes)
 
 
@@ -582,7 +650,8 @@ def fit(deposition_id: str, series: list[FermosSeries], *, sample: bool = False,
     inputs = _inputs(deposition_id, [s for s in series if s.role])
     keep = not sample
     g_art = artifacts.compute(GROWTH, inputs, keep=keep) if bio is not None else None
-    k_art = artifacts.compute(KINETIC, inputs + ([] if family == LOGISTIC else _held_inputs(family)), keep=keep)
+    held = [] if family == LOGISTIC else _held_inputs(family, gauged=_gauged([s for s in series if s.role]))
+    k_art = artifacts.compute(KINETIC, inputs + held, keep=keep)
     growth = GrowthFit.model_validate(g_art.output) if g_art is not None else None
     kinetic = KineticFit.model_validate(k_art.output)
     return FermosFitResponse(
@@ -740,7 +809,8 @@ def forecast(fit_: KineticFit, start: StartValues | None = None, duration_h: flo
 
 
 def _forecast_inputs(fit_artifact: str | None, fit_inline: KineticFit | None, start: StartValues,
-                     changed_by: str | None, duration_h: float | None, deposition_id: str | None) -> list[BasisInput]:
+                     changed_by: str | None, duration_h: float | None, deposition_id: str | None,
+                     duration_by: str | None = None) -> list[BasisInput]:
     inputs: list[BasisInput] = []
     if fit_artifact:
         inputs.append(BasisInput(name="kinetic fit", value=fit_artifact, unit="", source=BasisSource(kind="artifact", id=fit_artifact)))
@@ -758,8 +828,15 @@ def _forecast_inputs(fit_artifact: str | None, fit_inline: KineticFit | None, st
         inputs.append(BasisInput(name=f"start {key}", value=float(v), unit="",
                                  source=BasisSource(kind="assumption", by=changed_by.strip(), note=f"{key} set on screen")))
     if duration_h is not None:
-        inputs.append(BasisInput(name="duration", value=float(duration_h), unit="h",
-                                 source=BasisSource(kind="convention", note="how long the forecast runs, as asked")))
+        # A length a person typed is that person's assumption, named, and
+        # makes the forecast demo (OF-BLD-020 §3.R, findings 7 and 11; D3,
+        # E.2‴): the person who set it (`duration_by`), else the one who
+        # changed a start value. A length nobody is named for is the caller's
+        # convention, as asked (a test, a stand-in, a fixed check).
+        who = (duration_by or changed_by or "").strip()
+        source = (BasisSource(kind="assumption", by=who, note="how long the forecast runs, set on screen") if who
+                  else BasisSource(kind="convention", note="how long the forecast runs, as asked"))
+        inputs.append(BasisInput(name="duration", value=float(duration_h), unit="h", source=source))
     return inputs
 
 
@@ -785,7 +862,8 @@ artifacts.register(FORECAST, VERSION, _run_forecast)
 
 def forecast_run(*, fit_artifact: str | None = None, fit_inline: KineticFit | None = None,
                  start: StartValues | None = None, changed_by: str | None = None,
-                 duration_h: float | None = None, sample: bool = False) -> ForecastResult:
+                 duration_h: float | None = None, sample: bool = False,
+                 duration_by: str | None = None) -> ForecastResult:
     start = start or StartValues()
     if not fit_artifact and fit_inline is None:
         raise FitRefused("name a kept kinetic fit, or send the sample run's fit inline")
@@ -810,7 +888,7 @@ def forecast_run(*, fit_artifact: str | None = None, fit_inline: KineticFit | No
         if not math.isclose(v, own.value, rel_tol=1e-9, abs_tol=1e-12):
             kept[key] = v
     start = StartValues(**kept)
-    inputs = _forecast_inputs(fit_artifact, fit_inline, start, changed_by, duration_h, None)
+    inputs = _forecast_inputs(fit_artifact, fit_inline, start, changed_by, duration_h, None, duration_by)
     check_forecastable(_fit_from(inputs))
     art = artifacts.compute(FORECAST, inputs, seed=SEED, keep=not sample)
     out = art.output
@@ -1021,7 +1099,8 @@ def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Pr
     bound as a simulation binds them (bind_parameters) from the request's
     strain, product, sugar, fit, kept simulation and run-length preset over
     the evidence pool the program switch shows; a person's overrides lie on
-    them (params.resolve)."""
+    them (params.resolve), and a person's X0 rescales a gauged fit's Yx/s,
+    α and β here as in the run (§3.R), so the panel shows what runs."""
     (fid,) = ids
     fam = kinetics.FAMILIES.get(fid)
     if fam is None:
@@ -1029,13 +1108,27 @@ def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Pr
     sim = SimulationRequest(family=fid, strain=req.strain, product=req.product, sugar=req.sugar,
                             fitArtifact=req.fit, startFrom=req.startFrom or "records",
                             durationPreset=req.durationPreset or UNTIL_RUN_OUT_PRESET,
-                            includeArchived=req.includeArchived)
+                            includeArchived=req.includeArchived, overrides=list(req.overrides))
     try:
         _check_request(sim)
         got = _bound(fam, sim, _load_pool(sim.includeArchived))
     except SimulationRefused as e:
         raise params.ParamRefused(str(e)) from None
-    return params.Provided(title=f"{fam.title} ({fam.id})", specs=got.specs, sources=got.sources, notes=got.notes)
+    return params.Provided(title=f"{fam.title} ({fam.id})", specs=got.specs, sources=got.sources, notes=got.notes,
+                           unread=lambda values: _unread_words(fam, got.specs, values))
+
+
+def _unread_words(fam: kinetics.Family, specs: list[ParameterSpec], values: list[ParameterValue]) -> dict[str, str]:
+    """The keys the family's other values leave unread (`fam.irrelevant`, as
+    `_waiting` skips them), each with why: its spec's note (§3.R, finding 16)."""
+    spec_of = {s.key: s for s in specs}
+    p: dict[str, Any] = {}
+    for v in values:
+        x = v.value
+        p[v.key] = (x if spec_of[v.key].choices else None) if isinstance(x, str) else x
+    return {k: (f"Not read with the other values as they stand, so it waits for nothing: "
+                f"{spec_of[k].note or 'this setting of the family does not read it'}")
+            for k in fam.irrelevant(p) if k in spec_of}
 
 
 def _family_static():
@@ -1058,8 +1151,8 @@ def _family_static():
 FORECAST_KEYS = (("x0", "X0", "biomass"), ("s0", "S0", "substrate"), ("p0", "P0", "product"))
 FORECAST_SCOPE_NOTES = [
     "A forecast starts from the fitted run's own values and runs its own length unless a person names others here: "
-    "a changed start value is that person's assumption, and the forecast it makes is demo; a length is named in the "
-    "forecast's basis as asked.",
+    "a changed start value or length is that person's assumption, named in the forecast's basis, and the forecast it "
+    "makes is demo.",
     "A low and a high typed here are not read: a forecast starts from one value, and its band comes from the fit.",
 ]
 
@@ -1560,6 +1653,26 @@ def _identified(p: FitParam) -> bool | None:
     return None
 
 
+def _shown(art: Any, what: str, include_archived: bool) -> None:
+    """A kept simulation, fit or forecast a request starts from, refused in
+    words when it belongs to an archived program and the switch is off
+    (OF-BLD-020 §3.R, findings 6 and 18; CLAUDE.md *Programs*): the API, the
+    panel's scope and fermos_simulate alike, as a read tool names a hidden
+    row's program. Nothing is known to be archived with no projection."""
+    if include_archived:
+        return
+    from . import module_stores, programs
+
+    try:
+        pid = module_stores.artifact_program(art)
+        if not programs.hides(pid, False):
+            return
+        p = programs.program_by_id(pid)
+    except FileNotFoundError:
+        return
+    raise SimulationRefused(f"{what} belongs to {p.name if p else pid}, archived (hidden). {programs.SWITCH}")
+
+
 def _fit_art(fit_id: str) -> Any:
     try:
         art = artifacts.get(fit_id)
@@ -1574,13 +1687,27 @@ def _fit_art(fit_id: str) -> Any:
 
 
 def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, ParameterSpec], ctx: _Context,
-                    preset: str) -> tuple[dict[str, ParameterValue], list[str]]:
+                    preset: str, include_archived: bool = False,
+                    x0: float | None = None) -> tuple[dict[str, ParameterValue], list[str]]:
     """What a chosen fit gives each parameter it carries, in the spec's unit,
-    with its interval and whether its run identified it; and what it could
-    not give, in words. A fit of another family is refused."""
+    with its interval and whether its run identified it, and why not (the
+    reason the fit kept); and what it could not give, in words. A fit of
+    another family is refused.
+
+    A forecast chosen as the fit (OF-BLD-020 §3.R, finding 13) gives what it
+    holds: the start values and length it was drawn under, each credited to
+    it with the person its basis names, and its Yp/s as kept; the rates it
+    took unchanged from the kinetic fit it rests on are credited to that fit.
+    A fit of the family's own model gives the terms it held as conventions
+    (HELD_INTO_SIMULATION) as it held them (finding 4), so a simulation
+    started from it is the model that was fitted. A fit of a run with no
+    biomass series gives its gauge as X0; `x0`, a person's X0 in its place,
+    rescales Yx/s, α and β from the gauge to that scale, each one's source
+    saying so (findings 0 and 8)."""
     from . import proforma
 
     art = _fit_art(fit_id)
+    _shown(art, f"{art.tool} {fit_id}", include_archived)
     try:
         fit_ = fit_of(art)
     except FitRefused as e:
@@ -1597,6 +1724,11 @@ def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, Paramete
                                 f"a {LOGISTIC} fit")
     dep = deposition_of(art)
     what = f"{model} {art.tool} {fit_id}" + (f", fitted to deposition {dep}" if dep else "")
+    # A forecast holds its start values and length; its rates are its fit's.
+    under = fit_artifact_of(art) if art.tool == FORECAST else None
+    rates = (f"{model} {KINETIC} {under}, which forecast {fit_id} rests on"
+             + (f", fitted to deposition {dep}" if dep else "")) if under else what
+    started = {x.name.split(" ", 1)[1]: x for x in art.inputs if x.name.startswith("start ")} if under else {}
     roles = series_by_role(fit_)
     notes: list[str] = []
     out: dict[str, ParameterValue] = {}
@@ -1618,13 +1750,51 @@ def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, Paramete
             notes.append(f"Fit {fit_id} gives {specs[key].symbol or key} in {p.unit}, which does not convert into "
                          f"{specs[key].unit or 'a number'}, so it does not bind {key}.")
             continue
+        symbol = specs[key].symbol or key
+        if name in started:
+            # The value the forecast was drawn from, a person's assumption in
+            # its basis: credited to the forecast, with the person named.
+            x = started[name]
+            who = f", set by {x.source.by}" if x.source.by else ""
+            note = f"{symbol} forecast {fit_id} started from{who} (an assumption in its basis)"
+            out[key] = ParameterValue(key=key, value=float(x.value) * k, low=float(x.value) * k, high=float(x.value) * k,
+                                      identified=None, origin="fit", source=BasisSource(kind="artifact", id=fit_id,
+                                                                                        note=note), detail=note)
+            continue
         identified = _identified(p)
-        said = ("" if identified is not False else "; its run did not identify it: the interval reaches zero")
+        said = "" if identified is not False else f"; {NOT_IDENTIFIED}{unidentified_words(p)}"
         out[key] = ParameterValue(
             key=key, value=p.value * k, low=p.low * k, high=p.high * k, identified=identified, origin="fit",
-            source=BasisSource(kind="artifact", id=fit_id,
-                               note=f"{specs[key].symbol or key} of {what}, with its 95 % interval{said}"),
-            detail=f"{specs[key].symbol or key} of {what}{said}")
+            source=BasisSource(kind="artifact", id=under or fit_id,
+                               note=f"{symbol} of {rates}, with its 95 % interval{said}"),
+            detail=f"{symbol} of {rates}{said}")
+    gauge = None
+    if model == fam.id and "x0" in specs and "biomass" not in roles:
+        gp = param(fit_, "x0")
+        gauge = gp.value if gp is not None else X0_GAUGE
+        if gp is None:
+            # A fit kept before it carried its gauge: family_fit held X0 at
+            # X0_GAUGE, the only gauge it has held.
+            note = (f"X0 of {what}, held at the gauge family_fit holds, {_g(gauge)} {G_L} (the fit was kept before "
+                    f"it carried it); {NOT_IDENTIFIED}{X0_GAUGE_WORDS}")
+            out["x0"] = ParameterValue(key="x0", value=gauge, low=gauge, high=gauge, identified=False, origin="fit",
+                                       source=BasisSource(kind="artifact", id=fit_id, note=note), detail=note)
+    if gauge and x0 is not None and x0 != gauge:
+        c = x0 / gauge
+        for key in SCALED_WITH_X:
+            v = out.get(key)
+            if v is None:
+                continue
+            k = c if key == "yxs" else 1 / c
+            how = (f"rescaled from the fit's gauge X0 of {_g(gauge)} {G_L} to the X0 a person gave, {_g(x0)} {G_L} "
+                   f"(× {_g(k)})")
+            out[key] = v.model_copy(update={
+                "value": v.value * k, "low": v.low * k if v.low is not None else None,
+                "high": v.high * k if v.high is not None else None, "detail": f"{v.detail}; {how}",
+                "source": v.source.model_copy(update={"note": f"{v.source.note}; {how}"})})
+        notes.append(f"Fit {fit_id} has no biomass series, so it held X0 at a gauge of {_g(gauge)} {G_L}; a person "
+                     f"gave X0 as {_g(x0)} {G_L}, so Yx/s is multiplied and α and β divided by {_g(c)} to that scale: "
+                     "the sugar and product simulated are the fit's, the cells the person's scale (OF-BLD-020 §3.R).")
     if model == LOGISTIC and "yps" in specs:
         flowsheet = next((f for f, made in proforma.PRODUCTS.items() if made == ctx.product), None)
         if flowsheet is None:
@@ -1645,7 +1815,14 @@ def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, Paramete
                     high=feed.high * k if feed.high is not None else None, identified=True, origin="fit",
                     source=BasisSource(kind="artifact", id=fit_id, note=f"Yp/s of {what}: {feed.derivation}"),
                     detail=f"Yp/s of {what}: {feed.derivation}")
-    if preset == FIT_LENGTH and "t_end" in specs:
+    ran = _named(art.inputs, "duration") if under else None
+    if preset == FIT_LENGTH and "t_end" in specs and ran is not None:
+        # The length the forecast was drawn over, as its basis names it.
+        who = f", set by {ran.source.by}" if ran.source.by else ", as asked"
+        note = f"the length forecast {fit_id} ran{who}"
+        out["t_end"] = ParameterValue(key="t_end", value=float(ran.value), origin="fit",
+                                      source=BasisSource(kind="artifact", id=fit_id, note=note), detail=note)
+    elif preset == FIT_LENGTH and "t_end" in specs:
         hours = [pt.t for sr in fit_.series for pt in sr.points]
         if hours and max(hours) > 0:
             out["t_end"] = ParameterValue(
@@ -1655,18 +1832,32 @@ def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, Paramete
         else:
             notes.append(f"Fit {fit_id} holds no reading after its start, so it gives no run length.")
     if model == fam.id:
-        held = ", ".join(k for k, _, _ in FIT_HELD)
-        notes.append(f"Fit {fit_id} held what one batch's readings cannot pin as conventions ({held}); a simulation "
-                     "binds those as their specs say, from the records, a person or the spec's convention, not as the "
-                     "fit held them.")
+        held = {i.name: i for i in art.inputs if i.source.kind == "convention"}
+        for key in HELD_INTO_SIMULATION:
+            i = held.get(key)
+            if i is None or key not in specs or "fit" not in specs[key].sourceRule:
+                continue
+            note = f"{specs[key].symbol or key} as {what} held it, a convention of the fit: {i.source.note}"
+            value = i.value if isinstance(i.value, str) else float(i.value)
+            out[key] = ParameterValue(key=key, value=value, low=None if isinstance(value, str) else value,
+                                      high=None if isinstance(value, str) else value, identified=None, origin="fit",
+                                      source=BasisSource(kind="artifact", id=fit_id, note=note), detail=note)
+        rest = ", ".join(k for k, _, _ in FIT_HELD if k not in HELD_INTO_SIMULATION)
+        notes.append(f"Fit {fit_id} held what one batch's readings cannot pin as conventions; a simulation from it "
+                     f"takes {', '.join(HELD_INTO_SIMULATION)} as the fit held them, so it is the model that was "
+                     f"fitted, and a person's override still wins. {rest} shape no state the fit read, so they bind "
+                     "as their specs say.")
     return out, notes
 
 
-def _simulation_candidates(sim_id: str, specs: dict[str, ParameterSpec]) -> tuple[dict[str, ParameterValue], list[str]]:
+def _simulation_candidates(sim_id: str, specs: dict[str, ParameterSpec],
+                           include_archived: bool = False) -> tuple[dict[str, ParameterValue], list[str]]:
     """A kept simulation's values for the keys this family shares with it:
     each one it took from a fit, the records, another simulation or a named
-    person (a convention binds here as its spec says)."""
+    person (a convention binds here as its spec says). One of an archived
+    program is refused with the switch off (§3.R, findings 6 and 18)."""
     art = kept_simulation(sim_id)
+    _shown(art, f"kept simulation {sim_id}", include_archived)
     fid = _named(art.inputs, "family")
     other = kinetics.family(str(fid.value)) if fid else None
     if other is None:
@@ -1681,6 +1872,16 @@ def _simulation_candidates(sim_id: str, specs: dict[str, ParameterSpec]) -> tupl
                                     source=BasisSource(kind="artifact", id=sim_id, note=note), detail=note)
     return out, [f"Starting from kept simulation {sim_id} ({other.id}): its values bind where no fit or record "
                  "does, before a person's (D6)."]
+
+
+def _persons_x0(fam: kinetics.Family, req: SimulationRequest) -> float | None:
+    """The X0 a person gave in this request's overrides of the family's
+    scope, when it is a number above zero: what a gauged fit's Yx/s, α and β
+    are rescaled to (§3.R). Anything else rescales nothing, and the
+    override's own check refuses it where it cannot stand."""
+    scope = family_scope(fam.id)
+    x = next((o.value for o in req.overrides if o.key == "x0" and o.scope == scope), None)
+    return float(x) if kinetics._finite(x) and x > 0 else None
 
 
 class _Binding:
@@ -1704,12 +1905,13 @@ def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any) -> _Binding:
         notes.append(fam.refusal())
     fits: dict[str, ParameterValue] = {}
     if req.fitArtifact:
-        fits, said = _fit_candidates(req.fitArtifact, fam, by_key, ctx, req.durationPreset)
+        fits, said = _fit_candidates(req.fitArtifact, fam, by_key, ctx, req.durationPreset, req.includeArchived,
+                                     _persons_x0(fam, req))
         notes += said
     start = req.startFrom or "records"
     kept: dict[str, ParameterValue] = {}
     if start.startswith(SIM_PREFIX):
-        kept, said = _simulation_candidates(start[len(SIM_PREFIX):], by_key)
+        kept, said = _simulation_candidates(start[len(SIM_PREFIX):], by_key, req.includeArchived)
         notes += said
     named = dict(req.recordsByParam or {})
     stray = [k for k in named if k not in by_key]
@@ -1982,6 +2184,53 @@ def _ceiling_block(inputs: list[BasisInput], yps: float | None, achieved: float 
                              flagged=any(r.above for r in rows), empty=empty, computeAt=compute_at)
 
 
+def _why_unidentified(v: ParameterValue) -> str:
+    """Why a value bound to a fit is unidentified, as its own source says it
+    (the binding wrote the fit's reason after NOT_IDENTIFIED): read from the
+    basis alone, as a simulation reads everything."""
+    said = (v.detail or "").partition(NOT_IDENTIFIED)[2]
+    return said or "its source gives no reason"
+
+
+def _steady_state(fam: kinetics.ChemostatV1, p: dict[str, Any], traj: kinetics.Trajectory) -> SteadyState:
+    """chemostat_v1's steady state with the service's numbers in its words
+    (OF-BLD-020 §3.R, findings 1 and 17): the culture's X, S, P and D·P, or
+    washout; whether washout is a second stable state; which one this run's
+    path reached by its end. A steady state the solver cannot find is a
+    refusal in words, never a 500 (finding 2)."""
+    try:
+        ss = fam.steady_state(p)
+    except kinetics.FamilyRefused:
+        raise
+    except (ValueError, FloatingPointError, ZeroDivisionError, OverflowError) as e:
+        raise SimulationRefused(f"the chemostat's steady state cannot be solved for these parameters: {e}") from None
+    reached = fam.reached(ss, traj)
+    D, d5, dmax = ss["dilutionRate"], ss["dWashoutD5"], ss["dWashoutMax"]
+    rates = (f"μ(Sf) − kd is {_g(ss['dWashout'])} h⁻¹, D5's μmax·Sf/(Ks + Sf) reads {_g(d5)}, and the most μ − kd "
+             f"reaches over 0 to Sf with no product is {_g(dmax)}")
+    if ss["washout"]:
+        prod = None
+        words = (f"No steady culture at D = {_g(D)} h⁻¹: μ(S, P) − kd stays under D at every sugar from 0 to Sf, so "
+                 f"the cells wash out ({rates}). "
+                 + ("This run's path washed out by its end." if reached == "washout"
+                    else "This run's path had not washed out by its end."))
+    else:
+        prod = D * ss["P"]
+        words = (f"Steady state at D = {_g(D)} h⁻¹: X {_g(ss['X'])}, S {_g(ss['S'])} and P {_g(ss['P'])} {G_L}; its "
+                 f"productivity, D·P, is {_g(prod)} {G_L} h⁻¹. ")
+        if ss["bistable"]:
+            words += (f"Washout is a second stable state: μ(Sf) − kd is at or under D while μ − kd rises above it at "
+                      f"low sugar ({rates}), so a run reaches one or the other by where it starts. ")
+        else:
+            words += f"D is under the washout rate ({rates}). "
+        words += {"culture": "This run's path reached it by its end.",
+                  "washout": "This run's path washed out instead.",
+                  None: "This run's path had not reached it by its end."}[reached]
+    return SteadyState(washout=ss["washout"], dilutionRate=D, dWashout=ss["dWashout"], dWashoutD5=d5, X=ss["X"],
+                       S=ss["S"], P=ss["P"], productivity=prod, words=words, dWashoutMax=dmax,
+                       bistable=ss["bistable"], reached=reached)
+
+
 def _harvest_hour(fam: kinetics.Family, traj: kinetics.Trajectory) -> float:
     """A batch is harvested the hour its sugar runs out; a fed culture, and
     a batch whose sugar does not run out in its run, at the run's end."""
@@ -2014,8 +2263,8 @@ def _run_simulation(inputs, seed):
                                "parameters do not hold together")
               + ". The check catches a wrong rate law, not the integrator's error, which the tests hold."))
     flags = [v.outOfBounds for v in values if v.outOfBounds]
-    flags += [f"{v.key} is bound to fit {v.source.id if v.source else ''}, whose run did not identify it: its interval "
-              "reaches zero" for v in values if v.origin == "fit" and v.identified is False]
+    flags += [f"{v.key} is bound to fit {v.source.id if v.source else ''}, whose run did not identify it: "
+              f"{_why_unidentified(v)}" for v in values if v.origin == "fit" and v.identified is False]
     if not ok:
         flags.append(f"The mass balance does not close: {mb['closure']:.2g} against {kinetics.BALANCE_TOL:.0%}.")
     if traj.runout_h is None and fam.id in ("batch_v1", "storage_v1"):
@@ -2027,20 +2276,15 @@ def _run_simulation(inputs, seed):
     steady = None
     notes = list(traj.notes)
     if isinstance(fam, kinetics.ChemostatV1):
-        ss = fam.steady_state(p)
-        prod = None if ss["washout"] else ss["dilutionRate"] * ss["P"]
-        words = (f"Washout: D = {ss['dilutionRate']:.4g} h⁻¹ is at or above the washout rate, "
-                 f"{ss['dWashout']:.4g} h⁻¹ (μ(Sf) − kd; D5's μmax·Sf/(Ks + Sf) reads {ss['dWashoutD5']:.4g}), so the "
-                 "cells wash out." if ss["washout"] else
-                 f"Steady state at D = {ss['dilutionRate']:.4g} h⁻¹, under the washout rate {ss['dWashout']:.4g} h⁻¹ "
-                 f"(μ(Sf) − kd; D5's μmax·Sf/(Ks + Sf) reads {ss['dWashoutD5']:.4g}). Its productivity is D·P.")
-        steady = SteadyState(washout=ss["washout"], dilutionRate=ss["dilutionRate"], dWashout=ss["dWashout"],
-                             dWashoutD5=ss["dWashoutD5"], X=ss["X"], S=ss["S"], P=ss["P"], productivity=prod,
-                             words=words)
-        if ss["washout"]:
-            flags.append("The dilution rate is at or above the washout rate: the cells wash out.")
-        notes.append("A chemostat's productivity is D·P at its steady state (steadyState.productivity); the "
-                     "productivity above is the final titre over the run's hours, as for a batch.")
+        steady = _steady_state(fam, p, traj)
+        if steady.washout:
+            flags.append("No steady culture holds at this dilution rate: the cells wash out.")
+        elif steady.bistable and steady.reached == "washout":
+            flags.append("This run's cells washed out, though a steady culture holds at this dilution rate from "
+                         "another start: washout is a second stable state.")
+        notes.append("A chemostat's productivity is D·P at its steady state, given with the steady state; the end "
+                     "state's productivity is the final titre over the run's hours, a batch's measure, not a "
+                     "chemostat's.")
     if isinstance(fam, kinetics.StorageV1):
         notes.append("Q starts at zero, said so (Appendix 2 §A names no starting store).")
         if (p.get("kd") or 0) > 0:
@@ -2078,6 +2322,10 @@ def kept_simulation(key: Any) -> Any:
             art = artifacts.get(key)
         except artifacts.ArtifactNotFound:
             raise SimulationRefused(f"there is no kept simulation {key}") from None
+        except artifacts.ArtifactDamaged as e:
+            # OF-BLD-020 §3.R (finding 9): in words, as a damaged fit is
+            # (_fit_art), never a bare 500 on bind or simulate.
+            raise SimulationRefused(f"kept simulation {key} cannot be read: {e}") from None
     else:
         art = key
     if art.tool != SIMULATION:

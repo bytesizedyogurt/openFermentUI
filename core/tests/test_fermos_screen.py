@@ -201,11 +201,13 @@ def test_a_forecast_scope_takes_the_runs_own_units_and_refuses_what_is_not_a_log
 def test_a_forecast_from_the_panels_values_names_the_person_as_it_did_before(store):
     # The Forecast tab sends the scope's overrides as the forecast's start
     # values and length (src/lib/fermos.ts forecastAsk); the service keeps
-    # them as it always has: a changed start an assumption by name, the
-    # length a convention as asked.
+    # a changed start an assumption by name, and the length one too, by the
+    # person who set it, else the one who changed a start (OF-BLD-020 §3.R,
+    # findings 7 and 11; test_fermos_3r holds the length alone).
     fit = _logistic_fit(store)
     fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId,
                              start=fermos.StartValues(S0=80.0), changed_by=BY, duration_h=40.0)
     names = {i.name: i for i in artifacts.get(fc.artifactId).inputs}
     assert names["start S0"].source.kind == "assumption" and names["start S0"].source.by == BY
     assert names["duration"].value == 40.0 and fc.evidence.provenance == "demo"
+    assert names["duration"].source.kind == "assumption" and names["duration"].source.by == BY

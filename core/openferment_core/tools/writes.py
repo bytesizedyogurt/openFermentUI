@@ -472,6 +472,28 @@ def _simulation_evidence(r: Any) -> Any:
                     basis=r.basis, figure="trajectory")
 
 
+def _summary_flags(r: Any) -> list[str]:
+    """The simulation's flags as the summary says them (OF-BLD-020 §3.R,
+    finding 20): a value outside its bounds by its key alone, never the
+    value or its ends, which the artifact holds with the bounds and their
+    reason; any other flag whole, or cut at a sentence or clause under
+    MAX_FLAG_CHARS and said to be cut; each ending at a full stop."""
+    outside = {v.outOfBounds: v.key for v in [*r.parameters, *r.start] if v.outOfBounds}
+    out = []
+    for f in r.flags:
+        if f in outside:
+            f = (f"{outside[f]} lies outside its bounds; it is kept as given, and the artifact holds the value, its "
+                 "bounds and their reason")
+        elif len(f) > MAX_FLAG_CHARS:
+            head = f[:MAX_FLAG_CHARS]
+            at = max(head.rfind(". "), head.rfind("; "))
+            head = head[:at] if at > 0 else head[:head.rfind(" ")]
+            f = head.rstrip(" ,;:.") + " (cut here; the artifact holds the whole flag)"
+        f = f.rstrip()
+        out.append(f if f.endswith(".") else f"{f}.")
+    return out
+
+
 def _sig(x: Any) -> Any:
     """A number of the end state to four significant digits, for the summary
     alone; the artifact holds every number whole."""
@@ -513,7 +535,7 @@ def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResu
         r = fermos.simulate(req, by_pool=ctx.pool)
     except fermos.SimulationRefused as e:
         waits = f" {SIM_WAITS}" if "cannot run yet" in str(e) else ""
-        return ToolResult(error=f"{tool} refused: {e}.{waits}")
+        return ToolResult(error=f"{tool} refused: {str(e).rstrip('.')}.{waits}")
     ev = _simulation_evidence(r)
     _audit(ctx, "fermos", "simulate", "open", family, {"artifactId": r.artifactId, "evidenceId": ev.id, "tool": tool,
                                                        "strain": r.strain, "product": r.product, "sugar": r.sugar,
@@ -546,7 +568,7 @@ def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResu
             "ceiling": ({"rows": [{"modelId": c.modelId, "above": c.above, "words": c.words} for c in ceiling.rows],
                          "flagged": ceiling.flagged, "empty": ceiling.empty} if ceiling else None),
             "massBalanceCloses": r.massBalance.ok,
-            "flags": [f[:MAX_FLAG_CHARS] for f in r.flags],
+            "flags": _summary_flags(r),
             "meaning": "the family ran as the service binds it and is kept as one simulation artifact in the open lane, "
                        "marked as the model's in the audit log; each parameter says what bound it, and its value is in "
                        "the artifact. Its numbers are read from the artifact, never stated: cite the simulation by the "

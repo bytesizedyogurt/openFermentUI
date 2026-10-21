@@ -2534,6 +2534,28 @@ async function main() {
       await page.locator('[data-testid="simulation-result"] [data-testid="send-to-proforma"] button').first().click();
       const to = await page.locator('[data-testid="send-to-proforma-scenario"]').first().getAttribute('data-to', { timeout: 3000 }).catch(() => null);
       if (to !== `/proforma/scenario/sc-yeast-1?fit=${result.artifactId}`) problems.push(`Send to Proforma offers ${to}`);
+      // §3.R (findings 1, 17): a chemostat's end-state card shows its steady
+      // state, the service's X, S, P and D·P, and says the run-hours
+      // productivity is a batch's measure; no note points at a field name.
+      // kinetics.py's own chemostat simulation (fermos-chemostat.json, which
+      // demo.py --prototype writes) answers Simulate once.
+      const chemo = fixture('fermos-chemostat.json').body;
+      await page.route('**/api/fermos/simulate', (route) => route.fulfill({ json: chemo }));
+      await page.locator('[data-testid="simulate-button"]').click();
+      await page.locator(`[data-testid="simulation-result"][data-artifact="${chemo.artifactId}"]`).waitFor({ timeout: 8000 }).catch(() => {});
+      const steady = page.locator('[data-testid="simulation-steady"]');
+      if ((await steady.getAttribute('data-washout').catch(() => null)) !== String(chemo.steadyState.washout) || (await steady.getAttribute('data-reached').catch(() => null)) !== chemo.steadyState.reached)
+        problems.push("a chemostat's end-state card does not show its steady state as the service found it");
+      const shownSteady = Object.fromEntries(
+        await steady.locator('[data-testid="steady-value"]').evaluateAll((els) => els.map((e) => [e.getAttribute('data-key'), Number(e.getAttribute('data-value'))])),
+      );
+      for (const k of ['X', 'S', 'P', 'productivity'])
+        if (shownSteady[k] !== chemo.steadyState[k]) problems.push(`the steady state's ${k} on the card is ${shownSteady[k]}, not the service's ${chemo.steadyState[k]}`);
+      if (!(await steady.innerText().catch(() => '')).includes(chemo.steadyState.words)) problems.push("the steady state's words are not on the card");
+      if (!/a batch's measure/.test(await page.locator('[data-testid="simulation-productivity"]').innerText().catch(() => '')))
+        problems.push("a chemostat's run-hours productivity is not said to be a batch's measure");
+      if ((await page.locator('[data-testid="simulation-result"]').innerText().catch(() => '')).includes('steadyState.')) problems.push('a note on the page names a field instead of a number');
+      await page.unroute('**/api/fermos/simulate');
       // Reset one override: it waits again, and Simulate says so.
       await row('p0').locator('[data-testid="param-reset"]').click();
       await page.locator('[data-testid="simulate-waiting"][data-keys="p0"]').waitFor({ timeout: 8000 }).catch(() => {});
@@ -2556,7 +2578,7 @@ async function main() {
       simulateFails++;
       console.log(`✗ simulate     ${problems.join('; ')}`);
     } else {
-      console.log("✓ simulate     fermOS → Simulate offers the service's families with their equations and the light socket not choosable; every strain of the program first; the panel binds as the service does and what waits is said above a disabled Simulate; the waiting values typed are assumptions by the reviewer, Simulate posts them signed, and the time course, the end state, the ceiling card, the parameters and what it was built from are the artifact's; Design the vessel, Fit this family and Send to Proforma point at it; it is offered to start from; a reset override waits again");
+      console.log("✓ simulate     fermOS → Simulate offers the service's families with their equations and the light socket not choosable; every strain of the program first; the panel binds as the service does and what waits is said above a disabled Simulate; the waiting values typed are assumptions by the reviewer, Simulate posts them signed, and the time course, the end state, the ceiling card, the parameters and what it was built from are the artifact's; Design the vessel, Fit this family and Send to Proforma point at it; a chemostat's card shows the service's steady state, X, S, P and D·P, and calls the run-hours productivity a batch's measure; it is offered to start from; a reset override waits again");
     }
     await page.close();
   }

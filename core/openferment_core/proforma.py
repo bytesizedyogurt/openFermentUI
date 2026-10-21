@@ -1573,6 +1573,14 @@ def _simulation_info(art, out, declared: dict, product: str, flowsheet: str, ref
     if isinstance(fam, kinetics.ChemostatV1):
         return refuse_all(f"it simulates a chemostat ({sim.family}), which runs continuously and has no batch: "
                           f"{flowsheet} takes a batch's titre, yield and batch time")
+    # OF-BLD-020 §3.R (finding 14): the titre a flowsheet takes is a product
+    # in the broth (the family's P); a store inside the cells (storage_v1's
+    # Q) is not one, whatever product the simulation names.
+    state = fam.product_state() if fam is not None else None
+    if state != "P":
+        kept = (f"a store inside the cells ({state}), not a product in the broth" if state else "no product state")
+        return refuse_all(f"it simulates {sim.family}, whose product is {kept}: {flowsheet} takes the titre of "
+                          f"{product} in the broth")
     if sim.product and sim.product != product:
         return refuse_all(f"it simulates {sim.product}, not {product}, the product of {flowsheet}")
     if not sim.product:
@@ -1613,15 +1621,25 @@ def _simulation_info(art, out, declared: dict, product: str, flowsheet: str, ref
     return out
 
 
-def fermos_fits(flowsheet: str) -> list:
+def fermos_fits(flowsheet: str, include_archived: bool = False) -> list:
     """GET /api/fermos/fits: every kinetic fit and forecast fermOS keeps,
     and every simulation (OF-BLD-020 §3.3), newest first, each with what it
-    can feed `flowsheet` and why not. A read: it keeps nothing and starts no
-    simulator."""
-    from . import artifacts, fermos
+    can feed `flowsheet` and why not; one of an archived program (a storage_v1
+    simulation, one bound to an archived program's records or started from
+    one, `module_stores.artifact_program`) left out unless asked (§3.R,
+    findings 10 and 12). A read: it keeps nothing and starts no simulator."""
+    from . import artifacts, fermos, module_stores, programs
 
     runnable(flowsheet)
-    return [fit_info(a, flowsheet) for a in artifacts.all_artifacts() if a.tool in fermos.FEEDS_PROFORMA]
+
+    def hidden(a) -> bool:
+        try:
+            return programs.hides(module_stores.artifact_program(a), include_archived)
+        except FileNotFoundError:  # no projection here: nothing is known to be archived
+            return False
+
+    return [fit_info(a, flowsheet) for a in artifacts.all_artifacts()
+            if a.tool in fermos.FEEDS_PROFORMA and not hidden(a)]
 
 
 def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:

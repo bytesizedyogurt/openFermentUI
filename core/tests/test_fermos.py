@@ -304,7 +304,8 @@ def test_a_product_and_substrate_only_batch_v1_fit_reports_mu_unidentified(store
     k = out.kinetic
     assert out.growth is None and out.growthArtifactId is None and k.model == BATCH and k.reason is None
     got = {p.name: p for p in k.params}
-    assert got["mu_max"].identified is False and "x0" not in got
+    # §3.R (findings 0, 8): the gauge X0 is the fit's, held and said so.
+    assert got["mu_max"].identified is False and got["x0"].identified is False
     assert all(got[n].identified is False for n in fermos.SCALED_WITH_X)
     assert any("μmax is reported unidentified by rule" in n for n in k.notes)
     assert any("gauge" in n for n in k.notes)
@@ -427,3 +428,142 @@ def test_the_family_endpoints_and_the_simulation_endpoints(store):
     kept = c.get("/api/fermos/simulations").json()
     assert [k["artifactId"] for k in kept] == [ok.json()["artifactId"]] and kept[0]["provenance"] == "demo"
     assert c.post("/api/fermos/simulate", json=body, headers={"Origin": "https://evil.example"}).status_code == 403
+
+
+# ── §3.R: a fit's gauge travels with it; a chemostat's steady state ────
+#
+# STAND-INs, chosen here: none is a measurement or a result.
+
+CHEMO = "chemostat_v1"
+# A person names a Pmax far above any titre these runs reach: the fit held
+# Pmax off, and Pmax has no convention to fall back on.
+STANDIN_PMAX_FAR = 1.0e6
+STANDIN_CHEMOSTAT_TYPED = dict(mu_max=0.40, ks=0.20, yxs=0.15, alpha=2.0, yps=0.45, p_max=90.0, dilution_rate=0.1,
+                               feed_conc=20.0, x0=0.5, s0=10.0, p0=0.0, t_end=400.0)
+# The reviewer's Haldane case (test_kinetics' STANDIN_HALDANE): μ(Sf) − kd
+# under D, μ's peak above it.
+STANDIN_HALDANE_TYPED = dict(mu_max=0.5, ks=0.5, yxs=0.5, alpha=0.1, yps=0.45, p_max=90.0, ki_substrate=2.0,
+                             dilution_rate=0.15, feed_conc=50.0, x0=20.0, s0=1.0, p0=0.0, t_end=400.0)
+STANDIN_HALDANE_NEAR_WASHOUT = dict(x0=0.1, s0=50.0)
+
+
+def typed_for(family, **values):
+    return [Override(scope=f"fermos:family:{family}", key=k, value=v, by=BY, at="2026-10-21",
+                     note="a STAND-IN for a test") for k, v in values.items()]
+
+
+def test_a_gauged_fit_carries_its_x0_and_a_persons_x0_rescales_what_scales_with_it(store, monkeypatch):
+    """§3.R findings 0 and 8: a batch_v1 fit of substrate and product alone
+    held X0 at a gauge and kept no X0, so a simulation from it asked a person
+    for X0 and integrated the gauge-scaled Yx/s, α and β with the person's:
+    the sugar ran out at 11.88 h against the run's 7.92. The gauge is now the
+    fit's X0 (identified false, said a gauge) and a convention in its basis;
+    a simulation from the fit starts from it, and a person's X0 rescales
+    Yx/s, α and β to its scale, named in each one's source. Finding 3: each
+    flag says why its parameter is unidentified, never "the interval reaches
+    zero" for a reason the interval contradicts."""
+    readings = synthetic_batch(monkeypatch, ("substrate", "product"))
+    out = fermos.fit("dep-gauge", readings, family=BATCH)
+    fit_id = out.kineticArtifactId
+    got = {p.name: p for p in out.kinetic.params}
+    gauge = got["x0"]
+    assert gauge.value == gauge.low == gauge.high == fermos.X0_GAUGE and gauge.identified is False
+    assert gauge.unidentifiedBy == ["gauge"]
+    assert all("gauge" in got[k].unidentifiedBy for k in fermos.SCALED_WITH_X)
+    assert "rule" in got["mu_max"].unidentifiedBy and got["mu_max"].low > 0
+    assert len(out.kinetic.covariance) == len(out.kinetic.params), "the covariance stays the params' own"
+    held = {i.name: i for i in artifacts.get(fit_id).inputs if i.source.kind == "convention"}
+    assert held["x0"].value == fermos.X0_GAUGE and "gauge" in held["x0"].source.note
+    assert artifacts.replay(fit_id).identical
+
+    truth = kinetics.FAMILIES[BATCH].simulate(STANDIN_BATCH, STANDIN_BATCH_START, None)
+
+    def run(preset="until-sugar-runs-out", **over):
+        return fermos.simulate(SimulationRequest(family=BATCH, fitArtifact=fit_id, startFrom="fit",
+                                                 durationPreset=preset,
+                                                 overrides=typed(p_max=STANDIN_PMAX_FAR, **over)))
+
+    from_fit = run()
+    x0 = {p.key: p for p in from_fit.start}["x0"]
+    assert x0.origin == "fit" and x0.value == fermos.X0_GAUGE and "gauge" in x0.detail
+    assert from_fit.sugarRunsOutH == pytest.approx(truth.runout_h, rel=0.01)
+    person = run(x0=STANDIN_BATCH_START["X"])
+    assert person.sugarRunsOutH == pytest.approx(truth.runout_h, rel=0.01), "the harvest hour was 50 % late"
+    assert person.productivity == pytest.approx(from_fit.productivity, rel=1e-3)
+    assert person.end["X"] == pytest.approx(float(truth.y_final[kinetics.IX["X"]]), rel=0.01)
+    p = {v.key: v for v in person.parameters}
+    c = STANDIN_BATCH_START["X"] / fermos.X0_GAUGE
+    assert p["yxs"].value == pytest.approx(got["yxs"].value * c, rel=1e-12)
+    for k in ("alpha", "beta"):
+        assert p[k].value == pytest.approx(got[k].value / c, rel=1e-12), k
+    for k in fermos.SCALED_WITH_X:
+        assert p[k].origin == "fit" and "rescaled" in p[k].detail and "gauge" in p[k].detail, k
+        assert p[k].source.id == fit_id
+    # Finding 3: the flags say why, and never a reason the interval contradicts.
+    flags = {f.split(" ", 1)[0]: f for f in person.flags if " is bound to fit " in f}
+    assert "no biomass series" in flags["mu_max"] and "reaches zero" not in flags["mu_max"]
+    assert "gauge" in flags["yxs"] and "reaches zero" not in flags["yxs"]
+    assert "reaches zero" not in p["mu_max"].detail
+    # The panel binds as the run does: a person's X0 in the resolve rescales the fit's Yx/s there too.
+    from openferment_core import params
+    from openferment_core.models import ParamResolveRequest
+
+    panel = params.resolve_scope(SCOPE, ParamResolveRequest(fit=fit_id, startFrom="fit", overrides=typed(
+        p_max=STANDIN_PMAX_FAR, x0=STANDIN_BATCH_START["X"])))
+    shown = {v.key: v for v in panel.values}
+    assert shown["yxs"].value == pytest.approx(p["yxs"].value, rel=1e-12) and "rescaled" in shown["yxs"].detail
+    assert shown["x0"].origin == "assumption" and panel.waiting == []
+    plain = {v.key: v for v in params.scope(SCOPE, ParamResolveRequest(fit=fit_id, startFrom="fit")).values}
+    assert plain["x0"].origin == "fit" and plain["yxs"].value == pytest.approx(got["yxs"].value, rel=1e-12)
+    # Finding 8: from the fit, with the fit's length, the run's own readings come back, whichever X0.
+    last = {s.role: s.points[-1].value for s in readings}
+    scatter = {q.role: q.scatter for q in out.kinetic.quality}
+    for over in ({}, {"x0": STANDIN_BATCH_START["X"]}):
+        r = run("fit-length", **over)
+        for role, state in (("substrate", "S"), ("product", "P")):
+            assert abs(r.end[state] - last[role]) <= 3 * scatter[role] + 1e-6, (over, role, r.end[state], last[role])
+
+
+def test_a_chemostat_with_no_dilution_is_a_422_in_words(store):
+    """§3.R finding 2: D = 0 answered 500 (NaN into brentq)."""
+    from fastapi.testclient import TestClient
+
+    from openferment_core import api
+
+    c = TestClient(api.app, base_url="http://127.0.0.1", raise_server_exceptions=False)
+    still = typed_for(CHEMO, **{**STANDIN_CHEMOSTAT_TYPED, "dilution_rate": 0.0})
+    r = c.post("/api/fermos/simulate", json={"family": CHEMO, "overrides": [o.model_dump(mode="json") for o in still]})
+    assert r.status_code == 422 and "dilution rate above zero" in r.json()["detail"], (r.status_code, r.text[:200])
+
+
+def test_a_chemostats_steady_state_is_kept_with_its_values_and_a_haldane_culture_is_found(store):
+    """§3.R findings 1 and 17: the steady state's X, S, P and D·P are the
+    service's numbers, written into its words, and no note points at a
+    productivity "above" that the card never shows; a Haldane μ that rises
+    above D at low sugar holds a culture though μ(Sf) − kd is under D, and
+    the result says washout is a second stable state and which one this run
+    reached."""
+    r = fermos.simulate(SimulationRequest(family=CHEMO, overrides=typed_for(CHEMO, **STANDIN_CHEMOSTAT_TYPED)))
+    ss = r.steadyState
+    assert ss is not None and ss.washout is False and ss.bistable is False and ss.reached == "culture"
+    assert ss.productivity == pytest.approx(ss.dilutionRate * ss.P, rel=1e-12)
+    for x in (ss.X, ss.S, ss.P, ss.productivity, ss.dilutionRate):
+        assert f"{x:.4g}" in ss.words, (x, ss.words)
+    assert not any("above" in n and "productivity" in n.lower() for n in r.notes), r.notes
+    assert any("final titre over the run" in n for n in r.notes)
+    h = fermos.simulate(SimulationRequest(family=CHEMO, overrides=typed_for(CHEMO, **STANDIN_HALDANE_TYPED)))
+    hs = h.steadyState
+    assert hs.washout is False and hs.bistable is True and hs.reached == "culture", hs
+    assert hs.dWashout < hs.dilutionRate < hs.dWashoutMax and hs.X > 0 and hs.productivity > 0
+    assert h.end["X"] == pytest.approx(hs.X, rel=1e-6) and "second stable state" in hs.words
+    assert not any("wash out" in f for f in h.flags), h.flags
+    w = fermos.simulate(SimulationRequest(family=CHEMO, overrides=typed_for(
+        CHEMO, **{**STANDIN_HALDANE_TYPED, **STANDIN_HALDANE_NEAR_WASHOUT})))
+    ws = w.steadyState
+    assert ws.washout is False and ws.bistable is True and ws.reached == "washout" and w.end["X"] < 1e-6
+    assert any("washed out" in f for f in w.flags), w.flags
+    # Above μ's peak no culture holds: washout, and the words say μ − kd stays under D.
+    gone = fermos.simulate(SimulationRequest(family=CHEMO, overrides=typed_for(
+        CHEMO, **{**STANDIN_HALDANE_TYPED, "dilution_rate": 0.3})))
+    assert gone.steadyState.washout is True and gone.steadyState.productivity is None
+    assert any("wash out" in f for f in gone.flags)

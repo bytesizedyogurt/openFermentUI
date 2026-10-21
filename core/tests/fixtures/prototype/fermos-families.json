@@ -6,7 +6,7 @@
         "id": "batch_v1",
         "title": "Batch",
         "what": "A batch culture: sugar and cells at the start, nothing added, run until the sugar runs out.",
-        "equations": "batch_v1 — a batch culture: Monod growth with substrate (Haldane) and\nproduct inhibition, Luedeking–Piret product, Pirt maintenance.\n\ndX/dt = μ·X − kd·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β)·X\ndS/dt = −(1/Yxs)·μ·X − (1/Yps)·dP/dt − m·X\nstates X, S, P; optional kd, Ki, m (zero when absent, said so)\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: β·X is gated by (1 − P/Pmax)ⁿ too, so no product forms at\nPmax; when S reaches zero the culture is starved (S held at zero, β·X and\nm·X cut to nothing); Ki absent is the Haldane term off.",
+        "equations": "batch_v1 — a batch culture: Monod growth with substrate (Haldane) and\nproduct inhibition, Luedeking–Piret product, Pirt maintenance.\n\ndX/dt = μ·X − kd·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β)·X\ndS/dt = −(1/Yxs)·μ·X − (1/Yps)·dP/dt − m·X\nstates X, S, P; optional kd, Ki, m (zero when absent, said so)\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: β·X is gated by (1 − P/Pmax)ⁿ too, so no product forms at\nPmax:\ndP/dt = (α·μ + β·fP)·X,  fP = (1 − P/Pmax)ⁿ\nwhen S reaches zero the culture is starved (S held at zero, β·X and m·X\ncut to nothing); Ki absent is the Haldane term off.",
         "states": [
           "X",
           "S",
@@ -447,7 +447,7 @@
         "id": "fedbatch_v1",
         "title": "Fed-batch",
         "what": "A batch fed sugar over the run, at a constant rate or one that holds a set growth rate.",
-        "equations": "fedbatch_v1 — batch_v1 with a feed: adds V with dV/dt = F(t), feed\nconcentration Sf, profile constant | exponential (set μ_set,\nF = μ_set·X·V/(Yxs·(Sf − S))) | steps (a table), dilution terms on every\nstate.\n\ndX/dt = μ·X − kd·X − (F/V)·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β)·X − (F/V)·P\ndS/dt = (F/V)·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β)·X − m·X\ndV/dt = F(t)\nstates X, S, P, V\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: the exponential feed pays for the whole demand at μset,\nF = (μset/Yxs + (α·μset + β)/Yps + m)·X·V/(Sf − S); the steps profile\nwaits for a parameter that holds a table; the feed carries sugar alone;\nits start and end split the integration; when S reaches zero and the\nfeed brings less than β·X/Yps + m·X, those terms are cut to the supply.",
+        "equations": "fedbatch_v1 — batch_v1 with a feed: adds V with dV/dt = F(t), feed\nconcentration Sf, profile constant | exponential (set μ_set,\nF = μ_set·X·V/(Yxs·(Sf − S))) | steps (a table), dilution terms on every\nstate.\n\ndX/dt = μ·X − kd·X − (F/V)·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β·fP)·X − (F/V)·P,  fP = (1 − P/Pmax)ⁿ\ndS/dt = (F/V)·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β·fP)·X − m·X\ndV/dt = F(t)\nstates X, S, P, V\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: β·X is gated by fP, so no product forms at Pmax; the\nexponential feed pays for the whole demand at μset,\nF = (μset/Yxs + (α·μset + β)/Yps + m)·X·V/(Sf − S); the steps profile\nwaits for a parameter that holds a table; the feed carries sugar alone;\nits start and end split the integration; when S reaches zero and the\nfeed brings less than β·X/Yps + m·X, those terms are cut to the supply.",
         "states": [
           "X",
           "S",
@@ -1021,7 +1021,7 @@
         "id": "chemostat_v1",
         "title": "Chemostat",
         "what": "A continuous culture: fresh medium in and broth out at one dilution rate, toward a steady state.",
-        "equations": "chemostat_v1 — continuous culture: dilution D on every state, feed\nSf, steady state solved and the dynamic path integrated; washout reported\nwhen D ≥ μmax·Sf/(Ks + Sf).\n\ndX/dt = μ·X − kd·X − D·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β)·X − D·P\ndS/dt = D·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β)·X − m·X\nstates X, S, P\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: washout is D ≥ μ(Sf, P = 0) − kd, which is D5's expression\nwhen kd and Ki are off, and both are reported; the steady state is the\nlow-S root of μ(S, P(S)) = D + kd.",
+        "equations": "chemostat_v1 — continuous culture: dilution D on every state, feed\nSf, steady state solved and the dynamic path integrated; washout reported\nwhen D ≥ μmax·Sf/(Ks + Sf).\n\ndX/dt = μ·X − kd·X − D·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β·fP)·X − D·P,  fP = (1 − P/Pmax)ⁿ\ndS/dt = D·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β·fP)·X − m·X\nstates X, S, P\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: β·X is gated by fP, so no product forms at Pmax. The steady\nculture is the low-S root of μ(S, P(S)) = D + kd, found by scanning S\nfrom 0 to Sf; with no root the cells wash out, and D must be above zero\n(with none nothing flows: a batch). μ(Sf, P = 0) − kd, which is D5's\nexpression when kd and Ki are off, is the rate above which washout is\nstable; both are reported. A Haldane μ can rise above D + kd at low\nsugar while μ(Sf) − kd is under D: then the culture and washout are both\nstable, and which one a run reaches depends on where it starts.",
         "states": [
           "X",
           "S",
@@ -1353,7 +1353,7 @@
               "assumption"
             ],
             "note": null,
-            "boundsReason": "a physical limit: no negative rate; above the washout rate the cells wash out, which the simulation computes and shows",
+            "boundsReason": "a physical limit: above zero, since at zero nothing flows in or out and the culture is a batch, which the simulation refuses in words; past the most μ − kd reaches the cells wash out, which the simulation computes and shows",
             "choices": null,
             "convention": null
           },
@@ -1606,7 +1606,7 @@
         "id": "batch_v1",
         "title": "Batch",
         "what": "A batch culture: sugar and cells at the start, nothing added, run until the sugar runs out.",
-        "equations": "batch_v1 — a batch culture: Monod growth with substrate (Haldane) and\nproduct inhibition, Luedeking–Piret product, Pirt maintenance.\n\ndX/dt = μ·X − kd·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β)·X\ndS/dt = −(1/Yxs)·μ·X − (1/Yps)·dP/dt − m·X\nstates X, S, P; optional kd, Ki, m (zero when absent, said so)\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: β·X is gated by (1 − P/Pmax)ⁿ too, so no product forms at\nPmax; when S reaches zero the culture is starved (S held at zero, β·X and\nm·X cut to nothing); Ki absent is the Haldane term off.",
+        "equations": "batch_v1 — a batch culture: Monod growth with substrate (Haldane) and\nproduct inhibition, Luedeking–Piret product, Pirt maintenance.\n\ndX/dt = μ·X − kd·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β)·X\ndS/dt = −(1/Yxs)·μ·X − (1/Yps)·dP/dt − m·X\nstates X, S, P; optional kd, Ki, m (zero when absent, said so)\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: β·X is gated by (1 − P/Pmax)ⁿ too, so no product forms at\nPmax:\ndP/dt = (α·μ + β·fP)·X,  fP = (1 − P/Pmax)ⁿ\nwhen S reaches zero the culture is starved (S held at zero, β·X and m·X\ncut to nothing); Ki absent is the Haldane term off.",
         "states": [
           "X",
           "S",
@@ -2047,7 +2047,7 @@
         "id": "fedbatch_v1",
         "title": "Fed-batch",
         "what": "A batch fed sugar over the run, at a constant rate or one that holds a set growth rate.",
-        "equations": "fedbatch_v1 — batch_v1 with a feed: adds V with dV/dt = F(t), feed\nconcentration Sf, profile constant | exponential (set μ_set,\nF = μ_set·X·V/(Yxs·(Sf − S))) | steps (a table), dilution terms on every\nstate.\n\ndX/dt = μ·X − kd·X − (F/V)·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β)·X − (F/V)·P\ndS/dt = (F/V)·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β)·X − m·X\ndV/dt = F(t)\nstates X, S, P, V\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: the exponential feed pays for the whole demand at μset,\nF = (μset/Yxs + (α·μset + β)/Yps + m)·X·V/(Sf − S); the steps profile\nwaits for a parameter that holds a table; the feed carries sugar alone;\nits start and end split the integration; when S reaches zero and the\nfeed brings less than β·X/Yps + m·X, those terms are cut to the supply.",
+        "equations": "fedbatch_v1 — batch_v1 with a feed: adds V with dV/dt = F(t), feed\nconcentration Sf, profile constant | exponential (set μ_set,\nF = μ_set·X·V/(Yxs·(Sf − S))) | steps (a table), dilution terms on every\nstate.\n\ndX/dt = μ·X − kd·X − (F/V)·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β·fP)·X − (F/V)·P,  fP = (1 − P/Pmax)ⁿ\ndS/dt = (F/V)·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β·fP)·X − m·X\ndV/dt = F(t)\nstates X, S, P, V\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: β·X is gated by fP, so no product forms at Pmax; the\nexponential feed pays for the whole demand at μset,\nF = (μset/Yxs + (α·μset + β)/Yps + m)·X·V/(Sf − S); the steps profile\nwaits for a parameter that holds a table; the feed carries sugar alone;\nits start and end split the integration; when S reaches zero and the\nfeed brings less than β·X/Yps + m·X, those terms are cut to the supply.",
         "states": [
           "X",
           "S",
@@ -2621,7 +2621,7 @@
         "id": "chemostat_v1",
         "title": "Chemostat",
         "what": "A continuous culture: fresh medium in and broth out at one dilution rate, toward a steady state.",
-        "equations": "chemostat_v1 — continuous culture: dilution D on every state, feed\nSf, steady state solved and the dynamic path integrated; washout reported\nwhen D ≥ μmax·Sf/(Ks + Sf).\n\ndX/dt = μ·X − kd·X − D·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β)·X − D·P\ndS/dt = D·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β)·X − m·X\nstates X, S, P\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: washout is D ≥ μ(Sf, P = 0) − kd, which is D5's expression\nwhen kd and Ki are off, and both are reported; the steady state is the\nlow-S root of μ(S, P(S)) = D + kd.",
+        "equations": "chemostat_v1 — continuous culture: dilution D on every state, feed\nSf, steady state solved and the dynamic path integrated; washout reported\nwhen D ≥ μmax·Sf/(Ks + Sf).\n\ndX/dt = μ·X − kd·X − D·X\nμ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · (1 − P/Pmax)ⁿ\ndP/dt = (α·μ + β·fP)·X − D·P,  fP = (1 − P/Pmax)ⁿ\ndS/dt = D·(Sf − S) − (1/Yxs)·μ·X − (1/Yps)·(α·μ + β·fP)·X − m·X\nstates X, S, P\nqO2 = μ/Yxo + mo\nOUR(t) = qO2·X\n\nAs built: β·X is gated by fP, so no product forms at Pmax. The steady\nculture is the low-S root of μ(S, P(S)) = D + kd, found by scanning S\nfrom 0 to Sf; with no root the cells wash out, and D must be above zero\n(with none nothing flows: a batch). μ(Sf, P = 0) − kd, which is D5's\nexpression when kd and Ki are off, is the rate above which washout is\nstable; both are reported. A Haldane μ can rise above D + kd at low\nsugar while μ(Sf) − kd is under D: then the culture and washout are both\nstable, and which one a run reaches depends on where it starts.",
         "states": [
           "X",
           "S",
@@ -2953,7 +2953,7 @@
               "assumption"
             ],
             "note": null,
-            "boundsReason": "a physical limit: no negative rate; above the washout rate the cells wash out, which the simulation computes and shows",
+            "boundsReason": "a physical limit: above zero, since at zero nothing flows in or out and the culture is a batch, which the simulation refuses in words; past the most μ − kd reaches the cells wash out, which the simulation computes and shows",
             "choices": null,
             "convention": null
           },

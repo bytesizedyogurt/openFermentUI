@@ -449,10 +449,16 @@ export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
 // artifact: the browser shows them and keeps which artifact a person chose
 // for which input (`proformaFits`, Durable), and computes no value.
 
-/** Every kinetic fit and forecast fermOS keeps, with what it can feed `flowsheet`: `GET /api/fermos/fits`. */
-export async function fermosFits(flowsheet: string, signal?: AbortSignal): Promise<FermosFitInfo[]> {
+/**
+ * Every kinetic fit, forecast and simulation fermOS keeps, with what it can feed `flowsheet`: `GET /api/fermos/fits`.
+ * The program switch rides along (OF-BLD-020 §3.R): one of an archived program is left out unless it is on.
+ */
+export async function fermosFits(flowsheet: string, includeArchived: boolean, signal?: AbortSignal): Promise<FermosFitInfo[]> {
   try {
-    return await call<FermosFitInfo[]>(`/api/fermos/fits?flowsheet=${encodeURIComponent(flowsheet)}`, { signal });
+    return await call<FermosFitInfo[]>(
+      `/api/fermos/fits?flowsheet=${encodeURIComponent(flowsheet)}&includeArchived=${includeArchived ? 'true' : 'false'}`,
+      { signal },
+    );
   } catch (e) {
     if (!noEndpoint(e)) throw e;
     throw new RagRefused(404, 'This service has no fermOS fit list, so it cannot offer a fit to this scenario yet.');

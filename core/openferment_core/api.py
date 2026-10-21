@@ -346,7 +346,8 @@ def fermos_forecast(req: ForecastRequest) -> ForecastResult:
     parameter the run did not identify, and what run would."""
     try:
         return fermos.forecast_run(fit_artifact=req.fitArtifactId, fit_inline=req.fit if req.sample else None,
-                                   start=req.start, changed_by=req.changedBy, duration_h=req.durationH, sample=req.sample)
+                                   start=req.start, changed_by=req.changedBy, duration_h=req.durationH, sample=req.sample,
+                                   duration_by=req.durationBy)
     except fermos.FitRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -429,16 +430,17 @@ def fermos_simulations(includeArchived: bool = False) -> list[dict]:  # noqa: N8
 
 
 @app.get("/api/fermos/fits")
-def fermos_fits(flowsheet: str) -> list[dict]:
+def fermos_fits(flowsheet: str, includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
     """The kinetic fits, forecasts and simulations fermOS keeps (a
     simulation since OF-BLD-020 §3.3), newest first, each with what it can
     feed a shelf flowsheet's titre, yield and productivity and why not
-    (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
+    (OF-BLD-019 §5.1, D10); one of an archived program left out unless
+    `?includeArchived=true` (§3.R). A person picks one on the scenario page;
     a read: it keeps nothing. A flowsheet a scenario cannot run is a 422."""
     from . import proforma
 
     try:
-        return [f.model_dump(mode="json") for f in proforma.fermos_fits(flowsheet)]
+        return [f.model_dump(mode="json") for f in proforma.fermos_fits(flowsheet, includeArchived)]
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

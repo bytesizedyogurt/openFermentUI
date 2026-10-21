@@ -505,6 +505,16 @@ for mod in service:
             fail(f"{where} line {line} imports by name at run time ({root}): every module a tool file reaches is "
                  "named by an import")
             continue
+        # OF-BLD-020 §3.R (finding 21): a module looked up by name in the
+        # interpreter's table, or a module's names read as a dictionary,
+        # reaches what it names past every import this rule follows.
+        by_table = (any(t == "sys.modules" or (t == "sys" and attrs[:1] == ["modules"]) for t in targets)
+                    or (not local and not targets and root in ("vars", "globals", "locals"))
+                    or "__dict__" in attrs)
+        if by_table:
+            fail(f"{where} line {line} reaches a module by name at run time ({'.'.join([root, *attrs])}): every "
+                 "module a tool file reaches is named by an import")
+            continue
         key, obj = mod.resolve(root, attrs, targets, local)
         spelled = ".".join([root, *attrs])
         if isinstance(obj, types.ModuleType) and obj.__name__ in _STORE_NAMES:

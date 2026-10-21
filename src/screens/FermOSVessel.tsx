@@ -311,7 +311,7 @@ export default function FermOSVessel() {
     // The fits list also carries kept simulations (OF-BLD-020 §3.3: a
     // simulation feeds Proforma as a fit does); a simulation is chosen above
     // as itself, so the fits offered here are the kinetic fits and forecasts.
-    fermosFits(VESSEL_FIT_FLOWSHEET, ctrl.signal)
+    fermosFits(VESSEL_FIT_FLOWSHEET, showArchived, ctrl.signal)
       .then((all) => setFits(all.filter((f) => f.tool !== 'fermos.simulation')))
       .catch(() => !ctrl.signal.aborted && setFits([]));
     return () => ctrl.abort();

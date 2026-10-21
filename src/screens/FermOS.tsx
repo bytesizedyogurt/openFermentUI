@@ -51,7 +51,7 @@
 // This screen may be extended. Keep this header's reasoning with it.
 import { useEffect, useMemo, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
-import type { FermosFitResponse, FermosSeries, FitParam } from '@/data/types';
+import type { FermosFitResponse, FermosSeries, FitParam, UnidentifiedReason } from '@/data/types';
 import { useProgramFilter, useStore } from '@/store';
 import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate, useRoute } from '@/router';
@@ -82,6 +82,29 @@ import FermOSForecast from './FermOSForecast';
 import FermOSSimulate from './FermOSSimulate';
 import FermOSVessel from './FermOSVessel';
 
+/**
+ * Why a fit reports a parameter unidentified, in the words of the reasons it
+ * kept (OF-BLD-020 §3.R, finding 3; fermos.unidentified_words says the same
+ * in the service). A fit that kept none (a logistic fit, or one kept before
+ * fits did) says its interval reaches zero only when it does.
+ */
+const UNIDENTIFIED_WORDS: Record<UnidentifiedReason, string> = {
+  gauge: 'the run has no biomass series, so it scales with X0, which the fit held at a gauge',
+  rule: 'the run has no biomass series, and μmax is then unidentified by rule',
+  budget: 'the optimizer stopped at its budget before it converged',
+  'null-space': "it lies in the Jacobian's null space, so the run does not pin it",
+  interval: 'its interval reaches zero',
+};
+
+function unidentifiedWords(p: FitParam): string {
+  if (p.unidentifiedBy?.length)
+    return p.unidentifiedBy.map((r) => (r === 'gauge' && p.name === 'x0' ? 'the run has no biomass series, so X0 is a gauge the fit held, not a reading' : UNIDENTIFIED_WORDS[r])).join('; ');
+  return p.low <= 0 ? UNIDENTIFIED_WORDS.interval : 'the fit kept no reason';
+}
+
+/** An interval the optimizer's budget or the Jacobian's null space left: shown, and said not to be trusted. */
+const untrusted = (p: FitParam) => !!p.unidentifiedBy?.some((r) => r === 'budget' || r === 'null-space');
+
 function ParamTable({ params }: { params: FitParam[] }) {
   return (
     <table className="w-full text-body" data-testid="fit-params">
@@ -101,11 +124,12 @@ function ParamTable({ params }: { params: FitParam[] }) {
             <td className="py-1 pr-2 font-num">{fmt(p.value, 4)}</td>
             <td className="py-1 pr-2 font-num">
               {fmt(p.low, 4)} to {fmt(p.high, 4)}
+              {untrusted(p) && <span className="block font-sans text-caption text-signal-warn">not to be trusted as a range</span>}
             </td>
             <td className="py-1 pr-2 font-num text-caption">{p.unit}</td>
-            <td className="py-1 text-caption">
+            <td className="py-1 text-caption" data-testid="fit-param-why" data-key={p.name} data-why={(p.unidentifiedBy ?? []).join(',')}>
               {p.identified === true && 'identified'}
-              {p.identified === false && <span className="text-signal-warn">not identified: the interval reaches zero</span>}
+              {p.identified === false && <span className="text-signal-warn">not identified: {unidentifiedWords(p)}</span>}
               {p.indistinguishableFromZero === true && <span className="text-ink-soft">indistinguishable from zero on this run</span>}
             </td>
           </tr>

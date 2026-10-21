@@ -2522,7 +2522,16 @@ export interface FitParam {
   unit: string;
   identified: boolean | null;
   indistinguishableFromZero: boolean | null;
+  /**
+   * Why a kinetics family's fit reports it unidentified (OF-BLD-020 §3.R), in
+   * the order a reader names them; absent where it does not apply (a logistic
+   * fit's parameters, an identified one).
+   */
+  unidentifiedBy?: UnidentifiedReason[] | null;
 }
+
+/** Why a fitted parameter is unidentified: the gauge X0 of a run with no biomass series, the no-biomass rule on μmax, the optimizer's budget, the Jacobian's null space, the interval reaching zero. */
+export type UnidentifiedReason = 'gauge' | 'rule' | 'budget' | 'null-space' | 'interval';
 
 export interface GrowthFit {
   measureId: string;
@@ -2581,6 +2590,8 @@ export interface ForecastRequest {
   /** Who changed a starting value; a changed one is that person's assumption. */
   changedBy: string | null;
   durationH: number | null;
+  /** Who set the length; a length a person set is that person's assumption (OF-BLD-020 §3.R). */
+  durationBy: string | null;
   sample: boolean;
 }
 
@@ -3313,7 +3324,7 @@ export interface ThermoProps {
 // kept and flagged in words, never clamped. A model never sets one.
 
 /** The chip a value shows: finer than `BasisSourceKind` (a fit and a simulation are artifacts; a library default is a model source). */
-export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'convention' | 'library-default' | 'waiting';
+export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'convention' | 'library-default' | 'waiting' | 'not-read';
 
 /** What a scope parameterises. */
 export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'fermos-forecast' | 'pureos-unit' | 'proforma';
@@ -3687,6 +3698,12 @@ export interface SteadyState {
   /** D·P at the steady state; null at washout. */
   productivity: number | null;
   words: string;
+  /** The most μ(S, P = 0) − kd reaches over S from 0 to Sf: no culture holds at or above it (OF-BLD-020 §3.R). */
+  dWashoutMax: number | null;
+  /** A culture holds and washout is stable too: which one a run reaches depends on where it starts. */
+  bistable: boolean;
+  /** Which steady state this run's path reached by its end; null while it is still on its way to one. */
+  reached: 'culture' | 'washout' | null;
 }
 
 /** One kept `fermos.simulation` artifact as every reader reads it. */

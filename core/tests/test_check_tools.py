@@ -49,6 +49,11 @@ PLANTED = {
     # A vessel and a train, the tool spelled out and the store's function aliased.
     "plant_compute_vessel.py": 'from ..artifacts import compute as keep\n\n\ndef f():\n    return keep("fermos.vessel", [])\n',
     "plant_compute_train.py": 'from .. import artifacts\n\n\ndef f():\n    return artifacts.compute("pureos.train_run", [])\n',
+    # OF-BLD-020 §3.R (finding 21): a module from the interpreter's table, and
+    # a module's names read as a dictionary, past every import.
+    "plant_sysmodules.py": 'import sys\n\n\ndef f(req):\n    return sys.modules["openferment_core.fermos"].simulate(req)\n',
+    "plant_vars.py": 'from .. import api\n\n\ndef f():\n    return vars(api)["artifacts"].compute("fermos.simulation", [])\n',
+    "plant_globals.py": 'from .. import fermos\n\n\ndef f(req):\n    return globals()["fermos"].__dict__["simulate"](req)\n',
 }
 # The function the last planted tool file reaches, outside tools/.
 KEEPER = "from . import proforma\n\n\ndef keep(req):\n    return proforma.run(req)\n"

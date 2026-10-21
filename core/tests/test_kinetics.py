@@ -43,6 +43,15 @@ STANDIN_STORAGE_RICH = {"X": 0.5, "S": 200.0, "N": 0.5}
 STANDIN_PMAX = dict(mu_max=0.40, ks=0.20, kd=0.0, yxs=0.15, alpha=2.0, beta=0.5, yps=0.45, maintenance=0.0,
                     p_max=20.0, n_inhibition=1.0, ki_substrate=None, yxo=None, mo=0.0)
 STANDIN_PMAX_START = {"X": 0.2, "S": 150.0, "P": 0.0}
+# §3.R (finding 1): a Haldane μ that peaks at low sugar and falls far by the
+# feed's sugar, so μ(Sf) − kd is under D while μ's peak is above it. Two
+# starts: one near the culture, one near washout. STAND-INs, the reviewer's.
+STANDIN_HALDANE = dict(mu_max=0.5, ks=0.5, kd=0.0, yxs=0.5, alpha=0.1, beta=0.0, yps=0.45, maintenance=0.0,
+                       n_inhibition=1.0, p_max=90.0, ki_substrate=2.0, yxo=None, mo=0.0, dilution_rate=0.15,
+                       feed_conc=50.0)
+STANDIN_HALDANE_NEAR_CULTURE = {"X": 20.0, "S": 1.0, "P": 0.0}
+STANDIN_HALDANE_NEAR_WASHOUT = {"X": 0.1, "S": 50.0, "P": 0.0}
+STANDIN_HALDANE_RUN_H = 400.0
 STANDIN_FIT_TIMES = np.linspace(0.0, 12.0, 12)
 STANDIN_FIT_KEYS = ("mu_max", "ks", "yxs", "yps", "alpha", "beta")
 # Where the fit starts: each rate off its stand-in by a factor, as a start
@@ -115,6 +124,18 @@ def test_the_module_docstring_writes_every_family_as_d5_does():
         assert fam.equations.startswith(fid), fid
     for line in D5["batch_v1"] + D5["oxygen"]:
         assert line in FAMILIES["batch_v1"].equations
+
+
+def test_every_family_with_a_product_shows_the_pmax_gate_on_beta():
+    """§3.R finding 5: the rate law gates β·X by (1 − P/Pmax)ⁿ in every
+    family with a product (_rates), and fed-batch's and chemostat's
+    equations, which fermOS → Simulate shows, wrote β bare."""
+    for fid, fam in FAMILIES.items():
+        if not fam.has_P or fam.socket:
+            continue
+        eq = fam.equations
+        assert "fP = (1 − P/Pmax)ⁿ" in eq and "β·fP" in eq, fid
+        assert "(α·μ + β)·X" not in eq.split("As built")[0] or fid == "batch_v1", (fid, "β is bare in the rate law")
 
 
 def test_every_family_declares_the_appendix_parameters_with_bounds_and_groups():
@@ -331,6 +352,47 @@ def test_the_chemostat_reaches_its_steady_state_and_washes_out_at_the_predicted_
     assert abs(ch.simulate(between, STANDIN_CHEMOSTAT_START, 4000.0).y_final[IX["X"]]) < 1e-6
 
 
+def test_a_haldane_chemostat_finds_its_culture_where_mu_at_the_feed_is_under_d():
+    """§3.R finding 1: washout was decided on μ(Sf) − kd alone. A Haldane μ
+    can rise above D + kd at low sugar while μ(Sf) − kd is under D: then a
+    steady culture exists at the low-S root, and washout is a second stable
+    state. The steady state is the culture, said bistable; which one a run
+    reaches depends on where it starts, and `reached` says which."""
+    ch = FAMILIES["chemostat_v1"]
+    p = STANDIN_HALDANE
+    ss = ch.steady_state(p)
+    assert ss["dWashout"] < p["dilution_rate"] < ss["dWashoutMax"], ss
+    assert ss["washout"] is False and ss["bistable"] is True, ss
+    culture = ch.simulate(p, STANDIN_HALDANE_NEAR_CULTURE, STANDIN_HALDANE_RUN_H)
+    for state in ("X", "S", "P"):
+        assert culture.y_final[IX[state]] == pytest.approx(ss[state], rel=1e-6), state
+    assert ch.reached(ss, culture) == "culture"
+    washed = ch.simulate(p, STANDIN_HALDANE_NEAR_WASHOUT, STANDIN_HALDANE_RUN_H)
+    assert washed.y_final[IX["X"]] < 1e-6 and ch.reached(ss, washed) == "washout"
+    # Above μ's peak no culture holds, whatever the start.
+    over = {**p, "dilution_rate": ss["dWashoutMax"] * (1 + STANDIN_WASHOUT_MARGIN)}
+    gone = ch.steady_state(over)
+    assert gone["washout"] is True and gone["bistable"] is False and gone["X"] == 0.0
+    assert ch.reached(gone, ch.simulate(over, STANDIN_HALDANE_NEAR_CULTURE, STANDIN_HALDANE_RUN_H)) == "washout"
+    # Monod alone rises all the way to Sf: its peak is μ(Sf), and one state.
+    plain = ch.steady_state({**STANDIN_CHEMOSTAT, "ki_substrate": None})
+    assert plain["dWashoutMax"] == pytest.approx(plain["dWashout"], rel=1e-9) and plain["bistable"] is False
+
+
+def test_a_chemostat_with_no_dilution_is_refused_in_words():
+    """§3.R finding 2: D = 0 sits inside the spec's bounds, and the steady
+    state divided nothing by nothing (NaN into brentq, a 500). With nothing
+    flowing it is a batch: refused in words before anything integrates."""
+    ch = FAMILIES["chemostat_v1"]
+    still = {**STANDIN_CHEMOSTAT, "kd": 0.0, "beta": 0.0, "maintenance": 0.0, "dilution_rate": 0.0}
+    for call in (lambda: ch.simulate(still, STANDIN_CHEMOSTAT_START, STANDIN_CHEMOSTAT_RUN_H),
+                 lambda: ch.steady_state(still), lambda: ch.washout(still)):
+        with pytest.raises(FamilyRefused, match="dilution rate above zero.*a batch"):
+            call()
+    spec = next(s for s in ch.specs() if s.key == "dilution_rate")
+    assert "above zero" in spec.boundsReason
+
+
 def test_the_store_forms_only_after_the_second_nutrient_is_exhausted():
     st = FAMILIES["storage_v1"]
     tr = st.simulate(STANDIN_STORAGE, STANDIN_STORAGE_START, None)
@@ -396,6 +458,29 @@ def test_a_product_and_substrate_only_fit_reports_mu_unidentified(monkeypatch):
     assert r.identified["mu_max"] is False
     assert any("No biomass series: μmax is reported unidentified by rule" in n for n in r.notes)
     assert set(r.quality) == {"S", "P"}
+
+
+def test_a_fit_keeps_why_each_parameter_is_unidentified(monkeypatch):
+    """§3.R finding 3: a parameter was unidentified for one of several
+    reasons (its interval, the Jacobian's null space, the optimizer's budget,
+    the no-biomass rule), and every reader said "the interval reaches zero".
+    The fit now keeps the reasons by key, and a reason the interval beside it
+    contradicts is never one of them."""
+    keys = (*STANDIN_FIT_KEYS, "x0")
+    start = {**{k: STANDIN_FIT_START[k] for k in STANDIN_FIT_KEYS}, "x0": STANDIN_START["X"] * 2}
+    with monkeypatch.context() as m:
+        m.setattr(K, "FIT_MAX_NFEV", 1)  # stopped at once, at its budget
+        stopped = batch().fit(synthetic(monkeypatch, ("S", "P")), start, fixed_for(keys))
+    assert all("budget" in stopped.why[k] for k in keys), stopped.why
+    assert "rule" in stopped.why["mu_max"]
+    full = batch().fit(synthetic(monkeypatch), {k: STANDIN_FIT_START[k] for k in STANDIN_FIT_KEYS},
+                       fixed_for(STANDIN_FIT_KEYS))
+    assert full.why == {}
+    for r in (stopped, full):
+        for k in r.keys:
+            assert bool(r.why.get(k)) is (not r.identified[k]), (k, r.why.get(k))
+            assert ("interval" in r.why.get(k, [])) is (r.low[k] <= 0), (k, r.low[k])
+            assert set(r.why.get(k, [])) <= set(K.UNIDENTIFIED), k
 
 
 def test_a_fit_needs_more_readings_than_parameters():
