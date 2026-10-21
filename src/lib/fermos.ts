@@ -18,6 +18,7 @@ import type {
   FamilyInfo,
   FermosBinding,
   FermosFitResponse,
+  FermosHarvest,
   FermosSeries,
   ForecastResult,
   KineticFit,
@@ -107,6 +108,20 @@ export const fermosSimulate = (ask: SimulateAsk, overrides: Override[], signal?:
 /** The kept simulations, newest first (`GET /api/fermos/simulations`); an archived program's left out unless the switch shows it. Simulate and Vessel both read it. */
 export const fermosSimulations = (includeArchived: boolean, signal?: AbortSignal) =>
   call<SimulationSummary[]>(`/api/fermos/simulations${includeArchived ? '?includeArchived=true' : ''}`, { signal });
+
+/**
+ * OF-BLD-020 §6.2 (D10) — a kept simulation's broth at an hour, read by the
+ * service from the series the artifact keeps (`GET /api/fermos/harvest`):
+ * its own harvest hour, or `hour`, a person's (the value their inlet scope
+ * holds; a model never sends one). Nothing is integrated again or kept, and
+ * the browser computes nothing of it: it shows each state with its unit.
+ */
+export function fermosHarvest(simulationId: string, hour: number | null, includeArchived: boolean, signal?: AbortSignal) {
+  const q = new URLSearchParams({ simulation: simulationId });
+  if (hour != null) q.set('hour', String(hour));
+  if (includeArchived) q.set('includeArchived', 'true');
+  return call<FermosHarvest>(`/api/fermos/harvest?${q.toString()}`, { signal });
+}
 
 /** The word for each state a family integrates, on the time course and in its table. */
 export const STATE_WORDS: Record<string, string> = {

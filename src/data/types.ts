@@ -3102,6 +3102,12 @@ export interface FlowsheetInfo {
    * design and a `pureos.train_run`); empty for a flowsheet whole on its own.
    */
   builtFrom: string[];
+  /**
+   * OF-BLD-020 §6.2 (D10): the stream the flowsheet names as its fermenter's
+   * broth (its beer), by the id its run's stream table gives it: what a
+   * train's inlet takes from a scenario's newest run. Null: it names none.
+   */
+  brothStream: string | null;
 }
 
 // OF-BLD-019 §2.2 (D3) — a reference biorefinery runs whole on its package's
@@ -3895,6 +3901,51 @@ export interface SimulationSummary {
   harvestH: number | null;
   createdAt: string;
   provenance: Provenance;
+}
+
+// ── The harvest stream (OF-BLD-020 §6.2, D10) ───────────────────────────
+//
+// A kept simulation's broth at an hour, read from the series the artifact
+// keeps (`GET /api/fermos/harvest`): nothing is integrated again and nothing
+// is kept. A train's simulation inlet reads its composition through the
+// same read, so the broth that leaves fermOS is the stream that enters pureOS.
+
+/** Where the hour a harvest is read at comes from. */
+export type HarvestHourSource = "the simulation's harvest hour" | "a person's hour";
+
+/** One state of the simulation at the hour read, in the unit it keeps. */
+export interface HarvestState {
+  /** The family's state: X (cells), S (sugar), P (product), V, N, Q. */
+  state: string;
+  value: number;
+  unit: string;
+}
+
+/** `GET /api/fermos/harvest`: a kept simulation's broth at an hour. */
+export interface FermosHarvest {
+  artifactId: string;
+  family: string;
+  strain: string | null;
+  product: string | null;
+  sugar: string | null;
+  provenance: Provenance;
+  /** The hour asked: the simulation's own harvest hour, or a person's. */
+  asked: number;
+  hourSource: HarvestHourSource;
+  /** Why that hour, in words. */
+  how: string;
+  /** The kept point the states are read at, and whether it is the hour asked. */
+  hour: number;
+  exact: boolean;
+  /** How the states were read, in words (the kept point, or the nearest one, and why). */
+  read: string;
+  /** The simulation's own harvest hour, and the last hour it keeps. */
+  harvestH: number;
+  runEndH: number;
+  /** Every state the simulation keeps a series of, in its family's order. */
+  states: HarvestState[];
+  /** What the family does not model is absent from the broth, in words. */
+  absent: string;
 }
 
 // ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────

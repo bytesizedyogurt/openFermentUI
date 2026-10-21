@@ -1285,6 +1285,14 @@ await (async () => {
 await (async () => {
   const st = () => useStore.getState();
   const pu = await import('../src/lib/pureos');
+  // OF-BLD-020 §6.2: a link names a new train's inlet, a simulation's harvest or a scenario's newest run, and nothing else.
+  const fromSim = pu.inletOfQuery('simulation:c8b79f33e34a5f8f');
+  const fromScenario = pu.inletOfQuery('scenario:sc-yeast-1');
+  check('?inlet=simulation:<id> and ?inlet=scenario:<id> set a new train’s inlet, and anything else sets none',
+    fromSim?.kind === 'simulation' && fromSim.ref === 'c8b79f33e34a5f8f' && fromSim.streamId === null &&
+      fromScenario?.kind === 'run-stream' && fromScenario.ref === 'sc-yeast-1' && fromScenario.streamId === null &&
+      pu.inletOfQuery('typed:x') === null && pu.inletOfQuery('simulation:') === null && pu.inletOfQuery(null) === null &&
+      pu.builderInletPath({ kind: 'simulation', id: 'c8b79f33e34a5f8f' }) === '/pureos/build/new?inlet=simulation:c8b79f33e34a5f8f');
   useStore.setState({ parameterOverrides: {}, trainsMade: {} });
   const train: TrainSpec = {
     id: 'tr-check-store', name: 'A check-store train', program: 'yeast', product: 'ethanol',
@@ -1348,7 +1356,16 @@ await (async () => {
       /checkTrain\(\{ train: spec, overrides,/.test(page));
   check('the Builder saves under the reviewer name and never without one', /saveTrain\(spec, reviewer\)/.test(page) && /disabled=\{!reviewer\}/.test(page));
   check('removing a unit drops the values typed for it', /clearScope\(draft\.units\[i\]\.id\)/.test(page));
-  check('Price this in Proforma says what Phase 6 adds and makes nothing', /PRICE_TRAIN_WORDS/.test(page) && !/createScenario/.test(page));
+  // OF-BLD-020 §6.2: Price this in Proforma makes the scenario through §6.1's one helper, from the run kept on the
+  // page and the vessel chosen, says what it needs while either is missing, and makes nothing of its own.
+  check('Price this in Proforma makes a custom_train_v1 scenario through scenarioFromVesselAndTrain from the run kept here and the vessel chosen',
+    /scenarioFromVesselAndTrain\(vessel, run\.artifactId,/.test(page) && !/createScenario/.test(page) &&
+      /if \(!run \|\| !vessel\) return;/.test(page));
+  check('Price this in Proforma says what it needs while no run or no vessel is kept, and how one is made',
+    /\{!run && <li data-need="run">\{PRICE_NEEDS_RUN\}/.test(page) && /\{PRICE_NEEDS_VESSEL\}/.test(page) && /fermOS → Vessel/.test(page));
+  // OF-BLD-020 §6.2: the inlet chooser shows each simulation's broth as the service read it, and computes none.
+  check('the Builder reads each simulation’s broth from GET /api/fermos/harvest, the chosen one at the inlet’s hour',
+    /fermosHarvest\(sim\.artifactId, null, showArchived/.test(page) && /fermosHarvest\(inlet\.ref, hour, showArchived/.test(page));
 })();
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

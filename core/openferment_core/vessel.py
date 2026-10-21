@@ -62,7 +62,8 @@ ones the class runs for the design and kept as a convention of that request
 fermos_vessel returns and the screen reads the basis from. And the real
 simulation is read as §3.1 keeps it: `end` is the run's last hour, so a run
 that goes on past the hour its sugar runs out is read at `harvestH`
-(`fermos.harvest`), its oxygen uptake up to that hour (`_past_harvest`).
+(`fermos.harvest`, from the series the artifact keeps: OF-BLD-020 §6.2), its
+oxygen uptake up to that hour (`_past_harvest`).
 
 OF-BLD-020 §4.R (the Phase 4 review). The peak uptake is the one the
 simulation states (`our.peak`, on its solver's steps), not its display
@@ -233,17 +234,21 @@ def simulation_inputs(art: Artifact) -> dict[str, Any]:
     if _past_harvest(end_t, harvest):
         # §3.1's `end` is the run's last hour; a run set to go on past the
         # hour its sugar runs out is harvested at that hour (`harvestH`), so
-        # the broth is read there, integrated again from the artifact's own
-        # basis (fermos.harvest), and the uptake is the batch's up to it
-        # (OF-BLD-020 §4.2, reconciled with the real simulation).
+        # the broth is read there, from the series the artifact keeps
+        # (fermos.harvest, the read pureOS's inlet makes too: OF-BLD-020
+        # §6.2, never integrated again), and the uptake is the batch's up to
+        # it (OF-BLD-020 §4.2, reconciled with the real simulation).
         from . import fermos
 
-        state = fermos.harvest(art)["state"]
+        read = fermos.harvest(art)
+        state = {x.state: x.value for x in read.states}
         X, S, P = (_number(state.get(k), f"{k} at harvest") for k in ("X", "S", "P"))
         keep = [i for i, h in enumerate(t) if float(h) <= harvest * (1 + HARVEST_EPS)]
         t, value = [t[i] for i in keep], [value[i] for i in keep]
         notes.append(f"the simulation runs on to {float(end_t):.4g} h; the vessel reads its broth at harvest, "
                      f"{harvest:.4g} h, the hour its sugar runs out, and its oxygen uptake up to that hour")
+        if not read.exact:
+            notes.append(f"its broth at harvest is {read.read}")
     else:
         X, S, P = (_number(end.get(k), f"{k} at harvest") for k in ("X", "S", "P"))
     # The peak the simulation states, read on its solver's own steps (§3.1),

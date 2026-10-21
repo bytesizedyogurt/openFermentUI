@@ -238,10 +238,16 @@ def test_the_inlet_is_held_to_its_kind():
     assert "a simulation inlet names its artifact (ref)" in said
     assert "a stream id belongs to a run-stream inlet" in said
     assert "the inlet (simulation) has no parameter 'conc.Ethanol'" in said
-    said = " | ".join(pureos.validate(spec_of(inlet={"kind": "run-stream", "ref": "not-an-id", "vessel": "a" * 16})))
+    said = " | ".join(pureos.validate(spec_of(inlet={"kind": "run-stream", "ref": "a" * 16, "vessel": "b" * 16})))
     assert "a run's stream as the inlet names the stream (streamId)" in said
-    assert "the inlet's ref is an artifact id (16 hex)" in said
     assert "a vessel gives the broth flow of a simulation's harvest alone" in said
+    # OF-BLD-020 §6.2: a run-stream's ref is a run's artifact id or a scenario's id, whose broth it may take.
+    said = " | ".join(pureos.validate(spec_of(inlet={"kind": "run-stream", "ref": "not an id!"})))
+    assert "a run-stream inlet's ref is a run's artifact id (16 hex) or a scenario's id" in said
+    assert "names the stream (streamId)" not in said
+    said = " | ".join(pureos.validate(spec_of(inlet={"kind": "simulation", "ref": "sc-yeast-1"})))
+    assert "the inlet's ref is an artifact id (16 hex); 'sc-yeast-1' is not one" in said
+    assert pureos.validate(spec_of(inlet={"kind": "run-stream", "ref": "sc-yeast-1"})) == []
 
 
 def test_a_train_refuses_extra_fields_and_a_true_or_false_value():
@@ -282,7 +288,8 @@ def test_the_inlet_from_a_simulation_is_its_broth_at_harvest_read_as_the_program
     art = artifacts.get(sim.artifactId)
     spec = spec_of(inlet={"kind": "simulation", "ref": sim.artifactId, "params": {"broth_flow": typed(2.0)}})
     inlet = pureos.inlet_stream(spec)
-    at = fermos.harvest(art)
+    h = fermos.harvest(art)
+    at = {"hour": h.hour, "state": {x.state: x.value for x in h.states}}
     assert inlet.read.harvestHour == pytest.approx(art.output["harvestH"])
     assert inlet.read.concentrations == pytest.approx({"Yeast": at["state"]["X"], "Ethanol": at["state"]["P"],
                                                        "Glucose": at["state"]["S"]})
@@ -300,7 +307,8 @@ def test_the_inlet_from_a_simulation_is_its_broth_at_harvest_read_as_the_program
     # A person's hour reads the broth at that hour, and says so.
     later = pureos.inlet_stream(spec.model_copy(update={"inlet": spec.inlet.model_copy(update={"params": {
         **spec.inlet.params, "harvest_hour": spec.inlet.params["broth_flow"].model_copy(update={"value": 4.0})}})}))
-    assert later.read.concentrations["Ethanol"] == pytest.approx(fermos.harvest(art, 4.0)["state"]["P"])
+    assert later.read.concentrations["Ethanol"] == pytest.approx(
+        {x.state: x.value for x in fermos.harvest(art, 4.0).states}["P"])
     assert any("an hour openFerment test fixture named" in n for n in later.read.notes)
 
 

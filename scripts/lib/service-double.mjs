@@ -187,6 +187,8 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const fermosBinds = [];
   const fermosSimulates = [];
   const fermosSimulationsOnFile = [];
+  /** OF-BLD-020 §6.2: each GET /api/fermos/harvest the browser made, `{ simulation, hour }` as sent (hour null for none). */
+  const harvestReads = [];
   /**
    * pureOS → Builder (OF-BLD-020 §5.3): every Builder call the browser made
    * (catalogue specs, scopes, resolves, validate, check, run, from-run), each
@@ -474,6 +476,32 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       const seen = new Set(fermosSimulationsOnFile.map((s) => s.artifactId));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify([...fermosSimulationsOnFile, ...vessel.filter((s) => !seen.has(s.artifactId))]));
+    }
+    // OF-BLD-020 §6.2 — a kept simulation's broth at an hour, as the real
+    // fermos.harvest read it from the fixture's simulation's kept series
+    // (fermos-simulate.json's `harvest`: its own hour, a person's mid-run
+    // kept point, and an hour past its end, refused in its words), once
+    // Simulate has kept that simulation; an hour the fixture holds no read
+    // of is the double's 422 in words, and a simulation not on file the
+    // service's 404.
+    if (url === '/api/fermos/harvest' && req.method === 'GET') {
+      const q = new URL(req.url ?? '/', 'http://double').searchParams;
+      const id = q.get('simulation') ?? '';
+      const hour = q.get('hour');
+      harvestReads.push({ simulation: id, hour: hour == null ? null : Number(hour) });
+      const answer = (status, body) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(body));
+      };
+      if (!fermosSimulationsOnFile.some((x) => x.artifactId === id))
+        return answer(404, { detail: `there is no kept simulation ${id} here: fermOS → Simulate keeps one` });
+      const reads = (await prototype('fermos-simulate.json')).harvest.filter((r) => r.request.simulation === id);
+      const entry = reads.find((r) => (hour == null ? r.request.hour == null : r.request.hour != null && Number(hour) === r.request.hour));
+      if (!entry) {
+        const held = reads.filter((r) => r.request.hour != null).map((r) => `${r.request.hour} h`);
+        return answer(422, { detail: `the double holds the broth of simulation ${id} at its own harvest hour and at ${held.join(' and ')}; it reads no other hour` });
+      }
+      return answer(entry.status, entry.body);
     }
     // OF-BLD-019 §5.1 — the fits fermOS keeps, with what each can feed a
     // flowsheet, as the real code listed them over an empty store and over
@@ -1249,5 +1277,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, pureosProposals, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, builderCalls, trainRunsOnFile, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, pureosProposals, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, harvestReads, builderCalls, trainRunsOnFile, flags } };
 }

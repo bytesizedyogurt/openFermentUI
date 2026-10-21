@@ -1491,6 +1491,10 @@ def oxygen_peak(p: dict[str, Any], traj: Trajectory) -> tuple[float, float | Non
     return float(our[k]), float(times[k])
 
 
+# What a broth read from a family's states leaves out, in words (D10).
+ABSENT = "By-products the family does not model (carbon dioxide, glycerol, acids) are absent."
+
+
 def harvest(traj: Trajectory, when: float | None = None) -> dict[str, Any]:
     """The state at harvest: the hour the sugar runs out (a batch's), the
     run's end (a fed culture's: its sugar is fed again), or `when`."""
@@ -1511,4 +1515,4 @@ def harvest(traj: Trajectory, when: float | None = None) -> dict[str, Any]:
         state["V"] = float(y[_V])
     return {"hour": float(t), "how": how, "state": state, "units": {**fam.state_units, "V": "L"},
             "amounts": {s: float(y[IX[s]] * y[_V]) for s in fam.states if s != "V"},
-            "absent": "By-products the family does not model (carbon dioxide, glycerol, acids) are absent."}
+            "absent": ABSENT}

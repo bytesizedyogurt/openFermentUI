@@ -99,7 +99,9 @@ what would bind it, integrates (kinetics.py), and keeps one
 with their sources, the time course by state, OUR(t), the end state, the
 hour the sugar runs out, the harvest, the mass balance, Yp/s beside the
 newest stored geneOS ceiling of the strain's host models (read, never
-clamped), and its flags. `harvest(artifact, hour)` reads one, keeping nothing.
+clamped), and its flags. `harvest(artifact, hour)` reads one's broth at an
+hour from the series it keeps (OF-BLD-020 §6.2, D10): never integrated
+again, nothing kept; pureOS's simulation inlet reads through it.
 """
 from __future__ import annotations
 
@@ -121,6 +123,7 @@ from .models import (
     FamilyInfo,
     FermosBinding,
     FermosFitResponse,
+    FermosHarvest,
     FermosPoint,
     ForecastResult,
     Interval,
@@ -140,6 +143,7 @@ from .models import (
     FermosSeries,
     FitParam,
     GrowthFit,
+    HarvestState,
     KineticFit,
     SeriesFitQuality,
 )
@@ -2400,19 +2404,103 @@ def kept_simulation(key: Any) -> Any:
     return art
 
 
-def harvest(simulation_artifact: Any, hour: float | None = None) -> dict[str, Any]:
-    """The broth at harvest of a kept simulation (its id, or the artifact):
-    the hour its sugar runs out, else its run's end, or `hour`. Integrated
-    again from the artifact's own basis, as it was kept; keeps nothing."""
+# ── the harvest stream (OF-BLD-020 §6.2, D10) ──────────────────────────
+#
+# The broth that leaves fermOS is the stream that enters pureOS. A kept
+# simulation's broth at an hour is READ from the series its artifact keeps,
+# never integrated again (OF-BLD-019 D1: every reader reads the one
+# artifact). The artifact keeps its series on the display grid and every
+# segment's end (kinetics.Trajectory.times), not the solver's dense output,
+# so an hour that is not a kept point is read at the nearest kept point and
+# the read says so; nothing is interpolated between kept points, since only
+# the solver's own dense output could do that honestly. A batch run until
+# its sugar runs out ends at that hour, so its harvest is a kept point and
+# reads as its end state.
+HARVEST_HOUR = "the simulation's harvest hour"
+PERSONS_HOUR = "a person's hour"
+# The state a train's inlet carries as its product: the product in the broth.
+BROTH_PRODUCT = "P"
+
+
+def _finite(x: Any) -> bool:
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(float(x))
+
+
+def _no_broth_product(art: Any, family: str, fam: Any, kept: list[str]) -> str:
+    """Why a simulation keeps no product in the broth, in words naming what
+    it lacks and what it keeps."""
+    if fam is None:
+        what = f"its family {family or 'unnamed'} is none fermOS has"
+    elif fam.product_state() not in (None, BROTH_PRODUCT):
+        what = (f"its family {fam.id} keeps its product as a store inside the cells ({fam.product_state()}), not in "
+                "the broth")
+    elif fam.product_state() is None:
+        what = f"its family {fam.id} has no product state"
+    else:
+        what = f"its family {fam.id} has one, and the artifact keeps no series of it"
+    return (f"simulation {art.id} keeps no product series ({BROTH_PRODUCT}, the product in the broth): {what}; it "
+            f"keeps {', '.join(kept) or 'no state'}, so its broth is no train's inlet")
+
+
+def harvest(simulation_artifact: Any, hour: float | None = None, *, include_archived: bool = True) -> FermosHarvest:
+    """A kept simulation's broth at an hour (its id, or the artifact): its
+    own harvest hour when none is named (the hour its sugar runs out, else
+    its run's end), else the hour a person named, read from the series the
+    artifact keeps, each state in its unit. An artifact-free read: nothing
+    is integrated again and nothing is kept. Refused in words: an hour
+    outside the simulated span, a simulation that keeps no product series
+    in the broth (P), one of an archived program with the switch off, and a
+    file whose series cannot be read."""
     art = kept_simulation(simulation_artifact)
-    fam, _, _, _, traj = _trajectory(art.inputs)
-    when = hour if hour is not None else _harvest_hour(fam, traj)
-    out = kinetics.harvest(traj, when)
+    if not include_archived:
+        _shown(art, f"simulation {art.id}", False)
+    o = art.output if isinstance(art.output, dict) else {}
+    family = str(o.get("family") or "")
+    fam = kinetics.FAMILIES.get(family)
+    series = o.get("series") if isinstance(o.get("series"), dict) else {}
+    units_of = o.get("units") if isinstance(o.get("units"), dict) else {}
+    t = series.get("t")
+    if not (isinstance(t, list) and t and all(_finite(x) for x in t) and all(a <= b for a, b in zip(t, t[1:]))):
+        raise SimulationRefused(f"simulation {art.id} keeps no series of hours its broth can be read on")
+    own = [s for s in (fam.states if fam is not None else ()) if s in series]
+    kept = own + sorted(k for k in series if k != "t" and k not in own)
+    for k in kept:
+        col = series[k]
+        if not (isinstance(col, list) and len(col) == len(t) and all(_finite(x) for x in col)):
+            raise SimulationRefused(f"simulation {art.id}'s series of {k} cannot be read on its {len(t)} hours")
+    if BROTH_PRODUCT not in series:
+        raise SimulationRefused(_no_broth_product(art, family, fam, kept))
+    harvest_h = o.get("harvestH")
+    if not _finite(harvest_h):
+        raise SimulationRefused(f"simulation {art.id} keeps no harvest hour (harvestH)")
+    start, end = float(t[0]), float(t[-1])
     if hour is None:
-        out["how"] = ("the hour the sugar runs out" if when == traj.runout_h else
-                      "the run's end: a fed culture's sugar is fed again" if fam.feed != "none" else
-                      "the run's end: the sugar does not run out in this simulation")
-    return {"artifactId": art.id, "family": fam.id, **out}
+        asked, source = float(harvest_h), HARVEST_HOUR
+        runs_out = o.get("sugarRunsOutH")
+        how = ("the hour its sugar runs out" if _finite(runs_out) and float(runs_out) == asked else
+               "its run's end: a fed culture's sugar is fed again" if fam is not None and fam.feed != "none" else
+               "its run's end: its sugar does not run out in this simulation")
+    else:
+        if not _finite(hour):
+            raise SimulationRefused("the hour asked is not a number of hours")
+        asked, source, how = float(hour), PERSONS_HOUR, "an hour a person named"
+        tol = kinetics.TIME_EPS * max(1.0, abs(asked))
+        if not start - tol <= asked <= end + tol:
+            raise SimulationRefused(f"the hour {asked:.6g} h lies outside simulation {art.id}, which keeps its broth "
+                                    f"from {start:.6g} to {end:.6g} h")
+    k = min(range(len(t)), key=lambda i: (abs(float(t[i]) - asked), i))
+    at = float(t[k])
+    exact = abs(at - asked) <= kinetics.TIME_EPS * max(1.0, abs(asked))
+    read = (f"the kept point at {at:.6g} h, as the simulation keeps it" if exact else
+            f"the nearest kept point, {at:.6g} h, to the hour asked, {asked:.6g} h: the simulation keeps its series on "
+            f"{len(t)} hours, not the solver's own steps, so a broth between two of them is read at the nearer one, and "
+            "nothing is integrated again")
+    return FermosHarvest(
+        artifactId=art.id, family=family, strain=o.get("strain"), product=o.get("product"), sugar=o.get("sugar"),
+        provenance=art.provenance, asked=asked, hourSource=source, how=how, hour=at, exact=exact, read=read,  # type: ignore[arg-type]
+        harvestH=float(harvest_h), runEndH=end,
+        states=[HarvestState(state=s, value=float(series[s][k]), unit=str(units_of.get(s) or "")) for s in kept],
+        absent=kinetics.ABSENT)
 
 
 def simulations(include_archived: bool = False) -> list[SimulationSummary]:

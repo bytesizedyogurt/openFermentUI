@@ -21,7 +21,8 @@
       "leavesOut": [],
       "gridInputs": [],
       "packageTest": "biorefineries/tests/test_biorefineries.py::test_cornstover",
-      "builtFrom": []
+      "builtFrom": [],
+      "brothStream": null
     },
     {
       "id": "corn_drygrind",
@@ -245,7 +246,8 @@
       "leavesOut": [],
       "gridInputs": [],
       "packageTest": "biorefineries/tests/test_biorefineries.py::test_corn",
-      "builtFrom": []
+      "builtFrom": [],
+      "brothStream": null
     },
     {
       "id": "ethanol_glucose_v0",
@@ -348,7 +350,8 @@
         "glucose_price"
       ],
       "packageTest": null,
-      "builtFrom": []
+      "builtFrom": [],
+      "brothStream": "beer"
     },
     {
       "id": "custom_train_v1",
@@ -444,7 +447,8 @@
       "builtFrom": [
         "fermos.vessel",
         "pureos.train_run"
-      ]
+      ],
+      "brothStream": "beer"
     }
   ]
 }

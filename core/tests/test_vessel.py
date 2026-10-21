@@ -398,7 +398,7 @@ def test_a_run_past_its_harvest_is_read_at_harvest_with_the_uptake_up_to_it(stor
     art = artifacts.get(sim.artifactId)
     assert sim.end["t"] > sim.harvestH  # the run goes on after the sugar runs out
     src = vessel.simulation_inputs(art)
-    at = fermos.harvest(art)["state"]
+    at = {x.state: x.value for x in fermos.harvest(art).states}
     assert src["end"] == {k: at[k] for k in ("X", "S", "P")} and src["end"]["X"] != sim.end["X"]
     assert max(src["our"]["t"]) <= sim.harvestH and len(src["our"]["t"]) < len(sim.our.t)
     assert "reads its broth at harvest" in src["readNotes"][0]

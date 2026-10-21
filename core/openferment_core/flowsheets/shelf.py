@@ -15,6 +15,11 @@ on its package's own defaults (Rule 1; E.1).
     TEST_ONLY  the toy, a STAND-IN for tests: never on the shelf, never
                served, and refused wherever the shelf is asked unless the
                caller says `allow_toy` (as geneOS's toy network is)
+    brothStream   (OF-BLD-020 §6.2) the stream a scenario flowsheet names as
+               its fermenter's broth, by the id its own file gives the
+               fermenter's outlet (test_seam holds each to its file); a
+               train's inlet from a scenario takes it from the newest run.
+               A reference names none: its package names its streams.
     package_regression(id)
                a reference biorefinery's own test values (OF-BLD-019 §2.2),
                parsed from the installed package's test file (`ast`, no
@@ -174,6 +179,7 @@ _PHA = FlowsheetInfo(
     priceBasis=PHA_PRICE_BASIS,
     leavesOut=PHA_LEAVES_OUT,
     gridInputs=["titre", "yield", "sugarPrice"],
+    brothStream="broth",
 )
 
 # OF-BLD-019 §2.3: glucose to ethanol, ours. What it leaves out is
@@ -232,6 +238,7 @@ _ETHANOL = FlowsheetInfo(
     priceBasis=ETHANOL_PRICE_BASIS,
     leavesOut=ETHANOL_LEAVES_OUT,
     gridInputs=["titre", "yield", "glucose_price"],
+    brothStream="beer",
 )
 
 # OF-BLD-020 §6.1 (D11): a vessel and a train, priced. Its scenarios are made
@@ -300,6 +307,7 @@ _CUSTOM_TRAIN = FlowsheetInfo(
     priceBasis=COMPOSITE_PRICE_BASIS,
     leavesOut=COMPOSITE_LEAVES_OUT,
     gridInputs=["titre", "yield", "glucose_price"],
+    brothStream="beer",
 )
 
 SHELF: dict[str, FlowsheetInfo] = {f.id: f for f in (_CORNSTOVER, _CORN, _ETHANOL, _PHA, _CUSTOM_TRAIN)}

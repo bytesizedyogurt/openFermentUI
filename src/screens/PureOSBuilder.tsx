@@ -8,7 +8,17 @@
 // it from a kept run's units, read by the service (`POST
 // /api/pureos/train/from-run`): every unit the product passes through whose
 // BioSTEAM class is a catalogue type, its outlets routed as the run routed
-// them, and the units it left out with why.
+// them, and the units it left out with why. `?inlet=simulation:<id>` (fermOS
+// → Simulate's **Use as a train's inlet**) or `?inlet=scenario:<id>` starts
+// it with its inlet set (OF-BLD-020 §6.2).
+//
+// THE SEAM (OF-BLD-020 §6.2, D10). The inlet chooser lists the kept
+// simulations each with its broth at harvest, every state with its unit, as
+// the service reads it from the simulation's kept series (`GET
+// /api/fermos/harvest`; the chosen one at the hour the inlet's panel holds,
+// the simulation's own or a person's), and the newest run of every scenario
+// with the broth its flowsheet names on the shelf: such an inlet names the
+// scenario, so the service reads whichever run is newest when the train runs.
 //
 // A TRAIN IS DATA (D9). The page holds the train's structure: its name,
 // program and product; its inlet (a kept simulation's harvest, a kept run's
@@ -39,12 +49,18 @@
 // person's, and no numeric control is written here: every number is typed
 // in the parameter panel (E.1‴).
 //
-// **Price this in Proforma** waits for Phase 6 (§6.1, `custom_train_v1`):
-// until then it says what that adds and makes nothing.
+// **Price this in Proforma** (OF-BLD-020 §6.2) makes a scenario on
+// `custom_train_v1` through §6.1's helper (`scenarioFromVesselAndTrain`) from
+// the train run kept on the page and a vessel design the person chooses (the
+// one the inlet names, else one designed for the inlet's simulation, chosen
+// first), and opens it; while either is missing it says, in words, what it
+// needs and how one is made (Run here; fermOS → Vessel).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Download, Plus, Trash2 } from 'lucide-react';
 import type {
+  FermosHarvest,
   ParamScope,
+  ProgramId,
   SimulationSummary,
   StreamRow,
   TrainFromRun,
@@ -62,8 +78,8 @@ import { overridesFor, timeId, useProgramFilter, useStore } from '@/store';
 import { durableAvailable } from '@/lib/durable';
 import { paramScope, type ParamAsk } from '@/lib/params';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
-import { fermosSimulations } from '@/lib/fermos';
-import { NO_DIAGRAM, diagramSrc, stamp } from '@/lib/proforma';
+import { STATE_WORDS, fermosHarvest, fermosSimulations } from '@/lib/fermos';
+import { NO_DIAGRAM, compositeVessels, diagramSrc, scenarioFromVesselAndTrain, stamp, vesselWords } from '@/lib/proforma';
 import { exportCSV } from '@/lib/csv';
 import {
   INLET,
@@ -74,6 +90,7 @@ import {
   builderPath,
   checkTrain,
   fermosVessels,
+  inletOfQuery,
   nextUnitId,
   pureosCatalogue,
   routeChoices,
@@ -103,9 +120,14 @@ import { PurityByStream, RecoveryByUnit } from '@/components/figures';
 import { PUREOS_TABS } from '@/data/tabs';
 import { StreamTable } from './PureOSTrain';
 
-/** What §6.1 adds, said where the button would otherwise make a scenario. */
+/** What Price this in Proforma does, said beside its choices (OF-BLD-020 §6.2). */
 export const PRICE_TRAIN_WORDS =
-  'Pricing a train needs a flowsheet that takes one, and Proforma’s shelf has none yet: Phase 6 (§6.1) adds custom_train_v1, a fermenter built from a fermOS vessel design followed by a train run here, priced with the TEA the shelf flowsheets use. Until then nothing is made: no scenario is created from this train.';
+  'Proforma prices this train as the train of custom_train_v1: a fermenter rebuilt from a fermOS vessel design, its beer through the units of the train run kept here, priced with the TEA the shelf flowsheets use. The scenario is made in this browser and opens on its page, where it binds and says what waits.';
+/** What it needs while no train run is kept on the page. */
+export const PRICE_NEEDS_RUN = 'A train run: Run this train first. Proforma prices a kept train run, and this page holds none yet.';
+/** What it needs while no vessel design is kept on the service, and how one is made. */
+export const PRICE_NEEDS_VESSEL =
+  'A vessel design: none is kept on this service yet. fermOS → Vessel designs one for a kept simulation (fermOS → Simulate keeps one); it is then listed here.';
 
 /** How long the page waits after a change before asking the service what a run would refuse. */
 const CHECK_AFTER_MS = 400;
@@ -130,9 +152,16 @@ function useMadeScenarios(): { id: string; name: string }[] {
   );
 }
 
-/** A fresh train: typed broth, no unit, the active program and its product (a person changes either). */
-function freshTrain(program: string, product: string): TrainSpec {
-  return { id: timeId('tr'), name: 'A new train', program, product, inlet: { kind: 'typed', ref: null, streamId: null, vessel: null, params: {} }, units: [] };
+/** A fresh train: typed broth (or the inlet a link names), no unit, the active program and its product (a person changes either). */
+function freshTrain(program: string, product: string, inlet: TrainSpec['inlet'] | null = null): TrainSpec {
+  return {
+    id: timeId('tr'),
+    name: 'A new train',
+    program,
+    product,
+    inlet: inlet ?? { kind: 'typed', ref: null, streamId: null, vessel: null, params: {} },
+    units: [],
+  };
 }
 
 /** The train's structure alone: what the page holds, the values living in the panel's overrides. */
@@ -145,6 +174,8 @@ const structureOf = (t: TrainSpec): TrainSpec => ({
 export default function PureOSBuilder({ trainId }: { trainId: string }) {
   const route = useRoute();
   const fromRun = route.query.get('from');
+  // OF-BLD-020 §6.2: `?inlet=simulation:<id>` or `?inlet=scenario:<id>` sets a new train's inlet.
+  const inletFrom = trainId === NEW_TRAIN && !fromRun ? inletOfQuery(route.query.get('inlet')) : null;
   const durableReady = useStore((s) => s.durableReady);
   const saved = useStore((s) => (trainId !== NEW_TRAIN ? (s.trainsMade[trainId] ?? null) : null));
   const showArchived = useStore((s) => s.showArchived);
@@ -154,7 +185,7 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
   const defaultProgram = programs.find((p) => p.status === 'active')?.id ?? programs[0]?.id ?? '';
   const defaultProduct = products.includes('ethanol') ? 'ethanol' : (products[0] ?? '');
   const [draft, setDraft] = useState<TrainSpec | null>(() =>
-    trainId === NEW_TRAIN ? freshTrain(defaultProgram, defaultProduct) : saved ? structureOf(saved.train) : null,
+    trainId === NEW_TRAIN ? freshTrain(defaultProgram, defaultProduct, inletFrom) : saved ? structureOf(saved.train) : null,
   );
   const [fromInfo, setFromInfo] = useState<{ artifactId: string; answer: TrainFromRun | null; problem: string | null } | null>(null);
 
@@ -162,6 +193,17 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
   useEffect(() => {
     if (!draft && saved) setDraft(structureOf(saved.train));
   }, [draft, saved]);
+
+  // OF-BLD-020 §6.2: another `?inlet=` followed while a new train is open starts a fresh train with that inlet.
+  const inletQuery = trainId === NEW_TRAIN && !fromRun ? route.query.get('inlet') : null;
+  const seenInlet = useRef(inletQuery);
+  useEffect(() => {
+    if (inletQuery === seenInlet.current) return;
+    seenInlet.current = inletQuery;
+    const from = inletOfQuery(inletQuery);
+    if (from) setDraft(freshTrain(defaultProgram, defaultProduct, from));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inletQuery]);
 
   // ?from=<run>: a fresh train read from the run's units by the service.
   useEffect(() => {
@@ -451,11 +493,7 @@ function Builder({
             'Not saved yet: Save keeps it in this browser, with every value typed into its panels.'
           )}
         </p>
-        {pricing && (
-          <p className="text-caption text-ink-soft max-w-3xl mt-1" role="status" data-testid="builder-price-words">
-            {PRICE_TRAIN_WORDS}
-          </p>
-        )}
+        {pricing && <PriceInProforma run={run} spec={spec} changed={!!run && !sameTrain(run.spec, spec)} />}
       </section>
 
       <InletSection draft={draft} spec={spec} change={change} clearInlet={() => clearScope(INLET)} refusals={placeRefusals(INLET)} />
@@ -526,6 +564,102 @@ function Builder({
       </section>
 
       {run && <RunResult run={run} changed={!sameTrain(run.spec, spec)} />}
+    </div>
+  );
+}
+
+/**
+ * Price this in Proforma (OF-BLD-020 §6.2): a `custom_train_v1` scenario made
+ * through §6.1's helper from the train run kept on the page and a vessel
+ * design the person chooses, then opened; while either is missing it says
+ * what it needs and how one is made. The browser makes the scenario and
+ * computes nothing: its page binds it and says what waits.
+ */
+function PriceInProforma({ run, spec, changed }: { run: TrainRun | null; spec: TrainSpec; changed: boolean }) {
+  const showArchived = useStore((s) => s.showArchived);
+  const [vessels, setVessels] = useState<VesselSummary[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [vessel, setVessel] = useState('');
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setProblem(null);
+    compositeVessels(showArchived, ctrl.signal)
+      .then(setVessels)
+      .catch((e: unknown) => {
+        if (ctrl.signal.aborted) return;
+        setProblem(problemOf(e));
+        setVessels([]);
+      });
+    return () => ctrl.abort();
+  }, [showArchived]);
+  // The vessel the train's inlet names, else one designed for its simulation, chosen first.
+  const inlet = (run?.spec ?? spec).inlet;
+  const preferred =
+    vessels?.find((v) => !!inlet.vessel && v.artifactId === inlet.vessel) ??
+    (inlet.kind === 'simulation' && inlet.ref ? vessels?.find((v) => v.source === inlet.ref) : undefined) ??
+    null;
+  useEffect(() => {
+    if (!vessel && preferred) setVessel(preferred.artifactId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferred?.artifactId]);
+  const noVessel = vessels !== null && vessels.length === 0;
+  const needs = [...(run ? [] : ['run']), ...(noVessel ? ['vessel'] : [])];
+  const make = () => {
+    if (!run || !vessel) return;
+    const id = scenarioFromVesselAndTrain(vessel, run.artifactId, (run.spec.program as ProgramId) || null, `${run.spec.name}, priced`);
+    navigate(`/proforma/scenario/${encodeURIComponent(id)}`);
+  };
+  return (
+    <div className="card p-3 mt-2 space-y-2 max-w-3xl" role="status" data-testid="builder-price-panel" data-needs={needs.join(',')}>
+      <p className="text-caption text-ink-soft" data-testid="builder-price-words">
+        {PRICE_TRAIN_WORDS}
+      </p>
+      {problem && <p className="text-caption text-signal-warn">{problem}</p>}
+      {vessels === null && !problem && <p className="text-caption text-ink-soft">Asking the service for its kept vessel designs…</p>}
+      {needs.length > 0 && (
+        <div className="text-caption" data-testid="builder-price-needs">
+          <p className="font-medium text-signal-warn">The scenario waits for:</p>
+          <ul className="ml-3 list-disc space-y-0.5">
+            {!run && <li data-need="run">{PRICE_NEEDS_RUN}</li>}
+            {noVessel && (
+              <li data-need="vessel" data-testid="builder-price-no-vessel">
+                {PRICE_NEEDS_VESSEL}{' '}
+                <a className="text-accent hover:underline" href={href('/fermos/vessel')}>
+                  Open fermOS → Vessel
+                </a>
+                .
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+      {vessels !== null && vessels.length > 0 && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-caption text-ink-soft">
+            <span className="block mb-0.5">Vessel design</span>
+            <select className="input min-h-[44px] max-w-[520px]" aria-label="Vessel design to price with" data-testid="builder-price-vessel" value={vessel} onChange={(e) => setVessel(e.target.value)}>
+              <option value="">Choose a kept vessel design</option>
+              {vessels.map((v) => (
+                <option key={v.artifactId} value={v.artifactId}>
+                  {vesselWords(v)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button variant="primary" onClick={make} disabled={!run || !vessel} className="min-h-[44px]" data-testid="builder-price-make">
+            Make the scenario and open it
+          </Button>
+        </div>
+      )}
+      {run && (
+        <p className="text-caption text-ink-soft" data-testid="builder-price-run" data-run={run.artifactId}>
+          The train run priced is{' '}
+          <a className="font-num text-ink hover:text-accent" href={href(`/biorepo/artifacts/${run.artifactId}`)}>
+            {run.artifactId}
+          </a>
+          {changed ? ', the train as it was run: run it again to price the change.' : '.'}
+        </p>
+      )}
     </div>
   );
 }
@@ -605,6 +739,8 @@ function InletSection({
   const showArchived = useStore((s) => s.showArchived);
   const inlet = draft.inlet;
   const [sims, setSims] = useState<SimulationSummary[] | null>(null);
+  // OF-BLD-020 §6.2: each kept simulation's broth at its own harvest hour, as the service reads it (or its words why not).
+  const [harvests, setHarvests] = useState<Record<string, FermosHarvest | string>>({});
   const [vessels, setVessels] = useState<VesselSummary[]>([]);
   const [runs, setRuns] = useState<{ choices: RunChoice[]; problems: string[] } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -615,7 +751,13 @@ function InletSection({
     const ctrl = new AbortController();
     if (inlet.kind === 'simulation') {
       fermosSimulations(showArchived, ctrl.signal)
-        .then(setSims)
+        .then((list) => {
+          setSims(list);
+          for (const sim of list)
+            fermosHarvest(sim.artifactId, null, showArchived, ctrl.signal)
+              .then((h) => setHarvests((was) => ({ ...was, [sim.artifactId]: h })))
+              .catch((e: unknown) => !ctrl.signal.aborted && setHarvests((was) => ({ ...was, [sim.artifactId]: problemOf(e) })));
+        })
         .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
       fermosVessels(showArchived, ctrl.signal)
         .then(setVessels)
@@ -635,9 +777,29 @@ function InletSection({
     clearInlet();
     change({ inlet: { kind, ref: null, streamId: null, vessel: null, params: {} } });
   };
-  const chosenRun = runs?.choices.find((r) => r.artifactId === inlet.ref) ?? null;
-  const complete = inlet.kind === 'typed' || (inlet.kind === 'simulation' && !!inlet.ref) || (inlet.kind === 'run-stream' && !!inlet.ref && !!inlet.streamId);
+  const chosenRun = runs?.choices.find((r) => r.ref === inlet.ref) ?? null;
+  // A scenario's newest run takes the broth its flowsheet names unless a stream is chosen; any other run names its stream.
+  const byScenario = !!chosenRun?.scenarioId || (inlet.kind === 'run-stream' && !!inlet.ref && !/^[0-9a-f]{16}$/.test(inlet.ref));
+  const complete =
+    inlet.kind === 'typed' || (inlet.kind === 'simulation' && !!inlet.ref) || (inlet.kind === 'run-stream' && !!inlet.ref && (!!inlet.streamId || byScenario));
   const ofSim = vessels.filter((v) => v.source === inlet.ref);
+  // The chosen simulation's broth at the hour the inlet's panel holds: its own harvest hour, or a person's.
+  const typedHour = spec.inlet.params?.harvest_hour?.value;
+  const hour = typeof typedHour === 'number' ? typedHour : null;
+  const [chosen, setChosen] = useState<{ key: string; h: FermosHarvest | null; problem: string | null } | null>(null);
+  const chosenKey = `${inlet.kind}|${inlet.ref ?? ''}|${hour ?? ''}|${showArchived}`;
+  useEffect(() => {
+    if (inlet.kind !== 'simulation' || !inlet.ref) return;
+    const ctrl = new AbortController();
+    const key = chosenKey;
+    fermosHarvest(inlet.ref, hour, showArchived, ctrl.signal)
+      .then((h) => setChosen({ key, h, problem: null }))
+      .catch((e: unknown) => !ctrl.signal.aborted && setChosen({ key, h: null, problem: problemOf(e) }));
+    return () => ctrl.abort();
+    // `chosenKey` names the simulation, the hour and the switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chosenKey]);
+  const chosenHarvest = chosen && chosen.key === chosenKey ? chosen : null;
   return (
     <section aria-labelledby="builder-inlet" data-testid="builder-inlet" data-kind={inlet.kind}>
       <SectionTitle>
@@ -657,9 +819,10 @@ function InletSection({
             <span className="block mb-0.5">Simulation</span>
             <select className="input min-h-[44px]" aria-label="Simulation" data-testid="builder-inlet-simulation" value={inlet.ref ?? ''} onChange={(e) => change({ inlet: { ...inlet, ref: e.target.value || null, vessel: null } })}>
               <option value="">choose one</option>
+              {inlet.ref && !sims.some((s) => s.artifactId === inlet.ref) && <option value={inlet.ref}>{`simulation ${inlet.ref}`}</option>}
               {sims.map((s) => (
                 <option key={s.artifactId} value={s.artifactId}>
-                  {s.title} · {s.strain ?? 'every strain'} · {s.artifactId}
+                  {s.title} · {s.strain ?? 'every strain'} · {s.artifactId} · {harvestLine(harvests[s.artifactId])}
                 </option>
               ))}
             </select>
@@ -684,8 +847,9 @@ function InletSection({
               <span className="block mb-0.5">Run</span>
               <select className="input min-h-[44px]" aria-label="Run" data-testid="builder-inlet-run" value={inlet.ref ?? ''} onChange={(e) => change({ inlet: { ...inlet, ref: e.target.value || null, streamId: null } })}>
                 <option value="">choose one</option>
+                {inlet.ref && !runs.choices.some((r) => r.ref === inlet.ref) && <option value={inlet.ref}>{byScenario ? `the newest run of scenario ${inlet.ref}` : `run ${inlet.ref}`}</option>}
                 {runs.choices.map((r) => (
-                  <option key={r.artifactId} value={r.artifactId}>
+                  <option key={`${r.ref}-${r.artifactId}`} value={r.ref} data-scenario={r.scenarioId ?? ''}>
                     {r.label} · {r.artifactId}
                   </option>
                 ))}
@@ -695,7 +859,13 @@ function InletSection({
               <label className="text-caption text-ink-soft">
                 <span className="block mb-0.5">Stream</span>
                 <select className="input min-h-[44px]" aria-label="Stream" data-testid="builder-inlet-stream" value={inlet.streamId ?? ''} onChange={(e) => change({ inlet: { ...inlet, streamId: e.target.value || null } })}>
-                  <option value="">choose one</option>
+                  <option value="">
+                    {chosenRun.scenarioId
+                      ? chosenRun.broth
+                        ? `its broth, ${chosenRun.broth}, as its flowsheet names it`
+                        : 'choose one: its flowsheet names no broth'
+                      : 'choose one'}
+                  </option>
                   {chosenRun.streams.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.id} · {composition(s)}
@@ -707,6 +877,18 @@ function InletSection({
           </>
         )}
       </div>
+      {inlet.kind === 'simulation' && inlet.ref && <HarvestRead read={chosenHarvest} />}
+      {inlet.kind === 'run-stream' && chosenRun?.scenarioId && (
+        <p className="text-caption text-ink-soft mt-1" data-testid="builder-inlet-scenario" data-broth={chosenRun.broth ?? ''}>
+          The train names scenario <span className="font-num">{chosenRun.scenarioId}</span>, so the service reads its newest run when the train runs (now{' '}
+          <span className="font-num">{chosenRun.artifactId}</span>) and{' '}
+          {inlet.streamId
+            ? `its stream ${inlet.streamId}.`
+            : chosenRun.broth
+              ? `the broth its flowsheet names on the shelf, ${chosenRun.broth}.`
+              : 'a stream chosen here: its flowsheet names no broth.'}
+        </p>
+      )}
       {inlet.kind === 'simulation' && sims && sims.length === 0 && (
         <p className="text-caption mt-1">
           No simulation is kept yet:{' '}
@@ -736,6 +918,42 @@ function InletSection({
         <p className="text-caption text-ink-soft mt-1">Choose the {inlet.kind === 'simulation' ? 'simulation' : 'run and its stream'} the broth is; its values then show here, each with its source.</p>
       )}
     </section>
+  );
+}
+
+/** A simulation's broth at harvest in one line, every state with its unit, as the service read it; else its words why not. */
+function harvestLine(h: FermosHarvest | string | undefined): string {
+  if (h === undefined) return 'reading its broth…';
+  if (typeof h === 'string') return h;
+  return `${h.states.map((x) => `${x.state} ${fmt(x.value, 4)} ${x.unit}`).join(', ')} at ${fmt(h.hour, 4)} h`;
+}
+
+/** The chosen simulation's broth at the inlet's hour, as the service read it from the kept series (OF-BLD-020 §6.2). */
+function HarvestRead({ read }: { read: { h: FermosHarvest | null; problem: string | null } | null }) {
+  if (!read) return <p className="text-caption text-ink-soft mt-1">Asking the service for the simulation&rsquo;s broth…</p>;
+  if (!read.h)
+    return (
+      <p className="text-caption text-signal-warn mt-1" data-testid="builder-inlet-harvest-refused">
+        {read.problem}
+      </p>
+    );
+  const h = read.h;
+  return (
+    <div className="card p-3 mt-2 text-caption" data-testid="builder-inlet-harvest" data-artifact={h.artifactId} data-hour={h.hour} data-hour-source={h.hourSource} data-exact={String(h.exact)}>
+      <p>
+        Its broth at <span className="font-num">{fmt(h.hour, 4)} h</span>, {h.hourSource === "a person's hour" ? 'an hour typed in the panel below' : 'the simulation’s own harvest hour'} ({h.how}),
+        read by the service from the series the simulation keeps:
+      </p>
+      <ul className="mt-1 space-y-0.5">
+        {h.states.map((x) => (
+          <li key={x.state} data-testid="builder-inlet-harvest-state" data-state={x.state} data-value={x.value} data-unit={x.unit}>
+            {STATE_WORDS[x.state] ?? x.state}: <span className="font-num">{fmt(x.value, 5)}</span> {x.unit}
+          </li>
+        ))}
+      </ul>
+      {!h.exact && <p className="text-ink-soft mt-1">{h.read}.</p>}
+      <p className="text-ink-soft mt-1">{h.absent}</p>
+    </div>
   );
 }
 

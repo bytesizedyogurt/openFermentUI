@@ -856,6 +856,7 @@ def prototype_fermos_simulate() -> tuple[dict[str, Any], list[Any]]:
                 result.basis.at = AT
                 art = artifacts.get(result.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0})
                 listed = [x.model_copy(update={"createdAt": AT}).model_dump(mode="json") for x in fermos.simulations()]
+                harvests = prototype_harvests(result)
         finally:
             _intake.DATA_DIR = saved
     families = {"off": [f.model_dump(mode="json") for f in fermos.families(False)],
@@ -866,7 +867,26 @@ def prototype_fermos_simulate() -> tuple[dict[str, Any], list[Any]]:
                                       "boundTyped": with_typed,
                                       "simulate": {"request": request.model_dump(mode="json"),
                                                    "body": result.model_dump(mode="json")},
-                                      "simulations": listed}}, [art])
+                                      "simulations": listed, "harvest": harvests}}, [art])
+
+
+def prototype_harvests(result: Any) -> list[dict[str, Any]]:
+    """OF-BLD-020 §6.2: what `GET /api/fermos/harvest` answers for the
+    fixture's kept simulation, read by the real `fermos.harvest` from the
+    series it keeps: at its own harvest hour, at a person's hour (the kept
+    point mid-run, read from the series, not typed), and at an hour past its
+    end (the refusal, in its words). The double answers these alone."""
+    from . import fermos
+
+    t = result.series["t"]
+    out = []
+    for hour in (None, t[len(t) // 2], t[-1] * 2):
+        try:
+            entry = {"status": 200, "body": fermos.harvest(result.artifactId, hour).model_dump(mode="json")}
+        except fermos.SimulationRefused as e:
+            entry = {"status": 422, "body": {"detail": str(e)}}
+        out.append({"request": {"simulation": result.artifactId, "hour": hour}, **entry})
+    return out
 
 
 # OF-BLD-020 §3.R (finding 17): one chemostat_v1 simulation run by the real

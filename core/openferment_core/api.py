@@ -432,6 +432,33 @@ def fermos_simulations(includeArchived: bool = False) -> list[dict]:  # noqa: N8
     return [s.model_dump(mode="json") for s in fermos.simulations(includeArchived)]
 
 
+@app.get("/api/fermos/harvest")
+def fermos_harvest(simulation: str, hour: float | None = None,
+                   includeArchived: bool = False) -> dict:  # noqa: N803 (the wire name)
+    """A kept simulation's broth at an hour (`FermosHarvest`, OF-BLD-020
+    §6.2, D10): its own harvest hour, or `?hour=`, a person's (the hour the
+    Builder's inlet scope holds under their name; a model never sends one),
+    read from the series the artifact keeps, each state with its unit, the
+    hour's source and how it was read. A read: nothing is integrated again
+    and nothing is kept. 404 for a simulation not on file, 409 for one
+    damaged on disk, 422 in words for an hour outside the simulated span, a
+    simulation that keeps no product in the broth, another artifact, and an
+    archived program's with the switch off."""
+    from . import artifacts
+
+    try:
+        art = artifacts.get(simulation)
+    except artifacts.ArtifactNotFound:
+        raise HTTPException(status_code=404, detail=f"there is no kept simulation {simulation} here: fermOS → "
+                                                    "Simulate keeps one") from None
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    try:
+        return fermos.harvest(art, hour, include_archived=includeArchived).model_dump(mode="json")
+    except fermos.SimulationRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
 @app.get("/api/fermos/fits")
 def fermos_fits(flowsheet: str, includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
     """The kinetic fits, forecasts and simulations fermOS keeps (a

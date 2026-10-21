@@ -349,9 +349,11 @@ def test_a_simulation_is_kept_with_every_parameter_and_override_named(store):
     # The same request again is the same artifact.
     assert fermos.simulate(SimulationRequest(family=BATCH, overrides=typed(**STANDIN_TYPED))).artifactId == r.artifactId
     assert artifacts.replay(r.artifactId).identical
+    # OF-BLD-020 §6.2: the harvest is read from the kept series, its own hour a kept point.
     h = fermos.harvest(r.artifactId)
-    assert h["hour"] == pytest.approx(r.harvestH) and h["state"]["P"] == pytest.approx(r.finalTitre)
-    assert fermos.harvest(r.artifactId, 4.0)["how"] == "an hour a person set"
+    assert h.hour == pytest.approx(r.harvestH) and h.exact and h.hourSource == fermos.HARVEST_HOUR
+    assert {x.state: x.value for x in h.states}["P"] == pytest.approx(r.finalTitre)
+    assert fermos.harvest(r.artifactId, 4.0).how == "an hour a person named"
     assert [s.artifactId for s in fermos.simulations()] == [r.artifactId]
 
 

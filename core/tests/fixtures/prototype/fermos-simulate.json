@@ -8703,6 +8703,100 @@
         "createdAt": "2026-09-15T09:00:00Z",
         "provenance": "demo"
       }
+    ],
+    "harvest": [
+      {
+        "request": {
+          "simulation": "c8b79f33e34a5f8f",
+          "hour": null
+        },
+        "status": 200,
+        "body": {
+          "artifactId": "c8b79f33e34a5f8f",
+          "family": "batch_v1",
+          "strain": "s-cerevisiae-cenpk113-7d",
+          "product": "ethanol",
+          "sugar": "glucose",
+          "provenance": "demo",
+          "asked": 7.990398399908909,
+          "hourSource": "the simulation's harvest hour",
+          "how": "the hour its sugar runs out",
+          "hour": 7.990398399908909,
+          "exact": true,
+          "read": "the kept point at 7.9904 h, as the simulation keeps it",
+          "harvestH": 7.990398399908909,
+          "runEndH": 7.990398399908909,
+          "states": [
+            {
+              "state": "X",
+              "value": 4.349692307692307,
+              "unit": "g L⁻¹"
+            },
+            {
+              "state": "S",
+              "value": 0.05999999999999818,
+              "unit": "g L⁻¹"
+            },
+            {
+              "state": "P",
+              "value": 8.299384615384612,
+              "unit": "g L⁻¹"
+            }
+          ],
+          "absent": "By-products the family does not model (carbon dioxide, glycerol, acids) are absent."
+        }
+      },
+      {
+        "request": {
+          "simulation": "c8b79f33e34a5f8f",
+          "hour": 3.995199199954455
+        },
+        "status": 200,
+        "body": {
+          "artifactId": "c8b79f33e34a5f8f",
+          "family": "batch_v1",
+          "strain": "s-cerevisiae-cenpk113-7d",
+          "product": "ethanol",
+          "sugar": "glucose",
+          "provenance": "demo",
+          "asked": 3.995199199954455,
+          "hourSource": "a person's hour",
+          "how": "an hour a person named",
+          "hour": 3.995199199954455,
+          "exact": true,
+          "read": "the kept point at 3.9952 h, as the simulation keeps it",
+          "harvestH": 7.990398399908909,
+          "runEndH": 7.990398399908909,
+          "states": [
+            {
+              "state": "X",
+              "value": 0.9730369241480769,
+              "unit": "g L⁻¹"
+            },
+            {
+              "state": "S",
+              "value": 48.833911095638896,
+              "unit": "g L⁻¹"
+            },
+            {
+              "state": "P",
+              "value": 1.5460738482961527,
+              "unit": "g L⁻¹"
+            }
+          ],
+          "absent": "By-products the family does not model (carbon dioxide, glycerol, acids) are absent."
+        }
+      },
+      {
+        "request": {
+          "simulation": "c8b79f33e34a5f8f",
+          "hour": 15.980796799817819
+        },
+        "status": 422,
+        "body": {
+          "detail": "the hour 15.9808 h lies outside simulation c8b79f33e34a5f8f, which keeps its broth from 0 to 7.9904 h"
+        }
+      }
     ]
   }
 }

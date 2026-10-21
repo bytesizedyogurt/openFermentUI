@@ -2724,8 +2724,9 @@ async function main() {
   // artifact's; the basis names the reviewer. Save keeps it, a reload finds
   // it, the index lists it with its run, the train page links back, a run's
   // units read into a fresh train, and a run whose classes no type holds is
-  // refused in the service's words. Price this in Proforma says what Phase 6
-  // adds and makes nothing.
+  // refused in the service's words. Price this in Proforma (OF-BLD-020 §6.2)
+  // says what it needs with no vessel kept and makes nothing; with one kept,
+  // it makes the custom_train_v1 scenario from the run on the page and opens it.
   let builderFails = 0;
   {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -2817,11 +2818,20 @@ async function main() {
       await page.locator('[data-testid="builder-name"]').fill('Sam’s first train');
       await page.locator('[data-testid="builder-result-stale"]').waitFor({ timeout: 4000 }).catch(() => {});
       if (!(await page.locator('[data-testid="builder-result-stale"]').count())) problems.push('a changed train does not say the run shown is of the train as it was');
-      // Price this in Proforma: words, nothing made.
+      // Price this in Proforma (OF-BLD-020 §6.2): with the run on the page and
+      // no vessel design kept, it says what it needs and how one is made, and
+      // makes nothing.
+      await page.route('**/api/fermos/vessels*', (route) => route.fulfill({ json: [] }));
       const proformaBefore = doubleState.proformaRuns.length;
       await page.locator('[data-testid="builder-price"]').click();
-      if (!/§6\.1/.test(await page.locator('[data-testid="builder-price-words"]').innerText().catch(() => '')) || doubleState.proformaRuns.length !== proformaBefore)
-        problems.push('Price this in Proforma does not say what Phase 6 adds, or makes something');
+      await page.locator('[data-testid="builder-price-no-vessel"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const priceNeeds = await page.locator('[data-testid="builder-price-panel"]').getAttribute('data-needs').catch(() => null);
+      const noVessel = await page.locator('[data-testid="builder-price-no-vessel"]').innerText().catch(() => '');
+      if (priceNeeds !== 'vessel' || !/fermOS → Vessel/.test(noVessel) || (await page.locator('[data-testid="builder-price-make"]').count()) ||
+          doubleState.proformaRuns.length !== proformaBefore || !page.url().includes('#/pureos/build/'))
+        problems.push(`Price this in Proforma with a run and no vessel kept does not say what it needs (${priceNeeds}: ${noVessel.slice(0, 80)}), or makes something`);
+      if ((await page.locator('[data-testid="builder-price-run"]').getAttribute('data-run').catch(() => null)) !== run.artifactId) problems.push('Price this in Proforma does not name the run it prices');
+      await page.unroute('**/api/fermos/vessels*');
       // Save, then a reload finds the train, its values with it.
       await page.locator('[data-testid="builder-save"]').click();
       await page.waitForTimeout(900);
@@ -2856,6 +2866,31 @@ async function main() {
       await page.goto(`http://localhost:${PORT}/#/pureos/build/new?from=${refused.request.artifactId}`, { waitUntil: 'networkidle' });
       await page.locator('[data-testid="builder-from-run-refused"]').waitFor({ timeout: 8000 }).catch(() => {});
       if (!(await page.locator('[data-testid="builder-from-run-refused"]').innerText().catch(() => '')).includes(refused.body.detail.slice(0, 60))) problems.push('a run no catalogue type holds is not refused in the service\u2019s words');
+      // OF-BLD-020 §6.2: with a vessel design kept (the vessel fixture's, as
+      // GET /api/fermos/vessels lists one), Price this in Proforma makes the
+      // custom_train_v1 scenario through §6.1's helper from the run kept on the
+      // page and the vessel chosen, and opens it, naming both.
+      const vfx = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/fermos-vessel.json'), 'utf8')).response;
+      const design = vfx.designs.find((d) => d.status === 200).body;
+      const keptVessel = { artifactId: design.artifactId, provenance: design.provenance, createdAt: design.createdAt, source: design.source, sourceTool: design.sourceTool, unitClass: design.unitClass, vesselType: design.vesselType ?? null, vessels: null, volume: null, installed: null };
+      await page.route('**/api/fermos/vessels*', (route) => route.fulfill({ json: [keptVessel] }));
+      await page.goto(`http://localhost:${PORT}/#/pureos/build/${id}`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="builder-ready"]').waitFor({ timeout: 10000 }).catch(() => {});
+      await page.locator('[data-testid="builder-price"]').click();
+      await page.locator('[data-testid="builder-price-panel"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="builder-price-panel"]').getAttribute('data-needs').catch(() => null)) !== 'run' || (await page.locator('[data-testid="builder-price-make"]').isEnabled().catch(() => true)))
+        problems.push('Price this in Proforma with no run on the page does not say it needs one, or offers to make the scenario');
+      await page.locator('[data-testid="builder-run-button"]').click();
+      await page.locator('[data-testid="builder-result"]').waitFor({ timeout: 10000 }).catch(() => {});
+      await page.locator('[data-testid="builder-price-vessel"]').selectOption(design.artifactId).catch(() => {});
+      await page.locator('[data-testid="builder-price-make"]').click({ timeout: 8000 }).catch(() => {});
+      await page.waitForURL(/#\/proforma\/scenario\/sc-/, { timeout: 8000 }).catch(() => {});
+      const parts = page.locator('[data-testid="scenario-parts"]');
+      await parts.waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/#\/proforma\/scenario\/sc-/.test(page.url()) || (await parts.getAttribute('data-vessel').catch(() => null)) !== design.artifactId ||
+          (await parts.getAttribute('data-train-run').catch(() => null)) !== run.artifactId)
+        problems.push(`Price this in Proforma did not make and open the scenario of the vessel chosen and the run kept (${page.url()})`);
+      await page.unroute('**/api/fermos/vessels*');
     } catch (e) {
       problems.push(String(e).slice(0, 200));
     }
@@ -2863,11 +2898,88 @@ async function main() {
       builderFails++;
       console.log(`✗ builder      ${problems.join('; ')}`);
     } else {
-      console.log(`✓ builder      New train from the index; the palette is the service's catalogue by stage, no cost model said; a broth typed under ${REVIEWER}'s name; three units from the palette, an outlet never offered a later unit; what holds the run on the centrifuge's card and Run off; the split typed, Run on; the run posted whole with every override, its purity by stream and recovery by unit the artifact's (worker: ${fx.worker.kind}), the basis naming the reviewer; a rename says the run is of the train as it was; Price this in Proforma is words; Save, a reload finds it with its values; the index lists it with its run; the train page links back; a run's units read into a train, and one no type holds refused in words`);
+      console.log(`✓ builder      New train from the index; the palette is the service's catalogue by stage, no cost model said; a broth typed under ${REVIEWER}'s name; three units from the palette, an outlet never offered a later unit; what holds the run on the centrifuge's card and Run off; the split typed, Run on; the run posted whole with every override, its purity by stream and recovery by unit the artifact's (worker: ${fx.worker.kind}), the basis naming the reviewer; a rename says the run is of the train as it was; Price this in Proforma says it needs a vessel and how one is made; Save, a reload finds it with its values; the index lists it with its run; the train page links back; a run's units read into a train, and one no type holds refused in words; with a vessel kept, Price this in Proforma makes the custom_train_v1 scenario from the run and opens it`);
     }
     await page.close();
   }
   // ── end §5.3
+
+  // ── OF-BLD-020 §6.2 — the broth that leaves fermOS is the stream that enters pureOS.
+  //
+  // With a reviewer name, fermOS → Simulate runs the double's recorded
+  // simulation (the fixture's STAND-IN values typed); its result offers Use as
+  // a train's inlet, which lands on a new train in the Builder with that
+  // simulation as its inlet; the inlet shows its broth at the simulation's own
+  // harvest hour, every state with its unit, as the real fermos.harvest read
+  // it from the kept series (GET /api/fermos/harvest, the double answering
+  // from fermos-simulate.json), and lists the simulation with its broth.
+  // Price this in Proforma, with no run on the page and no vessel design
+  // kept, says it needs both and how a vessel is made, and makes nothing.
+  let seamFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const sim = fixture('fermos-simulate.json');
+    const want = sim.simulate.request;
+    const result = sim.simulate.body;
+    const own = sim.harvest.find((h) => h.request.hour == null).body;
+    try {
+      if (!(await setShowArchived(page, false))) problems.push('the archive switch is not off');
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/fermos/simulate`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="simulate-strain"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="simulate-strain"]').selectOption(want.strain);
+      await page.locator('[data-testid="simulate-panel"] [data-testid="param-row"][data-key="mu_max"]').waitFor({ timeout: 8000 }).catch(() => {});
+      for (const o of sim.typed) await typeParam(page, o.key, o.value);
+      await page.locator('[data-testid="simulate-ready"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="simulate-button"]').click();
+      await page.locator('[data-testid="simulation-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const link = page.locator('[data-testid="simulation-train-inlet"]');
+      if ((await link.getAttribute('href').catch(() => null)) !== `#/pureos/build/new?inlet=simulation:${result.artifactId}`)
+        problems.push(`Use as a train's inlet does not name the simulation (${await link.getAttribute('href').catch(() => null)})`);
+      await link.click();
+      await page.locator('[data-testid="pureos-builder"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const inletBox = page.locator('[data-testid="builder-inlet"]');
+      if ((await inletBox.getAttribute('data-kind').catch(() => null)) !== 'simulation') problems.push('the Builder does not open with a simulation inlet');
+      await page.locator('[data-testid="builder-inlet-simulation"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="builder-inlet-simulation"]').inputValue().catch(() => '')) !== result.artifactId) problems.push('the Builder does not open with the simulation chosen');
+      const harvest = page.locator('[data-testid="builder-inlet-harvest"]');
+      await harvest.waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await harvest.getAttribute('data-hour-source').catch(() => null)) !== own.hourSource || Number(await harvest.getAttribute('data-hour').catch(() => NaN)) !== own.hour)
+        problems.push("the inlet's broth is not read at the simulation's own harvest hour as the service read it");
+      const shownStates = await harvest
+        .locator('[data-testid="builder-inlet-harvest-state"]')
+        .evaluateAll((els) => els.map((e) => `${e.getAttribute('data-state')}=${e.getAttribute('data-value')} ${e.getAttribute('data-unit')}`).join());
+      const wantStates = own.states.map((x) => `${x.state}=${x.value} ${x.unit}`).join();
+      if (shownStates !== wantStates) problems.push(`the inlet's broth shows ${shownStates}, not the service's ${wantStates}`);
+      const option = await page.locator(`[data-testid="builder-inlet-simulation"] option[value="${result.artifactId}"]`).innerText().catch(() => '');
+      if (!own.states.every((x) => option.includes(`${x.state} `) && option.includes(x.unit))) problems.push(`the chooser does not list the simulation with its broth (${option})`);
+      const asked = doubleState.harvestReads.filter((r) => r.simulation === result.artifactId);
+      if (!asked.length || asked.some((r) => r.hour !== null)) problems.push('the Builder did not ask the service for the broth at the simulation\u2019s own hour, or sent an hour nobody typed');
+      // Price this in Proforma: no run here, and no vessel design kept.
+      await page.route('**/api/fermos/vessels*', (route) => route.fulfill({ json: [] }));
+      await page.locator('[data-testid="builder-price"]').click();
+      await page.locator('[data-testid="builder-price-no-vessel"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const needs = await page.locator('[data-testid="builder-price-panel"]').getAttribute('data-needs').catch(() => null);
+      if (needs !== 'run,vessel' || !/fermOS → Vessel/.test(await page.locator('[data-testid="builder-price-no-vessel"]').innerText().catch(() => '')) || !page.url().includes('#/pureos/build/new'))
+        problems.push(`Price this in Proforma does not say it needs a run and a vessel, and how one is made (${needs})`);
+      await page.unroute('**/api/fermos/vessels*');
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    if (problems.length) {
+      seamFails++;
+      console.log(`✗ seam         ${problems.join('; ')}`);
+    } else {
+      console.log("✓ seam         Simulate's result offers Use as a train's inlet, which opens a new train in the Builder with the simulation as its inlet; its broth at the simulation's own harvest hour is the service's read of the kept series, every state with its unit, and the chooser lists it with its broth; Price this in Proforma says it needs a run and a vessel design and how one is made, and makes nothing");
+    }
+    await page.close();
+  }
+  // ── end §6.2
 
   await browser.close();
   server.close();
@@ -2894,7 +3006,8 @@ async function main() {
   console.log(`${1 - vesselFails}/1 fermOS Vessel — every design parameter in the panel, a scale a named assumption, the design and its oxygen balance read from the service`);
   console.log(`${1 - simulateFails}/1 fermOS Simulate — a family simulated from its sources, what waits typed under a name, the result read from the artifact`);
   console.log(`${1 - builderFails}/1 pureOS Builder — a train built unit by unit, every value typed under a name, run, saved and found again`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || proposeFails || brothFails || ceilingFails || vesselFails || simulateFails || builderFails) process.exit(1);
+  console.log(`${1 - seamFails}/1 the seam — a simulation's harvest becomes a train's inlet, its broth the service's read of the kept series`);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || proposeFails || brothFails || ceilingFails || vesselFails || simulateFails || builderFails || seamFails) process.exit(1);
 }
 
 main();

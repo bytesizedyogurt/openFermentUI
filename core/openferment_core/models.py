@@ -1894,6 +1894,11 @@ class FlowsheetInfo(BaseModel):
     # on them (`custom_train_v1`: a `fermos.vessel` design and a
     # `pureos.train_run`); empty for a flowsheet that is whole on its own.
     builtFrom: list[str] = Field(default_factory=list)
+    # OF-BLD-020 §6.2 (D10): the stream the flowsheet names as its fermenter's
+    # broth (its beer), by the id its run's stream table gives it: what a
+    # train's inlet takes from a scenario's newest run. None: it names none,
+    # and such an inlet names its stream.
+    brothStream: str | None = None
 
 
 # ── A reference biorefinery's run (OF-BLD-019 §2.2, D3) ──────────────────
@@ -2958,6 +2963,56 @@ class SimulationSummary(BaseModel):
     harvestH: float | None = None
     createdAt: str
     provenance: Provenance
+
+
+# ── The harvest stream (OF-BLD-020 §6.2, D10) ───────────────────────────
+#
+# A kept simulation's broth at an hour, read from the series the artifact
+# keeps (fermos.harvest): nothing is integrated again and nothing is kept.
+# The broth that leaves fermOS is the stream that enters pureOS: a train's
+# simulation inlet reads its composition through the same read.
+
+HarvestHourSource = Literal["the simulation's harvest hour", "a person's hour"]
+
+
+class HarvestState(BaseModel):
+    """One state of the simulation at the hour read, in the unit it keeps."""
+
+    # The family's state: X (cells), S (sugar), P (product), V, N, Q.
+    state: str
+    value: float
+    unit: str
+
+
+class FermosHarvest(BaseModel):
+    """GET /api/fermos/harvest: a kept simulation's broth at an hour."""
+
+    artifactId: str
+    family: str
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    provenance: Provenance
+    # The hour asked: the simulation's own harvest hour, or a person's.
+    asked: float
+    hourSource: HarvestHourSource
+    # Why that hour, in words (the hour its sugar runs out, its run's end, an
+    # hour a person named).
+    how: str
+    # The kept point the states are read at, and whether it is the hour asked.
+    hour: float
+    exact: bool
+    # How the states were read, in words: the kept point at the hour, or the
+    # nearest kept point to it (the artifact keeps its series on a grid, not
+    # the solver's dense output, and nothing is integrated again).
+    read: str
+    # The simulation's own harvest hour, and the last hour it keeps.
+    harvestH: float
+    runEndH: float
+    # Every state the simulation keeps a series of, in its family's order.
+    states: list[HarvestState]
+    # What the family does not model is absent from the broth, in words.
+    absent: str
 
 
 # ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────

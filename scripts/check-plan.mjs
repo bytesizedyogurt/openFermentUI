@@ -250,6 +250,9 @@ const PAIRS = [
   ['SimulationSummary', 'SimulationSummary'],
   // OF-BLD-020 §3.2 — a family's parameters bound from a fit, the records, a kept simulation.
   ['FermosBinding', 'FermosBinding'],
+  // OF-BLD-020 §6.2 — a kept simulation's broth at an hour, read from its kept series.
+  ['HarvestState', 'HarvestState'],
+  ['FermosHarvest', 'FermosHarvest'],
   // OF-BLD-020 §5.1 — pureOS's unit catalogue: each entry a BioSTEAM class
   // or an in-house unit, with its parameters and their sources.
   ['UnitPort', 'UnitPort'],

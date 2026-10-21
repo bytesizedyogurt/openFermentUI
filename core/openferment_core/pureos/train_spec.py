@@ -19,7 +19,17 @@ run; the service keeps the runs.
                              from the mixture's density), a kept run's stream
                              (its kg/hr, temperature, pressure and phase), or a
                              composition typed under a person's name; with its
-                             values, their sources and its basis inputs
+                             values, their sources and its basis inputs.
+                             OF-BLD-020 §6.2: the broth is read through
+                             fermos.harvest at the scope's harvest hour (the
+                             simulation's own, or a person's, named), from the
+                             series the simulation keeps, never integrated
+                             again; a run-stream inlet may name a scenario by
+                             its id, and then reads that scenario's newest run
+                             and the stream its flowsheet names on the shelf as
+                             its broth (`brothStream`), refused in words naming
+                             the run's streams when it names none; the basis's
+                             `inlet source` says which source was read
     run_train(spec, overrides=None, by=None, include_archived=False)
                              resolve every parameter of every unit with its
                              source, refuse what waits in words, and keep one
@@ -113,6 +123,8 @@ ONWARD, WASTE, RECYCLE = "onward", "waste", "recycle:"
 # A unit's id is its BioSTEAM unit id: a letter, then letters, digits and
 # underscores (BioSTEAM's ids take no dash or dot).
 UNIT_ID = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,31}")
+# An artifact's id: the first sixteen hex of its hash (artifacts.artifact_id).
+ARTIFACT_ID = re.compile(r"[0-9a-f]{16}")
 SIMULATION = "fermos.simulation"
 VESSEL = "fermos.vessel"
 # The artifacts whose stream table a run-stream inlet reads.
@@ -283,14 +295,21 @@ def refusals_by_place(spec: TrainSpec) -> list[tuple[str, str]]:
         at("inlet", f"a {inlet.kind} inlet names its artifact (ref)")
     if inlet.kind == "typed" and inlet.ref:
         at("inlet", "a typed inlet names no artifact: its composition is typed")
-    if inlet.kind == "run-stream" and not inlet.streamId:
+    # OF-BLD-020 §6.2: a run-stream inlet names a kept run by its artifact id
+    # and the stream, or a scenario by its id, whose newest run's broth (the
+    # stream its flowsheet names on the shelf) it takes unless it names one.
+    by_scenario = inlet.kind == "run-stream" and bool(inlet.ref) and not ARTIFACT_ID.fullmatch(inlet.ref or "")
+    if inlet.kind == "run-stream" and not inlet.streamId and not by_scenario:
         at("inlet", "a run's stream as the inlet names the stream (streamId)")
     if inlet.kind != "run-stream" and inlet.streamId:
         at("inlet", "a stream id belongs to a run-stream inlet")
     if inlet.vessel and inlet.kind != "simulation":
         at("inlet", "a vessel gives the broth flow of a simulation's harvest alone")
-    for ref, what in ((inlet.ref, "ref"), (inlet.vessel, "vessel")):
-        if ref and not re.fullmatch(r"[0-9a-f]{16}", ref):
+    if by_scenario and not re.fullmatch(params._ID, inlet.ref or ""):
+        at("inlet", f"a run-stream inlet's ref is a run's artifact id (16 hex) or a scenario's id (letters, digits, "
+                    f"dots, dashes, underscores); {inlet.ref!r} is neither")
+    for ref, what in ((None if inlet.kind == "run-stream" else inlet.ref, "ref"), (inlet.vessel, "vessel")):
+        if ref and not ARTIFACT_ID.fullmatch(ref):
             at("inlet", f"the inlet's {what} is an artifact id (16 hex); {ref!r} is not one")
     allowed = {"simulation": ("broth_flow", "harvest_hour", "T", "P"), "run-stream": (), "typed": ("broth_flow", "T", "P")}
     for key in inlet.params:
@@ -461,6 +480,11 @@ class _InletRead(NamedTuple):
     chemical_of_state: dict[str, str]
     conventions: list[BasisInput]
     notes: list[str]
+    # OF-BLD-020 §6.2: the run's stream the inlet takes (named, or the broth
+    # a scenario's flowsheet names), and which source a run-stream read, in
+    # a word and in words (`inlet source` in the basis).
+    stream_id: str | None = None
+    source: tuple[str, str] | None = None
 
 
 def _vessel_flow(spec: TrainSpec, sim: Artifact) -> ParameterValue:
@@ -494,6 +518,44 @@ def _vessel_flow(spec: TrainSpec, sim: Artifact) -> ParameterValue:
         detail=f"read from vessel design {v.id}: working volume × vessels ÷ cycle time")
 
 
+def _scenario_run(scenario: str, stream_id: str | None, include_archived: bool) -> tuple[Artifact, str, tuple[str, str]]:
+    """A scenario's newest run on file and the stream the inlet takes from
+    it (OF-BLD-020 §6.2): the one the train names, else the broth its
+    flowsheet names on the shelf (`brothStream`, read from the shelf entry,
+    never guessed); refused in words naming the streams the run holds when
+    the flowsheet names none, and when the scenario has no run on file."""
+    from .. import proforma
+    from ..flowsheets import shelf
+
+    run = proforma.latest_run(scenario)
+    if run is None:
+        raise TrainRefused(f"there is no kept artifact or scenario run {scenario} here, which the train names as its "
+                           "inlet: a run-stream inlet names a kept run by its artifact id, or a scenario whose newest "
+                           "run is read (Proforma keeps a scenario's runs when it runs)")
+    _shown(run, "run", include_archived)
+    tables = proforma.tables_of(run)
+    ids = [s.id for s in tables.streams]
+    held = ", ".join(ids) or "none: its stream table is empty"
+    where = f"run {run.id}, the newest run of scenario {scenario} on file"
+    if stream_id:
+        if stream_id not in ids:
+            raise TrainRefused(f"{where}, holds no stream {stream_id}; its streams are {held}")
+        return run, stream_id, ("a scenario's newest run", f"stream {stream_id} of {where}, as the train names it")
+    flowsheet = tables.flowsheet
+    try:
+        broth = shelf.info(flowsheet).brothStream if flowsheet else None
+    except shelf.NotOnShelf:
+        broth = None
+    if not broth:
+        raise TrainRefused(f"{where}, is of {flowsheet or 'a flowsheet its basis does not name'}, whose shelf entry names "
+                           f"no broth stream: name the stream the train takes, one of {held}")
+    if broth not in ids:
+        raise TrainRefused(f"{flowsheet} names {broth} as its broth, and {where} holds no stream {broth}; its streams "
+                           f"are {held}")
+    return run, broth, ("a scenario's newest run", f"stream {broth} of {where}: the stream {flowsheet} names as its "
+                                                   "broth, read from its shelf entry")
+
+
 def _inlet_read(spec: TrainSpec, include_archived: bool = True) -> _InletRead:
     from .. import thermo
 
@@ -501,7 +563,7 @@ def _inlet_read(spec: TrainSpec, include_archived: bool = True) -> _InletRead:
     conventions: list[BasisInput] = []
     notes: list[str] = []
     if inlet.kind == "simulation":
-        from .. import kinetics, vessel
+        from .. import fermos, kinetics, vessel
 
         art = _artifact(inlet.ref or "", "inlet")
         if art.tool != SIMULATION:
@@ -541,6 +603,13 @@ def _inlet_read(spec: TrainSpec, include_archived: bool = True) -> _InletRead:
             raise TrainRefused(f"simulation {art.id} runs on {sugar or 'no sugar it names'}; the inlet reads "
                                f"{', '.join(SUGAR_CHEMICALS)} as the program's chemicals name them")
         mapping = {"X": cells or "", "P": chem, "S": sugar_chem}
+        # OF-BLD-020 §6.2: the broth is read from the series the simulation
+        # keeps (fermos.harvest); one it cannot be read from is refused here,
+        # in words naming what it lacks, before any value is asked.
+        try:
+            fermos.harvest(art)
+        except fermos.SimulationRefused as e:
+            raise TrainRefused(f"the inlet: {e}") from None
         harvest = o.get("harvestH")
         sources: dict[str, dict[str, ParameterValue | None]] = {"harvest_hour": {}, "broth_flow": {},
                                                                 "T": {"library-default": _stream_default("T")},
@@ -571,14 +640,19 @@ def _inlet_read(spec: TrainSpec, include_archived: bool = True) -> _InletRead:
     if inlet.kind == "run-stream":
         from .. import proforma
 
-        art = _artifact(inlet.ref or "", "inlet")
-        if art.tool not in STREAM_TOOLS:
-            raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact; a run's stream is read from a "
-                               f"{', '.join(STREAM_TOOLS)} artifact")
-        _shown(art, "run", include_archived)
-        row = next((s for s in proforma.tables_of(art).streams if s.id == inlet.streamId), None)
+        if ARTIFACT_ID.fullmatch(inlet.ref or ""):
+            art = _artifact(inlet.ref or "", "inlet")
+            if art.tool not in STREAM_TOOLS:
+                raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact; a run's stream is read from a "
+                                   f"{', '.join(STREAM_TOOLS)} artifact")
+            _shown(art, "run", include_archived)
+            stream_id = inlet.streamId
+            source = ("a run's stream", f"stream {stream_id} of run {art.id}, as the train names it")
+        else:
+            art, stream_id, source = _scenario_run(inlet.ref or "", inlet.streamId, include_archived)
+        row = next((s for s in proforma.tables_of(art).streams if s.id == stream_id), None)
         if row is None:
-            raise TrainRefused(f"run {art.id}'s stream table holds no stream {inlet.streamId}")
+            raise TrainRefused(f"run {art.id}'s stream table holds no stream {stream_id}")
         if len(row.phase) != 1:
             raise TrainRefused(f"stream {row.id} of run {art.id} is in phases {row.phase!r}; its table keeps no split "
                                "by phase, so it is not an inlet here")
@@ -588,8 +662,11 @@ def _inlet_read(spec: TrainSpec, include_archived: bool = True) -> _InletRead:
         specs = _tp_specs(["artifact"])
         notes.append(f"Stream {row.id} of run {art.id}: its kg/hr by chemical, temperature, pressure and phase, as its "
                      "stream table holds them.")
+        if not ARTIFACT_ID.fullmatch(inlet.ref or ""):
+            notes.append(f"{source[1][0].upper()}{source[1][1:]}.")
         return _InletRead(params.Provided(title=f"Inlet of train {spec.name}: stream {row.id} of run {art.id}",
-                                          specs=specs, sources=sources, notes=notes), art, {}, conventions, notes)
+                                          specs=specs, sources=sources, notes=notes), art, {}, conventions, notes,
+                          stream_id, source)
     ws = train_specs()
     chems = [c for c in ws["chemicals"] if c != catalogue.SOLVENT]
     specs = [_flow_spec(["assumption"], "A person's."), *(
@@ -661,9 +738,11 @@ def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, b
     if art is not None:
         basis.append(BasisInput(name="inlet", value=art.id, unit="", source=BasisSource(
             kind="artifact", id=art.id, note=f"the {art.tool} the inlet is read from")))
-    if spec.inlet.streamId:
-        basis.append(BasisInput(name="inlet stream", value=spec.inlet.streamId, unit="", source=BasisSource(
-            kind="convention", note="the stream of that run the train takes")))
+    stream_id = got.stream_id or spec.inlet.streamId
+    if stream_id:
+        basis.append(BasisInput(name="inlet stream", value=stream_id, unit="", source=BasisSource(
+            kind="convention", note="the stream of that run the train takes" if spec.inlet.streamId else
+            "the stream of that run the train takes: the broth its flowsheet names on the shelf")))
     if spec.inlet.vessel:
         basis.append(BasisInput(name="vessel", value=spec.inlet.vessel, unit="", source=BasisSource(
             kind="artifact", id=spec.inlet.vessel, note="the vessel design whose working volume, vessels and cycle time "
@@ -677,24 +756,37 @@ def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, b
     phase = "l"
     absent = None
     harvest_hour = None
+    source = got.source
     if spec.inlet.kind == "simulation":
-        harvest_hour = float(v["harvest_hour"].value)  # type: ignore[arg-type]
+        hv = v["harvest_hour"]
+        persons = hv.origin == "assumption"
+        harvest_hour = float(hv.value)  # type: ignore[arg-type]
+        # OF-BLD-020 §6.2: the broth at the scope's harvest hour, read from
+        # the series the simulation keeps (fermos.harvest, never integrated
+        # again): its own hour unless a person named one.
         try:
-            h = fermos.harvest(art, harvest_hour)
+            h = fermos.harvest(art, harvest_hour if persons else None)
         except (kinetics.FamilyRefused, ValueError) as e:
             raise TrainRefused(f"the inlet: {e}") from None
-        absent = h.get("absent")
+        absent = h.absent
+        state_of = {x.state: x.value for x in h.states}
         concentrations = {}
         for state, chem in got.chemical_of_state.items():
-            c = float(h["state"][state])
+            c = float(state_of[state])
             concentrations[chem] = concentrations.get(chem, 0.0) + c
             basis.append(BasisInput(name=f"{INLET}{catalogue.SEP}conc{catalogue.SEP}{chem}", value=c, unit="g L⁻¹",
                                     source=BasisSource(kind="artifact", id=art.id, note=(
-                                        f"{state} of simulation {art.id} at {harvest_hour:.6g} h, in g L⁻¹ as the "
-                                        f"simulation keeps it, read as {chem}"))))
-        if v["harvest_hour"].origin == "assumption":
-            notes.append(f"The broth is taken at {harvest_hour:.6g} h, an hour {v['harvest_hour'].overriddenBy} named, "
+                                        f"{state} of simulation {art.id} at {h.hour:.6g} h, in g L⁻¹ as the "
+                                        f"simulation keeps it, read as {chem}" + ("" if h.exact else f"; {h.read}")))))
+        if persons:
+            notes.append(f"The broth is taken at {harvest_hour:.6g} h, an hour {hv.overriddenBy} named, "
                          f"not the simulation's own harvest hour.")
+        if not h.exact:
+            notes.append(f"The broth is read at {h.read}.")
+        source = ((fermos.PERSONS_HOUR, f"the broth of simulation {art.id} at {h.asked:.6g} h, an hour "
+                                        f"{hv.overriddenBy} named, read from the series it keeps: {h.read}") if persons
+                  else (fermos.HARVEST_HOUR, f"the broth of simulation {art.id} at its own harvest hour, "
+                                             f"{h.asked:.6g} h ({h.how}), read from the series it keeps: {h.read}"))
         basis.append(BasisInput(name="inlet absent", value=str(absent or ""), unit="", source=BasisSource(
             kind="convention", note="what the simulation's family does not model is absent from the inlet (D10)")))
     elif spec.inlet.kind == "typed":
@@ -706,7 +798,7 @@ def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, b
     else:
         from .. import proforma
 
-        row = next(s for s in proforma.tables_of(art).streams if s.id == spec.inlet.streamId)
+        row = next(s for s in proforma.tables_of(art).streams if s.id == stream_id)
         flows = {c: float(m) for c, m in row.massFlows.items() if m > 0}
         phase = row.phase
         for c, m in flows.items():
@@ -715,7 +807,14 @@ def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, b
                                         f"{c} in stream {row.id} of run {art.id}, as its stream table holds it"))))
     basis.append(BasisInput(name="inlet phase", value=phase, unit="", source=BasisSource(
         kind="convention", note="the inlet's phase: a broth is a liquid" if spec.inlet.kind != "run-stream"
-        else f"the phase stream {spec.inlet.streamId} of run {art.id} is in")))
+        else f"the phase stream {stream_id} of run {art.id} is in")))
+    if source is None:
+        persons = sorted({str(x.overriddenBy) for x in values if x.origin == "assumption" and x.overriddenBy})
+        source = ("typed", f"each component's concentration typed in the inlet's panel, by {', '.join(persons)}"
+                  if persons else "each component's concentration typed in the inlet's panel")
+    # OF-BLD-020 §6.2: which source the inlet read, in a word and in words.
+    basis.append(BasisInput(name="inlet source", value=source[0], unit="", source=BasisSource(
+        kind="convention", note=source[1])))
     if concentrations is not None:
         basis.append(BasisInput(name="inlet balance", value=catalogue.SOLVENT, unit="", source=BasisSource(
             kind="convention", note=(f"{catalogue.SOLVENT} is the balance: the {catalogue.SOLVENT} that brings the "
@@ -727,7 +826,7 @@ def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, b
               "balance": catalogue.SOLVENT if concentrations is not None else None,
               "T": float(v["T"].value), "P": float(v["P"].value), "phase": phase}  # type: ignore[arg-type]
     read = TrainInletRead(kind=spec.inlet.kind, ref=art.id if art else None, refTool=art.tool if art else None,
-                          streamId=spec.inlet.streamId, vessel=spec.inlet.vessel, chemicals=chemicals,
+                          streamId=stream_id, vessel=spec.inlet.vessel, chemicals=chemicals,
                           concentrations=concentrations, flows=flows, brothFlow=worker["brothFlow"],
                           harvestHour=harvest_hour, T=worker["T"], P=worker["P"], phase=phase, absent=absent,
                           notes=notes)
@@ -749,7 +848,7 @@ def chemicals_of(spec: TrainSpec, overrides: Iterable[Override] = (), include_ar
         return sorted({*got.chemical_of_state.values(), catalogue.SOLVENT} - {""})
     from .. import proforma
 
-    row = next(s for s in proforma.tables_of(got.art).streams if s.id == inlet.streamId)
+    row = next(s for s in proforma.tables_of(got.art).streams if s.id == got.stream_id)
     return sorted(c for c, m in row.massFlows.items() if m > 0)
 
 
@@ -1463,14 +1562,19 @@ def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
             ref_tool = artifacts.get(str(ref.value)).tool
         except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged):
             ref_tool = None
-    inlet_notes = [str(i.source.note) for i in inputs if i.name in ("inlet kind", "cells read as", "product read as")
-                   and i.source.note]
+    inlet_notes = [str(i.source.note) for i in inputs
+                   if i.name in ("inlet kind", "inlet source", "cells read as", "product read as") and i.source.note]
+    # The run and stream the inlet read, as the basis names them: a
+    # scenario's newest run and its broth when the train names a scenario
+    # (OF-BLD-020 §6.2); the same as the train's own for an artifact.
+    stream = _named(inputs, "inlet stream")
     hour = given.get("harvest_hour")
     if hour is not None and hour.source.kind == "assumption":
         inlet_notes.append(f"the broth is taken at {float(hour.value):.6g} h, an hour {hour.source.by} named, not the "
                            "simulation's own harvest hour")
     read = TrainInletRead(
-        kind=spec.inlet.kind, ref=spec.inlet.ref, refTool=ref_tool, streamId=spec.inlet.streamId, vessel=spec.inlet.vessel,
+        kind=spec.inlet.kind, ref=str(ref.value) if ref is not None else spec.inlet.ref, refTool=ref_tool,
+        streamId=str(stream.value) if stream is not None else spec.inlet.streamId, vessel=spec.inlet.vessel,
         chemicals=chems, concentrations=conc if balance is not None else None, flows=built["flows"],
         water=built.get("water"), waterNote=built.get("waterNote"), brothFlow=inlet["brothFlow"],
         harvestHour=float(given["harvest_hour"].value) if "harvest_hour" in given else None,  # type: ignore[arg-type]

@@ -3916,7 +3916,7 @@
       "key": "{\"program\":\"yeast\",\"product\":\"ethanol\",\"inlet\":[\"typed\",null,null,null,[[\"broth_flow\",1.0],[\"conc.Ethanol\",50.0],[\"conc.Yeast\",10.0]]],\"units\":[[\"U1\",\"centrifugation\",[[\"split.Ethanol\",0.05],[\"split.Yeast\",0.9]],[[\"cake\",\"waste\"],[\"liquid\",\"onward\"]],null,[]],[\"U2\",\"tank\",[],[[\"outlet\",\"onward\"]],null,[]],[\"U3\",\"pump\",[],[[\"outlet\",\"onward\"]],null,[]]]}",
       "status": 200,
       "body": {
-        "artifactId": "376fdb32b77dee9d",
+        "artifactId": "64c8af8aa683d972",
         "provenance": "demo",
         "createdAt": "2026-09-15T09:00:00Z",
         "spec": {
@@ -4010,7 +4010,7 @@
         "train": {
           "scenarioId": null,
           "scenarioName": null,
-          "artifactId": "376fdb32b77dee9d",
+          "artifactId": "64c8af8aa683d972",
           "flowsheet": null,
           "createdAt": "2026-09-15T09:00:00Z",
           "provenance": "demo",
@@ -4342,7 +4342,8 @@
           "phase": "l",
           "absent": null,
           "notes": [
-            "the inlet is a composition typed under a person's name"
+            "the inlet is a composition typed under a person's name",
+            "each component's concentration typed in the inlet's panel, by openFerment test fixture"
           ]
         },
         "parameters": [
@@ -4811,6 +4812,17 @@
               }
             },
             {
+              "name": "inlet source",
+              "value": "typed",
+              "unit": "",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "each component's concentration typed in the inlet's panel, by openFerment test fixture",
+                "by": null
+              }
+            },
+            {
               "name": "inlet balance",
               "value": "Water",
               "unit": "",
@@ -5075,7 +5087,7 @@
               }
             }
           ],
-          "artifactId": "376fdb32b77dee9d",
+          "artifactId": "64c8af8aa683d972",
           "at": "2026-09-15T09:00:00Z",
           "seed": null
         },
@@ -5157,7 +5169,7 @@
       {
         "scenarioId": null,
         "scenarioName": null,
-        "artifactId": "376fdb32b77dee9d",
+        "artifactId": "64c8af8aa683d972",
         "flowsheet": null,
         "createdAt": "2026-09-15T09:00:00Z",
         "provenance": "demo",
@@ -5175,7 +5187,7 @@
     "trainOf": {
       "scenarioId": null,
       "scenarioName": null,
-      "artifactId": "376fdb32b77dee9d",
+      "artifactId": "64c8af8aa683d972",
       "flowsheet": null,
       "createdAt": "2026-09-15T09:00:00Z",
       "provenance": "demo",
@@ -5358,18 +5370,18 @@
     "fromRun": [
       {
         "request": {
-          "artifactId": "376fdb32b77dee9d"
+          "artifactId": "64c8af8aa683d972"
         },
         "status": 200,
         "body": {
           "train": {
-            "id": "from-376fdb32b77dee9d",
+            "id": "from-64c8af8aa683d972",
             "name": "The train of A train the browser tests build",
             "program": "yeast",
             "product": "ethanol",
             "inlet": {
               "kind": "run-stream",
-              "ref": "376fdb32b77dee9d",
+              "ref": "64c8af8aa683d972",
               "streamId": "inlet",
               "vessel": null,
               "params": {}

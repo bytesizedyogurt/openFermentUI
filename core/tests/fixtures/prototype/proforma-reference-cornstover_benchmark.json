@@ -21,7 +21,8 @@
       "leavesOut": [],
       "gridInputs": [],
       "packageTest": "biorefineries/tests/test_biorefineries.py::test_cornstover",
-      "builtFrom": []
+      "builtFrom": [],
+      "brothStream": null
     },
     "artifact": {
       "id": "42f80a77d306f673",

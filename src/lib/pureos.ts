@@ -130,6 +130,24 @@ export const builderPath = (trainId: string) => `/pureos/build/${encodeURICompon
 /** Where the Builder opens a fresh train read from a kept run's units. */
 export const builderFromRunPath = (artifactId: string) => `/pureos/build/${NEW_TRAIN}?from=${encodeURIComponent(artifactId)}`;
 
+/**
+ * OF-BLD-020 §6.2 — where the Builder opens a fresh train with its inlet set:
+ * a kept simulation's harvest (`simulation:<artifact id>`, fermOS → Simulate's
+ * **Use as a train's inlet**) or a scenario's newest run, whose broth its
+ * flowsheet names (`scenario:<scenario id>`).
+ */
+export type InletFrom = { kind: 'simulation' | 'scenario'; id: string };
+export const builderInletPath = (from: InletFrom) => `/pureos/build/${NEW_TRAIN}?inlet=${from.kind}:${encodeURIComponent(from.id)}`;
+
+/** The inlet a `?inlet=` names, as a train holds it; null for anything else. */
+export function inletOfQuery(q: string | null): TrainSpec['inlet'] | null {
+  const m = /^(simulation|scenario):([A-Za-z0-9][A-Za-z0-9._-]{0,127})$/.exec(q ?? '');
+  if (!m) return null;
+  return m[1] === 'simulation'
+    ? { kind: 'simulation', ref: m[2], streamId: null, vessel: null, params: {} }
+    : { kind: 'run-stream', ref: m[2], streamId: null, vessel: null, params: {} };
+}
+
 /** A person's override as a train's params hold it: an Override without its scope and key. */
 const paramOf = (o: Override): TrainParam => ({ value: o.value, low: o.low, high: o.high, by: o.by, at: o.at, note: o.note });
 
@@ -215,11 +233,29 @@ export function streamsOfArtifact(a: Artifact | null | undefined): StreamRow[] {
 /** A kept run a train can take a stream of, or be read from. */
 export interface RunChoice {
   artifactId: string;
+  /**
+   * What a train's inlet names for it (OF-BLD-020 §6.2): the run's artifact
+   * id, or, for a scenario's newest run, the scenario's id, so the service
+   * reads whichever run is newest when the train runs.
+   */
+  ref: string;
+  /** The scenario whose newest run this is; null for any other run. */
+  scenarioId: string | null;
+  /** The stream the run's flowsheet names as its broth on the shelf (`brothStream`); null when it names none. */
+  broth: string | null;
   tool: string;
   label: string;
   program: string | null;
   createdAt: string;
   streams: StreamRow[];
+}
+
+/** The flowsheet a kept run names: its output's, else its basis's. */
+export function flowsheetOfRun(a: Artifact): string | null {
+  const o = (a.output as Record<string, unknown> | undefined)?.flowsheet;
+  if (typeof o === 'string' && o) return o;
+  const i = a.inputs.find((x) => x.name === 'flowsheet');
+  return i && typeof i.value === 'string' ? i.value : null;
 }
 
 /**
@@ -245,20 +281,36 @@ export async function runChoices(
   const runs = (await pureosTrainRuns(signal).catch(said('pureOS’s train runs'))) ?? [];
   for (const r of runs) {
     const t = await pureosTrain(r.artifactId, signal).catch(said(`train run ${r.artifactId}`));
-    if (t) choices.push({ artifactId: r.artifactId, tool: r.tool, label: `train run of ${r.trainName ?? r.trainId ?? r.artifactId}`, program: r.program, createdAt: r.createdAt, streams: t.streams });
+    if (t)
+      choices.push({ artifactId: r.artifactId, ref: r.artifactId, scenarioId: null, broth: null, tool: r.tool, label: `train run of ${r.trainName ?? r.trainId ?? r.artifactId}`, program: r.program, createdAt: r.createdAt, streams: t.streams });
   }
+  // The shelf names each scenario flowsheet's broth (OF-BLD-020 §6.2); asked with the archive on, so a run of any flowsheet is named.
+  const shelf = (await proformaShelf(includeArchived, signal).catch(said('Proforma’s shelf'))) ?? [];
+  const brothOf = new Map(shelf.map((f) => [f.id, f.brothStream ?? null]));
   const seeds = (await proformaScenarios({ host: null, includeArchived }, signal).catch(said('Proforma’s scenarios'))) ?? [];
   const scenarios = [...seeds.map((s) => ({ id: s.id, name: s.name })), ...made];
   for (const sc of scenarios) {
     const a = await proformaNewestRun(sc.id, signal).catch(said(`the runs of ${sc.id}`));
-    if (a) choices.push({ artifactId: a.id, tool: a.tool, label: `newest run of ${sc.name}`, program: null, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
+    if (!a) continue;
+    const flowsheet = flowsheetOfRun(a);
+    const broth = flowsheet ? (brothOf.get(flowsheet) ?? null) : null;
+    choices.push({
+      artifactId: a.id,
+      ref: sc.id,
+      scenarioId: sc.id,
+      broth,
+      tool: a.tool,
+      label: `newest run of ${sc.name}${broth ? `, its broth ${broth}` : ''}`,
+      program: null,
+      createdAt: a.createdAt,
+      streams: streamsOfArtifact(a),
+    });
   }
-  const shelf = (await proformaShelf(includeArchived, signal).catch(said('Proforma’s shelf'))) ?? [];
   for (const f of shelf.filter((x) => x.reference)) {
     const ref = await proformaReference(f.id, signal).catch(said(`the reference run of ${f.id}`));
     const a = ref?.artifact;
     if (a && a.tool === 'proforma.reference')
-      choices.push({ artifactId: a.id, tool: a.tool, label: `reference run of ${f.title}`, program: f.program ?? null, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
+      choices.push({ artifactId: a.id, ref: a.id, scenarioId: null, broth: null, tool: a.tool, label: `reference run of ${f.title}`, program: f.program ?? null, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
   }
   return { choices, problems };
 }
