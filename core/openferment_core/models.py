@@ -3276,6 +3276,38 @@ class TrainRun(BaseModel):
     basis: ComputedBasis
 
 
+# ── a train a model built (OF-BLD-020 §5.4) ──────────────────────────────
+#
+# A person's trains live in their browser (D9). A model building a train across
+# tool calls, and an outside assistant over MCP (which has no ask), needs the
+# service to hold its draft: `core/data/pureos-trains.json`, written through
+# `pureos.kept.keep_train` alone, gitignored, on this machine alone.
+
+
+class KeptTrain(BaseModel):
+    """A train a model built with `pureos_build` or `pureos_write`, kept by
+    the service with who made it and when: the train as data (D9). Its runs
+    are `pureos.train_run` artifacts, found by the train's id."""
+
+    spec: TrainSpec
+    # A model, always: a person's trains live in their browser.
+    agent: Literal["model"] = "model"
+    # The model that made it (the one answering the run, after any fallback).
+    madeBy: str
+    effort: str | None = None
+    # The ask that made it; None for a call from the endpoint or the MCP server.
+    askId: str | None = None
+    # When it was made and when it last changed, ISO 8601 in UTC.
+    at: str
+    updatedAt: str
+
+
+class KeptTrains(BaseModel):
+    """core/data/pureos-trains.json."""
+
+    trains: list[KeptTrain] = Field(default_factory=list)
+
+
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()

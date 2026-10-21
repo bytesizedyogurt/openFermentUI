@@ -10,8 +10,9 @@ module's own write function, where the module's rules already live:
 `extract.add_candidate` (anchoring, §2.4), `intake.fetch_paper`,
 `extract.extract_paper`, and `checks.request` in a person's name. A module
 with no write function on the service refuses in words with the reason
-(Dominion, pureOS and Primer are curated seed; protocols and depositions
-are written in the browser), and that refusal is a result Postdoc reports
+(Dominion and Primer are curated seed, as pureOS's vocabulary and unit
+catalogue are; protocols and depositions are written in the browser), and
+that refusal is a result Postdoc reports
 in `gaps`. `check:tools` greps this file for a store write and fails on one.
 
 THE MARK. Every write that goes through carries `agent: model`, the model
@@ -35,7 +36,12 @@ below, the one call to `fermos.simulate`, free (compute, no model money) and
 at no gate, audited with the model as agent. So with a vessel (OF-BLD-020
 §4.2): `fermos_write`'s `design_vessel` and the registry's `fermos_vessel`
 (tools/fermos.py) both design through `design_vessel` below, the one call to
-`vessel.design`.
+`vessel.design`. So with a train (OF-BLD-020 §5.4): `pureos_write`'s
+`new_train`, `add_unit`, `remove_unit`, `set_from_record` and `run_train` and
+the registry's `pureos_build` (tools/pureos.py) share one function an action
+below, so the calls to `pureos.kept.keep_train` (the one write to the store of
+the trains a model built) and to `pureos.train_spec.run_train` stay in this
+file; each is free, at no gate, and audited with the model as agent.
 
 Inputs carry ids and words, as every tool's do: `action`, `target` (an id or
 ref), `fields` (names to words, what the action needs), `note` (the model's
@@ -86,7 +92,23 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
                           "keep it, as fermos_vessel does; refused in words while its plant scale waits for a person",
                           ("simulationArtifact", "fitArtifact", "vesselType", "klaMethod")),
     },
-    "pureos": {},
+    # OF-BLD-020 §5.4 — a train a model builds, kept on the service, as
+    # pureos_build builds it (the same function an action).
+    "pureos": {
+        "new_train": ("start a train for a product (its id) from the inlet a kept artifact gives (inletRef: a kept "
+                      "simulation's artifact id, a kept vessel design's, or a kept run's stream as "
+                      "<artifact id>/<stream id>), kept on the service as the model's, as pureos_build's new does",
+                      ("product", "inletRef")),
+        "add_unit": ("add a unit of a catalogue type to the train named in target, after the unit named (inlet for the "
+                     "first place; empty for the end)", ("unitType", "afterUnitId")),
+        "remove_unit": ("take a unit out of the train named in target", ("unitId",)),
+        "set_from_record": ("bind a unit's parameter to exactly the records named for it (records.<parameter key>, "
+                            "their ids separated by commas or spaces), each held to the parameter's field, the "
+                            "aggregate gate and its unit; refused naming a record that cannot bind and why",
+                            ("unitId", "records.<key>")),
+        "run_train": ("run the train named in target in the Proforma worker as the service binds it and keep the run; "
+                      "refused naming each value that waits for a person's", ()),
+    },
     "proforma": {
         "run": ("run the BioSTEAM scenario named in target as the service binds it and keep the run, as run_flowsheet "
                 "does; refused naming the inputs that wait for a person's assumption", ()),
@@ -122,9 +144,14 @@ NO_WRITE = {
     "dominion": "Dominion's molecules and clearance findings are curated seed (src/data/products.ts, "
                 "src/data/clearanceFindings.ts); the service has no write function for them, and a finding is written by a "
                 "person in a commit",
-    "pureos": "pureOS's unit operations are curated vocabulary (src/data/vocabulary.ts); the service has no write function "
-              "for them",
     "primer": "Primer's lessons are curated seed (src/data/learn.ts); the service has no write function for them",
+}
+# What a module that writes some things keeps as seed beside them, said when an
+# action is not one of its own (OF-BLD-020 §5.4: pureOS keeps a model's train,
+# and its vocabulary and catalogue stay curated).
+SEED_NOTE = {
+    "pureos": "pureOS's unit operations and its unit catalogue are curated (src/data/vocabulary.ts, "
+              "core/openferment_core/pureos/catalogue.py); the service has no write function for them",
 }
 NO_WRITE_ACTION = {
     ("runbooks", "revise_protocol"): "protocols are curated seed (src/data/protocols.ts) and revised in the browser's "
@@ -604,6 +631,227 @@ def _fermos_simulate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     return run_simulation("fermos_write", req, inp.note, ctx)
 
 
+# ── a train a model builds (OF-BLD-020 §5.4, D9, D13) ─────────────────────
+#
+# pureos_build and pureos_write's train actions are one function an action
+# here. A model's train is kept on the service by pureos.kept.keep_train, the
+# store's one write, under its locks; the change is pureos.build's, worked out
+# from the train as it stands. A run is pureos.train_spec.run_train, with no
+# person's value (the service holds none), so a value nothing binds waits and
+# the call returns the refusal's words.
+
+TRAIN_WAITS = ("A named person types each waiting value in pureOS → Builder under their reviewer name; a model never "
+               "supplies one. Where a waiting parameter binds from a record field, set_from_record names records for "
+               "it. Say in gaps which values wait.")
+KEPT_MEANING = ("the train is kept on the service as the model's, marked so in the audit log; it holds ids and words, "
+                "every value binds at the run from the records, the class's own default or a named person; toRun says "
+                "in words what still stops it running")
+
+
+def _kept_result(tool: str, action: str, k: Any, note: str, ctx: ToolContext, said: dict[str, Any] | None = None
+                 ) -> ToolResult:
+    from ..pureos import build
+
+    _audit(ctx, "pureos", action, "open", k.spec.id, {"tool": tool, "note": note, **(said or {})})
+    return ToolResult(summary={"state": "open", **build.described(k), **(said or {}), "meaning": KEPT_MEANING})
+
+
+def _train_refused(tool: str, e: Exception) -> ToolResult:
+    return ToolResult(error=f"{tool} refused: {str(e).rstrip('.')}.")
+
+
+def new_train(tool: str, product: str, inlet_ref: str, note: str, ctx: ToolContext) -> ToolResult:
+    """A new train, no unit yet, for a product from the inlet a kept
+    artifact gives; kept as the model's (pureos_build new, pureos_write
+    new_train)."""
+    from ..pureos import build, kept
+
+    try:
+        spec, said = build.new_spec(product, inlet_ref, ctx.include_archived)
+    except build.BuildRefused as e:
+        return _train_refused(tool, e)
+    model, effort = _who(ctx)
+    try:
+        k = kept.keep_train(None, lambda _: spec, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+    except kept.KeptTrainRefused as e:
+        return _train_refused(tool, e)
+    return _kept_result(tool, "new_train", k, note, ctx, {"read": said})
+
+
+def add_unit(tool: str, train_id: str, unit_type: str, after: str, note: str, ctx: ToolContext) -> ToolResult:
+    """A unit of a catalogue type added to a kept train, after the unit
+    named (pureos_build add_unit, pureos_write add_unit)."""
+    from ..pureos import build, kept
+
+    made: list[str] = []
+
+    def change(cur: Any) -> Any:
+        spec, uid = build.with_unit(cur, unit_type, after)
+        made.append(uid)
+        return spec
+
+    model, effort = _who(ctx)
+    try:
+        build.kept_or_refuse(train_id)
+        k = kept.keep_train(train_id.strip(), change, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+    except (build.BuildRefused, kept.KeptTrainRefused) as e:
+        return _train_refused(tool, e)
+    return _kept_result(tool, "add_unit", k, note, ctx, {"added": made[-1]})
+
+
+def remove_unit(tool: str, train_id: str, unit_id: str, note: str, ctx: ToolContext) -> ToolResult:
+    """A unit taken out of a kept train (pureos_build remove_unit,
+    pureos_write remove_unit)."""
+    from ..pureos import build, kept
+
+    model, effort = _who(ctx)
+    try:
+        build.kept_or_refuse(train_id)
+        k = kept.keep_train(train_id.strip(), lambda cur: build.without_unit(cur, unit_id), model,
+                            ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+    except (build.BuildRefused, kept.KeptTrainRefused) as e:
+        return _train_refused(tool, e)
+    return _kept_result(tool, "remove_unit", k, note, ctx, {"removed": unit_id.strip()})
+
+
+def set_from_record(tool: str, train_id: str, unit_id: str, records_by_param: dict[str, list[str]], note: str,
+                    ctx: ToolContext) -> ToolResult:
+    """A unit's parameters bound to exactly the records named for each, held
+    to the run's own check (pureos_build set_from_record, pureos_write
+    set_from_record). The check reads the class's parameters in the Proforma
+    worker, so it runs with the store let go; the train is kept only if it
+    did not change meanwhile."""
+    from ..pureos import build, kept
+    from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        base = build.kept_or_refuse(train_id).spec
+        spec, bound = build.with_records(base, unit_id, records_by_param, ctx.pool, ctx.include_archived)
+    except build.BuildRefused as e:
+        return _train_refused(tool, e)
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        return ToolResult(error=f"{tool} could not read unit {unit_id}'s parameters from the Proforma simulator, where "
+                                f"BioSTEAM runs: {e}")
+
+    def change(cur: Any) -> Any:
+        if cur != base:
+            raise build.BuildRefused(f"train {base.id} changed while its records were checked; ask again")
+        return spec
+
+    model, effort = _who(ctx)
+    try:
+        k = kept.keep_train(base.id, change, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+    except (build.BuildRefused, kept.KeptTrainRefused) as e:
+        return _train_refused(tool, e)
+    return _kept_result(tool, "set_from_record", k, note, ctx, {"unit": unit_id.strip(), "bound": bound})
+
+
+def run_train(tool: str, train_id: str, note: str, ctx: ToolContext) -> ToolResult:
+    """Run a kept train in the Proforma worker as the service binds it and
+    keep the run as one `pureos.train_run` artifact (pureos_build run,
+    pureos_write run_train). The service holds no person's value, so none is
+    passed: a value nothing binds waits, and the refusal is run_train's own
+    words (what `POST /api/pureos/train/run` answers with a 422). Returns the
+    run as one Evidence whose id is the artifact's, a summary a model reads,
+    and the whole run in `data`, which no model reads."""
+    from .. import artifacts
+    from ..pureos import build, train_spec
+    from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        k = build.kept_or_refuse(train_id)
+    except build.BuildRefused as e:
+        return _train_refused(tool, e)
+    try:
+        r = train_spec.run_train(k.spec, None, None, ctx.include_archived)
+    except train_spec.TrainRefused as e:
+        waits = f" {TRAIN_WAITS}" if " waits" in str(e) else ""
+        return ToolResult(error=f"{tool} refused: {str(e).rstrip('.')}.{waits}")
+    except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged) as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        return ToolResult(error=f"{tool} could not run the train: {e}")
+    ev = build.run_evidence(r)
+    _audit(ctx, "pureos", "run_train", "open", k.spec.id, {"artifactId": r.artifactId, "evidenceId": ev.id, "tool": tool,
+                                                            "note": note})
+    return ToolResult(
+        summary={"state": "open", **build.run_summary(r), "evidenceId": ev.id,
+                 "meaning": "the train ran as the service binds it in the Proforma worker, where BioSTEAM builds it, and "
+                            "the run is kept as one artifact in the open lane, marked as the model's in the audit log; "
+                            "its numbers are read from the artifact, never stated: cite a recovery or a purity by the "
+                            "evidence id, which is its artifact id; pureos_read reads it again as kind train-run"},
+        evidence=[ev], data=r.model_dump(mode="json"))
+
+
+def _proposal(got: Any) -> tuple[Any, list[Any]]:
+    """The train and its reasons from what OF-BLD-020 §7.2's proposer
+    returns: a pair, or one object carrying `train` (or `spec`) and
+    `reasons`."""
+    from ..models import TrainSpec
+
+    if isinstance(got, tuple) and len(got) == 2:
+        spec, reasons = got
+    else:
+        spec = getattr(got, "train", None) or getattr(got, "spec", None)
+        reasons = getattr(got, "reasons", None) or []
+    if spec is None:
+        raise ValueError("the proposer returned no train")
+    return TrainSpec.model_validate(spec.model_dump() if hasattr(spec, "model_dump") else spec), list(reasons or [])
+
+
+def propose_train(tool: str, product: str, inlet_ref: str, note: str, ctx: ToolContext) -> ToolResult:
+    """A train proposed by OF-BLD-020 §7.2's rules (`pureos.propose.propose`),
+    kept as the model's under an id of its own (pureos_build propose). Until
+    §7.2 has landed on this service, refused in words naming it."""
+    from ..pureos import build, kept
+
+    try:
+        from ..pureos.propose import propose as proposer  # OF-BLD-020 §7.2
+    except ImportError:
+        return ToolResult(error=f"{tool} refused propose: the train proposer is OF-BLD-020 §7.2's "
+                                "(pureos.propose) and has not landed on this service; build the train with new and "
+                                "add_unit instead. Say so in gaps.")
+    try:
+        spec, reasons = _proposal(proposer((product or "").strip(), None, (inlet_ref or "").strip() or None))
+    except (ValueError, LookupError) as e:
+        return _train_refused(tool, e)
+    spec = spec.model_copy(update={"id": build.new_id()})
+    model, effort = _who(ctx)
+    try:
+        k = kept.keep_train(None, lambda _: spec, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+    except kept.KeptTrainRefused as e:
+        return _train_refused(tool, e)
+    words = [r.model_dump(mode="json") if hasattr(r, "model_dump") else r for r in reasons]
+    return _kept_result(tool, "propose_train", k, note, ctx, {"reasons": words})
+
+
+def _pureos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
+    """`pureos_write`'s train actions: the train in `target` (empty for
+    new_train), the rest in `fields` as words; a parameter's records as
+    `records.<key>`, their ids separated by commas or spaces. A field the
+    action does not take is refused, never passed on and never guessed at."""
+    f = {k: (v or "").strip() for k, v in inp.fields.items()}
+    takes = [n for n in ACTIONS["pureos"][action][1] if n != "records.<key>"]
+    unknown = [k for k in f if k not in takes and not (action == "set_from_record" and k.startswith("records.")
+                                                       and k[len("records."):])]
+    if unknown:
+        listed = ", ".join(ACTIONS["pureos"][action][1]) or "none"
+        return ToolResult(error=f"pureos_write refused {action}: {', '.join(unknown)} "
+                                f"{'is' if len(unknown) == 1 else 'are'} not a field of it; its fields are {listed}")
+    name, target = "pureos_write", inp.target.strip()
+    if action == "new_train":
+        return new_train(name, f.get("product", ""), f.get("inletRef", ""), inp.note, ctx)
+    if action == "add_unit":
+        return add_unit(name, target, f.get("unitType", ""), f.get("afterUnitId", ""), inp.note, ctx)
+    if action == "remove_unit":
+        return remove_unit(name, target, f.get("unitId", ""), inp.note, ctx)
+    if action == "set_from_record":
+        named = {k[len("records."):]: [x for x in v.replace(",", " ").split() if x] for k, v in f.items()
+                 if k.startswith("records.")}
+        return set_from_record(name, target, f.get("unitId", ""), named, inp.note, ctx)
+    return run_train(name, target, inp.note, ctx)
+
+
 def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     from .. import extract
 
@@ -694,7 +942,7 @@ def _runner(module: str) -> Callable[[ModuleWriteInput, ToolContext], ToolResult
     def run(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
         action = inp.action.strip()
         if action not in actions:
-            seed = f" {NO_WRITE[module]}." if module in NO_WRITE else ""
+            seed = f" {NO_WRITE[module]}." if module in NO_WRITE else f" {SEED_NOTE[module]}." if module in SEED_NOTE else ""
             listed = f"the actions are {', '.join(actions)}" if actions else "it has no action"
             return ToolResult(error=f"{name} refused: {action!r} is not an action; {listed}.{seed} Say so in gaps.")
         # A gate is checked first: an action at one is a proposal whatever
@@ -716,6 +964,8 @@ def _runner(module: str) -> Callable[[ModuleWriteInput, ToolContext], ToolResult
             return _geneos(action, inp, ctx)
         if module == "fermos":
             return _fermos(action, inp, ctx)
+        if module == "pureos":
+            return _pureos(action, inp, ctx)
         if module == "proforma":
             return _proforma_run(inp, ctx)
         if module == "biorepo":
@@ -741,7 +991,8 @@ def _description(module: str) -> str:
         tail = (f" [gated: {g.covers}; becomes a proposal a person carries out on Home]" if g and g.id != "spend"
                 else " [at the budget, gated: becomes a spend proposal a person carries out on Home]" if g else "")
         lines.append(f"{action}: {what}" + (f" (fields: {', '.join(fields)})" if fields else "") + tail)
-    seed = f" {NO_WRITE[module]}: every other call is refused in words." if module in NO_WRITE else ""
+    seed = (f" {NO_WRITE[module]}: every other call is refused in words." if module in NO_WRITE else
+            f" {SEED_NOTE[module]}: every other call is refused in words." if module in SEED_NOTE else "")
     return (f"Write to {label}, through the module's own write function. Actions — " + "; ".join(lines) + f".{seed} "
             "Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane "
             "marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.")

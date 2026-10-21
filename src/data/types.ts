@@ -4123,3 +4123,27 @@ export interface TrainRun {
   flags: string[];
   basis: ComputedBasis;
 }
+
+/**
+ * A train a model built with `pureos_build` or `pureos_write` (OF-BLD-020
+ * §5.4), kept on the service in `core/data/pureos-trains.json`:
+ * `GET /api/pureos/trains-kept`. A person's trains stay in this browser.
+ */
+export interface KeptTrain {
+  spec: TrainSpec;
+  /** A model, always. */
+  agent: 'model';
+  /** The model id that made it. */
+  madeBy: string;
+  effort: string | null;
+  /** The ask that made it; null for a call from the endpoint or the MCP server. */
+  askId: string | null;
+  /** ISO 8601, UTC. */
+  at: string;
+  updatedAt: string;
+}
+
+/** `core/data/pureos-trains.json`. */
+export interface KeptTrains {
+  trains: KeptTrain[];
+}

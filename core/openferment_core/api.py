@@ -1386,6 +1386,19 @@ def pureos_train_runs(includeArchived: bool = False) -> list[dict]:  # noqa: N80
     return [s.model_dump(mode="json") for s in pureos.train_runs(include_archived=includeArchived)]
 
 
+@app.get("/api/pureos/trains-kept")
+def pureos_trains_kept(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The trains a model built with `pureos_build` or `pureos_write`
+    (`KeptTrain`: the train as data, `madeBy` the model, `at` and
+    `updatedAt`), the most recently changed first; one of an archived program
+    left out unless `?includeArchived=true` asks for it (OF-BLD-020 §5.4). A
+    person's trains stay in their browser. A read: it writes nothing and starts
+    no simulator."""
+    from .pureos import kept
+
+    return [k.model_dump(mode="json") for k in kept.listed(include_archived=includeArchived)]
+
+
 @app.post("/api/pureos/train/validate")
 def pureos_train_validate(train: TrainSpec) -> dict:
     """Every refusal of a train at once, in words (`TrainValidation`): a type

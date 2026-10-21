@@ -97,7 +97,8 @@ def test_the_server_counts_every_module_tool_with_its_marks_and_gates():
     # The registry's whole list and the server's two: the count is derived,
     # and test_tools.NAMES is the one literal list (OF-BLD-019 §6.1).
     assert len(names) == len(tools.WHITELIST) + len(mcp_server.EXTRA)
-    assert {"thermo_props", "run_flowsheet", "stream_table", "fermos_simulate", "fermos_vessel"} <= set(names)
+    assert {"thermo_props", "run_flowsheet", "stream_table", "fermos_simulate", "fermos_vessel",
+            "pureos_build"} <= set(names)
     assert set(reads) | set(writes) <= set(names)
     by_name = {t.name: t for t in listed}
     # A read says what state it computes; a write says which actions a gate stops.
@@ -148,4 +149,19 @@ def test_the_server_offers_fermos_simulate_as_the_registry_does(store):
     for args in ({"family": "batch_v1", "recordsByParam": {"mu_max": [0.4]}}, {"family": "light_v1"}):
         through = _text(asyncio.run(server.call_tool("fermos_simulate", args)))
         assert through == json.loads(tools.run("fermos_simulate", args).model_dump_json(exclude_none=True))
+        assert through["error"]
+
+
+# ── OF-BLD-020 §5.4: pureos_build, with no change here ─────────────────────
+
+
+def test_the_server_offers_pureos_build_as_the_registry_does(store):
+    listed = {t.name: t for t in asyncio.run(mcp_server.build().list_tools())}
+    assert listed["pureos_build"].description == tools.REGISTRY["pureos_build"].description
+    assert listed["pureos_build"].input_schema == tools.REGISTRY["pureos_build"].info().inputSchema
+    server = mcp_server.build()
+    for args in ({"action": "set_from_record", "trainId": "tr-x", "unitId": "C1", "recordsByParam": {"split.Ethanol": [9]}},
+                 {"action": "run", "trainId": "tr-nowhere"}):
+        through = _text(asyncio.run(server.call_tool("pureos_build", args)))
+        assert through == json.loads(tools.run("pureos_build", args).model_dump_json(exclude_none=True))
         assert through["error"]

@@ -541,3 +541,117 @@ def test_the_prompt_says_a_simulations_numbers_are_read_from_its_artifact():
     assert rule.startswith("A simulation comes from fermos_simulate")
     assert "read from its artifact and never stated by you" in rule and "recordsByParam" in rule
     assert "its artifact id" in rule
+
+
+# ── a train is built, run and cited by its artifact (OF-BLD-020 §5.4) ──
+
+
+@pytest.fixture()
+def train_inlet(tmp_path, monkeypatch):
+    """test_train's STAND-IN worker, a throwaway store, test_pureos_build_tool's
+    STAND-IN records as the pool, and a stream a STAND-IN person's train run
+    kept, which a model's train takes as its inlet. Imported here, inside the
+    fixture: test_train reaches test_module_tools, which imports this file."""
+    from openferment_core import audit, intake, proforma, proposals, pureos
+    from openferment_core.pureos import catalogue, train_spec
+    from test_pureos_build_tool import stand_in_pool
+    from test_train import TrainWorker, spec_of
+
+    monkeypatch.setattr(proforma, "call", TrainWorker())
+    for mod, name in ((catalogue, "_SPECS"), (train_spec, "_SPECS"), (train_spec, "_UNITS")):
+        monkeypatch.setattr(mod, name, {})
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
+    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
+    monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())
+    run = pureos.run_train(spec_of())
+    return f"{run.artifactId}/F1_liquid", stand_in_pool()
+
+
+class Turns(Script):
+    """A Script whose entries may be functions of the conversation so far,
+    for ids a tool made during the run (a kept train's, its run's)."""
+
+    def __call__(self, **kw):
+        if self.turns and callable(self.turns[0]):
+            self.turns[0] = self.turns[0](kw["messages"])
+        return super().__call__(**kw)
+
+
+def _last_result(messages):
+    """The summary the last tool call returned, as the model read it."""
+    block = next(b for b in messages[-1]["content"] if b.get("type") == "tool_result")
+    return json.loads(block["content"])
+
+
+def test_a_stand_in_run_builds_a_train_runs_it_cites_its_artifact_and_a_stated_recovery_is_dropped(train_inlet):
+    inlet, pool_ = train_inlet
+    made: dict = {}
+
+    def add(messages):
+        made["train"] = _last_result(messages)["trainId"]
+        return [("pureos_build", {"action": "add_unit", "trainId": made["train"], "unitType": "pressure-filtration"})]
+
+    def run_it(messages):
+        return [("pureos_build", {"action": "run", "trainId": made["train"]})]
+
+    def answer(messages):
+        made["run"] = _last_result(messages)["artifactId"]
+        return plan(claim("c1", text="The train built for the ethanol keeps most of it on its way to the product stream, "
+                                     "as its run reads it.", evidence=[made["run"]]),
+                    claim("c2", text="The train recovers ninety percent of the ethanol, 90 percent.",
+                          evidence=[made["run"]]),
+                    claim("c3", text="Another run of the train reads the same.", evidence=["0123456789abcdef"]))
+
+    script = Turns([("pureos_build", {"action": "new", "product": "ethanol", "inletRef": inlet})], add, run_it, answer)
+    out = postdoc_agent.ask("Build a train that recovers the ethanol from that stream and tell me its recovery.",
+                            converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool_))
+    [kept] = out.claims
+    assert kept.id == "c1" and kept.evidenceIds == [made["run"]]
+    assert out.rejected == 2
+    assert any(r.startswith("c2: claim text contains a number") for r in out.rejectionReasons), out.rejectionReasons
+    assert any(r.startswith("c3: cites what no tool returned") for r in out.rejectionReasons)
+    assert [e.id for e in out.evidence] == [made["run"]] and out.evidence[0].basis.tool == "pureos.train_run"
+    steps = [s.summary for s in out.trace if s.tool == "pureos_build"]
+    assert steps == [f"Built a train for ethanol · kept train {made['train']}",
+                     f"Added pressure-filtration to train {made['train']} as P1",
+                     f"Ran train {made['train']} · kept run {made['run']}"]
+    assert "pureos_build" in [t["name"] for t in script.calls[0]["tools"]]
+
+
+def test_the_prompt_says_a_trains_numbers_are_read_from_its_artifact():
+    rule = postdoc_agent.AGENT_SYSTEM.split("17. ", 1)[1]
+    assert rule.startswith("A train is built with pureos_build")
+    assert "read from its run's artifact and never" in rule and "its artifact id" in rule and "moduleRefs" in rule
+
+
+def test_a_train_changed_between_two_runs_is_run_again_never_served_from_the_cache(train_inlet):
+    """The same input twice (run the train) after the train changed is a new
+    run of the train as it stands: pureos_build is never served from the
+    per-question cache (postdoc_agent.UNCACHED, OF-BLD-020 §5.4)."""
+    inlet, pool_ = train_inlet
+    made: dict = {}
+
+    def first(messages):
+        made["train"] = _last_result(messages)["trainId"]
+        return [("pureos_build", {"action": "add_unit", "trainId": made["train"], "unitType": "pressure-filtration"})]
+
+    def run(messages):
+        return [("pureos_build", {"action": "run", "trainId": made["train"]})]
+
+    def grow(messages):
+        made.setdefault("runs", []).append(_last_result(messages)["artifactId"])
+        return [("pureos_build", {"action": "add_unit", "trainId": made["train"], "unitType": "spray-dry"})]
+
+    def last(messages):
+        made["runs"].append(_last_result(messages)["artifactId"])
+        return plan(claim("c1", text="The longer train's run is kept.", evidence=[made["runs"][-1]]))
+
+    script = Turns([("pureos_build", {"action": "new", "product": "ethanol", "inletRef": inlet})], first, run, grow,
+                   run, last)
+    out = postdoc_agent.ask("Build and run a train twice.", converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: pool_))
+    one, two = made["runs"]
+    assert one != two and [c.id for c in out.claims] == ["c1"]
+    ran = [s for s in out.trace if s.tool == "pureos_build" and s.summary.startswith("Ran train")]
+    assert [s.summary.rsplit(" ", 1)[-1] for s in ran] == [one, two]

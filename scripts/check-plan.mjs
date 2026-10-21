@@ -274,6 +274,9 @@ const PAIRS = [
   ['TrainInletRead', 'TrainInletRead'],
   ['TrainUnitParameters', 'TrainUnitParameters'],
   ['TrainRun', 'TrainRun'],
+  // OF-BLD-020 §5.4 — a train a model built, kept on the service.
+  ['KeptTrain', 'KeptTrain'],
+  ['KeptTrains', 'KeptTrains'],
 ];
 
 let compared = 0;

@@ -302,8 +302,10 @@ MAX_QUOTE_CHARS = 300
 # artifact's tool, and the module and kind of the row a read returns for one.
 # The tool that keeps one returns it as one Evidence whose id is the
 # artifact's; a read returns it as a row, cited by its ref. A simulation
-# (fermos_simulate, §3.4) and a vessel design (fermos_vessel, §4.2) alike.
-KEPT_RUNS = {"fermos.simulation": ("fermos", "simulation"), "fermos.vessel": ("fermos", "vessel")}
+# (fermos_simulate, §3.4), a vessel design (fermos_vessel, §4.2) and a train
+# run (pureos_build's run, §5.4) alike.
+KEPT_RUNS = {"fermos.simulation": ("fermos", "simulation"), "fermos.vessel": ("fermos", "vessel"),
+             "pureos.train_run": ("pureos", "train-run")}
 
 
 @dataclass
@@ -314,17 +316,20 @@ class SeenSet:
     evidence fermos_vessel returns, by its `fermos.vessel` artifact id, and as
     the `fermos/vessel/<id>` row fermos_read returns (a kept run, KEPT_RUNS,
     as a simulation is); a refused call teaches it nothing, so a design
-    nobody returned in this run is not citable."""
+    nobody returned in this run is not citable. A train run (§5.4) is learned
+    the same way: the evidence pureos_build's run returns, by its
+    `pureos.train_run` artifact id, and the `pureos/train-run/<id>` row
+    pureos_read returns."""
 
     records: set[str] = field(default_factory=set)
     passages: dict[str, Any] = field(default_factory=dict)
     evidence: dict[str, Any] = field(default_factory=dict)
     # Module rows by ref (OF-BLD-015 §7.2).
     rows: dict[str, Any] = field(default_factory=dict)
-    # The kept runs this run's tools returned (KEPT_RUNS: a simulation or a
-    # vessel design), by artifact id, to the ref of the row a read returns
-    # for it: learned from the Evidence the tool that keeps one returns, and
-    # from a read's row (OF-BLD-020 §3.4, §4.2).
+    # The kept runs this run's tools returned (KEPT_RUNS: a simulation, a
+    # vessel design or a train run), by artifact id, to the ref of the row a
+    # read returns for it: learned from the Evidence the tool that keeps one
+    # returns, and from a read's row (OF-BLD-020 §3.4, §4.2, §5.4).
     runs: dict[str, str] = field(default_factory=dict)
 
     def add(self, result: Any) -> None:
@@ -358,10 +363,10 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
     1. Its text holds a number.
     2. A record id does not resolve in the evidence pool.
     3. A record, passage, evidence id or module ref was never returned by a
-       tool call in this run. A kept run (a simulation or a vessel design,
-       KEPT_RUNS) a read returned only as a row is cited by that row's ref,
-       and a claim citing it by evidence id is told so (OF-BLD-020 §3.4,
-       §4.2).
+       tool call in this run. A kept run (a simulation, a vessel design or a
+       train run, KEPT_RUNS) a read returned only as a row is cited by that
+       row's ref, and a claim citing it by evidence id is told so (OF-BLD-020
+       §3.4, §4.2, §5.4).
     4. A quote is longer than MAX_QUOTE_CHARS, or is not one whole sentence
        or table row of its passage, or a run of them, after `normalize_text`
        (§5.R: a fragment can lift a number out of its negation).

@@ -25,8 +25,11 @@ time. Whichever is spent first names the plan's `stopped`.
 A REFUSAL OR AN OUTAGE mid-loop restarts the question once on the next model
 in the answer chain, with a fresh conversation; tool results come from the
 per-question cache, so nothing is computed twice, and a `restart` step enters
-the trace. A spent daily budget is not an outage another model can fix, and
-ends the question.
+the trace. A tool whose result depends on what the run changed since (a draft
+checked against what was seen; a train a model builds step by step, whose run
+must be of the train as it now stands, OF-BLD-020 §5.4) is never served from
+the cache (`UNCACHED`). A spent daily budget is not an outage another model
+can fix, and ends the question.
 
 Every claim the model writes is held to `validate_plan`: no number in its
 text, nothing cited that no tool returned in this run, every quote verbatim
@@ -72,6 +75,12 @@ MAX_SECONDS = 180.0
 # to a length, so a long conversation costs what a short one does.
 MAX_HISTORY_TURNS = 4
 MAX_TURN_CHARS = 2000
+# Tools whose result depends on what the run changed since an earlier call
+# with the same input, so never served from the per-question cache: a draft
+# (checked against what this conversation has seen, §9.2), and a train a model
+# builds a step at a time (OF-BLD-020 §5.4: its run must be of the train as it
+# stands now, and adding the same unit twice adds two).
+UNCACHED = frozenset({"draft_runbook", "pureos_build", "pureos_write"})
 
 FOLLOW_UP = (
     "This question follows the earlier turns above. They say what the conversation is about; "
@@ -162,7 +171,16 @@ heat, cost) are read from its artifact and cited by the evidence id \
 fermos_vessel returns, which is the artifact id, or a vessel row fermos_read \
 returned by its ref in moduleRefs; never state them yourself. When \
 fermos_vessel refuses because the plant scale waits, say in gaps that a named \
-person types it in fermOS → Vessel; never supply one."""
+person types it in fermOS → Vessel; never supply one.
+17. A train is built with pureos_build, one action a call: new (the product's id \
+and the artifact its inlet is read from), add_unit (a catalogue unit type, after \
+a unit), remove_unit, set_from_record (record ids for a unit's parameter), then \
+run. A train's numbers (a unit's recovery, the overall recovery, the product's \
+share of a stream, a flow, a cost) are read from its run's artifact and never \
+stated by you: cite the run by the evidence id pureos_build's run returns, which \
+is its artifact id, or a train-run row pureos_read returned by its ref in \
+moduleRefs. When the run refuses because values wait, say in gaps which wait; \
+never supply one: a value is a named person's, typed in pureOS → Builder."""
 )
 
 
@@ -302,6 +320,17 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
     if name == "fermos_vessel":
         what = inp.get("simulationArtifact") or inp.get("fitArtifact")
         return f"Designed the vessel for {what} · kept design {result.summary.get('artifactId')}"
+    if name == "pureos_build":
+        action, train = str(inp.get("action") or ""), result.summary.get("trainId")
+        if action == "run":
+            return f"Ran train {train} · kept run {result.summary.get('artifactId')}"
+        if action == "add_unit":
+            return f"Added {inp.get('unitType')} to train {train} as {result.summary.get('added')}"
+        if action == "remove_unit":
+            return f"Took {inp.get('unitId')} out of train {train}"
+        if action == "set_from_record":
+            return f"Bound records on {inp.get('unitId')} of train {train}"
+        return f"Built a train for {result.summary.get('product')} · kept train {train}"
     if name == "stream_table":
         cut = f", {result.summary.get('leftOut')} left out" if result.summary.get("leftOut") else ""
         return f"Read the stream table of run {inp.get('artifactId')} · {_count(int(result.summary.get('shown', 0)), 'stream')}{cut}"
@@ -329,8 +358,10 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
     started = run.clock()
     run.ctx.seen = run.seen
     # A draft is checked against what this conversation has seen, so it is
-    # never served from the cache across a restart (§9.2).
-    if key in run.cache and call.name != "draft_runbook":
+    # never served from the cache across a restart (§9.2); a train a model
+    # builds changes between calls, so its steps and its run are never served
+    # from it either (OF-BLD-020 §5.4).
+    if key in run.cache and call.name not in UNCACHED:
         result = run.cache[key]
     else:
         result = tools.run(call.name, call.input, run.ctx)

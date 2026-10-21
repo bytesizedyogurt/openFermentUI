@@ -400,9 +400,11 @@ def test_an_archived_train_is_hidden_and_a_read_by_its_id_says_whose(pool):  # n
 
 
 def test_the_kinds_name_trains_and_the_registry_stays_closed():
-    assert module_stores.KINDS["pureos"] == ("unit-operation", "train", "train-unit")
-    assert [n for n in tools.WHITELIST if n.startswith("pureos")] == ["pureos_read", "pureos_write"], \
-        "a train is a kind of pureos_read, never a tool of its own"
+    # OF-BLD-020 §5.4: a train a model built is a kind train row too, and its
+    # kept runs are kind train-run; pureos_build builds one.
+    assert module_stores.KINDS["pureos"] == ("unit-operation", "train", "train-unit", "train-run")
+    assert [n for n in tools.WHITELIST if n.startswith("pureos")] == ["pureos_read", "pureos_write", "pureos_build"], \
+        "a train is read as a kind of pureos_read; pureos_build (OF-BLD-020 §5.4) is the one tool that builds one"
     described = next(t for t in tools.infos() if t.name == "pureos_read").description
     assert "train-unit" in described and "artifact id" in described
 

@@ -381,3 +381,31 @@ def test_a_loose_tool_keeps_its_maps_and_a_strict_one_stays_closed():
         return sum(maps(v) for v in node) if isinstance(node, list) else 0
 
     assert not any(maps(t["input_schema"]) for t in sent.values() if t["strict"])
+
+
+def test_pureos_reads_a_train_a_model_built_as_kind_train_hidden_with_its_program(pool):  # noqa: F811
+    """OF-BLD-020 §5.4: a train a model built is kept on the service and read
+    as kind train, its ref `pureos/train/<train id>`, a detail of ids and words
+    alone; with the switch off, one of an archived program hides and says so.
+    The train is a STAND-IN written here."""
+    from openferment_core.models import KeptTrain, TrainSpec
+
+    spec = TrainSpec.model_validate({
+        "id": "tr-0123456789ab", "name": "ethanol train, built by a model", "program": "yeast", "product": "ethanol",
+        "inlet": {"kind": "run-stream", "ref": "0123456789abcdef", "streamId": "beer"},
+        "units": [{"id": "C1", "type": "centrifugation", "records": {"split.Ethanol": ["r-X1-1"]}}]})
+    k = KeptTrain(spec=spec, madeBy="claude-haiku-5-5", at="2026-10-21T00:00:00+00:00",
+                  updatedAt="2026-10-21T00:00:00+00:00")
+    r = read("pureos", ctx_for(pool, kept_trains=lambda: [k]), ids=[spec.id])
+    [row] = r.rows
+    assert (row.ref, row.kind, row.state, row.status, row.provenance) == (
+        "pureos/train/tr-0123456789ab", "train", "open", "built by a model", None)
+    assert row.detail["recordsNamed"] == {"C1": ["split.Ethanol"]} and row.detail["runs"] == []
+    assert row.detail["madeBy"] == "claude-haiku-5-5" and _numbers_in(row.detail) == []
+    seen = SeenSet()
+    seen.add(r)
+    assert row.ref in seen.rows and not seen.runs, "a train is data: its runs are the kept runs"
+    archived = k.model_copy(update={"spec": spec.model_copy(update={"program": "pha"})})
+    off = read("pureos", ctx_for(pool, include_archived=False, kept_trains=lambda: [archived]), ids=[spec.id])
+    assert off.rows == [] and "PHA" in off.summary["hidden"]
+    assert read("pureos", ctx_for(pool, kept_trains=lambda: [archived]), ids=[spec.id]).rows[0].id == spec.id

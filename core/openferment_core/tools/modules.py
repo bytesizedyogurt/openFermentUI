@@ -54,7 +54,11 @@ WHAT = {
     "pureos": "the downstream unit operations, by stage (each with the BioSTEAM classes it is), and the trains Proforma's "
               "runs simulated (kind train, one a scenario: read by the scenario id or the run's artifact id); kind "
               "train-unit is one unit of a train, in run order, with the product in and out and the recovery read "
-              "from the run's stream table",
+              "from the run's stream table. Kind train also holds the trains a model built with pureos_build (read by "
+              "the train's id: its product, inlet and units in words and ids, who made it, its runs' ids), and kind "
+              "train-run is one kept run of such a train (pureos/train-run/<artifact id>, read by its id or its "
+              "train's: its train, product, units and product stream in words; its numbers stay in the artifact, "
+              "cited by the row's ref or the evidence id pureos_build returns)",
     "proforma": "the cost scenarios and the runs kept as artifacts: each scenario's runs and the reference "
                 "biorefineries' runs (stream_table reads a run's streams)",
     "biorepo": "the records, the extractor's candidates, the computed artifacts and the Witness runs that score the extractor",
