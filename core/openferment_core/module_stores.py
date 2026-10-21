@@ -422,6 +422,18 @@ class Stores:
             self._cache[name] = getattr(self.sources, name)()
         return self._cache[name]
 
+    def forget(self, *sources: str) -> None:
+        """Read the named sources afresh on next use, and every module's rows
+        with them (OF-BLD-020 §5.R, finding 21): a write in the middle of a
+        question (a model's train changed, a run kept) changes what a later
+        read of the same question must see. The other sources stay as read."""
+        for name in sources:
+            self._cache.pop(name, None)
+        self._all.clear()
+        self._rows.clear()
+        self._hidden.clear()
+        self._errors.clear()
+
     def pool(self) -> Any:
         return self._get("pool")
 

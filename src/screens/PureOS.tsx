@@ -35,6 +35,14 @@
 // train runs the service keeps (`GET /api/pureos/train-runs`, an archived
 // program's hidden and said so), and the trains read from Proforma's runs.
 //
+// A MODEL'S TRAINS ARE LISTED (OF-BLD-020 §5.R). Postdoc builds a train with
+// `pureos_build` and the service keeps it as the model's (`GET
+// /api/pureos/trains-kept`); *Made by Postdoc* lists each with its name,
+// product, units, the model that made it and when, and its newest run (the
+// service's train runs, joined by the run's `trainId`), an archived program's
+// hidden with the switch and said so. **Open a copy** opens it in the Builder
+// as a new train of this browser (`?copy=`); the kept train stays the model's.
+//
 // A TRAIN IS PROPOSED BY RULES (OF-BLD-020 §7.2, D12). **Propose a train**
 // (PureOSPropose.tsx) sends a product, a host and optionally an inlet, and
 // shows the service's proposal: catalogue unit types in order, each with the
@@ -45,10 +53,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { STORAGE_FORMATS, UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER } from '@/data/vocabulary';
 import { PRODUCTS } from '@/data/products';
 import { PROGRAMS, isArchived } from '@/data/programs';
-import type { ProgramId, TrainSummary, UnitOperationStage } from '@/data/types';
+import type { KeptTrain, ProgramId, TrainSummary, UnitOperationStage } from '@/data/types';
 import { href, navigate, useRoute } from '@/router';
 import { useProgramFilter, useStore } from '@/store';
-import { NEW_TRAIN, PureosDown, PureosRefused, builderPath, pureosTrainRuns, pureosTrains, share, trainPath } from '@/lib/pureos';
+import { NEW_TRAIN, PureosDown, PureosRefused, builderCopyPath, builderPath, pureosTrainRuns, pureosTrains, pureosTrainsKept, share, trainPath } from '@/lib/pureos';
 import { stamp } from '@/lib/proforma';
 import { Button, Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -251,6 +259,103 @@ function TrainsBuiltHere({ runs, problem }: { runs: TrainSummary[] | null; probl
 }
 
 /**
+ * The trains a model built, kept on the service (OF-BLD-020 §5.4, §5.R): each
+ * with its name, product, units, the model that made it and when, and its
+ * newest run on the service (joined by the run's `trainId`). The program
+ * switch filters them like any list, and the list says what it hides. Open a
+ * copy opens one in the Builder as a new train of this browser.
+ */
+function TrainsMadeByPostdoc({ runs, problem: runsProblem }: { runs: TrainSummary[] | null; problem: string | null }) {
+  const [kept, setKept] = useState<KeptTrain[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const showArchived = useStore((s) => s.showArchived);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    pureosTrainsKept(ctrl.signal)
+      .then(setKept)
+      .catch((e) => {
+        if (ctrl.signal.aborted) return;
+        setProblem(e instanceof PureosDown ? `${e.message} ${e.remedy}` : e instanceof PureosRefused ? e.message : String(e));
+      });
+    return () => ctrl.abort();
+  }, []);
+  const visible = (k: KeptTrain) => showArchived || !isArchived(k.spec.program as ProgramId);
+  const listed = (kept ?? []).filter(visible);
+  const hidden = (kept ?? []).filter((k) => !visible(k));
+  const hiddenPrograms = PROGRAMS.filter((p) => hidden.some((k) => k.spec.program === p.id));
+  const hiddenLine = hidden.length > 0 && (
+    <HiddenByArchive
+      subject={`${hidden.length} ${listed.length ? 'more ' : ''}${hidden.length === 1 ? 'train' : 'trains'} a model built`}
+      plural={hidden.length !== 1}
+      programs={hiddenPrograms}
+    />
+  );
+  return (
+    <section className="mt-5" aria-labelledby="pureos-kept" data-testid="pureos-kept">
+      <SectionTitle right={<span className="font-num text-caption text-ink-soft">{kept ? `${listed.length} kept` : ''}</span>}>
+        <span id="pureos-kept">Made by Postdoc</span>
+      </SectionTitle>
+      {problem && (
+        <Callout kind="warn" title="The trains a model built are kept on the service">
+          <p className="text-ink">{problem}</p>
+        </Callout>
+      )}
+      {!problem && !kept && <p className="text-body text-ink-soft">Reading the trains a model built…</p>}
+      {kept && listed.length === 0 && (
+        <Card className="p-4" data-testid="pureos-kept-empty">
+          <p className="text-body text-ink">No train built by a model is kept on this service yet.</p>
+          <p className="text-body text-ink-soft mt-1">
+            Postdoc builds one with <span className="font-num">pureos_build</span> when a question asks for a train, from unit type names and record ids; the
+            service keeps it as the model&rsquo;s, and it is listed here, ready to open as a copy you can change and save.
+          </p>
+          {hiddenLine && <p className="text-caption text-ink-soft mt-2">{hiddenLine}</p>}
+        </Card>
+      )}
+      {listed.length > 0 && (
+        <Card className="px-4 py-1">
+          <ul>
+            {listed.map((k) => {
+              const run = runs?.find((r) => r.trainId === k.spec.id) ?? null;
+              return (
+                <li key={k.spec.id} className="py-2.5 border-b border-line/70 last:border-0" data-testid="pureos-kept-row" data-train={k.spec.id}>
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="text-body text-ink">{k.spec.name}</span>
+                    <span className="text-caption text-ink-soft font-num">{k.spec.id}</span>
+                    <a className="chip min-h-[44px] inline-flex items-center" href={href(builderCopyPath(k.spec.id))} data-testid="pureos-kept-copy">
+                      Open a copy in the Builder
+                    </a>
+                    <span className="ml-auto text-caption text-ink-soft">
+                      {run ? (
+                        <a className="hover:text-accent" href={href(`/pureos/train/${encodeURIComponent(k.spec.id)}`)}>
+                          ran: {share(run.overallRecovery)} recovered
+                        </a>
+                      ) : runsProblem ? (
+                        'its runs are read from the service'
+                      ) : runs === null ? (
+                        'reading its runs on the service…'
+                      ) : (
+                        'no run on the service'
+                      )}
+                    </span>
+                  </div>
+                  <div className="text-caption text-ink-soft mt-0.5">
+                    product {k.spec.product} · {k.spec.units.length} {k.spec.units.length === 1 ? 'unit' : 'units'}
+                    {k.spec.units.length ? `: ${k.spec.units.map((u) => `${u.id} ${u.type}`).join(', ')}` : ''} · inlet {k.spec.inlet.kind} · built by {k.madeBy}
+                    {k.effort ? ` at effort ${k.effort}` : ''}, {stamp(k.at)}
+                    {k.updatedAt !== k.at ? `, last changed ${stamp(k.updatedAt)}` : ''}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {hiddenLine && <p className="text-caption text-ink-soft py-2">{hiddenLine}</p>}
+        </Card>
+      )}
+    </section>
+  );
+}
+
+/**
  * The train runs the service keeps (OF-BLD-020 §5.2): one row a run, newest
  * first, opening at its train's id. An archived program's run is hidden with
  * the switch, and the list says so.
@@ -433,6 +538,8 @@ export default function PureOS() {
       </div>
 
       <TrainsBuiltHere runs={runs} problem={runsProblem} />
+
+      <TrainsMadeByPostdoc runs={runs} problem={runsProblem} />
 
       <TrainRunsOnFile runs={runs} problem={runsProblem} />
 

@@ -33,6 +33,9 @@ import type {
   SeriesRole,
   FermosFitResponse,
   TrainProposal,
+  TrainFromRun,
+  TrainRun,
+  KeptTrain,
   RunbookStage,
   RunOutput,
   RunState,
@@ -654,6 +657,18 @@ export interface OFState {
   proposedTrains: Record<string, TrainProposal>;
   /** Keep a proposal that proposed a train under a new train id, and return the id; null when it proposed none. */
   keepProposedTrain: (proposal: TrainProposal) => string | null;
+  /**
+   * OF-BLD-020 §5.R (finding 13) — what pureOS's Builder shows of a train in
+   * this session, by the train's id: the newest run made on the page, what
+   * the service said reading the train from a run (`?from=`), the train a
+   * model built that it copies (`?copy=`), and whether Price this in Proforma
+   * is open. Save moves a new train to its own address, which mounts the page
+   * afresh; the page reads these back, so nothing it showed is lost.
+   * Ephemeral: the run is the service's artifact, and the train is kept by
+   * Save.
+   */
+  builderShown: Record<string, BuilderShown>;
+  showInBuilder: (trainId: string, shown: Partial<BuilderShown>) => void;
   /** Whether the Durable tier's copy of the ledger has been read this session. */
   guildHydrated: boolean;
   /**
@@ -941,6 +956,9 @@ export const useStore = create<OFState>()((set, get) => ({
     set((s) => ({ proposedTrains: { ...s.proposedTrains, [id]: { ...proposal, train } } }));
     return id;
   },
+  builderShown: {} as Record<string, BuilderShown>,
+  showInBuilder: (trainId: string, shown: Partial<BuilderShown>) =>
+    set((s) => ({ builderShown: { ...s.builderShown, [trainId]: { ...(s.builderShown[trainId] ?? {}), ...shown } } })),
   guildHydrated: false,
   practice: null as Practice | null,
   checks: null as Checks | null,
@@ -3708,6 +3726,21 @@ if (durableAvailable()) {
 // the same of corpus.json and modules.json through `programs.py`.
 
 /** What `programOf` can be asked about. */
+/**
+ * OF-BLD-020 §5.R — what pureOS's Builder showed of one train this session
+ * (`builderShown`): each part absent until the page has shown it.
+ */
+export interface BuilderShown {
+  /** The newest run made on the page, as the service returned it. */
+  run?: TrainRun | null;
+  /** What the service said reading the train from a kept run's units. */
+  fromRun?: { artifactId: string; answer: TrainFromRun | null; problem: string | null } | null;
+  /** The train a model built that this train copies, as the service listed it. */
+  copyOf?: KeptTrain | null;
+  /** Whether Price this in Proforma is open. */
+  pricing?: boolean;
+}
+
 export type ProgramEntityKind =
   | 'paper'
   | 'record'

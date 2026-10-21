@@ -139,7 +139,8 @@
         ],
         "costModel": true,
         "notes": [
-          "The liquid goes on by default, as it does for a product in solution; a train routes the cake on for a product held in the cells."
+          "The liquid goes on by default, as it does for a product in solution; a train routes the cake on for a product held in the cells.",
+          "The moisture content sets the water: BioSTEAM moves water between the outlets to meet it and never reads a split of water, so split.Water is not read while a moisture content is set (§5.R)."
         ],
         "notOffered": [
           {
@@ -275,7 +276,8 @@
         ],
         "costModel": true,
         "notes": [
-          "BioSTEAM costs the filter as the NREL corn stover design's filter press and its tanks and pumps."
+          "BioSTEAM costs the filter as the NREL corn stover design's filter press and its tanks and pumps.",
+          "The moisture content sets the water: BioSTEAM moves water between the outlets to meet it and never reads a split of water, so split.Water is not read while a moisture content is set (§5.R)."
         ],
         "notOffered": [],
         "needs": [],
@@ -319,7 +321,9 @@
           }
         ],
         "costModel": true,
-        "notes": [],
+        "notes": [
+          "The moisture content sets the water: BioSTEAM moves water between the outlets to meet it and never reads a split of water, so split.Water is not read while a moisture content is set (§5.R)."
+        ],
         "notOffered": [
           {
             "name": "order",
@@ -1082,7 +1086,7 @@
       {
         "id": "molecular-sieve",
         "name": "Molecular sieve",
-        "line": "adsorbs the water distillation cannot take past the azeotrope: each component splits between the dehydrated product and the regenerate",
+        "line": "adsorbs the water distillation cannot take past the azeotrope: each component splits between the regenerate the sieves release and the dehydrated product",
         "stage": "polish",
         "biosteamClass": "MolecularSieve",
         "inhouseClass": null,
@@ -1099,24 +1103,26 @@
           {
             "side": "out",
             "index": 0,
-            "name": "product",
-            "what": "the dehydrated product: each component's split",
-            "onward": true,
+            "name": "regenerate",
+            "what": "the water the sieves adsorb and release, with what goes with it: each component's split",
+            "onward": false,
             "source": null,
             "many": false
           },
           {
             "side": "out",
             "index": 1,
-            "name": "regenerate",
-            "what": "the water the sieves release, with what goes with it",
-            "onward": false,
+            "name": "product",
+            "what": "the dehydrated product: the rest",
+            "onward": true,
             "source": null,
             "many": false
           }
         ],
         "costModel": true,
-        "notes": [],
+        "notes": [
+          "BioSTEAM's MolecularSieve sends its split to outlet 0, and biorefineries' ethanol plant uses it for the water-rich regenerate it recycles to the rectifier; the dehydrated ethanol leaves by outlet 1 (§5.R)."
+        ],
         "notOffered": [
           {
             "name": "order",
@@ -1308,7 +1314,10 @@
           }
         ],
         "costModel": true,
-        "notes": [],
+        "notes": [
+          "DrumDryer._run sends its split to the hot gas (outlet 1): a component the split does not name stays in the dried solids (§5.R).",
+          "The moisture content sets the water: BioSTEAM moves water between the outlets to meet it and never reads a split of water, so split.Water is not read while a moisture content is set (§5.R)."
+        ],
         "notOffered": [
           {
             "name": "gas_composition",
@@ -1756,7 +1765,8 @@
           "thermosteam": "0.54.2"
         },
         "notes": [
-          "The liquid goes on by default, as it does for a product in solution; a train routes the cake on for a product held in the cells."
+          "The liquid goes on by default, as it does for a product in solution; a train routes the cake on for a product held in the cells.",
+          "The moisture content sets the water: BioSTEAM moves water between the outlets to meet it and never reads a split of water, so split.Water is not read while a moisture content is set (§5.R)."
         ]
       },
       "tank": {
@@ -3195,12 +3205,12 @@
               "low": null,
               "high": null,
               "source": null,
-              "origin": "waiting",
+              "origin": "not-read",
               "identified": null,
               "overriddenBy": null,
               "libraryDefault": null,
               "recordIds": [],
-              "detail": "waits for a source: a record of step_recovery through the aggregate gate, a named person's assumption. a record of step_recovery binds the product's split alone (Ethanol)",
+              "detail": "not read: the moisture content sets the water (0.4, the class's own default): SolidsCentrifuge moves Water between its outlets to meet it and never reads a split of Water",
               "outOfBounds": null
             },
             {
@@ -3258,7 +3268,6 @@
           ],
           "waiting": [
             "split.Ethanol",
-            "split.Water",
             "split.Yeast"
           ],
           "notes": [
@@ -3269,6 +3278,7 @@
             "Not offered: moisture_ID, the chemical the moisture content is of: BioSTEAM's water when unset, and a broth's moisture is water.",
             "Not offered: strict_moisture_content, a check switch: whether BioSTEAM refuses a cake that cannot hold the moisture asked; left to the class.",
             "The liquid goes on by default, as it does for a product in solution; a train routes the cake on for a product held in the cells.",
+            "The moisture content sets the water: BioSTEAM moves water between the outlets to meet it and never reads a split of water, so split.Water is not read while a moisture content is set (§5.R).",
             "split is one key here, expanded per component as <key>.<item> when a train's unit is resolved (§5.2); records bind by the train's product then.",
             "No evidence pool here (no corpus exported), so no record binds."
           ]
@@ -3916,7 +3926,7 @@
       "key": "{\"program\":\"yeast\",\"product\":\"ethanol\",\"inlet\":[\"typed\",null,null,null,[[\"broth_flow\",1.0],[\"conc.Ethanol\",50.0],[\"conc.Yeast\",10.0]]],\"units\":[[\"U1\",\"centrifugation\",[[\"split.Ethanol\",0.05],[\"split.Yeast\",0.9]],[[\"cake\",\"waste\"],[\"liquid\",\"onward\"]],null,[]],[\"U2\",\"tank\",[],[[\"outlet\",\"onward\"]],null,[]],[\"U3\",\"pump\",[],[[\"outlet\",\"onward\"]],null,[]]]}",
       "status": 200,
       "body": {
-        "artifactId": "64c8af8aa683d972",
+        "artifactId": "a2f5c74c6389a3e5",
         "provenance": "demo",
         "createdAt": "2026-09-15T09:00:00Z",
         "spec": {
@@ -4010,7 +4020,7 @@
         "train": {
           "scenarioId": null,
           "scenarioName": null,
-          "artifactId": "64c8af8aa683d972",
+          "artifactId": "a2f5c74c6389a3e5",
           "flowsheet": null,
           "createdAt": "2026-09-15T09:00:00Z",
           "provenance": "demo",
@@ -4617,12 +4627,12 @@
           }
         ],
         "notes": [
-          "Unit U1: no record or person set split.Water; BioSTEAM reads a split that does not name a component as none of it to outlet cake."
+          "Unit U1: the moisture content (0.4) sets the Water: SolidsCentrifuge moves Water between its outlets to meet it and never reads a split of Water, so none is passed."
         ],
         "flags": [],
         "basis": {
           "tool": "pureos.train_run",
-          "toolVersion": "train run 1 · biosteam 2.54.0 · thermosteam 0.54.2 · biorefineries 2.35.1",
+          "toolVersion": "train run 2 · biosteam 2.54.0 · thermosteam 0.54.2 · biorefineries 2.35.1",
           "inputs": [
             {
               "name": "train",
@@ -5087,7 +5097,7 @@
               }
             }
           ],
-          "artifactId": "64c8af8aa683d972",
+          "artifactId": "a2f5c74c6389a3e5",
           "at": "2026-09-15T09:00:00Z",
           "seed": null
         },
@@ -5169,7 +5179,7 @@
       {
         "scenarioId": null,
         "scenarioName": null,
-        "artifactId": "64c8af8aa683d972",
+        "artifactId": "a2f5c74c6389a3e5",
         "flowsheet": null,
         "createdAt": "2026-09-15T09:00:00Z",
         "provenance": "demo",
@@ -5187,7 +5197,7 @@
     "trainOf": {
       "scenarioId": null,
       "scenarioName": null,
-      "artifactId": "64c8af8aa683d972",
+      "artifactId": "a2f5c74c6389a3e5",
       "flowsheet": null,
       "createdAt": "2026-09-15T09:00:00Z",
       "provenance": "demo",
@@ -5370,18 +5380,18 @@
     "fromRun": [
       {
         "request": {
-          "artifactId": "64c8af8aa683d972"
+          "artifactId": "a2f5c74c6389a3e5"
         },
         "status": 200,
         "body": {
           "train": {
-            "id": "from-64c8af8aa683d972",
+            "id": "from-a2f5c74c6389a3e5",
             "name": "The train of A train the browser tests build",
             "program": "yeast",
             "product": "ethanol",
             "inlet": {
               "kind": "run-stream",
-              "ref": "64c8af8aa683d972",
+              "ref": "a2f5c74c6389a3e5",
               "streamId": "inlet",
               "vessel": null,
               "params": {}

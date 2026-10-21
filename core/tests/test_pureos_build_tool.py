@@ -342,6 +342,76 @@ def test_a_worker_that_cannot_answer_is_said_in_words(store, inlet, monkeypatch)
     assert r.error == "pureos_build could not run the train: the simulator is starting"
 
 
+# ── what a kept train says (OF-BLD-020 §5.R) ───────────────────────────
+
+
+def test_to_run_names_what_a_run_would_refuse_not_only_what_stops_the_train_being_built(store, inlet):
+    """Finding 20: `toRun` held the validation alone, which is empty for a
+    train that builds but whose values wait, and the meaning said it named
+    what still stops the train running. It is the run's own check now
+    (`train_spec.check_train`): every refusal the run gives is in it."""
+    tid = built(inlet)
+    r = b(action="add_unit", trainId=tid, unitType="flash")
+    assert r.error is None, r.error
+    to_run = r.summary["toRun"]
+    assert to_run and any(w.startswith("unit F1: Flash drum waits for") for w in to_run), to_run
+    refused = b(action="run", trainId=tid).error
+    assert refused.startswith("pureos_build refused:")
+    assert all(w.rstrip(".") in refused for w in to_run), (to_run, refused)
+    assert "what a run of it would refuse now" in r.summary["meaning"]
+    assert "toRunNote" not in r.summary
+    # A train with no unit says the validation's words, as before.
+    empty = b(action="remove_unit", trainId=tid, unitId="F1")
+    assert empty.summary["toRun"] == ["a train holds at least one unit"]
+
+
+def test_to_run_falls_back_on_the_validation_and_says_so_when_the_simulator_cannot_answer(store, inlet, monkeypatch):
+    tid = built(inlet)
+    from openferment_core import proforma
+    from openferment_core.workers import WorkerError
+
+    def down(op, args):
+        raise WorkerError("the simulator is starting")
+
+    monkeypatch.setattr(proforma, "call", down)
+    monkeypatch.setattr(train_spec, "_SPECS", {})
+    r = b(action="add_unit", trainId=tid, unitType="flash")
+    assert r.error is None, r.error
+    assert r.summary["toRun"] == train_spec.validate(kept.kept_train(tid).spec)
+    assert "the simulator is starting" in r.summary["toRunNote"] and "not checked" in r.summary["toRunNote"]
+    assert [u.type for u in kept.kept_train(tid).spec.units] == ["flash"]
+
+
+def _clause(description: str, action: str) -> str:
+    """The words a field's description gives one action: from `<action>:`
+    to the next action's label or the end."""
+    labels = [f"{a}:" for a in ("new", "add_unit", "remove_unit", "set_from_record", "run", "propose")]
+    start = description.index(f"{action}:")
+    rest = description[start + len(action) + 1:]
+    ends = [rest.index(f" {label}") for label in labels if f" {label}" in rest]
+    return rest[: min(ends)] if ends else rest
+
+
+def test_the_build_fields_offer_propose_only_what_the_proposer_takes():
+    """Findings 19 and 32: `product` and `inletRef` were described for new
+    and propose alike, offering propose a vessel design's id and an empty
+    product, both of which the proposer refuses. Each action's words are
+    its own now, here and in docs/TOOLS.md."""
+    props = tools.REGISTRY["pureos_build"].info().inputSchema["properties"]
+    product, inlet_ref = props["product"]["description"], props["inletRef"]["description"]
+    for d in (product, inlet_ref):
+        assert "new and propose" not in d
+    assert "empty" in _clause(product, "new") and "empty" not in _clause(product, "propose")
+    assert "required" in _clause(product, "propose")
+    assert "vessel" in _clause(inlet_ref, "new") and "vessel" not in _clause(inlet_ref, "propose")
+    assert "simulation" in _clause(inlet_ref, "propose") and "<artifact id>/<stream id>" in _clause(inlet_ref, "propose")
+    description = tools.REGISTRY["pureos_build"].description
+    assert "vessel" not in description.split("propose keeps", 1)[1]
+    doc = (PKG.parent.parent / "docs" / "TOOLS.md").read_text(encoding="utf-8")
+    [row] = [line for line in doc.splitlines() if line.startswith("| `pureos_build` |")]
+    assert "for `new` and `propose`" not in row
+
+
 # ── pureos_write's train actions ───────────────────────────────────────
 
 

@@ -645,7 +645,8 @@ TRAIN_WAITS = ("A named person types each waiting value in pureOS → Builder un
                "it. Say in gaps which values wait.")
 KEPT_MEANING = ("the train is kept on the service as the model's, marked so in the audit log; it holds ids and words, "
                 "every value binds at the run from the records, the class's own default or a named person; toRun says "
-                "in words what still stops it running")
+                "in the run's own words what a run of it would refuse now (each value that waits, each need of a "
+                "unit), empty when the run would go; toRunNote, when present, says why the values were not checked")
 
 
 def _kept_result(tool: str, action: str, k: Any, note: str, ctx: ToolContext, said: dict[str, Any] | None = None
@@ -653,7 +654,8 @@ def _kept_result(tool: str, action: str, k: Any, note: str, ctx: ToolContext, sa
     from ..pureos import build
 
     _audit(ctx, "pureos", action, "open", k.spec.id, {"tool": tool, "note": note, **(said or {})})
-    return ToolResult(summary={"state": "open", **build.described(k), **(said or {}), "meaning": KEPT_MEANING})
+    return ToolResult(summary={"state": "open", **build.described(k, ctx.include_archived), **(said or {}),
+                               "meaning": KEPT_MEANING})
 
 
 def _train_refused(tool: str, e: Exception) -> ToolResult:

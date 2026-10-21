@@ -43,7 +43,9 @@ from openferment_core.models import (
     Override,
     ParamResolveRequest,
     SimulationRequest,
+    TrainParam,
     TrainSpec,
+    TrainUnitSpec,
 )
 from openferment_core.pureos import catalogue, train_spec
 from test_catalogue import StandInWorker
@@ -85,6 +87,9 @@ VERSIONS = {"biosteam": "0.0-standin", "thermosteam": "0.0-standin", "biorefiner
 STREAM_T, STREAM_P = 298.15, 101325.0
 # The share of the product a stand-in unit sends off its path.
 LOSS = 0.1
+# A STAND-IN of a class's own split table, by component (as PressureFilter
+# fills one when none is given): invented for the test, none a result.
+TABLE = {"Water": 0.04, "Ethanol": 0.04, "Glucose": 0.03, "Yeast": 0.98, "Octane": 0.04}
 
 
 class TrainWorker(StandInWorker):
@@ -102,9 +107,15 @@ class TrainWorker(StandInWorker):
             # What a class requires has no default of its own, as BioSTEAM's
             # flash, columns and evaporator give none: None here too.
             got = super().__call__(op, args)
-            needed = {k for alts, _ in catalogue.entry(args["type"]).needs for alt in alts for k in alt}
+            e = catalogue.entry(args["type"])
+            needed = {k for alts, _ in e.needs for alt in alts for k in alt}
             for k in needed & set(got["defaults"]):
                 got["defaults"][k] = {"value": None, "from": STANDIN}
+            # §5.R: a class that fills its own split table when none is given
+            # (PressureFilter) has it read by component, as the worker reads it.
+            for p in e.params:
+                if p.per == "component" and p.bst == "split" and "library-default" in p.rule:
+                    got["defaults"][p.key] = {"value": None, "from": STANDIN, "byComponent": dict(TABLE)}
             return got
         self.calls.append((op, args))
         if op == "train_specs":
@@ -205,7 +216,7 @@ def test_validate_names_every_refusal_at_once_in_words():
         {"id": "F1", "type": "flashy"},
         {"id": "M1", "type": "flash", "outlets": {"vapour": "recycle:C1", "liquid": "waste"}},
         {"id": "inlet", "type": "tank", "outlets": {"outlet": "somewhere"}},
-        {"id": "S1", "type": "molecular-sieve", "outlets": {"product": "recycle:M1"},
+        {"id": "S1", "type": "molecular-sieve", "outlets": {"regenerate": "recycle:M1"},
          "readFrom": {"flowsheet": "corn_drygrind", "unit": "U301"}, "records": {"approx_duty": ["r-x"]}},
     ])
     said = pureos.validate(bad)
@@ -222,7 +233,7 @@ def test_validate_names_every_refusal_at_once_in_words():
         "unit M1 (flash) sends no outlet on",
         "inlet names the train's inlet, not a unit",
         "unit inlet's outlet outlet goes onward, to waste or to recycle:<an earlier unit>; 'somewhere' is none of them",
-        "unit S1's outlet product recycles to M1 (flash), whose inlet takes one stream",
+        "unit S1's outlet regenerate recycles to M1 (flash), whose inlet takes one stream",
         "unit S1 reads from corn_drygrind, a reference biorefinery",
         "unit S1: approx_duty binds from no record field, so no record can be named for it",
     ]
@@ -364,8 +375,10 @@ def test_a_units_scope_expands_over_the_trains_chemicals_and_binds_the_products_
     assert (eth.value, eth.low, eth.high) == pytest.approx((0.15, 0.1, 0.2))
     assert "one less it: the split is to outlet cake, and the product goes on by liquid" in eth.detail
     assert "1 naming another step or none" in eth.detail and "1 not on the yeast program's papers" in eth.detail
-    # Another component's split nobody set is left to the class, which reads it as none to outlet 0.
-    assert v["split.Water"].origin == "not-read" and "as none of it to outlet cake" in v["split.Water"].detail
+    # Another component's split nobody set is left to the class, which reads it as none to outlet 0; the
+    # water's is the cake moisture's (§5.R part a, finding 6).
+    assert v["split.Glucose"].origin == "not-read" and "as none of it to outlet cake" in v["split.Glucose"].detail
+    assert v["split.Water"].origin == "not-read" and "moisture content sets the water" in v["split.Water"].detail
     bare = {x.key: x for x in params.scope("pureos:unit:t1:C1", ParamResolveRequest(train=spec_of(units=[
         {"id": "C1", "type": "centrifugation", "outlets": {"cake": "waste", "liquid": "onward"}}]))).values}
     assert bare["split.Water"].origin == "not-read"
@@ -482,7 +495,8 @@ def test_a_run_keeps_one_artifact_whose_basis_names_every_unit_and_source(store,
     assert {p.unit: p.type for p in run.parameters} == {"C1": "centrifugation", "F1": "flash"}
     v = {x.key: x for x in run.parameters[0].values}
     assert v["split.Yeast"].origin == "assumption" and v["split.Yeast"].overriddenBy == BY
-    assert any("no record or person set split.Ethanol, split.Glucose, split.Water" in n for n in run.notes)
+    assert any("no record or person set split.Ethanol, split.Glucose;" in n for n in run.notes), run.notes
+    assert any("Unit C1: the moisture content" in n and "sets the Water" in n for n in run.notes), run.notes
 
 
 def test_purity_names_each_streams_product_share_and_its_largest_other_components():
@@ -585,6 +599,152 @@ def test_a_unit_reading_a_flowsheets_own_unit_takes_its_values_first_as_the_pack
     assert sent["units"][0]["values"]["light_key"] == "Ethanol" and sent["units"][0]["values"]["k"] == 2.0
 
 
+# ── §5.R (part a): what the night-two review found (offline) ───────────
+
+
+def _values_of(spec, unit_id, overrides=()):
+    """A unit's values as the Builder's panel resolves them: the train's
+    typed values laid on as the scope's overrides, and any more given."""
+    scope = f"pureos:unit:{spec.id}:{unit_id}"
+    unit = next(u for u in spec.units if u.id == unit_id)
+    typed_ = [Override(scope=scope, key=k, **p.model_dump()) for k, p in unit.params.items()]
+    got = params.resolve_scope(scope, ParamResolveRequest(train=spec, overrides=[*typed_, *overrides])).values
+    return {x.key: x for x in got}
+
+
+def test_a_step_record_binds_a_unit_only_where_its_words_name_the_step_as_a_word(store, worker, monkeypatch):
+    """Finding 0: 'which' holds 'hic' and 'second' holds 'sec', and neither
+    names a chromatography step; the record still binds the centrifuge whose
+    step its words name. A mode named by its abbreviation binds as written in
+    capitals ('SEC'), never as seconds ('sec')."""
+    pool = stand_in_pool(
+        _record("r-c-1", "step_recovery", 60.0, "%", "The yield, which we measured after the second centrifugation, was 60%"),
+        _record("r-c-2", "product_purity", 92.0, "%", "Ethanol secreted into the broth reached a purity of 92% after "
+                                                       "distillation"),
+        _record("r-c-3", "step_recovery", 70.0, "%", "held for 30 sec before the pellet was collected"),
+    )
+    monkeypatch.setattr(train_spec, "_pool", lambda: pool)
+    spec = spec_of(units=[{"id": "C1", "type": "centrifugation"}, {"id": "K1", "type": "chromatography"}])
+    k1 = _values_of(spec, "K1")
+    assert k1["recovery"].origin == "waiting" and k1["recovery"].recordIds == []
+    assert "2 naming another step or none" in k1["recovery"].detail, k1["recovery"].detail
+    assert k1["purity"].origin == "waiting" and "1 naming another step or none" in k1["purity"].detail
+    c1 = _values_of(spec, "C1")
+    assert c1["split.Ethanol"].origin == "record" and c1["split.Ethanol"].recordIds == ["r-c-1"]
+    # An abbreviation in capitals names the mode's step.
+    sec = stand_in_pool(_record("r-c-4", "step_recovery", 80.0, "%", "after SEC the pool held"))
+    monkeypatch.setattr(train_spec, "_pool", lambda: sec)
+    assert _values_of(spec, "K1")["recovery"].recordIds == ["r-c-4"]
+    # A word that holds a step's word inside it names nothing: 'pellet' holds 'lle'.
+    assert train_spec._names_step({"quote": "the pellet was collected"}, ["lle"]) is False
+    assert train_spec._names_step({"quote": "after liquid-liquid extraction"}, ["liquid liquid extraction"]) is True
+
+
+def test_the_unset_split_words_name_the_outlet_the_split_goes_to(store, worker, no_pool):
+    """Findings 1 and 7: the drum dryer's split goes to its hot gas (outlet
+    1), so a component its split does not name stays in the dried solids;
+    the words on the panel and in the run's notes say so."""
+    spec = spec_of(units=[{"id": "D1", "type": "drying-drum", "params": {"split.Ethanol": typed(0.9)},
+                           "outlets": {"dried": "waste", "hot-gas": "onward"}}])
+    v = _values_of(spec, "D1")
+    words = v["split.Glucose"].detail
+    assert v["split.Glucose"].origin == "not-read"
+    assert "none of it to outlet hot-gas" in words and "all of it leaves by dried" in words, words
+    assert "outlet dried" not in words.replace("leaves by dried", "")
+    run = pureos.run_train(spec)
+    note = next(n for n in run.notes if n.startswith("Unit D1: no record or person set"))
+    assert "none of it to outlet hot-gas" in note and "none of it to outlet dried" not in note, note
+    # A centrifuge's split goes to its cake (outlet 0), as before.
+    c = _values_of(spec_of(units=[{"id": "C1", "type": "centrifugation", "params": {"split.Yeast": typed(0.9)}}]), "C1")
+    assert "none of it to outlet cake" in c["split.Ethanol"].detail and "all of it leaves by liquid" in c[
+        "split.Ethanol"].detail
+
+
+def test_a_pressure_filters_split_is_its_own_table_until_a_share_is_set_and_then_the_whole_table_is_passed(
+        store, worker, no_pool):
+    """Findings 1 and 5: the pressure filter fills its split from its own
+    table when none is given and drops the whole table once any share is:
+    each unset share is the class's table share, read in the worker, served
+    as its library default; nothing set is left to the class and said so;
+    one share set passes every share, the others the class's own."""
+    bare = spec_of(units=[{"id": "P1", "type": "pressure-filtration"}])
+    v = _values_of(bare, "P1")
+    # Water's share is the moisture content's (finding 6), so the table's water is not read.
+    assert v["split.Water"].origin == "not-read"
+    for c in ("Ethanol", "Glucose", "Yeast"):
+        x = v[f"split.{c}"]
+        assert x.origin == "library-default" and x.value == pytest.approx(TABLE[c]), (c, x)
+        assert x.libraryDefault == pytest.approx(TABLE[c]) and "own table" in x.detail
+    run = pureos.run_train(bare)
+    [(_, sent)] = [c for c in worker.calls if c[0] == "train_run"]
+    assert not [k for k in sent["units"][0]["values"] if k.startswith("split.")]
+    assert not any("none of it to outlet retentate" in n for n in run.notes), run.notes
+    assert any("PressureFilter's own table" in n for n in run.notes), run.notes
+    # One share set: every share goes to the class, the rest at the table's own.
+    one = spec_of(units=[{"id": "P1", "type": "pressure-filtration", "params": {"split.Ethanol": typed(0.05)}}])
+    run = pureos.run_train(one)
+    sent = [c for c in worker.calls if c[0] == "train_run"][-1][1]
+    split = {k: x for k, x in sent["units"][0]["values"].items() if k.startswith("split.")}
+    assert split == pytest.approx({"split.Ethanol": 0.05, "split.Glucose": TABLE["Glucose"], "split.Yeast": TABLE["Yeast"]})
+    p = {x.key: x for x in run.parameters[0].values}
+    assert p["split.Yeast"].origin == "library-default" and p["split.Yeast"].value == pytest.approx(TABLE["Yeast"])
+    assert any("passed with it" in n for n in run.notes), run.notes
+
+
+def test_a_run_reads_back_every_record_that_bound_a_value(store, worker, monkeypatch):
+    """Findings 2 and 9: two records bind a centrifuge's split; the run's
+    parameters name both, as its basis does."""
+    pool = stand_in_pool(_record("r-st-1", "step_recovery", 90.0, "%", "after centrifugation the broth kept"),
+                         _record("r-st-2", "step_recovery", 80.0, "%", "after centrifugation the broth kept"))
+    monkeypatch.setattr(train_spec, "_pool", lambda: pool)
+    run = pureos.run_train(spec_of(units=[{"id": "C1", "type": "centrifugation"}]))
+    basis = [i.value for i in artifacts.get(run.artifactId).inputs if i.name == "C1.split.Ethanol record"]
+    v = {x.key: x for x in run.parameters[0].values}
+    assert basis == ["r-st-1", "r-st-2"] and v["split.Ethanol"].recordIds == basis
+    assert v["split.Ethanol"].origin == "record"
+
+
+def test_the_moisture_content_sets_the_water_and_a_split_of_water_beside_it_is_refused(store, worker, no_pool):
+    """Finding 6: BioSTEAM's solids separators and drum dryer move water to
+    meet the moisture content and never read a split of water: unset, the
+    water's split is served not read and saying why; typed beside a moisture,
+    it is refused in words by the panel's resolve and the run, and never
+    enters a basis."""
+    spec = spec_of(units=[{"id": "C1", "type": "centrifugation", "params": {"split.Yeast": typed(0.9)}}])
+    v = _values_of(spec, "C1")
+    assert v["moisture_content"].value is not None
+    assert v["split.Water"].origin == "not-read" and "moisture content sets the water" in v["split.Water"].detail
+    run = pureos.run_train(spec)
+    assert not [i for i in artifacts.get(run.artifactId).inputs if i.name.startswith("C1.split.Water")]
+    typed_water = spec_of(units=[{"id": "C1", "type": "centrifugation", "params": {"split.Yeast": typed(0.9),
+                                                                                  "split.Water": typed(0.05)}}])
+    got = pureos.check_train(typed_water)
+    assert not got.ok and any("split.Water" in w and "moisture content" in w for w in got.places["C1"]), got.places
+    with pytest.raises(pureos.TrainRefused, match=r"unit C1: split.Water .*moisture content"):
+        pureos.run_train(typed_water)
+    with pytest.raises(params.ParamRefused, match="moisture content"):
+        _values_of(spec, "C1", [Override(scope="pureos:unit:t1:C1", key="split.Water", value=0.05, by=BY, at=AT)])
+    # The drum dryer and the pressure filter alike.
+    for unit in ({"id": "D1", "type": "drying-drum", "params": {"split.Ethanol": typed(0.9)}},
+                 {"id": "P1", "type": "pressure-filtration"}):
+        w = _values_of(spec_of(units=[unit]), unit["id"])["split.Water"]
+        assert w.origin == "not-read" and "moisture content sets the water" in w.detail, (unit["id"], w)
+
+
+def test_the_molecular_sieves_ports_say_what_the_class_sends_each(store):
+    """Finding 8: BioSTEAM's MolecularSieve sends its split to outlet 0, which
+    the package uses for the water the sieves release (recycled); the
+    dehydrated product leaves by outlet 1, and goes on by default."""
+    e = catalogue.entry("molecular-sieve")
+    outs = [p for p in e.ports if p.side == "out"]
+    assert [p.name for p in outs] == ["regenerate", "product"]
+    assert outs[1].onward and "dehydrated" in outs[1].what and not outs[0].onward
+    split = next(p for p in e.params if p.key == "split")
+    assert "regenerate (outlet 0)" in split.gloss and "dehydrated product (outlet 0)" not in split.gloss
+    assert train_spec.routes(TrainUnitSpec(id="U1", type="molecular-sieve")) == {"regenerate": "waste",
+                                                                                "product": "onward"}
+
+
 # ── Rule 1 and E.3‴ (offline) ──────────────────────────────────────────
 
 
@@ -646,16 +806,25 @@ def real(monkeypatch, tmp_path, warm):
 def three_units(**inlet) -> TrainSpec:
     """Solids centrifuge, flash, drum dryer on a STAND-IN yeast broth: the
     liquid on, its liquid on, the dryer's hot gas on (the ethanol leaves with
-    it)."""
+    it). No split of water is typed: the centrifuge's cake moisture and the
+    dryer's product moisture set the water (§5.R part a, finding 6)."""
     return spec_of(inlet=inlet or {"kind": "typed", "params": {
         "broth_flow": typed(1.0), "conc.Yeast": typed(10.0), "conc.Ethanol": typed(50.0), "conc.Glucose": typed(5.0),
         "T": typed(305.0)}}, units=[
-        {"id": "C1", "type": "centrifugation", "params": {"split.Yeast": typed(0.9), "split.Ethanol": typed(0.05),
-                                                          "split.Water": typed(0.05)}},
+        {"id": "C1", "type": "centrifugation", "params": {"split.Yeast": typed(0.9), "split.Ethanol": typed(0.05)}},
         {"id": "F1", "type": "flash", "params": {"P": typed(101325.0), "V": typed(0.1)},
          "outlets": {"vapour": "waste", "liquid": "onward"}},
-        {"id": "D1", "type": "drying-drum", "params": {"split.Water": typed(0.5), "split.Ethanol": typed(0.9)},
+        {"id": "D1", "type": "drying-drum", "params": {"split.Ethanol": typed(0.9)},
          "outlets": {"dried": "waste", "hot-gas": "onward"}}])
+
+
+def with_water(spec: TrainSpec) -> TrainSpec:
+    """The same train with a split of water typed on the centrifuge and the
+    drum dryer, beside the moisture each class meets (STAND-INs)."""
+    water = {"C1": 0.05, "D1": 0.5}
+    return spec.model_copy(update={"units": [
+        u.model_copy(update={"params": {**u.params, "split.Water": TrainParam(**typed(water[u.id]))}}) if u.id in water
+        else u for u in spec.units]})
 
 
 @pytest.mark.sim
@@ -678,6 +847,56 @@ def test_a_three_unit_train_converges_and_its_recovery_is_the_product_of_its_onw
     assert all(c.costModel and c.installedCost > 0 for c in run.costs)
     assert run.provenance == "demo"
     assert artifacts.replay(run.artifactId).identical
+
+
+@pytest.mark.sim
+def test_the_moisture_sets_the_water_and_the_drum_dryers_split_goes_to_its_hot_gas_on_the_real_worker(real):
+    """§5.R (part a), findings 6 and 7, on the real worker: a split of water
+    typed beside a cake's or a dried product's moisture is refused naming
+    both units, before the worker runs a train; without it the train runs,
+    its basis holds no split of water, the cake's water is the moisture's,
+    and the drum dryer's note says an unnamed component stays in the dried
+    solids, as its stream table shows."""
+    with pytest.raises(pureos.TrainRefused) as e:
+        pureos.run_train(with_water(three_units()))
+    said = str(e.value)
+    for uid in ("C1", "D1"):
+        assert f"unit {uid}: split.Water" in said and "moisture content" in said, said
+    run = pureos.run_train(three_units())
+    names = {i.name for i in artifacts.get(run.artifactId).inputs}
+    assert not {"C1.split.Water", "D1.split.Water"} & names
+    streams = {s.id: s for s in run.train.streams}
+    cake = streams["C1_cake"].massFlows
+    moisture = next(i.value for i in artifacts.get(run.artifactId).inputs if i.name == "C1.moisture_content")
+    assert cake["Water"] / sum(cake.values()) == pytest.approx(moisture, rel=1e-9)
+    note = next(n for n in run.notes if n.startswith("Unit D1: no record or person set"))
+    assert "none of it to outlet hot-gas" in note and "none of it to outlet dried" not in note, note
+    entering = streams["F1_liquid"].massFlows
+    for chem in ("Glucose", "Yeast"):
+        if entering.get(chem):
+            assert streams["D1_dried"].massFlows.get(chem, 0.0) == pytest.approx(entering[chem], rel=1e-9), chem
+
+
+@pytest.mark.sim
+def test_a_pressure_filter_keeps_its_own_table_for_every_share_nobody_set_on_the_real_worker(real):
+    """§5.R (part a), findings 1 and 5, on the real worker: the class's own
+    table share of each component is read in the worker and served as its
+    library default; with one share set the rest still split by the table
+    (the run passes the whole table), and with none set the class fills it
+    and the run says so."""
+    one = spec_of(units=[{"id": "P1", "type": "pressure-filtration", "params": {"split.Ethanol": typed(0.05)}}])
+    share = _values_of(one, "P1")["split.Yeast"]
+    assert share.origin == "library-default" and share.value is not None and 0 < share.value < 1
+    run = pureos.run_train(one)
+    streams = {s.id: s for s in run.train.streams}
+    fed = run.inlet.flows["Yeast"]
+    assert streams["P1_retentate"].massFlows["Yeast"] == pytest.approx(fed * share.value, rel=1e-9)
+    p = {x.key: x for x in run.parameters[0].values}
+    assert p["split.Yeast"].origin == "library-default" and p["split.Yeast"].value == pytest.approx(share.value)
+    bare = pureos.run_train(spec_of(units=[{"id": "P1", "type": "pressure-filtration"}]))
+    assert not any("none of it to outlet retentate" in n for n in bare.notes), bare.notes
+    kept = {s.id: s for s in bare.train.streams}["P1_retentate"].massFlows["Yeast"]
+    assert kept == pytest.approx(fed * share.value, rel=1e-9)
 
 
 @pytest.mark.sim
@@ -746,22 +965,23 @@ def test_the_ethanol_train_from_the_catalogue_gives_the_packages_own_purity_on_t
     package = next(s for s in tables.streams if s.id == "ethanol")
     package_purity = package.massFlows["Ethanol"] / package.massFlow
     # The package's sieve sends its water-rich share to its outlet 0 (the
-    # catalogue's `product`), which the package recycles to the rectifier;
-    # its outlet 1 (`regenerate`) is the fuel-grade ethanol.
+    # catalogue's `regenerate`), which the package recycles to the
+    # rectifier; its outlet 1 (`product`) is the fuel-grade ethanol (§5.R
+    # part a, finding 8: the catalogue's ports say so, and route so by default).
     units = [{"id": uid, "type": t, "readFrom": {"flowsheet": "ethanol_glucose_v0", "unit": pkg}}
              for uid, t, pkg in PACKAGE_UNITS]
-    units[-1]["outlets"] = {"product": "recycle:D2" if recycle else "waste", "regenerate": "onward"}
+    units[-1]["outlets"] = {"regenerate": "recycle:D2" if recycle else "waste", "product": "onward"}
     spec = TrainSpec.model_validate({"id": "ethanol-train", "name": "The ethanol train", "program": "yeast",
                                      "product": "ethanol", "inlet": {"kind": "run-stream", "ref": run.id,
                                                                      "streamId": "beer"}, "units": units})
     got = pureos.run_train(spec)
-    assert got.purity.productStream == "U1_regenerate"
+    assert got.purity.productStream == "U1_product"
     assert abs(got.purity.productFraction - package_purity) <= WITHIN * package_purity, (got.purity.productFraction,
                                                                                          package_purity)
     assert got.purity.productFraction == pytest.approx(package_purity, rel=MEASURED)
     if recycle:
         # With the package's recycle the ethanol delivered is the package's too.
-        out = next(s for s in got.train.streams if s.id == "U1_regenerate").massFlows["Ethanol"]
+        out = next(s for s in got.train.streams if s.id == "U1_product").massFlows["Ethanol"]
         assert out == pytest.approx(package.massFlows["Ethanol"], rel=WITHIN)
     # Every value the units took is the package's, read, never typed: a
     # `model` input naming biorefineries' version.

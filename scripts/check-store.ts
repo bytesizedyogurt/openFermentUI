@@ -1368,5 +1368,43 @@ await (async () => {
     /fermosHarvest\(sim\.artifactId, null, showArchived/.test(page) && /fermosHarvest\(inlet\.ref, hour, showArchived/.test(page));
 })();
 
+// OF-BLD-020 §5.R (finding 12) — the Builder's run chooser (its run-stream
+// inlet, Start from a run's train) goes through the program switch like every
+// list: with it off, a train run of an archived program and the newest run of
+// a scenario made here in an archived program are not offered; with it on,
+// they are. Driven with a stubbed service, STAND-IN runs with no number of a
+// paper's.
+await (async () => {
+  const pu = await import('../src/lib/pureos');
+  const runSummary = (artifactId: string, program: string, trainId: string) => ({
+    scenarioId: null, scenarioName: null, artifactId, flowsheet: null, createdAt: '2026-10-21T00:00:00Z', provenance: 'demo',
+    program, product: 'ethanol', unitCount: 1, overallRecovery: null, runs: 1, note: null, tool: 'pureos.train_run', trainId, trainName: trainId,
+  });
+  (globalThis as any).fetch = async (url: string) => {
+    const u = String(url);
+    const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+    if (u.startsWith('/api/pureos/train-runs')) return ok([runSummary('00000000000000a1', 'pha', 'tr-on-pha'), runSummary('00000000000000b1', 'yeast', 'tr-on-yeast')]);
+    if (u.startsWith('/api/pureos/train/')) return ok({ streams: [] });
+    if (u.startsWith('/api/proforma/shelf') || u.startsWith('/api/proforma/scenarios')) return ok([]);
+    const runs = /^\/api\/proforma\/runs\?scenarioId=(.+)$/.exec(u);
+    if (runs) return ok({ artifact: { id: runs[1] === 'sc-made-pha' ? '00000000000000a2' : '00000000000000b2', tool: 'proforma.run', output: {}, inputs: [], createdAt: '2026-10-21T00:00:00Z' } });
+    throw new Error(`no stub for ${u}`);
+  };
+  const made = [
+    { id: 'sc-made-pha', name: 'A PHA scenario made here', program: 'pha' },
+    { id: 'sc-made-yeast', name: 'A yeast scenario made here', program: 'yeast' },
+  ];
+  const offered = (r: { choices: { ref: string; program: string | null }[] }) => r.choices.map((c) => `${c.ref}:${c.program ?? 'none'}`).sort().join();
+  const off = await pu.runChoices(false, made);
+  check('with the switch off the Builder’s run chooser offers no archived program’s train run or made scenario',
+    offered(off) === '00000000000000b1:yeast,sc-made-yeast:yeast' && off.problems.length === 0, { offered: offered(off), problems: off.problems });
+  const on = await pu.runChoices(true, made);
+  check('with it on, the archived program’s runs are offered too, each with its program',
+    offered(on) === '00000000000000a1:pha,00000000000000b1:yeast,sc-made-pha:pha,sc-made-yeast:yeast', offered(on));
+  const page = readFileSync(new URL('../src/screens/PureOSBuilder.tsx', import.meta.url), 'utf8');
+  check('the Builder hands the chooser its made scenarios with their programs, through the program filter',
+    /shows\('scenario', sc\.id\)/.test(page) && /program: sc\.program \?\? null/.test(page));
+})();
+
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

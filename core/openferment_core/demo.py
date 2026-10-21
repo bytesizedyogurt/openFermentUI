@@ -461,6 +461,7 @@ def _rebuild_prototype(out: Path, real_worker: bool | None = None) -> list[Path]
         *prototype_pureos().items(),
         *prototype_thermo().items(),
         *prototype_propose().items(),
+        *prototype_kept_trains().items(),
         *prototype_proposals().items(),
         *prototype_vessel(real_worker).items(),
         *prototype_builder(real_worker).items(),
@@ -1819,6 +1820,42 @@ def prototype_propose() -> dict[str, Any]:
         finally:
             _intake.DATA_DIR, proforma.call = saved
     return {"pureos-propose.json": {"entries": entries}}
+
+
+# OF-BLD-020 §5.R: the trains a model built, as GET /api/pureos/trains-kept
+# lists them, for pureOS's index (Made by Postdoc) and the Builder's copy. One
+# train a STAND-IN model built through the real code (pureos.build shapes it on
+# the stand-in yeast run's beer, pureos.kept keeps it) in a throwaway store,
+# listed with the switch off and on; its id and its times are the fixture's,
+# so a regeneration moves nothing.
+KEPT_TRAIN_ID = "tr-fixture-kept"
+KEPT_TRAIN_BY = "a STAND-IN model (openFerment test fixture)"
+KEPT_TRAIN_UNITS = ("distillation", "molecular-sieve")
+
+
+def prototype_kept_trains() -> dict[str, Any]:
+    from . import proforma
+    from .pureos import build, kept
+
+    out: dict[str, Any] = {}
+
+    def made(arts: list) -> None:
+        yeast = next(a for a in arts if any(i.name == "scenario" and i.value == proforma.YEAST_SCENARIO_ID
+                                            for i in a.inputs))
+        spec, _ = build.new_spec("ethanol", f"{yeast.id}{build.STREAM_SEP}beer")
+        spec = spec.model_copy(update={"id": KEPT_TRAIN_ID})
+        for type_id in KEPT_TRAIN_UNITS:
+            spec, _ = build.with_unit(spec, type_id)
+        kept.keep_train(None, lambda _: spec, KEPT_TRAIN_BY, ask_id="ask-fixture", effort="medium")
+
+        def stamped(k: Any) -> dict[str, Any]:
+            return k.model_dump(mode="json") | {"at": AT, "updatedAt": AT}
+
+        out["listed"] = [stamped(k) for k in kept.listed(False)]
+        out["listedArchived"] = [stamped(k) for k in kept.listed(True)]
+
+    _kept_standin_runs(then=made)
+    return {"pureos-trains-kept.json": out}
 
 
 def prototype_thermo() -> dict[str, Any]:

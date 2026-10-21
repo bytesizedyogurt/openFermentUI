@@ -29,8 +29,14 @@ a `TrainSpec` the Builder opens, as data, and never computes a quantity:
                   (`proforma.run` on a non-reference entry) gives each unit taken
                   `readFrom` that flowsheet's own unit of the same id: its values
                   are the package's, read in the worker as `model` inputs naming
-                  its version when the train runs (§5.2); any other run's units
-                  stay at their classes' defaults, and what waits, waits
+                  its version when the train runs (§5.2); a run of a flowsheet
+                  built from parts (`custom_train_v1`, its shelf entry's
+                  `builtFrom`) is not read so, since the worker reads no unit of
+                  it: each unit of the train run its basis names takes that
+                  train's own flowsheet unit and named records, and the notes
+                  name what a person typed there (§5.R part a, findings 3, 14
+                  and 24); any other run's units stay at their classes'
+                  defaults, and what waits, waits
     the product   the chemical the run traced (pureOS's reading of the run) and
                   the product id `thermo.CHEMICALS` names for it; a run whose
                   product no id names here, or that names no product, is refused
@@ -126,7 +132,9 @@ def _read(art: Artifact, include_archived: bool) -> tuple[Any, str | None, str |
 
 def _reads_from(art: Artifact, flowsheet: str | None) -> str | None:
     """The shelf flowsheet whose own units a train read from this run takes
-    its values from: a run of one the worker builds case by case."""
+    its values from: a run of one the worker builds case by case. A
+    reference runs whole, and the worker reads no unit of a flowsheet built
+    from parts (§5.R part a)."""
     from ..flowsheets import shelf
 
     if art.tool != RUN or not flowsheet:
@@ -135,7 +143,33 @@ def _reads_from(art: Artifact, flowsheet: str | None) -> str | None:
         info = shelf.info(flowsheet)
     except shelf.NotOnShelf:
         return None
-    return None if info.reference else info.id
+    return None if info.reference or info.builtFrom else info.id
+
+
+def _parts_train(art: Artifact, flowsheet: str | None) -> tuple[str | None, TrainSpec | None, str | None]:
+    """For a run of a flowsheet built from parts: the train run its basis
+    names, that run's train as data, and why it is not read when it is not."""
+    from .. import artifacts
+    from ..flowsheets import shelf
+
+    if art.tool != RUN or not flowsheet:
+        return None, None, None
+    try:
+        if not shelf.info(flowsheet).builtFrom:
+            return None, None, None
+    except shelf.NotOnShelf:
+        return None, None, None
+    named = next((i for i in art.inputs if i.name == "train run" and i.source.kind == "artifact"), None)
+    if named is None:
+        return None, None, f"run {art.id}'s basis names no train run"
+    rid = str(named.source.id or named.value)
+    try:
+        tr = artifacts.get(rid)
+        return rid, TrainSpec.model_validate((tr.output or {})["train"]), None
+    except artifacts.ArtifactNotFound:
+        return rid, None, f"train run {rid}, which run {art.id} names, is not on file here"
+    except (artifacts.ArtifactDamaged, KeyError, TypeError, ValueError):
+        return rid, None, f"train run {rid}, which run {art.id} names, cannot be read"
 
 
 def from_run(artifact_id: str, train_id: str | None = None, include_archived: bool = False) -> TrainFromRun:
@@ -232,6 +266,11 @@ def from_run(artifact_id: str, train_id: str | None = None, include_archived: bo
 
     names = {uid: own_id(uid, n) for n, uid in enumerate(ids)}
     reads = _reads_from(art, t.flowsheet)
+    # §5.R (part a): a composite's train units are its train run's own.
+    parts_id, parts, parts_why = _parts_train(art, t.flowsheet)
+    own = {x.id: x for x in parts.units} if parts is not None else {}
+    carried: list[str] = []
+    typed: list[str] = []
     spec_units: list[TrainUnitSpec] = []
     for k, (u, e) in enumerate(taken):
         nxt = ids[k + 1] if k + 1 < len(ids) else None
@@ -281,6 +320,13 @@ def from_run(artifact_id: str, train_id: str | None = None, include_archived: bo
             notes.append(f"Unit {names[u.id]}'s onward outlet goes straight to {names[nxt]} in the train; between them "
                          "the run passes it through " + ", ".join(f"{x.id} ({x.unitClass})" for x in between)
                          + ", which the train leaves out.")
+        theirs = own.get(u.id)
+        if theirs is not None and theirs.type == e.id:
+            carried.append(names[u.id])
+            typed += [f"{names[u.id]}.{key} ({tp.by})" for key, tp in theirs.params.items()]
+            spec_units.append(TrainUnitSpec(id=names[u.id], type=e.id, outlets=routes, records=dict(theirs.records),
+                                            readFrom=theirs.readFrom))
+            continue
         spec_units.append(TrainUnitSpec(
             id=names[u.id], type=e.id, outlets=routes,
             readFrom=TrainUnitReadFrom(flowsheet=reads, unit=u.id) if reads else None))
@@ -296,10 +342,21 @@ def from_run(artifact_id: str, train_id: str | None = None, include_archived: bo
     renamed = [f"{uid} as {names[uid]}" for uid in ids if names[uid] != uid]
     if renamed:
         notes.append(f"A unit id BioSTEAM would not take is renamed: {', '.join(renamed)}.")
-    notes.append(f"Each unit reads its values from {reads}'s own unit of the same id, as the package builds it: a model "
-                 "input naming the package's version when the train runs." if reads else
-                 "Each unit starts at its class's own defaults: a value its class requires and gives none for waits "
-                 "for a record or a person in the Builder.")
+    if parts_id is not None or parts_why is not None:
+        notes.append(f"Run {art.id} is of {t.flowsheet}, built from a vessel design and a train run: the worker reads no "
+                     "unit of it, so no unit here reads from it. " + (
+                         f"{', '.join(carried) or 'No unit taken'} {'takes' if len(carried) == 1 else 'take'} the "
+                         f"flowsheet unit and the records, where any, that train run {parts_id} named for "
+                         f"{'it' if len(carried) == 1 else 'them'}"
+                         + (f"; what a person typed there is theirs and not carried: {', '.join(typed)}" if typed else "")
+                         + "; every other value starts at its class's own default."
+                         if parts is not None else f"Its train is not read ({parts_why}): each unit starts at its "
+                                                   "class's own defaults."))
+    else:
+        notes.append(f"Each unit reads its values from {reads}'s own unit of the same id, as the package builds it: a "
+                     "model input naming the package's version when the train runs." if reads else
+                     "Each unit starts at its class's own defaults: a value its class requires and gives none for waits "
+                     "for a record or a person in the Builder.")
     spec = TrainSpec(
         id=train_id or f"from-{art.id}", name=f"The train of {label}", program=program, product=pid,
         inlet=TrainInlet(kind="run-stream", ref=art.id, streamId=inlet_id), units=spec_units)

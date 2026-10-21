@@ -353,7 +353,7 @@ def test_a_scenarios_newest_real_run_gives_a_train_its_beer_as_the_shelf_names_i
     assert beer.source == "R1"  # the fermenter's own outlet, in the run BioSTEAM made
     units = [{"id": uid, "type": t, "readFrom": {"flowsheet": "ethanol_glucose_v0", "unit": pkg}}
              for uid, t, pkg in PACKAGE_UNITS]
-    units[-1]["outlets"] = {"product": "recycle:D2", "regenerate": "onward"}
+    units[-1]["outlets"] = {"regenerate": "recycle:D2", "product": "onward"}
     spec = TrainSpec.model_validate({"id": "seam-train", "name": "The seam's train", "program": "yeast",
                                      "product": "ethanol", "inlet": {"kind": "run-stream", "ref": "sc-seam-sim"},
                                      "units": units})

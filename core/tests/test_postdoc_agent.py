@@ -655,3 +655,50 @@ def test_a_train_changed_between_two_runs_is_run_again_never_served_from_the_cac
     assert one != two and [c.id for c in out.claims] == ["c1"]
     ran = [s for s in out.trace if s.tool == "pureos_build" and s.summary.startswith("Ran train")]
     assert [s.summary.rsplit(" ", 1)[-1] for s in ran] == [one, two]
+
+
+def test_a_read_after_the_model_changed_its_train_reads_the_train_as_it_stands_now(train_inlet):
+    """OF-BLD-020 §5.R (finding 21): the store a question reads is read once
+    (`ToolContext.stores`, the coverage sweep before round one) and each read
+    is cached by its input, so a train the model changed, or a run it made,
+    read again in the same question came back as it stood before. A
+    successful pureos_build or pureos_write forgets what the reads cached of
+    the trains and the kept runs, so the next read reads them afresh."""
+    inlet, pool_ = train_inlet
+    made: dict = {}
+
+    def read_it(messages):
+        made["train"] = _last_result(messages)["trainId"]
+        return [("pureos_read", {"ids": [made["train"]], "words": "", "kind": "train", "state": "", "limit": 6})]
+
+    def add(messages):
+        made["first"] = _last_result(messages)
+        return [("pureos_build", {"action": "add_unit", "trainId": made["train"], "unitType": "pressure-filtration"})]
+
+    def read_again(messages):
+        return [("pureos_read", {"ids": [made["train"]], "words": "", "kind": "train", "state": "", "limit": 6})]
+
+    def run_it(messages):
+        made["second"] = _last_result(messages)
+        return [("pureos_build", {"action": "run", "trainId": made["train"]})]
+
+    def read_run(messages):
+        made["run"] = _last_result(messages)["artifactId"]
+        return [("pureos_read", {"ids": [made["run"]], "words": "", "kind": "train-run", "state": "", "limit": 6})]
+
+    def answer(messages):
+        made["third"] = _last_result(messages)
+        return plan(claim("c1", text="The train's run is kept, and its row reads it.", evidence=[made["run"]]))
+
+    script = Turns([("pureos_build", {"action": "new", "product": "ethanol", "inletRef": inlet})], read_it, add,
+                   read_again, run_it, read_run, answer)
+    out = postdoc_agent.ask("Build a train, read it, grow it, read it again, run it and read the run.",
+                            converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool_))
+    rows = lambda r: r.get("rows") or []  # noqa: E731
+    [first] = rows(made["first"])
+    assert first["detail"]["units"] == []
+    [second] = rows(made["second"])
+    assert second["detail"]["units"] == ["P1"] and second["detail"]["unitTypes"] == ["pressure-filtration"]
+    [third] = rows(made["third"])
+    assert third["ref"] == f"pureos/train-run/{made['run']}" and third["detail"]["trainId"] == made["train"]
+    assert [c.id for c in out.claims] == ["c1"]

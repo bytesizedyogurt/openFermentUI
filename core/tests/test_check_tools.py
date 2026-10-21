@@ -67,6 +67,25 @@ PLANTED = {
     "plant_train_wrapper.py": "from .. import plant_train_keeper\n\n\ndef f(spec):\n    return plant_train_keeper.keep(spec)\n",
     # A second writer of the same store, found by the file it names.
     "plant_store_wrapper.py": "from .. import plant_store\n\n\ndef f(text):\n    return plant_store.save(text)\n",
+    # OF-BLD-020 §5.R (finding 18): a tool file that writes the kept-train
+    # store itself, past keep_train's locks and the audit log. Through atomic,
+    # by the store's own path function.
+    "plant_kept_direct.py": ("from .. import atomic\nfrom ..pureos import kept\n\n\ndef f(t):\n"
+                             "    atomic.write_text(kept.path(), t)\n"),
+    # The same, by the store's file name joined to the data directory.
+    "plant_kept_file.py": ("from .. import atomic\nfrom ..pureos import kept\n\n\ndef f(t):\n"
+                           "    atomic.write_text(kept.intake.DATA_DIR / kept.FILE, t)\n"),
+    # A tool file naming the store's file itself, its own function writing it.
+    "plant_kept_own.py": ('from .. import atomic, intake\n\nFILE = "pureos-trains.json"\n\n\n'
+                          "def _keep(text):\n    atomic.write_bytes(intake.DATA_DIR / FILE, text)\n\n\n"
+                          "def build(text):\n    return _keep(text)\n"),
+    # Past atomic altogether: the path's own write, and a file opened to write.
+    "plant_kept_path.py": "from ..pureos import kept\n\n\ndef f(t):\n    kept.path().write_text(t)\n",
+    "plant_kept_open.py": ('from ..pureos import kept\n\n\ndef f(t):\n    with open(kept.path(), "w") as fh:\n'
+                          "        fh.write(t)\n"),
+    # A helper outside tools/ that writes the store by its path function, not
+    # its file's name, reached from a tool file.
+    "plant_kept_helper_wrapper.py": "from .. import plant_kept_helper\n\n\ndef f(t):\n    return plant_kept_helper.save(t)\n",
 }
 # The function the last planted tool file reaches, outside tools/.
 KEEPER = "from . import proforma\n\n\ndef keep(req):\n    return proforma.run(req)\n"
@@ -74,6 +93,9 @@ KEEPER = "from . import proforma\n\n\ndef keep(req):\n    return proforma.run(re
 TRAIN_KEEPER = 'from .pureos import kept\n\n\ndef keep(spec):\n    return kept.keep_train(None, lambda _: spec, "m")\n'
 STORE = ('from . import atomic, intake\n\nFILE = "pureos-trains.json"\n\n\ndef save(text):\n'
          '    atomic.write_text(intake.DATA_DIR / FILE, text)\n')
+# OF-BLD-020 §5.R (finding 18): what the last planted tool file reaches, a
+# module that names no store file and writes the store through its path.
+KEPT_HELPER = "from . import atomic\nfrom .pureos import kept\n\n\ndef save(text):\n    atomic.write_text(kept.path(), text)\n"
 
 
 def _copy(tmp_path: Path) -> Path:
@@ -101,6 +123,7 @@ def test_rule_2b_names_every_way_a_tool_file_keeps_a_run_or_writes_an_audit_line
     (package / "plant_keeper.py").write_text(KEEPER, encoding="utf-8")
     (package / "plant_train_keeper.py").write_text(TRAIN_KEEPER, encoding="utf-8")
     (package / "plant_store.py").write_text(STORE, encoding="utf-8")
+    (package / "plant_kept_helper.py").write_text(KEPT_HELPER, encoding="utf-8")
     out = _check(root)
     assert out.returncode == 1, out.stdout + out.stderr
     errors = [line.strip()[2:] for line in out.stdout.splitlines() if line.strip().startswith("- ")]
@@ -112,6 +135,8 @@ def test_rule_2b_names_every_way_a_tool_file_keeps_a_run_or_writes_an_audit_line
     assert any("plant_train_keeper.keep" in e for e in errors if e.startswith("tools/plant_train_wrapper.py ")), out.stdout
     assert any("plant_store.save" in e for e in errors if e.startswith("tools/plant_store_wrapper.py ")), out.stdout
     assert any("pureos.kept._persist" in e for e in errors if e.startswith("tools/plant_kept_persist.py ")), out.stdout
+    assert any("plant_kept_helper.save" in e for e in errors if e.startswith("tools/plant_kept_helper_wrapper.py ")), \
+        out.stdout
 
 
 def test_the_copy_the_negative_test_plants_in_passes_as_the_tree_does(tmp_path):

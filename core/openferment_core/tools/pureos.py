@@ -102,15 +102,18 @@ class PureosBuildInput(BaseModel):
     afterUnitId: str = Field("", description="add_unit: the unit the new one follows, inlet for the first place, or an "
                                              "empty string for the end.")
     unitId: str = Field("", description="remove_unit and set_from_record: the unit acted on, by its id in the train.")
-    product: str = Field("", description="new and propose: the product the train recovers, by its id (ethanol); empty "
-                                         "takes a simulation inlet's own product.")
+    product: str = Field("", description=(
+        "new: the product the train recovers, by its id (ethanol); empty takes a simulation inlet's own product. "
+        "propose: the product's id, required (the proposer reads its class from it)."))
     host: str = Field("", description="propose: the host strain's id on geneOS's shelf of hosts, the cells the product "
                                       "is made in (the proposer's rules read where the product is made).")
     inletRef: str = Field("", description=(
-        "new and propose: the artifact the inlet is read from: a kept simulation's artifact id (its broth at harvest; "
-        "its broth flow then waits for a person), a kept vessel design's artifact id (the harvest of the simulation it "
-        "was designed for, the broth flow read from the design), or a kept run's stream as <artifact id>/<stream id> "
-        "(stream_table lists a Proforma run's streams)."))
+        "new: the artifact the inlet is read from: a kept simulation's artifact id (its broth at harvest; its broth "
+        "flow then waits for a person), a kept vessel design's artifact id (the harvest of the simulation it was "
+        "designed for, the broth flow read from the design), or a kept run's stream as <artifact id>/<stream id> "
+        "(stream_table lists a Proforma run's streams). propose: a kept simulation's artifact id (its broth at "
+        "harvest) or a kept run's stream as <artifact id>/<stream id>, or empty for none (a person types the inlet "
+        "in pureOS → Builder)."))
     recordsByParam: dict[str, list[str]] = Field(default_factory=dict, description=(
         "set_from_record: a parameter's key on the unit (split.Ethanol, P, and the rest) to the record ids that bind "
         "it, exactly those records (search_records returns them); ids only, never a value."))
@@ -151,7 +154,8 @@ BUILD_TOOL = register(
             "out; set_from_record binds a parameter of unitId to exactly the record ids recordsByParam names for it "
             "(each must be a record of the field the parameter binds from, kept by the aggregate gate; one that cannot "
             "bind is refused naming the record and why); run runs the train in the Proforma worker as the service "
-            "binds it; propose keeps the train the proposer's rules propose for the product made in host (a host strain id). You never type a "
+            "binds it; propose keeps the train the proposer's rules propose for the product (its id) made in host (a "
+            "host strain id), its inlet a kept simulation's id, a kept run's stream or none (inletRef). You never type a "
             "number: every value binds from the records, the class's own default or a named person. A value nothing "
             "binds waits: the run then refuses naming each one, and nothing is kept; say in gaps that a person types "
             "it in pureOS → Builder. A run comes back as one evidence id (its artifact id) with each unit's recovery, "

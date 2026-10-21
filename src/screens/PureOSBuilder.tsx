@@ -12,6 +12,20 @@
 // → Simulate's **Use as a train's inlet**) or `?inlet=scenario:<id>` starts
 // it with its inlet set (OF-BLD-020 §6.2).
 //
+// OF-BLD-020 §5.R. /pureos/build/<id> also opens a train pureOS's proposer
+// proposed in this session (the store's `proposedTrains`, under the id
+// **Propose a train** gave it): its units in order, what the rules miss above
+// the steps (`ProposalMissingList`) and each unit's reason beside its card
+// (`ProposalReasonLine`); Save makes it a train of this browser.
+// `?copy=<id>` opens a copy of a train a model built (`GET
+// /api/pureos/trains-kept`, pureOS's **Made by Postdoc**) as a new train of
+// this browser, naming the train it copies; the kept train stays the
+// model's. A train of an archived program opens under the banner naming it,
+// as every archived entity a link opens does. Save moves a new train to its
+// own address; what the page showed (its run, what it was read or copied
+// from, Price this in Proforma) is kept by train id in the store
+// (`builderShown`), so the page mounted at the new address shows it still.
+//
 // THE SEAM (OF-BLD-020 §6.2, D10). The inlet chooser lists the kept
 // simulations each with its broth at harvest, every state with its unit, as
 // the service reads it from the simulation's kept series (`GET
@@ -59,11 +73,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Download, Plus, Trash2 } from 'lucide-react';
 import type {
   FermosHarvest,
+  KeptTrain,
   ParamScope,
+  ProposalReason,
   ProgramId,
   SimulationSummary,
   StreamRow,
   TrainFromRun,
+  TrainProposal,
   TrainRun,
   TrainSpec,
   TrainUnitSpec,
@@ -72,7 +89,7 @@ import type {
   UnitType,
   VesselSummary,
 } from '@/data/types';
-import { PROGRAMS, isArchived } from '@/data/programs';
+import { PROGRAMS, PROGRAM_BY_ID, isArchived } from '@/data/programs';
 import { href, navigate, useRoute } from '@/router';
 import { overridesFor, timeId, useProgramFilter, useStore } from '@/store';
 import { durableAvailable } from '@/lib/durable';
@@ -93,6 +110,7 @@ import {
   inletOfQuery,
   nextUnitId,
   pureosCatalogue,
+  pureosTrainsKept,
   routeChoices,
   routeWords,
   runChoices,
@@ -115,6 +133,8 @@ import { ParameterPanel } from '@/components/ParameterPanel';
 import { SourceChip, shown } from '@/components/ParameterRow';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ComponentTag } from '@/components/ComponentTag';
+import { ArchivedProgramBanner } from '@/components/ArchivedBanner';
+import { ProposalMissingList, ProposalReasonLine } from '@/components/ProposedTrain';
 import { SubsystemReference } from '@/components/ReferenceView';
 import { PurityByStream, RecoveryByUnit } from '@/components/figures';
 import { PUREOS_TABS } from '@/data/tabs';
@@ -143,12 +163,17 @@ const problemOf = (e: unknown) =>
  * store holds them and filtered here, so a render never sees a new list
  * from the store's own snapshot (React's error 185, an endless update).
  */
-function useMadeScenarios(): { id: string; name: string }[] {
+function useMadeScenarios(): { id: string; name: string; program: string | null }[] {
   const scenarios = useStore((s) => s.scenarios);
   const ids = useStore((s) => s.createdScenarioIds);
+  // OF-BLD-020 §5.R (finding 12): through the program selector, as every list.
+  const shows = useProgramFilter();
   return useMemo(
-    () => scenarios.filter((sc) => ids.includes(sc.id) && sc.kind === 'biosteam').map((sc) => ({ id: sc.id, name: sc.name })),
-    [scenarios, ids],
+    () =>
+      scenarios
+        .filter((sc) => ids.includes(sc.id) && sc.kind === 'biosteam' && shows('scenario', sc.id))
+        .map((sc) => ({ id: sc.id, name: sc.name, program: sc.program ?? null })),
+    [scenarios, ids, shows],
   );
 }
 
@@ -174,10 +199,18 @@ const structureOf = (t: TrainSpec): TrainSpec => ({
 export default function PureOSBuilder({ trainId }: { trainId: string }) {
   const route = useRoute();
   const fromRun = route.query.get('from');
+  // OF-BLD-020 §5.R: `?copy=<id>` opens a copy of a train a model built.
+  const copyFrom = trainId === NEW_TRAIN && !fromRun ? route.query.get('copy') : null;
   // OF-BLD-020 §6.2: `?inlet=simulation:<id>` or `?inlet=scenario:<id>` sets a new train's inlet.
-  const inletFrom = trainId === NEW_TRAIN && !fromRun ? inletOfQuery(route.query.get('inlet')) : null;
+  const inletFrom = trainId === NEW_TRAIN && !fromRun && !copyFrom ? inletOfQuery(route.query.get('inlet')) : null;
   const durableReady = useStore((s) => s.durableReady);
   const saved = useStore((s) => (trainId !== NEW_TRAIN ? (s.trainsMade[trainId] ?? null) : null));
+  // OF-BLD-020 §5.R (findings 10, 31): a proposal this session kept under this id.
+  const proposal = useStore((s) => (trainId !== NEW_TRAIN ? (s.proposedTrains[trainId] ?? null) : null));
+  const proposedTrain = proposal?.train ?? null;
+  // What the page showed of this train before Save moved it here (finding 13).
+  const shownHere = useStore((s) => (trainId !== NEW_TRAIN ? (s.builderShown[trainId] ?? null) : null));
+  const showInBuilder = useStore((s) => s.showInBuilder);
   const showArchived = useStore((s) => s.showArchived);
   const shows = useProgramFilter();
   const programs = PROGRAMS.filter((p) => showArchived || !isArchived(p.id));
@@ -185,14 +218,24 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
   const defaultProgram = programs.find((p) => p.status === 'active')?.id ?? programs[0]?.id ?? '';
   const defaultProduct = products.includes('ethanol') ? 'ethanol' : (products[0] ?? '');
   const [draft, setDraft] = useState<TrainSpec | null>(() =>
-    trainId === NEW_TRAIN ? freshTrain(defaultProgram, defaultProduct, inletFrom) : saved ? structureOf(saved.train) : null,
+    trainId === NEW_TRAIN
+      ? freshTrain(defaultProgram, defaultProduct, inletFrom)
+      : saved
+        ? structureOf(saved.train)
+        : proposedTrain
+          ? structureOf(proposedTrain)
+          : null,
   );
-  const [fromInfo, setFromInfo] = useState<{ artifactId: string; answer: TrainFromRun | null; problem: string | null } | null>(null);
+  const [fromInfoHere, setFromInfo] = useState<{ artifactId: string; answer: TrainFromRun | null; problem: string | null } | null>(null);
+  const fromInfo = fromInfoHere ?? shownHere?.fromRun ?? null;
+  const [copyHere, setCopyInfo] = useState<CopyInfo | null>(null);
+  const copyInfo = copyHere ?? (shownHere?.copyOf ? { keptId: shownHere.copyOf.spec.id, kept: shownHere.copyOf, problem: null } : null);
 
   // A saved train arrives with the Durable tier, read just after the page loads.
   useEffect(() => {
     if (!draft && saved) setDraft(structureOf(saved.train));
-  }, [draft, saved]);
+    else if (!draft && proposedTrain) setDraft(structureOf(proposedTrain));
+  }, [draft, saved, proposedTrain]);
 
   // OF-BLD-020 §6.2: another `?inlet=` followed while a new train is open starts a fresh train with that inlet.
   const inletQuery = trainId === NEW_TRAIN && !fromRun ? route.query.get('inlet') : null;
@@ -214,18 +257,42 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
     trainFromRun({ artifactId: fromRun, trainId: id, includeArchived: showArchived }, ctrl.signal)
       .then((answer) => {
         setDraft(structureOf(answer.train));
-        setFromInfo({ artifactId: fromRun, answer, problem: null });
+        const info = { artifactId: fromRun, answer, problem: null };
+        setFromInfo(info);
+        showInBuilder(answer.train.id, { fromRun: info });
       })
       .catch((e: unknown) => !ctrl.signal.aborted && setFromInfo({ artifactId: fromRun, answer: null, problem: problemOf(e) }));
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trainId, fromRun]);
 
+  // ?copy=<id>: a fresh train holding a copy of a train a model built, read from the service (OF-BLD-020 §5.R).
+  useEffect(() => {
+    if (trainId !== NEW_TRAIN || !copyFrom) return;
+    const ctrl = new AbortController();
+    setCopyInfo({ keptId: copyFrom, kept: null, problem: null });
+    pureosTrainsKept(ctrl.signal)
+      .then((list) => {
+        const kept = list.find((k) => k.spec.id === copyFrom) ?? null;
+        if (!kept) {
+          setCopyInfo({ keptId: copyFrom, kept: null, problem: `No train ${copyFrom} built by a model is kept on this service: pureOS lists the ones it keeps under Made by Postdoc.` });
+          return;
+        }
+        const copy = structureOf({ ...kept.spec, id: timeId('tr'), name: `${kept.spec.name}, a copy` });
+        setDraft(copy);
+        setCopyInfo({ keptId: copyFrom, kept, problem: null });
+        showInBuilder(copy.id, { copyOf: kept });
+      })
+      .catch((e: unknown) => !ctrl.signal.aborted && setCopyInfo({ keptId: copyFrom, kept: null, problem: problemOf(e) }));
+    return () => ctrl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trainId, copyFrom]);
+
   if (!draft && !saved && trainId !== NEW_TRAIN && !durableReady && durableAvailable())
     return <p className="text-body text-ink-soft">Reading the trains kept in this browser…</p>;
 
   return (
-    <div data-testid="pureos-builder">
+    <div data-testid="pureos-builder" data-train={draft?.id ?? ''}>
       <a href={href('/pureos')} className="inline-flex items-center gap-1 text-caption text-ink-soft hover:text-accent mb-2">
         <ArrowLeft size={13} aria-hidden /> pureOS
       </a>
@@ -236,7 +303,10 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
       />
       <OwnerTabs tabs={PUREOS_TABS} />
 
+      {/* OF-BLD-020 §5.R (finding 17): a train of an archived program opens under the banner naming it. */}
+      {draft && <ArchivedProgramBanner noun="train" program={draft.program} />}
       {fromInfo && <FromRunNote info={fromInfo} />}
+      {copyInfo && <CopyNote info={copyInfo} />}
 
       {!draft ? (
         <div data-testid="builder-not-found">
@@ -259,7 +329,15 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
           />
         </div>
       ) : (
-        <Builder key={draft.id} draft={draft} setDraft={setDraft} routeId={trainId} programs={programs.map((p) => ({ id: p.id, name: p.name }))} products={products} />
+        <Builder
+          key={draft.id}
+          draft={draft}
+          setDraft={setDraft}
+          routeId={trainId}
+          programs={programs.map((p) => ({ id: p.id, name: p.name }))}
+          products={products}
+          proposal={proposedTrain && proposedTrain.id === draft.id ? proposal : null}
+        />
       )}
 
       {/* D15: harvest, capture, polish and recovery are live; their reference sits where the units are chosen. */}
@@ -320,18 +398,67 @@ function FromRunNote({ info }: { info: { artifactId: string; answer: TrainFromRu
   );
 }
 
+/** A copy of a train a model built, being read or read (OF-BLD-020 §5.R). */
+interface CopyInfo {
+  keptId: string;
+  kept: KeptTrain | null;
+  problem: string | null;
+}
+
+function CopyNote({ info }: { info: CopyInfo }) {
+  if (info.problem)
+    return (
+      <Callout kind="warn" title={`No copy was made of train ${info.keptId}`}>
+        <p className="text-ink" data-testid="builder-copy-refused">
+          {info.problem}
+        </p>
+      </Callout>
+    );
+  if (!info.kept) return <p className="text-caption text-ink-soft">Reading train {info.keptId}, which a model built…</p>;
+  const k = info.kept;
+  return (
+    <div className="mb-4">
+      <Callout kind="info" title={`A copy of train ${k.spec.id}, which Postdoc built`}>
+        <p className="text-caption" data-testid="builder-copy-of" data-kept={k.spec.id}>
+          Built by {k.madeBy}
+          {k.effort ? ` at effort ${k.effort}` : ''}, {stamp(k.at)}, last changed {stamp(k.updatedAt)}. This page holds a copy of it as a new train of
+          this browser: change it here and Save keeps the copy under your name, while the train the model built stays the model&rsquo;s, as it is.
+        </p>
+      </Callout>
+    </div>
+  );
+}
+
+/** What pureOS's proposer said of this train (OF-BLD-020 §7.2, §5.R): for what, and what its rules need and nothing holds. */
+function ProposalNote({ proposal }: { proposal: TrainProposal }) {
+  return (
+    <section aria-label="The proposal" className="space-y-2" data-testid="builder-proposal" data-product={proposal.product} data-host={proposal.host}>
+      <Callout kind="info" title="Proposed by pureOS's rules, in this session">
+        <p className="text-caption">
+          For <span className="font-num">{proposal.product}</span> made in <span className="font-num">{proposal.host}</span>
+          {proposal.productClass ? `, a ${proposal.productClass}` : ''}. Each unit below carries the rule that put it there and the property it read;
+          every parameter is at its library default or waits for a person. Save keeps it as a train of this browser.
+        </p>
+      </Callout>
+      <ProposalMissingList missing={proposal.missing} />
+    </section>
+  );
+}
+
 function Builder({
   draft,
   setDraft,
   routeId,
   programs,
   products,
+  proposal,
 }: {
   draft: TrainSpec;
   setDraft: (t: TrainSpec) => void;
   routeId: string;
   programs: { id: string; name: string }[];
   products: string[];
+  proposal: TrainProposal | null;
 }) {
   const overridesAll = useStore((s) => s.parameterOverrides);
   const reviewer = useStore((s) => s.reviewer).trim();
@@ -382,7 +509,16 @@ function Builder({
   }, [specKey, showArchived]);
   const fresh = check && check.key === specKey ? check.answer : null;
 
-  const [run, setRun] = useState<TrainRun | null>(null);
+  // The run on the page, and whether Price this in Proforma is open, are kept
+  // by train id in the store (OF-BLD-020 §5.R, finding 13): Save moves a new
+  // train to its own address and the page there shows them still.
+  const shownHere = useStore((s) => s.builderShown[draft.id] ?? null);
+  const showInBuilder = useStore((s) => s.showInBuilder);
+  const run = shownHere?.run ?? null;
+  const setRun = (r: TrainRun) => showInBuilder(draft.id, { run: r });
+  const pricing = !!shownHere?.pricing;
+  const setPricing = (on: boolean) => showInBuilder(draft.id, { pricing: on });
+  const reasons = useMemo(() => new Map((proposal?.reasons ?? []).map((r) => [r.unitId, r])), [proposal]);
   const [runProblem, setRunProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef<AbortController | null>(null);
@@ -432,7 +568,6 @@ function Builder({
     saveTrain(spec, reviewer);
     if (routeId !== draft.id) navigate(builderPath(draft.id), { replace: true });
   };
-  const [pricing, setPricing] = useState(false);
   const placeRefusals = (place: string) => fresh?.places[place] ?? [];
 
   return (
@@ -454,7 +589,12 @@ function Builder({
                   {p.name}
                 </option>
               ))}
-              {!programs.some((p) => p.id === draft.program) && <option value={draft.program}>{draft.program}</option>}
+              {!programs.some((p) => p.id === draft.program) && (
+                <option value={draft.program}>
+                  {PROGRAM_BY_ID[draft.program as ProgramId]?.name ?? draft.program}
+                  {isArchived(draft.program as ProgramId) ? ' (archived)' : ''}
+                </option>
+              )}
             </select>
           </label>
           <label className="text-caption text-ink-soft">
@@ -496,6 +636,8 @@ function Builder({
         {pricing && <PriceInProforma run={run} spec={spec} changed={!!run && !sameTrain(run.spec, spec)} />}
       </section>
 
+      {proposal && <ProposalNote proposal={proposal} />}
+
       <InletSection draft={draft} spec={spec} change={change} clearInlet={() => clearScope(INLET)} refusals={placeRefusals(INLET)} />
 
       <section aria-labelledby="builder-steps" data-testid="builder-steps">
@@ -518,6 +660,7 @@ function Builder({
               type={typeOf.get(u.type) ?? null}
               spec={spec}
               refusals={placeRefusals(u.id)}
+              reason={reasons.get(u.id) ?? null}
               move={(by) => moveUnit(i, by)}
               remove={() => removeUnit(i)}
               route={(port, to) => routeOutlet(i, port, to)}
@@ -974,6 +1117,7 @@ function UnitCard({
   type,
   spec,
   refusals,
+  reason,
   move,
   remove,
   route,
@@ -985,6 +1129,8 @@ function UnitCard({
   type: UnitType | null;
   spec: TrainSpec;
   refusals: string[];
+  /** The proposer's reason for this unit, when the train is a proposal (OF-BLD-020 §5.R). */
+  reason: ProposalReason | null;
   move: (by: -1 | 1) => void;
   remove: () => void;
   route: (port: string, to: string) => void;
@@ -1015,6 +1161,7 @@ function UnitCard({
         </span>
       </div>
       {type && <p className="text-caption text-ink-soft">{type.line}</p>}
+      {reason && <ProposalReasonLine reason={reason} />}
       {unit.readFrom && (
         <p className="text-caption text-ink-soft" data-testid="unit-reads">
           Reads its values from unit <span className="font-num">{unit.readFrom.unit}</span> of {unit.readFrom.flowsheet}, as the package builds it.
@@ -1304,7 +1451,19 @@ function RunResult({ run, changed }: { run: TrainRun; changed: boolean }) {
 
 function UnitTable({ run }: { run: TrainRun }) {
   const cost = new Map(run.costs.map((c) => [c.unit, c]));
-  const headers = ['Unit', 'Type', 'Class', 'Purchase cost (USD)', 'Installed cost (USD)', 'Heating duty', 'Cooling duty', 'Power', 'Cost note'];
+  // OF-BLD-020 §5.R (finding 16): the duties and the power in the units the run's table states (BioSTEAM's), never typed here.
+  const tableUnit = (key: string) => run.train.tableUnits[key] ?? 'unit not stated by the run';
+  const headers = [
+    'Unit',
+    'Type',
+    'Class',
+    'Purchase cost (USD)',
+    'Installed cost (USD)',
+    `Heating duty (${tableUnit('duty')})`,
+    `Cooling duty (${tableUnit('duty')})`,
+    `Power (${tableUnit('power')})`,
+    'Cost note',
+  ];
   const rows = run.units.map((u) => {
     const c = cost.get(u.id);
     const model = c ? c.costModel : true;
@@ -1356,7 +1515,7 @@ function UnitTable({ run }: { run: TrainRun }) {
         </table>
       </Card>
       <p className="text-caption text-ink-soft mt-1">
-        Costs are BioSTEAM&rsquo;s purchase and installed costs at its default plant cost index; an in-house unit carries no cost model and BioSTEAM costs it at nothing, which is said, never priced. Duties and power are as the run&rsquo;s unit table holds them.
+        Costs are BioSTEAM&rsquo;s purchase and installed costs at its default plant cost index; an in-house unit carries no cost model and BioSTEAM costs it at nothing, which is said, never priced. Duties are in {tableUnit('duty')} and power in {tableUnit('power')}, as the run&rsquo;s unit table states them.
       </p>
     </section>
   );

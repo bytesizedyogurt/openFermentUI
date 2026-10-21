@@ -1,0 +1,87 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "listed": [
+      {
+        "spec": {
+          "id": "tr-fixture-kept",
+          "name": "ethanol train, built by a model",
+          "program": "yeast",
+          "product": "ethanol",
+          "inlet": {
+            "kind": "run-stream",
+            "ref": "01c59ce34e14736d",
+            "streamId": "beer",
+            "vessel": null,
+            "params": {}
+          },
+          "units": [
+            {
+              "id": "D1",
+              "type": "distillation",
+              "params": {},
+              "outlets": {},
+              "records": {},
+              "readFrom": null
+            },
+            {
+              "id": "M1",
+              "type": "molecular-sieve",
+              "params": {},
+              "outlets": {},
+              "records": {},
+              "readFrom": null
+            }
+          ]
+        },
+        "agent": "model",
+        "madeBy": "a STAND-IN model (openFerment test fixture)",
+        "effort": "medium",
+        "askId": "ask-fixture",
+        "at": "2026-09-15T09:00:00Z",
+        "updatedAt": "2026-09-15T09:00:00Z"
+      }
+    ],
+    "listedArchived": [
+      {
+        "spec": {
+          "id": "tr-fixture-kept",
+          "name": "ethanol train, built by a model",
+          "program": "yeast",
+          "product": "ethanol",
+          "inlet": {
+            "kind": "run-stream",
+            "ref": "01c59ce34e14736d",
+            "streamId": "beer",
+            "vessel": null,
+            "params": {}
+          },
+          "units": [
+            {
+              "id": "D1",
+              "type": "distillation",
+              "params": {},
+              "outlets": {},
+              "records": {},
+              "readFrom": null
+            },
+            {
+              "id": "M1",
+              "type": "molecular-sieve",
+              "params": {},
+              "outlets": {},
+              "records": {},
+              "readFrom": null
+            }
+          ]
+        },
+        "agent": "model",
+        "madeBy": "a STAND-IN model (openFerment test fixture)",
+        "effort": "medium",
+        "askId": "ask-fixture",
+        "at": "2026-09-15T09:00:00Z",
+        "updatedAt": "2026-09-15T09:00:00Z"
+      }
+    ]
+  }
+}

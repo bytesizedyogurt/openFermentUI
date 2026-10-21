@@ -344,9 +344,28 @@ def _cut(line: str) -> str:
     return head.rstrip(" ,;:.") + " (cut here; the artifact holds the whole line)"
 
 
-def described(k: KeptTrain) -> dict[str, Any]:
+def to_run(spec: TrainSpec, include_archived: bool = False) -> tuple[list[str], str | None]:
+    """What a run of the train would refuse now, in the run's own words
+    (`train_spec.check_train`, OF-BLD-020 §5.R, finding 20): the validation's
+    refusals, then every value that waits and every need a unit has, as a
+    model's run would meet them (no person's value: the service holds none).
+    Runs no train and keeps nothing. When the simulator, where the classes'
+    parameters are read, cannot answer, the validation's words alone, and
+    words saying the values were not checked and why."""
+    from .. import artifacts
+    from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        return list(train_spec.check_train(spec, None, None, include_archived).refusals), None
+    except (WorkerError, WorkerCrashed, WorkerTimeout, artifacts.ArtifactNotFound, artifacts.ArtifactDamaged) as e:
+        return train_spec.validate(spec), (f"its values were not checked, so a value that waits is not named here: "
+                                           f"{str(e).rstrip('.')}. The run names every one")
+
+
+def described(k: KeptTrain, include_archived: bool = False) -> dict[str, Any]:
     """A kept train as a model reads it: ids and words, what is named for
-    each unit, and what still stops it running, in the validation's words."""
+    each unit, and what a run of it would refuse now, in the run's own words
+    (`to_run`)."""
     s = k.spec
     units = []
     for u in s.units:
@@ -354,11 +373,12 @@ def described(k: KeptTrain) -> dict[str, Any]:
         units.append({"id": u.id, "type": e.id, "name": e.name, "stage": e.stage, "class": e.cls,
                       "outlets": train_spec.routes(u, e),
                       "recordsNamed": {key: len(ids) for key, ids in u.records.items()}})
+    refusals, unchecked = to_run(s, include_archived)
     return {
         "trainId": s.id, "name": s.name, "program": s.program, "product": s.product,
         "inlet": {"kind": s.inlet.kind, "ref": s.inlet.ref, "streamId": s.inlet.streamId, "vessel": s.inlet.vessel},
         "units": units, "madeBy": k.madeBy, "at": k.at, "updatedAt": k.updatedAt,
-        "toRun": train_spec.validate(s),
+        "toRun": refusals, **({"toRunNote": unchecked} if unchecked else {}),
     }
 
 

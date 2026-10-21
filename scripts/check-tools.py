@@ -28,7 +28,13 @@ Fails when:
    that reaches one of those, to a fixed point, each name followed through its
    import as rule 2 follows it. A tool file may reach none of them but through
    writes.py, may not call `artifacts.compute` for a run, and, as in rule 2,
-   may not hand a store module around bare or import by name at run time;
+   may not hand a store module around bare or import by name at run time.
+   OF-BLD-020 §5.R (finding 18): a function that writes through `atomic` and
+   names a kept store's file by a function or constant of the module that
+   names it (`kept.path()`, `kept.FILE`) is a writer wherever it lives, and a
+   tool file writes no file itself: it may not reach `atomic.write_text` or
+   `write_bytes`, nor call a path's or a handle's write, a dump, a file made,
+   moved or taken away, or `open` with a mode that writes;
 3. a gated action can complete without a person's id on it: every (module,
    action) in `gates.GATES` comes back `proposed` with nothing written but
    the proposal, and carrying it out with no name, a placeholder or one
@@ -485,16 +491,60 @@ class _Module:
 
 service = [_Module(p) for p in sorted(PACKAGE_DIR.rglob("*.py"))
            if p.relative_to(PACKAGE_DIR).parts[0] not in WORKER_SIDE]
+# OF-BLD-020 §5.R (finding 18): the modules that name a kept store's file. A
+# function anywhere that writes through `atomic` and names that file, or
+# reaches a function of such a module (its `path()`, its `FILE` read as an
+# attribute), keeps the store as surely as one whose own module names it.
+STORE_MODULES = {mod.name for mod in service
+                 if any(isinstance(v, str) and v in KEPT_STORES for v in mod.consts.values())}
+
+
+def _names_store(mod: _Module, fn_refs: list) -> bool:
+    for _, r, a, _, t, lc in fn_refs:
+        key, obj = mod.resolve(r, a, t, lc)
+        if isinstance(obj, str) and obj in KEPT_STORES:
+            return True
+        if key and any(key.startswith(f"{m}.") for m in STORE_MODULES):
+            return True
+    return False
+
+
+# A tool file's own file writes past atomic (OF-BLD-020 §5.R, finding 18): a
+# path's or a handle's write, a dump into a handle, a file made, moved or
+# taken away, and a file opened to write. A tool file reads; it writes nothing.
+FILE_WRITES = frozenset({"write_text", "write_bytes", "write", "writelines", "dump", "touch", "mkdir", "unlink",
+                         "rename", "rmdir"})
+WRITE_MODES = frozenset("wax+")
+
+
+def _raw_writes(mod: _Module, refs: list) -> list[tuple[int, str]]:
+    found = []
+    for call in ast.walk(mod.tree):
+        if not isinstance(call, ast.Call):
+            continue
+        f = call.func
+        name = f.attr if isinstance(f, ast.Attribute) else f.id if isinstance(f, ast.Name) else None
+        if name in FILE_WRITES:
+            found.append((call.lineno, f".{name}()" if isinstance(f, ast.Attribute) else f"{name}()"))
+        elif name == "open":
+            mode = call.args[1 if isinstance(f, ast.Name) else 0] if len(call.args) > (1 if isinstance(f, ast.Name) else 0) \
+                else next((k.value for k in call.keywords if k.arg == "mode"), None)
+            if isinstance(mode, ast.Constant) and isinstance(mode.value, str) and set(mode.value) & WRITE_MODES:
+                found.append((call.lineno, f"open(…, {mode.value!r})"))
+    return found
+
+
 # What each function reaches, and the ones that keep a run or append to the audit log themselves.
 edges: dict[str, set[str]] = {}
 WRITERS: set[str] = {APPEND}
 for mod in service:
-    keeps_store = any(isinstance(v, str) and v in KEPT_STORES for v in mod.consts.values())
+    keeps_store = mod.name in STORE_MODULES
     for key, fn in mod.functions():
         fn_refs = mod.refs(fn)
         reached = {k for _, r, a, _, t, lc in fn_refs for k in [mod.resolve(r, a, t, lc)[0]] if k}
         edges[key] = {k for k in reached if not k.startswith(WRITES)}
-        if APPEND in reached or mod.run_computes(fn, fn_refs) or (keeps_store and reached & ATOMIC_WRITES):
+        if APPEND in reached or mod.run_computes(fn, fn_refs) or (
+                reached & ATOMIC_WRITES and (keeps_store or _names_store(mod, fn_refs))):
             WRITERS.add(key)
 grew = True
 while grew:
@@ -536,6 +586,15 @@ for mod in service:
         if isinstance(obj, types.ModuleType) and obj.__name__ in _STORE_NAMES:
             fail(f"{where} line {line} hands the store module {_STORE_NAMES[obj.__name__]} around bare ({spelled}): "
                  "a tool file names what it reads of a store")
+        elif key in ATOMIC_WRITES:
+            # OF-BLD-020 §5.R (finding 18): a tool file never writes a file
+            # through atomic itself, whatever path it names: the store a
+            # model's write keeps (its own copy of the file's name, the
+            # store's path function, the data directory and the name) is
+            # written by its module's write function, through writes.py.
+            fail(f"{where} line {line} writes a file through {key} itself (as {spelled}): a tool file keeps "
+                 "nothing; a write goes through tools/writes.py to its module's write function, where rule 2 "
+                 "reads it")
         elif key in WRITERS and key not in own and not key.startswith(WRITES):
             fail(f"{where} line {line} reaches {key} (as {spelled}), which keeps a Proforma run, a simulation, a "
                  "vessel, a train run or a train a model built, or writes an audit line: a tool that does goes through "
@@ -543,6 +602,9 @@ for mod in service:
     for line, kept in mod.run_computes(mod.tree, tool_refs):
         fail(f"{where} line {line} keeps {kept} through artifacts.compute itself: a tool that keeps a run goes "
              "through tools/writes.py, where rule 2 reads it")
+    for line, how in _raw_writes(mod, tool_refs):
+        fail(f"{where} line {line} writes a file itself ({how}): a tool file keeps nothing; a write goes through "
+             "tools/writes.py to its module's write function, where rule 2 reads it")
 
 # 3. a gated action completes only with a person's name on it
 data = Path(os.environ["OPENFERMENT_DATA_DIR"])

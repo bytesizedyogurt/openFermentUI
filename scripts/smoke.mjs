@@ -2214,6 +2214,10 @@ async function main() {
     page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
     const recorded = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/pureos-propose.json'), 'utf8')).response.entries;
     try {
+      // A reviewer name, so the proposal opened in the Builder can be saved (OF-BLD-020 §5.R).
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
       await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
       await page.locator('[data-testid="pureos-propose-open"]').click();
       await page.locator('[data-testid="pureos-propose-chooser"]').waitFor({ timeout: 8000 }).catch(() => {});
@@ -2245,6 +2249,30 @@ async function main() {
       const link = await page.locator('[data-testid="proposal-open-builder"]').getAttribute('href').catch(() => null);
       const trainId = await page.locator('[data-testid="pureos-proposal"]').getAttribute('data-train').catch(() => null);
       if (!trainId || !/^tr-/.test(trainId) || link !== `#/pureos/build/${encodeURIComponent(trainId)}`) problems.push(`the proposal does not open in the Builder under its new train id (${link}, ${trainId})`);
+      // OF-BLD-020 §5.R (findings 10, 31): the link opens the proposal in the
+      // Builder, read from this session's store: its units in order, each card
+      // with its reason beside it, what the rules miss above the steps; Save
+      // makes it a train of this browser, at the same address.
+      await page.locator('[data-testid="proposal-open-builder"]').click();
+      await page.locator('[data-testid="builder-unit"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if (await page.locator('[data-testid="builder-not-found"]').count()) problems.push('Open it in the Builder lands on no train');
+      const opened = await page.locator('[data-testid="builder-unit"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-unit')}:${e.getAttribute('data-type')}`).join());
+      if (opened !== 'D1:distillation,MS1:molecular-sieve') problems.push(`the Builder opens the proposal as ${opened || 'nothing'}`);
+      const beside = await page.locator('[data-testid="builder-unit"]').evaluateAll((els) =>
+        els.map((e) => `${e.getAttribute('data-unit')}:${[...e.querySelectorAll('[data-testid="proposal-reason"]')].map((r) => `${r.getAttribute('data-unit')}/${r.getAttribute('data-rule')}`).join('+')}`).join());
+      const besideWant = answer.reasons.map((r) => `${r.unitId}:${r.unitId}/${r.rule}`).join();
+      if (beside !== besideWant) problems.push(`the reasons beside the Builder's unit cards are ${beside}, not the proposal's ${besideWant}`);
+      if (!(await page.locator('[data-testid="builder-proposal"]').count())) problems.push('the Builder does not say the train is a proposal');
+      await page.locator('[data-testid="builder-save"]').click();
+      await page.waitForTimeout(900);
+      if ((await page.locator('[data-testid="builder-saved"]').getAttribute('data-saved').catch(() => null)) !== 'same' || !page.url().endsWith(`#/pureos/build/${trainId}`))
+        problems.push(`Save does not keep the proposal as a train of this browser (${page.url()})`);
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      await page.locator(`[data-testid="pureos-built-row"][data-train="${trainId}"]`).waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator(`[data-testid="pureos-built-row"][data-train="${trainId}"]`).count())) problems.push('the saved proposal is not among the trains built here');
+      await page.locator('[data-testid="pureos-propose-open"]').click();
+      await page.locator('[data-testid="pureos-propose-chooser"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="propose-host"]').selectOption('s-cerevisiae-s288c');
       // A protein the seed gives neither a sequence nor a location proposes nothing, and names both.
       await page.locator('[data-testid="propose-product"]').selectOption('taq-dna-polymerase');
       await page.locator('[data-testid="propose-submit"]').click();
@@ -2259,7 +2287,7 @@ async function main() {
       proposeFails++;
       console.log(`✗ propose      ${problems.join('; ')}`);
     } else {
-      console.log('✓ propose      Propose a train for ethanol in S288C posts ids and words; a column then a molecular sieve, each reason beside its unit naming the rule, the property (boiling point, azeotrope) and the volatility artifact, words with no number; kept under a new train id for the Builder; a protein with no sequence or location proposes nothing and names both');
+      console.log('✓ propose      Propose a train for ethanol in S288C posts ids and words; a column then a molecular sieve, each reason beside its unit naming the rule, the property (boiling point, azeotrope) and the volatility artifact, words with no number; kept under a new train id, which opens in the Builder with each reason beside its unit card and saves as a train of this browser; a protein with no sequence or location proposes nothing and names both');
     }
     await page.close();
   }
@@ -2812,6 +2840,11 @@ async function main() {
       const pct = (v, d) => `${(v * 100).toFixed(d)}%`;
       if (!body.includes(pct(run.purity.productFraction, 2)) || !body.includes(pct(run.train.overallRecovery, 1))) problems.push("the purity or the overall recovery is not the run's");
       if ((await page.locator('[data-testid="builder-unit-row"]').count()) !== 3) problems.push('the unit table does not hold the three units');
+      // OF-BLD-020 §5.R (finding 16): the duties and the power name their units, read from the run's table units.
+      const unitHead = await page.locator('[data-testid="builder-unit-table"] thead').innerText().catch(() => '');
+      const tu = run.train.tableUnits;
+      if (!tu.duty || !tu.power || !unitHead.includes(`Heating duty (${tu.duty})`) || !unitHead.includes(`Cooling duty (${tu.duty})`) || !unitHead.includes(`Power (${tu.power})`))
+        problems.push(`the unit table's duties and power do not name the run's units (${unitHead.replace(/\s+/g, ' ')})`);
       if (!(await page.locator(`[data-testid="builder-basis-input"][data-by="${REVIEWER}"]`).count())) problems.push("the basis does not name the reviewer's values");
       if (!run.diagram && (await page.locator('[data-testid="builder-unit-order"] li').allInnerTexts()).join() !== 'U1,U2,U3') problems.push('with no diagram the units are not listed in run order');
       // A rename changes the train: the run is said to be of the train as it was.
@@ -2837,6 +2870,9 @@ async function main() {
       await page.waitForTimeout(900);
       if (!page.url().endsWith(`#/pureos/build/${id}`)) problems.push(`a saved train does not open at its own address (${page.url()})`);
       if ((await page.locator('[data-testid="builder-saved"]').getAttribute('data-saved').catch(() => null)) !== 'same') problems.push('Save does not say the train is kept');
+      // OF-BLD-020 §5.R (finding 13): Save moves a new train to its own address, and the run on the page stays.
+      if (!(await page.locator(`[data-testid="builder-result"][data-artifact="${run.artifactId}"]`).count())) problems.push('Save drops the run the page showed');
+      if (!(await page.locator('[data-testid="builder-price-panel"]').count())) problems.push('Save drops what Price this in Proforma said');
       await page.reload({ waitUntil: 'networkidle' });
       await card('U3').waitFor({ timeout: 8000 }).catch(() => {});
       if ((await page.locator('[data-testid="builder-name"]').inputValue().catch(() => '')) !== 'Sam’s first train' || (await page.locator('[data-testid="builder-unit"]').count()) !== 3)
@@ -2891,6 +2927,23 @@ async function main() {
           (await parts.getAttribute('data-train-run').catch(() => null)) !== run.artifactId)
         problems.push(`Price this in Proforma did not make and open the scenario of the vessel chosen and the run kept (${page.url()})`);
       await page.unroute('**/api/fermos/vessels*');
+      // OF-BLD-020 §5.R (finding 17): a train saved in an archived program,
+      // opened by its address with the switch off, opens under the banner
+      // naming the program, as every archived entity a link opens does.
+      await setShowArchived(page, true);
+      await page.goto(`http://localhost:${PORT}/#/pureos/build/new`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="builder-program"]').selectOption('pha').catch(() => {});
+      await page.locator('[data-testid="builder-save"]').click();
+      await page.waitForTimeout(900);
+      const phaTrain = decodeURIComponent(page.url().split('#/pureos/build/')[1] ?? '');
+      await setShowArchived(page, false);
+      await page.goto(`http://localhost:${PORT}/#/pureos/build/${phaTrain}`, { waitUntil: 'networkidle' });
+      const banner = page.locator('[data-testid="pureos-builder"] [role="note"][data-archived-program="pha"]');
+      await banner.waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/^tr-/.test(phaTrain) || !(await banner.count()) || !/PHA/.test(await banner.innerText().catch(() => '')))
+        problems.push(`a PHA train opened by its address with the switch off shows no banner naming its program (${phaTrain})`);
+      if (!/PHA/.test(await page.locator('[data-testid="builder-program"] option:checked').innerText().catch(() => '')))
+        problems.push('the archived train’s program is not named by its name');
     } catch (e) {
       problems.push(String(e).slice(0, 200));
     }
@@ -2898,7 +2951,7 @@ async function main() {
       builderFails++;
       console.log(`✗ builder      ${problems.join('; ')}`);
     } else {
-      console.log(`✓ builder      New train from the index; the palette is the service's catalogue by stage, no cost model said; a broth typed under ${REVIEWER}'s name; three units from the palette, an outlet never offered a later unit; what holds the run on the centrifuge's card and Run off; the split typed, Run on; the run posted whole with every override, its purity by stream and recovery by unit the artifact's (worker: ${fx.worker.kind}), the basis naming the reviewer; a rename says the run is of the train as it was; Price this in Proforma says it needs a vessel and how one is made; Save, a reload finds it with its values; the index lists it with its run; the train page links back; a run's units read into a train, and one no type holds refused in words; with a vessel kept, Price this in Proforma makes the custom_train_v1 scenario from the run and opens it`);
+      console.log(`✓ builder      New train from the index; the palette is the service's catalogue by stage, no cost model said; a broth typed under ${REVIEWER}'s name; three units from the palette, an outlet never offered a later unit; what holds the run on the centrifuge's card and Run off; the split typed, Run on; the run posted whole with every override, its purity by stream and recovery by unit the artifact's (worker: ${fx.worker.kind}), the unit table's duties and power in the run's units, the basis naming the reviewer; a rename says the run is of the train as it was; Price this in Proforma says it needs a vessel and how one is made; Save keeps the run on the page, a reload finds the train with its values; the index lists it with its run; the train page links back; a run's units read into a train, and one no type holds refused in words; with a vessel kept, Price this in Proforma makes the custom_train_v1 scenario from the run and opens it; a PHA train opened by its address with the switch off opens under the banner naming PHA`);
     }
     await page.close();
   }
@@ -2981,6 +3034,88 @@ async function main() {
   }
   // ── end §6.2
 
+  // ── OF-BLD-020 §5.R — the trains a model built, listed on pureOS's index.
+  //
+  // The double answers GET /api/pureos/trains-kept from pureos-trains-kept.json,
+  // which demo.py --prototype made through the real pureos.kept in a throwaway
+  // store (a STAND-IN model's train on the stand-in yeast run's beer). The
+  // index lists it under Made by Postdoc with its name, product, units, the
+  // model that made it and when, and its newest run joined by the run's
+  // trainId; Open a copy opens it in the Builder as a new train of this
+  // browser naming the kept train it copies, and Save keeps the copy here
+  // under the reviewer's name while the kept train stays the model's. A model's
+  // train of an archived program is hidden with the switch off, and said so.
+  let keptFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const keptList = fixture('pureos-trains-kept.json').listedArchived;
+    const [k] = keptList;
+    const fx = fixture('pureos-builder.json');
+    const joined = { ...fx.trainRuns[0], trainId: k?.spec.id, trainName: k?.spec.name };
+    const pct = (v, d) => `${(v * 100).toFixed(d)}%`;
+    try {
+      if (keptList.length !== 1 || k.agent !== 'model' || !k.madeBy) problems.push('the kept-train fixture is not one train a model made');
+      const asksBefore = doubleState.keptTrainAsks.length;
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.route('**/api/pureos/train-runs*', (route) => route.fulfill({ json: [joined] }));
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      const row = page.locator(`[data-testid="pureos-kept-row"][data-train="${k.spec.id}"]`);
+      await row.waitFor({ timeout: 8000 }).catch(() => {});
+      await page
+        .waitForFunction((t) => /recovered|no run on the service/.test(document.querySelector(`[data-testid="pureos-kept-row"][data-train="${t}"]`)?.textContent ?? ''), k.spec.id, { timeout: 8000 })
+        .catch(() => {});
+      const text = await row.innerText().catch(() => '');
+      if (!doubleState.keptTrainAsks.slice(asksBefore).some((a) => a.includeArchived)) problems.push('the index did not ask the service for the trains a model built, every program\u2019s, to filter them itself');
+      for (const want of [k.spec.name, k.spec.product, k.madeBy, ...k.spec.units.map((u) => u.id)])
+        if (!text.includes(want)) problems.push(`the kept train's row does not say ${want} (${text.replace(/\s+/g, ' ').slice(0, 160)})`);
+      if (!text.includes(`${pct(joined.overallRecovery, 1)} recovered`)) problems.push('the kept train’s row does not show its run, joined by the run’s trainId');
+      const copy = row.locator('[data-testid="pureos-kept-copy"]');
+      if ((await copy.getAttribute('href').catch(() => null)) !== `#/pureos/build/new?copy=${k.spec.id}`) problems.push('Open a copy does not name the kept train');
+      await page.unroute('**/api/pureos/train-runs*');
+      await copy.click();
+      const note = page.locator('[data-testid="builder-copy-of"]');
+      await note.waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await note.getAttribute('data-kept').catch(() => null)) !== k.spec.id) problems.push('the Builder does not name the kept train it copies');
+      const units = await page.locator('[data-testid="builder-unit"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-unit')}:${e.getAttribute('data-type')}`).join());
+      const want = k.spec.units.map((u) => `${u.id}:${u.type}`).join();
+      if (units !== want) problems.push(`the copy's units are ${units}, not the kept train's ${want}`);
+      const copyId = await page.locator('[data-testid="pureos-builder"]').getAttribute('data-train').catch(() => null);
+      if (!copyId || copyId === k.spec.id || !/^tr-/.test(copyId)) problems.push(`the copy is not a new train of this browser (${copyId})`);
+      await page.locator('[data-testid="builder-save"]').click();
+      await page.waitForTimeout(900);
+      if (!page.url().endsWith(`#/pureos/build/${copyId}`) || (await page.locator('[data-testid="builder-saved"]').getAttribute('data-saved').catch(() => null)) !== 'same')
+        problems.push(`Save does not keep the copy in this browser at its own address (${page.url()})`);
+      if ((await page.locator('[data-testid="builder-copy-of"]').getAttribute('data-kept').catch(() => null)) !== k.spec.id) problems.push('Save drops what the copy says it copies');
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      await page.locator(`[data-testid="pureos-built-row"][data-train="${copyId}"]`).waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator(`[data-testid="pureos-built-row"][data-train="${copyId}"]`).count())) problems.push('the saved copy is not among the trains built here');
+      if (!(await page.locator(`[data-testid="pureos-kept-row"][data-train="${k.spec.id}"]`).count())) problems.push('the kept train left Made by Postdoc when its copy was saved');
+      // A model's train of an archived program: hidden with the switch off, and said so.
+      const archived = { ...k, spec: { ...k.spec, id: 'tr-kept-archived', name: 'A train a model built for PHA', program: 'pha' } };
+      await page.route('**/api/pureos/trains-kept*', (route) => route.fulfill({ json: [k, archived] }));
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator(`[data-testid="pureos-kept-row"][data-train="${k.spec.id}"]`).waitFor({ timeout: 8000 }).catch(() => {});
+      if (await page.locator('[data-testid="pureos-kept-row"][data-train="tr-kept-archived"]').count()) problems.push('a model’s train of an archived program shows with the switch off');
+      if (!/PHA/.test(await page.locator('[data-testid="pureos-kept"]').innerText().catch(() => ''))) problems.push('the hidden model’s train is not said to be hidden, and whose');
+      await page.unroute('**/api/pureos/trains-kept*');
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    if (problems.length) {
+      keptFails++;
+      console.log(`✗ kept         ${problems.join('; ')}`);
+    } else {
+      console.log('✓ kept         Made by Postdoc lists the train a model built (name, product, units, the model, when) with its run joined by trainId; Open a copy opens it in the Builder as a new train of this browser naming the kept train, and Save keeps the copy here while the kept train stays listed; a model’s train of an archived program is hidden with the switch off and said so');
+    }
+    await page.close();
+  }
+  // ── end §5.R (kept trains)
+
   await browser.close();
   server.close();
 
@@ -3007,7 +3142,8 @@ async function main() {
   console.log(`${1 - simulateFails}/1 fermOS Simulate — a family simulated from its sources, what waits typed under a name, the result read from the artifact`);
   console.log(`${1 - builderFails}/1 pureOS Builder — a train built unit by unit, every value typed under a name, run, saved and found again`);
   console.log(`${1 - seamFails}/1 the seam — a simulation's harvest becomes a train's inlet, its broth the service's read of the kept series`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || proposeFails || brothFails || ceilingFails || vesselFails || simulateFails || builderFails || seamFails) process.exit(1);
+  console.log(`${1 - keptFails}/1 pureOS Made by Postdoc — a model's trains listed with their runs, each opened in the Builder as a copy a person keeps`);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || proposeFails || brothFails || ceilingFails || vesselFails || simulateFails || builderFails || seamFails || keptFails) process.exit(1);
 }
 
 main();

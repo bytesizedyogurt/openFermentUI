@@ -7,7 +7,9 @@
 // and nothing stands in for a train (E.2). Shares lib/rag.ts's call.
 import type {
   Artifact,
+  KeptTrain,
   Override,
+  ProgramId,
   ProposeRequest,
   StreamRow,
   Train,
@@ -26,6 +28,7 @@ import type {
   UnitType,
   VesselSummary,
 } from '@/data/types';
+import { isArchived } from '@/data/programs';
 import { RagDown, RagRefused, call } from './rag';
 import { proformaNewestRun, proformaReference, proformaScenarios, proformaShelf } from './proforma';
 
@@ -116,6 +119,14 @@ export const runTrain = (req: TrainRunRequest, signal?: AbortSignal) => post<Tra
 /** Every kept train run, newest first; the page filters an archived program's with the switch, so it can say what it hides. */
 export const pureosTrainRuns = (signal?: AbortSignal) => call<TrainSummary[]>('/api/pureos/train-runs?includeArchived=true', { signal });
 
+/**
+ * OF-BLD-020 §5.R — the trains a model built with `pureos_build` or
+ * `pureos_write`, kept on the service (`GET /api/pureos/trains-kept`), the
+ * most recently changed first. Asked for with archived programs' too: the
+ * index filters them with the switch itself, so it can say what it hides.
+ */
+export const pureosTrainsKept = (signal?: AbortSignal) => call<KeptTrain[]>('/api/pureos/trains-kept?includeArchived=true', { signal });
+
 /** A kept run's units read into a train by the service (`POST /api/pureos/train/from-run`). */
 export const trainFromRun = (req: TrainFromRunRequest, signal?: AbortSignal) => post<TrainFromRun>('/api/pureos/train/from-run', req, signal);
 
@@ -127,6 +138,11 @@ export const NEW_TRAIN = 'new';
 export const unitScope = (trainId: string, place: string) => `pureos:unit:${trainId}:${place}`;
 /** Where the Builder opens a train. */
 export const builderPath = (trainId: string) => `/pureos/build/${encodeURIComponent(trainId)}`;
+/**
+ * OF-BLD-020 §5.R — where the Builder opens a copy of a train a model built:
+ * a new train of this browser, the kept one left the model's.
+ */
+export const builderCopyPath = (keptTrainId: string) => `/pureos/build/${NEW_TRAIN}?copy=${encodeURIComponent(keptTrainId)}`;
 /** Where the Builder opens a fresh train read from a kept run's units. */
 export const builderFromRunPath = (artifactId: string) => `/pureos/build/${NEW_TRAIN}?from=${encodeURIComponent(artifactId)}`;
 
@@ -260,17 +276,24 @@ export function flowsheetOfRun(a: Artifact): string | null {
 
 /**
  * The kept runs a train can take a stream of, or be read from: pureOS's own
- * train runs, the newest run of every BioSTEAM scenario the switch shows
- * (the seed's and the ones made here), and every reference run on the
- * shelf, each with its streams as its artifact or its train holds them.
+ * train runs of a program the switch shows, the newest run of every BioSTEAM
+ * scenario the switch shows (the seed's and the ones made here, each made one
+ * with its program), and every reference run on the shelf the switch shows,
+ * each with its streams as its artifact or its train holds them.
  * Read, never made; a source the service cannot answer is said in words and
  * the rest still come back.
  */
 export async function runChoices(
   includeArchived: boolean,
-  made: { id: string; name: string }[],
+  made: { id: string; name: string; program?: string | null }[],
   signal?: AbortSignal,
 ): Promise<{ choices: RunChoice[]; problems: string[] }> {
+  // OF-BLD-020 §5.R (finding 12): every source goes through the switch, as
+  // every list does. The train runs are asked for whole (the index says what
+  // it hides) and an archived program's left out here; a scenario made here
+  // carries its own program; the seed scenarios and the shelf are asked with
+  // the switch, so the service leaves an archived one out.
+  const shown = (program: string | null | undefined) => includeArchived || !isArchived((program ?? null) as ProgramId | null);
   const problems: string[] = [];
   const said = (what: string) => (e: unknown) => {
     if (signal?.aborted) return null;
@@ -279,7 +302,7 @@ export async function runChoices(
   };
   const choices: RunChoice[] = [];
   const runs = (await pureosTrainRuns(signal).catch(said('pureOS’s train runs'))) ?? [];
-  for (const r of runs) {
+  for (const r of runs.filter((x) => shown(x.program))) {
     const t = await pureosTrain(r.artifactId, signal).catch(said(`train run ${r.artifactId}`));
     if (t)
       choices.push({ artifactId: r.artifactId, ref: r.artifactId, scenarioId: null, broth: null, tool: r.tool, label: `train run of ${r.trainName ?? r.trainId ?? r.artifactId}`, program: r.program, createdAt: r.createdAt, streams: t.streams });
@@ -288,7 +311,7 @@ export async function runChoices(
   const shelf = (await proformaShelf(includeArchived, signal).catch(said('Proforma’s shelf'))) ?? [];
   const brothOf = new Map(shelf.map((f) => [f.id, f.brothStream ?? null]));
   const seeds = (await proformaScenarios({ host: null, includeArchived }, signal).catch(said('Proforma’s scenarios'))) ?? [];
-  const scenarios = [...seeds.map((s) => ({ id: s.id, name: s.name })), ...made];
+  const scenarios = [...seeds.map((s) => ({ id: s.id, name: s.name, program: null as string | null })), ...made.filter((m) => shown(m.program))];
   for (const sc of scenarios) {
     const a = await proformaNewestRun(sc.id, signal).catch(said(`the runs of ${sc.id}`));
     if (!a) continue;
@@ -301,7 +324,7 @@ export async function runChoices(
       broth,
       tool: a.tool,
       label: `newest run of ${sc.name}${broth ? `, its broth ${broth}` : ''}`,
-      program: null,
+      program: sc.program ?? null,
       createdAt: a.createdAt,
       streams: streamsOfArtifact(a),
     });

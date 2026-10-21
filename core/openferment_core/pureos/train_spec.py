@@ -63,7 +63,13 @@ not go on by turned into one less the recovery (said so); the record ids
 named for a key bind it and no other record does; then the class's own
 default, read from its code in the worker. A per-component key nobody set is
 left to the class, which reads a split that does not name a component as none
-of it to outlet 0 (BioSTEAM's own reading, said in the run's notes).
+of it to the outlet the split goes to (outlet 0, the drum dryer's hot gas:
+`catalogue.split_outlets`), said in the run's notes; a class that fills its
+own split table (the pressure filter) gives each share as its default, and a
+run that sets one share passes the whole table, since BioSTEAM drops it once
+any share is given. A split of water is not read beside a moisture content
+the class meets (`catalogue.Entry.moisture_sets`), and a person's is refused
+there in words (OF-BLD-020 §5.R part a).
 
 THE RUN'S ARTIFACT (E.2‴). Its basis names the train as data, the program,
 the product and the chemical traced, the chemical set, the BioSTEAM,
@@ -116,7 +122,10 @@ from ..models import (
 from . import catalogue
 
 TRAIN_RUN = "pureos.train_run"
-VERSION_WORDS = "train run 1"
+# §5.R (part a): the molecular sieve's ports, the pressure filter's table, the
+# moisture's water and the notes' words changed what a run of the same basis
+# gives, so a kept run of version 1 replays as one.
+VERSION_WORDS = "train run 2"
 # The pseudo-unit whose scope holds the inlet's own parameters.
 INLET = "inlet"
 ONWARD, WASTE, RECYCLE = "onward", "waste", "recycle:"
@@ -148,6 +157,11 @@ PERCENT_FIELDS = ("step_recovery", "product_purity", "cake_moisture", "disruptio
 STEP_FIELDS = ("step_recovery", "product_purity")
 # A per-component key bound by a record of these fields is the product's.
 PRODUCT_KEYED = ("split", "partition_coefficient", "sieving_coefficient")
+# The chromatography modes papers name by an abbreviation (a mode word that
+# is its own vocabulary id, one token): a step word that is one names the
+# step only as written in capitals, since in lower case 'sec' is seconds
+# (§5.R part a, finding 0).
+ABBREVIATIONS = frozenset(m for m, v in catalogue.MODE_VOCABULARY.items() if m == v and m.isalpha())
 # How many of a stream's largest other components a purity row names: a
 # reading convention, not a process number.
 IMPURITIES = 3
@@ -392,6 +406,12 @@ def refusals_by_place(spec: TrainSpec) -> list[tuple[str, str]]:
                 if info.reference:
                     at(u.id, f"unit {u.id} reads from {info.id}, a reference biorefinery: it runs whole, and a "
                                 "train reads the units of a flowsheet the worker builds case by case")
+                elif info.builtFrom:
+                    # §5.R (part a): the worker reads no unit of a flowsheet
+                    # built from parts; its train's units are the train run's.
+                    at(u.id, f"unit {u.id} reads from {info.id}, built from a vessel design and a train run "
+                                f"({', '.join(info.builtFrom)}): the worker reads no unit of it, and its train's units "
+                                "are that train run's own")
             if not UNIT_ID.fullmatch(u.readFrom.unit or ""):
                 at(u.id, f"unit {u.id} reads from unit {u.readFrom.unit!r}, which is no BioSTEAM unit id")
     return said
@@ -911,9 +931,26 @@ def _step_words(e: catalogue.Entry) -> list[str]:
     return sorted(w for w in words if w)
 
 
+def _tokens(text: str) -> str:
+    """Text as its lower-case words, each set apart by one space at both ends,
+    so a word or a phrase is found whole and never inside another word."""
+    return " " + " ".join(re.findall(r"[a-z0-9]+", text.lower())) + " "
+
+
 def _names_step(r: dict[str, Any], words: list[str]) -> bool:
-    text = " ".join(str(r.get(k) or "") for k in ("quote", "method", "conditions")).lower()
-    return any(w in text for w in words)
+    """Whether a record's quote, method or conditions name the step: one of
+    its words or phrases, whole ('which' does not name 'hic', nor 'second'
+    'sec'); an abbreviation only as written in capitals (§5.R part a)."""
+    raw = " ".join(str(r.get(k) or "") for k in ("quote", "method", "conditions"))
+    text = _tokens(raw)
+    written = set(re.findall(r"[A-Za-z0-9]+", raw))
+    for w in words:
+        if w in ABBREVIATIONS:
+            if w.upper() in written:
+                return True
+        elif _tokens(w).strip() and _tokens(w) in text:
+            return True
+    return False
 
 
 class _Kept(NamedTuple):
@@ -1024,11 +1061,22 @@ def unit_scope(spec: TrainSpec, unit: TrainUnitSpec, chemicals: list[str], pool:
     ws = train_specs()
     specs = expanded + _side_specs(e, ws["chemicals"])
     per = catalogue.template_keys(e)
+    # §5.R (part a): a class that fills a per-component default itself (the
+    # pressure filter's split table) gives each component's share, as read in
+    # the worker.
+    tables = catalogue.component_defaults(e.id) if "component" in per.values() else {}
     sources: dict[str, dict[str, ParameterValue | None]] = {}
     for s in specs:
         base = s.key.partition(catalogue.SEP)[0] if s.key not in got.sources else s.key
         cands = dict(got.sources.get(base) or {})
         sources[s.key] = {k: (c.model_copy(update={"key": s.key}) if c is not None else None) for k, c in cands.items()}
+        item = s.key.partition(catalogue.SEP)[-1] if catalogue.SEP in s.key else ""
+        if base in tables and item in tables[base][0] and "library-default" in s.sourceRule:
+            share, where = tables[base][0][item], tables[base][1]
+            sources[s.key]["library-default"] = ParameterValue(
+                key=s.key, value=share, origin="library-default", libraryDefault=share,
+                source=catalogue._model_source(e, catalogue.worker_specs(e.id), s.key, where),
+                detail=f"{e.cls}'s own table: its share of {item}, from {where}")
     read_from = None
     notes = list(got.notes)
     if unit.readFrom is not None:
@@ -1053,7 +1101,7 @@ def unit_scope(spec: TrainSpec, unit: TrainUnitSpec, chemicals: list[str], pool:
                                           or "every parameter was read") + ".")
     refused: list[str] = []
     pool_note = None
-    outlet0 = _out_ports(e)[0].name
+    split_to, split_rest = catalogue.split_outlets(e)
     onward = next((n for n, r in routes(unit, e).items() if r == ONWARD), None)
     passes = _number(by_key.get("passes"))
     for s in specs:
@@ -1086,10 +1134,10 @@ def unit_scope(spec: TrainSpec, unit: TrainUnitSpec, chemicals: list[str], pool:
             continue
         values = [k.value for k in kept]
         how = "each a percentage over a hundred, a share" if field in PERCENT_FIELDS else "each as the record gives it"
-        if base == "split" and field == "step_recovery" and onward is not None and onward != outlet0:
+        if base == "split" and field == "step_recovery" and onward is not None and onward != split_to:
             values = [1 - x for x in values]
-            how += (f", then one less it: the split is to outlet {outlet0}, and the product goes on by {onward}, so "
-                    "what the step recovers is what the split does not send to outlet 0")
+            how += (f", then one less it: the split is to outlet {split_to}, and the product goes on by {onward}, so "
+                    f"what the step recovers is what the split does not send to outlet {split_to}")
         st = binding.statistic(values)
         n = len(kept)
         span = f"{st.low:.4g}" if st.low == st.high else f"{st.low:.4g}–{st.high:.4g}"
@@ -1102,36 +1150,94 @@ def unit_scope(spec: TrainSpec, unit: TrainUnitSpec, chemicals: list[str], pool:
             source=BasisSource(kind="record", note=f"{n} record{'' if n == 1 else 's'} of {field}"), detail=detail)
     if pool_note:
         notes.append(pool_note)
+    # §5.R (part a), finding 6: a moisture content the class meets sets the
+    # water, and the class never reads a split of it: its candidates go (a
+    # record's, the class's table share, a flowsheet unit's), so it is served
+    # not read; a person's is refused by the resolve and the run.
+    water = _water_key(e)
+    if water in sources and _moisture_set(specs, sources, by_key):
+        sources[water] = {k: c for k, c in sources[water].items() if k == "waiting"}
     title = (f"Unit {unit.id} of train {spec.name}: {e.name} (" + (f"BioSTEAM's {e.biosteam}" if e.biosteam
                                                                    else f"in-house {e.inhouse}") + ")")
 
     def refuses(values: list[ParameterValue]) -> str | None:
+        moist = _moisture_refusal(unit.id, e, values)
         waiting = [v for v in values if v.origin == "waiting" and _required(e, v.key)]
         if waiting:
-            return None
-        said = catalogue.unmet(e.id, {v.key: v.value for v in values})
+            return moist
+        said = [*([moist] if moist else []), *catalogue.unmet(e.id, {v.key: v.value for v in values})]
         return "; ".join(said) if said else None
 
     sides = {p.name for p in _side_ports(e)}
 
     def unread(values: list[ParameterValue]) -> dict[str, str]:
-        """A side inlet's flow nobody typed is absent from it; a
+        """A side inlet's flow nobody typed is absent from it; a split of
+        water beside a moisture content the class meets is the moisture's; a
         per-component key nobody set, once its template has a value, is left
         to the class."""
         given_ = {v.key: v.value for v in values}
+        moisture = next((v for v in values if v.key == "moisture_content" and v.value is not None), None)
         out = {}
         for v in values:
             base = v.key.partition(catalogue.SEP)[0]
             if base in sides:
                 out[v.key] = f"absent from the {base} inlet: a component nobody typed is not in it"
+            elif v.key == water and moisture is not None:
+                out[v.key] = _moisture_words(e, moisture)
             elif base == "split" and any(k.startswith(f"split{catalogue.SEP}") and x is not None
                                          for k, x in given_.items()):
                 out[v.key] = ("set by no record or person: BioSTEAM reads a component a split does not name as none "
-                              f"of it to outlet {outlet0}")
+                              f"of it to outlet {split_to}, so all of it leaves by {split_rest}")
         return out
 
     return UnitScope(unit, e, params.Provided(title=title, specs=specs, sources=sources, notes=notes, refuses=refuses,
                                               unread=unread), given, refused, read_from)
+
+
+def _water_key(e: catalogue.Entry) -> str | None:
+    """The split key a moisture content the class meets sets in its place."""
+    return f"split{catalogue.SEP}{e.moisture_sets}" if e.moisture_sets else None
+
+
+def _moisture_set(specs: list[ParameterSpec], sources: dict[str, dict[str, ParameterValue | None]],
+                  by_key: dict[str, Override]) -> bool:
+    """Whether a unit's moisture content resolves to a value: a person's, or
+    the first source its rule finds (a record's, the class's own default)."""
+    o = by_key.get("moisture_content")
+    if o is not None:
+        return o.value is not None
+    spec = next((s for s in specs if s.key == "moisture_content"), None)
+    cands = sources.get("moisture_content") or {}
+    for entry in spec.sourceRule if spec is not None else ():
+        c = cands.get(entry)
+        if c is not None:
+            return c.value is not None
+    return False
+
+
+def _whose(v: ParameterValue) -> str:
+    return {"library-default": "the class's own default", "record": "its records'",
+            "assumption": f"{v.overriddenBy}'s"}.get(v.origin, f"its {v.origin}")
+
+
+def _moisture_words(e: catalogue.Entry, moisture: ParameterValue) -> str:
+    return (f"not read: the moisture content sets the water ({moisture.value:.4g}, {_whose(moisture)}): {e.cls} moves "
+            f"{e.moisture_sets} between its outlets to meet it and never reads a split of {e.moisture_sets}")
+
+
+def _moisture_refusal(unit_id: str, e: catalogue.Entry, values: list[ParameterValue]) -> str | None:
+    """A person's split of water beside a moisture content the class meets,
+    refused in words: the class would never read it, and a basis naming it
+    as applied would misstate the run (§5.R part a, finding 6)."""
+    key = _water_key(e)
+    by = {v.key: v for v in values}
+    v, moisture = by.get(key or ""), by.get("moisture_content")
+    if v is None or v.origin != "assumption" or moisture is None or moisture.value is None:
+        return None
+    return (f"unit {unit_id}: {key} is {v.overriddenBy}'s, and the moisture content ({moisture.value:.4g}, "
+            f"{_whose(moisture)}) sets the {e.moisture_sets}: BioSTEAM's {e.cls} moves {e.moisture_sets} between its "
+            f"outlets to meet the moisture and never reads a split of it; reset {key} to its source, or set the "
+            "moisture content in its place")
 
 
 def _required(e: catalogue.Entry, key: str) -> bool:
@@ -1288,6 +1394,9 @@ def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | No
         except params.ParamRefused as e:
             refusals.append((unit.id, f"unit {unit.id}: {e}"))
             continue
+        moist = _moisture_refusal(unit.id, got.entry, values)
+        if moist:
+            refusals.append((unit.id, moist))
         refusals += [(unit.id, w) for w in _waiting_words(f"unit {unit.id} ({got.entry.id})",
                                                           [v for v in values if _required(got.entry, v.key)])]
         refusals += [(unit.id, f"unit {unit.id}: {w}")
@@ -1377,20 +1486,32 @@ def _class_default(src: BasisSource) -> bool:
 
 
 def _prefixed(inputs: list[BasisInput], prefix: str) -> dict[str, BasisInput]:
+    """A place's inputs by name, the prefix taken off. A value's records share
+    one name (`<key> record`, one a record), so this keeps the last of them:
+    read the records through `_prefixed_all`."""
     return {i.name[len(prefix):]: i for i in inputs if i.name.startswith(prefix)}
+
+
+def _prefixed_all(inputs: list[BasisInput], prefix: str) -> list[tuple[str, BasisInput]]:
+    """A place's inputs in the basis's order, the prefix taken off, every one
+    kept: each record that bound a value among them (§5.R part a, findings 2
+    and 9)."""
+    return [(i.name[len(prefix):], i) for i in inputs if i.name.startswith(prefix)]
 
 
 _SUFFIXES = (" low", " high", " record")
 
 
-def _values(given: dict[str, BasisInput], spec_of: Any) -> list[ParameterValue]:
-    """A place's values as its basis holds them, each with its source."""
+def _values(given: list[tuple[str, BasisInput]], spec_of: Any) -> list[ParameterValue]:
+    """A place's values as its basis holds them, each with its source and
+    every record that bound it."""
+    by_name = dict(given)
     out = []
-    for key, i in given.items():
+    for key, i in given:
         if key.endswith(_SUFFIXES):
             continue
-        records = [str(x.value) for k, x in given.items() if k == f"{key} record"]
-        low, high = given.get(f"{key} low"), given.get(f"{key} high")
+        records = [str(x.value) for k, x in given if k == f"{key} record"]
+        low, high = by_name.get(f"{key} low"), by_name.get(f"{key} high")
         kind = i.source.kind
         origin = ("record" if records else "assumption" if kind == "assumption" else
                   "library-default" if kind == "model" else "convention" if kind == "convention" else "artifact")
@@ -1450,16 +1571,29 @@ def purity_of(streams: list[dict[str, Any]], product: str, product_stream: str |
                            "mass, read from the stream table; a stream carrying nothing has no share"))
 
 
+def _passed_templates(e: catalogue.Entry, mine: dict[str, BasisInput]) -> set[str]:
+    """The per-component templates of which a run passes some key: a value
+    whose source is not the class's own default."""
+    per = catalogue.template_keys(e)
+    return {k.partition(catalogue.SEP)[0] for k, i in mine.items() if not k.endswith(_SUFFIXES)
+            and per.get(k.partition(catalogue.SEP)[0]) == "component" and catalogue.SEP in k
+            and not _class_default(i.source)}
+
+
 def _unit_request(u: TrainUnitSpec, e: catalogue.Entry, mine: dict[str, BasisInput]) -> dict[str, Any]:
     """One unit as the worker builds it, from its values as a run's basis
     holds them (`mine`, by key): a value whose source is the class's own
-    default is left to the class; a side inlet's flows by chemical; every
-    other value passed."""
+    default is left to the class, but for a per-component template some key
+    of which is passed: then every key of it the basis holds goes, the
+    class's own shares too, since BioSTEAM drops the whole default table
+    (the pressure filter's) once any share is given (§5.R part a); a side
+    inlet's flows by chemical; every other value passed."""
     sides = {p.name for p in _side_ports(e)}
+    whole = _passed_templates(e, mine)
     values: dict[str, Any] = {}
     side_flows: dict[str, dict[str, float]] = {}
     for key, i in mine.items():
-        if key.endswith(_SUFFIXES) or _class_default(i.source):
+        if key.endswith(_SUFFIXES) or (_class_default(i.source) and key.partition(catalogue.SEP)[0] not in whole):
             continue
         base, _, item = key.partition(catalogue.SEP)
         if base in sides and item:
@@ -1467,6 +1601,40 @@ def _unit_request(u: TrainUnitSpec, e: catalogue.Entry, mine: dict[str, BasisInp
         else:
             values[key] = i.value
     return {"id": u.id, "type": e.id, "values": values, "outlets": routes(u, e), "sides": side_flows}
+
+
+def _split_notes(u: TrainUnitSpec, e: catalogue.Entry, mine: dict[str, BasisInput], chems: list[str]) -> list[str]:
+    """What a run says of a unit's split, as the class reads what the run
+    passed (§5.R part a, findings 1, 5, 6 and 7): a component nobody set is
+    none of it to the outlet the split goes to, and all of it to the rest; a
+    class's own table fills every share when none is passed, and gives the
+    others when one is; a moisture content sets the water."""
+    if not any(p.key == "split" and p.per == "component" for p in e.params):
+        return []
+    to, rest = catalogue.split_outlets(e)
+    moisture = mine.get("moisture_content")
+    water = _water_key(e) if moisture is not None and moisture.value is not None else None
+    keys = {k: i for k, i in mine.items() if k.startswith(f"split{catalogue.SEP}") and not k.endswith(_SUFFIXES)}
+    passed = sorted(k for k, i in keys.items() if not _class_default(i.source))
+    table = sorted(k for k, i in keys.items() if _class_default(i.source))
+    unset = [f"split{catalogue.SEP}{c}" for c in chems if f"split{catalogue.SEP}{c}" not in keys
+             and f"split{catalogue.SEP}{c}" != water]
+    shares = ", ".join(f"{k} {float(keys[k].value):.4g}" for k in table)  # type: ignore[arg-type]
+    out = []
+    if table and not passed:
+        out.append(f"Unit {u.id}: no record or person set its split; BioSTEAM fills each component's from {e.cls}'s own "
+                   f"table, read in the worker: {shares}.")
+    elif table:
+        out.append(f"Unit {u.id}: {', '.join(passed)} set by a record or a person; every other share is {e.cls}'s own "
+                   f"table's ({shares}), passed with it, since BioSTEAM drops its whole table once any share is given.")
+    if unset and passed:
+        out.append(f"Unit {u.id}: no record or person set {', '.join(unset)}; BioSTEAM reads a split that does not "
+                   f"name a component as none of it to outlet {to}, so all of it leaves by {rest}.")
+    if water and e.moisture_sets in chems:
+        out.append(f"Unit {u.id}: the moisture content ({float(moisture.value):.4g}) sets the {e.moisture_sets}: "  # type: ignore[union-attr,arg-type]
+                   f"{e.cls} moves {e.moisture_sets} between its outlets to meet it and never reads a split of "
+                   f"{e.moisture_sets}, so none is passed.")
+    return out
 
 
 def worker_units(art: Artifact) -> dict[str, Any]:
@@ -1514,16 +1682,10 @@ def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
         e = catalogue.entry(u.type)
         mine = _prefixed(inputs, f"{u.id}{catalogue.SEP}")
         units.append(_unit_request(u, e, mine))
-        vals = _values(mine, _spec_of(e))
+        vals = _values(_prefixed_all(inputs, f"{u.id}{catalogue.SEP}"), _spec_of(e))
         parameters.append(TrainUnitParameters(unit=u.id, type=e.id, unitClass=e.cls, values=vals))
         flags += [f"unit {u.id}: {v.outOfBounds}" for v in vals if v.outOfBounds]
-        per = [p.key for p in e.params if p.per == "component" and p.key in ("split",)]
-        for t in per:
-            unset = [c for c in chems if f"{t}{catalogue.SEP}{c}" not in mine]
-            if unset:
-                notes.append(f"Unit {u.id}: no record or person set {', '.join(f'{t}.{c}' for c in unset)}; BioSTEAM "
-                             f"reads a split that does not name a component as none of it to outlet "
-                             f"{_out_ports(e)[0].name}.")
+        notes += _split_notes(u, e, mine, chems)
         if e.biosteam == "DrumDryer":
             notes.append(f"Unit {u.id} is BioSTEAM's DrumDryer, which burns its fuel without taking the oxygen from its "
                          "gas: its outlets carry that oxygen's mass beyond its inlets (pureOS §5.1). No product is "
@@ -1580,7 +1742,8 @@ def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
         harvestHour=float(given["harvest_hour"].value) if "harvest_hour" in given else None,  # type: ignore[arg-type]
         T=built["T"], P=built["P"], phase=built["phase"], absent=str(absent.value) if absent and absent.value else None,
         notes=inlet_notes)
-    flags += [f"the inlet: {v.outOfBounds}" for v in _values(given, _inlet_spec_of) if v.outOfBounds]
+    flags += [f"the inlet: {v.outOfBounds}" for v in _values(_prefixed_all(inputs, f"{INLET}{catalogue.SEP}"),
+                                                             _inlet_spec_of) if v.outOfBounds]
     return {
         "train": spec.model_dump(mode="json"), "flowsheet": None,
         "tablesSource": said["tablesSource"], "streams": said["streams"], "units": said["units"],

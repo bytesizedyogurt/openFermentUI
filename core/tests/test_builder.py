@@ -214,7 +214,7 @@ def test_a_runs_train_takes_every_unit_the_product_passes_through_by_its_class(s
     by = {u.id: u for u in spec.units}
     assert by["D1"].outlets == {"distillate": "onward", "bottoms": "waste"}
     # The sieve's water-rich share runs back to the mixer before the rectifier, which takes several streams.
-    assert by["U1"].outlets == {"product": "recycle:M2", "regenerate": "onward"}
+    assert by["U1"].outlets == {"regenerate": "recycle:M2", "product": "onward"}
     # Each unit reads its values from the flowsheet's own unit of the same id.
     assert all(u.readFrom is not None and u.readFrom.flowsheet == "ethanol_glucose_v0" and u.readFrom.unit == u.id
                for u in spec.units)
@@ -293,6 +293,54 @@ def test_the_from_run_endpoint_answers_200_404_and_422_and_starts_no_simulator(c
     assert client.post("/api/pureos/train/from-run", json={"artifactId": RUN_ID, "units": []}).status_code == 422
 
 
+def test_a_composite_runs_train_reads_no_unit_of_the_composite_and_takes_its_train_runs_own(store, worker, no_pool,
+                                                                                             monkeypatch):
+    """Findings 3, 14 and 24 (§5.R part a): a `custom_train_v1` run's units
+    are its fermenter's and its train run's, and the worker reads no unit of
+    the composite; a train read from it reads none either, takes each unit's
+    named records and flowsheet unit from the train run the composite names,
+    says so, and checks clean. `validate` refuses a unit reading a flowsheet
+    built from parts."""
+    # The worker refuses the composite's units, as the real one does.
+    real_answer = worker.__class__.__call__
+
+    def refuse_composite(self, op, args):
+        if op == "flowsheet_unit_values" and args["flowsheet"] == "custom_train_v1":
+            from openferment_core.workers import WorkerError
+
+            raise WorkerError("Refused: custom_train_v1 is built from a vessel design and a train run: its units are "
+                              "the fermenter and that train's own, read from the train run")
+        return real_answer(self, op, args)
+
+    monkeypatch.setattr(worker.__class__, "__call__", refuse_composite)
+    # The train run the composite names: D1, D2 and U1, read from the package's own units.
+    reads = {"D1": "D302", "D2": "D303", "U1": "U301"}
+    train_run = pureos.run_train(spec_of(units=[
+        {"id": uid, "type": "molecular-sieve" if uid == "U1" else "distillation",
+         "readFrom": {"flowsheet": "ethanol_glucose_v0", "unit": pkg},
+         "params": {"k": typed(2.0)} if uid != "U1" else {},
+         "outlets": {"regenerate": "waste", "product": "onward"} if uid == "U1" else {}}
+        for uid, pkg in reads.items()]))
+    composite = _keep(flowsheet="custom_train_v1", scenario=None)
+    composite.inputs.append(BasisInput(name="train run", value=train_run.artifactId, unit="", source=BasisSource(
+        kind="artifact", id=train_run.artifactId)))
+    (artifacts.folder() / f"{RUN_ID}.json").write_text(composite.model_dump_json(), encoding="utf-8")
+    got = pureos.from_run(RUN_ID)
+    by = {u.id: u for u in got.train.units}
+    assert not [u.id for u in got.train.units if u.readFrom is not None and u.readFrom.flowsheet == "custom_train_v1"]
+    assert {uid: (u.readFrom.flowsheet, u.readFrom.unit) for uid, u in by.items() if u.readFrom is not None} == {
+        uid: ("ethanol_glucose_v0", pkg) for uid, pkg in reads.items()}
+    assert any(train_run.artifactId in n and "custom_train_v1" in n for n in got.notes), got.notes
+    assert got.refusals == []
+    checked = pureos.check_train(got.train)
+    assert not any("built from a vessel design" in w for w in checked.refusals), checked.refusals
+    # A unit that reads a flowsheet built from parts is refused in words.
+    bad = TrainSpec.model_validate({**got.train.model_dump(), "units": [
+        {**got.train.units[0].model_dump(), "readFrom": {"flowsheet": "custom_train_v1", "unit": "P1"}},
+        *(u.model_dump() for u in got.train.units[1:])]})
+    assert any("built from a vessel design and a train run" in w for w in pureos.validate(bad)), pureos.validate(bad)
+
+
 # ── the real worker (sim) ──────────────────────────────────────────────
 
 
@@ -312,10 +360,42 @@ def test_a_shelf_runs_train_read_from_the_run_gives_the_packages_own_purity(real
     assert spec.inlet.streamId == "beer" and got.refusals == []
     unmapped = {m.unitId: m.unitClass for m in got.unmapped}
     assert unmapped.get("R1") == "Fermenter" and unmapped.get("H302") == "HXprocess"
-    # The sieve's water-rich share runs back before the rectifier, as the package recycles it.
-    assert by["U301"].outlets["regenerate"] == "onward" and by["U301"].outlets["product"].startswith("recycle:")
+    # The sieve's water-rich share runs back before the rectifier, as the package recycles it: BioSTEAM's
+    # MolecularSieve sends its split to outlet 0, the regenerate, and the dehydrated ethanol goes on by outlet 1,
+    # the product (§5.R part a, finding 8).
+    assert by["U301"].outlets["product"] == "onward" and by["U301"].outlets["regenerate"].startswith("recycle:")
+    from openferment_core.models import ParamResolveRequest
+    from openferment_core import params
+    from openferment_core.pureos import catalogue
+
+    sieve = {x.key: x for x in params.scope(f"pureos:unit:{spec.id}:U301", ParamResolveRequest(train=spec)).values}
+    assert sieve["split.Ethanol"].value < sieve["split.Water"].value  # the package's: outlet 0 is water-rich
+    ports = {p.name: p for p in catalogue.entry("molecular-sieve").ports if p.side == "out"}
+    assert ports["product"].onward and "dehydrated" in ports["product"].what
+    assert "dehydrated" not in ports["regenerate"].what
     assert pureos.check_train(spec).ok
     out = pureos.run_train(spec)
     package = next(s for s in proforma.tables_of(run).streams if s.id == "ethanol")
     assert out.purity.productFraction == pytest.approx(package.massFlows["Ethanol"] / package.massFlow, rel=MEASURED)
     assert out.units and out.unitOrder == [u.id for u in out.units]
+
+
+@pytest.mark.sim
+def test_a_composite_runs_train_reads_no_unit_of_the_composite_on_the_real_worker(real, monkeypatch):
+    """Findings 3, 14 and 24 (§5.R part a), on the real worker: a train read
+    from a `custom_train_v1` run (an NREL vessel and the three-unit train)
+    reads no unit of the composite, which the worker refuses to read, so no
+    unit of it is held for that; what the train run's units took from a
+    person is named in its notes, and waits for a person here."""
+    from openferment_core.pureos import train_spec
+    from test_custom_train import POOL, _sim_parts, request
+
+    monkeypatch.setattr(train_spec, "_UNITS", {})
+    p = _sim_parts(False)
+    composite = proforma.run(request(p, samples=1), pool=POOL)
+    got = pureos.from_run(composite.artifactId)
+    assert [u.id for u in got.train.units] == ["C1", "F1", "D1"]
+    assert all(u.readFrom is None for u in got.train.units) and got.refusals == []
+    assert any(p.train in n and "custom_train_v1" in n and "not carried" in n for n in got.notes), got.notes
+    checked = pureos.check_train(got.train)
+    assert not any("built from a vessel design" in w for w in checked.refusals), checked.refusals

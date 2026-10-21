@@ -187,6 +187,16 @@ class Entry:
     needs: tuple[tuple[tuple[tuple[str, ...], ...], str], ...] = ()
     notes: tuple[str, ...] = ()
     maps: tuple[str, ...] = ()
+    # OF-BLD-020 §5.R (part a): the outlet a per-component split sends its
+    # share to, as the class's own `_run` sends it (None: the first outlet,
+    # BioSTEAM's reading for its splitters and solids separators; the drum
+    # dryer's `split_to(hot_air, dry_solids, split)` sends it to its hot gas).
+    split_to: str | None = None
+    # The chemical whose split the class never reads while a moisture content
+    # is set: it moves that chemical between its outlets to meet the moisture
+    # (SolidsSeparator._run zeroes its split; DrumDryer._run adjusts it after
+    # the split), so a split of it is not read (finding 6).
+    moisture_sets: str | None = None
 
     @property
     def cls(self) -> str:
@@ -226,6 +236,8 @@ _MOISTURE_ID = ("moisture_ID", "the chemical the moisture content is of: BioSTEA
                                "moisture is water")
 _STRICT = ("strict_moisture_content", "a check switch: whether BioSTEAM refuses a cake that cannot hold the moisture "
                                       "asked; left to the class")
+_MOISTURE_SETS = ("The moisture content sets the water: BioSTEAM moves water between the outlets to meet it and "
+                  "never reads a split of water, so split.Water is not read while a moisture content is set (§5.R).")
 
 
 def _moisture(rule: tuple[str, ...] = ("record:cake_moisture", "assumption", "library-default"),
@@ -338,7 +350,8 @@ UNIT_TYPES: tuple[Entry, ...] = (
         ports=(_in(many=True), _out("cake", "the solids-rich cake: each component's split"),
                _out("liquid", "the liquid: the rest", onward=True)),
         notes=("The liquid goes on by default, as it does for a product in solution; a train routes the cake on for a "
-               "product held in the cells.",),
+               "product held in the cells.", _MOISTURE_SETS),
+        moisture_sets=SOLVENT,
     ),
     # ── clarification ────────────────────────────────────────────────────
     Entry(
@@ -349,13 +362,17 @@ UNIT_TYPES: tuple[Entry, ...] = (
             _moisture(rule=("record:cake_moisture", "assumption", "library-default")),
             _split("the share of each component's flow that stays in the retentate, the cake (outlet 0)",
                    rule=("record:step_recovery", "assumption", "library-default"),
-                   note=("Per component: a key split.<chemical> for each chemical of the train. Unset, BioSTEAM fills "
-                         "each component's split from its own table (PressureFilter._init's, of the NREL corn stover "
-                         "design), read on the train's chemicals when a unit is built (§5.2).")),
+                   note=("Per component: a key split.<chemical> for each chemical of the train. Unset, each "
+                         "component's split is the class's own table share (PressureFilter._init's, of the NREL corn "
+                         "stover design), read in the worker from a filter built with its split unset on the program's "
+                         "chemicals. BioSTEAM drops its whole table once any share is given, so a run that sets one "
+                         "share passes every other at the table's own (§5.R).")),
         ),
         needs=(),
         ports=(_in(many=True), _out("retentate", "the cake"), _out("filtrate", "what passes the cloth", onward=True)),
-        notes=("BioSTEAM costs the filter as the NREL corn stover design's filter press and its tanks and pumps.",),
+        notes=("BioSTEAM costs the filter as the NREL corn stover design's filter press and its tanks and pumps.",
+               _MOISTURE_SETS),
+        moisture_sets=SOLVENT,
     ),
     Entry(
         id="rotary-vacuum-filtration", name="Rotary vacuum filter", stage="clarification",
@@ -369,6 +386,8 @@ UNIT_TYPES: tuple[Entry, ...] = (
         not_offered=(_ORDER, _MOISTURE_ID, _STRICT),
         needs=(((("split",),), "BioSTEAM requires the split"),),
         ports=(_in(many=True), _out("retentate", "the cake"), _out("permeate", "the filtrate", onward=True)),
+        notes=(_MOISTURE_SETS,),
+        moisture_sets=SOLVENT,
     ),
     Entry(
         id="clarifier", name="Clarifier", stage="clarification", biosteam="Clarifier", cost_model=True,
@@ -632,11 +651,13 @@ UNIT_TYPES: tuple[Entry, ...] = (
     Entry(
         id="molecular-sieve", name="Molecular sieve", stage="polish", biosteam="MolecularSieve", cost_model=True,
         line="adsorbs the water distillation cannot take past the azeotrope: each component splits between the "
-             "dehydrated product and the regenerate",
+             "regenerate the sieves release and the dehydrated product",
         params=(
-            _split("the share of each component's flow that leaves in the dehydrated product (outlet 0)",
+            _split("the share of each component's flow the sieves hold and release in the regenerate (outlet 0): the "
+                   "water they adsorb, and what goes with it; the rest leaves as the dehydrated product (outlet 1)",
                    rule=("assumption",), note=("Per component: a key split.<chemical> for each chemical of the train. "
-                                               "BioSTEAM's split, which the class requires and gives no default for.")),
+                                               "BioSTEAM's split, to outlet 0, which the class requires and gives no "
+                                               "default for.")),
             Param("approx_duty", "Approximate duty", "whether BioSTEAM adds the regeneration's heating and cooling "
                   "duties by its own per-flow rule", "choice", "", "Conditions", DEFAULT, (None, None, _WORDS),
                   choices=BOOL),
@@ -644,8 +665,11 @@ UNIT_TYPES: tuple[Entry, ...] = (
         not_offered=(_ORDER, ("P", "MolecularSieve._init sets P to None whatever it is passed (read from its code), so "
                                    "the outlets leave at the feed's pressure")),
         needs=(((("split",),), "BioSTEAM requires the split"),),
-        ports=(_in(), _out("product", "the dehydrated product: each component's split", onward=True),
-               _out("regenerate", "the water the sieves release, with what goes with it")),
+        ports=(_in(), _out("regenerate", "the water the sieves adsorb and release, with what goes with it: each "
+                                         "component's split"),
+               _out("product", "the dehydrated product: the rest", onward=True)),
+        notes=("BioSTEAM's MolecularSieve sends its split to outlet 0, and biorefineries' ethanol plant uses it for the "
+               "water-rich regenerate it recycles to the rectifier; the dehydrated ethanol leaves by outlet 1 (§5.R).",),
     ),
     Entry(
         id="crystallisation", name="Batch crystalliser", stage="polish", biosteam="BatchCrystallizer", cost_model=True,
@@ -721,6 +745,10 @@ UNIT_TYPES: tuple[Entry, ...] = (
                _side("fuel", "the natural gas, which the unit sizes to meet the heat", "unit"),
                _out("dried", "the dried solids", onward=True), _out("hot-gas", "the gas, with the water"),
                _out("emissions", "the burnt fuel's gas")),
+        notes=("DrumDryer._run sends its split to the hot gas (outlet 1): a component the split does not name stays in "
+               "the dried solids (§5.R).", _MOISTURE_SETS),
+        split_to="hot-gas",
+        moisture_sets=SOLVENT,
     ),
     # ── utility ──────────────────────────────────────────────────────────
     Entry(
@@ -873,6 +901,16 @@ def entry(type_id: str) -> Entry:
 
 def ids() -> list[str]:
     return list(BY_ID)
+
+
+def split_outlets(e: Entry) -> tuple[str, str | None]:
+    """The outlet a unit's per-component split sends its share to, and the
+    one a component the split does not name leaves by: the class's own
+    reading (`Entry.split_to`, else its first outlet; the rest to its first
+    other outlet, None for a unit of one outlet)."""
+    outs = [p.name for p in e.ports if p.side == "out"]
+    to = e.split_to or outs[0]
+    return to, next((n for n in outs if n != to), None)
 
 
 # ── what the service serves without BioSTEAM ──────────────────────────
@@ -1078,6 +1116,19 @@ def worker_specs(type_id: str) -> dict[str, Any]:
         if type_id not in _SPECS:
             _SPECS[type_id] = proforma.call("catalogue_specs", {"type": type_id})
         return _SPECS[type_id]
+
+
+def component_defaults(type_id: str) -> dict[str, tuple[dict[str, float], str]]:
+    """The per-component defaults a class fills itself when none is given
+    (PressureFilter's split table), by template key: each chemical's share
+    and where it was read, as the worker read them (`read_class`), or none
+    (OF-BLD-020 §5.R part a)."""
+    out: dict[str, tuple[dict[str, float], str]] = {}
+    for key, d in (worker_specs(type_id).get("defaults") or {}).items():
+        table = (d or {}).get("byComponent")
+        if isinstance(table, dict) and table:
+            out[key] = ({str(c): float(x) for c, x in table.items()}, str(d.get("from") or "its code"))
+    return out
 
 
 def _bounds(p: Param, ws: dict[str, Any]) -> tuple[float | None, str] | None:
@@ -1311,6 +1362,18 @@ def _refuses(cls: Any, name: str) -> dict[str, Any] | None:
             "from": f"{cls.__name__}.{name}'s setter raises ValueError at or below it (read from its code)"}
 
 
+def _own_split(cls: Any, name: str, chemicals: list[str]) -> dict[str, float]:
+    """In the worker: the split a class fills itself when built with it
+    unset, by chemical, read from a unit built so on a flowsheet of its own
+    (the thermo set is the worker's)."""
+    import biosteam as bst
+
+    with bst.Flowsheet("pureos_catalogue_own_split"):
+        unit = cls(None, **{name: None})
+        got = dict(zip(unit.chemicals.IDs, (float(x) for x in getattr(unit, name))))
+    return {c: got[c] for c in chemicals if c in got}
+
+
 def read_class(type_id: str, cls: Any, chemicals: list[str]) -> dict[str, Any]:
     """In the worker: what the class takes and gives, read from its code at
     import — its constructor's parameters and their defaults, the class
@@ -1338,6 +1401,12 @@ def read_class(type_id: str, cls: Any, chemicals: list[str]) -> dict[str, Any]:
     for p in e.params:
         if p.per or p.how:
             defaults[p.key] = {"value": None, "from": (f"{cls.__name__}'s {p.bst}, " + (p.how or "per " + str(p.per)))}
+            if p.per == "component" and p.bst == "split" and "library-default" in p.rule:
+                # §5.R (part a): a class that fills its split itself when none
+                # is given (PressureFilter's table) is read by component.
+                defaults[p.key] = {"value": None, "byComponent": _own_split(cls, p.bst, chemicals), "from": (
+                    f"{cls.__name__}._init's own table in place of None, read from a {cls.__name__} built with its "
+                    f"{p.bst} unset on the program's chemicals")}
             continue
         got = attributes.get(p.bst) if p.via == "attribute" else constructor.get(p.bst)
         defaults[p.key] = got or {"value": None, "from": f"{cls.__name__} names no {p.bst}"}

@@ -188,14 +188,18 @@ BioSTEAM*).
 
 | Tool | In | Out |
 |---|---|---|
-| `pureos_build` | `action` (`new`, `add_unit`, `remove_unit`, `set_from_record`, `run` or `propose`) and the fields that action takes, every one a string, a list of strings or a word: `product` (the product's id, `ethanol`) and `inletRef` for `new` and `propose`; `trainId` for every other action; `unitType` (a catalogue unit type's id) and `afterUnitId` (`inlet` for the first place, empty for the end) for `add_unit`; `unitId` for `remove_unit` and `set_from_record`; `recordsByParam` (a parameter's key on the unit to the record ids that bind it, exactly those records) for `set_from_record` | `new`, `add_unit`, `remove_unit`, `set_from_record` and `propose`: the train as kept, in ids and words (its id, product, program, inlet, each unit's id, type, class and routing, how many records are named for each key, who made it, when) and `toRun`, the validation's words for what still stops it running. `run`: the run as one evidence id (the `pureos.train_run` artifact's id; its value the overall recovery of the product to the product stream), each unit's recovery and the overall to four significant digits, the product's share of the product stream, what bound each parameter counted by origin (never a value), the flags and notes cut; the whole run in `ToolResult.data`, which no model reads. A refusal is in the service's words |
+| `pureos_build` | `action` (`new`, `add_unit`, `remove_unit`, `set_from_record`, `run` or `propose`) and the fields that action takes, every one a string, a list of strings or a word: `product` (the product's id, `ethanol`; for `new` empty takes a simulation inlet's own product, for `propose` it is required) and `inletRef` for `new` (a simulation, a vessel design or a run's stream) and for `propose` (a simulation or a run's stream, or empty for none); `host` for `propose`; `trainId` for every other action; `unitType` (a catalogue unit type's id) and `afterUnitId` (`inlet` for the first place, empty for the end) for `add_unit`; `unitId` for `remove_unit` and `set_from_record`; `recordsByParam` (a parameter's key on the unit to the record ids that bind it, exactly those records) for `set_from_record` | `new`, `add_unit`, `remove_unit`, `set_from_record` and `propose`: the train as kept, in ids and words (its id, product, program, inlet, each unit's id, type, class and routing, how many records are named for each key, who made it, when) and `toRun`, what a run of it would refuse now in the run's own words (`train_spec.check_train`: the validation's refusals, then each value that waits and each need of a unit; empty when the run would go), with `toRunNote` saying the values were not checked, and why, when the Proforma simulator cannot answer. `run`: the run as one evidence id (the `pureos.train_run` artifact's id; its value the overall recovery of the product to the product stream), each unit's recovery and the overall to four significant digits, the product's share of the product stream, what bound each parameter counted by origin (never a value), the flags and notes cut; the whole run in `ToolResult.data`, which no model reads. A refusal is in the service's words |
 
-The inlet a model names (`inletRef`): a kept simulation's artifact id (its
-broth at harvest, D10; its broth flow then waits for a person's value), a kept
-vessel design's (the harvest of the simulation it was designed for, the broth
-flow read from the design), or a kept run's stream as
+The inlet a model names for `new` (`inletRef`): a kept simulation's artifact
+id (its broth at harvest, D10; its broth flow then waits for a person's
+value), a kept vessel design's (the harvest of the simulation it was designed
+for, the broth flow read from the design), or a kept run's stream as
 `<artifact id>/<stream id>` (a `proforma.run`, `proforma.reference` or
-`pureos.train_run`; `stream_table` lists a Proforma run's streams). The train
+`pureos.train_run`; `stream_table` lists a Proforma run's streams). For
+`propose` it is what the proposer takes (OF-BLD-020 §5.R, findings 19 and
+32): a kept simulation's id or a run's stream, or empty for an inlet a person
+types; a vessel design's id is refused there, and `propose` names its
+product, never empty. The train
 belongs to its inlet's program, else to the one active program, said so; only
 the yeast program has a chemical set, and a product thermosteam's `CHEMICALS`
 does not name is refused. A unit a model adds takes the catalogue's own
@@ -235,7 +239,11 @@ gitignored, on this machine alone and not on the data branch, written through
 `pureos.kept.keep_train` alone: every read-modify-write under the store's
 thread lock and file lock, through `atomic.write_text`.
 `GET /api/pureos/trains-kept?includeArchived=` lists them, the most recently
-changed first, the switch honoured by the train's program.
+changed first, the switch honoured by the train's program. pureOS's index
+lists them under *Made by Postdoc* (name, product, units, the model, when,
+and the newest run joined by its `trainId`), and **Open a copy** opens one in
+the Builder as a new train of that browser (`/pureos/build/new?copy=<id>`):
+the kept train stays the model's (OF-BLD-020 §5.R).
 
 It is a free write: BioSTEAM's compute, no model money, **at no gate**
 (`gates.py` is unchanged), every action audited like every module write
@@ -248,10 +256,19 @@ calls to `pureos.kept.keep_train` and `pureos.train_spec.run_train` there
 (both in `ALLOWED_WRITES`, `pureos.kept` and `pureos.train_spec` among the
 stores rule 2 polices). Rule 2b finds the kept store's writer from its file
 name (`KEPT_STORES`): every function of a module naming `pureos-trains.json`
-that writes through `atomic`, and every function reaching one, which no tool
-file but `writes.py` may reach. Postdoc's loop never serves `pureos_build` or
+that writes through `atomic`, every function anywhere that writes through
+`atomic` and names the store by its module's path function or constant
+(`kept.path()`, `kept.FILE`; OF-BLD-020 §5.R, finding 18), and every function
+reaching one, which no tool file but `writes.py` may reach. A tool file
+writes no file itself: it may not reach `atomic.write_text` or `write_bytes`,
+nor call a path's or a handle's write, a dump, a file made, moved or taken
+away, or `open` with a mode that writes. Postdoc's loop never serves `pureos_build` or
 `pureos_write` from its per-question cache (`postdoc_agent.UNCACHED`): a
-train changes between calls, and its run is of the train as it stands.
+train changes between calls, and its run is of the train as it stands. After
+either goes through, the question's reads read the kept trains and the
+artifacts afresh and no module read cached before it is served again
+(`postdoc_agent.CHANGES_ROWS`, `module_stores.Stores.forget`; OF-BLD-020
+§5.R, finding 21), so `pureos_read` finds the train and its run as they stand.
 
 A run is cited like any computed value: its `Evidence` id is the artifact's,
 so `SeenSet` keeps it, and a claim citing a run no tool returned in this

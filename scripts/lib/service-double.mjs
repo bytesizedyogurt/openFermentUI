@@ -162,6 +162,8 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const thermoCalls = [];
   /** pureOS's proposals the browser asked for (OF-BLD-020 §7.2): each POST /api/pureos/propose body, as sent. */
   const pureosProposals = [];
+  /** OF-BLD-020 §5.R: each ask for the trains a model built (GET /api/pureos/trains-kept), by the switch it carried. */
+  const keptTrainAsks = [];
   /**
    * The parameter panel (OF-BLD-020 §2.2): each scope the browser asked for
    * (GET /api/params/{scope}, with its query) and each resolve it posted
@@ -682,6 +684,17 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         const id = asked.trainId ?? `from-${asked.artifactId}`;
         return sendJson(200, JSON.parse(JSON.stringify(read).split(words(`from-${asked.artifactId}`)).join(words(id))));
       }
+    }
+    // OF-BLD-020 §5.R — the trains a model built, kept on the service, as the
+    // real pureos.kept lists them (pureos-trains-kept.json, made by demo.py
+    // --prototype in a throwaway store): with the switch off, and, asked with
+    // ?includeArchived=true, on. Each ask is recorded.
+    if (url === '/api/pureos/trains-kept' && req.method === 'GET') {
+      const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
+      keptTrainAsks.push({ includeArchived: on });
+      const kept = await prototype('pureos-trains-kept.json');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(on ? kept.listedArchived : kept.listed));
     }
     const yeastTrain = (t) => t.scenarioId === 'sc-yeast-1' || t.program === 'yeast';
     if (url === '/api/pureos/trains' && req.method === 'GET') {
@@ -1277,5 +1290,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, pureosProposals, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, harvestReads, builderCalls, trainRunsOnFile, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, pureosProposals, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, harvestReads, builderCalls, trainRunsOnFile, keptTrainAsks, flags } };
 }
