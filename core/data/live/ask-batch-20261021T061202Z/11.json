@@ -1,0 +1,181 @@
+{
+  "question": "What is archived in this corpus, and how would I see the PHA work?",
+  "claims": [],
+  "gaps": [
+    "The PHA program is archived, so its papers, records, passages and rows are hidden from this question and no tool returns them. I did not search for or answer about PHA work.",
+    "To see the PHA work, use the archived-program switch the service names in its gap for this question. I have not confirmed that switch's name or what it reveals, so check it in the app.",
+    "I could not list what else is archived in the corpus. None of the other modules matched this question, and the archive listing is not something my tools return.",
+    "What the question names in PHA (PHA) is hidden: PHA is an archived program. Settings → Programs has the switch that shows archived programs; turn it on to include them."
+  ],
+  "declined": "The only archived material this question touches is the PHA program, and its contents are hidden from this question. I cannot describe the PHA work or confirm what the corpus archives until that program is shown through the app's archived-program switch.",
+  "usage": {
+    "inputTokens": 4,
+    "outputTokens": 641,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 23872,
+    "costUsd": 0.003305,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [],
+  "evidence": [],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 0",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0",
+          "PHA · found in archived program PHA (hidden)"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in none · found in archived program PHA (hidden)",
+      "ms": 4,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 0 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 0,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": [
+      {
+        "program": "pha",
+        "name": "PHA",
+        "entities": [
+          "PHA"
+        ],
+        "count": 0,
+        "modules": []
+      }
+    ]
+  },
+  "rows": [],
+  "runbookDraft": null
+}

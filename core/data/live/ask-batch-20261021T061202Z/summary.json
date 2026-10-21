@@ -1,0 +1,181 @@
+{
+  "rows": [
+    {
+      "n": 1,
+      "question": "What is the theoretical maximum ethanol yield on glucose according to the Yeast9 and iMM904 genome-scale models, and how close do measured ethanol yields come to it?",
+      "kept": 3,
+      "dropped": 5,
+      "toolCalls": 3,
+      "rounds": 2,
+      "seconds": 35.82,
+      "costUsd": 0.005257,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    },
+    {
+      "n": 2,
+      "question": "How does CEN.PK113-7D differ from S288C, according to the Saccharomyces Genome Database?",
+      "kept": 5,
+      "dropped": 2,
+      "toolCalls": 3,
+      "rounds": 2,
+      "seconds": 18.48,
+      "costUsd": 0.005788,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 5
+    },
+    {
+      "n": 3,
+      "question": "What maximum specific growth rate does wild-type Saccharomyces cerevisiae CEN.PK113-7D reach on glucose, and what biomass and ethanol yields go with it?",
+      "kept": 3,
+      "dropped": 1,
+      "toolCalls": 4,
+      "rounds": 3,
+      "seconds": 19.8,
+      "costUsd": 0.006038,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 3
+    },
+    {
+      "n": 4,
+      "question": "What minimum ethanol selling price does the NREL corn stover design report by Humbird et al. state, and how does the BioSTEAM benchmark of that design compare?",
+      "kept": 3,
+      "dropped": 1,
+      "toolCalls": 3,
+      "rounds": 2,
+      "seconds": 12.56,
+      "costUsd": 0.005077,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 2
+    },
+    {
+      "n": 5,
+      "question": "Which Monod saturation constants (Ks) and ethanol or substrate inhibition constants have been reported for Saccharomyces cerevisiae ethanol fermentation, and in which kinetic models?",
+      "kept": 6,
+      "dropped": 5,
+      "toolCalls": 6,
+      "rounds": 4,
+      "seconds": 29.94,
+      "costUsd": 0.008967,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 5
+    },
+    {
+      "n": 6,
+      "question": "What does openFerment hold on ethanol fermentation by Saccharomyces cerevisiae, and in which modules?",
+      "kept": 9,
+      "dropped": 1,
+      "toolCalls": 6,
+      "rounds": 3,
+      "seconds": 26.77,
+      "costUsd": 0.007665,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 6
+    },
+    {
+      "n": 7,
+      "question": "Which hosts in geneOS could make ethanol, which models sit on their pages, and what ceiling does each give on glucose?",
+      "kept": 5,
+      "dropped": 0,
+      "toolCalls": 6,
+      "rounds": 3,
+      "seconds": 16.23,
+      "costUsd": 0.005651,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    },
+    {
+      "n": 8,
+      "question": "Draft a runbook for a batch ethanol fermentation in CEN.PK113-7D on glucose, using the extracted yield records and the Yeast9 glucose ceiling as a bound.",
+      "kept": 7,
+      "dropped": 0,
+      "toolCalls": 9,
+      "rounds": 6,
+      "seconds": 39.35,
+      "costUsd": 0.010951,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 3
+    },
+    {
+      "n": 9,
+      "question": "What is waiting for a person on Home right now?",
+      "kept": 3,
+      "dropped": 0,
+      "toolCalls": 4,
+      "rounds": 4,
+      "seconds": 13.93,
+      "costUsd": 0.00529,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    },
+    {
+      "n": 10,
+      "question": "What does Proforma need before it can price ethanol from glucose on this evidence, and what does the corn stover benchmark give?",
+      "kept": 4,
+      "dropped": 1,
+      "toolCalls": 3,
+      "rounds": 2,
+      "seconds": 10.04,
+      "costUsd": 0.004407,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    },
+    {
+      "n": 11,
+      "question": "What is archived in this corpus, and how would I see the PHA work?",
+      "kept": 0,
+      "dropped": 0,
+      "toolCalls": 0,
+      "rounds": 1,
+      "seconds": 4.95,
+      "costUsd": 0.003305,
+      "stopped": "done",
+      "declined": "The only archived material this question touches is the PHA program, and its contents are hidden from this question. I cannot describe the PHA work or confirm what the corpus archives until that program is shown through the app's archived-program switch.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    }
+  ],
+  "costUsd": 0.068396
+}

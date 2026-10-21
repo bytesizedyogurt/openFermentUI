@@ -1,0 +1,236 @@
+{
+  "question": "Design a fermenter for that simulated batch and tell me how many vessels and what working volume it needs.",
+  "claims": [],
+  "gaps": [
+    "No batch simulation is kept in fermOS. A read of the fermOS simulation rows returned none, so there is no simulated batch to design a fermenter for. Please run a batch simulation (fermOS → Simulate, or fermos_simulate with the batch family and the strain and sugar named) and tell me which artifact it produced.",
+    "The vessel design needs a kept simulation or kinetic fit artifact id. None exists, so the design was not attempted. A write attempt without an artifact id was refused, which asked for one kept simulation or fit id.",
+    "A kinetic fit or a forecast could serve as the basis instead of a simulation. fermOS holds no fit or forecast artifacts either, so the same gap applies.",
+    "I did not create a simulation myself, because the question refers to one that already exists and I have no parameters or records to bind it."
+  ],
+  "declined": "The corpus holds no simulated batch to design a fermenter for. fermOS has no kept simulation, fit, forecast or vessel rows, and the plant scale that sets the vessel count and working volume is not on file.",
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 1327,
+    "cacheReadTokens": 72605,
+    "cacheWriteTokens": 25038,
+    "costUsd": 0.00452,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 0",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in none",
+      "ms": 8,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "fermos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "simulation",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read fermOS for simulation · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "fermos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "vessel",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read fermOS for vessel · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "fermos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "artifact",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read fermOS for artifact · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "fermos_write",
+      "input": {
+        "action": "design_vessel",
+        "target": "",
+        "fields": {
+          "simulationArtifact": "",
+          "fitArtifact": "",
+          "vesselType": "stirred-tank",
+          "klaMethod": ""
+        },
+        "note": "Attempted to check whether a vessel design could be made; no simulation artifact was named."
+      },
+      "summary": "fermos_write refused: name one kept simulation (simulationArtifact) or one kept kinetic fit (fitArtifact) by its artifact id, not both; fermos_read lists them",
+      "ms": 29,
+      "ok": false
+    },
+    {
+      "n": 6,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 0 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 0,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [],
+  "runbookDraft": null
+}

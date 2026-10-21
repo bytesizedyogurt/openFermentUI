@@ -1,0 +1,407 @@
+{
+  "question": "How does CEN.PK113-7D differ from S288C, according to the Saccharomyces Genome Database?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "According to the SGD strain entry, CEN.PK113-7D is a laboratory strain derived from the parental strains ENY.WA-1A and MC996A, and is popular for systems biology studies, whereas S288C is the reference-genome strain that Mortimer designed for biochemical studies.",
+      "recordIds": [],
+      "paperIds": [
+        "Q3",
+        "Q4"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q4:abstract:0",
+          "quote": "CEN.PK113-7D is a laboratory strain derived from parental strains ENY.WA-1A and MC996A, and is popular for use in systems biology studies."
+        },
+        {
+          "passageId": "Q3:abstract:0",
+          "quote": "S288C is a widely used laboratory strain, designed by Robert Mortimer for biochemical studies, and specifically selected to be non-flocculent with a minimal set of nutritional requirements."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "geneos/host/s-cerevisiae-cenpk113-7d",
+        "geneos/host/s-cerevisiae-s288c"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "According to the SGD strain entry, CEN.PK113-7D carries several duplicated chromosomal regions relative to S288C, including an enrichment of maltose metabolism genes.",
+      "recordIds": [],
+      "paperIds": [
+        "Q4"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q4:abstract:0",
+          "quote": "There are six duplicated regions in CEN.PK113-7D relative to S288C, two on chromosome II, and one each on chromosomes III, VII, VIII and XV, including an enrichment of maltose metabolism genes."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c3",
+      "text": "According to the SGD strain entry, CEN.PK113-7D is a biotin prototroph with genes required for biotin biosynthesis, whereas the SGD S288C genotype line lists biotin-related markers.",
+      "recordIds": [],
+      "paperIds": [
+        "Q3",
+        "Q4"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q4:abstract:0",
+          "quote": "CEN.PK113-7D is a biotin prototroph, and has genes required for biotin biosynthesis."
+        },
+        {
+          "passageId": "Q3:s1:0",
+          "quote": "MATα SUC2 gal2 mal2 mel flo1 flo8-1 hap1 ho bio1 bio6"
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c6",
+      "text": "According to the SGD strain entry, S288C does not form pseudohyphae and has a mutated copy of the HAP1 gene, which the entry says makes it a poor choice for mitochondrial studies.",
+      "recordIds": [],
+      "paperIds": [
+        "Q3"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q3:abstract:0",
+          "quote": "S288C does not form pseudohyphae. In addition, since it has a mutated copy of HAP1, it is not a good strain for mitochondrial studies."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c7",
+      "text": "According to the SGD strain entry, S288C is gal2-negative and does not use galactose anaerobically.",
+      "recordIds": [],
+      "paperIds": [
+        "Q3"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q3:abstract:0",
+          "quote": "S288C is gal2- and does not use galactose anaerobically."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "The SGD entry for CEN.PK113-7D in the corpus is a single passage set from a strain-entry page; its full genotype line is not in the corpus, so a direct genotype comparison with S288C cannot be made.",
+    "The corpus has no SGD statement on whether CEN.PK113-7D shares the S288C mitochondrial or galactose phenotypes; the SGD passage on CEN.PK113-7D is cut off mid-sentence about its additional genes.",
+    "The geneOS host entries for both strains carry badges only and no provenance, so they add no genome-level detail."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 6,
+    "outputTokens": 3795,
+    "cacheReadTokens": 23891,
+    "cacheWriteTokens": 29210,
+    "costUsd": 0.005788,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 2,
+  "rejectionReasons": [
+    "c4: claim text contains a number ('hundred') — values come from the record",
+    "c5: a quote that is not a whole sentence or row of Q4:abstract:0",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "Q3:abstract:0",
+      "paperId": "Q3",
+      "sectionId": "abstract",
+      "heading": "Description",
+      "kind": "abstract",
+      "text": "Reference Genome\nS288C is a widely used laboratory strain, designed by Robert Mortimer for biochemical studies, and specifically selected to be non-flocculent with a minimal set of nutritional requirements. S288C is the strain used in the systematic sequencing project, the reference sequence stored in SGD. S288C does not form pseudohyphae. In addition, since it has a mutated copy of HAP1, it is not a good strain for mitochondrial studies. It has an allelic variant of MIP1 which increases petite frequency. S288C is gal2- and does not use galactose anaerobically.",
+      "start": 0,
+      "end": 567
+    },
+    {
+      "id": "Q3:s1:0",
+      "paperId": "Q3",
+      "sectionId": "s1",
+      "heading": "Genotype",
+      "kind": "prose",
+      "text": "MATα SUC2 gal2 mal2 mel flo1 flo8-1 hap1 ho bio1 bio6",
+      "start": 0,
+      "end": 53
+    },
+    {
+      "id": "Q4:abstract:0",
+      "paperId": "Q4",
+      "sectionId": "abstract",
+      "heading": "Description",
+      "kind": "abstract",
+      "text": "Lab strain constructed by Michael Ciriacy and K.D. Entian\nCEN.PK113-7D is a laboratory strain derived from parental strains ENY.WA-1A and MC996A, and is popular for use in systems biology studies. There are six duplicated regions in CEN.PK113-7D relative to S288C, two on chromosome II, and one each on chromosomes III, VII, VIII and XV, including an enrichment of maltose metabolism genes. CEN.PK113-7D is a biotin prototroph, and has genes required for biotin biosynthesis. There are >20,000 SNPs between CEN.PK113-7D and S288C, two-thirds of which are within ORFs. Almost 5000 of these result in altered sequences of >1400 proteins. There are also >2800 small indels averaging 3 bp each in CEN.PK113-7D relative to S288C, and more than 400 of these are in coding regions. CEN.PK113-7D is missing 83 genes that are present in S288C, but has additional genes not present in S288C, including the ENA6 sodium pump that is also found in YJM269, and others that are present in both YJM269 and PW5.",
+      "start": 0,
+      "end": 994
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 2 · s-cerevisiae-s288c, s-cerevisiae-cenpk113-7d",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in one",
+      "ms": 4,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [
+          "geneos/host/s-cerevisiae-s288c",
+          "geneos/host/s-cerevisiae-cenpk113-7d"
+        ],
+        "words": "",
+        "kind": "host",
+        "state": "",
+        "limit": 5
+      },
+      "summary": "Read geneOS for geneos/host/s-cerevisiae-s288c, geneos/host/s-cerevisiae-cenpk113-7d · host · 2 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "Saccharomyces Genome Database CEN.PK113-7D S288C",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"Saccharomyces Genome Database CEN.PK113-7D S288C\" · 6 passages",
+      "ms": 1486,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "CEN.PK113-7D S288C genome strain differences",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of CEN.PK113-7D S288C genome strain differences · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 5 claims kept, 2 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [
+      "s288c",
+      "cen pk113 7d"
+    ],
+    "searched": 11,
+    "found": 1,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 2,
+        "hits": [
+          {
+            "ref": "geneos/host/s-cerevisiae-s288c",
+            "id": "s-cerevisiae-s288c",
+            "kind": "host",
+            "label": "Saccharomyces cerevisiae S288C",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/s-cerevisiae-cenpk113-7d",
+            "id": "s-cerevisiae-cenpk113-7d",
+            "kind": "host",
+            "label": "Saccharomyces cerevisiae CEN.PK113-7D",
+            "state": "open"
+          }
+        ],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "s-cerevisiae-cenpk113-7d",
+      "ref": "geneos/host/s-cerevisiae-cenpk113-7d",
+      "label": "Saccharomyces cerevisiae CEN.PK113-7D",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "prototrophic",
+          "physiology reference",
+          "BSL-1"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "s-cerevisiae-s288c",
+      "ref": "geneos/host/s-cerevisiae-s288c",
+      "label": "Saccharomyces cerevisiae S288C",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "reference genome",
+          "laboratory strain",
+          "BSL-1"
+        ]
+      }
+    }
+  ],
+  "runbookDraft": null
+}

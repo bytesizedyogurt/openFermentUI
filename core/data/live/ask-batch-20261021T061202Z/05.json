@@ -1,0 +1,557 @@
+{
+  "question": "Which Monod saturation constants (Ks) and ethanol or substrate inhibition constants have been reported for Saccharomyces cerevisiae ethanol fermentation, and in which kinetic models?",
+  "claims": [
+    {
+      "id": "c3",
+      "text": "A literature table of Monod and Andrews kinetic parameters for alcoholic fermentation lists Ks and substrate inhibition constants across several feedstocks, with the strain not stated per row in the passage returned.",
+      "recordIds": [
+        "cl1-Q12-9da8d3c2",
+        "cl1-Q12-942a1840"
+      ],
+      "paperIds": [
+        "Q12"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q12:t1:0",
+          "quote": "Table 1 The fermentation kinetics parameters of the Monod model using different feedstocks."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c5",
+      "text": "The sugarcane leaf waste yeast study did not include an ethanol inhibition term in its growth model, because its maximum ethanol concentration was judged far below the level that inhibits yeast.",
+      "recordIds": [],
+      "paperIds": [
+        "Q13"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q13:s8:1",
+          "quote": "A term considering inhibition of growth by ethanol concentration was not included, since the maximum ethanol concentration obtained in this study is far below the 15% threshold which inhibits yeast cells."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c7",
+      "text": "A modified Monod-type model of alcoholic fermentation with a byproduct inhibition function was fitted to batch data, and the byproduct inhibition coefficient and a maximum inhibitory byproduct concentration were reported; these concern glycerol and organic acids, not ethanol.",
+      "recordIds": [],
+      "paperIds": [
+        "Q6"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q6:s10:1",
+          "quote": "In this study, the fermentation process kinetics was described with a modified Monod-type cell growth model that accounts for byproduct inhibition."
+        },
+        {
+          "passageId": "Q6:s11:3",
+          "quote": "In the present study, the fitting of the experimental data showed that Zm = 60 g/L and Kz = 0.83."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c8",
+      "text": "The byproduct inhibition model in the alcoholic fermentation study was built on the same Monod-plus-inhibition approach that Luong previously used for the ethanol inhibitory effect during alcoholic fermentation.",
+      "recordIds": [],
+      "paperIds": [
+        "Q6"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q6:s10:1",
+          "quote": "The same approach has been previously used by Luong to develop a model for the ethanol inhibitory effect during alcoholic fermentation."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c9",
+      "text": "No ethanol inhibition constant for Saccharomyces cerevisiae was returned by the corpus in a record or a quoted passage; the only inhibition constants returned for yeast fermentation are substrate inhibition constants on molasses or on a sorghum extractive process.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c10",
+      "text": "A sorghum extractive fermentation model reported a substrate saturation constant and a substrate inhibition constant, but the strain is not stated in the returned records.",
+      "recordIds": [
+        "cl1-Q14-c4abd971",
+        "cl1-Q14-68855673"
+      ],
+      "paperIds": [
+        "Q14"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "The saturation and inhibition records from the molasses and sugarcane leaf studies, and the sorghum study, have no strain in the record, so it is not confirmed which yeast strain each constant was measured in.",
+    "The records returned are curation notes with provenance unverified; none is a checked value.",
+    "The growth-kinetic constants in the freeze-tolerant AFY study are for aerobic growth on glucose and ethanol, not for anaerobic ethanol fermentation.",
+    "The sucrose Monod parameters in the predictive growth study of yeast strains are described in a passage but no record returned gives their values.",
+    "The geneOS yeast models (iMM904, Yeast9) are flux-balance networks and carry no Monod or inhibition constants in the material returned.",
+    "No Dominion, runbook, fermOS fit or simulation row for these constants was found; no kinetic fit was run in this session."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 5885,
+    "cacheReadTokens": 90753,
+    "cacheWriteTokens": 40925,
+    "costUsd": 0.008967,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 5,
+  "rejectionReasons": [
+    "c1: a quote of Q12:s1:6 longer than 300 characters",
+    "c2: a quote that is not a whole sentence or row of Q12:abstract:0",
+    "c4: a quote that is not a whole sentence or row of Q13:s8:1",
+    "c6: claim text contains a number ('two') — values come from the record",
+    "c11: a quote that is not a whole sentence or row of Q20:s5:1",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "Q12:t1:0",
+      "paperId": "Q12",
+      "sectionId": "t1",
+      "heading": "Table 1 The fermentation kinetics parameters of the Monod model using different feedstocks.",
+      "kind": "table",
+      "text": "Table 1 The fermentation kinetics parameters of the Monod model using different feedstocks.\nSubstrate | Model | µmax (h−1) | Ks (g.L−1) | Ki (g.L−1) | Reference\nSorghum leaves | Monod | 0.176 | 10.11 | ---- | \nOil palm frond juice | Monod | 0.150 | 10.21 | ---- | \nSweet sorghum juice | Monod | 0.313 | 47.51 | ---- | \nBanana peels | Monod | 1.500 | 25.00 | ---- | \nGlucose | Monod | 0.084 | 213.60 | ---- | \nGlucose | Monod | 0.650 | 11.39 | ---- | \nCitrus waste pulp | Monod | 0.350 | 10.69 | ---- | \nGlucose | Monod | 0.133 | 3.70 | ---- | \nBeet molasses | Monod | 0.355 | 6.65 | ---- | \nSoft drinks mixture | Andrews | 0.606 | 65.53 | 0.029 | \nSucrose | Andrews | 0.103 | 30.24 | 109.8 | \nSugar cane juice | Andrews | 0.500 | 0.006 | 139.7 | \nGlucose | Andrews | 0.088 | 700 | 3.730 | \nμmax—the maximum specific growth rate; Ks—the Monod constant; Ki—the substrate inhibition constant.",
+      "start": 0,
+      "end": 797
+    },
+    {
+      "id": "Q13:s8:1",
+      "paperId": "Q13",
+      "sectionId": "s8",
+      "heading": "Methods › Kinetic models and calculation of kinetic parameters",
+      "kind": "prose",
+      "text": "The processes were sampled every 2 h, and sugar consumption and cell growth were monitored. The specific growth rates (μ) were estimated using experimental data obtained during the exponential phase by linear regression from the slope of natural log of biomass vs time (Eq. (1)): (1) μ = (ln(X2-X1))/t2-t1 The maximum specific growth rate (μmax) and Monod constant (KS) were subsequently estimated using the non-linear least squares method. (2) μ = μmaxS/(Ks + S) In addition to the Monod kinetic model, the logistic model is increasingly being used to describe microbial growth systems. A term considering inhibition of growth by ethanol concentration was not included, since the maximum ethanol concentration obtained in this study is far below the 15% threshold which inhibits yeast cells. ",
+      "start": 663,
+      "end": 1456
+    },
+    {
+      "id": "Q6:s10:1",
+      "paperId": "Q6",
+      "sectionId": "s10",
+      "heading": "Results and Discussion › Model Development and Modification of the Monod Model",
+      "kind": "prose",
+      "text": "In this study, the fermentation process kinetics was described with a modified Monod-type cell growth model that accounts for byproduct inhibition. Starting from the Monod equation for cell growth (eq 1), three inhibition functions were considered in modeling byproduct inhibition: linear, parabolic, and exponential. The same approach has been previously used by Luong to develop a model for the ethanol inhibitory effect during alcoholic fermentation.",
+      "start": 698,
+      "end": 1151
+    },
+    {
+      "id": "Q6:s11:3",
+      "paperId": "Q6",
+      "sectionId": "s11",
+      "heading": "Results and Discussion › Kinetics of the Effect of Byproducts on Alcoholic Fermentation",
+      "kind": "prose",
+      "text": "In contrast with the two other models, the parabolic model seems to be not suitable to present the experimental data with a lower R-squared (R2 = 0.6828). Based on the fitting results, the exponential model will be considered as the suggested model to describe the inhibitory effect of byproducts during fermentation, Equation 3 can be written as follows: (8) Zm is the maximum byproduct concentration where the fermentation stops totally. Kz is the byproduct inhibition coefficient, which is mainly dependent on yeast strain and operating conditions. In the present study, the fitting of the experimental data showed that Zm = 60 g/L and Kz = 0.83.",
+      "start": 1759,
+      "end": 2408
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 5 · s-cerevisiae, s-cerevisiae-s288c, s-cerevisiae-cenpk113-7d …",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 163 · cl1-Q1-d897e4fe, cl1-Q1-e04daf67, cl1-Q1-6aa5ac68 … · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 22 · Q1, Q2, Q3 …",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in three",
+      "ms": 5,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "Monod saturation constant Ks substrate inhibition constant ethanol inhibition kinetic model Saccharomyces cerevisiae",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of Monod saturation constant Ks substrate inhibition constant ethanol inhibition kinetic model Saccharomyces cerevisiae · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "Monod saturation constant Ks yeast ethanol fermentation kinetic model",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"Monod saturation constant Ks yeast ethanol fermentation kinetic model\" · 6 passages",
+      "ms": 201,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "ethanol inhibition constant product inhibition alcoholic fermentation model yeast",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of ethanol inhibition constant product inhibition alcoholic fermentation model yeast · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "Saccharomyces cerevisiae strain used in Monod model fermentation kinetic parameters Ks",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"Saccharomyces cerevisiae strain used in Monod model fermentation kinetic parameters Ks\" · 6 passages",
+      "ms": 170,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "byproduct inhibitory effect ethanol inhibition term kinetic model alcoholic fermentation",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"byproduct inhibitory effect ethanol inhibition term kinetic model alcoholic fermentation\" · 6 passages",
+      "ms": 172,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "ethanol inhibition Luedeking-Piret growth model product inhibition constant",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of ethanol inhibition Luedeking-Piret growth model product inhibition constant · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 6 claims kept, 5 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [
+      "saccharomyces cerevisiae"
+    ],
+    "searched": 11,
+    "found": 3,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 5,
+        "hits": [
+          {
+            "ref": "geneos/host/s-cerevisiae",
+            "id": "s-cerevisiae",
+            "kind": "host",
+            "label": "Saccharomyces cerevisiae S288C-derived",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/s-cerevisiae-s288c",
+            "id": "s-cerevisiae-s288c",
+            "kind": "host",
+            "label": "Saccharomyces cerevisiae S288C",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/s-cerevisiae-cenpk113-7d",
+            "id": "s-cerevisiae-cenpk113-7d",
+            "kind": "host",
+            "label": "Saccharomyces cerevisiae CEN.PK113-7D",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/model/iMM904",
+            "id": "iMM904",
+            "kind": "model",
+            "label": "Saccharomyces cerevisiae S288C (iMM904)",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/model/Yeast9",
+            "id": "Yeast9",
+            "kind": "model",
+            "label": "Saccharomyces cerevisiae S288C (Yeast9)",
+            "state": "open"
+          }
+        ],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 163,
+        "hits": [
+          {
+            "ref": "biorepo/candidate/cl1-Q1-d897e4fe",
+            "id": "cl1-Q1-d897e4fe",
+            "kind": "candidate",
+            "label": "ethanol_mesp",
+            "state": "proposed"
+          },
+          {
+            "ref": "biorepo/candidate/cl1-Q1-e04daf67",
+            "id": "cl1-Q1-e04daf67",
+            "kind": "candidate",
+            "label": "ethanol_mesp",
+            "state": "proposed"
+          },
+          {
+            "ref": "biorepo/candidate/cl1-Q1-6aa5ac68",
+            "id": "cl1-Q1-6aa5ac68",
+            "kind": "candidate",
+            "label": "ethanol_mesp",
+            "state": "proposed"
+          },
+          {
+            "ref": "biorepo/candidate/cl1-Q1-b958fe4b",
+            "id": "cl1-Q1-b958fe4b",
+            "kind": "candidate",
+            "label": "ethanol_titre",
+            "state": "proposed"
+          },
+          {
+            "ref": "biorepo/candidate/cl1-Q1-526a5e6d",
+            "id": "cl1-Q1-526a5e6d",
+            "kind": "candidate",
+            "label": "medium_component_conc",
+            "state": "proposed"
+          },
+          {
+            "ref": "biorepo/candidate/cl1-Q10-f19d6e1d",
+            "id": "cl1-Q10-f19d6e1d",
+            "kind": "candidate",
+            "label": "growth_rate_mu",
+            "state": "proposed"
+          },
+          {
+            "ref": "biorepo/candidate/cl1-Q10-a508daa2",
+            "id": "cl1-Q10-a508daa2",
+            "kind": "candidate",
+            "label": "growth_rate_mu",
+            "state": "proposed"
+          },
+          {
+            "ref": "biorepo/candidate/cl1-Q10-ae275663",
+            "id": "cl1-Q10-ae275663",
+            "kind": "candidate",
+            "label": "biomass_yield_substrate",
+            "state": "proposed"
+          }
+        ],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 22,
+        "hits": [
+          {
+            "ref": "intake/source/Q1",
+            "id": "Q1",
+            "kind": "source",
+            "label": "Process Design and Economics for Biochemical Conversion of Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover",
+            "state": "approved"
+          },
+          {
+            "ref": "intake/source/Q2",
+            "id": "Q2",
+            "kind": "source",
+            "label": "NREL 2012 Achievement of Ethanol Cost Targets: Biochemical Ethanol Fermentation via Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover",
+            "state": "approved"
+          },
+          {
+            "ref": "intake/source/Q3",
+            "id": "Q3",
+            "kind": "source",
+            "label": "Saccharomyces Genome Database strain entry: S288C",
+            "state": "approved"
+          },
+          {
+            "ref": "intake/source/Q4",
+            "id": "Q4",
+            "kind": "source",
+            "label": "Saccharomyces Genome Database strain entry: CEN.PK",
+            "state": "approved"
+          },
+          {
+            "ref": "intake/source/Q5",
+            "id": "Q5",
+            "kind": "source",
+            "label": "Growth characteristics of freeze-tolerant baker's yeast Saccharomyces cerevisiae AFY in aerobic batch culture",
+            "state": "approved"
+          },
+          {
+            "ref": "intake/source/Q6",
+            "id": "Q6",
+            "kind": "source",
+            "label": "A New Model of Alcoholic Fermentation under a Byproduct Inhibitory Effect",
+            "state": "approved"
+          },
+          {
+            "ref": "intake/source/Q7",
+            "id": "Q7",
+            "kind": "source",
+            "label": "The metabolic costs of improving ethanol yield by reducing glycerol formation capacity under anaerobic conditions in Saccharomyces cerevisiae",
+            "state": "approved"
+          },
+          {
+            "ref": "intake/source/Q8",
+            "id": "Q8",
+            "kind": "source",
+            "label": "Improving ethanol yield in acetate-reducing Saccharomyces cerevisiae by cofactor engineering of 6-phosphogluconate dehydrogenase and deletion of ALD6",
+            "state": "approved"
+          }
+        ],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [],
+  "runbookDraft": null
+}

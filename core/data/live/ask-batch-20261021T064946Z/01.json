@@ -1,0 +1,394 @@
+{
+  "question": "Simulate a glucose batch for CEN.PK113-7D from the extracted kinetics and compare the predicted yield with the Yeast9 ceiling.",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Yeast9 genome-scale flux balance ceiling for ethanol from glucose in Saccharomyces cerevisiae S288C: the most product the network can make from this feed, with no time axis and no vessel.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-b616b00ba65aeadb"
+      ],
+      "moduleRefs": [
+        "geneos/model/Yeast9"
+      ]
+    }
+  ],
+  "gaps": [
+    "The growth-rate and yield records for this strain are unverified extractor candidates, and their conditions field is empty. The yields come from high-glucose batch, fed-batch and anaerobic settings that differ from one another and from a simulated batch, so they are not a like-for-like comparison.",
+    "The Yeast9 ceiling has no time axis, no vessel and no growth limit. It is a flux balance upper bound, not a prediction of batch yield.",
+    "Nothing was written to Runbooks, geneOS or fermOS."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 4439,
+    "cacheReadTokens": 80959,
+    "cacheWriteTokens": 34206,
+    "costUsd": 0.007305,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 6,
+  "rejectionReasons": [
+    "c2: claim text contains a number ('1') — values come from the record",
+    "c3: claim text contains a number ('1') — values come from the record",
+    "c4: claim text contains a number ('1') — values come from the record",
+    "c5: claim text contains a number ('1') — values come from the record",
+    "c6: claim text contains a number ('1') — values come from the record",
+    "c7: claim text contains a number ('1') — values come from the record",
+    "a gap dropped: it holds a number",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [
+    {
+      "id": "ev-b616b00ba65aeadb",
+      "label": "most ethanol from glucose, Saccharomyces cerevisiae S288C (Yeast9) (genome scale)",
+      "value": 0.5114345345145319,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "Saccharomyces cerevisiae S288C (Yeast9)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "Yeast9",
+              "note": "https://github.com/SysBioChalmers/yeast-GEM at v9.1.1 (2d594ae1c4a2d550ccef120d96a58c7bbf586255), model/yeast-GEM.xml, sha256 30842b15eefb0ef7e36cbdea86a9efddfacf69a871c8b054165faa9af9f6c8eb (CC-BY-4.0)",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "secreted through r_1761 (ethanol exchange in the file); ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through r_1714 (D-glucose exchange in the file), 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "b616b00ba65aeadb",
+        "at": "2026-10-20T03:56:20Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    }
+  ],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 2 · s-cerevisiae-cenpk113-7d, Yeast9",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in one",
+      "ms": 141,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [
+          "geneos/host/s-cerevisiae-cenpk113-7d",
+          "geneos/model/Yeast9"
+        ],
+        "words": "",
+        "kind": "",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read geneOS for geneos/host/s-cerevisiae-cenpk113-7d, geneos/model/Yeast9 · 2 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "fermos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read fermOS · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "CEN.PK113-7D glucose batch kinetics growth rate yield ethanol",
+        "field": null,
+        "organism": "s-cerevisiae-cenpk113-7d",
+        "limit": 10
+      },
+      "summary": "Looked up records of CEN.PK113-7D glucose batch kinetics growth rate yield ethanol · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "fermos_simulate",
+      "input": {
+        "family": "batch_v1",
+        "strain": "s-cerevisiae-cenpk113-7d",
+        "product": "ethanol",
+        "sugar": "glucose",
+        "fitArtifact": "",
+        "durationPreset": "until-sugar-runs-out",
+        "startFrom": "records",
+        "recordsByParam": {}
+      },
+      "summary": "fermos_simulate refused: batch_v1 cannot run yet: 5 parameters wait. ks (half-saturation constant) waits for a source: a fit a person chooses, a record of monod_ks through the aggregate",
+      "ms": 13,
+      "ok": false
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "Yeast9",
+        "product": "ethanol",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 7134,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "Monod half-saturation constant glucose ks ethanol maximum concentration product inhibition alpha",
+        "field": null,
+        "organism": "s-cerevisiae-cenpk113-7d",
+        "limit": 10
+      },
+      "summary": "Looked up records of Monod half-saturation constant glucose ks ethanol maximum concentration product inhibition alpha · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "CEN.PK 113-7D batch glucose ethanol yield",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"CEN.PK 113-7D batch glucose ethanol yield\" · 4 passages",
+      "ms": 1608,
+      "ok": true
+    },
+    {
+      "n": 9,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 1 claim kept, 6 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [
+      "cen pk113 7d",
+      "yeast9"
+    ],
+    "searched": 11,
+    "found": 1,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 2,
+        "hits": [
+          {
+            "ref": "geneos/host/s-cerevisiae-cenpk113-7d",
+            "id": "s-cerevisiae-cenpk113-7d",
+            "kind": "host",
+            "label": "Saccharomyces cerevisiae CEN.PK113-7D",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/model/Yeast9",
+            "id": "Yeast9",
+            "kind": "model",
+            "label": "Saccharomyces cerevisiae S288C (Yeast9)",
+            "state": "open"
+          }
+        ],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [
+    {
+      "module": "geneos",
+      "kind": "model",
+      "id": "Yeast9",
+      "ref": "geneos/model/Yeast9",
+      "label": "Saccharomyces cerevisiae S288C (Yeast9)",
+      "state": "open",
+      "status": "on the shelf",
+      "provenance": null,
+      "detail": {
+        "host": "s-cerevisiae-s288c",
+        "unavailable": null
+      }
+    }
+  ],
+  "runbookDraft": null
+}

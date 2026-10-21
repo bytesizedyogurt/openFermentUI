@@ -1,0 +1,763 @@
+{
+  "question": "Which hosts in geneOS could make ethanol, which models sit on their pages, and what ceiling does each give on glucose?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Within geneOS, the only host page that has a genome-scale model on the shelf is the Saccharomyces cerevisiae S288C-derived host; both its shelf models (iMM904 and Yeast9) name that host.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "geneos/host/s-cerevisiae-s288c",
+        "geneos/model/iMM904",
+        "geneos/model/Yeast9"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "The Saccharomyces cerevisiae S288C genome-scale model iMM904 has a native ethanol route through pyruvate decarboxylase and alcohol dehydrogenase, with ethanol leaving through its ethanol exchange; its flux-balance ceiling on glucose is reported in the evidence.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-6a660880be72f7be"
+      ],
+      "moduleRefs": [
+        "geneos/model/iMM904"
+      ]
+    },
+    {
+      "id": "c3",
+      "text": "The Saccharomyces cerevisiae S288C genome-scale model Yeast9 has a native ethanol route through pyruvate decarboxylase and alcohol dehydrogenase, with ethanol leaving through its file's ethanol exchange; its flux-balance ceiling on glucose is reported in the evidence.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-b616b00ba65aeadb"
+      ],
+      "moduleRefs": [
+        "geneos/model/Yeast9"
+      ]
+    },
+    {
+      "id": "c4",
+      "text": "The two Saccharomyces cerevisiae S288C models give the same flux-balance ceiling for ethanol from glucose, in both mass and molar terms, at the same glucose uptake bound.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "inferred",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-6a660880be72f7be",
+        "ev-b616b00ba65aeadb"
+      ],
+      "moduleRefs": []
+    },
+    {
+      "id": "c5",
+      "text": "No other host page in geneOS (including the E. coli expression strains, Komagataella phaffii GS115, Trichoderma reesei, Bacillus subtilis, Corynebacterium glutamicum, Yarrowia, Kluyveromyces, Aspergillus, Myceliophthora and the CEN.PK113-7D and S288C strain pages) has a genome-scale model linked to it, so no ethanol ceiling is available for those hosts from geneOS.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "geneos/host/ecoli",
+        "geneos/host/gs115",
+        "geneos/host/treesei",
+        "geneos/host/b-subtilis",
+        "geneos/host/c-glutamicum",
+        "geneos/host/y-lipolytica",
+        "geneos/host/k-lactis",
+        "geneos/host/a-niger",
+        "geneos/host/a-oryzae",
+        "geneos/host/m-thermophila",
+        "geneos/host/s-cerevisiae-cenpk113-7d",
+        "geneos/host/s-cerevisiae-s288c"
+      ]
+    }
+  ],
+  "gaps": [
+    "Host pages in geneOS list badges only (for example GRAS, secretion, reference genome); none of the host rows states an ethanol pathway, so whether any non-yeast host could make ethanol is not established from geneOS.",
+    "The E. coli core model (e_coli_core) and the iJO1366 E. coli model are on the shelf, but the ceiling tool only takes ethanol on iMM904 and Yeast9, so no ethanol ceiling exists for E. coli in this platform. A ceiling for E. coli would need a route check and a run the tool supports.",
+    "The geneOS pathway kind returned no rows for ethanol, so no pathway page documents an ethanol route for any host.",
+    "The geneOS ceiling is a flux-balance upper bound at the model's glucose uptake setting, not a measured yield; no measured ethanol yield from geneOS hosts was found in this module.",
+    "The CEN.PK113-7D strain page has no linked model, though it is a common ethanol physiology reference; its ceiling is not computed here."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 2943,
+    "cacheReadTokens": 52089,
+    "cacheWriteTokens": 29264,
+    "costUsd": 0.005651,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [],
+  "evidence": [
+    {
+      "id": "ev-6a660880be72f7be",
+      "label": "most ethanol from glucose, Saccharomyces cerevisiae S288C (iMM904) (genome scale)",
+      "value": 0.5114345345145316,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "Saccharomyces cerevisiae S288C (iMM904)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "iMM904",
+              "note": "https://bigg.ucsd.edu/static/models/iMM904.xml (ETag \"017c86841952cc365f20a8b466292b31\", Last-Modified 2019-11-01), sha256 a4bcff4f8f2228a5b1553264c3bcb1e8a8093907754446007f3f3b529d29d3e1 (BiGG Models terms: educational, research and non-profit use; commercial use by agreement with UC San Diego)",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "secreted through EX_etoh_e; ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "6a660880be72f7be",
+        "at": "2026-10-20T03:56:22Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    },
+    {
+      "id": "ev-b616b00ba65aeadb",
+      "label": "most ethanol from glucose, Saccharomyces cerevisiae S288C (Yeast9) (genome scale)",
+      "value": 0.5114345345145319,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "Saccharomyces cerevisiae S288C (Yeast9)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "Yeast9",
+              "note": "https://github.com/SysBioChalmers/yeast-GEM at v9.1.1 (2d594ae1c4a2d550ccef120d96a58c7bbf586255), model/yeast-GEM.xml, sha256 30842b15eefb0ef7e36cbdea86a9efddfacf69a871c8b054165faa9af9f6c8eb (CC-BY-4.0)",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "secreted through r_1761 (ethanol exchange in the file); ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through r_1714 (D-glucose exchange in the file), 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "b616b00ba65aeadb",
+        "at": "2026-10-20T03:56:20Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    }
+  ],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 31 · gs115, treesei, ecoli …",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in one",
+      "ms": 5,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "host",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read geneOS for host · 13 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "model",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read geneOS for model · 4 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "artifact",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read geneOS for artifact · 4 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [],
+        "words": "ethanol",
+        "kind": "pathway",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read geneOS for \"ethanol\" · pathway · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "iMM904",
+        "product": "ethanol",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 298,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "Yeast9",
+        "product": "ethanol",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 1105,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 5 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 1,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 31,
+        "hits": [
+          {
+            "ref": "geneos/host/gs115",
+            "id": "gs115",
+            "kind": "host",
+            "label": "Komagataella phaffii GS115 (formerly Pichia pastoris)",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/treesei",
+            "id": "treesei",
+            "kind": "host",
+            "label": "Trichoderma reesei industrial secretion host",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/ecoli",
+            "id": "ecoli",
+            "kind": "host",
+            "label": "Escherichia coli expression strains (BL21 and derivatives)",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/s-cerevisiae",
+            "id": "s-cerevisiae",
+            "kind": "host",
+            "label": "Saccharomyces cerevisiae S288C-derived",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/y-lipolytica",
+            "id": "y-lipolytica",
+            "kind": "host",
+            "label": "Yarrowia lipolytica W29-derived",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/a-niger",
+            "id": "a-niger",
+            "kind": "host",
+            "label": "Aspergillus niger ATCC 1015-derived",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/a-oryzae",
+            "id": "a-oryzae",
+            "kind": "host",
+            "label": "Aspergillus oryzae RIB40-derived",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/host/b-subtilis",
+            "id": "b-subtilis",
+            "kind": "host",
+            "label": "Bacillus subtilis 168-derived",
+            "state": "open"
+          }
+        ],
+        "named": true,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "a-niger",
+      "ref": "geneos/host/a-niger",
+      "label": "Aspergillus niger ATCC 1015-derived",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "food enzyme",
+          "high secretion"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "a-oryzae",
+      "ref": "geneos/host/a-oryzae",
+      "label": "Aspergillus oryzae RIB40-derived",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "GRAS",
+          "koji",
+          "high secretion"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "b-subtilis",
+      "ref": "geneos/host/b-subtilis",
+      "label": "Bacillus subtilis 168-derived",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "GRAS",
+          "true secretion"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "c-glutamicum",
+      "ref": "geneos/host/c-glutamicum",
+      "label": "Corynebacterium glutamicum ATCC 13032-derived",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "no endotoxin",
+          "industrial heritage"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "ecoli",
+      "ref": "geneos/host/ecoli",
+      "label": "Escherichia coli expression strains (BL21 and derivatives)",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "prokaryote",
+          "no secretory pathway",
+          "BSL-1"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "gs115",
+      "ref": "geneos/host/gs115",
+      "label": "Komagataella phaffii GS115 (formerly Pichia pastoris)",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "methylotrophic yeast",
+          "high cell density",
+          "secretory pathway",
+          "BSL-1"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "k-lactis",
+      "ref": "geneos/host/k-lactis",
+      "label": "Kluyveromyces lactis GG799-derived",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "dairy",
+          "lactose utilisation"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "m-thermophila",
+      "ref": "geneos/host/m-thermophila",
+      "label": "Myceliophthora thermophila C1-derived",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "thermophilic",
+          "high secretion"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "s-cerevisiae-cenpk113-7d",
+      "ref": "geneos/host/s-cerevisiae-cenpk113-7d",
+      "label": "Saccharomyces cerevisiae CEN.PK113-7D",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "prototrophic",
+          "physiology reference",
+          "BSL-1"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "s-cerevisiae-s288c",
+      "ref": "geneos/host/s-cerevisiae-s288c",
+      "label": "Saccharomyces cerevisiae S288C",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "reference genome",
+          "laboratory strain",
+          "BSL-1"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "treesei",
+      "ref": "geneos/host/treesei",
+      "label": "Trichoderma reesei industrial secretion host",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "filamentous fungus",
+          "industrial secretion",
+          "BSL-1"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "y-lipolytica",
+      "ref": "geneos/host/y-lipolytica",
+      "label": "Yarrowia lipolytica W29-derived",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "oleaginous",
+          "terpenes"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "model",
+      "id": "Yeast9",
+      "ref": "geneos/model/Yeast9",
+      "label": "Saccharomyces cerevisiae S288C (Yeast9)",
+      "state": "open",
+      "status": "on the shelf",
+      "provenance": null,
+      "detail": {
+        "host": "s-cerevisiae-s288c",
+        "unavailable": null
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "model",
+      "id": "iMM904",
+      "ref": "geneos/model/iMM904",
+      "label": "Saccharomyces cerevisiae S288C (iMM904)",
+      "state": "open",
+      "status": "on the shelf",
+      "provenance": null,
+      "detail": {
+        "host": "s-cerevisiae-s288c",
+        "unavailable": null
+      }
+    }
+  ],
+  "runbookDraft": null
+}

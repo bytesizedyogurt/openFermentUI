@@ -1,0 +1,395 @@
+{
+  "question": "What does Proforma need before it can price ethanol from glucose on this evidence, and what does the corn stover benchmark give?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "The draft glucose-to-ethanol scenario in Proforma has no kept run, so no minimum selling price exists for it yet.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "proforma/scenario/sc-yeast-1"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "Pricing the glucose-to-ethanol scenario waits on three inputs: the ethanol volumetric productivity, the plant scale as ethanol fermented per year, and the price of glucose.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "proforma/scenario/sc-yeast-1"
+      ]
+    },
+    {
+      "id": "c3",
+      "text": "The corn stover ethanol benchmark, as the biorefineries.cornstover package computes it, gives a minimum ethanol selling price in USD per gallon, with the ethanol density used for the unit conversion stored alongside.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "35e708d122a6b4fc"
+      ],
+      "moduleRefs": [
+        "proforma/artifact/35e708d122a6b4fc"
+      ]
+    },
+    {
+      "id": "c5",
+      "text": "The corn stover benchmark is a cellulosic lignocellulose-to-ethanol design, not a batch fermentation of glucose, so its selling price does not price the glucose scenario.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "35e708d122a6b4fc"
+      ],
+      "moduleRefs": [
+        "proforma/artifact/35e708d122a6b4fc"
+      ]
+    }
+  ],
+  "gaps": [
+    "No record in the corpus gives an ethanol volumetric productivity for a glucose batch run to feed the scenario.",
+    "No record gives a plant scale or a glucose price for this scenario."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 6,
+    "outputTokens": 1718,
+    "cacheReadTokens": 23936,
+    "cacheWriteTokens": 26470,
+    "costUsd": 0.004407,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c4: cites what no tool returned in this run: 42f80a77d306f673",
+    "a gap dropped: it holds a number",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [
+    {
+      "id": "35e708d122a6b4fc",
+      "label": "Minimum ethanol selling price, the NREL 2011 corn stover design as biorefineries.cornstover builds it",
+      "value": 1.9676711216619653,
+      "unit": "USD gal⁻¹",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "proforma_benchmark",
+        "toolVersion": "biorefineries.cornstover@2.35.1",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "biorefineries.cornstover.Biorefinery",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "biorefineries.cornstover@2.35.1",
+              "note": "the corn stover ethanol biorefinery built to NREL/TP-5100-47764, with every setting the package's own",
+              "by": null
+            }
+          },
+          {
+            "name": "simulator",
+            "value": "biosteam 2.54.0",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "biosteam@2.54.0",
+              "note": "the process simulator the package runs on",
+              "by": null
+            }
+          },
+          {
+            "name": "gallon",
+            "value": "ethanol_density_kggal",
+            "unit": "kg gal-1",
+            "source": {
+              "kind": "model",
+              "id": "biorefineries.cornstover@2.35.1",
+              "note": "the package's own ethanol density per gallon converts its price per kilogram",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "35e708d122a6b4fc",
+        "at": "2026-10-15T19:54:30Z",
+        "seed": null
+      },
+      "figure": null
+    }
+  ],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 0",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 4 · sc-yeast-1, 42f80a77d306f673, 1b2f2c463c872086 …",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in one",
+      "ms": 5,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "proforma_read",
+      "input": {
+        "ids": [
+          "proforma/scenario/sc-yeast-1",
+          "proforma/artifact/35e708d122a6b4fc",
+          "proforma/artifact/42f80a77d306f673",
+          "proforma/artifact/1b2f2c463c872086"
+        ],
+        "words": "",
+        "kind": "",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read Proforma for proforma/scenario/sc-yeast-1, proforma/artifact/35e708d122a6b4fc, proforma/artifact/42f80a77d306f673, proforma/artifact/1b2f2c463c872086 · 4 rows",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "selling_price",
+      "input": {
+        "scenarioId": "sc-yeast-1"
+      },
+      "summary": "selling_price refused: selling_price refused: no run of sc-yeast-1 is on file here; these inputs wait for a source, a record or a named person's assumption: productivity (ethanol volu",
+      "ms": 26,
+      "ok": false
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "selling_price",
+      "input": {
+        "scenarioId": "proforma_benchmark"
+      },
+      "summary": "Ran selling_price",
+      "ms": 3,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 4 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 1,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 4,
+        "hits": [
+          {
+            "ref": "proforma/scenario/sc-yeast-1",
+            "id": "sc-yeast-1",
+            "kind": "scenario",
+            "label": "Glucose to ethanol — draft flowsheet",
+            "state": "open"
+          },
+          {
+            "ref": "proforma/artifact/42f80a77d306f673",
+            "id": "42f80a77d306f673",
+            "kind": "artifact",
+            "label": "proforma.reference artifact",
+            "state": "open"
+          },
+          {
+            "ref": "proforma/artifact/1b2f2c463c872086",
+            "id": "1b2f2c463c872086",
+            "kind": "artifact",
+            "label": "proforma.reference artifact",
+            "state": "open"
+          },
+          {
+            "ref": "proforma/artifact/35e708d122a6b4fc",
+            "id": "35e708d122a6b4fc",
+            "kind": "artifact",
+            "label": "proforma_benchmark artifact",
+            "state": "open"
+          }
+        ],
+        "named": true,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [
+    {
+      "module": "proforma",
+      "kind": "artifact",
+      "id": "35e708d122a6b4fc",
+      "ref": "proforma/artifact/35e708d122a6b4fc",
+      "label": "proforma_benchmark artifact",
+      "state": "open",
+      "status": "computed",
+      "provenance": "computed",
+      "detail": {
+        "tool": "proforma_benchmark",
+        "createdAt": "2026-10-15T19:54:30Z",
+        "inputs": [
+          "model=biorefineries.cornstover.Biorefinery",
+          "simulator=biosteam 2.54.0",
+          "gallon=ethanol_density_kggal"
+        ],
+        "output": {
+          "package": "biorefineries.cornstover@2.35.1",
+          "biosteam": "2.54.0",
+          "mespUsdPerGal": 1.9676711216619653,
+          "mespUsdPerKg": 0.6588136420152626,
+          "ethanolDensityKgPerGal": 2.98668849
+        },
+        "cite": "cite the value through get_artifact or the tool that computes it; this row names it"
+      }
+    },
+    {
+      "module": "proforma",
+      "kind": "scenario",
+      "id": "sc-yeast-1",
+      "ref": "proforma/scenario/sc-yeast-1",
+      "label": "Glucose to ethanol — draft flowsheet",
+      "state": "open",
+      "status": "biosteam",
+      "provenance": null,
+      "detail": {
+        "kind": "biosteam",
+        "product": "Fuel-grade ethanol",
+        "modelId": "ethanol_glucose_v0"
+      }
+    }
+  ],
+  "runbookDraft": null
+}

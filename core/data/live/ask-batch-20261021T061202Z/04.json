@@ -1,0 +1,330 @@
+{
+  "question": "What minimum ethanol selling price does the NREL corn stover design report by Humbird et al. state, and how does the BioSTEAM benchmark of that design compare?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "The Humbird corn stover design report states a minimum ethanol selling price for dilute-acid pretreatment and enzymatic hydrolysis of corn stover, in US dollars per gallon of ethanol, in its stated dollar-year basis.",
+      "recordIds": [
+        "cl1-Q1-6aa5ac68",
+        "cl1-Q1-d897e4fe"
+      ],
+      "paperIds": [
+        "Q1"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q1:s94:0",
+          "quote": "The end result of the technoeconomic analysis was a predicted minimum ethanol selling price (MESP) of $2.15/gal (2007$)."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c2",
+      "text": "The BioSTEAM corn stover ethanol benchmark, which builds the Humbird corn stover design as the biorefineries.cornstover package, computes a minimum ethanol selling price in US dollars per gallon from its package settings.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "35e708d122a6b4fc"
+      ],
+      "moduleRefs": []
+    },
+    {
+      "id": "c3",
+      "text": "The BioSTEAM benchmark's computed minimum ethanol selling price for the Humbird corn stover design is lower than the minimum ethanol selling price the Humbird report states for that design.",
+      "recordIds": [
+        "cl1-Q1-6aa5ac68"
+      ],
+      "paperIds": [
+        "Q1"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q1:s94:0",
+          "quote": "The end result of the technoeconomic analysis was a predicted minimum ethanol selling price (MESP) of $2.15/gal (2007$)."
+        }
+      ],
+      "evidenceIds": [
+        "35e708d122a6b4fc"
+      ],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "The benchmark's dollar-year basis, and whether its settings match the Humbird report's discount rate, tax, plant life and feedstock cost, are not shown in the returned selling-price result; the stored package settings must be read before the two prices are called like-for-like.",
+    "The gap between the benchmark and the report is not explained by any returned record or passage; the cause (for example, updated costs or process changes in the package) was not found in the corpus.",
+    "The report's minimum ethanol selling price records are curation notes marked unverified; the value should be checked against the report's own discounted cash flow table.",
+    "The benchmark result is a single computed value without an interval in the returned output, so the comparison cannot be tested against the report's uncertainty range from this result alone.",
+    "No run of the Humbird scenario in the platform was found; the selling_price result is the stored benchmark, not a fresh run of a scenario."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 6,
+    "outputTokens": 2168,
+    "cacheReadTokens": 23808,
+    "cacheWriteTokens": 30033,
+    "costUsd": 0.005077,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c4: claim text contains a number ('2') — values come from the record"
+  ],
+  "evidence": [
+    {
+      "id": "35e708d122a6b4fc",
+      "label": "Minimum ethanol selling price, the NREL 2011 corn stover design as biorefineries.cornstover builds it",
+      "value": 1.9676711216619653,
+      "unit": "USD gal⁻¹",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "proforma_benchmark",
+        "toolVersion": "biorefineries.cornstover@2.35.1",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "biorefineries.cornstover.Biorefinery",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "biorefineries.cornstover@2.35.1",
+              "note": "the corn stover ethanol biorefinery built to NREL/TP-5100-47764, with every setting the package's own",
+              "by": null
+            }
+          },
+          {
+            "name": "simulator",
+            "value": "biosteam 2.54.0",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "biosteam@2.54.0",
+              "note": "the process simulator the package runs on",
+              "by": null
+            }
+          },
+          {
+            "name": "gallon",
+            "value": "ethanol_density_kggal",
+            "unit": "kg gal-1",
+            "source": {
+              "kind": "model",
+              "id": "biorefineries.cornstover@2.35.1",
+              "note": "the package's own ethanol density per gallon converts its price per kilogram",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "35e708d122a6b4fc",
+        "at": "2026-10-15T19:54:30Z",
+        "seed": null
+      },
+      "figure": null
+    }
+  ],
+  "passages": [
+    {
+      "id": "Q1:s94:0",
+      "paperId": "Q1",
+      "sectionId": "s94",
+      "heading": "Page 94",
+      "kind": "prose",
+      "text": " \n84 \n \nThe end result of the technoeconomic analysis was a predicted minimum ethanol selling price \n(MESP) of $2.15/gal (2007$). This reflects a $0.74/gal contribution from feedstock, a $0.34/gal \ncontribution from enzymes, and a $1.07/gal contribution from the remainder of the conversion \nprocess. \n6.2 Variance from the 2002 Design \nIn the original 2002 design report, which projected 2012 technology, the modeled 2012 MESP \nwas $1.07/gal ethanol in 2000$ ($1.29/gal if directly converted to 2007$). Since then, the \nprojected 2012 model has evolved to include inflation in capital and chemical costs, new \nfeedstock costs from INL, elimination of feedstock handling and yard workers, and some key \nprocess changes, including the oligomer conversion step in pretreatment and the switch to \nammonia conditioning. ",
+      "start": 0,
+      "end": 816
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 0",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in none",
+      "ms": 5,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "minimum ethanol selling price corn stover Humbird",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of minimum ethanol selling price corn stover Humbird · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "selling_price",
+      "input": {
+        "scenarioId": "proforma_benchmark"
+      },
+      "summary": "Ran selling_price",
+      "ms": 3,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "minimum ethanol selling price corn stover design",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"minimum ethanol selling price corn stover design\" · 6 passages",
+      "ms": 154,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 3 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 0,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [],
+  "runbookDraft": null
+}
