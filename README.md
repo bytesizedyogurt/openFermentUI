@@ -99,7 +99,8 @@ archived programs (above).
 | Yield ceilings | **Computed by flux balance analysis** on published reaction networks (geneOS → Model): for ethanol, Yeast9 (yeast-GEM v9.1.1) and iMM904, two reconstructions of *S. cerevisiae* S288C, each giving **0.5114** g g⁻¹ on glucose (OF-BLD-016 B.1); for PHB (archived), `e_coli_core` and `iJO1366` as bundled with cobra with the phaCAB route added, and `RehMBEL1391` for *C. necator* H16, fetched at its pinned commit and hash. A ceiling has no time axis and no vessel; geneOS → Model draws thread Q's reported ethanol yields beside it and rings one above it for a reviewer, and Proforma's ceiling check reads a scenario's fermenter yield against it, flagged and never clamped (OF-BLD-019 Phase 5) |
 | Computed values | **Computed, with a basis** — a value no paper states (a converted unit, a yield ceiling, a fitted rate, a price) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **29** kept on `openferment-data` (25 before OF-BLD-019 §7.1 added two reference runs, a scenario run and a property answer) |
 | Retrieval | **Real, measured** — 88 fetched papers cut into **7,179** passages of their own words, with meaning vectors from `BAAI/bge-small-en-v1.5`. Witness → Retrieval's scorecard is measured on thread Q (2026-10-20T07:46:46Z): K 85 questions, S 83, F empty; the rule's score (mean nDCG@10 on K and S) bm25 0.4226, bm25+expand 0.4294, hybrid 0.4587, bm25+rerank **0.5942**, hybrid+rerank not scored. The rule chose bm25+rerank; search is held on **hybrid** (`core/data/index/config.json`), because each reranked search is a model call of about twenty seconds, and Witness names both the lane in use (`laneInUse`) and the rule's choice |
-| Fits and forecasts of runs | **Computed from depositions** (fermOS): a run's timed readings are fitted with a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance), each fit kept as an artifact with the deposition as its source, and a forecast is a band for readings drawn from one fit. On synthetic runs the fit returns its generating parameters within 0.1 % and the band holds a fresh reading in 33 to 35 of 40 runs. A fit or forecast can feed a Proforma scenario's titre, yield and productivity when a person chooses it (OF-BLD-019 Phase 5). No run is deposited, so nothing real has been fitted and no fit is on file to feed a scenario: fermOS says *No run deposited yet* and names the readings to deposit and where |
+| Fits and forecasts of runs | **Computed from depositions** (fermOS): a run's timed readings are fitted with a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance; or, since OF-BLD-020, the batch model family below), each fit kept as an artifact with the deposition as its source, and a forecast is a band for readings drawn from one logistic fit. On synthetic runs the fit returns its generating parameters within 0.1 % and the band holds a fresh reading in 33 to 35 of 40 runs. A fit or forecast can feed a Proforma scenario's titre, yield and productivity when a person chooses it (OF-BLD-019 Phase 5). No run is deposited, so nothing real has been fitted and no fit is on file to feed a scenario: fermOS says *No run deposited yet* and names the readings to deposit and where |
+| Simulated cultures | **Computed by scipy, from parameters that each name a source** (OF-BLD-020 Phase 3) — fermOS → Simulate integrates a model family (batch, fed-batch, chemostat; growth then storage with the archived PHA program; light-limited as a socket that refuses) from parameters bound to a fit, thread Q's records through the aggregate gate, a kept simulation, a named person's value or a stated convention, and keeps the run as one `fermos.simulation` artifact whose provenance follows those sources. A simulation is never a measurement. On synthetic runs each family that runs closes its mass balance within 0.1 %, and a batch fit of a simulated run recovers its parameters within 1 %. None is kept on `openferment-data`: for a glucose batch of CEN.PK113-7D thread Q binds μmax, Yx/s, Yp/s and the starting sugar, and Ks, α, Pmax and the starting cells and ethanol wait for Sean (STATE.md §3.5, run owed) |
 | Predictions and their score | **Locked, and scored by runs** — a prediction is a point, an interval or a bound, locked with what it rests on; Runbooks → Ledger draws each against what reconciled runs measured and counts locked, tested, held, missed and inconclusive runs. The seed's ten runbooks (eight of them locked) are examples, so by default the ledger counts zero and says why; no run has tested a prediction. Postdoc can draft a runbook whose numbers the service writes from artifacts and records |
 | Simulation economics, authored | **Modeled, and examples** — the three scenarios S1–S3 are illustrative casein cost surfaces written by hand, not validated, labelled *Cost model v0*, and hidden with the archive |
 | Simulation economics, BioSTEAM | **Simulated, from a shelf of four flowsheets** (OF-BLD-019 Phase 2). Two are published reference biorefineries run whole on their package's own defaults: the stored benchmark, `biorefineries.cornstover`, reproduces the NREL 2011 corn stover design at **1.9677** USD per gallon against 1.968 (2026-10-15), and `selling_price` cites it, as it cites the newest kept run of a seed BioSTEAM scenario the program switch shows; the dry-grind corn ethanol plant, `biorefineries.corn`, the yeast program's reference, matched all eleven values its package's own test asserts on this installation, the largest relative difference 1.8×10⁻⁵ against the test's 5 % (measured in the build, STATE.md §2.2). Two are ours: `sc-yeast-1` runs glucose to ethanol, three of its process inputs bound to thread Q records and its productivity, plant scale and glucose price waiting; `sc-pha-1` (archived with PHA) runs fermentation, harvest and drying of PHA. Each scenario run draws 500 seeded samples by default and is `demo` while any input rests on a named person's assumption. Kept on `openferment-data` since OF-BLD-019 §7.1: the corn plant's reference run (`1b2f2c463c872086`), the corn stover plant's through the reference endpoint (`42f80a77d306f673`, 1.967671122 USD per gallon, nine of its package test's eleven values within tolerance, the two misses the package's own on this lock), and one run of `sc-pha-1` (`23c3304c1c35e26d`, `demo`), made in §1.2 on stand-in assumptions under the reviewer name *OF-BLD-019 session* (a test entry), whose base case could not run; no run of `sc-yeast-1` is kept: three of its inputs wait for Sean |
@@ -135,8 +136,9 @@ programs and examples hidden.
                     and the reader says which it shows. 22 show
 134 records         132 curated · 2 industry-estimate · 7 non-primary; all on casein papers, so none
                     shows (thread Q's 163 values are extracted candidates, arriving with the service)
- 40 ontology fields  7 families: expression, PTM, functional, cultivation, downstream & economics,
-                    polymer, growth and product kinetics
+ 44 ontology fields  7 families: expression, PTM, functional, cultivation, downstream & economics,
+                    polymer, growth and product kinetics (OF-BLD-020 §3.2 added four kinetics fields
+                    on 2026-10-21: maintenance, biomass yield on oxygen, specific oxygen uptake, kLa)
   8 ontology gaps   real values the v1 ontology cannot express, recorded rather than dropped
  19 strains         4 casein (cw15, UVM4, C. reinhardtii wild type, the bovine reference), 2 PHA
                     (C. necator H16, P. putida KT2440), 2 yeast (S288C, CEN.PK113-7D, from SGD) and 11
@@ -169,9 +171,9 @@ browser ──POST /api/ask/stream──▶ FastAPI
                                     │    question names; the map goes in round one and is the first trace line
                                     ├─ the loop: the model calls its tools — search_records, search_passages,
                                     │    convert_units, yield_ceiling, growth_forecast, selling_price,
-                                    │    draft_runbook, thermo_props, run_flowsheet, stream_table, and a read
-                                    │    and a write tool for every module — each step streamed to the browser
-                                    │    as it completes
+                                    │    draft_runbook, thermo_props, run_flowsheet, stream_table,
+                                    │    fermos_simulate, fermos_vessel, and a read and a write tool for
+                                    │    every module — each step streamed to the browser as it completes
                                     ├─ budget spent (6 rounds, 12 calls, cost, 180 s): one last turn, no tools
                                     ├─ a refusal or outage: asked again once, on the fallback model
                                     ├─ validate_plan: no number, nothing cited that no tool returned,
@@ -297,13 +299,30 @@ nothing else. Now (OF-BLD-015 Phase 7, `docs/TOOLS.md`):
   pureOS's trains and from BioRepo → Artifacts by one rule, `module_stores.artifact_program`
   (a run is its scenario's, its flowsheet's and its basis's program, an archived one winning);
   the MCP server's `get_artifact` still reads any kept artifact by its id.
+- **Postdoc simulates a culture and asks for its vessel** (OF-BLD-020 Phases 3 and 4).
+  `fermos_simulate` takes a model family's name, a strain, a product and a sugar by their ids,
+  and optionally the record ids that bind a parameter, a kept fit's or forecast's id and where
+  to start from: ids and words, never a number. It runs the same simulation fermOS → Simulate
+  runs, as a free write at no gate, audited as the model's, and returns the kept run as one
+  evidence id with what bound each parameter said in words and counts; a parameter's value
+  stays in the artifact. The service holds no person's value, so a parameter nothing binds
+  waits and the tool returns the refusal's words: while no fit or kept simulation is on file
+  that is every run, because a run's starting cells and product bind from a fit, a kept
+  simulation or a person, never a record. `fermos_vessel` asks BioSTEAM for the vessel a kept
+  simulation needs (*fermOS sizes the vessel on BioSTEAM*, below). `fermos_read` lists kept
+  simulations (kind `simulation`) and designs (kind `vessel`), and Postdoc's prompt says a
+  simulation's or a vessel's numbers are read from its artifact and never stated.
 
 `pnpm check:tools` holds its rules in `verify`: a read and a write tool for every module;
 `tools/writes.py`, read as parsed Python so a write function reached through an aliased import
 is still caught, calling only the module write functions it names; no other tool file reaching
-what keeps a Proforma run or writes an audit line, found by following every function of the
-service that does, through its imports (rule 2b); a person's name on every gated action; one
-gate table in two places; and every name in the closed registry written down. `pnpm eval:o`
+what keeps a Proforma run, a fermOS simulation, a vessel design or a pureOS train, or writes an
+audit line, found by following every function of the service that does, through its imports,
+and no tool file reaching a module by name at run time (rule 2b); a person's name on every
+gated action; one gate table in two places; every name in the closed registry written down;
+and, since OF-BLD-020 Phase 3, no `fermos_*` or `pureos_*` tool whose input schema admits a
+number, the two count fields `k` and `limit` at the top of an input aside (rule 6, E.4‴: a
+model's parameter is a source, never a value). `pnpm eval:o`
 runs ten cross-module questions and scores whether the right modules were read (on Haiku,
 2026-10-20: searched 80 %, five cents). The footer is not scored: its key and the footer come
 from the same coverage call, so it could not miss.
@@ -311,8 +330,9 @@ from the same coverage call, so it could not miss.
 ### The same tools, from an assistant outside the app
 
 `core/openferment_core/mcp_server.py` is an MCP server over stdio. It lists the
-thirty-two tools Postdoc uses, with the registry's own schemas, and two more:
-`ask_postdoc`, which runs the loop and returns the plan, and `get_artifact`. The
+thirty-four tools Postdoc uses, with the registry's own schemas, and two more:
+`ask_postdoc`, which runs the loop and returns the plan, and `get_artifact`, thirty-six
+in all (`fermos_simulate` and `fermos_vessel`, OF-BLD-020, are the registry's newest). The
 registry's rules hold there as everywhere: a number typed into an input is
 refused, a write goes through the module's own write function, and anything at
 a gate becomes a proposal a person carries out on Home. No tool signs for a
@@ -551,7 +571,9 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   reaches any of the 24 functions it finds keeping a Proforma run or writing an
                          #   audit line (rule 2b); 12 gated actions need a person's name; the 7 gates in
                          #   gates.py and docs/TOOLS.md alike; each of the 32 names in WHITELIST registered
-                         #   and written down in docs/TOOLS.md
+                         #   and written down in docs/TOOLS.md; since OF-BLD-020 Phase 3, rule 2b also finds
+                         #   what keeps a simulation, a vessel design or a train, and rule 6 (E.4‴) fails a
+                         #   fermOS or pureOS tool whose input schema admits a number
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches;
                          #   every thread letter has one program and the [A-Q] class follows programs.ts; a
                          #   locked runbook with no deposition behind it is an example; nothing under src/ is
@@ -559,8 +581,9 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   stand-in, placeholder or scripted (three named exceptions); a BioSTEAM class names
                          #   one unit-operation step; no scenario takes a reserved id (scenario, reference), and
                          #   a BioSTEAM seed scenario's description names no binding outcome; since OF-BLD-020
-                         #   Phase 2, every declared parameter has a written bounds reason (D4), and Proforma's
-                         #   and pureOS's screens render no number box or slider outside the panel (E.1‴)
+                         #   Phase 2, every declared parameter has a written bounds reason (D4), and Proforma's,
+                         #   pureOS's and (since Phase 3) fermOS's screens render no number box or slider outside
+                         #   the panel (E.1‴)
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
   pnpm test:export       #   the decision merge, exercised on core/tests/fixtures/export/; a bent one fails
   pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
@@ -707,14 +730,22 @@ dynamics: a genome-scale model gives a yield ceiling with no time axis, and
 titre is fermOS's output rather than geneOS's. **fermOS → pureOS** is the
 harvest step, which pays for a choice made back in geneOS — secreted or
 intracellular — so the handoff carries product location, not just a titre.
-Two more reach Proforma (OF-BLD-019 Phase 5, below): **fermOS → Proforma** is a fit a person
-chooses as the source of a scenario's titre, yield and productivity, and **geneOS → Proforma** is
-the ceiling a scenario's fermenter yield is read against, flagged and never clamped.
+Two more reach Proforma (OF-BLD-019 Phase 5, below): **fermOS → Proforma** is a fit, or since
+OF-BLD-020 a kept simulation, a person chooses as the source of a scenario's titre, yield and
+productivity, and **geneOS → Proforma** is the ceiling a scenario's fermenter yield is read
+against, flagged and never clamped.
 
-**fermOS fits what a run measured**: kinetics is built from depositions alone,
-and the other four subsystems are named and not built. It is the one that
-cannot be seeded from literature, because kinetic parameters are fitted to real
-runs and come from Deposition. **pureOS** has the
+**fermOS fits what a run measured, and simulates from what it is given.** The
+rule, as OF-BLD-020 D1 amends it: a *fit* takes only a deposition's measured
+readings, because kinetic parameters fitted to a run belong to that run in that
+vessel. A *simulation* may take each parameter from a paper's records through
+the aggregate gate, from a fit or forecast, from a kept simulation, from a named
+person's assumption or from a stated convention, each labelled with its source
+on the screen and in the artifact's basis, and its provenance follows the
+weakest of them: it is never a measurement. Kinetics (the fits), operating mode
+(the model families, simulated on scipy) and transport and scale (the vessel,
+sized on BioSTEAM) are built; control is named and not built (*fermOS simulates
+on scipy* and *fermOS sizes the vessel on BioSTEAM*, below). **pureOS** has the
 unit-operation vocabulary and reads the train a BioSTEAM flowsheet ran (below); it
 has no process model of its own, chooses no train, and its four subsystems are
 named and not built. Both say so on the screen
@@ -967,6 +998,18 @@ choice is kept in this browser by scenario and input, goes with the binding and 
 `fits`, and the run's basis names the artifact for each input it feeds, and the batch time, so
 the run's provenance follows the fit's. No fit is on file in this checkout.
 
+**A kept simulation is a source too** (OF-BLD-020 §3.3). The same list holds every kept
+`fermos.simulation` beside the fits and forecasts (`fermos.FEEDS_PROFORMA`), and the same choice
+attaches one, from **Send to Proforma** on fermOS → Simulate or the scenario page's chooser. It
+feeds its end state as it was kept, recomputed nowhere: titre its final product at harvest, yield
+the product made over the sugar used to harvest, productivity that titre over the harvest hour,
+each one value with no interval, and the harvest hour as the batch time. It carries its own
+provenance and a flag saying it is a simulation, not a measurement. A chemostat (it has no batch),
+a family whose product is stored inside the cells (`storage_v1`), or a simulation of another
+product feeds nothing and says why; one naming no product is read as the scenario's and flagged.
+Its productivity feeds only beside its own titre, as a fit's does. No simulation is kept on
+`openferment-data` yet (*fermOS simulates on scipy*, below).
+
 **The ceiling check is a flag, never a bound** (D11). `GET /api/proforma/ceiling-check` sets the
 scenario's fermenter yield, bound as its page binds it (records, a named person's assumption, or
 a fit), beside the newest stored geneOS ceiling of each shelf model of its organism, on its
@@ -1050,6 +1093,154 @@ record of the active program (with no titre record on file, it says what
 fills it). Postdoc asks the same through `thermo_props`, each property its own
 evidence id. With the service down the trains, the train page and each card
 say so, and nothing stands in for an answer.
+
+### fermOS simulates on scipy (OF-BLD-020 Phase 3)
+
+fermOS → Simulate (`/fermos/simulate`, `src/screens/FermOSSimulate.tsx`, the tab after Fits)
+answers one question: given these numbers, how would a culture run over time? A model family is
+a small set of rate equations: how fast the cells grow, how fast they eat the sugar, how fast they
+make the product. scipy does the arithmetic. It is an open-source library of numerical methods for
+Python. Its integrator (`solve_ivp`, the LSODA method) starts from the cells, sugar and product at
+hour zero and steps the equations forward in time until the sugar runs out, or until the run's
+length is reached. Its least-squares solver (`least_squares`) works the other way, for a fit: it
+moves the parameters until the curves pass as close as they can to a run's readings. A root
+finder (`brentq`) finds a chemostat's steady state. scipy runs in the service itself, in
+`core/openferment_core/kinetics.py` and `fermos.py`, the only two service modules that import it
+(`test_workers` greps for it), so a simulation starts no worker: a batch on the tests' stand-in
+takes 13 to 20 milliseconds (STATE.md §3.1).
+
+- **The rule, amended (D1).** A *fit* still takes only a deposition's measured readings. A
+  *simulation* may take each parameter from a paper's records through the aggregate gate, from a
+  fit or forecast, from a kept simulation, from a named person's assumption, or from a stated
+  convention. Each value is labelled with its source in the parameter panel and in the artifact's
+  basis, and the simulation's provenance is the weakest of them (`basis_provenance`): one built on
+  thread Q's unverified records is `unverified`, and one with any typed value is `demo`. A
+  simulation never poses as a measurement: its curves are computed lines, and the card above them
+  says what it was built from.
+- **Five model families** (`kinetics.py`, each with its equations in plain Unicode in its
+  docstring and on the screen; the file holds no process number, only the solver's twenty
+  settings, each named with its reason and stated in every basis):
+  - `batch_v1`, **Batch**: sugar and cells at the start, nothing added. Growth follows Monod: it
+    slows as the sugar runs low, and runs at half speed when the sugar is at Ks. Optional terms:
+    substrate inhibition (Haldane's Ki: too much sugar slows growth), product inhibition (growth
+    and product stop as the product nears Pmax), Luedeking–Piret production (α grams of product
+    per gram of growth, plus β per gram of cells per hour) and maintenance (m, the sugar cells
+    burn just to stay alive).
+  - `fedbatch_v1`, **Fed-batch**: the same culture fed sugar during the run, at a constant rate or
+    at a rate that holds a set growth rate. The volume grows, and a person gives the run's length.
+  - `chemostat_v1`, **Chemostat**: fresh medium in and broth out at one dilution rate. The result
+    gives the steady state (cells, sugar, product and the productivity D·P), or washout when the
+    cells cannot grow as fast as they are diluted. When both are stable it says so, and which one
+    the run reached. A dilution rate of zero is refused: nothing flows, and that is a batch.
+  - `storage_v1`, **Growth then storage**: the cells grow until a second nutrient runs out, then
+    store a product inside them (the PHA and lipid shape). It belongs to the archived PHA program,
+    so it is hidden while the switch is off.
+  - `light_v1`, **Light-limited**: a socket. Its four parameters are declared; it has no rate law,
+    and it refuses to run, saying what would build it.
+
+  Every family that runs reports its oxygen uptake rate (OUR) from Yx/o, the cells made per gram
+  of oxygen, and mO, the oxygen burnt for maintenance. With no Yx/o the culture is anaerobic and
+  its uptake is zero, said so. Each run's mass balance is checked afterwards, and a gap past 1 % becomes a
+  flag. The families declare 84 parameters: 18 for batch, 24 for fed-batch, 20 for chemostat, 18
+  for storage and 4 for light.
+- **Where a value comes from, in order** (D6, `fermos.bind_parameters`). Each parameter's rule
+  lists its sources, and the first that has a value gives it:
+  1. a fit a person chose: a kinetic fit of the same family, or a logistic fit or its forecast
+     for what it carries (μ, α, β, the start values, and Yp/s through its forecast), with its
+     interval and whether its run identified it;
+  2. records, through Proforma's aggregate gate: the program's papers, the strain chosen (or every
+     strain of the program's organism), the sugar named as the carbon source (Pmax's and Ki's
+     records are held otherwise, and their notes say how), converted by `units.py`, and valued
+     by Proforma's own statistic (the median, with the lowest and highest). Every record left out
+     is counted and the reason given;
+  3. a kept simulation's value, when the run starts from one;
+  4. a named person's value, typed into the panel. It wins over all the sources above wherever it
+     is typed;
+  5. the parameter's stated convention: no death, no non-growth product, no maintenance and no
+     oxygen for maintenance (zero, said so), substrate inhibition off, n of 1, anaerobic, per
+     litre, until the sugar runs out.
+
+  A parameter with none of these waits, and the run is refused naming it and the record field
+  that would bind it. Postdoc may name exactly which records bind a parameter (`recordsByParam`);
+  named records go ahead of a fit or a kept simulation, and a person's value still wins.
+- **What thread Q binds tonight, and what waits** (STATE.md §3.5, measured 2026-10-21 over 163
+  unverified thread Q values, `GET /api/fermos/bind?family=batch_v1&product=ethanol&sugar=glucose`).
+  For CEN.PK113-7D: μmax from 1 record, Yx/s from 3, Yp/s from 3, and the starting sugar from 4
+  `medium_component_conc` records (the medium binds over every strain); the conventions above for
+  the rest; **Ks, α, Pmax, X0 and P0 wait**. For every strain of the program: Ks (1 record), Pmax
+  (1) and Ki (2) bind as well; **α, X0 and P0 still wait**. Thread Q holds no Luedeking–Piret α,
+  and a run's starting cells and product come from a fit, a kept simulation or a person, never a
+  record. So no simulation is kept on `openferment-data`; it waits for Sean (run owed).
+- **fermOS → Simulate.** Choose a family (its one line and its equations are shown; the light
+  socket is listed and cannot be chosen), a strain or every strain of the program, a product, a
+  sugar, and **Start from**: records, a fit (run until the sugar runs out, or as long as the
+  fitted run), or a kept simulation. The parameter panel shows the family's scope,
+  `fermos:family:<id>`, in its groups (Growth, Product, Inhibition, Oxygen, then Feed, Dilution or
+  Storage where the family has them, Start values, Run length), each value with its source chip.
+  What still waits is listed above **Simulate**, from `GET /api/fermos/bind` with the panel's
+  values laid on (`?overrides=`), and the button stays off until nothing waits. **Simulate** posts
+  the scope's overrides. The result shows what it was built from; the time course; the end state
+  (final titre, yield achieved, productivity, the hour the sugar runs out; a chemostat's steady
+  state); the ceiling card (Yp/s beside each geneOS ceiling read for the strain's host models,
+  flagged when above and never clamped, D11); every parameter with its source and interval, as
+  CSV; and the basis. Then **Fit this family to a deposition** (fermOS → Fits, whose family
+  chooser offers the logistic fit and `batch_v1`), **Design the vessel** and **Send to Proforma**.
+- **The time course** (`src/components/figures/TimeCourse.tsx`, D14). Every state is a computed
+  curve drawn in the simulation's own provenance (dotted when `computed`, amber dashes when
+  `demo`). The volume shows where it varies, and OUR rides on the cells' panel against a second
+  axis. A deposition's readings drawn against the curves are filled points, the only filled
+  mark. The
+  yield panel sets Yp/s and the yield the run achieved beside each geneOS ceiling as a rule; a
+  point above a ceiling is ringed by the service's own flag and never moved. Like every figure it
+  has a table twin and a CSV, and `check:figures` (part 8) holds it.
+- **Forecast goes through the panel.** fermOS → Forecast renders no number box of its own any
+  more. A logistic fit's start values and length are the scope `fermos:forecast:<fit id>` (X0, S0
+  and P0 in the run's own units, and the length), bound to the fitted run's own; a person's change
+  goes into the forecast with their name and makes it `demo`. A `batch_v1` fit has no covariance
+  band in the tree, so Forecast simulates from it instead (`startFrom: fit`, as long as the fitted
+  run): the family scope's Start values and Run length show, the run's readings are drawn as
+  filled points, and **Simulate from this fit** is held while anything waits, naming the keys.
+- **One artifact a run.** `POST /api/fermos/simulate` takes a `SimulationRequest` (family,
+  strain, product, sugar, the scope's `overrides`, `fitArtifact`, `startFrom`, `durationPreset`,
+  `recordsByParam`, `includeArchived`) and keeps one `fermos.simulation` artifact, versioned
+  `kinetics <family> 1 · scipy <version>`. It answers a `SimulationResult`: the parameters and
+  start values with their sources, the series by state, OUR and its peak, the end state, the hour
+  the sugar runs out and the harvest hour, final titre, yield achieved and productivity, the mass
+  balance, the ceiling rows, the flags and the basis. The basis names the family, strain, product
+  and sugar; every value with its source (records each as a `record` input; a fit or kept
+  simulation with its `<key> origin`); each person's value by name; the solver's settings as
+  conventions; and one `ceiling <model>` input per host model. Asked again on the same basis, the
+  kept run comes back. `GET /api/fermos/families` (and `/{id}`), `GET /api/fermos/bind` and
+  `GET /api/fermos/simulations` read and keep nothing. A refusal is a 422 in words (a parameter
+  that waits, the light socket, a bad override, a run that cannot end, a damaged kept
+  simulation); an unknown family is a 404 on bind.
+- **Postdoc simulates with ids and words.** `fermos_simulate` (the registry's thirty-third tool)
+  and `fermos_write`'s `simulate` are one function, `writes.run_simulation`: a free write at no
+  gate, audited with the model as the agent. It returns the run as one evidence id, whose value is
+  the titre at harvest, and a summary saying what bound each parameter in words and counts; a
+  parameter's value stays in the artifact. `fermos_read`'s kind `simulation` lists kept runs
+  (`fermos/simulation/<artifact id>`), and a claim citing one that a read returned only as a row
+  cites the row's ref. Postdoc's prompt (rule 15) says a simulation's numbers are read from its
+  artifact, never stated. The registry now holds thirty-four tools, and the MCP server lists
+  thirty-six. `check:tools` rule 2b holds every function that keeps a simulation to
+  `tools/writes.py`, and rule 6 (E.4‴) fails any `fermos_*` or `pureos_*` tool whose input schema
+  admits a number. Tonight's four live asks each called it and got the refusal naming the five
+  parameters that wait for CEN.PK113-7D (`docs/DEMO.md` §7).
+- **Where the tree overruled the build document.** D5's equations as written take the sugar below
+  zero; the sugar is held at zero once it runs out, and "runs out" is the hour it falls to a
+  thousandth of its start. Pmax stops β's product as well as growth. An exponential feed pays for
+  the whole demand at the set rate, not for growth alone. The step-table feed waits, because a
+  parameter holds one number or one word. A batch fit with no biomass series cannot tell the
+  scale of the cells: it holds X0 at a stated gauge of 1 g L⁻¹ and reports Yx/s, α and β, which
+  scale with it, unidentified; a person who types the run's own X0 rescales them, and each
+  value's source says so. N0 and Qmax bind no record (`medium_component_conc` names a sugar,
+  never the second nutrient; `pha_content_cdw` is in % of cell dry weight, which `units.py` does
+  not turn into a share). `kinetics.py`'s docstring lists each departure, and STATE.md §3.1, §3.2
+  and §3.R record them.
+- **What waits for Sean.** In fermOS → Simulate, choose `batch_v1`, ethanol and glucose, Start
+  from records, and type under his reviewer name what the panel says waits: α (g g⁻¹), X0 and P0
+  (g L⁻¹) for every strain, plus Ks and Pmax for CEN.PK113-7D alone. Then **Simulate**, and
+  **Design the vessel**.
 
 ### fermOS sizes the vessel on BioSTEAM (OF-BLD-020 Phase 4)
 
@@ -1268,22 +1459,30 @@ A screen never builds a form of its own for one.
 - **The service serves a scope.** `GET /api/params/{scope}` answers with every spec of the scope
   and its value as the service binds it now. `POST /api/params/{scope}/resolve` lays a person's
   values on and says what a run would add to its basis; it runs nothing and keeps nothing.
-  Three kinds of scope are served. `proforma:<scenario id>` is a scenario's inputs, bound as a
-  run binds them, and starts no worker. `fermos:vessel:<simulation or fit id>` is a vessel
-  design's parameters, with BioSTEAM's own defaults read in the Proforma worker, so a read can
-  start it. `fermos:family:<family id>` is a kinetics family's parameters. `pureos:unit:…` answers
-  404 until pureOS has a provider. A malformed scope or a refused value is a 422 in words.
+  Four kinds of scope are served. `proforma:<scenario id>` is a scenario's inputs, bound as a
+  run binds them, and starts no worker. `fermos:family:<family id>` is a model family's
+  parameters, bound as a simulation binds them (the strain, product, sugar, fit and start ride as
+  query parameters). `fermos:forecast:<kinetic fit id>` is a logistic fit's start values and
+  forecast length, in the units of the fitted run's own series and bound to that run's values
+  (404 for an id not on file; 422 for a batch fit, a forecast or another artifact).
+  `fermos:vessel:<simulation or fit id>` is a vessel design's parameters, with BioSTEAM's own
+  defaults read in the Proforma worker, so a read can start it. `pureos:unit:…` answers 404 until
+  pureOS has a provider (night two). A malformed scope or a refused value is a 422 in words.
 - **One panel draws every scope.** `src/components/ParameterPanel.tsx` renders one row per
   parameter (`ParameterRow.tsx`), in its group. A row shows the value, the unit and the interval,
   and its source as a chip: *fitted* or *artifact* or *simulation* with a link to the artifact,
   *record ×N low–high*, which opens the records, *assumption by <name>*, *convention*,
-  *library default*, or *waiting*. Where the parameter's rule takes a person's value, below them
-  are a number box, a slider when the parameter has both bounds, or a list when it is a choice of
-  words, then the low, the high and what the value rests on. **Reset to source** shows while a
-  person's value stands, and every row has **Why**: what the symbol means, the source rule in
-  order with the one that answered, the bounds and their reason, and the library's default. The panel computes nothing: every value and warning on it came from the service or
-  from the person. It is live on Proforma's scenario page and on fermOS → Vessel. Its controls
-  are 44 px touch targets and nothing on it needs a hover, because it may be used at the bench.
+  *library default*, *not read here* (a key the other values leave unread, such as a fed-batch's
+  μset under a constant feed), or *waiting*. Where the parameter's rule takes a person's value,
+  below them are a number box, a slider when the parameter has both bounds, or a list when it is
+  a choice of words, then the low, the high and what the value rests on. **Reset to source** shows
+  while a person's value stands, and every row has **Why**: what the symbol means, the source rule
+  in order with the one that answered, the bounds and their reason, and the library's default.
+  The panel computes nothing: every value and warning on it came from the service or from the
+  person.
+  It is live in four places: Proforma's scenario page, and fermOS → Simulate, Vessel and
+  Forecast. Its controls are 44 px touch targets and nothing on it needs a hover, because it may
+  be used at the bench.
 - **A person's change is a named assumption** (D3). Typing needs a reviewer name, set in
   Settings; without one every edit control is off and the row says where to set it. Each change
   is an `Override`: the scope, the key, the value, its low and high, who typed it, when, and
@@ -1301,18 +1500,21 @@ A screen never builds a form of its own for one.
   physical limit (nothing negative, a share between none and the whole), or a sentence saying why
   it has no bounds (a choice of words). A value typed outside the bounds is kept as typed; the
   row shows the service's warning, and the basis records the value. `check:seed` asks
-  `python -m openferment_core.params --check` and fails on a spec with no reason: 156 parameters
-  are declared at this commit, across Proforma's flowsheets, fermOS's five model families and the
-  vessel, and every one has one.
-- **A number box lives only in the panel** (E.1‴). `check:seed` reads Proforma's and pureOS's
-  screens (`ProformaScenario.tsx`, `ProformaBiosteam.tsx`, `PureOS*.tsx`) as syntax trees. It
-  fails on any `<input>` of type number or range there, and on one whose type it cannot read.
-  Three are allowed by name, each with its reason: the authored surfaces' number box and slider
-  (S1–S3, the archived casein examples) and the run's grid sliders (*Move three inputs over the
-  run's grid*). All three move a view over a computed grid and set no parameter. fermOS's screens
-  join the guard once fermOS → Forecast's typed start values and duration move into the panel.
+  `python -m openferment_core.params --check` and fails on a spec with no reason: 160 parameters
+  are declared at this commit, 36 across Proforma's flowsheets, 84 across fermOS's five model
+  families, 4 in a logistic fit's forecast and 36 in the vessel (27 aerated, 9 anaerobic), and
+  every one has one.
+- **A number box lives only in the panel** (E.1‴). `check:seed` reads Proforma's, pureOS's and
+  fermOS's screens (`ProformaScenario.tsx`, `ProformaBiosteam.tsx`, `PureOS*.tsx`,
+  `FermOS*.tsx`: eight files at this commit) as syntax trees. It fails on any `<input>` of type
+  number or range there, and on one whose type it cannot read. Three are allowed by name, each
+  with its reason: the authored surfaces' number box and slider (S1–S3, the archived casein
+  examples) and the run's grid sliders (*Move three inputs over the run's grid*). All three move a
+  view over a computed grid and set no parameter. fermOS's screens joined the guard with
+  OF-BLD-020 §3.3, when Forecast's typed start values and length moved into the panel.
 - **A model never sets one.** Postdoc's tools carry ids and words. `proforma_write`'s `bind` is
-  refused, and `run_flowsheet` runs a scenario as the service binds it, with no person's value.
+  refused, and `run_flowsheet`, `fermos_simulate` and `fermos_vessel` run as the service binds
+  the scenario, the simulation or the design, with no person's value.
 
 ### No simulated agent
 

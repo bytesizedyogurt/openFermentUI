@@ -89,7 +89,7 @@ id.
 
 | Tool | In | Out |
 |---|---|---|
-| `fermos_simulate` | a model family's id (`batch_v1`, `fedbatch_v1`, `chemostat_v1`; `storage_v1` with the switch on; `light_v1` refuses in words), a strain, a product and a sugar by their ids (each may be empty), `recordsByParam` (a parameter's key to the record ids that bind it, exactly those records), a kept fit's artifact id, `startFrom` (`records`, `fit` or `simulation:<artifact id>`) and `durationPreset` (`until-sugar-runs-out` or `fit-length`) | runs `fermos.simulate` as the service binds the family's parameters, keeps one `fermos.simulation` artifact and returns its evidence id (the artifact id; its value the product's titre at harvest), what bound each parameter in words and counts (never the value, which the artifact holds), the end state, the ceiling rows beside Yp/s in words, and the flags (a value outside its bounds by its key alone, the value and its bounds left to the artifact; a long flag cut at a sentence or clause and said to be cut; each ending at a full stop, OF-BLD-020 §3.R); or refuses with `fermos.simulate`'s own words (the 422's) naming each parameter that waits and the field that would bind it, and, with the switch off, a start from a kept simulation, a fit or a forecast of an archived program (a storage_v1 simulation is PHA's, as is one built on it) |
+| `fermos_simulate` | a model family's id (`batch_v1`, `fedbatch_v1`, `chemostat_v1`; `storage_v1` with the switch on; `light_v1` refuses in words), a strain, a product and a sugar by their ids (each may be empty), `recordsByParam` (a parameter's key to the record ids that bind it, exactly those records), a kept kinetic fit's or forecast's artifact id (`fitArtifact`), `startFrom` (`records`, `fit` or `simulation:<artifact id>`) and `durationPreset` (`until-sugar-runs-out` or `fit-length`) | runs `fermos.simulate` as the service binds the family's parameters, keeps one `fermos.simulation` artifact and returns its evidence id (the artifact id; its value the product's titre at harvest), what bound each parameter in words and counts (never the value, which the artifact holds), the end state, the ceiling rows beside Yp/s in words, and the flags (a value outside its bounds by its key alone, the value and its bounds left to the artifact; a long flag cut at a sentence or clause and said to be cut; each ending at a full stop, OF-BLD-020 §3.R); or refuses with `fermos.simulate`'s own words (the 422's) naming each parameter that waits and the field that would bind it, and, with the switch off, a start from a kept simulation, a fit or a forecast of an archived program (a storage_v1 simulation is PHA's, as is one built on it) |
 
 Offered loose, as the module tools are. Ids and words only (D13): a JSON
 number anywhere refuses the call, as for every tool, and no field of its
@@ -106,7 +106,11 @@ each as a `record` input and says beside the value (`<key> origin`,
 `POST /api/fermos/simulate` (`SimulationRequest.recordsByParam`).
 
 It is a free write: compute, no model money, and **at no gate** (`gates.py`
-is unchanged, as for a flowsheet run). It is audited like every module write,
+is unchanged, as for a flowsheet run). The integration is scipy's, in the
+service itself (`kinetics.py`: an open-source numerical library steps the
+family's rate equations forward in time), so it starts no worker; README.md
+(*fermOS simulates on scipy*) has the families and where each value comes
+from. It is audited like every module write,
 `agent: model` with the model id, the effort and the ask id, `module:
 fermos`, `action: simulate`, the family as target and the tool's name in
 `detail`. The service holds no person's assumption (they are typed in fermOS →
@@ -193,9 +197,12 @@ A number a person sets for a model reaches a run one way, and no tool is on it.
    and keeps nothing.
 3. The browser sends the scope's overrides with the run, as `overrides` in the
    body of `POST /api/proforma/run`, `POST /api/fermos/vessel` or
-   `POST /api/fermos/simulate`. `GET /api/proforma/bind` and the ceiling
-   check take them as `?overrides=`. Proforma still reads the older field,
-   `assumptions`, the same way for one release.
+   `POST /api/fermos/simulate`. `GET /api/proforma/bind`, the ceiling check
+   and `GET /api/fermos/bind` take them as `?overrides=`. A logistic fit's
+   forecast scope (`fermos:forecast:<fit id>`) travels as the forecast's own
+   fields on `POST /api/fermos/forecast`: its start values, its length, and
+   who typed each (`changedBy`, `durationBy`). Proforma still reads the older
+   field, `assumptions`, the same way for one release.
 4. The service checks each one (a real name, when it was typed, a number or
    one of the offered words, a parameter whose rule takes a person's value, a
    value inside its own low and high) and refuses one that fails, in words. A

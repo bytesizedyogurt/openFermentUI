@@ -342,9 +342,10 @@ branch's service, over this checkout's data (thread Q: 163 unverified candidates
 - **Postdoc**, asked *Simulate a glucose batch for CEN.PK113-7D from the extracted kinetics and compare the predicted
   yield with the Yeast9 ceiling*, four times: each run called `fermos_simulate`, quoted its refusal (the five that
   wait), kept the Yeast9 ceiling as a claim and said in gaps that there is no simulated yield to compare. One to five
-  claims kept; $0.0036–$0.0073 a run.
-- **Asked to design a fermenter for that batch**, three times: `fermos_vessel` refused in words, since no simulation is
-  kept. Zero or one claim; $0.0015–$0.0046.
+  claims kept; $0.0030–$0.0073 a run.
+- **Asked to design a fermenter for that batch**, three times, with no simulation kept: once `fermos_vessel` refused in
+  words, once `fermos_write`'s `design_vessel` refused in words, and once Postdoc read fermOS three times, found
+  nothing kept and called no vessel tool. Zero or one claim; $0.0015–$0.0046.
 
 ### Steer around (fermOS)
 
