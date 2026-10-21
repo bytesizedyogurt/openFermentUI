@@ -31,7 +31,7 @@ import {
   Legend,
 } from 'recharts';
 import { AlertTriangle, Copy, Download, GitCompare, Pin, PinOff, Play, Route, Table2, SlidersHorizontal } from 'lucide-react';
-import { archivedProgramOf, overridesFor, proformaScope, useProgramLookup, useStore } from '@/store';
+import { archivedProgramOf, overrideEnds, overridesFor, proformaScope, useProgramLookup, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import type { Artifact, BasisInput, CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, ParamScope, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
 import { PROGRAM_BY_ID } from '@/data/programs';
@@ -63,6 +63,7 @@ import {
 import { trainPath } from '@/lib/pureos';
 import { paramScope } from '@/lib/params';
 import { ParameterPanel } from '@/components/ParameterPanel';
+import { TOUCH_CHIP } from '@/components/ParameterRow';
 import { inputSourceWords } from '@/components/NewScenarioDialog';
 import { evaluateGrid, mspSweep, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
 import { fmt } from '@/engine/units';
@@ -687,7 +688,8 @@ const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e
  * chip on its paper, with the organism, the carbon source and its value in
  * the input's unit. The parameter panel opens it from the input's
  * `record ×N` chip (OF-BLD-020 §2.2: the records chooser this page had
- * became the panel's record link).
+ * became the panel's record link). Rendered inside the panel, its chips are
+ * the panel's 44 px touch targets (§2.R, finding 11; check:store walks it).
  */
 function RecordsChooser({ input }: { input: ScenarioInput | undefined }) {
   if (!input || input.records.length === 0) return null;
@@ -696,7 +698,7 @@ function RecordsChooser({ input }: { input: ScenarioInput | undefined }) {
       {input.source?.note && <span className="text-caption text-ink-soft">{input.source.note}</span>}
       {input.records.map((r) => (
         <span key={r.id} className="inline-flex flex-wrap items-center gap-1">
-          <CitationChip recordId={r.id} paperId={r.paperId} />
+          <CitationChip recordId={r.id} paperId={r.paperId} className={TOUCH_CHIP} />
           <span className="text-caption text-ink-soft">
             {r.organism ?? 'organism not stated'} · {r.carbonSource ?? 'carbon source not stated'} ·{' '}
             <span className="font-num">{fmt(r.value, 3)}</span>
@@ -738,16 +740,22 @@ function BasisAssumptions({ inputs, labels }: { inputs: BasisInput[]; labels: Re
  * feeds which input (`proformaFits`, Durable, like assumptions), and the
  * binding then names it as the inputs' source. A fit sent from fermOS →
  * Forecast arrives as `?fit=` and is attached here, once, for the inputs it
- * can feed. With no fit on file it says how one gets made.
+ * can feed. With no fit on file it says how one gets made. A value a person
+ * typed for an input wins over a fit chosen for it (OF-BLD-020 D3), so a
+ * card never says it is in use for that input: it says whose value wins
+ * there (§2.R, findings 8 and 12).
  */
 function FermosFitSlot({
   flowsheetId,
   chosen,
+  overridden,
   onChoose,
   onStop,
 }: {
   flowsheetId: string;
   chosen: Record<string, string>;
+  /** The inputs a person's value overrides, each with the person's name: no fit feeds them. */
+  overridden: Record<string, string>;
   onChoose: (fits: Record<string, string>) => void;
   /** Stop using these artifacts: only the inputs each feeds are cleared (§5.R). */
   onStop: (artifactIds: string[]) => void;
@@ -796,7 +804,8 @@ function FermosFitSlot({
         from the fit&rsquo;s forecast, drawn again to the hour its median sugar runs out (found between the forecast&rsquo;s points, so
         the length it was asked to run does not move them): titre from the final product, yield from product made over sugar used,
         and productivity as that titre over that hour. A fit&rsquo;s productivity feeds the fermenter only beside its own titre, since
-        the batch time is the titre over the productivity. The run then names the fit as the source of each.
+        the batch time is the titre over the productivity. The run then names the fit as the source of each input it feeds; a value a
+        person types in the panel wins over the fit for that input.
       </p>
       {arrived && (
         <p className="text-caption mb-2" data-testid="fermos-fit-arrived">
@@ -835,6 +844,11 @@ function FermosFitSlot({
           {fits.map((f) => {
             const feeds = fitsFrom(f);
             const inUse = using.has(f.artifactId);
+            const mine = Object.entries(chosen)
+              .filter(([, id]) => id === f.artifactId)
+              .map(([k]) => k);
+            const used = mine.filter((k) => !(k in overridden));
+            const beaten = mine.filter((k) => k in overridden);
             return (
               <li key={f.artifactId} className="card p-3" data-testid="fermos-fit-option" data-artifact={f.artifactId} data-feeds={Object.keys(feeds).length}>
                 <div className="flex flex-wrap items-center gap-2">
@@ -880,7 +894,13 @@ function FermosFitSlot({
                 <div className="mt-2">
                   {inUse ? (
                     <span className="text-caption">
-                      In use for {Object.entries(chosen).filter(([, id]) => id === f.artifactId).map(([k]) => k).join(', ')}.{' '}
+                      {used.length > 0 ? `In use for ${used.join(', ')}.` : 'In use for no input: a person’s value wins wherever it was chosen.'}{' '}
+                      {beaten.length > 0 && (
+                        <span data-testid="fermos-fit-overridden">
+                          Chosen for {beaten.map((k) => `${k}, where ${overridden[k]}’s value wins`).join('; ')}: the run does not use the fit
+                          there.{' '}
+                        </span>
+                      )}
                       <button className="underline hover:text-accent" onClick={() => onStop([f.artifactId])} data-testid="fermos-fit-stop">
                         Stop using this fit
                       </button>
@@ -1142,6 +1162,10 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   const [ceilingProblem, setCeilingProblem] = useState<string | null>(null);
   const [panel, setPanel] = useState<ParamScope | null>(null);
   const [panelProblem, setPanelProblem] = useState<string | null>(null);
+  // The service's refusal of the scope's overrides as they stand: the panel
+  // binds them as a run binds them, so a run of them would be refused in
+  // the same words, and Run waits until they stand (OF-BLD-020 §2.R).
+  const [refused, setRefused] = useState<string | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -1282,8 +1306,10 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     const inputs = info.inputs.map((i): ScenarioInput => {
       const o = by.get(i.key);
       if (!o || typeof o.value !== 'number') return i;
-      const low = o.low ?? o.value;
-      const high = o.high ?? o.value;
+      // One end typed, the other is the value; neither, held at the value (overrideEnds, as the service reads it).
+      const ends = overrideEnds(o);
+      const low = ends.low ?? o.value;
+      const high = ends.high ?? o.value;
       return {
         ...i,
         binding: 'assumption',
@@ -1298,6 +1324,12 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     });
     return { ...info, id: scenario.id, name: scenario.name, inputs, waiting: inputs.filter((i) => i.binding === 'waiting').map((i) => i.key) };
   }, [info, overrides, scenario.id, scenario.name]);
+
+  // The inputs a person's value overrides, with the person: a fit chosen for one does not feed it (D3).
+  const overridden = useMemo(
+    () => Object.fromEntries(overrides.filter((o) => typeof o.value === 'number').map((o) => [o.key, o.by])) as Record<string, string>,
+    [overrides],
+  );
 
   const priceBasis = bound?.priceBasis || flowsheet?.priceBasis || 'on the basis its flowsheet states';
   const labels = inputLabels(bound?.inputs ?? null, flowsheet);
@@ -1428,20 +1460,30 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
                 scope={scope}
                 data={panel}
                 request={ask}
+                onRefused={setRefused}
                 groups={PROFORMA_GROUPS}
                 recordsOf={(key) => <RecordsChooser input={info?.inputs.find((i) => i.key === key)} />}
               />
               {Object.keys(chosenFits).length > 0 && (
                 <p className="text-caption text-ink-soft">
-                  {Object.entries(chosenFits).map(([key, id]) => (
-                    <span key={key} className="mr-3">
-                      {labels[key] ?? key} from the fermOS fit{' '}
-                      <span className="font-num">{id}</span>:{' '}
-                      <button className="underline hover:text-accent min-h-[44px]" onClick={() => clearFit(scenario.id, key)} data-testid="fit-stop-input" data-key={key}>
-                        stop using it here
-                      </button>
-                    </span>
-                  ))}
+                  {Object.entries(chosenFits).map(([key, id]) =>
+                    key in overridden ? (
+                      <span key={key} className="mr-3" data-testid="fit-line" data-key={key} data-overridden="true">
+                        {labels[key] ?? key}: {overridden[key]}&rsquo;s value replaces the fermOS fit <span className="font-num">{id}</span>, and the run
+                        does not use the fit here:{' '}
+                        <button className="underline hover:text-accent min-h-[44px]" onClick={() => clearFit(scenario.id, key)} data-testid="fit-stop-input" data-key={key}>
+                          stop using it here
+                        </button>
+                      </span>
+                    ) : (
+                      <span key={key} className="mr-3" data-testid="fit-line" data-key={key} data-overridden="false">
+                        {labels[key] ?? key} from the fermOS fit <span className="font-num">{id}</span>:{' '}
+                        <button className="underline hover:text-accent min-h-[44px]" onClick={() => clearFit(scenario.id, key)} data-testid="fit-stop-input" data-key={key}>
+                          stop using it here
+                        </button>
+                      </span>
+                    ),
+                  )}
                 </p>
               )}
             </div>
@@ -1474,6 +1516,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
             <FermosFitSlot
               flowsheetId={flowsheetId}
               chosen={chosenFits}
+              overridden={overridden}
               onChoose={(fits) => setFits(scenario.id, fits)}
               onStop={(ids) =>
                 Object.entries(chosenFits)
@@ -1489,7 +1532,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
             )}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button variant="primary" onClick={go} disabled={running || starting || !bound || bound.waiting.length > 0}>
+            <Button variant="primary" onClick={go} disabled={running || starting || !bound || bound.waiting.length > 0 || refused !== null}>
               <Play size={14} /> {running ? 'Simulating…' : view ? 'Run the scenario again' : 'Run the scenario'}
             </Button>
             <StatusLine status={status} problem={statusProblem} running={running} elapsed={elapsed} />
@@ -1499,6 +1542,11 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
               </span>
             )}
           </div>
+          {refused !== null && (
+            <p className="text-caption text-signal-warn mt-2" data-testid="run-held">
+              Run waits until the service takes these values, since a run of them would be refused in the same words: {refused}
+            </p>
+          )}
           {bound && bound.waiting.length > 0 && (
             <p className="text-caption text-signal-warn mt-2" data-testid="proforma-waiting">
               Waiting for a source: {bound.waiting.map((k) => bound.inputs.find((i) => i.key === k)?.label ?? k).join(', ')}.

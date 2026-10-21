@@ -825,7 +825,7 @@ def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
     from . import artifacts, proforma
     from . import intake as _intake
     from .flowsheets import shelf as _shelf
-    from .models import ParamResolveRequest
+    from .models import Override, ParamResolveRequest
 
     rs = _standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
@@ -867,12 +867,24 @@ def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
             with _PoolLoaded(pool):
                 panel = [{"fits": chosen, **_param_answer(scope, ParamResolveRequest(fits=chosen))}
                          for chosen in (fits, *_bridge_choices(fit_id, fc_id))]
+                # OF-BLD-020 §2.R: the forecast chosen for every input it
+                # feeds, then titre typed by a person. The resolve binds as
+                # the run binds and refuses in the run's words, which the
+                # page shows as why Run waits (the double answers the
+                # panel's resolve with this recording for those fits and
+                # that key).
+                key, value = PARAMS_TYPED_BESIDE_A_FIT
+                typed = [*_standin_overrides(proforma.YEAST_SCENARIO_ID, YEAST_STANDIN_ASSUMED),
+                         Override(scope=scope, key=key, value=value, by="openFerment test fixture", at=AT,
+                                  note=PROFORMA_STANDIN)]
+                resolves = [{"fits": fits, "keys": sorted(o.key for o in typed), **_resolve_answer(
+                    scope, ParamResolveRequest(fits=fits, overrides=typed))}]
             kept = [artifacts.get(i).model_copy(update={"createdAt": AT, "durationMs": 0}) for i in (fit_id, fc_id)]
         finally:
             _intake.DATA_DIR = saved
     return ({"fermos-fits.json": {"none": none, "onFile": on_file},
              "proforma-bind-fits.json": {"flowsheet": proforma.ETHANOL, "fits": fits, "body": body, "others": others},
-             "params-proforma-fits.json": {"scope": scope, "answers": panel}}, kept)
+             "params-proforma-fits.json": {"scope": scope, "answers": panel, "resolves": resolves}}, kept)
 
 
 # §8.4: Proforma's BioSTEAM scenario for the smoke double. The binding and
@@ -1249,6 +1261,11 @@ PARAMS_MADE_HERE = "sc-made-here"
 # recorded as the real code answers it, warning and all. Not a yield of
 # anything.
 PARAMS_OUT_OF_BOUNDS = ("yield", 0.7)
+# A STAND-IN titre the browser tests type beside a fermOS fit chosen for
+# titre, yield and productivity (OF-BLD-020 §2.R): the resolve is recorded as
+# the real code answers it, a refusal in the run's words. Not a titre of
+# anything; the words name no value.
+PARAMS_TYPED_BESIDE_A_FIT = ("titre", 50.0)
 
 
 class _PoolLoaded:
@@ -1278,6 +1295,19 @@ def _param_answer(scope: str, req=None) -> dict[str, Any]:
 
     try:
         return {"status": 200, "body": params.scope(scope, req).model_dump(mode="json")}
+    except params.ScopeUnknown as e:
+        return {"status": 404, "body": {"detail": str(e)}}
+    except params.ParamRefused as e:
+        return {"status": 422, "body": {"detail": str(e)}}
+
+
+def _resolve_answer(scope: str, req) -> dict[str, Any]:
+    """POST /api/params/{scope}/resolve as the service answers it: the
+    result, or the refusal in its words with its status."""
+    from . import params
+
+    try:
+        return {"status": 200, "body": params.resolve_scope(scope, req).model_dump(mode="json")}
     except params.ScopeUnknown as e:
         return {"status": 404, "body": {"detail": str(e)}}
     except params.ParamRefused as e:

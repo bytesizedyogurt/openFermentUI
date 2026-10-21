@@ -27,7 +27,19 @@
  * wondering why a record they rejected came back.
  */
 import { readFileSync } from 'node:fs';
-import { isExample, mergeAssumptions, overrideOfAssumption, overridesFor, programOf, programVisible, proformaScope, snapshotOf, useStore } from '../src/store';
+import {
+  assumptionOfOverride,
+  isExample,
+  mergeAssumptions,
+  overrideEnds,
+  overrideOfAssumption,
+  overridesFor,
+  programOf,
+  programVisible,
+  proformaScope,
+  snapshotOf,
+  useStore,
+} from '../src/store';
 import { RECORDS } from '../src/data/records';
 import { PRODUCTS } from '../src/data/products';
 import { lockIntact } from '../src/engine/lock';
@@ -675,9 +687,21 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   const made = { id: 'sc-made-1', kind: 'biosteam', flowsheetId: 'ethanol_glucose_v0', modelId: 'ethanol_glucose_v0' } as unknown as Scenario;
   const bound = fixture<{ off: Record<string, { status: number; body: ProformaScenarioInfo }> }>('proforma-bind.json').off.ethanol_glucose_v0.body;
   const byService = inputCounts(made, bound, shelf, []);
-  check('a made scenario\u2019s card counts the inputs the service binds, as its page lists them',
-    !!byService && byService.bound && byService.total === bound.inputs.length &&
+  // OF-BLD-020 §2.R (finding 16): the page lists the flowsheet's convention
+  // among its inputs (the panel's Conventions group), and the binding holds
+  // none, so the card counts it from the shelf, as the page shows it.
+  const stated = ethanol?.inputs.filter((i) => i.kind === 'convention').length ?? 0;
+  check('a made scenario\u2019s card counts the inputs the service binds, and the convention its page lists, as its page lists them',
+    !!byService && byService.bound && stated === 1 && byService.total === bound.inputs.length + stated && byService.conventions === stated &&
       byService.waiting === bound.inputs.filter((i) => i.binding === 'waiting').length, byService);
+  const scenarios = fixture<ProformaScenarioInfo[]>('proforma-scenarios.json');
+  const yeastInfo = scenarios.find((x) => x.id === 'sc-yeast-1') ?? null;
+  const panelSpecs = JSON.parse(readFileSync(new URL('../core/tests/fixtures/prototype/params-proforma.json', import.meta.url), 'utf8'))
+    .response.scopes['proforma:sc-yeast-1'].body.specs as { key: string }[];
+  const yeastCard = inputCounts({ id: 'sc-yeast-1', kind: 'biosteam', flowsheetId: 'ethanol_glucose_v0', modelId: 'ethanol_glucose_v0' } as unknown as Scenario,
+    yeastInfo, shelf, []);
+  check('sc-yeast-1\u2019s card counts as many inputs as its page\u2019s panel lists, the convention among them',
+    !!yeastCard && yeastCard.total === panelSpecs.length && yeastCard.conventions === 1, { card: yeastCard, panel: panelSpecs.length });
   const index = readFileSync(new URL('../src/screens/Proforma.tsx', import.meta.url), 'utf8');
   check('the index asks the service to bind a scenario made here, and says only what can bind when it cannot ask',
     /proformaBind\(/.test(index) && /can bind to records/.test(index) && !/bind to records when it runs/.test(index) && !!ethanol);
@@ -773,10 +797,13 @@ await (async () => {
   check('a reference plant\u2019s read-back names each default and its unit, as the shelf lists it, and credits the package',
     cornFeed?.label === 'corn fed' && cornFeed?.unit === 'kg h-1' && cornRb.every((r) => r.origin === 'setting'), cornRb);
 
-  // (27) The left-out line names the flowsheet's own feed.
-  const left = String(call('leftOutWords', { leftOutNoCarbon: 14, leftOutOtherCarbon: 2 }, 'ethanol_glucose_v0') ?? '');
-  check('the ethanol inputs\u2019 left-out line names glucose, not the PHA rule\u2019s sugar or hydrolysate',
-    /glucose/.test(left) && !/hydrolysate/.test(left) && /a sugar or a hydrolysate/.test(String(call('leftOutWords', { leftOutNoCarbon: 1, leftOutOtherCarbon: 1 }, 'pha_sugar_v0') ?? '')), left);
+  // (27) The left-out line names the flowsheet's own feed. Since OF-BLD-020
+  // §2.2 a person reads it from the service (the panel shows the value's
+  // detail), so test_params holds its words, and nothing here writes a line
+  // of its own (§2.R, finding 15: this check held a function no screen called).
+  const libText = readFileSync(new URL('../src/lib/proforma.ts', import.meta.url), 'utf8');
+  check('the left-out line is the service\u2019s alone: no browser function writes one of its own',
+    !/leftOutWords|on a feed other than/.test(libText) && call('leftOutWords', {}, 'ethanol_glucose_v0') === undefined);
 
   // (3) A flowsheet with a program files its scenario there and nowhere else.
   check('New scenario offers only the flowsheet\u2019s own program when it has one',
@@ -1033,32 +1060,97 @@ await (async () => {
   check('nothing under src/ reads proformaAssumptions but the store\u2019s migration', readers.length === 0, readers);
 
   // The panel's controls: every input and select labelled, every one at least 44 px (Deposition.tsx's constraints).
-  for (const file of ['src/components/ParameterRow.tsx', 'src/components/ParameterPanel.tsx']) {
+  // OF-BLD-020 §2.R (finding 11): a link and the controls a component renders
+  // (CitationChip's trigger, Button) are touch targets too, so the walk sees
+  // `<a>`, `<CitationChip>` and `<Button>` beside the intrinsic controls, and
+  // the records Proforma renders into a row (RecordsChooser) with the panel's
+  // two files: each must carry a 44 px class (TOUCH_CHIP for a chip).
+  const TARGETS = ['input', 'select', 'button', 'summary', 'a', 'CitationChip', 'Button'];
+  const within = [
+    { file: 'src/components/ParameterRow.tsx', fn: null },
+    { file: 'src/components/ParameterPanel.tsx', fn: null },
+    { file: 'src/screens/ProformaScenario.tsx', fn: 'RecordsChooser' },
+  ];
+  for (const { file, fn } of within) {
     const text = readFileSync(file, 'utf8');
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const unlabelled: string[] = [];
     const small: string[] = [];
-    const visit = (node: ts.Node): void => {
-      if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && ['input', 'select', 'button', 'summary'].includes(node.tagName.getText(sf))) {
+    let seen = 0;
+    const visit = (node: ts.Node, inside: boolean): void => {
+      const here = inside || (ts.isFunctionDeclaration(node) && node.name?.getText(sf) === fn);
+      if (here && (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && TARGETS.includes(node.tagName.getText(sf))) {
         const attrs = node.attributes.properties.filter(ts.isJsxAttribute);
         const named = (n: string) => attrs.find((a) => a.name.getText(sf) === n);
         const tag = node.tagName.getText(sf);
         const line = sf.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+        seen++;
         if ((tag === 'input' || tag === 'select') && !named('aria-label')) unlabelled.push(`${file}:${line}`);
-        if (!/min-h-\[44px\]/.test(named('className')?.getText(sf) ?? '')) small.push(`${file}:${line} <${tag}>`);
+        const cls = named('className')?.getText(sf) ?? '';
+        if (!/min-h-\[44px\]|TOUCH_CHIP|linkClass/.test(cls)) small.push(`${file}:${line} <${tag}>`);
       }
-      ts.forEachChild(node, visit);
+      ts.forEachChild(node, (child) => visit(child, here));
     };
-    visit(sf);
-    check(`${file}: every input and select carries a label`, unlabelled.length === 0, unlabelled);
-    check(`${file}: every control is a 44 px touch target`, small.length === 0, small);
+    visit(sf, fn === null);
+    const where = fn ? `${file} (${fn})` : file;
+    check(`${where}: every input and select carries a label`, unlabelled.length === 0, unlabelled);
+    check(`${where}: every control, link and chip is a 44 px touch target`, small.length === 0 && (fn === null || seen > 0), small);
   }
+  check('TOUCH_CHIP and the links\u2019 class are 44 px',
+    /export const TOUCH_CHIP = '[^']*min-h-\[44px\]/.test(readFileSync('src/components/ParameterRow.tsx', 'utf8')) &&
+      /const linkClass = '[^']*min-h-\[44px\]/.test(readFileSync('src/components/ParameterRow.tsx', 'utf8')));
   const row = readFileSync(new URL('../src/components/ParameterRow.tsx', import.meta.url), 'utf8');
   check('a row offers Reset to source and Why, and says where a reviewer name is set when there is none',
     /Reset to source/.test(row) && />Why</.test(row) && /Set a reviewer name in Settings/.test(row) && /disabled=\{!named/.test(row));
   const panelSrc = readFileSync(new URL('../src/components/ParameterPanel.tsx', import.meta.url), 'utf8');
   check('the panel keeps a change as an override under the reviewer name and asks the service to resolve it',
     /setOverride\(\{ scope, key: spec\.key[^}]*by: reviewer/.test(panelSrc) && /resolveParams\(/.test(panelSrc) && /clearOverride\(scope, spec\.key\)/.test(panelSrc));
+}
+
+// OF-BLD-020 §2.R — the Phase 2 review. A migrated assumption whose ends
+// were its own value moves freely (10); one end of an interval typed is read
+// the same way by the row, the page's binding and the run (1, 14: the
+// service's `params.held`); an override wins over a fit on the scenario page
+// and the fit card, which never claim a fit feeds an input a person's value
+// overrides (8, 12); the panel tells the page when the service refuses the
+// scope's overrides, and Run waits with those words (13).
+{
+  const st = () => useStore.getState();
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  const fixed = { key: 'plant_scale', value: 100000, low: 100000, high: 100000, by: 'Sean Creighton', at: '2026-10-20', note: 'typed before the panel' };
+  st().applyDurable({ ...snapshotOf(st()), parameterOverrides: undefined, proformaAssumptions: { 'sc-x': [fixed] } });
+  const migrated = st().parameterOverrides['proforma:sc-x']?.[0];
+  check('a migrated assumption with both ends at its value comes back with no ends, so the value is held at itself',
+    migrated?.value === 100000 && migrated.low === null && migrated.high === null, migrated);
+  // ParameterRow's keep: a new value keeps the override's ends.
+  if (migrated) st().setOverride({ ...migrated, value: 200000, low: migrated.low, high: migrated.high, by: 'Sean Creighton', at: '2026-10-21T04:00:00Z' });
+  const moved = st().parameterOverrides['proforma:sc-x']?.[0];
+  const asRun = moved ? assumptionOfOverride(moved) : null;
+  check('…and a new value typed over it stands inside its own ends, held at itself in the run',
+    moved?.value === 200000 && moved.low === null && moved.high === null && asRun?.low === 200000 && asRun.high === 200000, { moved, asRun });
+  const ranged = overrideOfAssumption('sc-x', { ...fixed, low: 90000, high: 110000 });
+  check('a migrated assumption with a range keeps it', ranged.low === 90000 && ranged.high === 110000, ranged);
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+
+  const one = overrideEnds({ value: 50, low: 40, high: null });
+  const other = overrideEnds({ value: 50, low: null, high: 70 });
+  const none = overrideEnds({ value: 50, low: null, high: null });
+  check('one end typed, the other is the value; neither, held at itself with no interval (the service\u2019s params.held)',
+    one.low === 40 && one.high === 50 && other.low === 50 && other.high === 70 && none.low === null && none.high === null, { one, other, none });
+  const half = assumptionOfOverride({ scope: 'proforma:sc-x', key: 'titre', value: 50, low: 40, high: null, by: 'Sean Creighton', at: '2026-10-21', note: null });
+  check('…and the run\u2019s assumption takes the same interval', half?.low === 40 && half.high === 50, half);
+  const panelText = readFileSync(new URL('../src/components/ParameterPanel.tsx', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
+  check('the panel\u2019s row and the page\u2019s binding read an override\u2019s ends through overrideEnds',
+    /const ends = overrideEnds\(o\)/.test(panelText) && /low: ends\.low/.test(panelText) && /const ends = overrideEnds\(o\)/.test(page) && !/o\.low \?\? o\.value/.test(page));
+  check('the fit card says it is in use only for the inputs no person\u2019s value overrides, and whose value wins elsewhere',
+    /const used = mine\.filter\(\(k\) => !\(k in overridden\)\)/.test(page) && /In use for \$\{used\.join/.test(page) && /data-testid="fermos-fit-overridden"/.test(page) &&
+      !/In use for \{Object\.entries\(chosen\)/.test(page));
+  check('the line under the panel says a person\u2019s value replaces the fit where one overrides it',
+    /key in overridden \?/.test(page) && /value replaces the fermOS fit/.test(page) && /data-overridden="true"/.test(page));
+  check('the panel tells the page when the service refuses the scope\u2019s overrides, and Run waits with its words',
+    /onRefused=\{setRefused\}/.test(page) && /refused !== null\}/.test(page) && /data-testid="run-held"/.test(page) &&
+      /if \(!down\) refusedRef\.current\?\.\(words\)/.test(panelText) && /refusedRef\.current\?\.\(null\)/.test(panelText));
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

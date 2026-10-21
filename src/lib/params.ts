@@ -1,16 +1,23 @@
 // The browser's side of the parameter panel (OF-BLD-020 §2.1–§2.2, D2–D4).
 //
-// Two calls, both binding only (no worker starts, nothing is kept):
+// Two calls, neither of which keeps anything:
 //
 //   GET  /api/params/{scope}?flowsheet=&host=&fits=&vesselType=   a scope's specs and
 //        each value as the service binds it now, with its source
 //        (`ParamScope`);
 //   POST /api/params/{scope}/resolve   a person's overrides laid on, each an
-//        assumption by the person it names, with every value outside its
-//        bounds said in words (`ParamResolveResult`).
+//        assumption by the person it names, bound as a run of the scope
+//        binds them (a refusal is the run's, in its words), with every value
+//        outside its bounds said in words and the basis inputs a run adds
+//        for them (`ParamResolveResult`).
 //
 // A scope is `proforma:<scenario id>`, `fermos:family:<id>`,
-// `fermos:vessel:<simulation id>` or `pureos:unit:<train>:<unit>`. With the
+// `fermos:vessel:<simulation id>` or `pureos:unit:<train>:<unit>`. What a
+// call starts depends on the scope (OF-BLD-020 §2.R, finding 7): a
+// `proforma:` scope binds only and starts no worker; a `fermos:vessel:`
+// scope reads BioSTEAM's defaults through the Proforma worker, once per
+// process, so its first read on a cold service starts that worker and waits
+// for it. With the
 // service down these say so (RagDown), and a refusal comes back in the
 // service's words (RagRefused); nothing stands in for an answer (E.2). The
 // overrides themselves live in the store's Durable tier

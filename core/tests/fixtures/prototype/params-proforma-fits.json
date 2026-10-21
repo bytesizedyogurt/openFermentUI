@@ -615,6 +615,24 @@
           "detail": "productivity from growth_forecast 9493894dbc27ffad is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from 9493894dbc27ffad: the fermenter's batch time is the titre over the productivity, and here titre is from a9074acb4eeb57d9. To use it, choose 9493894dbc27ffad for titre as well, or stop using it for productivity"
         }
       }
+    ],
+    "resolves": [
+      {
+        "fits": {
+          "titre": "9493894dbc27ffad",
+          "yield": "9493894dbc27ffad",
+          "productivity": "9493894dbc27ffad"
+        },
+        "keys": [
+          "glucose_price",
+          "plant_scale",
+          "titre"
+        ],
+        "status": 422,
+        "body": {
+          "detail": "productivity from growth_forecast 9493894dbc27ffad is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from 9493894dbc27ffad: the fermenter's batch time is the titre over the productivity, and here titre is a named person's assumption, which wins over any fit. To use it, reset titre to its source and choose 9493894dbc27ffad for titre, or stop using it for productivity"
+        }
+      }
     ]
   }
 }

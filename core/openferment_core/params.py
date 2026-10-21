@@ -14,7 +14,10 @@ served; no screen writes a form for a parameter of its own.
                                 proforma:<scenario id>
     resolve(specs, sources, overrides, by=None)
                               each spec's value: an Override for its key wins
-                              over everything (an `assumption` by the person);
+                              over everything (an `assumption` by the person)
+                              where the spec's rule takes a person's value
+                              (`checked`; §2.R), its interval's empty end the
+                              value itself when one end is typed (`held`);
                               else the first entry of its `sourceRule` with a
                               candidate (fit, record:<field>, artifact,
                               simulation, assumption, convention,
@@ -36,8 +39,12 @@ served; no screen writes a form for a parameter of its own.
                               `check()`
     scope(name, req) / resolve_scope(name, req)
                               GET /api/params/{scope} and
-                              POST /api/params/{scope}/resolve: binding only,
-                              no worker, no integration, nothing kept
+                              POST /api/params/{scope}/resolve: they integrate
+                              nothing and keep nothing. A `proforma:` scope
+                              binds only and starts no worker; a
+                              `fermos:vessel:` scope reads BioSTEAM's defaults
+                              through the Proforma worker, once per process,
+                              and so starts the worker when it is cold (below)
     check()                   every statically named spec has a written
                               boundsReason (D4); `pnpm check:seed` runs
                               `python -m openferment_core.params --check`
@@ -142,12 +149,18 @@ class Provided(NamedTuple):
     """What a provider gives for one scope. `sources` maps each parameter
     key to a dict from a sourceRule entry to the candidate value that entry
     found (or None); a provider may add a `"waiting"` candidate whose detail
-    says why nothing bound."""
+    says why nothing bound. `basis`, when a provider gives it, is what a run
+    of the scope adds to its basis for the request's overrides, built by the
+    function the run builds them with (OF-BLD-020 §2.R: Proforma's run writes
+    every override's low and high and the line saying it read overrides);
+    without it the resolve takes `basis_inputs` over the overridden values,
+    which is how the vessel builds its own."""
 
     title: str
     specs: list[ParameterSpec]
     sources: dict[str, dict[str, ParameterValue | None]]
     notes: list[str]
+    basis: list[BasisInput] | None = None
 
 
 Provider = Callable[[tuple[str, ...], ParamResolveRequest], Provided]
@@ -191,8 +204,7 @@ def _provided(scope: str, req: ParamResolveRequest) -> tuple[str, Provided]:
     provider = _PROVIDERS.get(kind)
     if provider is None:
         raise ScopeUnknown(f"this service serves no parameters for {KIND_WORDS[kind]} yet")
-    title, specs, sources, notes = provider(ids, req)
-    return kind, Provided(title, specs, sources, notes)
+    return kind, Provided(*provider(ids, req))
 
 
 def scope(name: str, req: ParamResolveRequest | None = None) -> ParamScope:
@@ -214,10 +226,10 @@ def resolve_scope(name: str, req: ParamResolveRequest) -> ParamResolveResult:
         raise ParamRefused(f"an override names the scope it changes, and these were sent to {name}: {', '.join(stray)}")
     _, got = _provided(name, req)
     values = resolve(got.specs, got.sources, req.overrides)
+    added = got.basis if got.basis is not None else basis_inputs(got.specs, [v for v in values if v.overriddenBy])
     return ParamResolveResult(
         scope=name, values=values, waiting=[v.key for v in values if v.origin == "waiting"],
-        basisInputs=basis_inputs(got.specs, [v for v in values if v.overriddenBy]),
-        warnings=[v.outOfBounds for v in values if v.outOfBounds], notes=got.notes)
+        basisInputs=added, warnings=[v.outOfBounds for v in values if v.outOfBounds], notes=got.notes)
 
 
 # ── resolution ─────────────────────────────────────────────────────────
@@ -276,16 +288,52 @@ def _waiting_words(spec: ParameterSpec) -> str:
     return "waits for a source: " + (", ".join(parts) if parts else "none is declared")
 
 
+def unstamped(o: Override) -> str | None:
+    """Why an override cannot stand for want of when it was typed, or None:
+    the panel's resolve and a run refuse it in these words alike (§2.R,
+    finding 5: the run kept one, and its basis named no day)."""
+    return None if (o.at or "").strip() else f"the override of {o.key} says when it was typed"
+
+
+def held(value: Any, low: float | None, high: float | None) -> tuple[float | None, float | None]:
+    """An override's interval as every reader takes it (OF-BLD-020 §2.R,
+    findings 1 and 14): one end typed and the other left empty, the empty
+    end is the value itself, so the range runs from the end typed to the
+    value; with neither end typed the value is held at itself and both stay
+    empty (a run then holds it fixed, both ends the value). The resolve, the
+    panel's row and a run (`proforma.named_values`) all read it so."""
+    if low is None and high is None:
+        return None, None
+    return (value if low is None else low), (value if high is None else high)
+
+
+def _takes_no_person(spec: ParameterSpec) -> str:
+    """The refusal of an override of a parameter whose rule takes no named
+    person's value, naming what the rule takes (§2.R, findings 2 and 18)."""
+    if "convention" in spec.sourceRule:
+        stated = f", {spec.convention}," if spec.convention is not None else ""
+        return (f"{spec.key} is a convention{stated} that every run states in its basis, and takes no person's value: "
+                "its source rule takes no assumption")
+    if "library-default" in spec.sourceRule:
+        return f"{spec.key} is the library's own default, read from its code, and takes no person's value"
+    return (f"{spec.key} takes no person's value: its value comes from "
+            + ", ".join(_origin_of(e) for e in spec.sourceRule))
+
+
 def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
-    """An override that can stand, with the person named, or the refusal."""
+    """An override that can stand, with the person named and its interval
+    as `held` reads it, or the refusal."""
     from .threadp import reviewer_refusal
 
+    if "assumption" not in spec.sourceRule:
+        raise ParamRefused(_takes_no_person(spec))
     name = (o.by or "").strip() or (by or "").strip()
     why = reviewer_refusal(name)
     if why:
         raise ParamRefused(f"the override of {spec.key} needs a person's name: {why}")
-    if not (o.at or "").strip():
-        raise ParamRefused(f"the override of {spec.key} says when it was typed")
+    when = unstamped(o)
+    if when:
+        raise ParamRefused(when)
     if spec.choices is not None:
         if not isinstance(o.value, str) or o.value not in spec.choices:
             raise ParamRefused(f"{spec.key} is one of {', '.join(spec.choices)}; {o.value!r} is not")
@@ -299,7 +347,8 @@ def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
         raise ParamRefused(f"the override of {spec.key} must be a finite number, with a finite low and high")
     if (o.low is not None and o.low > o.value) or (o.high is not None and o.value > o.high):
         raise ParamRefused(f"the override of {spec.key} must lie within its own low and high")
-    return o.model_copy(update={"by": name})
+    low, high = held(o.value, o.low, o.high)
+    return o.model_copy(update={"by": name, "low": low, "high": high})
 
 
 def _from_override(spec: ParameterSpec, o: Override) -> ParameterValue:
@@ -327,15 +376,14 @@ def _first(spec: ParameterSpec, cands: Mapping[str, ParameterValue | None]) -> P
     return ParameterValue(key=spec.key, value=None, source=None, origin="waiting", detail=detail)
 
 
-def resolve(specs: list[ParameterSpec], sources: Mapping[str, Mapping[str, ParameterValue | None]],
-            overrides: Iterable[Override] | None, by: str | None = None) -> list[ParameterValue]:
-    """Each spec's value. An Override for its key wins over every source and
-    becomes an `assumption` by the person it names (or by `by`, when it names
-    nobody; with neither it is refused). Otherwise the first entry of the
-    spec's `sourceRule` with a candidate in `sources` wins, its origin the
-    entry's; "convention" falls back on the spec's stated convention, with
-    its note as the reason. With none, the value waits and says what would
-    bind it. Every value outside the bounds is kept and flagged."""
+def checked(specs: list[ParameterSpec], overrides: Iterable[Override] | None, by: str | None = None) -> dict[str, Override]:
+    """A scope's overrides that can stand, by key, each with its person named
+    and its interval as `held` reads it; or the refusal in words: a key the
+    scope does not have, a key twice, a parameter whose rule takes no named
+    person's value, no person, no time, words where a number is needed, a
+    choice not offered, a value outside its own low and high. `resolve` reads
+    them through this, and a provider that binds with them (Proforma's) reads
+    them through this first, so both refuse alike."""
     by_key: dict[str, ParameterSpec] = {}
     for spec in specs:
         if spec.key in by_key:
@@ -348,6 +396,20 @@ def resolve(specs: list[ParameterSpec], sources: Mapping[str, Mapping[str, Param
         if o.key in given:
             raise ParamRefused(f"two overrides of {o.key}: one person's value a parameter")
         given[o.key] = _checked(by_key[o.key], o, by)
+    return given
+
+
+def resolve(specs: list[ParameterSpec], sources: Mapping[str, Mapping[str, ParameterValue | None]],
+            overrides: Iterable[Override] | None, by: str | None = None) -> list[ParameterValue]:
+    """Each spec's value. An Override for its key wins over every source and
+    becomes an `assumption` by the person it names (or by `by`, when it names
+    nobody; with neither it is refused), where the spec's rule takes a named
+    person's value (`checked`). Otherwise the first entry of the spec's
+    `sourceRule` with a candidate in `sources` wins, its origin the entry's;
+    "convention" falls back on the spec's stated convention, with its note as
+    the reason. With none, the value waits and says what would bind it.
+    Every value outside the bounds is kept and flagged."""
+    given = checked(specs, overrides, by)
     out = []
     for spec in specs:
         cands = sources.get(spec.key) or {}
@@ -510,6 +572,19 @@ def _input_sources(inp, pool, feed: str) -> dict[str, ParameterValue | None]:
     return {}
 
 
+def feed_words(flowsheet: str) -> str:
+    """The feed a flowsheet's records must name, as its left-out line says it
+    (§2.R, finding 15): the ethanol flowsheet's glucose (FEED_CARBON); the
+    PHA draft's rule admits a sugar or a hydrolysate (`proforma.SUGARS`)."""
+    from . import proforma
+
+    if flowsheet in proforma.FEED_CARBON:
+        return " or ".join(sorted(proforma.FEED_CARBON[flowsheet]))
+    if flowsheet == proforma.FLOWSHEET:
+        return "a sugar or a hydrolysate"
+    return "a fermentable sugar"
+
+
 def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
     from . import evidence_pool, proforma
     from .flowsheets import shelf
@@ -523,18 +598,28 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
     try:
         flowsheet = proforma.flowsheet_of(scenario_id, req.flowsheet)
         info = shelf.info(flowsheet)
+        specs = flowsheet_specs(info)
+        # OF-BLD-020 §2.R (findings 0, 9, 13): the scope binds as a run of it
+        # binds. A person's overrides, checked as `resolve` checks them, are
+        # laid on as the run lays them on (`proforma.named_values`): each wins
+        # over the records and any fit for its input (`bound` takes no fit
+        # there), and a fit's productivity beside a titre a person typed is
+        # refused in the run's own words.
+        typed, read = proforma.named_values(scenario_id, list(checked(specs, req.overrides).values()))
+        proforma._check_keys(info, typed)
         # A scope names its scenario by id, so its records bind whatever the
         # program switch says, as a run's do (OF-BLD-016).
         pool = evidence_pool.load(include_archived=True)
-        # An input a person's override names takes no fit (D3), as a run
-        # binds it: the override is laid on by `resolve`, over the records.
-        fits = {k: v for k, v in req.fits.items() if k not in {o.key for o in req.overrides}}
         bound = proforma.bound(flowsheet, scenario_id=scenario_id, name=seeds.get(scenario_id, {}).get("name") or "",
-                               host=req.host, pool=pool, fits=fits)
+                               host=req.host, assumptions=typed, pool=pool, fits=req.fits)
     except proforma.ScenarioRefused as e:
         raise ParamRefused(str(e)) from None
-    feed = " or ".join(sorted(proforma.FEED_CARBON.get(flowsheet, ()))) or "a fermentable sugar"
+    feed = feed_words(flowsheet)
     sources = {inp.key: _input_sources(inp, pool, feed) for inp in bound.inputs}
+    # What a run adds to its basis for these overrides, by the run's own
+    # functions: each overridden input's value, low and high, then the line
+    # saying the run read overrides (§2.R, findings 3 and 19).
+    added = [b for inp in bound.inputs if inp.binding == "assumption" for b in proforma.assumption_inputs(inp)]
     name = seeds.get(scenario_id, {}).get("name")
     title = f"{name} ({info.title})" if name else info.title
     notes = [
@@ -544,7 +629,8 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         "A person's override wins over the records and any fit for its input, here and in the run, which carries the "
         "overrides and names the person in its basis (OF-BLD-020 D3).",
     ]
-    return Provided(title=title, specs=flowsheet_specs(info), sources=sources, notes=notes)
+    return Provided(title=title, specs=specs, sources=sources, notes=notes,
+                    basis=added + proforma.assumptions_read(read))
 
 
 def _proforma_static() -> Iterable[tuple[str, list[ParameterSpec]]]:

@@ -671,9 +671,10 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     binds as GET /api/fermos/bind does, from `?strain=`, `?product=`,
     `?sugar=`, `?fit=`, `?startFrom=`, `?durationPreset=` and
     `?includeArchived=` (OF-BLD-020 §3.2). 404 for a scope no provider here
-    knows; 422 in words for a malformed one or a refused binding; 503 when the
-    worker cannot answer."""
-    from . import params
+    knows; 422 in words for a malformed one or a refused binding; 409 for an
+    artifact the scope names that is damaged on disk, as the vessel's own route
+    answers it (§2.R, finding 17); 503 when the worker cannot answer."""
+    from . import artifacts, params
 
     if vesselType not in (None, "stirred-tank", "bubble-column"):
         raise HTTPException(status_code=422, detail=f"a vessel type is stirred-tank or bubble-column; {vesselType!r} is neither")
@@ -689,6 +690,8 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
         raise HTTPException(status_code=404, detail=str(e)) from e
     except params.ParamRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
 
@@ -698,9 +701,12 @@ def params_resolve(scope: str, req: ParamResolveRequest) -> dict:
     """A person's overrides laid on a scope's values (`ParamResolveResult`):
     each override an `assumption` by the person it names, the basis inputs
     the overrides would add to a run, and every value outside its bounds in
-    words (kept, never clamped). Runs nothing and keeps nothing: the service
-    keeps no override (D3). 404 and 422 as the GET answers them."""
-    from . import params
+    words (kept, never clamped). The basis inputs are the ones a run of the
+    scope writes for those overrides (§2.R). Runs nothing and keeps nothing:
+    the service keeps no override (D3). 404, 422, 409 and 503 as the GET
+    answers them; a `fermos:vessel:` scope may start the worker as the GET
+    may."""
+    from . import artifacts, params
 
     try:
         return params.resolve_scope(scope, req).model_dump(mode="json")
@@ -708,6 +714,8 @@ def params_resolve(scope: str, req: ParamResolveRequest) -> dict:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except params.ParamRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
 

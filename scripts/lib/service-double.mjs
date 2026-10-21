@@ -543,10 +543,17 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     // the browser tests make), any other a 422 in words. A scope no provider
     // serves yet is the service's 404; a malformed one its 422.
     // POST .../resolve lays each override on as the service does, an
-    // assumption by the person it names, and returns the words the real code
-    // returned for the recorded override outside its bounds; a key the scope
-    // does not have, an override of another scope or one naming nobody is
-    // refused in the service's words.
+    // assumption by the person it names, its interval's empty end the value
+    // when one end is typed (params.held), with the basis inputs a run adds
+    // for it (the value, its low and high, and the line saying the run read
+    // overrides, copied from the recorded resolve), and returns the words the
+    // real code returned for the recorded override outside its bounds; a key
+    // the scope does not have, an override of another scope, one naming
+    // nobody or one of a parameter whose rule takes no person's value is
+    // refused in the service's words. OF-BLD-020 §2.R: the service binds the
+    // overrides as a run binds them, so a titre typed beside a fermOS fit
+    // chosen for every input is refused in the run's words; that resolve is
+    // answered as demo.py recorded the real code's answer (`resolves`).
     {
       const m = /^\/api\/params\/(.+?)(\/resolve)?$/.exec(url);
       if (m) {
@@ -584,6 +591,12 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         const fits = ask.fits ?? {};
         const typed = new Set((ask.overrides ?? []).map((o) => o.key));
         const kept = Object.fromEntries(Object.entries(fits).filter(([k]) => !typed.has(k)));
+        if (resolving && typed.size > 0 && Object.keys(fits).length > 0) {
+          const withFits = await prototype('params-proforma-fits.json');
+          const keys = [...typed].sort().join();
+          const heard = scope === withFits.scope && (withFits.resolves ?? []).find((r) => sameFits(fits, r.fits) && [...r.keys].sort().join() === keys);
+          if (heard) return send(heard.status, heard.body);
+        }
         let answer;
         if (Object.keys(kept).length > 0) {
           const withFits = await prototype('params-proforma-fits.json');
@@ -613,6 +626,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
           if (!specs.has(o.key)) return send(422, { detail: `there is no parameter ${o.key} here; the parameters are ${[...specs.keys()].join(', ')}` });
           if (seen.has(o.key)) return send(422, { detail: `two overrides of ${o.key}: one person's value a parameter` });
           seen.add(o.key);
+          const sp = specs.get(o.key);
+          if (!sp.sourceRule.includes('assumption'))
+            return send(422, {
+              detail: sp.sourceRule.includes('convention')
+                ? `${o.key} is a convention${sp.convention != null ? `, ${sp.convention},` : ''} that every run states in its basis, and takes no person's value: its source rule takes no assumption`
+                : `${o.key} is the library's own default, read from its code, and takes no person's value`,
+            });
           if (!String(o.by ?? '').trim()) return send(422, { detail: `the override of ${o.key} needs a person's name: a decision needs a reviewer name` });
         }
         const out = recorded.resolve.body.values;
@@ -623,23 +643,29 @@ export function createServiceDouble({ dist, seedOnly = false }) {
           return r && flowsheet === recorded.resolve.flowsheet ? (out.find((v) => v.key === o.key)?.outOfBounds ?? null) : null;
         };
         const byKey = new Map(overrides.map((o) => [o.key, o]));
+        // params.held: one end typed, the other is the value; neither, held at itself.
+        const held = (o) => (o.low == null && o.high == null ? [null, null] : [o.low ?? o.value, o.high ?? o.value]);
         const values = served.values.map((v) => {
           const o = byKey.get(v.key);
           if (!o) return v;
+          const [low, high] = held(o);
           return {
-            key: v.key, value: o.value, low: o.low ?? null, high: o.high ?? null,
+            key: v.key, value: o.value, low, high,
             source: { kind: 'assumption', id: null, note: `typed on ${o.at}${o.note ? `: ${o.note}` : ''}`, by: String(o.by).trim() },
             origin: 'assumption', identified: null, overriddenBy: String(o.by).trim(), libraryDefault: v.libraryDefault ?? null,
             recordIds: [], detail: `typed by ${String(o.by).trim()} on ${o.at}${o.note ? `: ${o.note}` : ''}`, outOfBounds: flagged(o),
           };
         });
+        // What a run adds for them (proforma.assumption_inputs): the value, its low and its high, then the line saying it read overrides.
+        const readLine = recorded.resolve.body.basisInputs.find((i) => i.name === 'assumptions read from');
         const basisInputs = values
           .filter((v) => v.overriddenBy)
           .flatMap((v) => [
             { name: v.key, value: v.value, unit: specs.get(v.key).unit, source: v.source },
-            ...(v.low != null ? [{ name: `${v.key} low`, value: v.low, unit: specs.get(v.key).unit, source: v.source }] : []),
-            ...(v.high != null ? [{ name: `${v.key} high`, value: v.high, unit: specs.get(v.key).unit, source: v.source }] : []),
-          ]);
+            { name: `${v.key} low`, value: v.low ?? v.value, unit: specs.get(v.key).unit, source: v.source },
+            { name: `${v.key} high`, value: v.high ?? v.value, unit: specs.get(v.key).unit, source: v.source },
+          ])
+          .concat(overrides.length && readLine ? [readLine] : []);
         return send(200, {
           scope,
           values,

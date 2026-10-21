@@ -556,10 +556,14 @@ def scenario(host: str | None = None, assumptions: list | None = None, pool=None
 # for its input, the input says how many records it stands in place of, and
 # the basis names the person (basis.assumption_source), so the run is
 # `demo`. The older `assumptions` field is read the same way for one
-# release. The basis says which field it read: a run that read overrides
-# carries `assumptions read from`; one that read the older field alone
-# carries nothing new, so its basis, and its artifact id, are what they were
-# before the panel. The service keeps none.
+# release, and so wins over the records too: before the panel an older-field
+# value of an input that bound records was ignored, so such a run now binds,
+# bases and is kept differently (§2.R, finding 4; a test holds it). The basis
+# says which field it read: a run that read overrides carries `assumptions
+# read from`; one that read the older field alone adds no such line, so a
+# run whose older-field values name only inputs no record binds keeps the
+# basis, and the artifact id, it had before the panel. The service keeps
+# none.
 
 ASSUMPTIONS_READ = "assumptions read from"
 READ_WORDS = {
@@ -595,15 +599,23 @@ def named_values(scenario_id: str | None, overrides: list | None = None,
     elif len(scopes) > 1 or (scopes and not scopes[0].startswith("proforma:")):
         raise ScenarioRefused(f"the overrides of one binding name one scenario's scope, proforma:<scenario id>; "
                               f"these name {', '.join(scopes)}")
+    from . import params
+
     out: dict[str, InputAssumption] = {}
     for o in over:
         if isinstance(o.value, bool) or not isinstance(o.value, (int, float)):
             raise ScenarioRefused(f"the override of {o.key} takes a number, not words")
         if o.key in out:
             raise ScenarioRefused(f"two overrides of {o.key}: one person's value an input")
+        when = params.unstamped(o)
+        if when:  # §2.R, finding 5: the resolve refused it, and the run kept a basis naming no day
+            raise ScenarioRefused(when)
         value = float(o.value)
-        out[o.key] = InputAssumption(key=o.key, value=value, low=value if o.low is None else o.low,
-                                     high=value if o.high is None else o.high, by=o.by, at=o.at, note=o.note)
+        # One end typed, the other is the value (params.held, as the panel's
+        # resolve reads it); neither, the value is held fixed at itself.
+        low, high = params.held(value, o.low, o.high)
+        out[o.key] = InputAssumption(key=o.key, value=value, low=value if low is None else low,
+                                     high=value if high is None else high, by=o.by, at=o.at, note=o.note)
     from_overrides = set(out)
     for a in old:
         if a.key in from_overrides:
@@ -639,8 +651,9 @@ def _check_keys(info, typed: list) -> None:
 def assumptions_read(words: str | None) -> list:
     """The basis input that says a run's named values were read from the
     panel's overrides (OF-BLD-020 §2.2): none for a run that carries no
-    override, so a run with none keeps the basis, and the artifact id, it
-    had before the panel."""
+    override. A run with none whose older-field values name only inputs no
+    record binds keeps the basis, and the artifact id, it had before the
+    panel; an older-field value over records now wins over them (§2.R)."""
     from .models import BasisInput, BasisSource
 
     if not words:
@@ -693,13 +706,23 @@ def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = F
                 out.append(BasisInput(name=f"{inp.key} scale", value=BOUND[inp.key][4], unit="", source=BasisSource(
                     kind="convention", note=f"{BOUND[inp.key][3]} to a share")))
         elif inp.binding == "assumption":
-            for part, v in (("", inp.value), (" low", inp.low), (" high", inp.high)):
-                out.append(BasisInput(name=f"{inp.key}{part}", value=v, unit=inp.unit, source=inp.source))
+            out += assumption_inputs(inp)
         elif inp.binding == "artifact":
             for part, v in (("", inp.value), (" low", inp.low), (" high", inp.high)):
                 out.append(BasisInput(name=f"{inp.key} fit{part}", value=v, unit=inp.unit, source=inp.source))
     out += fitted or []
     return out
+
+
+def assumption_inputs(inp) -> list:
+    """The basis inputs a run writes for one input bound to a named person's
+    value: the value, its low and its high, each with the person as its
+    source. The parameter panel's resolve says what a run adds through this
+    same function (OF-BLD-020 §2.R)."""
+    from .models import BasisInput
+
+    return [BasisInput(name=f"{inp.key}{part}", value=v, unit=inp.unit, source=inp.source)
+            for part, v in (("", inp.value), (" low", inp.low), (" high", inp.high))]
 
 
 def utility_input():
@@ -1560,8 +1583,12 @@ def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
         n = len(t.records) if t else 0
         paired = (f"titre is from {fits['titre']}" if fits.get("titre") else
                   f"titre binds {n} record{'s' if n != 1 else ''}" if t and t.binding == "records" else
-                  "titre is a named person's assumption" if t and t.binding == "assumption" else
+                  "titre is a named person's assumption, which wins over any fit" if t and t.binding == "assumption" else
                   "titre waits for a source")
+        # §2.R (finding 13): beside a titre a person typed, choosing the fit
+        # for titre is not enough, since the person's value wins over it.
+        remedy = ("reset titre to its source and choose {aid} for titre" if t and t.binding == "assumption"
+                  and not fits.get("titre") else "choose {aid} for titre as well")
     infos: dict[str, Any] = {}
     extra: list = []
     for key in FIT_KEYS:
@@ -1593,7 +1620,7 @@ def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
             raise ScenarioRefused(
                 f"productivity from {info.tool} {aid} is its titre over the hour its median sugar runs out, so it feeds "
                 f"the fermenter only beside titre from {aid}: the fermenter's batch time is the titre over the "
-                f"productivity, and here {paired}. To use it, choose {aid} for titre as well, or stop using it for "
+                f"productivity, and here {paired}. To use it, {remedy.format(aid=aid)}, or stop using it for "
                 "productivity")
         if key == "productivity" and info.batchTimeH is not None:
             extra.append(BasisInput(name="fit batch time", value=info.batchTimeH, unit="h", source=BasisSource(

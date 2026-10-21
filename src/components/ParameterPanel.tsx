@@ -21,14 +21,17 @@
 //                overrides on (`POST /api/params/{scope}/resolve`), and its
 //                answer, its out-of-bounds warnings included, is what each
 //                row shows. A value outside the bounds is kept, never clamped.
-//                With the service down the panel says so, and the override
-//                is still kept and still sent with the run.
+//                The service binds the scope with the overrides as a run of
+//                it binds them, so a refusal here is the run's refusal, in
+//                its words: the caller hears it (`onRefused`) and holds Run
+//                (OF-BLD-020 §2.R). With the service down the panel says so,
+//                and the override is still kept and still sent with the run.
 //
 // The panel COMPUTES NOTHING: every value, source and warning it shows came
 // from the service or the person. A model never sets an override.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Override, ParameterSpec, ParameterValue, ParamResolveResult, ParamScope } from '@/data/types';
-import { overridesFor, useStore } from '@/store';
+import { overrideEnds, overridesFor, useStore } from '@/store';
 import { ParamsDown, resolveParams, type ParamAsk } from '@/lib/params';
 import { ParameterRow, type ParameterChange } from './ParameterRow';
 
@@ -43,6 +46,8 @@ export interface ParameterPanelProps {
   onChange?: (overrides: Override[]) => void;
   /** The service's answer to the latest resolve, or null when there is none to read (no override, or no answer). */
   onResolved?: (result: ParamResolveResult | null) => void;
+  /** The service's words when it refuses the scope's overrides as they stand (a run of them would be refused alike), else null. */
+  onRefused?: (words: string | null) => void;
   /** The order the groups are shown in; groups it does not name follow in the specs' order. */
   groups?: string[];
   /** Show every value and its source, and offer no edit. */
@@ -54,13 +59,14 @@ export interface ParameterPanelProps {
 /** How long the panel waits after a change before asking the service to resolve it. */
 const RESOLVE_AFTER_MS = 350;
 
-/** A person's override as the row shows it while the service has not answered: their value, their name. */
+/** A person's override as the row shows it while the service has not answered: their value, its interval as the service reads it (`overrideEnds`), their name. */
 function asTyped(o: Override, served: ParameterValue | undefined): ParameterValue {
+  const ends = overrideEnds(o);
   return {
     key: o.key,
     value: o.value,
-    low: o.low,
-    high: o.high,
+    low: ends.low,
+    high: ends.high,
     source: { kind: 'assumption', id: null, by: o.by, note: o.note },
     origin: 'assumption',
     identified: null,
@@ -81,7 +87,7 @@ export function groupOrder(specs: ParameterSpec[], groups: string[] = []): strin
 /** The time an override is kept at: now, to the second, in UTC. */
 const nowStamp = () => `${new Date().toISOString().slice(0, 19)}Z`;
 
-export function ParameterPanel({ scope, data, request, onChange, onResolved, groups, readOnly, recordsOf }: ParameterPanelProps) {
+export function ParameterPanel({ scope, data, request, onChange, onResolved, onRefused, groups, readOnly, recordsOf }: ParameterPanelProps) {
   const overrides = useStore(overridesFor(scope));
   const reviewer = useStore((s) => s.reviewer).trim();
   const setOverride = useStore((s) => s.setOverride);
@@ -90,6 +96,8 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, gro
   const [problem, setProblem] = useState<{ down: boolean; words: string } | null>(null);
   const resolvedRef = useRef(onResolved);
   resolvedRef.current = onResolved;
+  const refusedRef = useRef(onRefused);
+  refusedRef.current = onRefused;
 
   const askKey = JSON.stringify(request ?? {});
   const overridesKey = JSON.stringify(overrides);
@@ -98,6 +106,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, gro
   // After each change, debounced: the service lays the scope's overrides on.
   useEffect(() => {
     setProblem(null);
+    refusedRef.current?.(null);
     if (!data || overrides.length === 0) {
       setResolved(null);
       resolvedRef.current?.(null);
@@ -114,10 +123,10 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, gro
           if (ctrl.signal.aborted) return;
           setResolved(null);
           resolvedRef.current?.(null);
-          setProblem({
-            down: e instanceof ParamsDown,
-            words: e instanceof ParamsDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e),
-          });
+          const down = e instanceof ParamsDown;
+          const words = down ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e);
+          setProblem({ down, words });
+          if (!down) refusedRef.current?.(words);
         });
     }, RESOLVE_AFTER_MS);
     return () => {

@@ -13,9 +13,11 @@
 //
 // The bench may use it (pureOS's Builder, fermOS at the fermenter), so the
 // constraints Deposition.tsx's header lists hold here too: every control is
-// labelled, every touch target is at least 44 px, nothing appears only on
-// hover (Why and the records are disclosures a key or a tap opens), and the
-// keyboard reaches every control.
+// labelled, every touch target is at least 44 px (the citation chips a
+// record-bound row opens included, through TOUCH_CHIP), nothing appears only
+// on hover (Why and the records are disclosures a key or a tap opens), and
+// the keyboard reaches every control. check:store walks these files, and the
+// records Proforma renders into a row, for it.
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { Override, ParameterSpec, ParameterValue } from '@/data/types';
 import { href } from '@/router';
@@ -51,6 +53,13 @@ export interface ParameterRowProps {
 
 /** Where the settings that hold the reviewer name live. */
 export const REVIEWER_SETTINGS = '/settings/corpus';
+
+/**
+ * A citation chip inside the panel as a bench-sized touch target
+ * (OF-BLD-020 §2.R, finding 11): CitationChip's own trigger is a 12 px line,
+ * so the panel, and the records a caller renders into it, give it this.
+ */
+export const TOUCH_CHIP = 'min-h-[44px] inline-flex items-center';
 
 /** A value in the row's own words: a number formatted, words as they are, nothing as a dash. */
 export const shown = (v: number | string | null | undefined, digits = 4): string => (v == null ? '—' : typeof v === 'number' ? fmt(v, digits) : v);
@@ -149,7 +158,8 @@ export function SourceChip({ value, records }: { value: ParameterValue | null; r
             </span>
           </summary>
           <div className="flex flex-col gap-1 mt-1">
-            {records ?? value.recordIds.map((rid) => <CitationChip key={rid} recordId={rid} label={rid} />)}
+            {records ??
+              value.recordIds.map((rid) => <CitationChip key={rid} recordId={rid} label={rid} className={TOUCH_CHIP} />)}
           </div>
         </details>
       );

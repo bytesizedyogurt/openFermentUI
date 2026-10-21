@@ -7,6 +7,7 @@ records, the pool the ethanol tests already use.
 """
 from __future__ import annotations
 
+import json
 import math
 from types import SimpleNamespace
 
@@ -154,8 +155,10 @@ def test_an_override_needs_a_person_a_number_or_a_choice_and_its_own_range():
     # A name the request gives stands in for an override that names nobody.
     (v,) = params.resolve([s], {}, [override(by="")], by=BY)
     assert v.overriddenBy == BY and v.source.by == BY
-    choice = spec(key="method", rule=["library-default"], unit="", min=None, max=None, choices=["Riet", "Dewes"],
-                  boundsReason="a choice of words: the library's own list")
+    # A choice a person may make (the vessel's kLa correlation takes a person's
+    # value over the library's default; §2.R: a rule with no assumption takes none).
+    choice = spec(key="method", rule=["assumption", "library-default"], unit="", min=None, max=None,
+                  choices=["Riet", "Dewes"], boundsReason="a choice of words: the library's own list")
     (v,) = params.resolve([choice], {"method": {"library-default": cand("Riet", "library-default")}},
                           [override(key="method", value="Dewes")])
     assert (v.value, v.origin, v.libraryDefault) == ("Dewes", "assumption", "Riet")
@@ -312,8 +315,10 @@ def test_an_override_of_a_proforma_input_is_an_assumption_in_the_basis(standin):
     values = {v.key: v for v in r.values}
     assert values["glucose_price"].origin == "assumption" and values["glucose_price"].overriddenBy == BY
     assert r.waiting == ["plant_scale"] and r.warnings == []
-    assert [i.name for i in r.basisInputs] == ["glucose_price", "glucose_price low", "glucose_price high"]
-    assert all(i.unit == "USD kg-1" and i.source.kind == "assumption" and i.source.by == BY for i in r.basisInputs)
+    # What a run adds for it (§2.R): the value, its low and high, and the line saying the run read overrides.
+    assert [i.name for i in r.basisInputs] == ["glucose_price", "glucose_price low", "glucose_price high",
+                                               proforma.ASSUMPTIONS_READ]
+    assert all(i.unit == "USD kg-1" and i.source.kind == "assumption" and i.source.by == BY for i in r.basisInputs[:3])
     # D4: a person may type outside the bounds; it is kept and said.
     far = params.resolve_scope("proforma:sc-yeast-1", ParamResolveRequest(overrides=[
         override(key="titre", value=400.0, scope="proforma:sc-yeast-1")]))
@@ -361,7 +366,10 @@ def test_post_resolves_overrides_and_runs_nothing(client, store):
     body = r.json()
     assert set(body) == {"scope", "values", "waiting", "basisInputs", "warnings", "notes"}
     assert body["waiting"] == ["glucose_price"] and body["warnings"] == []
-    assert [i["name"] for i in body["basisInputs"]] == ["plant_scale"]
+    # As a run writes it (§2.R): held at itself, so its low and high are the value.
+    assert [(i["name"], i["value"]) for i in body["basisInputs"]] == [
+        ("plant_scale", 100000.0), ("plant_scale low", 100000.0), ("plant_scale high", 100000.0),
+        (proforma.ASSUMPTIONS_READ, "overrides")]
     assert body["basisInputs"][0]["source"] == {"kind": "assumption", "id": None, "note": "typed on 2026-10-21: a STAND-IN", "by": BY}
     assert not any(store.rglob("*.json")), "the service keeps no override and no artifact"
     for payload, status, words in (
@@ -381,3 +389,62 @@ def test_the_post_is_guarded_like_every_changing_request(client):
                     headers={"host": "127.0.0.1:8000", "origin": "https://evil.example.com"})
     assert r.status_code == 403 and "evil.example.com" in r.json()["detail"]
     assert client.get("/api/params/proforma:sc-yeast-1", headers={"origin": "https://evil.example.com"}).status_code == 200
+
+
+# ── OF-BLD-020 §2.R: the review's findings, held ───────────────────────
+
+
+def test_a_parameter_whose_rule_takes_no_persons_value_refuses_an_override():
+    """§2.R findings 2 and 18: an override was laid on whatever the source
+    rule said; a convention or a library's default alone takes none."""
+    stated = spec(key="purity", rule=["convention"], unit="", min=None, max=None, convention="fuel grade",
+                  boundsReason="a STAND-IN convention stated in words")
+    with pytest.raises(params.ParamRefused, match="purity is a convention, fuel grade, .*takes no person's value"):
+        params.resolve([stated], {}, [override(key="purity", value=0.5)])
+    package = spec(key="V_wf", rule=["library-default"])
+    with pytest.raises(params.ParamRefused, match="V_wf is the library's own default, read from its code, and takes no person's value"):
+        params.resolve([package], {"V_wf": {"library-default": cand(0.8, "library-default")}}, [override(key="V_wf", value=0.9)])
+    # Shown, never edited: with no override both still resolve to their source.
+    (v,) = params.resolve([stated], {}, [])
+    assert (v.value, v.origin) == ("fuel grade", "convention")
+
+
+def test_a_json_true_or_false_is_never_read_as_a_number():
+    """§2.R finding 6: pydantic read `true` as 1.0 before any check saw it."""
+    base = override(scope="proforma:sc-yeast-1", key="glucose_price").model_dump()
+    for field in ("value", "low", "high"):
+        for flag in (True, False):
+            with pytest.raises(ValidationError, match="true or false"):
+                Override.model_validate_json(json.dumps({**base, field: flag}))
+    assert Override.model_validate_json(json.dumps({**base, "value": 1})).value == 1
+
+
+def test_the_left_out_words_name_the_flowsheets_own_feed(monkeypatch, standin):
+    """§2.R finding 15: the left-out line a person sees is the service's; it
+    names glucose for the ethanol flowsheet and a sugar or a hydrolysate for
+    the PHA draft, whose rule admits both."""
+    from openferment_core import evidence_pool
+
+    other = [{**r, "id": f"{r['id']}-other", "carbonSource": c} for r, c in (
+        (next(r for r in standin.records if r["field"] == "ethanol_titre"), "xylose"),
+        (next(r for r in standin.records if r["field"] == "pha_titre"), "glycerol"))]
+    rs = standin.records + other
+    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: SimpleNamespace(
+        records=rs, records_by_id={r["id"]: r for r in rs}))
+    yeast = next(v for v in params.scope("proforma:sc-yeast-1").values if v.key == "titre")
+    assert "1 record left out for naming a carbon source other than glucose" in yeast.detail and "hydrolysate" not in yeast.detail
+    pha = next(v for v in params.scope("proforma:sc-pha-1").values if v.key == "titre")
+    assert "1 record left out for naming a carbon source other than a sugar or a hydrolysate" in pha.detail, pha.detail
+
+
+def test_an_artifact_damaged_on_disk_under_a_vessel_scope_is_a_409_in_words(client, store):
+    """§2.R finding 17: the params endpoints answered a bare 500 where the
+    vessel's own route answers 409 in words."""
+    from openferment_core import artifacts
+
+    aid = "0123456789abcdef"
+    artifacts.folder().mkdir(parents=True, exist_ok=True)
+    (artifacts.folder() / f"{aid}.json").write_text("{not json", encoding="utf-8")
+    scope = f"fermos:vessel:{aid}"
+    for r in (client.get(f"/api/params/{scope}"), client.post(f"/api/params/{scope}/resolve", json={})):
+        assert r.status_code == 409 and f"artifact {aid} is damaged on disk" in r.json()["detail"], (r.status_code, r.text)

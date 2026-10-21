@@ -262,8 +262,13 @@ export function inputCounts(
   fits: Record<string, string> = {},
 ): InputCounts | null {
   const typed = new Set(typedValues.map((a) => a.key));
+  const flowsheet = shelf.find((f) => f.id === (scenario.flowsheetId ?? scenario.modelId));
   if (info) {
-    const c = { total: info.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: true };
+    // The binding holds no convention (a run states it in its basis), and the
+    // scenario page lists it among the inputs, so the card counts it from the
+    // shelf as the page does (OF-BLD-020 §2.R, finding 16).
+    const conventions = flowsheet ? flowsheet.inputs.filter((i) => i.kind === 'convention').length : 0;
+    const c = { total: info.inputs.length + conventions, records: 0, computed: 0, assumed: 0, conventions, waiting: 0, bound: true };
     for (const i of info.inputs) {
       if (typed.has(i.key) || i.binding === 'assumption') c.assumed++;
       else if (i.binding === 'artifact' || fits[i.key]) c.computed++;
@@ -272,7 +277,6 @@ export function inputCounts(
     }
     return c;
   }
-  const flowsheet = shelf.find((f) => f.id === (scenario.flowsheetId ?? scenario.modelId));
   if (!flowsheet) return null;
   const c = { total: flowsheet.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: false };
   for (const i of flowsheet.inputs) {
@@ -819,12 +823,9 @@ export function modellerQuestions(
     .map(({ n: _n, ...q }) => q);
 }
 
-/** What a record left out of a binding was fed, in words, by the flowsheet's own feed (§3.R, finding 27). */
-const FEED_WORDS: Record<string, string> = { pha_sugar_v0: 'a sugar or a hydrolysate', ethanol_glucose_v0: 'glucose' };
-
-/** The inputs table's line on the records a binding left out, naming the flowsheet's own feed. */
-export const leftOutWords = (i: { leftOutNoCarbon: number; leftOutOtherCarbon: number }, flowsheet: string | null) =>
-  `Left out: ${i.leftOutNoCarbon} naming no carbon source, ${i.leftOutOtherCarbon} on a feed other than ${FEED_WORDS[flowsheet ?? ''] ?? 'this flowsheet’s own feed'}.`;
+// The line on the records a binding left out is the service's own now
+// (`params._input_sources`, with the flowsheet's feed in `params.feed_words`;
+// OF-BLD-020 §2.R, finding 15): no screen writes it, and test_params holds it.
 
 // ── What a run read back, credited to whoever set it (§3.R, findings 6, 20) ──
 //

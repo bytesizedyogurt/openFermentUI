@@ -1299,6 +1299,39 @@ async function main() {
         (await ceilingSource.getAttribute('href', { timeout: 3000 }).catch(() => null)) !== `#/biorepo/artifacts/${chosen}`
       )
         problems.push('the ceiling check does not read the yield the chosen forecast feeds');
+      // OF-BLD-020 §2.R (findings 8, 12, 13): a titre a person types beside the forecast chosen for every input wins over
+      // the fit there. The fit's card and the line under the panel say whose value wins, and Run waits with the service's
+      // words, which are the run's (the panel binds as the run binds); Reset to source takes the fit back and Run is free.
+      const heldBy = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/params-proforma-fits.json'), 'utf8')).response.resolves[0];
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-chip"][data-origin="fit"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await typeParam(page, 'plant_scale', 100000);
+      await typeParam(page, 'glucose_price', 0.4);
+      await typeParam(page, 'titre', 50);
+      await page.locator('[data-testid="run-held"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const held = await page.locator('[data-testid="run-held"]').innerText({ timeout: 3000 }).catch(() => '');
+      if (heldBy.status !== 422 || !held.includes(heldBy.body.detail) || !/titre is a named person's assumption/.test(held))
+        problems.push(`with titre typed beside the forecast, Run does not wait with the service's words: ${JSON.stringify(held.slice(0, 200))}`);
+      if (!(await page.getByRole('button', { name: /Run the scenario/ }).isDisabled().catch(() => false))) problems.push('Run is enabled for a run the service would refuse');
+      if (await page.locator('[data-testid="proforma-waiting"]').count()) problems.push('an input still waits with every value typed');
+      if ((await chipOf(page, 'titre')).origin !== 'assumption') problems.push('the typed titre is not the person\u2019s assumption');
+      const card = (await option.innerText({ timeout: 3000 }).catch(() => '')).replace(/\s+/g, ' ');
+      if (!/In use for yield, productivity\./.test(card) || /In use for titre/.test(card) || !card.includes(`titre, where ${REVIEWER}\u2019s value wins`))
+        problems.push(`the forecast's card claims it feeds titre over the person's value: ${JSON.stringify(card.slice(-220))}`);
+      const titreLine = page.locator('[data-testid="fit-line"][data-key="titre"]');
+      if ((await titreLine.getAttribute('data-overridden', { timeout: 3000 }).catch(() => null)) !== 'true' ||
+        !(await titreLine.innerText({ timeout: 3000 }).catch(() => '')).includes(`${REVIEWER}\u2019s value replaces the fermOS fit ${chosen}`))
+        problems.push('the line under the panel still says titre is from the fit');
+      await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-reset"]').click({ timeout: 8000 });
+      await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-chip"][data-origin="fit"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(800);
+      if (await page.locator('[data-testid="run-held"]').count()) problems.push('Run still waits once titre is reset to the fit');
+      if (await page.getByRole('button', { name: /Run the scenario/ }).isDisabled().catch(() => true)) problems.push('Run stays disabled once titre is reset to the fit');
+      if (!/In use for titre, yield, productivity\./.test(await option.innerText({ timeout: 3000 }).catch(() => ''))) problems.push('the reset titre is not the fit\u2019s again on its card');
+      for (const key of ['plant_scale', 'glucose_price']) await page.locator(`[data-testid="param-row"][data-key="${key}"] [data-testid="param-reset"]`).click({ timeout: 8000 });
       await page.waitForTimeout(700);
       await page.reload({ waitUntil: 'networkidle' });
       await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-chip"][data-origin="fit"]').waitFor({ timeout: 8000 }).catch(() => {});
@@ -1342,7 +1375,7 @@ async function main() {
       fitFails++;
       console.log(`✗ fermos fit   ${problems.join('; ')}`);
     } else {
-      console.log("✓ fermos fit   sc-yeast-1 with no fit on file says how one gets made; with the fit and the forecast on file each says what it can feed and why not, choosing the forecast binds titre, yield and productivity to its artifact, asked of the service with the fits, read by the ceiling check, kept across a reload and counted on the index as chosen; the fit's titre beside the forecast's productivity is refused naming titre, stopping the forecast clears its productivity alone, and stopping the fit puts the records back");
+      console.log("✓ fermos fit   sc-yeast-1 with no fit on file says how one gets made; with the fit and the forecast on file each says what it can feed and why not, choosing the forecast binds titre, yield and productivity to its artifact, asked of the service with the fits, read by the ceiling check, kept across a reload and counted on the index as chosen; a titre typed beside it wins there, the card and the line under the panel say whose value wins, and Run waits with the service's words until titre is reset; the fit's titre beside the forecast's productivity is refused naming titre, stopping the forecast clears its productivity alone, and stopping the fit puts the records back");
     }
     await page.close();
   }

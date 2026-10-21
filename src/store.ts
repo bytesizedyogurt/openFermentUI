@@ -3448,15 +3448,46 @@ export function overridesFor(scope: string): (s: Pick<OFState, 'parameterOverrid
   return (s) => s.parameterOverrides[scope] ?? NO_OVERRIDES;
 }
 
-/** A Proforma assumption as the override of its scenario's scope. */
+/**
+ * A Proforma assumption as the override of its scenario's scope. The old
+ * form (OF-BLD-019's Keep assumption) asked for a value, a low and a high
+ * every time, so a fixed value was typed with both ends at itself; such ends
+ * say nothing the value does not, and are read as none (OF-BLD-020 §2.R,
+ * finding 10: kept, they held every later value to the old one, and the
+ * service refused it as outside its own low and high).
+ */
 export function overrideOfAssumption(scenarioId: string, a: InputAssumption): Override {
-  return { scope: proformaScope(scenarioId), key: a.key, value: a.value, low: a.low, high: a.high, by: a.by, at: a.at, note: a.note ?? null };
+  const fixed = a.low === a.value && a.high === a.value;
+  return {
+    scope: proformaScope(scenarioId),
+    key: a.key,
+    value: a.value,
+    low: fixed ? null : a.low,
+    high: fixed ? null : a.high,
+    by: a.by,
+    at: a.at,
+    note: a.note ?? null,
+  };
+}
+
+/**
+ * An override's interval as every reader takes it (OF-BLD-020 §2.R,
+ * findings 1 and 14; the service's `params.held`): one end typed and the
+ * other left empty, the empty end is the value itself; with neither, the
+ * value is held at itself and both stay empty. The panel's row, the
+ * scenario page's binding and `assumptionOfOverride` read it so, as the
+ * service's resolve and run do.
+ */
+export function overrideEnds(o: Pick<Override, 'value' | 'low' | 'high'>): { low: number | null; high: number | null } {
+  if (typeof o.value !== 'number' || (o.low == null && o.high == null)) return { low: o.low ?? null, high: o.high ?? null };
+  return { low: o.low ?? o.value, high: o.high ?? o.value };
 }
 
 /** An override as a Proforma assumption; null for a value in words, which no Proforma input takes. */
 export function assumptionOfOverride(o: Override): InputAssumption | null {
   if (typeof o.value !== 'number' || !Number.isFinite(o.value)) return null;
-  return { key: o.key, value: o.value, low: o.low ?? o.value, high: o.high ?? o.value, by: o.by, at: o.at, note: o.note ?? null };
+  const ends = overrideEnds(o);
+  return { key: o.key, value: o.value, low: ends.low ?? o.value, high: ends.high ?? o.value, by: o.by, at: o.at, note: o.note ?? null };
 }
 
 /** `proformaAssumptions` as the overrides of every `proforma:` scope give it, by scenario id. */

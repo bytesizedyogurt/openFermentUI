@@ -212,3 +212,97 @@ def test_resolve_warns_outside_the_bounds_and_keeps_the_value(standin, client):
     run = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", overrides=[*ECONOMICS, over("yield", 0.45)], samples=4),
                        pool=standin)
     assert {i.key: i for i in run.inputs}["yield"].value == 0.45
+
+
+# ── OF-BLD-020 §2.R: the panel binds as the run binds ──────────────────
+
+
+def test_the_panel_binds_as_the_run_binds_and_both_refuse_in_the_same_words(standin, client):
+    """§2.R findings 0, 9 and 13: a forecast chosen for titre, yield and
+    productivity, then titre typed by a person. The resolve used to bind
+    without the person's values, so its refusal said titre binds records;
+    it binds with them now, as the run does, and both refuse in the same
+    words, which say the titre is the person's and the remedy that applies."""
+    _, fc = demo._bridge_fits()
+    every = {k: fc for k in proforma.FIT_KEYS}
+    typed = [*ECONOMICS, over("titre", 50.0)]
+    with pytest.raises(params.ParamRefused) as panel:
+        params.resolve_scope(SCOPE, ParamResolveRequest(fits=every, overrides=typed))
+    words = str(panel.value)
+    assert "titre is a named person's assumption" in words and "titre binds" not in words, words
+    assert "reset titre to its source" in words, words
+    # What the page sends (the fits of the inputs no override names) and what the panel sends are refused alike.
+    for fits in (every, {"yield": fc, "productivity": fc}):
+        with pytest.raises(proforma.ScenarioRefused) as run:
+            proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", overrides=typed, fits=fits, samples=4), pool=standin)
+        assert str(run.value) == words
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={"fits": every, "overrides": [o.model_dump() for o in typed]})
+    assert r.status_code == 422 and r.json()["detail"] == words
+    # Reset titre: the resolve binds every input to the forecast, as the run would.
+    ok = params.resolve_scope(SCOPE, ParamResolveRequest(fits=every, overrides=ECONOMICS))
+    assert {v.key: v.origin for v in ok.values if v.key in proforma.FIT_KEYS} == dict.fromkeys(proforma.FIT_KEYS, "fit")
+
+
+def test_resolve_states_the_interval_and_the_basis_inputs_the_run_takes(standin, client):
+    """§2.R findings 1, 14, 3 and 19: one end of an interval typed and the
+    other left empty is the value itself, the same in the resolve and the
+    run; and the basis inputs the resolve says the overrides add are the
+    ones the run's basis takes for the same overrides, from one function."""
+    typed = [over("titre", 50.0, low=40.0), over("plant_scale", 100000.0), over("glucose_price", 0.4, 0.3, 0.5)]
+    r = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=typed))
+    got = {v.key: v for v in r.values}
+    held = {a.key: a for a in proforma.named_values("sc-yeast-1", typed)[0]}
+    assert (got["titre"].low, got["titre"].high) == (held["titre"].low, held["titre"].high) == (40.0, 50.0)
+    # With neither end it is held at itself: no interval on the panel, both ends the value in the run.
+    assert (got["plant_scale"].low, got["plant_scale"].high) == (None, None)
+    assert (held["plant_scale"].low, held["plant_scale"].high) == (100000.0, 100000.0)
+    up = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[over("titre", 50.0, high=70.0)]))
+    assert next((v.low, v.high) for v in up.values if v.key == "titre") == (50.0, 70.0)
+    run = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", overrides=typed, samples=4), pool=standin)
+    added = [i for i in artifacts.get(run.artifactId).inputs if i.source.kind == "assumption" or i.name == proforma.ASSUMPTIONS_READ]
+    assert [i.model_dump() for i in r.basisInputs] == [i.model_dump() for i in added]
+    assert [i.name for i in r.basisInputs][:3] == ["titre", "titre low", "titre high"]
+    body = client.post(f"/api/params/{SCOPE}/resolve", json={"overrides": [o.model_dump() for o in typed]}).json()
+    assert [i["name"] for i in body["basisInputs"]] == [i.name for i in added]
+
+
+def test_an_override_of_a_convention_is_refused_by_the_resolve_as_by_the_run(standin, client):
+    """§2.R findings 2 and 18: the resolve accepted a person's value for a
+    convention every run states, which every run refuses."""
+    o = over("ethanol_purity", 0.5)
+    with pytest.raises(params.ParamRefused, match="ethanol_purity is a convention, fuel grade") as refused:
+        params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[o]))
+    assert "takes no person's value" in str(refused.value)
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={"overrides": [o.model_dump()]})
+    assert r.status_code == 422 and "ethanol_purity is a convention" in r.json()["detail"]
+    with pytest.raises(proforma.ScenarioRefused, match="ethanol_purity is a convention"):
+        proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", overrides=[*ECONOMICS, o], samples=4), pool=standin)
+
+
+def test_an_older_field_value_wins_over_the_records_and_moves_the_artifact_id(standin):
+    """§2.R finding 4: the comment said a run that read the older field alone
+    keeps the basis and the artifact id it had before the panel. That holds
+    only for inputs no record binds: an older-field value of an input that
+    binds records now wins over them (D3), so the binding, the basis and the
+    id change."""
+    old = [assume("plant_scale", 100000.0), assume("glucose_price", 0.4, 0.3, 0.5)]
+    plain = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=old, samples=8), pool=standin)
+    typed = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=[*old, assume("titre", 50.0)], samples=8),
+                         pool=standin)
+    t = {i.key: i for i in typed.inputs}["titre"]
+    assert t.binding == "assumption" and t.value == 50.0 and "chosen in place of the 3 records it bound" in t.flags
+    assert typed.artifactId != plain.artifactId
+    got = named(artifacts.get(typed.artifactId))
+    assert "titre record" not in got and proforma.ASSUMPTIONS_READ not in got
+
+
+def test_a_run_refuses_an_override_that_does_not_say_when_it_was_typed(standin, client):
+    """§2.R finding 5: the resolve refused an override with no `at`, the run
+    kept one, and its basis named no day."""
+    for at in ("", "   "):
+        blank = over("glucose_price", 0.4).model_copy(update={"at": at})
+        with pytest.raises(proforma.ScenarioRefused, match="the override of glucose_price says when it was typed"):
+            proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", overrides=[ECONOMICS[0], blank], samples=4), pool=standin)
+        with pytest.raises(params.ParamRefused, match="the override of glucose_price says when it was typed"):
+            params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[blank]))
+    assert not [a for a in artifacts.all_artifacts() if a.tool == proforma.RUN]

@@ -1423,6 +1423,39 @@
               "note": "typed on 2026-10-15: STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM",
               "by": "openFerment test fixture"
             }
+          },
+          {
+            "name": "yield low",
+            "value": 0.7,
+            "unit": "g g-1",
+            "source": {
+              "kind": "assumption",
+              "id": null,
+              "note": "typed on 2026-10-15: STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM",
+              "by": "openFerment test fixture"
+            }
+          },
+          {
+            "name": "yield high",
+            "value": 0.7,
+            "unit": "g g-1",
+            "source": {
+              "kind": "assumption",
+              "id": null,
+              "note": "typed on 2026-10-15: STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM",
+              "by": "openFerment test fixture"
+            }
+          },
+          {
+            "name": "assumptions read from",
+            "value": "overrides",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "where the named persons' values in this basis came from: the parameter panel's overrides, and any the older assumptions field gave, which the service reads as overrides for one release; a basis without this input read the older field alone",
+              "by": null
+            }
           }
         ],
         "warnings": [

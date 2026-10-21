@@ -2367,6 +2367,15 @@ class Override(BaseModel):
     at: str
     note: str | None = None
 
+    @field_validator("value", "low", "high", mode="before")
+    @classmethod
+    def _no_true_or_false(cls, v: Any) -> Any:
+        # OF-BLD-020 §2.R (finding 6): pydantic reads a JSON true or false as
+        # 1.0 or 0.0 before any check sees it, a number nobody typed.
+        if isinstance(v, bool):
+            raise ValueError("an override's value, low and high are numbers or words, never true or false")
+        return v
+
 
 class ParamScope(BaseModel):
     """GET /api/params/{scope}: a scope's specs with their current values."""
@@ -2416,7 +2425,10 @@ class ParamResolveResult(BaseModel):
     values: list[ParameterValue]
     waiting: list[str]
     # What the overrides would add to a run's basis, each an `assumption`
-    # naming the person and what it rests on.
+    # naming the person and what it rests on: the inputs a run of the scope
+    # writes for them, built by the function the run builds them with (a
+    # Proforma scope's value, low and high, and the line saying the run read
+    # overrides; OF-BLD-020 §2.R).
     basisInputs: list[BasisInput]
     # A value outside its bounds, in words.
     warnings: list[str]
