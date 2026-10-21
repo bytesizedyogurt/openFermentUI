@@ -107,6 +107,17 @@ is already loaded. The service names a run's stream or a preset, never a
 number, and keeps the answer as a `thermo_props` artifact; fermOS asks the same
 worker about water and ethanol at a measured titre.
 
+**fermOS → BioSTEAM goes through the same worker** (OF-BLD-020 Phase 4). A
+vessel design is BioSTEAM's: the service sends the worker what a kept
+simulation (or, anaerobic, a kept fit) holds, what a person typed in the
+parameter panel and the stated conventions its basis names; every other value
+is BioSTEAM's own default for the class. The worker builds BioSTEAM's
+`AeratedBioreactor` or its NREL batch fermenter, sizes and costs it, and
+answers; the service reads the oxygen balance against the simulation's own
+uptake and keeps the design as one `fermos.vessel` artifact. The vessel reaches
+neither Proforma's price nor pureOS's inlet yet: night two's `custom_train_v1`
+and harvest stream join them (OF-BLD-020 Phase 6).
+
 One more carries records into a flowsheet, and it is built too (OF-BLD-019
 Phase 2).
 
@@ -237,6 +248,8 @@ The vessel: kinetics, oxygen and heat transport, operating mode and feeding, sca
 | Operating mode | `fermos.mode` | live |
 | Scale | `fermos.scale` | live |
 | Control | `fermos.control` | stub |
+
+**Transport and scale are the vessel, sized on BioSTEAM** (OF-BLD-020 Phase 4). A kept `batch_v1` simulation that takes up oxygen gets BioSTEAM's `AeratedBioreactor`, a stirred tank (kLa by Riet's correlation) or a bubble column (by Dewes'), the only two correlations the class runs; an anaerobic one, and a kept kinetic fit or forecast, gets the NREL batch fermenter, with no air (other model families are not designed yet). Every design parameter is in the panel over `fermos:vessel:<artifact id>` (27 for the aerated vessel, 9 for the NREL one), each from BioSTEAM's own default for the class read from its code at import, the simulation's harvest hour and oxygen uptake, a stated convention, or a named person. A design needs a person's plant scale (or, aerated, one vessel's batch volume), so every design is `demo`. BioSTEAM's aerated class sizes the air for what its reaction consumes, not for a demand it is given, so the Proforma worker (`core/openferment_core/flowsheets/vessel.py`) builds the reaction from what the simulation made and scales its oxygen to the simulation's peak uptake. Transport is the oxygen balance after the design, what the vessel transfers against what the simulation takes up hour by hour, with the short hours named, and the heat line, BioSTEAM's duty beside a convention's estimate from the oxygen the culture took up. Scale is the design itself: vessels, volumes, the batch cycle, power, cooling and BioSTEAM's own cost, kept as one `fermos.vessel` artifact. `fermos_vessel` and `fermos_write`'s `design_vessel` are one function, free and audited. Scale-down to the bench, and pricing the vessel in Proforma (night two's `custom_train_v1`), are not built.
 
 | Component | Implemented in |
 |---|---|
@@ -376,10 +389,11 @@ is a smaller problem than a system with no name for the thing it is missing.
 the unit-operation vocabulary and no process model of its own: it reads the
 train a Proforma run simulated, and decides nothing yet. fermOS had a screen and five
 named subsystems with no code until kinetics arrived, fitted from depositions
-alone; transport, operating mode, scale and control are still named and not
-built. Putting them in the navigation from day one means that when the work
-arrives the question is what the destination does with it, not where in the
-navigation it should go. Each screen says what it lacks rather than implying
+alone; operating mode followed (OF-BLD-020 Phase 3, the model families),
+then transport and scale (Phase 4, the vessel on BioSTEAM), and control is
+still named and not built. Putting them in the navigation from day one means
+that when the work arrives the question is what the destination does with it,
+not where in the navigation it should go. Each screen says what it lacks rather than implying
 otherwise.
 
 **A program is not a destination.** The corpus serves three research programs

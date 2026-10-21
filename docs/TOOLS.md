@@ -170,6 +170,14 @@ only as a row is cited by its ref in `moduleRefs`, and a claim citing it by
 evidence id is dropped with words that say so. Postdoc's prompt (rule 16)
 says a vessel's numbers are read from its artifact, never stated.
 
+The `Evidence`'s value is the number of vessels BioSTEAM sized; every other
+number stays in the artifact, which the MCP server's `get_artifact` reads
+whole. With the program switch off, a simulation of an archived program is
+refused like any other archived target. The design itself is BioSTEAM's, made in the Proforma
+worker, and spends no model money; what it computes, and where BioSTEAM
+overruled the build document, are in README.md (*fermOS sizes the vessel on
+BioSTEAM*).
+
 ## A person's value (OF-BLD-020 Phase 2)
 
 A number a person sets for a model reaches a run one way, and no tool is on it.
@@ -224,7 +232,11 @@ inputs when it is read, and a `detail` of words, ids and flags alone (its
 family, title, strain, product and sugar, which keys each source bound, whether
 it is aerobic, whether its Yp/s is above a ceiling): its numbers stay in the
 artifact; and `vessel` (§4.2), one row a kept `fermos.vessel` design, ref
-`fermos/vessel/<artifact id>`, found by its own id or its simulation's.
+`fermos/vessel/<artifact id>`, found by its own id or its simulation's,
+labelled with BioSTEAM's class and the vessel type, `open` and `computed`, its
+mark worked out from its inputs when it is read; its `detail` names the class,
+the vessel type and the source, and copies from the artifact the number of
+vessels, each vessel's volume and the installed cost.
 
 **pureOS reads trains** (OF-BLD-019 §4.1). `pureos_read` holds three kinds:
 `unit-operation` (the vocabulary, each with the BioSTEAM classes that perform
@@ -383,7 +395,7 @@ audited as `finding`.
 | `fermos_write` | `forecast` | forecasts from a kept fit and keeps it | `fermos.forecast_run` |
 | `fermos_write` | `fit` | refused: a deposition's series lives in the browser | — |
 | `fermos_write` | `simulate` | simulates the model family named in `target` as the service binds it, the same run as `fermos_simulate` (`run_simulation`); `fields` carry `strain`, `product`, `sugar`, `fitArtifact`, `startFrom`, `durationPreset` and `records.<parameter key>` (record ids, separated by commas or spaces), any other field refused; refuses naming each parameter that waits | `fermos.simulate` |
-| `fermos_write` | `design_vessel` | designs the vessel a kept simulation (or, anaerobic, a kept fit) needs on BioSTEAM, the same design as `fermos_vessel` (`design_vessel`); fields `simulationArtifact` or `fitArtifact`, `vesselType`, `klaMethod`; refuses in words while the plant scale waits for a person | `vessel.design` |
+| `fermos_write` | `design_vessel` | designs the vessel a kept simulation (or, anaerobic, a kept fit) needs on BioSTEAM, the same design as `fermos_vessel` (`design_vessel`); fields `simulationArtifact` or `fitArtifact`, `vesselType`, `klaMethod`; refuses in words while no plant scale (or, aerated, one vessel's batch volume) is given, which only a named person types in fermOS → Vessel | `vessel.design` |
 | `proforma_write` | `run` | runs the BioSTEAM scenario named in `target` as the service binds it, the same run as `run_flowsheet` (`run_scenario`); refuses naming what waits, an empty target, or a scenario the service does not hold | `proforma.run` |
 | `proforma_write` | `bind` | refused: an assumption is a named person's, typed into the parameter panel and kept in the browser's Durable tier (*A person's value*, above) | — |
 | `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…`, kept in `candidates/hand/` apart from the extractor's file, so it never counts as an extraction; fields the action lists only, `negativeResult` and `isPrimary` as the word true or false | `extract.add_candidate` (§2.4's rules) |
@@ -421,7 +433,10 @@ No gate covers a Proforma run (OF-BLD-019 §6.1): `run_flowsheet` and
 `proforma_write`'s `run` keep one `proforma.run` artifact in the open lane and
 spend no model money, so `gates.py` and this table are unchanged by them. Nor
 a simulation (OF-BLD-020 §3.4): `fermos_simulate` and `fermos_write`'s
-`simulate` keep one `fermos.simulation` artifact the same way.
+`simulate` keep one `fermos.simulation` artifact the same way. Nor a vessel
+design (§4.2): `fermos_vessel` and `fermos_write`'s `design_vessel` keep one
+`fermos.vessel` artifact the same way, and BioSTEAM's design spends no model
+money.
 
 A proposal is carried out or dismissed by a named person (the reviewer name
 in Settings; placeholders are refused), and each carries their name and the

@@ -103,6 +103,7 @@ archived programs (above).
 | Predictions and their score | **Locked, and scored by runs** — a prediction is a point, an interval or a bound, locked with what it rests on; Runbooks → Ledger draws each against what reconciled runs measured and counts locked, tested, held, missed and inconclusive runs. The seed's ten runbooks (eight of them locked) are examples, so by default the ledger counts zero and says why; no run has tested a prediction. Postdoc can draft a runbook whose numbers the service writes from artifacts and records |
 | Simulation economics, authored | **Modeled, and examples** — the three scenarios S1–S3 are illustrative casein cost surfaces written by hand, not validated, labelled *Cost model v0*, and hidden with the archive |
 | Simulation economics, BioSTEAM | **Simulated, from a shelf of four flowsheets** (OF-BLD-019 Phase 2). Two are published reference biorefineries run whole on their package's own defaults: the stored benchmark, `biorefineries.cornstover`, reproduces the NREL 2011 corn stover design at **1.9677** USD per gallon against 1.968 (2026-10-15), and `selling_price` cites it, as it cites the newest kept run of a seed BioSTEAM scenario the program switch shows; the dry-grind corn ethanol plant, `biorefineries.corn`, the yeast program's reference, matched all eleven values its package's own test asserts on this installation, the largest relative difference 1.8×10⁻⁵ against the test's 5 % (measured in the build, STATE.md §2.2). Two are ours: `sc-yeast-1` runs glucose to ethanol, three of its process inputs bound to thread Q records and its productivity, plant scale and glucose price waiting; `sc-pha-1` (archived with PHA) runs fermentation, harvest and drying of PHA. Each scenario run draws 500 seeded samples by default and is `demo` while any input rests on a named person's assumption. Kept on `openferment-data` since OF-BLD-019 §7.1: the corn plant's reference run (`1b2f2c463c872086`), the corn stover plant's through the reference endpoint (`42f80a77d306f673`, 1.967671122 USD per gallon, nine of its package test's eleven values within tolerance, the two misses the package's own on this lock), and one run of `sc-pha-1` (`23c3304c1c35e26d`, `demo`), made in §1.2 on stand-in assumptions under the reviewer name *OF-BLD-019 session* (a test entry), whose base case could not run; no run of `sc-yeast-1` is kept: three of its inputs wait for Sean |
+| Vessel designs | **Designed by BioSTEAM, from a kept simulation and a person's scale** (OF-BLD-020 Phase 4) — fermOS → Vessel sizes the vessels a kept batch simulation needs (or, anaerobic, a kept fit) with BioSTEAM's own fermenter classes, in the Proforma worker: how many, how large, the batch cycle, agitator and compressor power, cooling, the oxygen the vessel transfers against the uptake the simulation takes, and BioSTEAM's own cost. Every design parameter is in the parameter panel with its source. The scale is always a named person's assumption, so every design is `demo`. None is kept on `openferment-data` (2026-10-21 05:51 UTC): no simulation is kept yet, because its parameters wait for Sean (STATE.md §3.5), so no vessel has been designed outside the tests and the service double, which design on stand-in simulations (§4.3, run owed) |
 | Downstream trains | **Read from a simulated run, never typed** — pureOS reads the train of the newest Proforma run of each scenario from the one artifact that run kept (OF-BLD-019 Phase 4): unit by unit in run order, the mass in and out, the product in and out, the product each unit passes on toward the product stream and what it loses and to which outlet, its recovery and the share still on the path, and the overall recovery. Nothing is simulated again on read. A train exists once somebody runs a scenario. The one scenario run on `openferment-data`, `sc-pha-1`'s (archived), has a base case that could not run, so its train names no product and reads no recovery, and says why; no yeast train is on file, and pureOS says so and how to make one |
 | Physical properties | **Computed by thermosteam**, BioSTEAM's property engine, in the Proforma worker: density, heat capacity, viscosity, and bubble and dew points of a run's stream, or of a preset the service fills (the ethanol–water azeotrope, or water and ethanol at a titre record's value). Each answer is an artifact whose basis names the library and its version; a chemical the library lacks is refused in words. One is kept on `openferment-data`: §7.1's beer at a thread Q titre record (`cfdfdee7ec2bae37`, `unverified`, the record's mark) |
 | Agent answer prose | **Real model calls in a bounded loop** — Postdoc on the configured model (`claude-haiku-5-5` in this build), restarted once on the fallback on a refusal or an outage, through `openferment-core`. Code sweeps the eleven modules first; the loop reads them, searches the records and passages (at most 6 rounds, 12 tool calls, the per-question cost cap and 180 seconds), and answers with claims that carry no numbers of their own, each citing records, module rows, quoted sentences checked word for word against their passages, or computed values. There is no scripted mode: with the service down Postdoc says so, keeps the history, and offers nothing in its place. The eleven run-sheet questions, each asked twice on 2026-10-20, cost $0.1072 for the 22 and took 8–53 s each (`docs/DEMO.md`). The 13 authored flows are an evaluation set, graded against and never offered |
@@ -1049,6 +1050,122 @@ record of the active program (with no titre record on file, it says what
 fills it). Postdoc asks the same through `thermo_props`, each property its own
 evidence id. With the service down the trains, the train page and each card
 say so, and nothing stands in for an answer.
+
+### fermOS sizes the vessel on BioSTEAM (OF-BLD-020 Phase 4)
+
+fermOS → Vessel (`/fermos/vessel`, `src/screens/FermOSVessel.tsx`, the tab between Simulate and
+Forecast) answers two questions about a batch fermOS kept. What vessels would run it? And would
+they give the culture the oxygen it takes up? BioSTEAM answers both. Given the broth a fermenter
+takes and the reaction inside it, BioSTEAM's fermenter classes size the vessels and their batch
+schedule, size the air compressor and the agitator, work out the heat to take away, and cost each
+piece from their own correlations. BioSTEAM runs in the Proforma worker, where it is already
+loaded. `core/openferment_core/vessel.py` talks to it through the worker's JSON contract and never
+imports it; `core/openferment_core/flowsheets/vessel.py` is the worker's side.
+
+- **What a design starts from.** A kept simulation of the `batch_v1` family, ethanol on glucose
+  (a fed-batch's feed and a chemostat's flow are refused in words, for now). Or, for an anaerobic
+  vessel only, a kept kinetic fit or forecast, read for its titre, yield and batch time the way
+  Proforma reads one (`proforma.fit_info` on `ethanol_glucose_v0`). Simulate's **Design the
+  vessel** opens the page on its simulation (`?simulation=`); a fit opens with `?fit=`; with
+  neither, the newest kept simulation is chosen. The broth is read at the simulation's harvest
+  hour, and its oxygen uptake up to that hour, even when the run went on after its sugar ran out.
+- **Which vessel.** A simulation that takes up oxygen (its Yx/o is set) gets BioSTEAM's
+  `AeratedBioreactor`. It is a stirred tank, whose agitator BioSTEAM sizes and costs and whose kLa
+  (how fast oxygen moves from the bubbles into the broth) comes from Riet's correlation; or a
+  bubble column, with no agitator and kLa from Dewes'. An anaerobic simulation, and every fit,
+  gets the NREL batch fermenter (`NRELAnaerobicBatchBioreactor`, the class the ethanol flowsheet's
+  fermenter is built on): no gas inlet, no compressor, and so no oxygen balance.
+- **Every parameter in hand.** The parameter panel shows the scope `fermos:vessel:<artifact id>`
+  in six groups: Scale, Vessel, Schedule, Aeration, Agitation, Heat. The aerated vessel has 27
+  parameters and the NREL one 9. Each value names its source. Most are BioSTEAM's own defaults for
+  the class, read from its code when the worker loads it (its signatures, its class attributes,
+  and a vessel built with nothing set), and never typed here. The reacting time `tau` is the
+  simulation's harvest hour (a fit's batch time). The peak and batch-average oxygen uptake are the
+  simulation's. Stated conventions are named in the basis: the air is sized for the peak uptake,
+  a bubble column's agitation power is zero (else BioSTEAM costs an agitator), and a vessel type
+  or kLa correlation a request names (as Postdoc's tool does) is that request's. A person may type
+  any parameter under a reviewer name, as a named assumption. The vessel type is the panel's
+  choice `design` (Stirred tank or Bubble column), BioSTEAM's own word for it;
+  `vessel_type` is BioSTEAM's word for the vessel's orientation.
+- **A design needs a person's scale.** Either a plant scale, in tonnes of product a year, which
+  the corn plant's TEA operating hours and the titre at harvest turn into broth an hour; or, for
+  the aerated vessel only, one vessel's batch volume in m³, with a loading time. Neither, or both,
+  is refused in words, and the line above **Design** says which the panel offers. Other requests
+  BioSTEAM cannot design are refused before the worker is asked: a number of vessels that is not
+  whole, or under the class's own minimum (the NREL vessel refuses one, read from its code); a
+  largest vessel the class refuses; N and V_max both; V_max or N beside a batch volume; one
+  aerated vessel at a plant scale with no loading time.
+- **The oxygen comes from the reaction.** BioSTEAM's aerated class takes no oxygen demand. It
+  sizes the air so that the oxygen it transfers, averaged over the cycle, meets what its reaction
+  consumes. So the worker builds the reaction from what the simulation made: glucose and oxygen to
+  cells, ethanol, carbon dioxide and water, closed on thermosteam's formulas. It designs once,
+  reads the uptake BioSTEAM sized for, scales the reaction's oxygen to the simulation's peak (or
+  its batch average, when a person chooses that), and designs again on a fresh unit. A flag says
+  by how much. If even the scaled reaction sits under the floor BioSTEAM aerates from (read from
+  its code), the design has no air, and says that every hour of uptake is short.
+- **The oxygen balance.** After the design, the service sets what the vessel transfers (OTR)
+  against what the simulated culture takes up (OUR), hour by hour, in mmol L⁻¹ h⁻¹. OTR is the
+  class's own kLa times the driving force BioSTEAM sizes with: the gap between oxygen's
+  solubility (at the vessel's temperature and the oxygen's partial pressure in the gas, averaged
+  between the sparged air and the vent) and the broth held at the dissolved oxygen setpoint θ, a
+  share of it. The `OxygenBalance` figure draws OUR as a computed curve and OTR as a computed
+  rule, and shades the hours the service found short. Dissolved oxygen is not a state of the
+  simulation: the balance is checked after it, not fed back into it.
+- **The heat line.** BioSTEAM's duty comes from the reaction's heats of formation, out less in.
+  If a person types a heat per oxygen (`Q_O2_consumption`, unset by default), BioSTEAM's duty is
+  that heat times the oxygen the vessel consumed, and the line says so. Beside it, labelled a
+  convention, stands an estimate from the oxygen the culture took up: the heat per oxygen that
+  `biorefineries.cane`'s aerated fermentation gives BioSTEAM (read from its code; it cites Benz,
+  after Cooney's rule that heat follows oxygen uptake), times the oxygen the simulation took up
+  over the batch. When the reaction's balanced oxygen and the simulation's differ by more than a
+  tenth (`OXYGEN_AGREE_RTOL`, a convention named in the basis), a flag names both.
+- **The cost line.** Purchase and installed cost, by item as BioSTEAM lists them (for the aerated
+  vessel the pressure vessels, their platforms and ladders, the compressor, the air cooler, the
+  heat exchanger, the recirculation pump and motor, and a stirred tank's agitator; the NREL
+  vessel's own lines, cleaning in place among them), from BioSTEAM's own correlations at the
+  plant cost index it holds, named with its year. BioSTEAM's warnings, such as a vessel taller
+  than a cost correlation covers, are kept as flags.
+- **One artifact a design.** `POST /api/fermos/vessel` takes a `VesselRequest` (`simulation` or
+  `fit`, `vesselType`, `klaMethod`, the scope's `overrides`, `includeArchived`), keeps one
+  `fermos.vessel` artifact and answers a `VesselDesign`: the design table (each row naming where
+  BioSTEAM put it), the oxygen balance, heat, cost, every parameter with its source and BioSTEAM's
+  default beside it, the flags, and one `Evidence` whose id is the artifact's. The basis names the
+  simulation or fit, the vessel class, the chemicals, the utility prices and cost index, the
+  vessel type, the unit id, the operating hours a plant scale reads, the cross-check's heat per
+  oxygen and tolerance for an aerated vessel, and every parameter with its source, each person's
+  value by name. Its provenance follows those, so a design is always `demo`. Asked again on the
+  same basis, the kept design is returned. A refusal is a 422 in words, a damaged file a 409, and
+  a worker that cannot answer a 503.
+  `GET /api/fermos/vessel/specs?simulation=|fit=&vesselType=` and
+  `GET /api/params/fermos:vessel:<id>` serve the scope (404 for an artifact not on file), and
+  `GET /api/fermos/vessels` lists the kept designs without starting a simulator.
+- **The screen computes nothing.** Every number on it is the service's or a person's, and it
+  renders no number box of its own (`check:seed` reads every fermOS screen for one, E.1‴). It
+  offers the design table as CSV, shows the basis, and for the NREL vessel says *Anaerobic: no
+  compressor, no oxygen balance*. **Price this in Proforma** says what night two's
+  `custom_train_v1` adds, and makes no scenario.
+- **Postdoc asks with ids and words.** `fermos_vessel` takes a simulation's or a fit's artifact
+  id, a vessel type and a kLa correlation by name, all strings. It and `fermos_write`'s
+  `design_vessel` are one function, free at no gate, audited with the model as the agent. The
+  service holds no person's scale, so on a real service the tool refuses until a person designs
+  on the screen, and Postdoc says the design waits. `fermos_read`'s kind `vessel` lists the kept
+  designs. `docs/TOOLS.md` has the rest.
+- **Where BioSTEAM overruled the build document.** BioSTEAM takes its oxygen demand from the
+  reaction, not from `Q_O2_consumption`, which is a forced heat per oxygen. Only Riet's and
+  Dewes' correlations run in the class: BioSTEAM 2.54.0 registers Labik and Galaction for a
+  stirred tank, and Deshpande, DeJesus, Akita & Yoshida, Posarac & Tekic, Seno, Suh and Shah for a
+  bubble column, and its `AeratedBioreactor` implements none of them, so the panel names them
+  and does not offer them. There is no `V` to set: BioSTEAM finds a vessel's size from `V_max` or
+  `N`. The NREL vessel stores `Nmin` and `Nmax` and never uses them, and the aerated class has
+  neither, so a design holds N to a whole number at or above the class's own minimum instead.
+  The air flow, its vvm and the gas velocity are BioSTEAM's to solve, so they are read, not set.
+  `batch` stays on: BioSTEAM's continuous mode divides the transfer by one hour where the batch
+  time belongs. An aerated design replayed in another process agrees to about one part in a
+  million, not bit for bit, because BioSTEAM's air-flow solve starts from sums whose order
+  Python's string hashing sets.
+- **What waits for Sean.** No simulation is kept on `openferment-data`, because §3.5's parameters
+  wait for him, so no vessel has been designed for the yeast program (§4.3, run owed). Once he
+  simulates a batch, he types a plant scale on fermOS → Vessel and presses **Design**.
 
 ## Architecture
 
