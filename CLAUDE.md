@@ -4,7 +4,20 @@ Read this before touching anything. Each line below is something a previous
 session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 §4.2.
 
-## The active build (OF-BLD-019)
+## The active build (OF-BLD-020)
+
+OF-BLD-020 (fermOS and pureOS on BioSTEAM: the vessel and the train, every parameter in
+hand) runs over two nights. Night one runs on `claude/of-bld-020-vessel-train`, cut from
+`main` at `1a92325`: Phases 1–4, then Phase 8. Night two, after Sean's merge, runs on
+`claude/of-bld-020-vessel-train-2` from `main`: Phases 5–7, then Phase 8 again. Its
+document is `docs/build/OF-BLD-020.md` (prompt `docs/build/PROMPT-020.md`); its commits are
+`OF-BLD-020 §n.m: <what>`; it follows OF-BLD-014 Part A with OF-BLD-016's amendments below,
+a 10:30 UTC clock and a 2.00 USD cap a night. "Next phase" means the first `OF-BLD-020 §`
+step missing from the log, in the document's Part D order (Phase 7 drops first). A
+reviewer name this build types on a live service is `OF-BLD-020 session`, a test entry Sean
+may withdraw.
+
+## The previous build (OF-BLD-019)
 
 OF-BLD-019 (Proforma stands on BioSTEAM) ran on `claude/of-bld-019-proforma`, cut from
 `main` at `a261f30`. Its document is `docs/build/OF-BLD-019.md` (prompt
@@ -16,7 +29,7 @@ BioSTEAM* below, and STATE.md's `## OF-BLD-019` section is its log). Its pull re
 Appendix 1 on the Mini (`deploy.sh --keep-decisions`, `pnpm data:pull`, the kickstart,
 `pnpm ready`, `brew install graphviz`) and types `sc-yeast-1`'s three assumptions.
 
-## The previous build (OF-BLD-016)
+## The build before (OF-BLD-016)
 
 OF-BLD-016 (one active program, nothing invented on screen, Postdoc with every
 tool) runs on `claude/of-bld-016-demo`, cut from `main` at `7e3ebb0`, with
