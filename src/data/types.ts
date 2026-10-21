@@ -3269,6 +3269,10 @@ export interface Train {
   /** How many runs of this scenario are on file; the newest is read. */
   runs: number;
   note: string | null;
+  /** OF-BLD-020 §5.2: the artifact read, `proforma.run` or `pureos.train_run`; for a train run, the train it ran. */
+  tool: string;
+  trainId: string | null;
+  trainName: string | null;
 }
 
 /** One train on file, for pureOS's index (`GET /api/pureos/trains`). */
@@ -3285,6 +3289,10 @@ export interface TrainSummary {
   overallRecovery: number | null;
   runs: number;
   note: string | null;
+  /** As Train's (OF-BLD-020 §5.2). */
+  tool: string;
+  trainId: string | null;
+  trainName: string | null;
 }
 
 // ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
@@ -3525,8 +3533,15 @@ export interface ParamResolveRequest {
   startFrom?: string | null;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
   includeArchived?: boolean;
-  /** pureOS's unit scope (OF-BLD-020 §5.1): the unit's catalogue type, until a train is kept and names it. */
+  /** pureOS's unit scope (OF-BLD-020 §5.1): the unit's catalogue type, when no train is sent. */
   unitType?: string | null;
+  /**
+   * pureOS's unit scope (§5.2): the whole train, so per-component keys expand
+   * over its chemicals and records bind by its program and product; the scope
+   * `pureos:unit:<train id>:inlet` is its inlet. Its typed values are not laid
+   * on here: the resolve's `overrides` are.
+   */
+  train?: TrainSpec | null;
 }
 
 export interface ParamResolveResult {
@@ -3945,4 +3960,166 @@ export interface UnitSpecs {
   chemicals: string[];
   versions: Record<string, string>;
   notes: string[];
+}
+
+// ── pureOS builds the train (OF-BLD-020 §5.2, D9, D10, E.2‴) ──────────
+//
+// A train is data: an inlet, then units in order, each a catalogue type with
+// what a person typed (Override-shaped, D3), the records named for a
+// parameter, each outlet's routing and optionally a shelf flowsheet's own unit
+// to read its values from. The worker builds and runs it; one
+// `pureos.train_run` artifact keeps it; `pureos.train_of` reads it.
+
+/** A value a person typed for one parameter of a train's unit or inlet: an Override without scope and key. */
+export interface TrainParam {
+  value: number | string;
+  low?: number | null;
+  high?: number | null;
+  by: string;
+  at: string;
+  note?: string | null;
+}
+
+/** Where a train's broth comes from (D10). */
+export interface TrainInlet {
+  kind: 'simulation' | 'run-stream' | 'typed';
+  /** A `fermos.simulation`, or a run (`proforma.run`, `proforma.reference`, `pureos.train_run`) whose stream it is; null when typed. */
+  ref?: string | null;
+  /** The run's stream (run-stream alone). */
+  streamId?: string | null;
+  /** A `fermos.vessel` design of the simulation, which gives the broth flow (simulation alone). */
+  vessel?: string | null;
+  /** The inlet's typed values by key (broth_flow, harvest_hour, conc.<chemical>, T, P). */
+  params?: Record<string, TrainParam>;
+}
+
+/** A shelf flowsheet's own unit whose values a train's unit takes, read in the worker, never typed. */
+export interface TrainUnitReadFrom {
+  flowsheet: string;
+  unit: string;
+}
+
+/** One unit of a train, in order (D9). */
+export interface TrainUnitSpec {
+  /** The BioSTEAM unit id: a letter, then letters, digits or underscores. */
+  id: string;
+  /** A catalogue id. */
+  type: string;
+  params?: Record<string, TrainParam>;
+  /** Outlet name → 'onward' | 'waste' | 'recycle:<earlier unit id>'; one not named takes the catalogue's default. */
+  outlets?: Record<string, string>;
+  /** Record ids named for a parameter, by key. */
+  records?: Record<string, string[]>;
+  readFrom?: TrainUnitReadFrom | null;
+}
+
+/** A train as data (D9), kept whole in this browser and sent with a run. */
+export interface TrainSpec {
+  id: string;
+  name: string;
+  program: string;
+  /** A product id; thermo's CHEMICALS names the library chemical it is. */
+  product: string;
+  inlet: TrainInlet;
+  units: TrainUnitSpec[];
+}
+
+/** `POST /api/pureos/train/validate`: every refusal at once; runs nothing. */
+export interface TrainValidation {
+  ok: boolean;
+  refusals: string[];
+}
+
+/** `POST /api/pureos/train/run`. */
+export interface TrainRunRequest {
+  train: TrainSpec;
+  /** Overrides of `pureos:unit:<train id>:<unit id | inlet>`, each replacing the train's value of its key. */
+  overrides?: Override[];
+  by?: string | null;
+  includeArchived?: boolean;
+}
+
+export interface StreamImpurity {
+  chemical: string;
+  massFraction: number;
+}
+
+/** One stream of a train run: the product's mass share and its largest other components. */
+export interface StreamPurity {
+  stream: string;
+  massFlow: number;
+  productFraction: number | null;
+  impurities: StreamImpurity[];
+}
+
+export interface TrainPurity {
+  /** The chemical traced. */
+  product: string;
+  productStream: string | null;
+  productFraction: number | null;
+  streams: StreamPurity[];
+  /** How many of each stream's largest other components are named (a reading convention). */
+  impuritiesShown: number;
+  note: string;
+}
+
+/** One unit's cost as BioSTEAM gives it, or why there is none. */
+export interface TrainUnitCost {
+  unit: string;
+  type: string;
+  unitClass: string;
+  costModel: boolean;
+  purchaseCost: number | null;
+  installedCost: number | null;
+  /** BioSTEAM's purchase cost by item, USD. */
+  items: Record<string, number>;
+  note: string | null;
+}
+
+/** What a train run's inlet was and where it came from (D10). */
+export interface TrainInletRead {
+  kind: 'simulation' | 'run-stream' | 'typed';
+  ref: string | null;
+  refTool: string | null;
+  streamId: string | null;
+  vessel: string | null;
+  chemicals: string[];
+  /** g L⁻¹ by chemical, water aside (a simulation's harvest, or typed). */
+  concentrations: Record<string, number> | null;
+  /** kg/hr by chemical as the worker built the stream, water included. */
+  flows: Record<string, number>;
+  water: number | null;
+  waterNote: string | null;
+  /** m³/hr. */
+  brothFlow: number | null;
+  harvestHour: number | null;
+  T: number;
+  P: number;
+  phase: string;
+  absent: string | null;
+  notes: string[];
+}
+
+/** One unit's parameters as its run's basis holds them. */
+export interface TrainUnitParameters {
+  unit: string;
+  type: string;
+  unitClass: string;
+  values: ParameterValue[];
+}
+
+/** `POST /api/pureos/train/run`: the one `pureos.train_run` artifact, read. */
+export interface TrainRun {
+  artifactId: string;
+  provenance: Provenance;
+  createdAt: string;
+  spec: TrainSpec;
+  train: Train;
+  purity: TrainPurity;
+  costs: TrainUnitCost[];
+  inlet: TrainInletRead;
+  parameters: TrainUnitParameters[];
+  notes: string[];
+  flags: string[];
+  basis: ComputedBasis;
 }

@@ -49,6 +49,14 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 and values (catalogue keys), simulated, and read: its streams,
                 design, costs and the attributes it holds (`build_unit`,
                 `unit_report`); the catalogue's sim test runs every type so
+    train_specs   what a train builds on (OF-BLD-020 §5.2): the yeast
+                program's chemical IDs and thermosteam's Stream defaults
+    flowsheet_unit_values  a shelf flowsheet's own units read by catalogue
+                key, as its package builds them (a train's `readFrom`)
+    train_run   one pureOS train built from its plain spec
+                (`flowsheets/train.py`), simulated whole with its recycles,
+                and read: stream, unit and utility tables, the diagram or
+                the unit list, each unit's costs, the inlet as built
 
 NO WORKER STOPS IN A DEBUGGER. BioSTEAM 2.54.0's AeratedBioreactor answers a
 failure of its bubble-column correlation with a bare `breakpoint()`, which
@@ -985,12 +993,97 @@ def _op_catalogue_unit_check(args):
         return catalogue.unit_report(unit, keys)
 
 
+# ── pureOS's train (OF-BLD-020 §5.2, D9, D10) ─────────────────────────
+
+
+def _versions() -> dict[str, str]:
+    return {"biosteam": version("biosteam"), "thermosteam": version("thermosteam"),
+            "biorefineries": version("biorefineries")}
+
+
+def _op_train_specs(args):
+    """What a train builds on, read here: the yeast program's chemical IDs,
+    and the temperature, pressure and phase thermosteam gives a Stream nobody
+    set them on (an inlet's library default)."""
+    T, P, phase = stream_defaults()
+    with package_defaults():
+        chems = yeast_chemicals()
+        ids = list(chems.IDs)
+    return {"chemicals": ids, "T": T, "P": P, "phase": phase,
+            "from": "thermosteam's Stream signature (its T, P and phase defaults)", "versions": _versions()}
+
+
+def _op_flowsheet_unit_values(args):
+    """The values of a shelf flowsheet's own units by catalogue key, as its
+    package builds them (§5.2, `TrainUnitReadFrom`): the flowsheet built once
+    and kept, each unit found by its ID and held to the catalogue type's
+    class, and read (`flowsheets/train.read_unit`). Read, never simulated: a
+    unit's design values are set when it is built."""
+    from ..flowsheets import train as train_fs
+
+    name = str(args.get("flowsheet") or "")
+    _, b = built(name)
+    system = b.system if hasattr(b, "system") else b
+    by_id = {u.ID: u for u in system.units}
+    out = {}
+    for want in args.get("units") or []:
+        uid, type_id = str(want.get("unit") or ""), str(want.get("type") or "")
+        e, cls = unit_class(type_id)
+        unit = by_id.get(uid)
+        if unit is None:
+            raise Refused(f"{name} has no unit {uid}; its units are {', '.join(by_id)}")
+        if type(unit) is not cls and not isinstance(unit, cls):
+            raise Refused(f"unit {uid} of {name} is a {type(unit).__name__}, not the {cls.__name__} of the catalogue's "
+                          f"{e.id}: a train's unit reads a flowsheet's unit of its own class")
+        values, unread = train_fs.read_unit(e.id, unit)
+        out[uid] = {"unitClass": type(unit).__name__, "values": values, "unread": unread}
+    return {"flowsheet": name, "units": out, "versions": _versions()}
+
+
+def _op_train_run(args):
+    """One train built and run (OF-BLD-020 §5.2): inside `package_defaults()`
+    on the yeast program's chemicals, BioSTEAM's default utility prices and
+    cost index set as every scenario flowsheet sets them, a fresh flowsheet;
+    the train built by `flowsheets/train.Built` and simulated whole; then its
+    tables read with this worker's own readers (no TEA: a train is not priced
+    here) and each unit's costs. A train that cannot be built or run is the
+    module's refusal, in words naming the unit and BioSTEAM's error."""
+    from ..flowsheets import train as train_fs
+
+    with package_defaults():
+        chems = yeast_chemicals()
+        bst.settings.set_thermo(chems)
+        bst.process_tools.default_utilities()
+        bst.process_tools.default_CEPCI()
+        bst.main_flowsheet.set_flowsheet(bst.Flowsheet(str(args["system"])))
+        b = train_fs.Built(dict(args), unit_class, chems)
+        b.simulate()
+        system = b.system
+        return {
+            "tablesSource": f"BioSTEAM {version('biosteam')}, thermosteam {version('thermosteam')}",
+            "streams": stream_table(system),
+            "units": unit_table(system),
+            "utilities": utility_duties(system.units, "every unit of the train"),
+            **diagram(system, args.get("diagram")),
+            "unitOrder": [u.ID for u in system.units],
+            "tableUnits": TABLE_UNITS,
+            "inlet": b.inlet_built,
+            "productStream": b.product.ID,
+            "outlets": b.outlet_ids(),
+            "costs": b.costs(),
+            "utilitySettings": flowsheets.utility_settings(system.units),
+            "versions": _versions(),
+        }
+
+
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
             "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
             "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design,
             "catalogue_specs": _op_catalogue_specs, "catalogue_unit_check": _op_catalogue_unit_check}
 
 HANDLERS["volatility"] = _op_volatility  # OF-BLD-020 §7.1
+HANDLERS.update(train_specs=_op_train_specs, flowsheet_unit_values=_op_flowsheet_unit_values,
+                train_run=_op_train_run)  # OF-BLD-020 §5.2
 
 if __name__ == "__main__":
     serve(HANDLERS, name="proforma")

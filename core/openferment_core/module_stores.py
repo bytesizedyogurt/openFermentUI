@@ -312,6 +312,8 @@ def artifact_program(a: Any, record_lookup: Any = None, scenarios: Iterable[dict
     tool = getattr(a, "tool", None)
     if tool in FERMOS_RUNS:
         return _fermos_program(a, record_lookup, frozenset())
+    if tool == "pureos.train_run":  # OF-BLD-020 §5.2: the train's, its inlet's, its records'
+        return pureos.program_of_run(a, record_lookup)
     if tool not in RUN_TOOLS:
         return programs.program_of_artifact(a, record_lookup)
     scenarios = list(pureos.seed_scenarios() if scenarios is None else scenarios)

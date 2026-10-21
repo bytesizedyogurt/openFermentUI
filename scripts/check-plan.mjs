@@ -259,6 +259,21 @@ const PAIRS = [
   ['UnitDefault', 'UnitDefault'],
   ['UnitParamMap', 'UnitParamMap'],
   ['UnitSpecs', 'UnitSpecs'],
+  // OF-BLD-020 §5.2 — a train is data; the worker runs it; one artifact keeps it.
+  ['TrainParam', 'TrainParam'],
+  ['TrainInlet', 'TrainInlet'],
+  ['TrainUnitReadFrom', 'TrainUnitReadFrom'],
+  ['TrainUnitSpec', 'TrainUnitSpec'],
+  ['TrainSpec', 'TrainSpec'],
+  ['TrainValidation', 'TrainValidation'],
+  ['TrainRunRequest', 'TrainRunRequest'],
+  ['StreamImpurity', 'StreamImpurity'],
+  ['StreamPurity', 'StreamPurity'],
+  ['TrainPurity', 'TrainPurity'],
+  ['TrainUnitCost', 'TrainUnitCost'],
+  ['TrainInletRead', 'TrainInletRead'],
+  ['TrainUnitParameters', 'TrainUnitParameters'],
+  ['TrainRun', 'TrainRun'],
 ];
 
 let compared = 0;

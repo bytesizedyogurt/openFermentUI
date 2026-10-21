@@ -941,6 +941,10 @@ def listing() -> list[UnitType]:
 def _static() -> Iterable[tuple[str, list[ParameterSpec]]]:
     for e in UNIT_TYPES:
         yield f"pureos unit {e.id}", static_specs(e)
+    # OF-BLD-020 §5.2: what a train adds, its inlet and its side inlets.
+    from . import train_spec
+
+    yield from train_spec.static_specs()
 
 
 def template_keys(e: Entry) -> dict[str, str]:
@@ -1161,9 +1165,18 @@ def provided(type_id: str) -> params.Provided:
 
 def _provider(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
     train, unit = ids
+    if req.train is not None:
+        # OF-BLD-020 §5.2: the train sent with the request decides the unit's
+        # type, its chemicals and its records (pureos/train_spec.py).
+        from . import train_spec as _train
+
+        return _train.provided(ids, req)
+    if unit == "inlet":
+        raise params.ScopeUnknown(f"the inlet of train {train} is resolved with its train: send the train as ?train= "
+                                  "(JSON) or as the resolve's `train`")
     if not req.unitType:
         raise params.ScopeUnknown(
-            f"this service serves pureOS's train units by their unit type until trains are kept (OF-BLD-020 §5.2): "
+            f"pureOS's train units are served with their train (?train=, OF-BLD-020 §5.2), or by their unit type: "
             f"name the type of unit {unit} of train {train} with ?unitType=<catalogue id>")
     try:
         e = entry(req.unitType)

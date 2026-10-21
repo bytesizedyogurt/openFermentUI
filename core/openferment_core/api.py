@@ -57,6 +57,8 @@ from .models import (
     ProformaRunRequest,
     SimulationRequest,
     ThermoPropsRequest,
+    TrainRunRequest,
+    TrainSpec,
     VesselDesign,
     VesselRequest,
     ForecastResult,
@@ -461,6 +463,21 @@ def _fits_param(raw: str | None) -> dict[str, str]:
     return fits
 
 
+def _train_param(raw: str | None) -> TrainSpec | None:
+    """`?train=` on GET /api/params/{scope} (OF-BLD-020 §5.2): the whole
+    TrainSpec as JSON, as the resolve's `train` carries it; refused in words
+    when it is not one."""
+    from pydantic import ValidationError
+
+    if not raw:
+        return None
+    try:
+        return TrainSpec.model_validate_json(raw)
+    except (ValidationError, ValueError, RecursionError) as e:
+        first = str(e).splitlines()[0] if str(e) else type(e).__name__
+        raise HTTPException(status_code=422, detail=f"train is a pureOS train as JSON (a TrainSpec): {first}") from None
+
+
 def _assumptions_param(raw: str | None) -> list:
     """`?assumptions=` on GET /api/proforma/ceiling-check: a JSON list of
     named persons' assumptions, as ProformaRunRequest.assumptions carries
@@ -668,7 +685,7 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
                  vesselType: str | None = None, strain: str | None = None, product: str | None = None,  # noqa: N803
                  sugar: str | None = None, fit: str | None = None, startFrom: str | None = None,  # noqa: N803
                  durationPreset: str | None = None, includeArchived: bool = False,  # noqa: N803 (the wire name)
-                 unitType: str | None = None) -> dict:  # noqa: N803 (the wire name)
+                 unitType: str | None = None, train: str | None = None) -> dict:  # noqa: N803 (the wire name)
     """A scope's parameters (`ParamScope`): every spec with its bounds and
     their reason, and its value as the service binds it now, with its
     source. `proforma:<scenario id>` is a seed scenario, or with
@@ -682,7 +699,10 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     `?includeArchived=` (OF-BLD-020 §3.2). `pureos:unit:<train>:<unit>` takes
     the unit's catalogue type as `?unitType=` and reads its class's defaults
     through the Proforma worker as the vessel's do (§5.1); with no type it is
-    a 404 in words. 404 for a scope no provider here
+    a 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is
+    the train's own, its per-component keys expanded over the train's
+    chemicals and its records bound by the train's program and product, and
+    `pureos:unit:<train>:inlet` is the train's inlet. 404 for a scope no provider here
     knows; 422 in words for a malformed one or a refused binding; 409 for an
     artifact the scope names that is damaged on disk, as the vessel's own route
     answers it (§2.R, finding 17); 503 when the worker cannot answer."""
@@ -695,7 +715,8 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
                                                     f"{durationPreset!r} is neither")
     req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits), vesselType=vesselType,
                               strain=strain, product=product, sugar=sugar, fit=fit, startFrom=startFrom,
-                              durationPreset=durationPreset, includeArchived=includeArchived, unitType=unitType)
+                              durationPreset=durationPreset, includeArchived=includeArchived, unitType=unitType,
+                              train=_train_param(train))
     try:
         return params.scope(scope, req).model_dump(mode="json")
     except params.ScopeUnknown as e:
@@ -1355,11 +1376,55 @@ def pureos_trains(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (t
             for t in pureos.trains(include_archived=includeArchived, record_lookup=_record_lookup())]
 
 
+@app.get("/api/pureos/train-runs")
+def pureos_train_runs(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """Every kept pureOS train run (`TrainSummary`), newest first; one of an
+    archived program left out unless `?includeArchived=true` asks for it
+    (OF-BLD-020 §5.2). A read: it starts no simulator."""
+    from . import pureos
+
+    return [s.model_dump(mode="json") for s in pureos.train_runs(include_archived=includeArchived)]
+
+
+@app.post("/api/pureos/train/validate")
+def pureos_train_validate(train: TrainSpec) -> dict:
+    """Every refusal of a train at once, in words (`TrainValidation`): a type
+    not in the catalogue, an outlet its type does not have, a recycle that is
+    not to an earlier unit, a key its unit does not declare, no unit, two
+    outlets on, a duplicate id. Runs nothing (OF-BLD-020 §5.2, D9)."""
+    from . import pureos
+
+    return pureos.validation(train).model_dump(mode="json")
+
+
+@app.post("/api/pureos/train/run")
+def pureos_train_run(req: TrainRunRequest) -> dict:
+    """Run a train (`TrainRun`): every value resolved with its source, the
+    train built and run in the Proforma worker, one `pureos.train_run`
+    artifact kept (or the one kept for the same basis returned). 422 in words
+    for every refusal (the validation's, a value that waits naming what would
+    bind it, a unit's needs, a unit that does not converge, with BioSTEAM's
+    words); 409 for an artifact the train names that is damaged on disk; 503
+    when the worker cannot answer (OF-BLD-020 §5.2)."""
+    from . import artifacts, pureos
+
+    try:
+        return pureos.run_train(req.train, req.overrides, req.by, req.includeArchived).model_dump(mode="json")
+    except pureos.TrainRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not run the "
+                                                    f"train: {e}") from e
+
+
 @app.get("/api/pureos/train/{key}")
 def pureos_train(key: str) -> dict:
-    """One train: the newest run of the scenario `key` names, or the run whose
-    artifact id it is. 404 says how a run gets there; a deep link opens
-    whatever program it belongs to, and the page names it."""
+    """One train: the newest run of the scenario `key` names, the newest run
+    of the pureOS train it names (OF-BLD-020 §5.2), or the run whose artifact
+    id it is. 404 says how a run gets there; a deep link opens whatever
+    program it belongs to, and the page names it."""
     from . import pureos
 
     try:
