@@ -23,6 +23,13 @@
  *    provenance. CostWaterfall and Tornado each stand on the grammar (their
  *    own toTable, ENCODING, FigureFrame, no recharts), are exported from the
  *    figures index, and the BioSTEAM scenario's sections draw with them.
+ * 8. OF-BLD-020 §3.3 (D14): TimeCourse draws one row per mark (every curve
+ *    point, OUR's, each reading, each band point, each ceiling rule, each
+ *    yield point); a simulation's curves keep its provenance, a reading is
+ *    measured, a ceiling's rule keeps its own, and a yield is flagged above a
+ *    ceiling only where the service said so, never by a comparison the figure
+ *    makes. It stands on the grammar, and fermOS → Simulate and Forecast draw
+ *    with it.
  * 9. OF-BLD-020 §4.2 (D14): OxygenBalance draws one row per hour of the
  *    simulated uptake, the vessel's transfer the one value the design gives
  *    on every row, the short hours exactly the service's intervals, every row
@@ -46,6 +53,7 @@ import { emptyOf as recoveryEmpty, noBar, toTable as recoveryTable } from '../sr
 import { bars as waterfallBars, toTable as waterfallTable } from '../src/components/figures/CostWaterfall';
 import { emptyOf as oxygenEmpty, toTable as oxygenTable } from '../src/components/figures/OxygenBalance';
 import { fmt } from '../src/engine/units';
+import { toTable as timeCourseTable, type TimeCourseProps } from '../src/components/figures/TimeCourse';
 import type { TrainUnit } from '../src/data/types';
 import { gatherLinks } from '../src/components/Dossier';
 import { ArtifactsDown, ArtifactRefused } from '../src/lib/artifacts';
@@ -251,6 +259,51 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
   const page = readFileSync('src/screens/ProformaBiosteam.tsx', 'utf8');
   if (!/<CostWaterfall\b/.test(page) || !/<Tornado\b/.test(page)) problems.push("the BioSTEAM scenario's sections do not draw the cost breakdown and the sensitivity through the grammar");
   ok.push(`tables: cost breakdown ${rows.length}, one row per line and the run's price; CostWaterfall and Tornado stand on toTable, ENCODING and FigureFrame`);
+}
+
+// 8 — OF-BLD-020 §3.3, D14: the time course of a simulation.
+{
+  const props: TimeCourseProps = {
+    title: 't',
+    t: [0, 1, 2],
+    states: [
+      { key: 'X', label: 'Cells (X)', unit: 'g L⁻¹', values: [0.1, 0.5, 1.2] },
+      { key: 'S', label: 'Substrate (S)', unit: 'g L⁻¹', values: [50, 40, 20] },
+    ],
+    provenance: 'demo',
+    our: { unit: 'g O2 L⁻¹ h⁻¹', values: [0, 0.1, 0.2] },
+    readings: [{ key: 'X', points: [{ t: 0, value: 0.1 }, { t: 2, value: 1.1 }] }],
+    bands: [{ key: 'S', t: [0, 1], low: [48, 37], high: [52, 43], provenance: 'computed' }],
+    // The service flagged Yp/s above the ceiling; the achieved yield, below
+    // it, carries no word, and the figure makes no comparison of its own.
+    yields: {
+      unit: 'g g⁻¹',
+      points: [{ label: 'Yp/s, the parameter', value: 0.5, above: true }, { label: 'yield achieved', value: 0.6 }],
+      ceilings: [{ label: 'Yeast9 ceiling', value: 0.47, provenance: 'computed', above: true }],
+    },
+  };
+  const rows = timeCourseTable(props).rows;
+  const marks = 2 * 3 + 3 + 2 + 2 + 1 + 2;
+  if (rows.length !== marks) problems.push(`TimeCourse's table has ${rows.length} rows for ${marks} marks`);
+  if (rows.some((r) => r.some((c) => /NaN|Infinity/.test(String(c))))) problems.push('a TimeCourse cell holds NaN or Infinity');
+  const curves = rows.filter((r) => String(r[1]).startsWith('computed curve'));
+  if (curves.length !== 9 || curves.some((r) => r[5] !== 'demo')) problems.push("a simulation's curves lose its provenance in TimeCourse's table");
+  if (rows.filter((r) => r[1] === 'reading').some((r) => r[5] !== 'measured')) problems.push('a reading drawn against a simulation is not measured');
+  const rule = rows.find((r) => r[1] === 'ceiling, a rule');
+  if (!rule || rule[5] !== 'computed') problems.push("a ceiling's rule does not keep its own provenance");
+  const yps = rows.find((r) => r[0] === 'Yp/s, the parameter');
+  const achieved = rows.find((r) => r[0] === 'yield achieved');
+  if (!yps || !/flagged, not clamped/.test(String(yps[1])) || yps[3] !== '0.5') problems.push('Yp/s above a ceiling is not flagged, or is moved');
+  if (!achieved || /flagged/.test(String(achieved[1]))) problems.push('TimeCourse flags a yield the service did not flag: it compares on its own');
+  const src = readFileSync('src/components/figures/TimeCourse.tsx', 'utf8');
+  if (!/export function toTable\(/.test(src)) problems.push('TimeCourse exports no toTable');
+  if (!/from '\.\/FigureFrame'/.test(src) || !/<FigureFrame\b/.test(src)) problems.push('TimeCourse is not framed by FigureFrame');
+  if (!/from '\.\/encoding'/.test(src) || !/\bENCODING\[/.test(src)) problems.push('TimeCourse does not take its marks from ENCODING');
+  if (/['"]recharts/.test(src)) problems.push('TimeCourse draws with recharts');
+  if (!/export \{ TimeCourse,/.test(readFileSync('src/components/figures/index.ts', 'utf8'))) problems.push('the figures index does not export TimeCourse');
+  for (const screen of ['src/screens/FermOSSimulate.tsx', 'src/screens/FermOSForecast.tsx'])
+    if (!/<TimeCourse\b/.test(readFileSync(screen, 'utf8'))) problems.push(`${screen} does not draw its simulation through TimeCourse`);
+  ok.push(`tables: time course ${rows.length}, one row per mark; curves keep the simulation's provenance, a ceiling's rule its own, and only the service's flag rings a yield`);
 }
 
 // 9 — OF-BLD-020 §4.2: the oxygen balance, on the grammar.

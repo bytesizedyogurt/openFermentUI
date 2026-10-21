@@ -464,7 +464,7 @@ export const fitsFrom = (info: FermosFitInfo): Record<string, string> =>
   info.refused ? {} : Object.fromEntries(info.feeds.filter((f) => !f.refused && f.value != null).map((f) => [f.key, info.artifactId]));
 
 /** What a fermOS artifact is, in words. */
-export const FIT_TOOL_WORDS: Record<string, string> = { kinetic_fit: 'kinetic fit', growth_forecast: 'forecast' };
+export const FIT_TOOL_WORDS: Record<string, string> = { kinetic_fit: 'kinetic fit', growth_forecast: 'forecast', 'fermos.simulation': 'simulation' };
 
 /** The scenario page a fit is sent to, with the fit to attach when it opens. */
 export const sendFitPath = (scenarioId: string, artifactId: string) =>

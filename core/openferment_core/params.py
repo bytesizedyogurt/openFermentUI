@@ -10,6 +10,7 @@ served; no screen writes a form for a parameter of its own.
     parse_scope(scope)        what a scope names, or the refusal in words:
                                 fermos:family:<family id>
                                 fermos:vessel:<simulation artifact id>
+                                fermos:forecast:<kinetic fit artifact id>
                                 pureos:unit:<train id>:<unit id>
                                 proforma:<scenario id>
     resolve(specs, sources, overrides, by=None)
@@ -62,7 +63,10 @@ through the aggregate gate, the fermOS fits a person chose), called, never
 copied. OF-BLD-020 §3.1 registers `fermos-family`
 (`fermos:family:<family id>`): a kinetics family's specs, bound from a
 person's overrides and the family's stated conventions (fermos.py). §4.1
-registers `fermos-vessel`. Later steps register `pureos-unit`.
+registers `fermos-vessel`. §3.3 registers `fermos-forecast`
+(`fermos:forecast:<kinetic fit artifact id>`): a logistic_v0 fit's start
+values and run length, which a forecast takes from the fitted run unless a
+person names others. Later steps register `pureos-unit`.
 
 Rule 1 holds here: no value in this file. A bound is a convention with its
 reason written beside it (an ontology plausibility range read from
@@ -108,14 +112,16 @@ _ID = r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}"
 _FORMS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("fermos-family", re.compile(rf"fermos:family:({_ID})")),
     ("fermos-vessel", re.compile(rf"fermos:vessel:({_ID})")),
+    ("fermos-forecast", re.compile(rf"fermos:forecast:({_ID})")),
     ("pureos-unit", re.compile(rf"pureos:unit:({_ID}):({_ID})")),
     ("proforma", re.compile(rf"proforma:({_ID})")),
 )
 SCOPE_WORDS = ("fermos:family:<family id>, fermos:vessel:<simulation artifact id>, "
-               "pureos:unit:<train id>:<unit id> or proforma:<scenario id>")
+               "fermos:forecast:<kinetic fit artifact id>, pureos:unit:<train id>:<unit id> or proforma:<scenario id>")
 KIND_WORDS = {
     "fermos-family": "fermOS's model families",
     "fermos-vessel": "fermOS's vessel designs",
+    "fermos-forecast": "fermOS's forecasts",
     "pureos-unit": "pureOS's train units",
     "proforma": "Proforma's scenarios",
 }
@@ -135,8 +141,8 @@ def parse_scope(scope: str) -> tuple[str, tuple[str, ...]]:
 
 def scope_name(kind: str, *ids: str) -> str:
     """The scope string for a kind and its ids (parse_scope's inverse)."""
-    prefix = {"fermos-family": "fermos:family", "fermos-vessel": "fermos:vessel", "pureos-unit": "pureos:unit",
-              "proforma": "proforma"}[kind]
+    prefix = {"fermos-family": "fermos:family", "fermos-vessel": "fermos:vessel", "fermos-forecast": "fermos:forecast",
+              "pureos-unit": "pureos:unit", "proforma": "proforma"}[kind]
     name = ":".join((prefix, *ids))
     parse_scope(name)
     return name
@@ -659,6 +665,29 @@ def _fermos_family_static() -> Iterable[tuple[str, list[ParameterSpec]]]:
 
 
 register("fermos-family", _fermos_family, _fermos_family_static)
+
+
+# ── fermOS's forecasts (`fermos:forecast:<kinetic fit artifact id>`) ────
+#
+# OF-BLD-020 §3.3: a forecast of a logistic_v0 fit starts from the fitted
+# run's own start values and runs its own length; a person's other values are
+# this scope's overrides (fermos.forecast_provided), so FermOSForecast.tsx
+# renders no number box of its own (E.1‴).
+
+
+def _fermos_forecast(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
+    from . import fermos
+
+    return fermos.forecast_provided(ids, req)
+
+
+def _fermos_forecast_static() -> Iterable[tuple[str, list[ParameterSpec]]]:
+    from . import fermos
+
+    yield from fermos._forecast_static()
+
+
+register("fermos-forecast", _fermos_forecast, _fermos_forecast_static)
 
 
 # ── the guard ──────────────────────────────────────────────────────────

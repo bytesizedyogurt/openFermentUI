@@ -136,7 +136,12 @@ and drawn again to that hour (`fermos.to_run_out`). Nothing is copied: the run's
 basis names the fit for each input it feeds, so the run's provenance follows
 the fit's. A person chooses it, on the scenario page or with Send to Proforma on
 fermOS → Forecast, and a fit's productivity feeds only beside its own titre; a
-fit that cannot give an input is refused naming the parameter.
+fit that cannot give an input is refused naming the parameter. A kept
+simulation feeds the same three from its end state as it was kept (OF-BLD-020
+§3.3): its final titre, the product made over the sugar used to harvest, and
+that titre over the harvest hour, each one value, with the simulation's own
+provenance; a chemostat or a simulation of another product feeds nothing, and
+says why.
 
 **geneOS → Proforma is a flag, never a bound.** The ceiling check
 (`proforma.ceiling_check`, `GET /api/proforma/ceiling-check`) sets a scenario's
@@ -148,10 +153,13 @@ records' strains and species, a model matches by strain or by species, and the
 check is computed when read and kept nowhere. geneOS → Model lists the
 scenarios above a model's ceiling.
 
-**fermOS cannot be seeded from literature.** Kinetic parameters are fitted to
-real runs in a specific vessel, so they come from Deposition. fermOS is the
-component that most needs the Assay loop and the one that cannot be built out of
-papers.
+**A fermOS fit takes only measurements; a simulation names every source**
+(OF-BLD-020 D1). Kinetic parameters *fitted* to a run come from Deposition and
+nothing else. A *simulation* may take a parameter from a paper's records
+through the aggregate gate, a fit, a kept artifact, a named person's assumption
+or a stated convention, each labelled in the parameter panel and in its basis,
+and its provenance follows the weakest of them: it is never a measurement.
+fermOS is still the component that most needs the Assay loop.
 
 ## The eleven
 
@@ -220,19 +228,19 @@ Views: [Hosts](#) `/geneos/hosts` · [Pathway](#) `/geneos/pathway`
 
 **Reactor, kinetics, scale.** `/fermos` · chord `g f`
 
-The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. A fit or forecast can feed a Proforma scenario's titre, yield and productivity when a person chooses it (fermOS → Proforma, above). **The vessel is BioSTEAM's** (OF-BLD-020 §4.2): fermOS → Vessel (`/fermos/vessel`, `src/screens/FermOSVessel.tsx`) designs the vessel a kept simulation needs in the Proforma worker (`core/openferment_core/vessel.py`, `POST /api/fermos/vessel`), an AeratedBioreactor (stirred tank or bubble column) or the NREL batch fermenter, every design parameter in the parameter panel with its source and a plant scale a named person's assumption, and draws the oxygen balance (`OxygenBalance`): what the culture takes up against what the vessel transfers. Postdoc asks for one with `fermos_vessel`. Operating mode and control are not built.
+The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, and a fit takes only measurements**: a run's readings become time series, the service fits a growth rate and a kinetic model (the closed-form logistic, or the batch family) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. **Operating modes are built** (OF-BLD-020 §3.3): fermOS → Simulate integrates a model family (batch, fed-batch, chemostat; growth then storage with the PHA program; light-limited as a socket) from parameters each bound to a fit, the records, a kept simulation, a named person or a stated convention, shown with its source in the parameter panel, and keeps the run as a `fermos.simulation` artifact whose provenance follows those sources: a simulation is never a measurement. A fit, forecast or simulation can feed a Proforma scenario's titre, yield and productivity when a person chooses it (fermOS → Proforma, above). **The vessel is BioSTEAM's** (OF-BLD-020 §4.2): fermOS → Vessel (`/fermos/vessel`, `src/screens/FermOSVessel.tsx`) designs the vessel a kept simulation needs in the Proforma worker (`core/openferment_core/vessel.py`, `POST /api/fermos/vessel`), an AeratedBioreactor (stirred tank or bubble column) or the NREL batch fermenter, every design parameter in the parameter panel with its source and a plant scale a named person's assumption, and draws the oxygen balance (`OxygenBalance`): what the culture takes up against what the vessel transfers. Postdoc asks for one with `fermos_vessel`, and simulates with `fermos_simulate`. Control is not built.
 
 | Subsystem | Key | State |
 |---|---|---|
 | Kinetics | `fermos.kinetics` | live |
 | Transport | `fermos.transport` | live |
-| Operating mode | `fermos.mode` | stub |
+| Operating mode | `fermos.mode` | live |
 | Scale | `fermos.scale` | live |
 | Control | `fermos.control` | stub |
 
 | Component | Implemented in |
 |---|---|
-| fermOS | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py`, `src/screens/FermOSVessel.tsx`, `core/openferment_core/vessel.py` |
+| fermOS | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/screens/FermOSSimulate.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py`, `core/openferment_core/kinetics.py`, `src/screens/FermOSVessel.tsx`, `core/openferment_core/vessel.py` |
 
 ### pureOS
 
@@ -333,7 +341,7 @@ for the ones with a rail entry.
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |
-| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py`, `src/screens/FermOSVessel.tsx`, `core/openferment_core/vessel.py` | the rail, /fermos |
+| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/screens/FermOSSimulate.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py`, `core/openferment_core/kinetics.py`, `src/screens/FermOSVessel.tsx`, `core/openferment_core/vessel.py` | the rail, /fermos |
 | Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/screens/ProformaReference.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` | the rail, /proforma |
 | Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts`, `core/openferment_core/basis.py` | provenance ticks and their labels |

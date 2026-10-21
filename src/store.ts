@@ -890,7 +890,13 @@ export const useStore = create<OFState>()((set, get) => ({
   guildPendingWithdrawals: [] as GuildWithdrawal[],
   guildActingId: null as string | null,
   fermosFits: {} as Record<string, FermosFitResponse>,
-  keepFermosFit: (fit: FermosFitResponse) => set((s) => ({ fermosFits: { ...s.fermosFits, [fit.depositionId]: fit } })),
+  // By run, and by family when it is not the logistic (OF-BLD-020 §3.3): a run keeps one fit of each family.
+  keepFermosFit: (fit: FermosFitResponse) =>
+    set((s) => {
+      const model = fit.kinetic?.model ?? 'logistic_v0';
+      const key = model === 'logistic_v0' ? fit.depositionId : `${fit.depositionId} · ${model}`;
+      return { fermosFits: { ...s.fermosFits, [key]: fit } };
+    }),
   guildHydrated: false,
   practice: null as Practice | null,
   checks: null as Checks | null,

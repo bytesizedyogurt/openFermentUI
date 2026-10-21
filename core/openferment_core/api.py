@@ -390,16 +390,20 @@ def fermos_simulate(req: SimulationRequest) -> dict:
 @app.get("/api/fermos/bind")
 def fermos_bind(family: str, strain: str | None = None, product: str | None = None, sugar: str | None = None,
                 fit: str | None = None, startFrom: str = "records",  # noqa: N803 (the wire name)
-                durationPreset: str = "until-sugar-runs-out", includeArchived: bool = False) -> dict:  # noqa: N803
+                durationPreset: str = "until-sugar-runs-out", includeArchived: bool = False,  # noqa: N803
+                overrides: str | None = None) -> dict:
     """A family's parameters bound for a strain, product and sugar
     (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
     (`?fit=`), the records of the evidence pool the switch shows through the
     aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
     spec's convention, with its source; what waits, each named with the field
-    that would bind it; and notes saying what bound from where. Starts no
-    integration and keeps nothing. 404 for a family no one declared; 422 in
-    words for a fit or simulation not on file, a fit of another family, a
-    sugar or id that is not one."""
+    that would bind it; and notes saying what bound from where. `?overrides=`
+    (a JSON list of the person's overrides of `fermos:family:<family>`, as
+    the simulation would carry them; OF-BLD-020 §3.3) lays them on, so
+    `waiting` is what Simulate would refuse for. Starts no integration and
+    keeps nothing. 404 for a family no one declared; 422 in words for a fit
+    or simulation not on file, a fit of another family, a sugar or id that is
+    not one, or an override of another scope."""
     from . import kinetics
 
     if family not in kinetics.FAMILIES:
@@ -409,7 +413,8 @@ def fermos_bind(family: str, strain: str | None = None, product: str | None = No
         raise HTTPException(status_code=422, detail=f"a run-length preset is until-sugar-runs-out or fit-length; "
                                                     f"{durationPreset!r} is neither")
     req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar, fitArtifact=fit,
-                            startFrom=startFrom, durationPreset=durationPreset, includeArchived=includeArchived)
+                            startFrom=startFrom, durationPreset=durationPreset, includeArchived=includeArchived,
+                            overrides=_overrides_param(overrides))
     try:
         return fermos.bind(req).model_dump(mode="json")
     except fermos.SimulationRefused as e:
@@ -425,9 +430,10 @@ def fermos_simulations(includeArchived: bool = False) -> list[dict]:  # noqa: N8
 
 @app.get("/api/fermos/fits")
 def fermos_fits(flowsheet: str) -> list[dict]:
-    """The kinetic fits and forecasts fermOS keeps, newest first, each with
-    what it can feed a shelf flowsheet's titre, yield and productivity and
-    why not (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
+    """The kinetic fits, forecasts and simulations fermOS keeps (a
+    simulation since OF-BLD-020 §3.3), newest first, each with what it can
+    feed a shelf flowsheet's titre, yield and productivity and why not
+    (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
     a read: it keeps nothing. A flowsheet a scenario cannot run is a 422."""
     from . import proforma
 

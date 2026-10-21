@@ -133,8 +133,12 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * `pureosYeastOnFile` (OF-BLD-019 §7.R) lists and serves sc-yeast-1's
    * train beside sc-pha-1's; off, the double holds the PHA run alone, so
    * pureOS's empty list for the active program is drawn.
+   * `vesselSimulationsOnFile` (OF-BLD-020 §4.2, stacked on §3.3) adds
+   * fermos-vessel.json's two simulations to GET /api/fermos/simulations,
+   * which the vessel flow chooses from; off, the list holds only what
+   * Simulate's recorded run kept, empty as a fresh install starts.
    */
-  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true };
+  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true, vesselSimulationsOnFile: false };
   /** The ceiling checks the browser asked for (OF-BLD-019 §5.2): each query, as sent. */
   const ceilingChecks = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
@@ -164,6 +168,55 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * Proforma worker on BioSTEAM (its `worker.kind` says which).
    */
   const vesselPosts = [];
+  /**
+   * fermOS → Simulate (OF-BLD-020 §3.3): what the browser asked to bind
+   * (GET /api/fermos/bind, with its query) and to simulate (POST
+   * /api/fermos/simulate, with its body), as sent; and the simulations the
+   * double holds, empty as a fresh install starts, the fixture's one once a
+   * simulation it recorded was asked for.
+   */
+  const fermosBinds = [];
+  const fermosSimulates = [];
+  const fermosSimulationsOnFile = [];
+  /** The fixture's binding key for an ask: its family and strain (none: every strain). */
+  const simKey = (ask) => `${ask.family}|${ask.strain ?? ''}`;
+  /** Whether the double recorded this ask: ethanol on glucose from the records, until the sugar runs out. */
+  const simAskRecorded = (ask) =>
+    (ask.product ?? null) === 'ethanol' && (ask.sugar ?? null) === 'glucose' && (ask.startFrom ?? 'records') === 'records' &&
+    !ask.fit && !ask.fitArtifact && (ask.durationPreset ?? 'until-sugar-runs-out') === 'until-sugar-runs-out';
+  /**
+   * A person's overrides laid on recorded values as the service lays them on:
+   * each an assumption by the person it names, its interval's empty end the
+   * value when one end is typed (params.held, OF-BLD-020 §2.R).
+   */
+  const laidOn = (values, overrides) => {
+    const byKey = new Map(overrides.map((o) => [o.key, o]));
+    return values.map((v) => {
+      const o = byKey.get(v.key);
+      if (!o) return v;
+      const by = String(o.by).trim();
+      const ends = o.low == null && o.high == null ? [null, null] : [o.low ?? o.value, o.high ?? o.value];
+      return {
+        key: v.key, value: o.value, low: ends[0], high: ends[1],
+        source: { kind: 'assumption', id: null, note: `typed on ${o.at}${o.note ? `: ${o.note}` : ''}`, by },
+        origin: 'assumption', identified: null, overriddenBy: by, libraryDefault: v.libraryDefault ?? null,
+        recordIds: [], detail: `typed by ${by} on ${o.at}${o.note ? `: ${o.note}` : ''}`, outOfBounds: null,
+      };
+    });
+  };
+  /** The service's refusal of an override it cannot lay on, in its words, or null. */
+  const overrideRefusal = (scope, overrides, keys) => {
+    const stray = [...new Set(overrides.map((o) => o.scope).filter((sc) => sc !== scope))].sort();
+    if (stray.length) return `an override names the scope it changes, and these were sent to ${scope}: ${stray.join(', ')}`;
+    const seen = new Set();
+    for (const o of overrides) {
+      if (!keys.includes(o.key)) return `there is no parameter ${o.key} here; the parameters are ${keys.join(', ')}`;
+      if (seen.has(o.key)) return `two overrides of ${o.key}: one person's value a parameter`;
+      seen.add(o.key);
+      if (!String(o.by ?? '').trim()) return `the override of ${o.key} needs a person's name: a decision needs a reviewer name`;
+    }
+    return null;
+  };
 
   const server = createServer(async (req, res) => {
     try {
@@ -334,6 +387,76 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(fixture));
     }
+    // OF-BLD-020 §3.3 — fermOS → Simulate. The families, the switch off and
+    // on; what binds and waits with the person's overrides laid on; the run,
+    // answered with the simulation the real kinetics.py made of the
+    // fixture's STAND-IN values when those are what was typed (a parameter
+    // that waits is the service's 422, in its words); and the simulations on
+    // file, which that run adds to.
+    if (url === '/api/fermos/families' && req.method === 'GET') {
+      const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
+      const families = await prototype('fermos-families.json');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(on ? families.on : families.off));
+    }
+    if ((url === '/api/fermos/bind' && req.method === 'GET') || (url === '/api/fermos/simulate' && req.method === 'POST')) {
+      const send = (status, body) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(body));
+      };
+      const sim = await prototype('fermos-simulate.json');
+      let ask;
+      if (req.method === 'GET') {
+        const q = new URL(req.url ?? '/', 'http://double').searchParams;
+        let overrides = [];
+        try {
+          overrides = q.get('overrides') ? JSON.parse(q.get('overrides')) : [];
+        } catch {
+          return send(422, { detail: 'overrides is a JSON list of overrides, each with scope, key, value, by and at, as a run takes them' });
+        }
+        ask = { ...Object.fromEntries(q), strain: q.get('strain'), overrides };
+        fermosBinds.push(ask);
+      } else {
+        let raw = '';
+        for await (const chunk of req) raw += chunk;
+        ask = JSON.parse(raw || '{}');
+        fermosSimulates.push(ask);
+      }
+      const recorded = simAskRecorded(ask) ? sim.bind[simKey(ask)] : null;
+      if (!recorded) return send(422, { detail: `the double holds no binding of ${ask.family} for this ask: it holds ethanol on glucose from the records` });
+      if (recorded.status !== 200) return send(recorded.status, recorded.body);
+      const overrides = ask.overrides ?? [];
+      const scope = `fermos:family:${ask.family}`;
+      const keys = recorded.body.values.map((v) => v.key);
+      const why = overrideRefusal(scope, overrides, keys);
+      if (why) return send(422, { detail: why });
+      const values = laidOn(recorded.body.values, overrides);
+      const typed = new Set(overrides.map((o) => o.key));
+      const waiting = recorded.body.waiting.filter((k) => !typed.has(k));
+      if (url === '/api/fermos/bind') return send(200, { values, waiting, notes: recorded.body.notes });
+      if (waiting.length) {
+        const family = (await prototype('fermos-families.json')).on.find((f) => f.id === ask.family);
+        const label = (k) => family?.specs.find((sp) => sp.key === k)?.label ?? k;
+        const lines = waiting.map((k) => `${k} (${label(k)}) ${values.find((v) => v.key === k)?.detail ?? ''}`).join('; ');
+        return send(422, { detail: `${ask.family} cannot run yet: ${waiting.length} parameter${waiting.length === 1 ? ' waits' : 's wait'}. ${lines}` });
+      }
+      const want = sim.simulate.request;
+      const same = (a, b) => JSON.stringify(a.map((o) => [o.key, o.value]).sort()) === JSON.stringify(b.map((o) => [o.key, o.value]).sort());
+      if (simKey(ask) !== simKey(want) || !same(overrides, want.overrides))
+        return send(422, { detail: `the double holds one simulation, of ${want.family} for ${want.strain} with the fixture's typed values; it cannot integrate another` });
+      if (!fermosSimulationsOnFile.length) fermosSimulationsOnFile.push(...sim.simulations);
+      return send(200, sim.simulate.body);
+    }
+    // The one list of kept simulations, newest first, that Simulate and
+    // Vessel both read: the simulation Simulate's recorded run kept (none
+    // until it runs), then, with flags.vesselSimulationsOnFile, the two
+    // fermos-vessel.json's designs were made for.
+    if (url === '/api/fermos/simulations' && req.method === 'GET') {
+      const vessel = flags.vesselSimulationsOnFile ? (await prototype('fermos-vessel.json')).simulations : [];
+      const seen = new Set(fermosSimulationsOnFile.map((s) => s.artifactId));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify([...fermosSimulationsOnFile, ...vessel.filter((s) => !seen.has(s.artifactId))]));
+    }
     // OF-BLD-019 §5.1 — the fits fermOS keeps, with what each can feed a
     // flowsheet, as the real code listed them over an empty store and over
     // the stand-in fit and forecast (flags.fermosFitsOnFile picks which);
@@ -438,7 +561,8 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(entry.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(entry.body));
     }
-    // OF-BLD-020 §4.2 — fermOS → Vessel. The kept simulations; the vessel
+    // OF-BLD-020 §4.2 — fermOS → Vessel. The kept simulations are the one
+    // list above (flags.vesselSimulationsOnFile); the vessel
     // scope of each as the real code served it (by its vesselType); a
     // resolve that lays each override on as the service does, an assumption
     // by the person it names; and a design answered by its request: the
@@ -452,7 +576,6 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         res.writeHead(status, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify(body));
       };
-      if (url === '/api/fermos/simulations' && req.method === 'GET') return sendJson(200, (await vesselFixture()).simulations);
       if (url === '/api/fermos/vessels' && req.method === 'GET') return sendJson(200, []);
       const vm = /^\/api\/params\/fermos:vessel:([A-Za-z0-9][A-Za-z0-9._-]{0,127})(\/resolve)?$/.exec(url);
       if (vm) {
@@ -575,9 +698,41 @@ export function createServiceDouble({ dist, seedOnly = false }) {
           ask = { flowsheet: q.get('flowsheet'), host: q.get('host'), fits: q.get('fits') ? JSON.parse(q.get('fits')) : {} };
           paramScopes.push({ scope, ...Object.fromEntries(q) });
         }
+        // OF-BLD-020 §3.3 — a family's scope, as demo.py --prototype recorded
+        // the real code binding it over the stand-in yeast records (ethanol
+        // on glucose, from the records, for every strain and for
+        // CEN.PK113-7D); another ask is the double's 422 in its own words.
+        const family = /^fermos:family:([A-Za-z0-9][A-Za-z0-9._-]{0,127})$/.exec(scope)?.[1];
+        if (family) {
+          const sim = await prototype('fermos-simulate.json');
+          const asked = { family, ...ask, strain: ask.strain ?? null };
+          if (!resolving) {
+            const q = new URL(req.url ?? '/', 'http://double').searchParams;
+            for (const k of ['strain', 'product', 'sugar', 'fit', 'startFrom', 'durationPreset']) asked[k] = q.get(k);
+          }
+          const answer = simAskRecorded(asked) ? sim.scopes[simKey(asked)] : null;
+          if (!answer) return send(422, { detail: `the double holds no binding of ${scope} for this ask: it holds ethanol on glucose from the records` });
+          if (answer.status !== 200) return send(answer.status, answer.body);
+          const served = { ...answer.body, scope };
+          if (!resolving) return send(200, served);
+          const overrides = ask.overrides ?? [];
+          const why = overrideRefusal(scope, overrides, served.specs.map((sp) => sp.key));
+          if (why) return send(422, { detail: why });
+          const specs = new Map(served.specs.map((sp) => [sp.key, sp]));
+          const values = laidOn(served.values, overrides);
+          const basisInputs = values
+            .filter((v) => v.overriddenBy)
+            .flatMap((v) => [
+              { name: v.key, value: v.value, unit: specs.get(v.key).unit, source: v.source },
+              ...(v.low != null ? [{ name: `${v.key} low`, value: v.low, unit: specs.get(v.key).unit, source: v.source }] : []),
+              ...(v.high != null ? [{ name: `${v.key} high`, value: v.high, unit: specs.get(v.key).unit, source: v.source }] : []),
+            ]);
+          return send(200, { scope, values, waiting: values.filter((v) => v.origin === 'waiting').map((v) => v.key), basisInputs, warnings: [], notes: served.notes });
+        }
         const kinds = {
           'fermos:family': "fermOS's model families",
           'fermos:vessel': "fermOS's vessel designs",
+          'fermos:forecast': "fermOS's forecasts",
           'pureos:unit': "pureOS's train units",
         };
         const other = Object.keys(kinds).find((k) => scope.startsWith(`${k}:`));
@@ -585,7 +740,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         const id = /^proforma:([A-Za-z0-9][A-Za-z0-9._-]{0,127})$/.exec(scope)?.[1];
         if (!id)
           return send(422, {
-            detail: `a parameter scope is fermos:family:<family id>, fermos:vessel:<simulation artifact id>, pureos:unit:<train id>:<unit id> or proforma:<scenario id>, each id letters, digits, dots, dashes and underscores; '${scope}' is none of them`,
+            detail: `a parameter scope is fermos:family:<family id>, fermos:vessel:<simulation artifact id>, fermos:forecast:<kinetic fit artifact id>, pureos:unit:<train id>:<unit id> or proforma:<scenario id>, each id letters, digits, dots, dashes and underscores; '${scope}' is none of them`,
           });
         const recorded = await prototype('params-proforma.json');
         const fits = ask.fits ?? {};
@@ -892,5 +1047,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, paramScopes, paramResolves, vesselPosts, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, flags } };
 }

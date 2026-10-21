@@ -231,13 +231,15 @@ def test_a_spec_without_a_bounds_reason_or_with_an_unknown_source_is_refused():
 def test_the_check_reads_every_declared_spec_and_names_one_with_no_reason(monkeypatch, capsys):
     n, problems = params.check()
     assert problems == []
-    from openferment_core import kinetics, vessel
+    from openferment_core import fermos, kinetics, vessel
 
-    # The shelf's inputs, fermOS's family specs (OF-BLD-020 §3.1) and its
-    # vessel declarations (§4.1).
+    # The shelf's inputs, fermOS's family specs (OF-BLD-020 §3.1), its
+    # vessel declarations (§4.1) and a forecast's start values and length
+    # (§3.3).
     assert n == (sum(len(info.inputs) for info in shelf.SHELF.values())
                  + sum(len(f.specs()) for f in kinetics.FAMILIES.values())
-                 + sum(len(s) for _, s in vessel._static()))
+                 + sum(len(s) for _, s in vessel._static())
+                 + sum(len(s) for _, s in fermos._forecast_static()))
     assert params.main(["--check"]) == 0 and "every one has a written bounds reason" in capsys.readouterr().out
     unreasoned = ParameterSpec.model_construct(**{**spec().model_dump(), "boundsReason": " "})
     monkeypatch.setitem(params._STATIC, "fermos-family", lambda: [("a STAND-IN family", [spec(), unreasoned])])

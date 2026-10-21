@@ -1,33 +1,73 @@
-// fermOS → Forecast (OF-BLD-014 §7.4): pick a fit, set the conditions, see
-// the band.
+// fermOS → Forecast (OF-BLD-014 §7.4, OF-BLD-020 §3.3): pick a fit, set the
+// conditions in the parameter panel, see the run.
 //
 // A forecast is drawn from one kept fit's covariance by the service, under the
 // fitted run's own starting values and length unless a person changes them;
 // a changed value is that person's assumption, and the forecast becomes
 // `demo`. The band leaves out run-to-run variation, and says so.
 //
-// Send to Proforma (OF-BLD-019 §5.1, D10): the fit in hand, or the forecast
-// just made from it, goes to a Proforma scenario of the active program, or
-// to a new one made in the New scenario chooser, whose page attaches it to
-// the inputs it can feed (titre, yield, productivity); the service computes
-// each value from the artifact there.
-import { useState } from 'react';
-import type { ForecastResult } from '@/data/types';
-import { useStore, reviewerName, useProgramFilter } from '@/store';
-import { navigate } from '@/router';
+// THE CONDITIONS ARE THE PANEL'S (OF-BLD-020 §3.3, E.1‴). A logistic_v0 fit's
+// start values and length are the scope `fermos:forecast:<fit id>`, served
+// by the service bound to the fitted run's own, in the run's own units; a
+// person's value there is an override under their reviewer name, sent as the
+// forecast's start values and length. A batch_v1 fit is simulated from, not
+// forecast from a covariance: its start values and run length are its
+// family's scope (`fermos:family:batch_v1`, groups Start values and Run
+// length), started from the fit and as long as its run, and the service
+// keeps the run as a `fermos.simulation`, drawn as computed curves with the
+// run's own readings as filled points. Either way this screen renders no
+// number box of its own: every value comes from the service or the person.
+//
+// Send to Proforma (OF-BLD-019 §5.1, D10): the fit in hand, the forecast
+// just made from it, or the simulation, goes to a Proforma scenario of the
+// active program, or to a new one made in the New scenario chooser, whose
+// page attaches it to the inputs it can feed (titre, yield, productivity);
+// the service computes each value from the artifact there.
+import { useEffect, useMemo, useState } from 'react';
+import type { ForecastResult, ParamScope, SimulationResult } from '@/data/types';
+import { overridesFor, useStore, useProgramFilter } from '@/store';
+import { href, navigate } from '@/router';
 import { Button, Callout } from '@/components/ui';
 import { NewScenarioDialog } from '@/components/NewScenarioDialog';
+import { ParameterPanel } from '@/components/ParameterPanel';
 import { FIT_TOOL_WORDS, sendFitPath } from '@/lib/proforma';
+import { paramScope } from '@/lib/params';
 import { EvidenceCard } from '@/components/EvidenceCard';
-import { TrajectoryBand } from '@/components/figures';
-import { fmt } from '@/engine/units';
-import { FermosDown, FermosRefused, fermosForecast, fitFigureSeries, fitSeriesOf } from '@/lib/fermos';
+import { TimeCourse, TrajectoryBand } from '@/components/figures';
+import { fmt, normalizeUnit } from '@/engine/units';
+import {
+  FIT_LENGTH,
+  FermosDown,
+  FermosRefused,
+  LOGISTIC,
+  STATE_WORDS,
+  familyScope,
+  fermosForecast,
+  fermosSimulate,
+  fitFigureSeries,
+  fitSeriesOf,
+  forecastAsk,
+  forecastScope,
+  paramAskOf,
+  simulateFromFitPath,
+  timeCourseOf,
+  type SimulateAsk,
+} from '@/lib/fermos';
+
+/** The groups a batch fit's forecast shows of its family's scope. */
+const FORECAST_GROUPS = ['Start values', 'Run length'];
+/** The state a deposition's series of each role is read against. */
+const STATE_OF_ROLE: Record<string, string> = { biomass: 'X', substrate: 'S', product: 'P' };
+
+const problemOf = (e: unknown) =>
+  e instanceof FermosDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof FermosRefused ? e.message : String(e);
 
 /**
- * Send a kept fit or forecast to Proforma: a scenario the program switch
- * shows, or a new one; the scenario page attaches it to what it can feed.
+ * Send a kept fit, forecast or simulation to Proforma: a scenario the
+ * program switch shows, or a new one; the scenario page attaches it to what
+ * it can feed.
  */
-function SendToProforma({ artifactId, tool }: { artifactId: string; tool: string }) {
+export function SendToProforma({ artifactId, tool }: { artifactId: string; tool: string }) {
   const scenarios = useStore((s) => s.scenarios);
   const shows = useProgramFilter();
   const [open, setOpen] = useState(false);
@@ -48,7 +88,12 @@ function SendToProforma({ artifactId, tool }: { artifactId: string; tool: string
         <ul className="mt-2 space-y-1" data-testid="send-to-proforma-list">
           {offered.map((sc) => (
             <li key={sc.id}>
-              <button className="text-body text-accent hover:underline" onClick={() => navigate(sendFitPath(sc.id, artifactId))}>
+              <button
+                className="text-body text-accent hover:underline"
+                onClick={() => navigate(sendFitPath(sc.id, artifactId))}
+                data-testid="send-to-proforma-scenario"
+                data-to={sendFitPath(sc.id, artifactId)}
+              >
                 {sc.name}
               </button>{' '}
               <span className="text-caption text-ink-soft font-num">{sc.flowsheetId ?? sc.modelId}</span>
@@ -69,14 +114,25 @@ export default function FermOSForecast() {
   const fits = useStore((s) => s.fermosFits);
   const depositions = useStore((s) => s.depositions);
   const runbooks = useStore((s) => s.runbooks);
-  const usable = Object.values(fits).filter((f) => f.kinetic?.params.length);
-  const [chosen, setChosen] = useState<string>(usable[0]?.depositionId ?? '');
-  const [start, setStart] = useState<{ X0: string; P0: string; S0: string }>({ X0: '', P0: '', S0: '' });
-  const [duration, setDuration] = useState('');
+  const showArchived = useStore((s) => s.showArchived);
+  const usable = Object.entries(fits).filter(([, f]) => f.kinetic?.params.length);
+  const [chosen, setChosen] = useState<string>(usable[0]?.[0] ?? '');
   const [result, setResult] = useState<ForecastResult | null>(null);
+  const [sim, setSim] = useState<SimulationResult | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [scopeData, setScopeData] = useState<ParamScope | null>(null);
+  const [scopeProblem, setScopeProblem] = useState<string | null>(null);
   const fit = fits[chosen];
+  const model = fit?.kinetic?.model ?? LOGISTIC;
+  const fitId = fit?.kineticArtifactId ?? null;
+  const batchAsk: SimulateAsk | null =
+    fitId && model !== LOGISTIC
+      ? { family: model, strain: null, product: null, sugar: null, fitArtifact: fitId, startFrom: 'fit', durationPreset: FIT_LENGTH, includeArchived: showArchived }
+      : null;
+  const scope = !fitId ? '' : model === LOGISTIC ? forecastScope(fitId) : familyScope(model);
+  const overrides = useStore(overridesFor(scope));
+  const askKey = JSON.stringify(batchAsk);
 
   const seriesFor = (id: string) => {
     const d = depositions.find((x) => x.id === id);
@@ -84,27 +140,65 @@ export default function FermOSForecast() {
     return d && rb ? fitSeriesOf(d, rb) : [];
   };
 
+  // The conditions' scope: the forecast's own, or the batch family's from the fit.
+  useEffect(() => {
+    setScopeData(null);
+    setScopeProblem(null);
+    setResult(null);
+    setSim(null);
+    if (!scope) return;
+    const ctrl = new AbortController();
+    paramScope(scope, batchAsk ? paramAskOf(batchAsk) : {}, ctrl.signal)
+      .then((d) => {
+        if (!batchAsk) return setScopeData(d);
+        // A batch fit's forecast shows its family's start values and run length alone.
+        const keys = new Set(d.specs.filter((s) => FORECAST_GROUPS.includes(s.group)).map((s) => s.key));
+        setScopeData({ ...d, specs: d.specs.filter((s) => keys.has(s.key)), values: d.values.filter((v) => keys.has(v.key)), waiting: d.waiting.filter((k) => keys.has(k)) });
+      })
+      .catch((e: unknown) => !ctrl.signal.aborted && setScopeProblem(problemOf(e)));
+    return () => ctrl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, askKey]);
+
   const run = () => {
     if (!fit) return;
-    const num = (v: string) => (v.trim() === '' ? null : Number(v));
-    const changed = Object.values(start).some((v) => v.trim() !== '');
     setBusy(true);
     setProblem(null);
-    fermosForecast({
-      fitArtifactId: fit.kineticArtifactId,
-      fit: null,
-      start: { X0: num(start.X0), P0: num(start.P0), S0: num(start.S0) },
-      changedBy: changed ? reviewerName() : null,
-      durationH: num(duration),
-      sample: false,
-    })
-      .then(setResult)
+    if (batchAsk) {
+      fermosSimulate(batchAsk, overrides)
+        .then((r) => {
+          setSim(r);
+          setResult(null);
+        })
+        .catch((e: unknown) => {
+          setSim(null);
+          setProblem(problemOf(e));
+        })
+        .finally(() => setBusy(false));
+      return;
+    }
+    const a = forecastAsk(overrides);
+    fermosForecast({ fitArtifactId: fitId, fit: null, start: a.start, changedBy: a.changedBy, durationH: a.durationH, sample: false })
+      .then((r) => {
+        setResult(r);
+        setSim(null);
+      })
       .catch((e: unknown) => {
         setResult(null);
-        setProblem(e instanceof FermosDown ? `${e.message} ${e.remedy}` : e instanceof FermosRefused ? e.message : String(e));
+        setProblem(problemOf(e));
       })
       .finally(() => setBusy(false));
   };
+
+  // A deposition's readings against a simulation: filled points, where the
+  // series' unit is the state's own.
+  const readings = useMemo(() => {
+    if (!sim || !fit) return [];
+    return seriesFor(fit.depositionId)
+      .filter((s) => s.role && STATE_OF_ROLE[s.role] && normalizeUnit(s.unit) !== null && normalizeUnit(s.unit) === normalizeUnit(sim.units[STATE_OF_ROLE[s.role]] ?? ''))
+      .map((s) => ({ key: STATE_OF_ROLE[s.role!], points: s.points.map((p) => ({ t: p.t, value: p.value })), provenance: 'measured' as const }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sim, fit, depositions, runbooks]);
 
   if (usable.length === 0) {
     return (
@@ -120,50 +214,97 @@ export default function FermOSForecast() {
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-caption text-ink-soft">
           <span className="block mb-0.5">Fit</span>
-          <select className="input" aria-label="Fit" value={chosen} onChange={(e) => { setChosen(e.target.value); setResult(null); }}>
-            {usable.map((f) => (
-              <option key={f.depositionId} value={f.depositionId}>
-                {f.depositionId}
+          <select
+            className="input"
+            aria-label="Fit"
+            value={chosen}
+            onChange={(e) => {
+              setChosen(e.target.value);
+              setResult(null);
+              setSim(null);
+            }}
+          >
+            {usable.map(([key, f]) => (
+              <option key={key} value={key}>
+                {f.depositionId} · {f.kinetic?.model ?? LOGISTIC}
               </option>
             ))}
           </select>
         </label>
-        {(['X0', 'P0', 'S0'] as const).map((k) => (
-          <label key={k} className="text-caption text-ink-soft">
-            <span className="block mb-0.5">{k}, blank for the run's own</span>
-            <input className="input w-24 font-num" type="number" step="any" aria-label={`Starting ${k}`} value={start[k]} onChange={(e) => setStart({ ...start, [k]: e.target.value })} />
-          </label>
-        ))}
-        <label className="text-caption text-ink-soft">
-          <span className="block mb-0.5">Hours, blank for the run's own</span>
-          <input className="input w-24 font-num" type="number" step="any" aria-label="Duration in hours" value={duration} onChange={(e) => setDuration(e.target.value)} />
-        </label>
         <Button variant="primary" onClick={run} disabled={busy || !fit}>
-          {busy ? 'Forecasting…' : 'Forecast'}
+          {busy ? (batchAsk ? 'Simulating…' : 'Forecasting…') : batchAsk ? 'Simulate from this fit' : 'Forecast'}
         </Button>
       </div>
-      {Object.values(start).some((v) => v.trim()) && (
+      {batchAsk ? (
         <p className="text-caption text-ink-soft">
-          A changed starting value is an assumption in the name of {reviewerName() ?? 'the reviewer set in Settings'}; the forecast it
-          makes is marked modeled.
+          A {model} fit is simulated from, not drawn from its covariance: the curves are its central values, its parameters&rsquo;
+          intervals are in the fit&rsquo;s table, and what it held as conventions binds as the family&rsquo;s specs say. The start values
+          and run length below are the family&rsquo;s, started from the fit and as long as its run; the rest of its parameters are on{' '}
+          <a className="text-accent hover:underline" href={href(simulateFromFitPath(model, fitId!))}>
+            fermOS → Simulate
+          </a>
+          .
+        </p>
+      ) : (
+        <p className="text-caption text-ink-soft">
+          The forecast starts from the fitted run&rsquo;s own values and runs its own length unless you name others below. A changed
+          starting value is an assumption in your reviewer name; the forecast it makes is marked modeled.
         </p>
       )}
+      {scope && (
+        <section aria-label="Conditions" className="card p-3" data-testid="forecast-panel">
+          {scopeProblem && <Callout kind="warn">{scopeProblem}</Callout>}
+          <ParameterPanel scope={scope} data={scopeData} request={batchAsk ? paramAskOf(batchAsk) : undefined} groups={FORECAST_GROUPS} />
+        </section>
+      )}
+      {!fitId && <p className="text-caption text-ink-soft">This fit is not kept as an artifact, so its conditions cannot be changed here.</p>}
       {problem && <Callout kind="warn">{problem}</Callout>}
-      {result?.artifactId ? (
+      {problem && batchAsk && fitId && (
+        <p className="text-caption">
+          <a className="text-accent hover:underline" href={href(simulateFromFitPath(model, fitId))}>
+            Open this fit in fermOS → Simulate
+          </a>{' '}
+          to give what waits a source.
+        </p>
+      )}
+      {sim ? (
+        <SendToProforma artifactId={sim.artifactId} tool="fermos.simulation" />
+      ) : result?.artifactId ? (
         <SendToProforma artifactId={result.artifactId} tool="growth_forecast" />
       ) : (
-        fit?.kineticArtifactId && <SendToProforma artifactId={fit.kineticArtifactId} tool="kinetic_fit" />
+        fitId && model === LOGISTIC && <SendToProforma artifactId={fitId} tool="kinetic_fit" />
+      )}
+      {sim && fit && (
+        <>
+          <TimeCourse
+            title={`What would a run like ${fit.depositionId} do, simulated from its ${model} fit?`}
+            {...timeCourseOf(sim)}
+            readings={readings}
+            csvName={`simulation-${sim.artifactId}`}
+          />
+          <p className="text-caption text-ink-soft">
+            {Object.keys(sim.series)
+              .filter((k) => k !== 't')
+              .map((k) => STATE_WORDS[k] ?? k)
+              .join(', ')}{' '}
+            are computed curves, kept as{' '}
+            <a className="font-num hover:text-accent" href={href(`/biorepo/artifacts/${sim.artifactId}`)}>
+              {sim.artifactId}
+            </a>
+            ; the run&rsquo;s readings are the filled points.
+          </p>
+        </>
       )}
       {result && fit && (
         <>
           <TrajectoryBand
-            title={`What would a run like ${chosen} do?`}
-            series={fitFigureSeries(seriesFor(chosen), fit.kinetic)}
+            title={`What would a run like ${fit.depositionId} do?`}
+            series={fitFigureSeries(seriesFor(fit.depositionId), fit.kinetic)}
             forecast={{ times: result.times, bands: result.bands, provenance: result.evidence?.provenance }}
             readingProvenance="measured"
             notes={result.notes}
             basis={result.evidence ? [result.evidence.basis] : undefined}
-            csvName={`forecast-${chosen}`}
+            csvName={`forecast-${fit.depositionId}`}
           />
           <ul className="text-body space-y-0.5" data-testid="forecast-finals">
             {result.finals.map((f) => (

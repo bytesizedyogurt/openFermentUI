@@ -2266,7 +2266,7 @@ class RunbookDraft(BaseModel):
 ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "convention", "library-default", "waiting"]
 # What a scope parameterises: a fermOS model family, a vessel designed for
 # a simulation, one unit of a pureOS train, or a Proforma scenario.
-ParamScopeKind = Literal["fermos-family", "fermos-vessel", "pureos-unit", "proforma"]
+ParamScopeKind = Literal["fermos-family", "fermos-vessel", "fermos-forecast", "pureos-unit", "proforma"]
 # The entries a sourceRule may hold besides a record's, which names its
 # field as "record:<ontology field id>".
 SOURCE_RULE_ENTRIES = ("fit", "artifact", "simulation", "assumption", "convention", "library-default")

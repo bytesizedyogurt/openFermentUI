@@ -16,6 +16,7 @@ import { RUNBOOKS } from '../src/data/runbooks';
 import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
 import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/components';
 import { ALL_SURFACES, ELEVEN, RAIL, REDIRECTS, SUB_VIEWS, redirectFor } from '../src/data/nav';
+import { FERMOS_TABS } from '../src/data/tabs';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -1190,6 +1191,10 @@ for (const f of CLEARANCE_FINDINGS) {
     // OF-BLD-019 §3.3: /proforma/:id moves to /proforma/scenario/:id, so a
     // scenario named for a view would land on that view instead.
     proforma: ['scenario', 'reference'],
+    // OF-BLD-020 §3.3: fermOS's views. Nothing under /fermos takes an id, so
+    // the guard is that every fermOS tab is one of these, and each is a tab:
+    // a view added without reserving its segment fails here.
+    fermos: ['simulate', 'vessel', 'forecast'],
   };
   for (const p of PAPERS)
     if (RESERVED.biorepo.includes(p.id))
@@ -1197,6 +1202,14 @@ for (const f of CLEARANCE_FINDINGS) {
   for (const sc of SCENARIOS)
     if (RESERVED.proforma.includes(sc.id))
       fail(`scenario ${sc.id}: "${sc.id}" is a Proforma view (/proforma/${sc.id}), so no scenario may take it as an id`);
+  const fermosViews = FERMOS_TABS.map((t) => t.to.split('/').filter(Boolean)[1]).filter(Boolean);
+  for (const v of fermosViews)
+    if (!RESERVED.fermos.includes(v)) fail(`fermOS's tab /fermos/${v} is not a reserved segment under /fermos: add it to RESERVED.fermos`);
+  for (const v of RESERVED.fermos)
+    if (!fermosViews.includes(v)) fail(`"${v}" is reserved under /fermos but no fermOS tab shows it`);
+  for (const v of RESERVED.fermos)
+    if (!SUB_VIEWS.some((sv) => sv.to === `/fermos/${v}` && sv.owner === 'fermOS'))
+      fail(`fermOS's view /fermos/${v} is not named in nav.ts's SUB_VIEWS, so the palette cannot reach it`);
 }
 
 // ── a BioSTEAM class is one step (OF-BLD-019 §4.1) ─────────────────────
@@ -1362,11 +1375,12 @@ let parametersLine = '';
 // renders them, each with why, as E.3′ does: views over a computed grid that
 // set no parameter. They stay where they are; moving one to dodge this guard
 // is the thing it forbids. An ALLOWED entry that matches nothing fails too.
-// §3.3 adds fermOS's screens by one line, `/^FermOS.*\.tsx$/`, once
-// FermOSForecast.tsx's typed start values and duration are in the panel.
+// OF-BLD-020 §3.3 added fermOS's screens, `/^FermOS.*\.tsx$/`, once
+// FermOSForecast.tsx's typed start values and duration moved into the panel
+// (the forecast scope `fermos:forecast:<fit id>`, or the batch family's).
 let numericLine = '';
 {
-  const SCREENS: RegExp[] = [/^ProformaScenario\.tsx$/, /^ProformaBiosteam\.tsx$/, /^PureOS.*\.tsx$/];
+  const SCREENS: RegExp[] = [/^ProformaScenario\.tsx$/, /^ProformaBiosteam\.tsx$/, /^PureOS.*\.tsx$/, /^FermOS.*\.tsx$/];
   const NUMERIC = /^(number|range)$/i;
   const ALLOWED: { file: string; within: string; type: 'number' | 'range'; why: string }[] = [
     { file: 'src/screens/ProformaScenario.tsx', within: 'AuthoredScenario', type: 'number',
@@ -1452,7 +1466,7 @@ let numericLine = '';
   ALLOWED.forEach((a, i) => {
     if (!used.has(i)) fail(`E.1‴: ALLOWED names an <input type="${a.type}"> in ${a.within} (${a.file}) that is not there any more; take the allowance out with it`);
   });
-  numericLine = `numeric controls  ${found} in ${files.length} Proforma and pureOS screens, each a view over a computed grid that sets no parameter (ALLOWED); every parameter is the panel's (E.1‴)`;
+  numericLine = `numeric controls  ${found} in ${files.length} Proforma, pureOS and fermOS screens, each a view over a computed grid that sets no parameter (ALLOWED); every parameter is the panel's (E.1‴)`;
 }
 
 // ── report ─────────────────────────────────────────────────────────────

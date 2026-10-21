@@ -297,6 +297,25 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'fermOS',
   },
   {
+    // OF-BLD-020 §3.3 — 'simulate' and 'vessel' are reserved under /fermos
+    // (check-seed's RESERVED): a model family integrated from its sources,
+    // and (§4.2) the fermenter a simulation needs.
+    label: 'Simulate',
+    to: '/fermos/simulate',
+    descriptor: 'a run integrated from a model family, every parameter with its source',
+    aliases: ['simulation', 'simulate a run', 'model family', 'monod', 'batch culture', 'fed-batch', 'fed batch', 'chemostat', 'time course'],
+    icon: FlaskConical,
+    owner: 'fermOS',
+  },
+  {
+    label: 'Vessel',
+    to: '/fermos/vessel',
+    descriptor: 'the fermenter a simulation needs, sized on BioSTEAM',
+    aliases: ['vessel', 'vessel design', 'bioreactor', 'kla', 'aeration', 'oxygen balance'],
+    icon: FlaskConical,
+    owner: 'fermOS',
+  },
+  {
     // OF-BLD-019 §4.1 — 'train' is reserved under /pureos: /pureos/train/:scenarioId.
     label: 'Train',
     to: '/pureos/train',

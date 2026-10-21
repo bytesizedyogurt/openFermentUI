@@ -1,27 +1,39 @@
-// fermOS — the reactor (OF-BLD-011 §3, OF-BLD-014 Phase 7).
+// fermOS — the reactor (OF-BLD-011 §3, OF-BLD-014 Phase 7, OF-BLD-020 Phase 3).
 //
 //     fermOS answers: what DOES a real vessel achieve over time?
 //
-// WHAT IT HOLDS NOW. Fits and forecasts computed from depositions, and nothing
-// else. A deposition whose readings carry sample times becomes time series
-// (§7.1); the service fits a growth rate and a kinetic model to them — logistic
-// growth, Luedeking–Piret production, the substrate balance — and keeps each
-// fit as an artifact with the deposition as its source (§7.2); a forecast is a
-// band drawn from one fit's covariance (§7.3). Fits is the default view;
-// Forecast is the last. OF-BLD-020 §4.2 adds Vessel (FermOSVessel.tsx): the
-// vessel BioSTEAM sizes for a kept simulation, with the oxygen balance, so
-// transport and scale are live; operating mode and control remain unbuilt,
-// and the shelf below says so.
+// WHAT IT HOLDS NOW. Fits of deposited runs, forecasts from those fits,
+// simulations of a model family, and the vessel a simulation needs. A
+// deposition whose readings carry sample times becomes time series (§7.1); the
+// service fits a growth rate and a kinetic model to them — the closed-form
+// logistic (`logistic_v0`: logistic growth, Luedeking–Piret production, the
+// substrate balance), or kinetics.py's batch family (`batch_v1`), chosen on the
+// Fits tab — and keeps each fit as an artifact with the deposition as its
+// source (§7.2); a forecast is a band drawn from one fit's covariance (§7.3).
+// Simulate (OF-BLD-020 §3.3, FermOSSimulate.tsx) integrates a model family
+// (batch, fed-batch, chemostat; storage with the PHA program; light as a
+// socket that refuses) from its parameters. Vessel (OF-BLD-020 §4.2,
+// FermOSVessel.tsx) is the vessel BioSTEAM sizes for a kept simulation, with
+// the oxygen balance, so transport and scale are live. Fits is the default
+// view; Simulate, Vessel and Forecast sit beside it, in the order a run is
+// made. Control is not built, and the shelf below says so.
 //
-// AND IT IS NOT SEEDED FROM LITERATURE (§3, D6). Kinetic parameters are fitted
-// to real runs in a specific vessel; mu_max copied out of a paper about a
-// different strain in a different reactor is a number with no owner. No
-// parameter from a paper enters fermOS: the screen sends only a deposition's
-// own series. With no deposition to fit, the screen names the readings to
-// deposit and where (OF-BLD-016 §3.2: the invented sample run left the
-// screen; demo.py still writes it for the service double). The service cannot see the browser's depositions, so it
-// takes the readings as sent, and each fit's basis says so (§7.R). The only route from here to a
-// kinetic model runs through Deposition.
+// THE RULE, AS OF-BLD-020 D1 AMENDS IT. A FIT takes only measurements: the
+// screen sends a deposition's own series and nothing else, because kinetic
+// parameters fitted to a run belong to that run in that vessel, and a fit
+// carries no number from a paper. The service cannot see the browser's
+// depositions, so it takes the readings as sent, and each fit's basis says so
+// (§7.R). A SIMULATION may take its parameters from records through the
+// aggregate gate, from a fit or forecast, from a kept simulation, from a named
+// person's assumption, or from a stated convention, each labelled with its
+// source in the parameter panel and in the artifact's basis; its provenance is
+// basis_provenance over all of them, so a simulation from unverified records
+// shows as unverified and one with any typed value as modeled (demo). A
+// simulation never pretends to be a measurement: its curves are computed
+// lines, and its card says what it was built from. With no deposition to fit,
+// the Fits tab names the readings to deposit and where (OF-BLD-016 §3.2: the
+// invented sample run left the screen; demo.py still writes it for the service
+// double).
 //
 // PROPERTIES OF A BROTH (OF-BLD-019 §4.2, D9). Below the fits, a person picks
 // an ethanol titre record of the active program, and thermosteam (BioSTEAM's
@@ -31,6 +43,10 @@
 // it enters no fit and no forecast, and the card names the record it read, the
 // library's version and the artifact the answer is kept as. With no titre
 // record on file the card says what would fill it.
+//
+// RESERVED SEGMENTS. `simulate`, `vessel` and `forecast` are views under
+// /fermos (nav.ts, check-seed's RESERVED); Simulate's "Design the vessel" links
+// to `/fermos/vessel?simulation=`, which FermOSVessel reads as its source.
 //
 // This screen may be extended. Keep this header's reasoning with it.
 import { useEffect, useMemo, useState } from 'react';
@@ -49,8 +65,21 @@ import { TrajectoryBand } from '@/components/figures';
 import { FERMOS_TABS } from '@/data/tabs';
 import { stubsFor } from '@/data/subsystems';
 import { fmt } from '@/engine/units';
-import { FermosDown, FermosRefused, fermosFit, fitFigureSeries, fitSeriesOf, qualifies } from '@/lib/fermos';
+import {
+  FIT_FAMILIES,
+  FIT_FAMILY_WORDS,
+  FermosDown,
+  FermosRefused,
+  LOGISTIC,
+  fermosFit,
+  fitFigureSeries,
+  fitSeriesOf,
+  isFitFamily,
+  qualifies,
+  simulateFromFitPath,
+} from '@/lib/fermos';
 import FermOSForecast from './FermOSForecast';
+import FermOSSimulate from './FermOSSimulate';
 import FermOSVessel from './FermOSVessel';
 
 function ParamTable({ params }: { params: FitParam[] }) {
@@ -103,6 +132,17 @@ function Fits() {
   );
   const options = qualifying.map((d) => d.id);
   const chosen = route.query.get('run') ?? options[0] ?? null;
+  // The family fitted (OF-BLD-020 §3.3): the closed-form logistic by
+  // default, or the batch family; Simulate's "Fit this family" names it.
+  const asked = route.query.get('family');
+  const family = isFitFamily(asked) ? asked : LOGISTIC;
+  const goTo = (run: string | null, fam: string) => {
+    const q = new URLSearchParams();
+    if (run) q.set('run', run);
+    if (fam !== LOGISTIC) q.set('family', fam);
+    const qs = q.toString();
+    navigate(`/fermos${qs ? `?${qs}` : ''}`, { replace: true });
+  };
   const [result, setResult] = useState<FermosFitResponse | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -119,7 +159,7 @@ function Fits() {
     setBusy(true);
     setProblem(null);
     setResult(null);
-    fermosFit(chosen, seriesFor(chosen), false, ctrl.signal)
+    fermosFit(chosen, seriesFor(chosen), false, ctrl.signal, family)
       .then((r) => {
         setResult(r);
         keepFit(r);
@@ -131,7 +171,7 @@ function Fits() {
       .finally(() => !ctrl.signal.aborted && setBusy(false));
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chosen, depositions]);
+  }, [chosen, depositions, family]);
 
   return (
     <div className="space-y-4" data-testid="fermos-fits">
@@ -143,9 +183,7 @@ function Fits() {
               className="input"
               aria-label="Run"
               value={chosen ?? ''}
-              onChange={(e) => {
-                navigate(`/fermos?run=${encodeURIComponent(e.target.value)}`, { replace: true });
-              }}
+              onChange={(e) => goTo(e.target.value, family)}
             >
               {options.map((id) => (
                 <option key={id} value={id}>
@@ -155,6 +193,16 @@ function Fits() {
             </select>
           </label>
         )}
+        <label className="text-caption text-ink-soft">
+          <span className="block mb-0.5">Model fitted</span>
+          <select className="input" aria-label="Model fitted" value={family} onChange={(e) => goTo(chosen, e.target.value)} data-testid="fit-family">
+            {FIT_FAMILIES.map((f) => (
+              <option key={f} value={f}>
+                {f}: {FIT_FAMILY_WORDS[f]}
+              </option>
+            ))}
+          </select>
+        </label>
         {busy && <span className="text-caption text-ink-soft">Fitting…</span>}
       </div>
       {chosen && !options.includes(chosen) && <ArchivedBanner kind="deposition" id={chosen} />}
@@ -182,6 +230,20 @@ function Fits() {
 
       {problem && <Callout kind="warn">{problem}</Callout>}
 
+      {result && chosen && result.kinetic?.model && result.kinetic.model !== LOGISTIC && (
+        <p className="text-caption text-ink-soft" data-testid="fit-family-note">
+          A {result.kinetic.model} fit draws no closed-form curve through the readings: its parameters are below, and{' '}
+          {result.kineticArtifactId ? (
+            <a className="text-accent hover:underline" href={href(simulateFromFitPath(result.kinetic.model, result.kineticArtifactId))}>
+              Simulate from this fit
+            </a>
+          ) : (
+            'a simulation from it'
+          )}{' '}
+          integrates the family with them.
+          {(result.kinetic.notes ?? []).length > 0 && ` ${(result.kinetic.notes ?? []).join(' ')}`}
+        </p>
+      )}
       {result && chosen && (
         <>
           <TrajectoryBand
@@ -298,6 +360,7 @@ function BrothProperties() {
 export default function FermOS() {
   const route = useRoute();
   const onForecast = route.path.startsWith('/fermos/forecast');
+  const onSimulate = route.path.startsWith('/fermos/simulate');
   // OF-BLD-020 §4.2 — 'vessel' is a second segment of its own: the vessel
   // BioSTEAM designs for a kept simulation.
   const onVessel = route.path.startsWith('/fermos/vessel');
@@ -308,25 +371,26 @@ export default function FermOS() {
       <PageHeader
         eyebrow="Reactor, kinetics, scale"
         title="fermOS"
-        subtitle="The vessel. What a real reactor achieves over time: fitted to the runs deposited here and forecast from those fits, and the vessel BioSTEAM sizes for a kept simulation, with its oxygen balance. Operating mode and control are not built."
+        subtitle="The vessel. What a real reactor achieves over time: fitted to the runs deposited here, forecast from those fits, simulated from a model family whose every parameter names its source, and the vessel BioSTEAM sizes for a kept simulation, with its oxygen balance. Control is not built."
       />
       <OwnerTabs tabs={FERMOS_TABS} />
 
-      {onVessel ? <FermOSVessel /> : onForecast ? <FermOSForecast /> : <Fits />}
+      {onForecast ? <FermOSForecast /> : onSimulate ? <FermOSSimulate /> : onVessel ? <FermOSVessel /> : <Fits />}
 
       <BrothProperties />
 
       <div className="mt-6 space-y-4">
-        <Callout kind="warn" title="Kinetic parameters come from runs, not from papers">
+        <Callout kind="warn" title="A fit takes only measurements; a simulation names every source">
           <p className="text-ink">
-            mu_max, Xmax and the production and uptake coefficients are <em>fitted</em> to a real fermentation in a
-            specific vessel. Lifting them from a paper about a different strain in a different reactor produces a number
-            with no owner and no error bar, which is the failure mode this whole platform is built against. So fermOS is
-            not seeded: every fit here comes from a{' '}
+            mu_max, Xmax and the production and uptake coefficients of a <em>fit</em> are fitted to a real fermentation in a
+            specific vessel, from a{' '}
             <a href={href('/runbooks/depositions')} className="text-accent hover:underline">
               deposition
-            </a>
-            .
+            </a>{' '}
+            and nothing else. A <em>simulation</em> may take a parameter from a paper&rsquo;s records, a fit, a kept artifact, a
+            person&rsquo;s assumption or a stated convention, and it names which for every one: a number lifted from a paper about
+            another strain in another reactor is labelled as that, and the simulation&rsquo;s provenance follows the weakest of its
+            sources. It is never a measurement.
           </p>
         </Callout>
 
@@ -356,7 +420,7 @@ export default function FermOS() {
       <SubsystemShelf owner="fermOS" />
 
       <div className="mt-5">
-        <ComponentTag component="fermOS" action={`kinetics, transport and scale live; ${stubs.length} subsystems named and not built`} />
+        <ComponentTag component="fermOS" action={`kinetics, operating modes, transport and scale live; ${stubs.length} subsystems named and not built`} />
       </div>
     </>
   );

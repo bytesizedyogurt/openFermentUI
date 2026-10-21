@@ -3316,7 +3316,7 @@ export interface ThermoProps {
 export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'convention' | 'library-default' | 'waiting';
 
 /** What a scope parameterises. */
-export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'pureos-unit' | 'proforma';
+export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'fermos-forecast' | 'pureos-unit' | 'proforma';
 
 /** One parameter as its model, unit or flowsheet declares it. */
 export interface ParameterSpec {

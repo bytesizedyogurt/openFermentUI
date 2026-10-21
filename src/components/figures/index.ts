@@ -13,3 +13,4 @@ export { IntervalLedger, toTable as intervalLedgerTable, type IntervalLedgerProp
 export { CostWaterfall, toTable as costWaterfallTable, bars as costWaterfallBars, type CostWaterfallProps, type WaterfallLine, type WaterfallBar } from './CostWaterfall';
 export { RecoveryByUnit, toTable as recoveryByUnitTable, noBar as recoveryNoBar, type RecoveryByUnitProps } from './RecoveryByUnit';
 export { OxygenBalance, toTable as oxygenBalanceTable, emptyOf as oxygenBalanceEmpty, isShort as oxygenShort, type OxygenBalanceProps } from './OxygenBalance';
+export { TimeCourse, toTable as timeCourseTable, type TimeCourseProps, type TimeCourseState } from './TimeCourse';

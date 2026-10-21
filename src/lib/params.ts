@@ -2,7 +2,7 @@
 //
 // Two calls, neither of which keeps anything:
 //
-//   GET  /api/params/{scope}?flowsheet=&host=&fits=&vesselType=   a scope's specs and
+//   GET  /api/params/{scope}?flowsheet=&host=&fits=&vesselType=&strain=&…   a scope's specs and
 //        each value as the service binds it now, with its source
 //        (`ParamScope`);
 //   POST /api/params/{scope}/resolve   a person's overrides laid on, each an
@@ -12,12 +12,12 @@
 //        for them (`ParamResolveResult`).
 //
 // A scope is `proforma:<scenario id>`, `fermos:family:<id>`,
-// `fermos:vessel:<simulation id>` or `pureos:unit:<train>:<unit>`. What a
-// call starts depends on the scope (OF-BLD-020 §2.R, finding 7): a
-// `proforma:` scope binds only and starts no worker; a `fermos:vessel:`
-// scope reads BioSTEAM's defaults through the Proforma worker, once per
-// process, so its first read on a cold service starts that worker and waits
-// for it. With the
+// `fermos:vessel:<simulation id>`, `fermos:forecast:<kinetic fit id>` or
+// `pureos:unit:<train>:<unit>`. What a call starts depends on the scope
+// (OF-BLD-020 §2.R, finding 7): a `proforma:` scope binds only and starts no
+// worker; a `fermos:vessel:` scope reads BioSTEAM's defaults through the
+// Proforma worker, once per process, so its first read on a cold service
+// starts that worker and waits for it. With the
 // service down these say so (RagDown), and a refusal comes back in the
 // service's words (RagRefused); nothing stands in for an answer (E.2). The
 // overrides themselves live in the store's Durable tier
@@ -27,13 +27,27 @@ import { RagDown, RagRefused, call } from './rag';
 
 export { RagDown as ParamsDown, RagRefused as ParamsRefused };
 
-/** What a scope is asked with besides its name: a Proforma scenario made here names its flowsheet; host and fits bind as Proforma's binding does; a vessel scope names the vessel type its design is (OF-BLD-020 §4.2). */
+/** What a scope is asked with besides its name: a Proforma scenario made here names its flowsheet; host and fits bind as Proforma's binding does; a vessel scope names the vessel type its design is (OF-BLD-020 §4.2); a family scope binds as a simulation binds (§3.3). */
 export interface ParamAsk {
   flowsheet?: string | null;
   host?: string | null;
   fits?: Record<string, string>;
   vesselType?: 'stirred-tank' | 'bubble-column' | null;
+  // fermOS's family scope (OF-BLD-020 §3.2–§3.3), bound as a simulation
+  // binds: the strain whose records bind (none: every strain of the
+  // program), the product, the sugar, the fit a person chose, where the
+  // simulation starts, the run-length preset and the program switch.
+  strain?: string | null;
+  product?: string | null;
+  sugar?: string | null;
+  fit?: string | null;
+  startFrom?: string | null;
+  durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
+  includeArchived?: boolean;
 }
+
+/** The fermOS fields of an ask, as query parameters and as the resolve's body fields alike. */
+const FERMOS_ASK = ['strain', 'product', 'sugar', 'fit', 'startFrom', 'durationPreset'] as const;
 
 /** A scope's path: each id between the colons encoded, the colons kept (`params.parse_scope`'s forms). */
 export const scopePath = (scope: string) => `/api/params/${scope.split(':').map(encodeURIComponent).join(':')}`;
@@ -44,6 +58,11 @@ const askQuery = (ask: ParamAsk) => {
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
   if (ask.vesselType) q.set('vesselType', ask.vesselType);
+  for (const k of FERMOS_ASK) {
+    const v = ask[k];
+    if (v) q.set(k, v);
+  }
+  if (ask.includeArchived) q.set('includeArchived', 'true');
   const s = q.toString();
   return s ? `?${s}` : '';
 };
@@ -60,6 +79,8 @@ export function resolveRequest(overrides: Override[], ask: ParamAsk = {}): Param
     ...(ask.host ? { host: ask.host } : {}),
     ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
     ...(ask.vesselType ? { vesselType: ask.vesselType } : {}),
+    ...Object.fromEntries(FERMOS_ASK.filter((k) => ask[k]).map((k) => [k, ask[k]])),
+    ...(ask.includeArchived ? { includeArchived: true } : {}),
   };
 }
 

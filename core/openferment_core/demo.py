@@ -438,6 +438,7 @@ def _rebuild_prototype(out: Path, real_worker: bool | None = None) -> list[Path]
     proforma_fixtures = prototype_proforma()
     run_artifacts = proforma_fixtures.pop(PROFORMA_RUN_ARTIFACTS)
     bridge, bridge_artifacts = prototype_fermos_bridge()
+    simulate_fixtures, simulate_artifacts = prototype_fermos_simulate()
     replay = artifacts.ReplayResult(
         artifactId=art.id, identical=True, storedHash=art.outputHash, replayedHash=art.outputHash, durationMs=0
     )
@@ -445,13 +446,15 @@ def _rebuild_prototype(out: Path, real_worker: bool | None = None) -> list[Path]
     written = []
     for name, value in (
         ("artifacts.json", [art.model_dump(mode="json"), *(a.model_dump(mode="json") for a in draft_artifacts),
-                            *run_artifacts, *(a.model_dump(mode="json") for a in bridge_artifacts)]),
+                            *run_artifacts, *(a.model_dump(mode="json") for a in bridge_artifacts),
+                            *(a.model_dump(mode="json") for a in simulate_artifacts)]),
         ("ask-draft-stream.jsonl", draft_stream),
         ("artifact-replay.json", replay.model_dump(mode="json")),
         *prototype_rag().items(),
         *prototype_geneos().items(),
         *prototype_fermos().items(),
         *bridge.items(),
+        *simulate_fixtures.items(),
         *proforma_fixtures.items(),
         *prototype_ceiling_check().items(),
         *prototype_pureos().items(),
@@ -781,6 +784,86 @@ def prototype_fermos() -> dict[str, Any]:
     if fc.evidence is not None:
         fc.evidence.basis.at = AT
     return {"fermos-fit.json": fit.model_dump(mode="json"), "fermos-forecast.json": fc.model_dump(mode="json")}
+
+
+# OF-BLD-020 §3.3: fermOS → Simulate for the double. The families as the
+# service lists them (the switch off and on); each family's parameter scope
+# and binding over the stand-in yeast records (demo's Proforma pool, on a
+# paper id no corpus holds) for ethanol on glucose, for every strain of the
+# program and for CEN.PK113-7D; the binding with the values a person would
+# type for what waits (STAND-INs, named as such, not a batch of anything);
+# one batch_v1 simulation run by the real kinetics.py on those values, beside
+# a STAND-IN Yeast9 ceiling, in a scratch store; and the simulations list
+# that run leaves. Dates are fixed so the files are the same on every run.
+SIM_STRAIN = "s-cerevisiae-cenpk113-7d"
+SIM_PRODUCT, SIM_SUGAR = "ethanol", "glucose"
+SIM_STANDIN = ("STAND-IN for the browser tests: a value typed for the fixture, not a parameter of any batch "
+               "(OF-BLD-020 §3.3)")
+# What the browser tests type for each parameter that waits on the stand-in
+# pool for CEN.PK113-7D: a STAND-IN each, inside its spec's bounds.
+SIM_TYPED = (("mu_max", 0.4), ("ks", 0.2), ("yxs", 0.1), ("alpha", 2.0), ("p_max", 90.0), ("x0", 0.2), ("p0", 0.0))
+
+
+def prototype_fermos_simulate() -> tuple[dict[str, Any], list[Any]]:
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import artifacts, fermos, kinetics
+    from . import intake as _intake
+    from .models import Override, ParamResolveRequest, SimulationRequest
+
+    rs = _standin_yeast_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}, hidden={})
+    asks = {"": False, SIM_STRAIN: False}
+
+    def ask_of(family: str, strain: str) -> dict[str, Any]:
+        archived = kinetics.FAMILIES[family].program is not None
+        return {"family": family, "strain": strain or None, "product": SIM_PRODUCT, "sugar": SIM_SUGAR,
+                "startFrom": "records", "durationPreset": fermos.UNTIL_RUN_OUT_PRESET, "includeArchived": archived}
+
+    def bound(req: SimulationRequest) -> dict[str, Any]:
+        try:
+            return {"status": 200, "body": fermos.bind(req, pool=pool).model_dump(mode="json")}
+        except fermos.SimulationRefused as e:
+            return {"status": 422, "body": {"detail": str(e)}}
+
+    typed = [Override(scope=fermos.family_scope("batch_v1"), key=k, value=v, by="openFerment test fixture",
+                      at="2026-10-21T04:00:00Z", note=SIM_STANDIN) for k, v in SIM_TYPED]
+    saved = _intake.DATA_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            scopes: dict[str, Any] = {}
+            binds: dict[str, Any] = {}
+            with _PoolLoaded(pool):
+                for family in kinetics.FAMILIES:
+                    for strain in (asks if family == "batch_v1" else {"": False}):
+                        a = ask_of(family, strain)
+                        key = f"{family}|{strain}"
+                        req = ParamResolveRequest(**{k: v for k, v in a.items() if k != "family"})
+                        scopes[key] = _param_answer(fermos.family_scope(family), req)
+                        binds[key] = bound(SimulationRequest(**a))
+                sim_ask = ask_of("batch_v1", SIM_STRAIN)
+                with_typed = bound(SimulationRequest(**sim_ask, overrides=typed))
+                assert with_typed["status"] == 200 and with_typed["body"]["waiting"] == [], \
+                    f"the stand-in values no longer cover what waits: {with_typed}"
+                standin_ceiling(STANDIN_CEILING_MODEL, SIM_PRODUCT, SIM_SUGAR, STANDIN_CEILING_G_PER_G)
+                request = SimulationRequest(**sim_ask, overrides=typed)
+                result = fermos.simulate(request, by_pool=pool)
+                result.basis.at = AT
+                art = artifacts.get(result.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0})
+                listed = [x.model_copy(update={"createdAt": AT}).model_dump(mode="json") for x in fermos.simulations()]
+        finally:
+            _intake.DATA_DIR = saved
+    families = {"off": [f.model_dump(mode="json") for f in fermos.families(False)],
+                "on": [f.model_dump(mode="json") for f in fermos.families(True)]}
+    return ({"fermos-families.json": families,
+             "fermos-simulate.json": {"note": SIM_STANDIN, "scopes": scopes, "bind": binds,
+                                      "typed": [o.model_dump(mode="json") for o in typed],
+                                      "boundTyped": with_typed,
+                                      "simulate": {"request": request.model_dump(mode="json"),
+                                                   "body": result.model_dump(mode="json")},
+                                      "simulations": listed}}, [art])
 
 
 # OF-BLD-019 §5.1: a fermOS fit feeds the fermenter. The sample time course

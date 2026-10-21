@@ -146,9 +146,11 @@ export const SUBSYSTEMS: Subsystem[] = [
 
   // ── fermOS — the reactor (§3) ────────────────────────────────────────
   //
-  // All five. Kinetics went live with OF-BLD-014 Phase 7; transport (the
-  // oxygen balance) and scale (the vessel design) with OF-BLD-020 §4.2 (D15).
-  // Operating mode and control remain stubs.
+  // All five. Kinetics went live with OF-BLD-014 Phase 7 (fits and forecasts
+  // of deposited runs); operating mode with OF-BLD-020 §3.3 (the model
+  // families, simulated from their sources); transport (the oxygen balance)
+  // and scale (the vessel design) with OF-BLD-020 §4.2 (D15). Control
+  // remains a stub.
   {
     id: 'fermos.kinetics',
     owner: 'fermOS',
@@ -183,7 +185,24 @@ export const SUBSYSTEMS: Subsystem[] = [
       'src/components/figures/OxygenBalance.tsx',
     ],
   },
-  { id: 'fermos.mode', owner: 'fermOS', label: 'Operating mode', status: 'stub', state: UNBUILT },
+  {
+    // OF-BLD-020 §3.3, D15.
+    id: 'fermos.mode',
+    owner: 'fermOS',
+    label: 'Operating mode',
+    status: 'live',
+    state:
+      'Model families integrated on scipy: batch, fed-batch with a constant or exponential feed, chemostat with its ' +
+      'steady state and washout, growth then storage (with the PHA program), and light-limited growth as a socket that ' +
+      'refuses to run. Every parameter is bound to a fit, the records, a kept simulation, a named person or a stated ' +
+      'convention and shown with its source; each simulation is kept as an artifact whose provenance follows them.',
+    implementedIn: [
+      'core/openferment_core/kinetics.py',
+      'core/openferment_core/fermos.py',
+      'src/screens/FermOSSimulate.tsx',
+      'src/components/figures/TimeCourse.tsx',
+    ],
+  },
   {
     // OF-BLD-020 §4.2, D15 — the vessel design.
     id: 'fermos.scale',

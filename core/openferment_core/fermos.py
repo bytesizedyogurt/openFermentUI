@@ -975,6 +975,11 @@ ANAEROBIC_NOTE = ("Yx/o is absent, so the culture is taken as anaerobic: it take
                   "said so (D5).")
 START_GROUP = "Start values"
 SimulationRefused = kinetics.FamilyRefused
+# What a Proforma scenario may take its titre, yield and productivity from
+# (proforma.fit_info, GET /api/fermos/fits): a fit, a forecast, and a kept
+# simulation (OF-BLD-020 §3.3). A simulation binds no other simulation's
+# parameters through FEEDABLE: it starts from one (`simulation:<id>`).
+FEEDS_PROFORMA = (*FEEDABLE, SIMULATION)
 
 
 def _named(inputs: list[BasisInput], name: str) -> BasisInput | None:
@@ -1036,6 +1041,102 @@ def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Pr
 def _family_static():
     for fid, fam in kinetics.FAMILIES.items():
         yield f"fermos family {fid}", fam.specs()
+
+
+# ── a forecast's start values and length, in the panel (§3.3, E.1‴) ─────
+#
+# A forecast of a logistic_v0 fit starts from the fitted run's own X0, S0 and
+# P0 and runs the run's own length unless a person names others. Those are
+# the scope `fermos:forecast:<kinetic fit artifact id>`: the batch family's
+# own declarations of the start values and run length (kinetics.py), in the
+# units of the fit's series (a forecast's start values are the run's
+# readings' units), each bound to the fit and overridable by a named person,
+# so FermOS*.tsx renders no number box of its own. A batch_v1 fit is
+# simulated from, not forecast: its start values and run length are its
+# family's scope (`fermos:family:batch_v1`), started from the fit.
+
+FORECAST_KEYS = (("x0", "X0", "biomass"), ("s0", "S0", "substrate"), ("p0", "P0", "product"))
+FORECAST_SCOPE_NOTES = [
+    "A forecast starts from the fitted run's own values and runs its own length unless a person names others here: "
+    "a changed start value is that person's assumption, and the forecast it makes is demo; a length is named in the "
+    "forecast's basis as asked.",
+    "A low and a high typed here are not read: a forecast starts from one value, and its band comes from the fit.",
+]
+
+
+def forecast_scope(fit_id: str) -> str:
+    return params.scope_name("fermos-forecast", fit_id)
+
+
+def _forecast_specs(unit_of: dict[str, str]) -> list[ParameterSpec]:
+    """The start values the fit has, in its series' units, and the run
+    length: batch_v1's own declarations, bound to the fit or a person."""
+    base = {s.key: s for s in kinetics.family("batch_v1").specs()}
+    out = []
+    for key, _, role in FORECAST_KEYS:
+        if key not in unit_of:
+            continue
+        b, u = base[key], unit_of[key]
+        out.append(b.model_copy(update={
+            "unit": u, "dimension": units.family(u) or "a reading", "sourceRule": ["fit", "assumption"],
+            "gloss": f"{b.gloss}, in the unit of the run's {role} series",
+            "note": f"The fitted run's own {b.symbol} unless a person names another (a forecast's start value).",
+            "convention": None}))
+    t = base["t_end"]
+    out.append(t.model_copy(update={
+        "label": "forecast length", "gloss": "how long the forecast runs", "sourceRule": ["fit", "assumption"],
+        "note": "The length of the run the fit was made on, its last reading, unless a person names another.",
+        "convention": None}))
+    return out
+
+
+def _forecast_static():
+    yield "fermos forecast of a logistic_v0 fit", _forecast_specs({k: G_L for k, _, _ in FORECAST_KEYS})
+
+
+def forecast_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
+    """The `fermos-forecast` scope (`fermos:forecast:<kinetic fit id>`):
+    a logistic_v0 fit's start values and run length, each bound to the
+    fitted run's own, a person's overrides laid on them (params.resolve).
+    A fit not on file is a 404; a fit of a family, a forecast or another
+    artifact, or a fit that holds no parameters, a 422 in words."""
+    (fit_id,) = ids
+    try:
+        art = artifacts.get(fit_id)
+    except artifacts.ArtifactNotFound:
+        raise params.ScopeUnknown(f"there is no kept kinetic fit {fit_id}: fermOS keeps a fit when it fits a "
+                                  "deposited run") from None
+    except artifacts.ArtifactDamaged as e:
+        raise params.ParamRefused(f"fit {fit_id} cannot be read: {e}") from None
+    if art.tool != KINETIC:
+        raise params.ParamRefused(f"{fit_id} is a {art.tool}; a forecast is drawn from a kinetic fit")
+    fit_ = KineticFit.model_validate(art.output)
+    if fit_.model != LOGISTIC:
+        raise params.ParamRefused(f"fit {fit_id} fits {fit_.model}, which is simulated from its parameters, not "
+                                  f"forecast: its start values and run length are {family_scope(fit_.model)}'s, "
+                                  "started from the fit")
+    if fit_.reason or not fit_.params:
+        raise params.ParamRefused(f"fit {fit_id} holds no kinetic fit: {fit_.reason or 'no parameters'}")
+    roles = series_by_role(fit_)
+    unit_of = {key: roles[role].unit for key, name, role in FORECAST_KEYS if role in roles and param(fit_, name)}
+    sources: dict[str, dict[str, ParameterValue | None]] = {}
+    for key, name, _ in FORECAST_KEYS:
+        if key not in unit_of:
+            continue
+        p = param(fit_, name)
+        note = f"{name} of {LOGISTIC} kinetic fit {fit_id}: the fitted run's own, with its 95 % interval"
+        sources[key] = {"fit": ParameterValue(key=key, value=p.value, low=p.low, high=p.high, identified=_identified(p),
+                                              origin="fit", source=BasisSource(kind="artifact", id=fit_id, note=note),
+                                              detail=note)}
+    hours = [pt.t for sr in fit_.series for pt in sr.points]
+    if hours and max(hours) > 0:
+        note = f"the length of the run kinetic fit {fit_id} was made on: its last reading"
+        sources["t_end"] = {"fit": ParameterValue(key="t_end", value=float(max(hours)), origin="fit",
+                                                  source=BasisSource(kind="artifact", id=fit_id, note=note),
+                                                  detail=note)}
+    dep = deposition_of(art)
+    title = f"Forecast of kinetic fit {fit_id}" + (f", fitted to deposition {dep}" if dep else "")
+    return params.Provided(title=title, specs=_forecast_specs(unit_of), sources=sources, notes=list(FORECAST_SCOPE_NOTES))
 
 
 def _check_request(req: SimulationRequest) -> None:
@@ -1717,9 +1818,20 @@ def bind(req: SimulationRequest, *, pool: Any = None) -> FermosBinding:
     say what bound from where. Starts no integration and keeps nothing."""
     fam = kinetics.family(req.family)
     _check_request(req)
+    _own_scope(fam, req.overrides)
     got = _bound(fam, req, pool if pool is not None else _load_pool(req.includeArchived))
     values, waiting = _resolved(fam, got, req.overrides, None)
     return FermosBinding(values=values, waiting=waiting, notes=got.notes)
+
+
+def _own_scope(fam: kinetics.Family, overrides: list[Override]) -> None:
+    """An override names the scope it changes; one of another scope is
+    refused in words, never laid on."""
+    scope = family_scope(fam.id)
+    stray = sorted({o.scope for o in overrides if o.scope != scope})
+    if stray:
+        raise SimulationRefused(f"an override names the scope it changes, and these were sent to {scope}: "
+                                f"{', '.join(stray)}")
 
 
 def _binding_inputs(got: _Binding, values: list[ParameterValue]) -> list[BasisInput]:
@@ -1761,11 +1873,7 @@ def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult
     if fam.socket:
         raise SimulationRefused(fam.refusal())
     _check_request(req)
-    scope = family_scope(fam.id)
-    stray = sorted({o.scope for o in req.overrides if o.scope != scope})
-    if stray:
-        raise SimulationRefused(f"an override names the scope it changes, and these were sent to {scope}: "
-                                f"{', '.join(stray)}")
+    _own_scope(fam, req.overrides)
     pool = by_pool if by_pool is not None else _load_pool(req.includeArchived)
     got = _bound(fam, req, pool)
     specs = got.specs

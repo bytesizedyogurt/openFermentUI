@@ -55,6 +55,8 @@ const ROUTES = [
   ['/geneos/model', 'geneOS — Model: the ceiling beside what was reported'],
   ['/fermos', 'fermOS — Fits'],
   ['/fermos/forecast', 'fermOS — Forecast'],
+  // OF-BLD-020 §3.3 — a model family simulated from its sources.
+  ['/fermos/simulate', 'fermOS — Simulate'],
   // OF-BLD-020 §4.2 — the vessel BioSTEAM designs for a kept simulation.
   ['/fermos/vessel', 'fermOS — Vessel'],
   ['/pureos', 'pureOS'],
@@ -2276,6 +2278,9 @@ async function main() {
       await page.waitForTimeout(400);
       return doubleState.vesselPosts.at(-1);
     };
+    // The double lists the fixture's two simulations for this flow alone; the
+    // Simulate flow below starts, as a fresh install does, with none.
+    doubleState.flags.vesselSimulationsOnFile = true;
     try {
       await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
       await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
@@ -2358,6 +2363,7 @@ async function main() {
     } catch (e) {
       problems.push(String(e).slice(0, 200));
     }
+    doubleState.flags.vesselSimulationsOnFile = false;
     if (problems.length) {
       vesselFails++;
       console.log(`✗ vessel       ${problems.join('; ')}`);
@@ -2367,6 +2373,124 @@ async function main() {
     await page.close();
   }
   // ── end §4.2
+
+  // ── OF-BLD-020 §3.3 — fermOS → Simulate, against the double.
+  //
+  // With the switch off and a reviewer name: the families the service lists
+  // are offered with their equations, the light socket listed and not
+  // choosable; the strain chooser offers every strain of the program first;
+  // choosing CEN.PK113-7D binds the panel over the double's recorded scope,
+  // and what waits is said above Simulate, which is disabled. Typing each
+  // waiting value (the fixture's STAND-INs) under the reviewer name makes
+  // each an assumption by that name and nothing waits; Simulate posts the
+  // scope's overrides, signed; the result draws the time course from the
+  // artifact (its curves the simulation's provenance), the end state, the
+  // ceiling card, the parameters and what it was built from; Design the
+  // vessel, Fit this family and Send to Proforma point where they should;
+  // the kept simulation is offered to start from; Reset one override and it
+  // waits again, and Simulate says so.
+  let simulateFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const sim = fixture('fermos-simulate.json');
+    const families = fixture('fermos-families.json').off;
+    const want = sim.simulate.request;
+    const result = sim.simulate.body;
+    const key = `${want.family}|${want.strain}`;
+    const served = sim.scopes[key].body;
+    const waiting = sim.bind[key].body.waiting;
+    const row = (k) => page.locator(`[data-testid="simulate-panel"] [data-testid="param-row"][data-key="${k}"]`);
+    try {
+      if (!(await setShowArchived(page, false))) problems.push('the archive switch is not off');
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/fermos/simulate`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="simulate-family"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      const listed = await page.locator('[data-testid="simulate-family"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-family')).join());
+      if (listed !== families.map((f) => f.id).join()) problems.push(`the families offered are ${listed}, not the service's ${families.map((f) => f.id).join()}`);
+      const socket = page.locator('[data-testid="simulate-family"][data-socket="true"]');
+      if (!(await socket.count()) || !(await socket.locator('button[role="radio"]').isDisabled())) problems.push('the light socket is choosable');
+      if (!(await socket.innerText().catch(() => '')).includes(families.find((f) => f.socket).what)) problems.push('the light socket does not say what it is in its own words');
+      if (!/dX\/dt = μ·X − kd·X/.test(await page.locator('[data-testid="simulate-family"][data-family="batch_v1"] [data-testid="simulate-equations"]').innerText().catch(() => '')))
+        problems.push("batch_v1's equations are not shown in plain Unicode");
+      const firstStrain = await page.locator('[data-testid="simulate-strain"] option').first().innerText().catch(() => '');
+      if (firstStrain !== 'Every strain of the program') problems.push(`the strain chooser offers "${firstStrain}" first`);
+      await page.locator('[data-testid="simulate-strain"]').selectOption(want.strain);
+      if ((await page.locator('[data-testid="simulate-product"]').inputValue()) !== want.product || (await page.locator('[data-testid="simulate-sugar"]').inputValue()) !== want.sugar)
+        problems.push('the product and sugar do not open on ethanol and glucose');
+      await row('mu_max').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="simulate-panel"] [data-testid="param-row"]').count()) !== served.specs.length)
+        problems.push(`the panel shows ${await page.locator('[data-testid="simulate-panel"] [data-testid="param-row"]').count()} rows for the scope's ${served.specs.length}`);
+      const groups = await page.locator('[data-testid="simulate-panel"] [data-testid="param-group"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')).join());
+      if (groups !== 'Growth,Product,Inhibition,Oxygen,Start values,Run length') problems.push(`the panel's groups are ${groups}`);
+      if ((await chipOf(page, 'yps')).origin !== 'record') problems.push('Yp/s is not bound to the records');
+      await page.locator('[data-testid="simulate-waiting"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="simulate-waiting"]').getAttribute('data-keys').catch(() => null)) !== waiting.join(','))
+        problems.push(`what waits is not said above Simulate as the service binds it (${waiting.join(',')})`);
+      if (!(await page.locator('[data-testid="simulate-button"]').isDisabled())) problems.push('Simulate is enabled while parameters wait');
+      for (const o of sim.typed) await typeParam(page, o.key, o.value);
+      await page.locator('[data-testid="simulate-ready"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="simulate-ready"]').count()) || (await page.locator('[data-testid="simulate-button"]').isDisabled()))
+        problems.push('with every waiting value typed, Simulate is still disabled');
+      const typedChip = await chipOf(page, 'mu_max');
+      if (typedChip.origin !== 'assumption' || !typedChip.text.includes(`assumption by ${REVIEWER}`)) problems.push(`a typed value is not an assumption by the reviewer (${JSON.stringify(typedChip)})`);
+      await page.locator('[data-testid="simulate-button"]').click();
+      await page.locator('[data-testid="simulation-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const posted = doubleState.fermosSimulates.at(-1);
+      if (!posted || posted.family !== want.family || posted.strain !== want.strain || posted.product !== want.product || posted.sugar !== want.sugar)
+        problems.push(`Simulate did not post the family, strain, product and sugar chosen (${JSON.stringify(posted ?? {}).slice(0, 160)})`);
+      else if (
+        posted.overrides.length !== sim.typed.length ||
+        posted.overrides.some((o) => o.scope !== `fermos:family:${want.family}` || o.by !== REVIEWER || !sim.typed.some((t) => t.key === o.key && t.value === o.value))
+      )
+        problems.push("Simulate did not post the scope's overrides, each signed by the reviewer");
+      if ((await page.locator('[data-testid="simulation-result"]').getAttribute('data-artifact').catch(() => null)) !== result.artifactId) problems.push('the result is not the simulation the service kept');
+      const curves = await page.locator('[data-testid="timecourse-curve"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-provenance')));
+      if (curves.length !== 3 || curves.some((p) => p !== result.provenance)) problems.push(`the time course draws ${curves.length} curves as ${curves.join()}, not X, S and P as ${result.provenance}`);
+      const titre = Number.parseFloat(await page.locator('[data-testid="simulation-titre"]').innerText().catch(() => 'NaN'));
+      if (!(Math.abs(titre - result.finalTitre) <= 1e-3 * Math.abs(result.finalTitre))) problems.push(`the end state shows a titre of ${titre}, not the artifact's ${result.finalTitre}`);
+      if (!(await page.locator('[data-testid="simulation-runs-out"]').innerText().catch(() => '')).includes('The sugar runs out at')) problems.push('the end state does not give the hour the sugar runs out');
+      const ceilingRow = page.locator(`[data-testid="simulation-ceiling-row"][data-model="${result.ceiling.rows[0].modelId}"]`);
+      if (!(await ceilingRow.count()) || (await ceilingRow.getAttribute('data-above')) !== String(result.ceiling.rows[0].above)) problems.push('the ceiling card does not set Yp/s beside the ceiling the service read');
+      if ((await page.locator('[data-testid="simulation-built-from"]').getAttribute('data-provenance').catch(() => null)) !== result.provenance) problems.push('the card does not say what the simulation was built from, with its provenance');
+      if (!/not a measurement/.test(await page.locator('[data-testid="simulation-built-from"]').innerText().catch(() => ''))) problems.push('the simulation does not say it is not a measurement');
+      if ((await page.locator('[data-testid="simulation-param"]').count()) !== result.parameters.length + result.start.length) problems.push("the parameter table does not list every parameter and start value");
+      if ((await page.locator('[data-testid="simulation-vessel-link"]').getAttribute('href')) !== `#/fermos/vessel?simulation=${result.artifactId}`) problems.push('Design the vessel does not name the simulation');
+      if ((await page.locator('[data-testid="simulation-fit-link"]').getAttribute('href')) !== `#/fermos?family=${want.family}`) problems.push('Fit this family does not open Fits with the family');
+      await page.locator('[data-testid="simulation-result"] [data-testid="send-to-proforma"] button').first().click();
+      const to = await page.locator('[data-testid="send-to-proforma-scenario"]').first().getAttribute('data-to', { timeout: 3000 }).catch(() => null);
+      if (to !== `/proforma/scenario/sc-yeast-1?fit=${result.artifactId}`) problems.push(`Send to Proforma offers ${to}`);
+      // Reset one override: it waits again, and Simulate says so.
+      await row('p0').locator('[data-testid="param-reset"]').click();
+      await page.locator('[data-testid="simulate-waiting"][data-keys="p0"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="simulate-waiting"][data-keys="p0"]').count()) || !(await page.locator('[data-testid="simulate-button"]').isDisabled()))
+        problems.push('a reset override does not wait again with Simulate disabled');
+      // The kept simulation is offered to start from.
+      await page.locator('[data-testid="simulate-start"]').selectOption('simulation');
+      await page.locator('[data-testid="simulate-kept"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator(`[data-testid="simulate-kept"] option[value="${result.artifactId}"]`).count())) problems.push('the kept simulation is not offered to start from');
+      await page.goto(`http://localhost:${PORT}/#/fermos/vessel?simulation=${result.artifactId}`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="vessel-source"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="vessel-source"]').inputValue().catch(() => '')) !== `simulation:${result.artifactId}`)
+        problems.push('/fermos/vessel?simulation= does not land on fermOS → Vessel with the simulation chosen');
+      await page.goto(`http://localhost:${PORT}/#/fermos?family=batch_v1`, { waitUntil: 'networkidle' });
+      if ((await page.locator('[data-testid="fit-family"]').inputValue().catch(() => '')) !== 'batch_v1') problems.push('Fits does not open with the family chosen');
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    if (problems.length) {
+      simulateFails++;
+      console.log(`✗ simulate     ${problems.join('; ')}`);
+    } else {
+      console.log("✓ simulate     fermOS → Simulate offers the service's families with their equations and the light socket not choosable; every strain of the program first; the panel binds as the service does and what waits is said above a disabled Simulate; the waiting values typed are assumptions by the reviewer, Simulate posts them signed, and the time course, the end state, the ceiling card, the parameters and what it was built from are the artifact's; Design the vessel, Fit this family and Send to Proforma point at it; it is offered to start from; a reset override waits again");
+    }
+    await page.close();
+  }
+  // ── end §3.3
 
   await browser.close();
   server.close();
@@ -2390,7 +2514,8 @@ async function main() {
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
   console.log(`${1 - brothFails}/1 fermOS Properties — the card answers the record it names, and asks again after a 503`);
   console.log(`${1 - vesselFails}/1 fermOS Vessel — every design parameter in the panel, a scale a named assumption, the design and its oxygen balance read from the service`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails || ceilingFails || vesselFails) process.exit(1);
+  console.log(`${1 - simulateFails}/1 fermOS Simulate — a family simulated from its sources, what waits typed under a name, the result read from the artifact`);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails || ceilingFails || vesselFails || simulateFails) process.exit(1);
 }
 
 main();

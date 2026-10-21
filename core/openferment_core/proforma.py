@@ -1410,8 +1410,21 @@ def bind_flowsheet(flowsheet: str, *, include_archived: bool = False, host: str 
 # series names another product than the scenario's is refused whole.
 # `batch_simulation` does not exist in this tree; fermOS keeps
 # `kinetic_fit` and `growth_forecast` (fermos.FEEDABLE).
+#
+# A SIMULATION FEEDS TOO (OF-BLD-020 §3.3, D1). A kept `fermos.simulation`
+# gives the same three from its end state as it was kept: titre its final
+# product at harvest, yield the product made over the sugar used to harvest,
+# productivity that titre over the harvest hour, which is the batch time it
+# gives; each a single value (a simulation draws no band), fixed. Its
+# provenance is the artifact's own, basis_provenance over every source its
+# parameters came from (a person's value makes it `demo`), and it enters a
+# run through the `artifact` source as a fit's does. A simulation is never a
+# measurement, and its card says so. A chemostat runs continuously and gives
+# a batch flowsheet nothing; a simulation of another product is refused
+# whole, as a fit's product series is.
 
 FIT_KEYS = ("titre", "yield", "productivity")
+
 _FIT_NAME = re.compile(r"(\w+) fit(?: (low|high))?")
 # The words a series' label or measure id uses for what each shelf
 # flowsheet makes, to tell a fit of another product's series (PRODUCTS).
@@ -1455,6 +1468,8 @@ def fit_info(art, flowsheet: str):
         out.feeds = [FitFeed(key=k, unit=i.unit, derivation="", refused=why) for k, i in declared.items()]
         return out
 
+    if art.tool == fermos.SIMULATION:
+        return _simulation_info(art, out, declared, product, flowsheet, refuse_all)
     try:
         fit_ = fermos.fit_of(art)
     except fermos.FitRefused as e:
@@ -1542,14 +1557,71 @@ def fit_info(art, flowsheet: str):
     return out
 
 
+def _simulation_info(art, out, declared: dict, product: str, flowsheet: str, refuse_all):
+    """What a kept simulation feeds (OF-BLD-020 §3.3): its end state as it
+    was kept, read from the artifact and recomputed nowhere."""
+    from . import fermos, kinetics, units
+    from .models import FitFeed
+
+    try:
+        sim = fermos.result_of(art)
+    except (KeyError, TypeError, ValueError) as e:
+        return refuse_all(f"simulation {art.id} cannot be read as one: {e}")
+    fam = kinetics.FAMILIES.get(sim.family)
+    out.flags.append(f"a {sim.family} simulation, not a measurement: each value it gives was computed from the sources "
+                     "its basis names, and its provenance follows them")
+    if isinstance(fam, kinetics.ChemostatV1):
+        return refuse_all(f"it simulates a chemostat ({sim.family}), which runs continuously and has no batch: "
+                          f"{flowsheet} takes a batch's titre, yield and batch time")
+    if sim.product and sim.product != product:
+        return refuse_all(f"it simulates {sim.product}, not {product}, the product of {flowsheet}")
+    if not sim.product:
+        out.flags.append(f"it names no product: it is read as {product} because a person chose it")
+    out.productSeries = sim.product
+    out.substrateSeries = sim.sugar
+    harvest = (sim.sugarRunsOutH if sim.sugarRunsOutH is not None and sim.harvestH == sim.sugarRunsOutH
+               else None)
+    where = ("the hour its sugar runs out" if harvest is not None else "its run's end")
+    if sim.harvestH and sim.harvestH > 0:
+        out.batchTimeH = float(sim.harvestH)
+    for flag in sim.flags:
+        if "did not run out" in flag:
+            out.flags.append(flag[:1].lower() + flag[1:].rstrip("."))
+    G = kinetics.G_L
+    got = {
+        "titre": (sim.finalTitre, G, f"the final product of simulation {art.id} at harvest ({where})",
+                  "the family keeps no product state" if sim.finalTitre is None else None),
+        "yield": (sim.yieldAchieved, "g g⁻¹", f"product made over sugar used to harvest ({where}) in simulation {art.id}",
+                  "no sugar was used before harvest" if sim.yieldAchieved is None else None),
+        "productivity": (sim.productivity, f"{G} h⁻¹",
+                         f"the final titre of simulation {art.id} over its harvest hour ({where}), the batch time it gives",
+                         "it gives no titre or no harvest hour" if sim.productivity is None else None),
+    }
+    feeds = []
+    for key, inp in declared.items():
+        value, unit, derivation, why = got[key]
+        feed = FitFeed(key=key, unit=inp.unit, derivation=derivation)
+        if why:
+            feed.refused = why
+        else:
+            try:
+                feed.value = feed.low = feed.high = units.convert(float(value), unit, inp.unit)
+            except units.UnitError as e:
+                feed.refused = f"its value does not convert to {inp.unit}: {e}"
+        feeds.append(feed)
+    out.feeds = feeds
+    return out
+
+
 def fermos_fits(flowsheet: str) -> list:
     """GET /api/fermos/fits: every kinetic fit and forecast fermOS keeps,
-    newest first, each with what it can feed `flowsheet` and why not. A
-    read: it keeps nothing and starts no simulator."""
+    and every simulation (OF-BLD-020 §3.3), newest first, each with what it
+    can feed `flowsheet` and why not. A read: it keeps nothing and starts no
+    simulator."""
     from . import artifacts, fermos
 
     runnable(flowsheet)
-    return [fit_info(a, flowsheet) for a in artifacts.all_artifacts() if a.tool in fermos.FEEDABLE]
+    return [fit_info(a, flowsheet) for a in artifacts.all_artifacts() if a.tool in fermos.FEEDS_PROFORMA]
 
 
 def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
