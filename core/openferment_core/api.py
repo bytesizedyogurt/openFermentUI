@@ -57,6 +57,7 @@ from .models import (
     ProformaRunRequest,
     SimulationRequest,
     ThermoPropsRequest,
+    TrainFromRunRequest,
     TrainRunRequest,
     TrainSpec,
     VesselDesign,
@@ -1419,6 +1420,49 @@ def pureos_train_validate(train: TrainSpec) -> dict:
     from . import pureos
 
     return pureos.validation(train).model_dump(mode="json")
+
+
+@app.post("/api/pureos/train/check")
+def pureos_train_check(req: TrainRunRequest) -> dict:
+    """Everything a run of the train would refuse, at once, in the run's
+    words, each by the place it belongs to (`TrainValidation`: a unit's id,
+    `inlet`, or `train`): the validation's refusals, a value that waits naming
+    what would bind it, a unit's needs (OF-BLD-020 §5.3). Runs no train and
+    keeps nothing; it reads what the scopes read (the program's chemicals,
+    each class's defaults), which a cold worker starts for. 409 for an
+    artifact the train names that is damaged on disk; 503 when the worker
+    cannot answer."""
+    from . import artifacts, pureos
+
+    try:
+        return pureos.check_train(req.train, req.overrides, req.by, req.includeArchived).model_dump(mode="json")
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not read "
+                                                    f"the train's units: {e}") from e
+
+
+@app.post("/api/pureos/train/from-run")
+def pureos_train_from_run(req: TrainFromRunRequest) -> dict:
+    """A kept run's units read into a train (`TrainFromRun`, OF-BLD-020
+    §5.3): every unit on the product's path whose class is a catalogue
+    type, in run order, its outlets routed as the run routed them, its values
+    read from the package's own unit when the run is of a shelf flowsheet;
+    the units it does not take and why; the train's structural refusals.
+    Keeps nothing and starts no simulator. 404 for an artifact not on file;
+    422 in words for one that is no run or that no train is read from; 409
+    for one damaged on disk."""
+    from . import artifacts, pureos
+
+    try:
+        return pureos.from_run(req.artifactId, req.trainId, req.includeArchived).model_dump(mode="json")
+    except pureos.RunNotOnFile as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    except pureos.TrainRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
 
 @app.post("/api/pureos/train/run")

@@ -316,6 +316,15 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'fermOS',
   },
   {
+    // OF-BLD-020 §5.3 — 'build' is reserved under /pureos: /pureos/build/:trainId, `new` for a fresh train.
+    label: 'Builder',
+    to: '/pureos/build',
+    descriptor: 'a train built unit by unit from the catalogue, every parameter in hand, run on BioSTEAM',
+    aliases: ['builder', 'build a train', 'new train', 'train builder', 'unit catalogue', 'palette', 'purity', 'downstream train'],
+    icon: Filter,
+    owner: 'pureOS',
+  },
+  {
     // OF-BLD-019 §4.1 — 'train' is reserved under /pureos: /pureos/train/:scenarioId.
     label: 'Train',
     to: '/pureos/train',

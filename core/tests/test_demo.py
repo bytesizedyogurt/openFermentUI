@@ -167,6 +167,10 @@ def test_the_prototype_fixtures_are_what_demo_prototype_writes(tmp_path, monkeyp
             _same_vessel_asks(json.loads(path.read_text(encoding="utf-8"))["response"],
                               json.loads(committed.read_text(encoding="utf-8"))["response"])
             continue
+        if path.name == BUILDER_FIXTURE:
+            _same_builder_asks(json.loads(path.read_text(encoding="utf-8"))["response"],
+                               json.loads(committed.read_text(encoding="utf-8"))["response"])
+            continue
         assert path.read_text(encoding="utf-8") == committed.read_text(encoding="utf-8"), (
             f"{path.name} no longer matches the code: run python -m openferment_core.demo --prototype"
         )
@@ -196,6 +200,69 @@ def _same_vessel_asks(written: dict, committed: dict) -> None:
     refused = [d["body"] for d in committed["designs"] if d["status"] == 422]
     assert refused == [d["body"] for d in written["designs"] if d["status"] == 422]
     assert written["worker"]["kind"] == "stand-in" and committed["worker"]["kind"] in ("biosteam", "stand-in")
+
+
+BUILDER_FIXTURE = "pureos-builder.json"
+
+
+def _same_builder_asks(written: dict, committed: dict) -> None:
+    """OF-BLD-020 §5.3: the Builder's fixture asks what the code asks. Its
+    train, its catalogue (data), what a run would refuse at each moment and
+    each validation are the code's whatever runs the units; its specs,
+    scopes, run and train runs are the worker's, asked alike: the same
+    places, the same keys, the same statuses, the run's train read back into
+    the same units."""
+    for key in ("by", "trainId", "train", "catalogue", "checks", "validations"):
+        assert written[key] == committed[key], f"{BUILDER_FIXTURE}'s {key} no longer matches the code"
+    assert sorted(written["specs"]) == sorted(committed["specs"])
+    for t in written["specs"]:
+        assert [s["key"] for s in written["specs"][t]["specs"]] == [s["key"] for s in committed["specs"][t]["specs"]]
+    assert [(s["unit"], s["type"], s["status"]) for s in written["scopes"]] == \
+        [(s["unit"], s["type"], s["status"]) for s in committed["scopes"]]
+    for w, c in zip(written["scopes"][1:], committed["scopes"][1:]):
+        # A unit's own keys are the class's; per component they follow the inlet's chemicals, the same here.
+        assert [v["key"] for v in w["body"]["values"]] == [v["key"] for v in c["body"]["values"]]
+    assert (written["run"]["request"], written["run"]["key"], written["run"]["status"]) == \
+        (committed["run"]["request"], committed["run"]["key"], committed["run"]["status"])
+    units = lambda r: [(u["id"], u["type"], u["outlets"]) for u in r["body"]["train"]["units"]]  # noqa: E731
+    assert [f["status"] for f in written["fromRun"]] == [f["status"] for f in committed["fromRun"]]
+    assert units(written["fromRun"][0]) == units(committed["fromRun"][0])
+    assert written["fromRun"][1] == committed["fromRun"][1]
+    assert len(written["trainRuns"]) == len(committed["trainRuns"]) == 1
+    assert written["worker"]["kind"] == "stand-in" and committed["worker"]["kind"] in ("biosteam", "stand-in")
+
+
+@pytest.mark.sim
+def test_the_builder_fixture_is_what_the_worker_runs():
+    """The Builder fixture's run, scopes and specs are the real worker's
+    within VESSEL_FIXTURE_RTOL (OF-BLD-020 §5.3)."""
+    from openferment_core import proforma
+
+    committed = json.loads((demo.PROTOTYPE / BUILDER_FIXTURE).read_text(encoding="utf-8"))["response"]
+    drawn_here = proforma.drawn_here
+    proforma.drawn_here = lambda: False
+    try:
+        written = demo.prototype_builder(real_worker=True)[BUILDER_FIXTURE]
+    finally:
+        proforma.drawn_here = drawn_here
+    assert committed["worker"]["kind"] == "biosteam", "commit the fixture BioSTEAM ran: run demo --prototype"
+    _close(json.loads(json.dumps(written)), committed)
+
+
+def _close(a, b, where="") -> None:
+    if isinstance(a, bool) or not isinstance(a, (int, float)):
+        if isinstance(a, dict):
+            assert isinstance(b, dict) and a.keys() == b.keys(), where
+            for k in a:
+                _close(a[k], b[k], f"{where}.{k}")
+        elif isinstance(a, list):
+            assert isinstance(b, list) and len(a) == len(b), where
+            for n, (x, y) in enumerate(zip(a, b)):
+                _close(x, y, f"{where}[{n}]")
+        else:
+            assert a == b, where
+        return
+    assert b == pytest.approx(a, rel=demo.VESSEL_FIXTURE_RTOL, abs=1e-9), where
 
 
 @pytest.mark.sim

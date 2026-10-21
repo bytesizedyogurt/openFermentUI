@@ -13,7 +13,7 @@
 //
 // A scope is `proforma:<scenario id>`, `fermos:family:<id>`,
 // `fermos:vessel:<simulation id>`, `fermos:forecast:<kinetic fit id>` or
-// `pureos:unit:<train>:<unit>`. What a call starts depends on the scope
+// `pureos:unit:<train>:<unit>` (with the train, OF-BLD-020 §5.3). What a call starts depends on the scope
 // (OF-BLD-020 §2.R, finding 7): a `proforma:` scope binds only and starts no
 // worker; a `fermos:vessel:` scope reads BioSTEAM's defaults through the
 // Proforma worker, once per process, so its first read on a cold service
@@ -22,7 +22,7 @@
 // service's words (RagRefused); nothing stands in for an answer (E.2). The
 // overrides themselves live in the store's Durable tier
 // (`parameterOverrides`); the service keeps none.
-import type { Override, ParamResolveRequest, ParamResolveResult, ParamScope } from '@/data/types';
+import type { Override, ParamResolveRequest, ParamResolveResult, ParamScope, TrainSpec } from '@/data/types';
 import { RagDown, RagRefused, call } from './rag';
 
 export { RagDown as ParamsDown, RagRefused as ParamsRefused };
@@ -47,6 +47,12 @@ export interface ParamAsk {
   /** A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the vessel design and the train run it is built from. */
   vessel?: string | null;
   trainRun?: string | null;
+  // pureOS's unit scope (OF-BLD-020 §5.3): the whole train the unit belongs
+  // to, so its per-component keys expand over the train's chemicals and its
+  // records bind by its program and product (`?train=` as JSON on the GET,
+  // `train` in the resolve's body), and the unit's catalogue type.
+  train?: TrainSpec | null;
+  unitType?: string | null;
 }
 
 /** The fermOS fields of an ask, as query parameters and as the resolve's body fields alike. */
@@ -68,6 +74,8 @@ const askQuery = (ask: ParamAsk) => {
   if (ask.includeArchived) q.set('includeArchived', 'true');
   if (ask.vessel) q.set('vessel', ask.vessel);
   if (ask.trainRun) q.set('trainRun', ask.trainRun);
+  if (ask.unitType) q.set('unitType', ask.unitType);
+  if (ask.train) q.set('train', JSON.stringify(ask.train));
   const s = q.toString();
   return s ? `?${s}` : '';
 };
@@ -88,6 +96,8 @@ export function resolveRequest(overrides: Override[], ask: ParamAsk = {}): Param
     ...(ask.includeArchived ? { includeArchived: true } : {}),
     ...(ask.vessel ? { vessel: ask.vessel } : {}),
     ...(ask.trainRun ? { trainRun: ask.trainRun } : {}),
+    ...(ask.unitType ? { unitType: ask.unitType } : {}),
+    ...(ask.train ? { train: ask.train } : {}),
   };
 }
 

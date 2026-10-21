@@ -44,7 +44,7 @@ import { RECORDS } from '../src/data/records';
 import { PRODUCTS } from '../src/data/products';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
-import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, Override, ProformaScenarioInfo, Scenario } from '../src/data/types';
+import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, Override, ProformaScenarioInfo, Scenario, TrainSpec } from '../src/data/types';
 import { visibleArtifacts } from '../src/lib/artifacts';
 import { COMPOSITE_FLOWSHEET, inputCounts, partsOf, referencePrice, runBody, runOverrides, scenarioFromVesselAndTrain } from '../src/lib/proforma';
 import { resolveRequest } from '../src/lib/params';
@@ -1272,6 +1272,83 @@ await (async () => {
   check('fermOS \u2192 Vessel says it is asking (BioSTEAM starting) until the panel answers, and holds Design and Scale until then',
     /data-testid="vessel-panel-asking"/.test(vessel) && /\{!panel && !panelProblem && \(/.test(vessel) && /proformaStatus\(ctrl\.signal\)/.test(vessel) &&
       /\{panel && \(\s*<div className="flex flex-wrap items-center gap-3">\s*<p className="text-body" data-testid="vessel-scale"/.test(vessel));
+})();
+
+// OF-BLD-020 §5.3 — a train built in pureOS → Builder is kept in this
+// browser: `trainsMade` holds each train whole by its id, with when and by
+// whom it was saved, round-trips through the Durable tier (a train made since
+// the page loaded wins over the snapshot's copy), and goes with Clear this
+// browser's data. The values typed into its panels are overrides of its
+// places' scopes, laid into the train's params as it is sent (`trainSpecOf`),
+// so the panel and the run read one set; a run carries those overrides and no
+// other scope's. A recycle is offered only to an earlier unit.
+await (async () => {
+  const st = () => useStore.getState();
+  const pu = await import('../src/lib/pureos');
+  useStore.setState({ parameterOverrides: {}, trainsMade: {} });
+  const train: TrainSpec = {
+    id: 'tr-check-store', name: 'A check-store train', program: 'yeast', product: 'ethanol',
+    inlet: { kind: 'typed', ref: null, streamId: null, vessel: null, params: {} },
+    units: [
+      { id: 'U1', type: 'centrifugation', params: {}, outlets: { '0': 'waste', '1': 'onward' }, records: {}, readFrom: null },
+      { id: 'U2', type: 'tank', params: {}, outlets: { '0': 'onward' }, records: {}, readFrom: null },
+    ],
+  };
+  const at = '2026-10-21T15:00:00Z';
+  const typed = (place: string, key: string, value: number | string): Override =>
+    ({ scope: pu.unitScope(train.id, place), key, value, low: null, high: null, by: 'Sean Creighton', at, note: null });
+  st().setOverride(typed(pu.INLET, 'broth_flow', 1));
+  st().setOverride(typed('U1', 'split.Yeast', 0.9));
+  st().setOverride({ ...typed('U1', 'split.Ethanol', 0.05), low: 0.04, high: 0.06 });
+  st().setOverride(typed('U9', 'split.Yeast', 0.5)); // a place the train no longer has
+  st().setOverride({ ...typed('U1', 'split.Yeast', 0.5), scope: pu.unitScope('tr-another', 'U1') });
+  const sent = pu.trainSpecOf(train, st().parameterOverrides);
+  check('a train as sent carries each place’s overrides as its params, by key, with the person',
+    sent.inlet.params?.broth_flow?.value === 1 && sent.units[0].params?.['split.Yeast']?.value === 0.9 &&
+      sent.units[0].params?.['split.Ethanol']?.low === 0.04 && sent.units[0].params?.['split.Ethanol']?.by === 'Sean Creighton' &&
+      Object.keys(sent.units[1].params ?? {}).length === 0, sent);
+  const carried = pu.trainOverrides(train, st().parameterOverrides);
+  check('a train’s run carries the overrides of its own places and no other scope’s (not a removed unit’s, not another train’s)',
+    carried.map((o) => `${o.scope.split(':').slice(-1)[0]}/${o.key}`).sort().join() === 'U1/split.Ethanol,U1/split.Yeast,inlet/broth_flow', carried);
+  check('a unit’s outlet may go back only to an earlier unit, never a later one or itself',
+    JSON.stringify(pu.routeChoices(train.units, 0)) === JSON.stringify(['onward', 'waste']) &&
+      JSON.stringify(pu.routeChoices(train.units, 1)) === JSON.stringify(['onward', 'waste', 'recycle:U1']));
+  check('the next unit added takes the next free U-number', pu.nextUnitId(train.units) === 'U3' && pu.nextUnitId([]) === 'U1');
+  // The service echoes the train it ran in its own field order, an absent optional field as null: still the same train.
+  const echoed = JSON.parse(JSON.stringify({ units: sent.units.map(({ readFrom: _r, ...u }) => ({ ...u, readFrom: null })), inlet: { params: sent.inlet.params, kind: 'typed' }, product: sent.product, program: sent.program, name: sent.name, id: sent.id }));
+  check('a train the service echoes in its own order is the same train, and one changed is not',
+    pu.sameTrain(sent, echoed) && !pu.sameTrain(sent, { ...echoed, units: echoed.units.slice(0, 1) }));
+  st().saveTrain(sent, 'Sean Creighton');
+  const kept = st().trainsMade[train.id];
+  check('Save keeps the train whole under its id, with when and by whom',
+    !!kept && kept.by === 'Sean Creighton' && !Number.isNaN(Date.parse(kept.savedAt)) &&
+      JSON.stringify(kept.train) === JSON.stringify(sent) && kept.train !== sent, kept);
+  const snap = snapshotOf(st());
+  check('the snapshot keeps every saved train', snap.trainsMade?.[train.id]?.train.units.length === 2, snap.trainsMade);
+  useStore.setState({ trainsMade: {} });
+  st().applyDurable(snap);
+  check('after a reload the saved train is back, its typed values with it',
+    st().trainsMade[train.id]?.train.units[0].params?.['split.Yeast']?.value === 0.9 && st().trainsMade[train.id]?.by === 'Sean Creighton');
+  // A train saved since the page loaded wins over the snapshot's older copy.
+  st().saveTrain({ ...sent, name: 'Renamed since the load' }, 'Sam Okonkwo');
+  st().applyDurable(snap);
+  check('a train saved since the page loaded wins over the snapshot’s copy',
+    st().trainsMade[train.id]?.train.name === 'Renamed since the load' && st().trainsMade[train.id]?.by === 'Sam Okonkwo');
+  st().clearBrowserData();
+  check('Clearing this browser’s data drops every saved train and its typed values',
+    Object.keys(st().trainsMade).length === 0 && Object.keys(st().parameterOverrides).length === 0 && Object.keys(snapshotOf(st()).trainsMade ?? {}).length === 0);
+  const durable = readFileSync(new URL('../src/lib/durable.ts', import.meta.url), 'utf8');
+  check('the Durable snapshot names trainsMade as saved trains by id, each with when and by whom',
+    /trainsMade\?: Record<string, TrainMade>/.test(durable) && /export interface TrainMade \{[^}]*\btrain: TrainSpec;[^}]*\bsavedAt: string;[^}]*\bby: string;[^}]*\}/.test(durable));
+  const store = readFileSync(new URL('../src/store.ts', import.meta.url), 'utf8');
+  check('the store saves when trainsMade changes', /s\.trainsMade === prev\.trainsMade/.test(store));
+  const page = readFileSync(new URL('../src/screens/PureOSBuilder.tsx', import.meta.url), 'utf8');
+  check('the Builder sends the train as trainSpecOf lays it and the overrides of its places, and computes nothing it shows',
+    /trainSpecOf\(draft, mine\)/.test(page) && /trainOverrides\(spec, mine\)/.test(page) && /runTrain\(\{ train: spec, overrides,/.test(page) &&
+      /checkTrain\(\{ train: spec, overrides,/.test(page));
+  check('the Builder saves under the reviewer name and never without one', /saveTrain\(spec, reviewer\)/.test(page) && /disabled=\{!reviewer\}/.test(page));
+  check('removing a unit drops the values typed for it', /clearScope\(draft\.units\[i\]\.id\)/.test(page));
+  check('Price this in Proforma says what Phase 6 adds and makes nothing', /PRICE_TRAIN_WORDS/.test(page) && !/createScenario/.test(page));
 })();
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

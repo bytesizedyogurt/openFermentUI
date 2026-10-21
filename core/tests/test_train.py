@@ -257,10 +257,12 @@ def test_the_validate_endpoint_returns_the_refusals_and_runs_nothing(client, mon
 
     monkeypatch.setattr(proforma, "call", refuse)
     ok = client.post("/api/pureos/train/validate", json=spec_of().model_dump(mode="json"))
-    assert ok.status_code == 200 and ok.json() == {"ok": True, "refusals": []}
+    assert ok.status_code == 200 and ok.json() == {"ok": True, "refusals": [], "places": {}}
     bad = spec_of(units=[{"id": "C1", "type": "centrifugation", "outlets": {"cake": "recycle:C1"}}])
     r = client.post("/api/pureos/train/validate", json=bad.model_dump(mode="json")).json()
     assert r["ok"] is False and any("recycles to C1, itself" in w for w in r["refusals"])
+    # OF-BLD-020 §5.3: each refusal by its place, so the Builder says a unit's on its card.
+    assert r["places"]["C1"] == [w for w in r["refusals"] if w.startswith("unit C1")]
 
 
 # ── the inlet (offline) ────────────────────────────────────────────────
@@ -578,7 +580,7 @@ def test_a_unit_reading_a_flowsheets_own_unit_takes_its_values_first_as_the_pack
 # ── Rule 1 and E.3‴ (offline) ──────────────────────────────────────────
 
 
-@pytest.mark.parametrize("rel", ["pureos/train_spec.py", "flowsheets/train.py"])
+@pytest.mark.parametrize("rel", ["pureos/train_spec.py", "flowsheets/train.py", "pureos/from_run.py"])
 def test_no_process_number_in_the_trains_code(rel):
     """Every number literal is 0 or 1, or a module-level constant named with
     its reason (PER_CENT, a unit's definition; IMPURITIES, a reading

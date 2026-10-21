@@ -234,10 +234,79 @@ export const SUBSYSTEMS: Subsystem[] = [
   },
 
   // ── pureOS — downstream (§4) ─────────────────────────────────────────
-  { id: 'pureos.harvest', owner: 'pureOS', label: 'Harvest', status: 'stub', state: UNBUILT },
-  { id: 'pureos.capture', owner: 'pureOS', label: 'Capture', status: 'stub', state: UNBUILT },
-  { id: 'pureos.polish', owner: 'pureOS', label: 'Polish', status: 'stub', state: UNBUILT },
-  { id: 'pureos.recovery', owner: 'pureOS', label: 'Recovery', status: 'stub', state: UNBUILT },
+  // OF-BLD-020 D15 (§5.3) — the four go live with the unit catalogue and the
+  // train: a person builds a train on pureOS → Builder from the catalogue's
+  // BioSTEAM classes (and the in-house units BioSTEAM has none for), every
+  // parameter bound with its source, and the service runs it in the Proforma
+  // worker and keeps one artifact. Their reference sits on the Builder, where
+  // the units are chosen.
+  {
+    id: 'pureos.harvest',
+    owner: 'pureOS',
+    label: 'Harvest',
+    status: 'live',
+    state:
+      'A train starts from a broth: a kept fermOS simulation\u2019s harvest, a stream of a kept run, or a composition ' +
+      'typed under a reviewer\u2019s name. Centrifugation, filtration and clarification split it on BioSTEAM\u2019s ' +
+      'classes, and cell disruption runs as an in-house unit with no cost model; each split is a parameter shown with ' +
+      'its source. Which harvest suits a host is a person\u2019s choice: nothing proposes one yet.',
+    implementedIn: [
+      'core/openferment_core/pureos/catalogue.py',
+      'core/openferment_core/pureos/train_spec.py',
+      'core/openferment_core/pureos/inhouse.py',
+      'src/screens/PureOSBuilder.tsx',
+    ],
+  },
+  {
+    id: 'pureos.capture',
+    owner: 'pureOS',
+    label: 'Capture',
+    status: 'live',
+    state:
+      'Liquid\u2013liquid extraction, in one stage or several, on BioSTEAM\u2019s classes, and chromatography as an ' +
+      'in-house unit with no cost model: a person adds either to a train from the catalogue with every parameter in ' +
+      'hand, and the train runs on BioSTEAM and is kept as an artifact. Resins and their binding capacities are not ' +
+      'read from records.',
+    implementedIn: [
+      'core/openferment_core/pureos/catalogue.py',
+      'core/openferment_core/pureos/inhouse.py',
+      'core/openferment_core/flowsheets/train.py',
+      'src/screens/PureOSBuilder.tsx',
+    ],
+  },
+  {
+    id: 'pureos.polish',
+    owner: 'pureOS',
+    label: 'Polish',
+    status: 'live',
+    state:
+      'Distillation, evaporation, molecular sieves, crystallisation and drying on BioSTEAM\u2019s classes, and ' +
+      'ultrafiltration with diafiltration in-house with no cost model; a train\u2019s run reads the product\u2019s ' +
+      'share of every stream\u2019s mass from its stream table, and the product stream\u2019s is its purity. ' +
+      'Formulation and storage are not built.',
+    implementedIn: [
+      'core/openferment_core/pureos/catalogue.py',
+      'core/openferment_core/pureos/train_spec.py',
+      'core/openferment_core/flowsheets/train.py',
+      'src/components/figures/PurityByStream.tsx',
+    ],
+  },
+  {
+    id: 'pureos.recovery',
+    owner: 'pureOS',
+    label: 'Recovery',
+    status: 'live',
+    state:
+      'Reads, from a kept run\u2019s stream table, how much of the product each unit passes on toward the product ' +
+      'stream, what it loses and the overall recovery, for a Proforma run, a reference run or a train built here; ' +
+      'and reads a run\u2019s units into a train by their BioSTEAM class, saying which it leaves out and why.',
+    implementedIn: [
+      'core/openferment_core/pureos/__init__.py',
+      'core/openferment_core/pureos/from_run.py',
+      'src/screens/PureOSTrain.tsx',
+      'src/components/figures/RecoveryByUnit.tsx',
+    ],
+  },
   {
     id: 'proforma.uncertainty',
     owner: 'Proforma',

@@ -79,7 +79,7 @@ from __future__ import annotations
 import json
 import re
 import threading
-from typing import Any, Iterable, NamedTuple
+from typing import Any, Iterable, NamedTuple, NoReturn
 
 from .. import params
 from ..models import (
@@ -150,7 +150,25 @@ _ABS_P = "a physical limit: an absolute pressure is above none"
 
 
 class TrainRefused(ValueError):
-    """A train that cannot run, in words (a 422)."""
+    """A train that cannot run, in words (a 422). `places` holds each
+    refusal with the place it belongs to (a unit's id, `inlet`, or `train`),
+    so the Builder can say a unit's on its card (OF-BLD-020 §5.3); one raised
+    with words alone is the train's."""
+
+    def __init__(self, words: str, places: list[tuple[str, str]] | None = None):
+        super().__init__(words)
+        self.places: list[tuple[str, str]] = list(places) if places else [("train", words)]
+
+
+def _refuse(places: list[tuple[str, str]]) -> NoReturn:
+    raise TrainRefused("; ".join(w for _, w in places), places)
+
+
+def _placed(places: list[tuple[str, str]]) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for place, words in places:
+        out.setdefault(place, []).append(words)
+    return out
 
 
 class TrainNotOnFile(LookupError):
@@ -244,115 +262,126 @@ def _key_words(e: catalogue.Entry, key: str) -> str | None:
     return ""
 
 
-def validate(spec: TrainSpec) -> list[str]:
-    """Every reason the train cannot be built, at once, in words; empty when
-    it can (its values still resolve at the run). Runs nothing."""
+def refusals_by_place(spec: TrainSpec) -> list[tuple[str, str]]:
+    """Every reason the train cannot be built, at once, in words, each with
+    the place it belongs to (a unit's id, `inlet`, or `train`); empty when it
+    can (its values still resolve at the run). Runs nothing."""
     from ..flowsheets import shelf
 
-    said: list[str] = []
+    said: list[tuple[str, str]] = []
+
+    def at(place: str, words: str) -> None:
+        said.append((place, words))
+
     for word, value in (("train", spec.id), ("program", spec.program), ("product", spec.product)):
         if not re.fullmatch(params._ID, value or ""):
-            said.append(f"a {word} is named by its id (letters, digits, dots, dashes, underscores); {value!r} is not one")
+            at("train", f"a {word} is named by its id (letters, digits, dots, dashes, underscores); {value!r} is not one")
     if not (spec.name or "").strip():
-        said.append("a train has a name")
+        at("train", "a train has a name")
     inlet = spec.inlet
     if inlet.kind in ("simulation", "run-stream") and not inlet.ref:
-        said.append(f"a {inlet.kind} inlet names its artifact (ref)")
+        at("inlet", f"a {inlet.kind} inlet names its artifact (ref)")
     if inlet.kind == "typed" and inlet.ref:
-        said.append("a typed inlet names no artifact: its composition is typed")
+        at("inlet", "a typed inlet names no artifact: its composition is typed")
     if inlet.kind == "run-stream" and not inlet.streamId:
-        said.append("a run's stream as the inlet names the stream (streamId)")
+        at("inlet", "a run's stream as the inlet names the stream (streamId)")
     if inlet.kind != "run-stream" and inlet.streamId:
-        said.append("a stream id belongs to a run-stream inlet")
+        at("inlet", "a stream id belongs to a run-stream inlet")
     if inlet.vessel and inlet.kind != "simulation":
-        said.append("a vessel gives the broth flow of a simulation's harvest alone")
+        at("inlet", "a vessel gives the broth flow of a simulation's harvest alone")
     for ref, what in ((inlet.ref, "ref"), (inlet.vessel, "vessel")):
         if ref and not re.fullmatch(r"[0-9a-f]{16}", ref):
-            said.append(f"the inlet's {what} is an artifact id (16 hex); {ref!r} is not one")
+            at("inlet", f"the inlet's {what} is an artifact id (16 hex); {ref!r} is not one")
     allowed = {"simulation": ("broth_flow", "harvest_hour", "T", "P"), "run-stream": (), "typed": ("broth_flow", "T", "P")}
     for key in inlet.params:
         if key in allowed[inlet.kind] or (inlet.kind == "typed" and key.startswith(f"conc{catalogue.SEP}")
                                           and len(key) > len("conc.")):
             continue
-        said.append(f"the inlet ({inlet.kind}) has no parameter {key!r}; its parameters are "
+        at("inlet", f"the inlet ({inlet.kind}) has no parameter {key!r}; its parameters are "
                     + (", ".join(allowed[inlet.kind]) + (", conc.<chemical>" if inlet.kind == "typed" else "")
                        if allowed[inlet.kind] else "none a person sets: a run's stream carries its own"))
     if not spec.units:
-        said.append("a train holds at least one unit")
+        at("train", "a train holds at least one unit")
     order = [u.id for u in spec.units]
     seen: set[str] = set()
     for n, u in enumerate(spec.units):
         if u.id in seen:
-            said.append(f"two units are named {u.id}: a unit's id is its own")
+            at(u.id, f"two units are named {u.id}: a unit's id is its own")
         seen.add(u.id)
         if not UNIT_ID.fullmatch(u.id or ""):
-            said.append(f"unit id {u.id!r} is not one BioSTEAM takes: a letter, then letters, digits or underscores")
+            at(u.id, f"unit id {u.id!r} is not one BioSTEAM takes: a letter, then letters, digits or underscores")
         if u.id == INLET:
-            said.append(f"{INLET} names the train's inlet, not a unit")
+            at(u.id, f"{INLET} names the train's inlet, not a unit")
         try:
             e = catalogue.entry(u.type)
         except catalogue.CatalogueUnknown as ex:
-            said.append(f"unit {u.id}: {ex}")
+            at(u.id, f"unit {u.id}: {ex}")
             continue
         outs = {p.name for p in _out_ports(e)}
         for name, route in u.outlets.items():
             if name not in outs:
-                said.append(f"unit {u.id} ({e.id}) has no outlet {name!r}; its outlets are {', '.join(sorted(outs))}")
+                at(u.id, f"unit {u.id} ({e.id}) has no outlet {name!r}; its outlets are {', '.join(sorted(outs))}")
                 continue
             if route in (ONWARD, WASTE):
                 continue
             if not route.startswith(RECYCLE):
-                said.append(f"unit {u.id}'s outlet {name} goes onward, to waste or to recycle:<an earlier unit>; "
+                at(u.id, f"unit {u.id}'s outlet {name} goes onward, to waste or to recycle:<an earlier unit>; "
                             f"{route!r} is none of them")
                 continue
             target = route[len(RECYCLE):]
             if target not in order[:n]:
                 where = ("itself" if target == u.id else "a unit after it" if target in order
                          else "no unit of this train")
-                said.append(f"unit {u.id}'s outlet {name} recycles to {target}, {where}: a recycle goes back to an "
+                at(u.id, f"unit {u.id}'s outlet {name} recycles to {target}, {where}: a recycle goes back to an "
                             "earlier unit (D9), and a forward one is refused")
                 continue
             te = _entry_of(spec, target)
             if te is not None:
                 up = _upstream(te)
                 if up is None or not up.many:
-                    said.append(f"unit {u.id}'s outlet {name} recycles to {target} ({te.id}), whose inlet takes one "
+                    at(u.id, f"unit {u.id}'s outlet {name} recycles to {target} ({te.id}), whose inlet takes one "
                                 "stream: route it to a unit whose inlet takes several (a mixer, a column, a "
                                 "centrifuge, a filter)")
         onward = [name for name, route in routes(u, e).items() if route == ONWARD]
         if len(onward) > 1:
-            said.append(f"unit {u.id} ({e.id}) sends {len(onward)} outlets on ({', '.join(onward)}): a unit of a train "
+            at(u.id, f"unit {u.id} ({e.id}) sends {len(onward)} outlets on ({', '.join(onward)}): a unit of a train "
                         "sends one on")
         elif not onward:
-            said.append(f"unit {u.id} ({e.id}) sends no outlet on: each unit of a train sends one on, and the last "
+            at(u.id, f"unit {u.id} ({e.id}) sends no outlet on: each unit of a train sends one on, and the last "
                         "one's is the product stream")
         rules = {p.key: p.rule for p in e.params}
         for key in [*u.params, *u.records]:
             why = _key_words(e, key)
             if why is None:
                 continue
-            said.append(f"unit {u.id} ({e.id}) has no parameter {key!r}; its parameters are "
+            at(u.id, f"unit {u.id} ({e.id}) has no parameter {key!r}; its parameters are "
                         f"{', '.join(p.key + (catalogue.SEP + '<' + p.per + '>' if p.per else '') for p in e.params)}"
                         + (f" and the side inlets' {', '.join(p.name + '.<chemical>' for p in _side_ports(e))}"
                            if _side_ports(e) else "") + (f" ({why})" if why else ""))
         for key, ids in u.records.items():
             base = key.partition(catalogue.SEP)[0]
             if not any(r.startswith("record:") for r in rules.get(base, ())):
-                said.append(f"unit {u.id}: {key} binds from no record field, so no record can be named for it")
+                at(u.id, f"unit {u.id}: {key} binds from no record field, so no record can be named for it")
             if not ids or any(not isinstance(i, str) or not i.strip() for i in ids):
-                said.append(f"unit {u.id}: the records named for {key} are record ids")
+                at(u.id, f"unit {u.id}: the records named for {key} are record ids")
         if u.readFrom is not None:
             try:
                 info = shelf.info(u.readFrom.flowsheet)
             except shelf.NotOnShelf as ex:
-                said.append(f"unit {u.id} reads from {u.readFrom.flowsheet!r}: {ex}")
+                at(u.id, f"unit {u.id} reads from {u.readFrom.flowsheet!r}: {ex}")
             else:
                 if info.reference:
-                    said.append(f"unit {u.id} reads from {info.id}, a reference biorefinery: it runs whole, and a "
+                    at(u.id, f"unit {u.id} reads from {info.id}, a reference biorefinery: it runs whole, and a "
                                 "train reads the units of a flowsheet the worker builds case by case")
             if not UNIT_ID.fullmatch(u.readFrom.unit or ""):
-                said.append(f"unit {u.id} reads from unit {u.readFrom.unit!r}, which is no BioSTEAM unit id")
+                at(u.id, f"unit {u.id} reads from unit {u.readFrom.unit!r}, which is no BioSTEAM unit id")
     return said
+
+
+def validate(spec: TrainSpec) -> list[str]:
+    """Every reason the train cannot be built, at once, in words; empty when
+    it can (its values still resolve at the run). Runs nothing."""
+    return [w for _, w in refusals_by_place(spec)]
 
 
 def _entry_of(spec: TrainSpec, unit_id: str) -> catalogue.Entry | None:
@@ -365,8 +394,8 @@ def _entry_of(spec: TrainSpec, unit_id: str) -> catalogue.Entry | None:
 
 
 def validation(spec: TrainSpec) -> TrainValidation:
-    said = validate(spec)
-    return TrainValidation(ok=not said, refusals=said)
+    said = refusals_by_place(spec)
+    return TrainValidation(ok=not said, refusals=[w for _, w in said], places=_placed(said))
 
 
 # ── the inlet (D10) ────────────────────────────────────────────────────
@@ -622,7 +651,7 @@ def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, b
         raise TrainRefused(f"the inlet: {e}") from None
     waiting = _waiting_words("the inlet", [v for v in values if not v.key.startswith(f"conc{catalogue.SEP}")])
     if waiting:
-        raise TrainRefused("; ".join(waiting))
+        raise TrainRefused("; ".join(waiting), [(INLET, w) for w in waiting])
     v = {x.key: x for x in values}
     basis = [BasisInput(name="inlet kind", value=spec.inlet.kind, unit="", source=BasisSource(kind="convention", note={
         "simulation": "the inlet is a kept fermOS simulation's broth at harvest (D10)",
@@ -1082,17 +1111,26 @@ def _version() -> str:
             f"biorefineries {_installed('biorefineries')}")
 
 
-def run_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None,
-              include_archived: bool = False) -> TrainRun:
-    """Resolve every value of the train with its source, refuse in words what
-    cannot run (the validation's refusals, a value that waits naming what
-    would bind it, a unit's needs, every one at once), and keep one
-    `pureos.train_run` artifact, or return the one kept for the same basis."""
-    from .. import artifacts, programs, proforma
+class _Prepared(NamedTuple):
+    """A train every value of which resolved: the run's basis, and the pool
+    its records came from."""
 
-    said = validate(spec)
+    basis: list[BasisInput]
+    pool: Any
+
+
+def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | None,
+             include_archived: bool) -> _Prepared:
+    """Resolve every value of the train with its source and write the run's
+    basis; refuse in words, every refusal at once with its place, what cannot
+    run (the validation's refusals, a value that waits naming what would bind
+    it, a unit's needs). Runs no train: the worker is asked only what the
+    scopes read (the program's chemicals, each class's defaults)."""
+    from .. import programs, proforma
+
+    said = refusals_by_place(spec)
     if said:
-        raise TrainRefused("; ".join(said))
+        _refuse(said)
     overrides = list(overrides or [])
     scopes = {scope_of(spec.id, INLET), *(scope_of(spec.id, u.id) for u in spec.units)}
     stray = sorted({o.scope for o in overrides if o.scope not in scopes})
@@ -1118,31 +1156,50 @@ def run_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: 
         except Exception as e:  # VolatilityMissing, ThermoRefused: in their words
             raise TrainRefused(f"{e}. A train traces its product by the library's own name for it") from None
     ws = train_specs()
-    inlet = inlet_stream(spec, overrides, by, include_archived)
-    unknown = sorted(set(inlet.chemicals) - set(ws["chemicals"]))
+    # The inlet's refusals and every unit's are said together (§5.3): a unit
+    # resolves over the chemicals the inlet carries, read even while one of
+    # the inlet's values waits.
+    refusals: list[tuple[str, str]] = []
+    inlet: Inlet | None = None
+    try:
+        inlet = inlet_stream(spec, overrides, by, include_archived)
+        chemicals = inlet.chemicals
+    except TrainRefused as e:
+        refusals += [(INLET, w) for _, w in e.places]
+        try:
+            chemicals = chemicals_of(spec, overrides, include_archived)
+        except TrainRefused as again:
+            _refuse([*refusals, *((INLET, w) for _, w in again.places if (INLET, w) not in refusals)])
+    unknown = sorted(set(chemicals) - set(ws["chemicals"]))
     if unknown:
-        raise TrainRefused(f"the inlet carries {', '.join(unknown)}, which {PROGRAM_CHEMICALS[spec.program]} do not "
-                           "hold: the train cannot build its stream")
+        refusals.append((INLET, f"the inlet carries {', '.join(unknown)}, which {PROGRAM_CHEMICALS[spec.program]} do "
+                                "not hold: the train cannot build its stream"))
+        _refuse(refusals)
     pool = _pool()
-    refusals: list[str] = []
     resolved: list[tuple[UnitScope, list[ParameterValue]]] = []
     for unit in spec.units:
-        got = unit_scope(spec, unit, inlet.chemicals, pool, overrides, chem)
-        refusals += got.refused
+        try:
+            got = unit_scope(spec, unit, chemicals, pool, overrides, chem)
+        except TrainRefused as e:
+            refusals += [(unit.id, f"unit {unit.id}: {w}") for _, w in e.places]
+            continue
+        refusals += [(unit.id, w) for w in got.refused]
         try:
             values = params.resolve(got.provided.specs, got.provided.sources, got.overrides, by)
         except params.ParamRefused as e:
-            refusals.append(f"unit {unit.id}: {e}")
+            refusals.append((unit.id, f"unit {unit.id}: {e}"))
             continue
-        refusals += _waiting_words(f"unit {unit.id} ({got.entry.id})", [v for v in values if _required(got.entry, v.key)])
-        refusals += [f"unit {unit.id}: {w}" for w in catalogue.unmet(got.entry.id, {v.key: v.value for v in values})]
+        refusals += [(unit.id, w) for w in _waiting_words(f"unit {unit.id} ({got.entry.id})",
+                                                          [v for v in values if _required(got.entry, v.key)])]
+        refusals += [(unit.id, f"unit {unit.id}: {w}")
+                     for w in catalogue.unmet(got.entry.id, {v.key: v.value for v in values})]
         try:
             catalogue.kwargs_of(got.entry.id, {v.key: v.value for v in values})
         except ValueError as e:
-            refusals.append(f"unit {unit.id}: {e}")
+            refusals.append((unit.id, f"unit {unit.id}: {e}"))
         resolved.append((got, values))
-    if refusals:
-        raise TrainRefused("; ".join(refusals))
+    if refusals or inlet is None:
+        _refuse(refusals)
     sim = f"biosteam@{ws['versions']['biosteam']}"
     lib = f"biorefineries@{ws['versions']['biorefineries']}"
     basis: list[BasisInput] = [
@@ -1181,8 +1238,32 @@ def run_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: 
                                         f"the shelf flowsheet's own unit whose values unit {u.id} takes first"))))
         basis += [b.model_copy(update={"name": f"{u.id}{catalogue.SEP}{b.name}"})
                   for b in params.basis_inputs(got.provided.specs, values)]
-    art = artifacts.compute(TRAIN_RUN, basis, records_by_id=pool.records_by_id if pool is not None else {})
+    return _Prepared(basis, pool)
+
+
+def run_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None,
+              include_archived: bool = False) -> TrainRun:
+    """Resolve every value of the train with its source, refuse in words what
+    cannot run (the validation's refusals, a value that waits naming what
+    would bind it, a unit's needs, every one at once), and keep one
+    `pureos.train_run` artifact, or return the one kept for the same basis."""
+    from .. import artifacts
+
+    got = _prepare(spec, overrides, by, include_archived)
+    art = artifacts.compute(TRAIN_RUN, got.basis, records_by_id=got.pool.records_by_id if got.pool is not None else {})
     return run_of(art)
+
+
+def check_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None,
+          include_archived: bool = False) -> TrainValidation:
+    """POST /api/pureos/train/check (OF-BLD-020 §5.3): everything a run of the
+    train would refuse, at once, in the run's words, each by its place; runs
+    no train and keeps nothing. The Builder holds Run on it."""
+    try:
+        _prepare(spec, overrides, by, include_archived)
+    except TrainRefused as e:
+        return TrainValidation(ok=False, refusals=[w for _, w in e.places], places=_placed(e.places))
+    return TrainValidation(ok=True)
 
 
 # ── the artifact ───────────────────────────────────────────────────────
@@ -1428,17 +1509,21 @@ _register_lazy()
 def run_of(art: Artifact) -> TrainRun:
     """A kept train run, read: the train as pureos.train_of reads it, and
     the artifact's own purity, costs, inlet, parameters, notes and flags."""
-    from .. import artifacts
+    from .. import artifacts, proforma
     from . import train_of
 
     if art.tool != TRAIN_RUN:
         raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact, not a train run ({TRAIN_RUN})")
     o = art.output
+    t = proforma.tables_of(art)
     return TrainRun(artifactId=art.id, provenance=art.provenance, createdAt=art.createdAt,  # type: ignore[arg-type]
                     spec=TrainSpec.model_validate(o["train"]), train=train_of(art), purity=TrainPurity(**o["purity"]),
                     costs=[TrainUnitCost(**c) for c in o["costs"]], inlet=TrainInletRead(**o["inlet"]),
                     parameters=[TrainUnitParameters(**p) for p in o["parameters"]], notes=o.get("notes") or [],
-                    flags=o.get("flags") or [], basis=artifacts.basis_of(art))
+                    flags=o.get("flags") or [], basis=artifacts.basis_of(art),
+                    # OF-BLD-020 §5.3: the run's own tables, read as every reader reads them.
+                    units=t.units, utilities=t.utilities, diagram=t.diagram, diagramNote=t.diagramNote,
+                    unitOrder=t.unitOrder)
 
 
 # ── what is on file ────────────────────────────────────────────────────

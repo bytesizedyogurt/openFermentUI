@@ -282,6 +282,10 @@ const PAIRS = [
   ['ProposalReason', 'ProposalReason'],
   ['ProposalMissing', 'ProposalMissing'],
   ['TrainProposal', 'TrainProposal'],
+  // OF-BLD-020 §5.3 — a run's units read into a train for the Builder.
+  ['TrainFromRunRequest', 'TrainFromRunRequest'],
+  ['TrainUnmapped', 'TrainUnmapped'],
+  ['TrainFromRun', 'TrainFromRun'],
 ];
 
 let compared = 0;

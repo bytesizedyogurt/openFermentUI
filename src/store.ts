@@ -55,6 +55,7 @@ import type {
   Checks,
   Program,
   ProgramId,
+  TrainSpec,
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
@@ -80,6 +81,7 @@ import {
   loadDurable,
   saveDurable,
   type DurableSnapshot,
+  type TrainMade,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
 import { blocks, carryOverSpan, isNewCandidate, spanChangesNumber, writeRefusal, type ReviewAction } from '@/lib/review';
@@ -365,6 +367,16 @@ export interface OFState {
   setProformaFits: (scenarioId: string, fits: Record<string, string>) => void;
   /** Stop using a fermOS fit for one input of a scenario, or for every input when no key is named. */
   clearProformaFit: (scenarioId: string, key?: string) => void;
+  /**
+   * pureOS's trains built here, by train id (OF-BLD-020 §5.3, D9): each saved
+   * whole as data, with when and by whom. Durable; the service keeps the
+   * train runs and no train. The values typed into a train's panels live in
+   * `parameterOverrides` under its scopes, and a saved train carries them as
+   * they stood when it was saved.
+   */
+  trainsMade: Record<string, TrainMade>;
+  /** Save a train built in the Builder under a reviewer name, replacing the one saved by its id. */
+  saveTrain: (train: TrainSpec, by: string) => void;
   checkpointAnswers: Record<string, boolean>;
   exports: { name: string; at: string; rows: number }[];
 
@@ -852,6 +864,7 @@ const seedState = () => ({
   proformaAssumptions: {} as Record<string, InputAssumption[]>,
   parameterOverrides: {} as Record<string, Override[]>,
   proformaFits: {} as Record<string, Record<string, string>>,
+  trainsMade: {} as Record<string, TrainMade>,
   adoptedRunbookIds: [] as string[],
   createdScenarioIds: [] as string[],
   checkpointAnswers: {} as Record<string, boolean>,
@@ -2429,6 +2442,12 @@ export const useStore = create<OFState>()((set, get) => ({
       return { parameterOverrides, proformaAssumptions: assumptionsFromOverrides(parameterOverrides) };
     }),
 
+  // ── pureOS's trains built here (OF-BLD-020 §5.3, D9) ───────────────────
+  // Saved whole, by id, with when and by whom; the Builder sends the train
+  // with every value its panels hold laid in (lib/pureos.trainSpecOf).
+  saveTrain: (train, by) =>
+    set((s) => ({ trainsMade: { ...s.trainsMade, [train.id]: { train: structuredClone(train), savedAt: new Date().toISOString(), by } } })),
+
   // ── Proforma's fermOS fits (OF-BLD-019 §5.1, D10) ─────────────────────
   // A person picks the fit; the browser keeps which artifact feeds which
   // input and nothing else: every value is the service's, from the artifact.
@@ -2628,6 +2647,8 @@ export const useStore = create<OFState>()((set, get) => ({
         // OF-BLD-019 §5.1 — the fermOS fits chosen here; a scenario's choice
         // made since load wins over the snapshot's.
         proformaFits: { ...(snap.proformaFits ?? {}), ...s.proformaFits },
+        // OF-BLD-020 §5.3 — the trains built here; one saved since load wins by id.
+        trainsMade: { ...(snap.trainsMade ?? {}), ...s.trainsMade },
         adoptedRunbookIds: [...new Set([...adopted.map((r) => r.id), ...s.adoptedRunbookIds])],
         // Postdoc's Live conversations. A turn still running when the page
         // went away has no stream to finish it, and says so.
@@ -3361,7 +3382,7 @@ export const useStore = create<OFState>()((set, get) => ({
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished, conversations, Proforma scenarios and the parameters changed here are gone, archived programs are hidden again, and the corpus is as it shipped',
+      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished, conversations, Proforma scenarios, the trains built here and the parameters changed here are gone, archived programs are hidden again, and the corpus is as it shipped',
       kind: 'info',
     });
   },
@@ -3627,6 +3648,8 @@ export function snapshotOf(s: OFState): DurableSnapshot {
     ),
     // OF-BLD-019 §3.3 (D6) — the seeded scenarios pinned to compare here.
     pinnedScenarios: s.scenarios.filter((sc) => !s.createdScenarioIds.includes(sc.id) && sc.pinned).map((sc) => sc.id),
+    // OF-BLD-020 §5.3 — pureOS's trains built here, whole, by id.
+    trainsMade: s.trainsMade,
   };
 }
 
@@ -3663,6 +3686,7 @@ if (durableAvailable()) {
       s.proformaAssumptions === prev.proformaAssumptions &&
       s.parameterOverrides === prev.parameterOverrides &&
       s.proformaFits === prev.proformaFits &&
+      s.trainsMade === prev.trainsMade &&
       s.adoptedRunbookIds === prev.adoptedRunbookIds &&
       s.liveConversations === prev.liveConversations &&
       s.scenarios === prev.scenarios &&

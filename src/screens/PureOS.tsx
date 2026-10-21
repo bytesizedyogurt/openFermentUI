@@ -27,6 +27,14 @@
 // molecule in the catalogue declares or a train BioSTEAM ships runs; none is
 // invented.
 //
+// PUREOS BUILDS A TRAIN (OF-BLD-020 §5.3, D9). **New train** opens the
+// Builder (/pureos/build/new, PureOSBuilder.tsx), where a person puts units
+// from the catalogue in order with every parameter in hand and the service
+// runs them on BioSTEAM. This page lists the trains built in this browser
+// (the Durable tier's `trainsMade`, filtered by the program switch), the
+// train runs the service keeps (`GET /api/pureos/train-runs`, an archived
+// program's hidden and said so), and the trains read from Proforma's runs.
+//
 // A TRAIN IS PROPOSED BY RULES (OF-BLD-020 §7.2, D12). **Propose a train**
 // (PureOSPropose.tsx) sends a product, a host and optionally an inlet, and
 // shows the service's proposal: catalogue unit types in order, each with the
@@ -38,10 +46,13 @@ import { STORAGE_FORMATS, UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER } from '@/data/vo
 import { PRODUCTS } from '@/data/products';
 import { PROGRAMS, isArchived } from '@/data/programs';
 import type { ProgramId, TrainSummary, UnitOperationStage } from '@/data/types';
-import { href, useRoute } from '@/router';
+import { href, navigate, useRoute } from '@/router';
 import { useProgramFilter, useStore } from '@/store';
-import { PureosDown, PureosRefused, pureosTrains, share, trainPath } from '@/lib/pureos';
-import { Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
+import { NEW_TRAIN, PureosDown, PureosRefused, builderPath, pureosTrainRuns, pureosTrains, share, trainPath } from '@/lib/pureos';
+import { stamp } from '@/lib/proforma';
+import { Button, Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { PUREOS_TABS } from '@/data/tabs';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ComponentTag } from '@/components/ComponentTag';
 import { HiddenByArchive } from '@/components/HiddenByArchive';
@@ -85,13 +96,15 @@ function TrainsOnFile() {
   }, []);
   const visible = (t: TrainSummary) =>
     (showArchived || !isArchived(t.program as ProgramId | null)) && (!t.scenarioId || shows('scenario', t.scenarioId));
-  const listed = (trains ?? []).filter(visible);
-  const hidden = (trains ?? []).filter((t) => !visible(t));
+  // A train run built in pureOS is listed with the train runs below, never twice.
+  const read = (trains ?? []).filter((t) => t.tool !== TRAIN_RUN_TOOL);
+  const listed = read.filter(visible);
+  const hidden = read.filter((t) => !visible(t));
   const hiddenPrograms = PROGRAMS.filter((p) => hidden.some((t) => t.program === p.id));
   return (
     <section className="mt-5" aria-labelledby="pureos-trains" data-testid="pureos-trains">
       <SectionTitle right={<span className="font-num text-caption text-ink-soft">{trains ? `${listed.length} on file` : ''}</span>}>
-        <span id="pureos-trains">Trains on file</span>
+        <span id="pureos-trains">Trains read from Proforma&rsquo;s runs</span>
       </SectionTitle>
       {problem && (
         <Callout kind="warn" title="The trains are read from the service">
@@ -159,6 +172,159 @@ function TrainsOnFile() {
   );
 }
 
+/** The tool that keeps a train run built in pureOS (OF-BLD-020 §5.2). */
+const TRAIN_RUN_TOOL = 'pureos.train_run';
+
+/**
+ * The trains built in this browser (OF-BLD-020 §5.3): the Durable tier's
+ * `trainsMade`, each with when and by whom it was saved, and the newest run
+ * the service keeps of it. The program switch filters them like any list.
+ */
+function TrainsBuiltHere({ runs, problem }: { runs: TrainSummary[] | null; problem: string | null }) {
+  const made = useStore((s) => s.trainsMade);
+  const showArchived = useStore((s) => s.showArchived);
+  const all = Object.values(made).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  const visible = (program: string) => showArchived || !isArchived(program as ProgramId);
+  const listed = all.filter((m) => visible(m.train.program));
+  const hidden = all.filter((m) => !visible(m.train.program));
+  const hiddenPrograms = PROGRAMS.filter((p) => hidden.some((m) => m.train.program === p.id));
+  return (
+    <section className="mt-5" aria-labelledby="pureos-built" data-testid="pureos-built">
+      <SectionTitle right={<span className="font-num text-caption text-ink-soft">{listed.length} saved</span>}>
+        <span id="pureos-built">Trains built here</span>
+      </SectionTitle>
+      {listed.length === 0 ? (
+        <Card className="p-4" data-testid="pureos-built-empty">
+          <p className="text-body text-ink">No train is saved in this browser yet.</p>
+          <p className="text-body text-ink-soft mt-1">
+            <strong>New train</strong> opens the Builder: choose where the broth comes from, add units from the catalogue in order, give each what it
+            needs, run it, and Save.
+          </p>
+          {hidden.length > 0 && (
+            <p className="text-caption text-ink-soft mt-2">
+              <HiddenByArchive subject={`${hidden.length} ${hidden.length === 1 ? 'train' : 'trains'} built here`} plural={hidden.length !== 1} programs={hiddenPrograms} />
+            </p>
+          )}
+        </Card>
+      ) : (
+        <Card className="px-4 py-1">
+          <ul>
+            {listed.map((m) => {
+              const run = runs?.find((r) => r.trainId === m.train.id) ?? null;
+              return (
+                <li key={m.train.id} className="py-2.5 border-b border-line/70 last:border-0" data-testid="pureos-built-row" data-train={m.train.id}>
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <a className="text-body text-ink hover:text-accent" href={href(builderPath(m.train.id))}>
+                      {m.train.name}
+                    </a>
+                    <span className="text-caption text-ink-soft font-num">{m.train.id}</span>
+                    <span className="ml-auto text-caption text-ink-soft">
+                      {run ? (
+                        <a className="hover:text-accent" href={href(`/pureos/train/${encodeURIComponent(m.train.id)}`)}>
+                          ran: {share(run.overallRecovery)} recovered
+                        </a>
+                      ) : problem ? (
+                        'its runs are read from the service'
+                      ) : runs === null ? (
+                        'reading its runs on the service…'
+                      ) : (
+                        'no run on the service'
+                      )}
+                    </span>
+                  </div>
+                  <div className="text-caption text-ink-soft mt-0.5">
+                    {m.train.units.length} units · product {m.train.product} · inlet {m.train.inlet.kind} · saved {stamp(m.savedAt)} by {m.by}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {hidden.length > 0 && (
+            <p className="text-caption text-ink-soft py-2">
+              <HiddenByArchive subject={`${hidden.length} more ${hidden.length === 1 ? 'train' : 'trains'} built here`} plural={hidden.length !== 1} programs={hiddenPrograms} />
+            </p>
+          )}
+        </Card>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The train runs the service keeps (OF-BLD-020 §5.2): one row a run, newest
+ * first, opening at its train's id. An archived program's run is hidden with
+ * the switch, and the list says so.
+ */
+function TrainRunsOnFile({ runs, problem }: { runs: TrainSummary[] | null; problem: string | null }) {
+  const showArchived = useStore((s) => s.showArchived);
+  const made = useStore((s) => s.trainsMade);
+  const visible = (t: TrainSummary) => showArchived || !isArchived(t.program as ProgramId | null);
+  const listed = (runs ?? []).filter(visible);
+  const hidden = (runs ?? []).filter((t) => !visible(t));
+  const hiddenPrograms = PROGRAMS.filter((p) => hidden.some((t) => t.program === p.id));
+  return (
+    <section className="mt-5" aria-labelledby="pureos-train-runs" data-testid="pureos-train-runs">
+      <SectionTitle right={<span className="font-num text-caption text-ink-soft">{runs ? `${listed.length} on file` : ''}</span>}>
+        <span id="pureos-train-runs">Train runs on the service</span>
+      </SectionTitle>
+      {problem && (
+        <Callout kind="warn" title="Train runs are read from the service">
+          <p className="text-ink">{problem}</p>
+        </Callout>
+      )}
+      {!problem && !runs && <p className="text-body text-ink-soft">Reading the train runs on file…</p>}
+      {runs && listed.length === 0 && (
+        <Card className="p-4" data-testid="pureos-train-runs-empty">
+          <p className="text-body text-ink">No train built in pureOS has run on this service yet.</p>
+          {hidden.length > 0 && (
+            <p className="text-caption text-ink-soft mt-2">
+              <HiddenByArchive subject={`${hidden.length} ${hidden.length === 1 ? 'train run' : 'train runs'} on file`} plural={hidden.length !== 1} programs={hiddenPrograms} />
+            </p>
+          )}
+        </Card>
+      )}
+      {listed.length > 0 && (
+        <Card className="px-4 py-1">
+          <ul>
+            {listed.map((t) => (
+              <li key={t.artifactId} className="py-2.5 border-b border-line/70 last:border-0" data-testid="pureos-train-run-row" data-train={t.trainId ?? ''}>
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <a className="text-body text-ink hover:text-accent" href={href(`/pureos/train/${encodeURIComponent(t.trainId ?? t.artifactId)}`)}>
+                    {t.trainName ?? t.trainId ?? t.artifactId}
+                  </a>
+                  <span className="text-caption text-ink-soft font-num">{t.artifactId}</span>
+                  <ProvenanceBadge p={t.provenance} compact />
+                  <span className="ml-auto font-num text-caption text-ink">
+                    {t.overallRecovery == null ? 'no recovery read' : `${share(t.overallRecovery)} recovered`}
+                  </span>
+                </div>
+                <div className="text-caption text-ink-soft mt-0.5">
+                  {t.unitCount} units · product {t.product ?? 'not named'} · run {t.createdAt}
+                  {t.trainId && made[t.trainId] ? (
+                    <>
+                      {' · '}
+                      <a className="text-accent hover:underline" href={href(builderPath(t.trainId))}>
+                        open in the Builder
+                      </a>
+                    </>
+                  ) : (
+                    ' · built in another browser or by a tool'
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {hidden.length > 0 && (
+            <p className="text-caption text-ink-soft py-2">
+              <HiddenByArchive subject={`${hidden.length} more ${hidden.length === 1 ? 'train run' : 'train runs'}`} plural={hidden.length !== 1} programs={hiddenPrograms} />
+            </p>
+          )}
+        </Card>
+      )}
+    </section>
+  );
+}
+
 export default function PureOS() {
   // A unit in a train links here with `?op=<id>`: the step is outlined and
   // brought into view, so a BioSTEAM class reads as the vocabulary's word.
@@ -199,13 +365,34 @@ export default function PureOS() {
 
   const unused = UNIT_OPERATIONS.filter((op) => !usage.has(op.id)).length;
 
+  // The service's train runs, read once for both lists that show them.
+  const [runs, setRuns] = useState<TrainSummary[] | null>(null);
+  const [runsProblem, setRunsProblem] = useState<string | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    pureosTrainRuns(ctrl.signal)
+      .then(setRuns)
+      .catch((e) => {
+        if (ctrl.signal.aborted) return;
+        setRunsProblem(e instanceof PureosDown ? `${e.message} ${e.remedy}` : e instanceof PureosRefused ? e.message : String(e));
+      });
+    return () => ctrl.abort();
+  }, []);
+
   return (
     <>
       <PageHeader
         eyebrow="Harvest, capture, recovery"
         title="pureOS"
-        subtitle="Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. pureOS reads the train a flowsheet ran, unit by unit, from the run Proforma priced; Proforma prices a train, pureOS decides it — whether centrifugation or filtration suits a cell-wall-deficient host is a process question, not an economics one."
+        subtitle="Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it, and reads the train a flowsheet ran from the run Proforma priced; Proforma prices a train, pureOS decides it — whether centrifugation or filtration suits a cell-wall-deficient host is a process question, not an economics one."
       />
+      <OwnerTabs tabs={PUREOS_TABS} />
+
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <Button variant="primary" className="min-h-[44px]" onClick={() => navigate(builderPath(NEW_TRAIN))} data-testid="pureos-new-train">
+          New train
+        </Button>
+      </div>
 
       <Callout kind="warn" title="The train starts with a decision made in geneOS">
         <p className="text-ink">
@@ -245,6 +432,10 @@ export default function PureOS() {
         />
       </div>
 
+      <TrainsBuiltHere runs={runs} problem={runsProblem} />
+
+      <TrainRunsOnFile runs={runs} problem={runsProblem} />
+
       <TrainsOnFile />
 
       <ProposeTrain />
@@ -252,9 +443,9 @@ export default function PureOS() {
       <div className="mt-5">
         <Callout kind="info" title="The vocabulary is names, not a process model">
           Everything below is a name for a step and the stage it belongs to, with the BioSTEAM classes
-          that perform it. A train above is read from a run somebody made, and a proposed one is the
-          service's rules, each naming the property it read; nothing here knows whether a train is a good
-          one — that is the piece that is not built.
+          that perform it. A train above is built by a person in the Builder or read from a run somebody
+          made, and a proposed one is the service's rules, each naming the property it read; nothing here
+          knows whether a train is a good one — that is the piece that is not built.
           What exists is the shared language the rest of the platform describes a train in.
         </Callout>
       </div>
@@ -330,7 +521,7 @@ export default function PureOS() {
       <div className="mt-6">
         <UnbuiltList
           title="What pureOS will hold"
-          note="The trains on file and the vocabulary are the parts that exist. Everything here would need code, and none of it has any."
+          note="The Builder, the trains on file and the vocabulary are the parts that exist. Everything here would need code, and none of it has any."
           items={PLANNED}
         />
       </div>
@@ -338,7 +529,7 @@ export default function PureOS() {
       <SubsystemShelf owner="pureOS" />
 
       <div className="mt-5">
-        <ComponentTag component="pureOS" action={`${UNIT_OPERATIONS.length} operations; trains read from Proforma's runs`} />
+        <ComponentTag component="pureOS" action={`${UNIT_OPERATIONS.length} operations; trains built here and read from runs`} />
       </div>
     </>
   );

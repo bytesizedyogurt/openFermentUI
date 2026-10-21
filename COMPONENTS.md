@@ -264,16 +264,18 @@ Views: [Simulate](#) `/fermos/simulate` · [Vessel](#) `/fermos/vessel` · [Fore
 
 **Harvest, capture, recovery.** `/pureos` · chord `g u`
 
-Everything after the fermenter: harvest, disruption, capture, polishing, recovery, formulation and storage. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it. **pureOS reads the train a flowsheet ran** (OF-BLD-019 Phase 4): `/pureos/train/:scenarioId` (`src/screens/PureOSTrain.tsx`) shows the units of the newest Proforma run of a scenario in run order, each with its inlets and outlets, mass in and out, the product in and out, the product it passes on toward the product stream and what it loses and to which outlet, its recovery and the share still on the path, and the overall recovery, read by the service (`core/openferment_core/pureos/__init__.py`, `GET /api/pureos/trains`, `GET /api/pureos/train/{key}`) from the run artifact's stream table and never typed; the front page lists the trains on file. Recovery is credited by pass: a unit whose passes BioSTEAM keeps apart (`SEPARATE_PASSES`, the process heat exchanger) is counted only on the pass that carries the product on, and product a unit on the path takes in and lets out by no outlet is lost there. A train's mark is its run's, worked out from the run's inputs as they stand when it is read. A vocabulary entry names the BioSTEAM classes that perform it, so a unit links to its step. A **Properties** card asks thermosteam, through the Proforma worker, about the broth, the product stream or any stream of the run (`core/openferment_core/thermo.py`, `src/components/PropertiesPanel.tsx`); fermOS carries the same card for a measured titre. `pureos_read` reads trains (kind `train`) and their units (kind `train-unit`), and `thermo_props` asks thermosteam. With the service down each says so. Choosing a train is not built, and the four subsystems below remain stubs.
+Everything after the fermenter: harvest, disruption, capture, polishing, recovery, formulation and storage. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it. **pureOS reads the train a flowsheet ran** (OF-BLD-019 Phase 4): `/pureos/train/:scenarioId` (`src/screens/PureOSTrain.tsx`) shows the units of the newest Proforma run of a scenario in run order, each with its inlets and outlets, mass in and out, the product in and out, the product it passes on toward the product stream and what it loses and to which outlet, its recovery and the share still on the path, and the overall recovery, read by the service (`core/openferment_core/pureos/__init__.py`, `GET /api/pureos/trains`, `GET /api/pureos/train/{key}`) from the run artifact's stream table and never typed; the front page lists the trains on file. Recovery is credited by pass: a unit whose passes BioSTEAM keeps apart (`SEPARATE_PASSES`, the process heat exchanger) is counted only on the pass that carries the product on, and product a unit on the path takes in and lets out by no outlet is lost there. A train's mark is its run's, worked out from the run's inputs as they stand when it is read. A vocabulary entry names the BioSTEAM classes that perform it, so a unit links to its step. A **Properties** card asks thermosteam, through the Proforma worker, about the broth, the product stream or any stream of the run (`core/openferment_core/thermo.py`, `src/components/PropertiesPanel.tsx`); fermOS carries the same card for a measured titre. `pureos_read` reads trains (kind `train`) and their units (kind `train-unit`), and `thermo_props` asks thermosteam. With the service down each says so.
 
-Views: [Train](#) `/pureos/train`
+**pureOS builds a train, unit by unit** (OF-BLD-020 Phase 5). The catalogue (`core/openferment_core/pureos/catalogue.py`, `GET /api/pureos/catalogue`) holds 23 unit types by stage, each a BioSTEAM class or an in-house unit where BioSTEAM has none (cell disruption, ultrafiltration with diafiltration, chromatography: *no cost model*, said wherever they show). A train is data (`TrainSpec`): an inlet (a kept fermOS simulation's harvest, a stream of a kept run, or a composition typed under a reviewer's name) and units in order, each a catalogue type with its outlets routed on, to waste, or back to an earlier unit. pureOS → Builder (`/pureos/build/:trainId`, `new` for a fresh one; `src/screens/PureOSBuilder.tsx`) builds one: the palette by stage, each unit a card with the parameter panel over `pureos:unit:<train id>:<unit id>` (and the inlet's over `…:inlet`), every value with its source, what a run would refuse said on the card it belongs to (`POST /api/pureos/train/validate`, then `/check`), and **Run** (`POST /api/pureos/train/run`) off while anything waits. The service builds and runs the train in the Proforma worker and keeps one `pureos.train_run` artifact; the page draws the product's share of each stream's mass (`PurityByStream`), recovery by unit, the stream and unit tables with BioSTEAM's costs or *no cost model*, the utilities, the diagram or the units in order, every parameter with its source and the basis naming each person's value, and computes nothing. **Save** keeps the train in this browser (`trainsMade`, with when and by whom); **Start from a run's train** reads a kept run's units into a train by their BioSTEAM class and says which it leaves out (`POST /api/pureos/train/from-run`). The front page lists the trains built here, the train runs on the service (`GET /api/pureos/train-runs`) and the trains read from Proforma's runs. Pricing a train in Proforma (§6.1) and proposing one (§7.2) are not built.
+
+Views: [Builder](#) `/pureos/build` · [Train](#) `/pureos/train`
 
 | Subsystem | Key | State |
 |---|---|---|
-| Harvest | `pureos.harvest` | stub |
-| Capture | `pureos.capture` | stub |
-| Polish | `pureos.polish` | stub |
-| Recovery | `pureos.recovery` | stub |
+| Harvest | `pureos.harvest` | live |
+| Capture | `pureos.capture` | live |
+| Polish | `pureos.polish` | live |
+| Recovery | `pureos.recovery` | live |
 
 ### Proforma
 
@@ -390,9 +392,11 @@ them. They are in the table because the table is the architecture, not an
 inventory of what happens to exist — and because a name with nothing under it
 is a smaller problem than a system with no name for the thing it is missing.
 
-**A destination can be thin and still be in the rail.** pureOS has a screen,
-the unit-operation vocabulary and no process model of its own: it reads the
-train a Proforma run simulated, and decides nothing yet. fermOS had a screen and five
+**A destination can be thin and still be in the rail.** pureOS had a screen,
+the unit-operation vocabulary and no process model of its own: it read the
+train a Proforma run simulated, until OF-BLD-020 Phase 5 gave it a catalogue
+of units and a train a person builds and runs; choosing a train for a person is
+still not built. fermOS had a screen and five
 named subsystems with no code until kinetics arrived, fitted from depositions
 alone; operating mode followed (OF-BLD-020 Phase 3, the model families),
 then transport and scale (Phase 4, the vessel on BioSTEAM), and control is
@@ -418,12 +422,14 @@ default). `GET /api/params/{scope}` serves a scope's parameters with their value
 and sources, for four kinds of scope: a Proforma scenario (`proforma:<scenario
 id>`), a model family (`fermos:family:<id>`), a logistic fit's forecast
 (`fermos:forecast:<fit id>`) or a vessel design (`fermos:vessel:<id>`);
-`pureos:unit:…` answers 404 until pureOS's units arrive in night two. 160
+`pureos:unit:<train id>:<unit id | inlet>` serves one place of a pureOS train
+(OF-BLD-020 §5.2), bound with the train it is sent with. 160
 parameters are declared: 36 for Proforma's flowsheets, 84 for fermOS's five
 model families, 4 for a forecast and 36 for the vessel. One component,
 `src/components/ParameterPanel.tsx`, draws every scope the same way, each value
 with its source chip, **Reset to source** and **Why**, and it is live on
-Proforma's scenario page and on fermOS → Simulate, Vessel and Forecast. A
+Proforma's scenario page, on fermOS → Simulate, Vessel and Forecast, and on
+each place of a train in pureOS → Builder. A
 person's change is an `Override` under their reviewer name, kept in this
 browser's Durable tier (`parameterOverrides`) and sent with the run; the service
 keeps none, and the run's basis names each one as an `assumption` by that person,
@@ -454,9 +460,12 @@ Proforma prices whatever pureOS specifies* (OF-BLD-011 §6). The code now
 answers it the other way, for the moment: the train is a flowsheet
 on Proforma's shelf, BioSTEAM closes its mass balance in the Proforma worker,
 and pureOS reads each unit's recovery out of the run artifact (OF-BLD-019
-Phase 4). pureOS specifies nothing yet. It is recorded here rather than settled
-quietly, because whoever builds train selection will otherwise settle it by
-accident.
+Phase 4). Since OF-BLD-020 §5.3 pureOS specifies a train of its own too: a
+person builds it in pureOS → Builder, the Proforma worker runs it and closes its
+mass balance, and the run is a `pureos.train_run` artifact Proforma does not
+price yet (§6.1's `custom_train_v1` will). It is recorded here rather than
+settled quietly, because whoever builds train selection will otherwise settle it
+by accident.
 
 **Attribution survives the reorganisation.** `ComponentTag` names the component
 that did a piece of work, which is a different job from naming the surface you

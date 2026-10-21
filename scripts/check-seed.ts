@@ -16,7 +16,7 @@ import { RUNBOOKS } from '../src/data/runbooks';
 import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
 import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/components';
 import { ALL_SURFACES, ELEVEN, RAIL, REDIRECTS, SUB_VIEWS, redirectFor } from '../src/data/nav';
-import { FERMOS_TABS } from '../src/data/tabs';
+import { FERMOS_TABS, PUREOS_TABS } from '../src/data/tabs';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -1195,6 +1195,12 @@ for (const f of CLEARANCE_FINDINGS) {
     // the guard is that every fermOS tab is one of these, and each is a tab:
     // a view added without reserving its segment fails here.
     fermos: ['simulate', 'vessel', 'forecast'],
+    // OF-BLD-020 §5.3: pureOS's views. /pureos/train/:key (OF-BLD-019 §4.1)
+    // and /pureos/build/:trainId (the Builder, `new` for a fresh train) are
+    // matched before anything else under /pureos, so each is a tab and a
+    // palette view; a train's id is minted by the Builder (`tr-…`), never one
+    // of these words.
+    pureos: ['build', 'train'],
   };
   for (const p of PAPERS)
     if (RESERVED.biorepo.includes(p.id))
@@ -1210,6 +1216,14 @@ for (const f of CLEARANCE_FINDINGS) {
   for (const v of RESERVED.fermos)
     if (!SUB_VIEWS.some((sv) => sv.to === `/fermos/${v}` && sv.owner === 'fermOS'))
       fail(`fermOS's view /fermos/${v} is not named in nav.ts's SUB_VIEWS, so the palette cannot reach it`);
+  const pureosViews = PUREOS_TABS.map((t) => t.to.split('/').filter(Boolean)[1]).filter(Boolean);
+  for (const v of pureosViews)
+    if (!RESERVED.pureos.includes(v)) fail(`pureOS's tab /pureos/${v} is not a reserved segment under /pureos: add it to RESERVED.pureos`);
+  for (const v of RESERVED.pureos) {
+    if (!pureosViews.includes(v)) fail(`"${v}" is reserved under /pureos but no pureOS tab shows it`);
+    if (!SUB_VIEWS.some((sv) => sv.to === `/pureos/${v}` && sv.owner === 'pureOS'))
+      fail(`pureOS's view /pureos/${v} is not named in nav.ts's SUB_VIEWS, so the palette cannot reach it`);
+  }
 }
 
 // ── a BioSTEAM class is one step (OF-BLD-019 §4.1) ─────────────────────

@@ -3179,10 +3179,15 @@ class TrainSpec(BaseModel):
 
 class TrainValidation(BaseModel):
     """POST /api/pureos/train/validate: every refusal at once, in words;
-    runs nothing."""
+    runs nothing. POST /api/pureos/train/check answers in the same shape
+    with everything the run would refuse (OF-BLD-020 §5.3)."""
 
     ok: bool
     refusals: list[str] = Field(default_factory=list)
+    # The same refusals by the place they belong to: a unit's id, `inlet`,
+    # or `train` for the train as a whole (§5.3: the Builder shows a unit's
+    # on its card).
+    places: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class TrainRunRequest(BaseModel):
@@ -3296,6 +3301,49 @@ class TrainRun(BaseModel):
     notes: list[str] = Field(default_factory=list)
     flags: list[str] = Field(default_factory=list)
     basis: ComputedBasis
+    # The run's own tables beside the train (OF-BLD-020 §5.3), as
+    # proforma.tables_of reads them: the unit table (duties and power), the
+    # utilities, the diagram (SVG text when Graphviz drew it) or the words
+    # why not and the units in run order.
+    units: list[UnitRow] = Field(default_factory=list)
+    utilities: UtilityDuties | None = None
+    diagram: str | None = None
+    diagramNote: str | None = None
+    unitOrder: list[str] = Field(default_factory=list)
+
+
+class TrainFromRunRequest(BaseModel):
+    """POST /api/pureos/train/from-run (OF-BLD-020 §5.3): a run's units read
+    into a train, each by its class."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # A `proforma.run`, `proforma.reference` or `pureos.train_run` artifact.
+    artifactId: str
+    # The id the train takes; by default `from-<artifact id>`.
+    trainId: str | None = None
+    includeArchived: bool = False
+
+
+class TrainUnmapped(BaseModel):
+    """A unit of the run the train does not take, and why, in words."""
+
+    unitId: str
+    unitClass: str
+    why: str
+
+
+class TrainFromRun(BaseModel):
+    """A run's train as data: every unit on the product's path whose class is
+    a catalogue type, in run order, each outlet routed as the run routed it;
+    the units it does not take; what it says of itself; and the refusals
+    its structure meets (validate's), which a person settles in the
+    Builder."""
+
+    train: TrainSpec
+    unmapped: list[TrainUnmapped] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    refusals: list[str] = Field(default_factory=list)
 
 
 # ── a train a model built (OF-BLD-020 §5.4) ──────────────────────────────

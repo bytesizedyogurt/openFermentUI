@@ -453,6 +453,7 @@ def train(key: str, *, arts: Iterable[Artifact] | None = None, scenarios: Iterab
 # package's readers inside its functions, so the import order is safe).
 from .train_spec import (  # noqa: E402, F401 (re-exported: pureos.run_train and kin)
     TrainRefused,
+    check_train,
     inlet_stream,
     program_of_run,
     run_of,
@@ -465,3 +466,5 @@ from .train_spec import (  # noqa: E402, F401 (re-exported: pureos.run_train and
 # OF-BLD-020 §7.2: a train proposed by written rules, re-exported as
 # pureos.propose (the module is `proposer`, so the function shadows no module).
 from .proposer import ProposeRefused, ProposeUnknown, propose  # noqa: E402, F401
+# OF-BLD-020 §5.3: a run's units read into a train for the Builder.
+from .from_run import RunNotOnFile, from_run  # noqa: E402, F401

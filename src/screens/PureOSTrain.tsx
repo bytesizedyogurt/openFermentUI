@@ -18,13 +18,23 @@
 // temperature, pressure and phase. The page names the run and the stream; the
 // service reads the stream from the run and asks thermosteam in the Proforma
 // worker, and the answer is one `thermo_props` artifact (PropertiesPanel).
+//
+// A TRAIN BUILT IN PUREOS (OF-BLD-020 §5.3) opens here too, by its train id
+// (its newest run) or a run's artifact id: the same reading of the one
+// `pureos.train_run` artifact, with a link back to the Builder when this
+// browser saved the train. A Proforma or reference run offers **Build a train
+// from this run**, which opens the Builder with the run's units read into a
+// train by the service.
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Download, Filter } from 'lucide-react';
 import type { StreamRow, Train, TrainUnit } from '@/data/types';
 import { trainSubjects } from '@/lib/thermo';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { operationForClass } from '@/data/vocabulary';
-import { PureosDown, PureosRefused, RUN_WORDS, productIn, pureosTrain, share, streamsOf } from '@/lib/pureos';
+import { PureosDown, PureosRefused, RUN_WORDS, builderFromRunPath, builderPath, productIn, pureosTrain, share, streamsOf } from '@/lib/pureos';
+import { useStore } from '@/store';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { PUREOS_TABS } from '@/data/tabs';
 import { exportCSV } from '@/lib/csv';
 import { fmt } from '@/engine/units';
 import { href, useRoute } from '@/router';
@@ -69,9 +79,10 @@ export default function PureOSTrain({ scenarioId }: { scenarioId: string }) {
       {train?.scenarioId && train.scenarioId !== scenarioId && <ArchivedBanner kind="scenario" id={train.scenarioId} />}
       <PageHeader
         eyebrow="pureOS · Train"
-        title={train ? (train.scenarioName ?? train.flowsheet ?? train.artifactId) : scenarioId}
-        subtitle="The units of the run Proforma priced, in the order the flowsheet ran them: what enters and leaves each, how much of the product it passes on toward the product stream, and how much is still on the path after it."
+        title={train ? (train.scenarioName ?? train.trainName ?? train.flowsheet ?? train.artifactId) : scenarioId}
+        subtitle="The units of a run, in the order it ran them (a run Proforma priced, or a train built in pureOS): what enters and leaves each, how much of the product it passes on toward the product stream, and how much is still on the path after it."
       />
+      <OwnerTabs tabs={PUREOS_TABS} />
 
       {problem?.kind === 'down' && (
         <Callout kind="warn" title="pureOS reads the train from the service">
@@ -100,6 +111,29 @@ export default function PureOSTrain({ scenarioId }: { scenarioId: string }) {
         <ComponentTag component="pureOS" action={train ? `train of ${train.units.length} units, read from a run` : 'train'} />
       </div>
     </div>
+  );
+}
+
+/** Back to the Builder for a train this browser saved; for any other run, a fresh train read from its units. */
+function BuilderLink({ train }: { train: Train }) {
+  const saved = useStore((s) => (train.trainId ? (s.trainsMade[train.trainId] ?? null) : null));
+  if (train.tool === 'pureos.train_run') {
+    if (!train.trainId || !saved)
+      return (
+        <span className="text-caption text-ink-soft" data-testid="train-builder-elsewhere">
+          Built in pureOS, but not saved in this browser.
+        </span>
+      );
+    return (
+      <a className="chip" href={href(builderPath(train.trainId))} data-testid="train-open-builder">
+        Open in the Builder
+      </a>
+    );
+  }
+  return (
+    <a className="chip" href={href(builderFromRunPath(train.artifactId))} data-testid="train-build-from-run">
+      Build a train from this run
+    </a>
   );
 }
 
@@ -135,6 +169,7 @@ function TrainView({ train, unit, choose }: { train: Train; unit: TrainUnit | nu
               Open the scenario in Proforma
             </a>
           )}
+          <BuilderLink train={train} />
         </div>
         <p className="text-caption text-ink-soft mt-2">{RUN_WORDS}</p>
         <p className="text-caption text-ink-soft mt-1" data-testid="train-product-basis">
@@ -313,7 +348,7 @@ function UnitRowView({ u, picked, choose }: { u: TrainUnit; picked: boolean; cho
   );
 }
 
-function StreamTable({ train, unit, clear }: { train: Train; unit: TrainUnit | null; clear: () => void }) {
+export function StreamTable({ train, unit, clear }: { train: Train; unit: TrainUnit | null; clear: () => void }) {
   const rows = streamsOf(train, unit);
   const u = train.tableUnits;
   const headers = [

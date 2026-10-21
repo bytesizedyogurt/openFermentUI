@@ -4057,10 +4057,12 @@ export interface TrainSpec {
   units: TrainUnitSpec[];
 }
 
-/** `POST /api/pureos/train/validate`: every refusal at once; runs nothing. */
+/** `POST /api/pureos/train/validate`: every refusal at once; runs nothing. `POST /api/pureos/train/check` answers the same shape with everything a run would refuse (OF-BLD-020 §5.3). */
 export interface TrainValidation {
   ok: boolean;
   refusals: string[];
+  /** The same refusals by their place: a unit's id, `inlet`, or `train`. */
+  places: Record<string, string[]>;
 }
 
 /** `POST /api/pureos/train/run`. */
@@ -4155,6 +4157,36 @@ export interface TrainRun {
   notes: string[];
   flags: string[];
   basis: ComputedBasis;
+  /** The run's own tables beside the train (OF-BLD-020 §5.3): the unit table, the utilities, the diagram or the words why not and the units in run order. */
+  units: UnitRow[];
+  utilities: UtilityDuties | null;
+  diagram: string | null;
+  diagramNote: string | null;
+  unitOrder: string[];
+}
+
+/** `POST /api/pureos/train/from-run` (OF-BLD-020 §5.3): a kept run's units read into a train. */
+export interface TrainFromRunRequest {
+  /** A `proforma.run`, `proforma.reference` or `pureos.train_run` artifact. */
+  artifactId: string;
+  /** The id the train takes; by default `from-<artifact id>`. */
+  trainId?: string | null;
+  includeArchived?: boolean;
+}
+
+/** A unit of the run the train does not take, and why. */
+export interface TrainUnmapped {
+  unitId: string;
+  unitClass: string;
+  why: string;
+}
+
+/** A run's train as data, what it leaves out, what it says, and its structural refusals (validate's). */
+export interface TrainFromRun {
+  train: TrainSpec;
+  unmapped: TrainUnmapped[];
+  notes: string[];
+  refusals: string[];
 }
 
 /**
