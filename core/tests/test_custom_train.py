@@ -235,7 +235,7 @@ def test_the_vessel_design_binds_the_plant_scale_it_was_designed_at_and_a_person
     assert next(i for i in mine.inputs if i.key == "plant_scale").binding == "assumption"
 
 
-def test_a_batch_volume_design_gives_no_plant_scale_and_says_so(store, worker, monkeypatch):
+def test_a_batch_volume_design_is_refused_as_the_composites_fermenter(store, worker, monkeypatch):
     # A design of one vessel's batch volume (its basis names no plant scale).
     d = vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[Override(
         scope=f"fermos:vessel:{ANAEROBIC_ID}", key="plant_scale", value=PLANT_STANDIN, by=BY, at=AT, note=STANDIN)]))
@@ -244,11 +244,12 @@ def test_a_batch_volume_design_gives_no_plant_scale_and_says_so(store, worker, m
                                             for i in art.inputs]})
     monkeypatch.setattr(artifacts, "get", lambda aid, real=artifacts.get: art if aid == d.artifactId else real(aid))
     run = pureos.run_train(spec_of())
-    got = proforma.bind_flowsheet(FLOWSHEET, pool=POOL, vessel=d.artifactId, train_run=run.artifactId)
-    scale = next(i for i in got.inputs if i.key == "plant_scale")
-    assert scale.binding == "waiting" and "plant_scale" in got.waiting
-    assert any("was designed for one vessel's batch volume, so it gives this flowsheet no plant scale" in f
-               for f in scale.flags)
+    # OF-BLD-020 §6.R (main-4/22): one vessel's batch volume sizes no plant, so
+    # the composite refuses it in words, where it once waited for a plant scale
+    # and then priced one vessel of whatever size the plant's flow asked.
+    with pytest.raises(proforma.ScenarioRefused, match=rf"vessel design {d.artifactId} was designed for one vessel's "
+                                                       r"batch volume \(batch_volume\)"):
+        proforma.bind_flowsheet(FLOWSHEET, pool=POOL, vessel=d.artifactId, train_run=run.artifactId)
 
 
 def test_the_panel_serves_finance_from_the_packages_own_file_and_a_persons_value_is_theirs(parts, client):

@@ -446,6 +446,27 @@ def depreciation_schedules() -> list[str] | None:
     """The depreciation schedules BioSTEAM's TEA holds tables for, as its
     `depreciation` takes them by name ('MACRS7'), read from the installed
     class's `depreciation_schedules` keys. None when not found here."""
+    table = _depreciation_table()
+    return None if table is None else [name for name, _ in table]
+
+
+@lru_cache(maxsize=None)
+def depreciation_lengths() -> dict[str, int]:
+    """How many years each schedule BioSTEAM's TEA holds a table for writes
+    the capital off over: the length of its table's array, read from the
+    installed class's `depreciation_schedules` without importing it (a
+    MACRS schedule's table runs a year past its name, by the half-year
+    convention). BioSTEAM refuses a schedule longer than the plant's life
+    (its `_fill_depreciation_array`), so the panel says so before a run
+    (OF-BLD-020 §6.R, main-29). Empty when not found here; a table this
+    reader cannot count is left out."""
+    return {name: n for name, n in (_depreciation_table() or []) if n is not None}
+
+
+def _depreciation_table() -> list[tuple[str, int | None]] | None:
+    """Each schedule of BioSTEAM's TEA table by name, with its array's
+    length when the file writes it as `np.array([...])`; None when the class
+    or its table is not found here."""
     path = _dist_file("biosteam", TEA_CLASS_FILE)
     if path is None:
         return None
@@ -457,11 +478,12 @@ def depreciation_schedules() -> list[str] | None:
         target = node.target if isinstance(node, ast.AnnAssign) else (node.targets[0] if isinstance(node, ast.Assign)
                                                                        and len(node.targets) == 1 else None)
         if isinstance(target, ast.Name) and target.id == "depreciation_schedules" and isinstance(node.value, ast.Dict):
-            out = []
-            for k in node.value.keys:
+            out: list[tuple[str, int | None]] = []
+            for k, v in zip(node.value.keys, node.value.values):
                 key = ast.literal_eval(k) if k is not None else None
                 if isinstance(key, tuple) and all(isinstance(x, (str, int)) for x in key):
-                    out.append("".join(str(x) for x in key))
+                    arr = v.args[0] if isinstance(v, ast.Call) and len(v.args) == 1 else None
+                    out.append(("".join(str(x) for x in key), len(arr.elts) if isinstance(arr, ast.List) else None))
             return out
     return None
 

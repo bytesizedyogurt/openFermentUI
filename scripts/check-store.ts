@@ -1086,7 +1086,8 @@ await (async () => {
   const page = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
   check('the scenario page\u2019s inputs are the parameter panel over its scope, and Keep assumption is gone',
     /<ParameterPanel[\s\S]*?scope=\{scope\}/.test(page) && /proformaScope\(scenario\.id\)/.test(page) && !/Keep assumption/.test(page) && !/AssumptionForm/.test(page));
-  check('the scenario page runs with the scope\u2019s overrides', /runOverrides\(overrides,/.test(page) && /overrides: sent/.test(page));
+  // OF-BLD-020 §6.R (main-15/26): through scenarioRunOverrides, which keeps runOverrides for a flowsheet that is not a composite.
+  check('the scenario page runs with the scope\u2019s overrides', /scenarioRunOverrides\(overrides,/.test(page) && /overrides: sent/.test(page));
   const lib = readFileSync(new URL('../src/lib/proforma.ts', import.meta.url), 'utf8');
   check('runProformaScenario posts what runBody makes', /const body = runBody\(ask\)/.test(lib));
   // Nothing reads the older field but the store's migration (and this check's own tests of it).
@@ -1404,6 +1405,62 @@ await (async () => {
   const page = readFileSync(new URL('../src/screens/PureOSBuilder.tsx', import.meta.url), 'utf8');
   check('the Builder hands the chooser its made scenarios with their programs, through the program filter',
     /shows\('scenario', sc\.id\)/.test(page) && /program: sc\.program \?\? null/.test(page));
+})();
+
+// OF-BLD-020 §6.R (part a) — a composite run's read-back credits a value a
+// person typed to them, a Finance value in the scenario's panel or a vessel
+// setting in fermOS → Vessel, from the run's own basis, never to the
+// package (main-11/23); and a composite's run carries every override of its
+// scope whether or not the panel has answered, so a person's Finance value
+// is never dropped while the scope loads or after it failed (main-15/26).
+// Namespace imports, so a function the tree lacks fails its own check.
+await (async () => {
+  const pf = (await import('../src/lib/proforma')) as unknown as Record<string, any>;
+  const sean = 'Sean Creighton';
+  const flowsheet = { id: COMPOSITE_FLOWSHEET, reference: false, inputs: [] } as unknown as FlowsheetInfo;
+  const source = (kind: string, by: string | null, id: string | null = null) => ({ kind, id, note: 'a check-store stand-in', by });
+  const basis = [
+    { name: 'finance.IRR', value: 0.12, unit: '', source: source('assumption', sean) },
+    { name: 'finance.income_tax', value: 0.35, unit: '', source: source('model', null, 'biorefineries@x') },
+    { name: 'fermenter.V_wf', value: 0.8, unit: '', source: source('artifact', sean, 'a1a1a1a1a1a1a1a1') },
+    { name: 'fermenter.tau_0', value: 3, unit: 'h', source: source('artifact', null, 'a1a1a1a1a1a1a1a1') },
+  ];
+  const readBack = { 'finance.IRR': 0.12, 'finance.income_tax': 0.35, workingVolumeFraction: 0.8, cleaningTimeH: 3, reactors: 2 };
+  let rows: { key: string; origin: string; by?: string | null }[] = [];
+  try {
+    rows = pf.readBackRows(readBack, flowsheet, basis) ?? [];
+  } catch (e) {
+    check('readBackRows takes the run’s basis', false, String(e));
+  }
+  const row = (k: string) => rows.find((r) => r.key === k);
+  check('a composite run’s read-back credits a Finance value a person typed to them, by name, never to the package',
+    row('finance.IRR')?.origin === 'person' && row('finance.IRR')?.by === sean, rows);
+  check('a vessel setting a person typed in fermOS → Vessel is credited to them in the composite’s read-back',
+    row('workingVolumeFraction')?.origin === 'person' && row('workingVolumeFraction')?.by === sean, rows);
+  check('the package’s finance and the design’s own defaults stay the package’s, and the case’s stays the case’s',
+    row('finance.income_tax')?.origin === 'setting' && row('cleaningTimeH')?.origin === 'setting' && row('reactors')?.origin === 'case', rows);
+  const biosteamPage = readFileSync(new URL('../src/screens/ProformaBiosteam.tsx', import.meta.url), 'utf8');
+  check('the read-back card reads the run’s basis and shows a named person’s values in a group of their own',
+    /readBackRows\(view\.readBack, flowsheet, view\.basis/.test(biosteamPage) && /origin: 'person'/.test(biosteamPage) &&
+      /r\.by/.test(biosteamPage));
+  const over = (key: string, value: number): Override =>
+    ({ scope: 'proforma:sc-check', key, value, low: null, high: null, by: sean, at: '2026-10-21T00:00:00Z', note: 'a check-store stand-in' });
+  const keys = (os: Override[] | undefined) => JSON.stringify((os ?? []).map((o) => o.key).sort());
+  let early: Override[] | undefined;
+  let other: Override[] | undefined;
+  try {
+    // The panel has not answered: no Finance key is known to the page.
+    early = pf.scenarioRunOverrides([over('IRR', 0.1), over('plant_scale', 50000)], { inputs: ['plant_scale', 'titre'], finance: [], composite: true });
+    other = pf.scenarioRunOverrides([over('IRR', 0.1), over('titre', 50)], { inputs: ['titre'], finance: [], composite: false });
+  } catch (e) {
+    check('scenarioRunOverrides is the one place a run’s overrides are chosen', false, String(e));
+  }
+  check('a composite run carries every override of its scope while its panel has not answered, Finance included',
+    keys(early) === '["IRR","plant_scale"]', early);
+  check('a run of any other flowsheet carries the overrides of the inputs it takes, as before', keys(other) === '["titre"]', other);
+  const scenarioPage = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
+  check('the scenario page chooses its run’s overrides through scenarioRunOverrides, never from the panel alone',
+    /scenarioRunOverrides\(overrides, \{/.test(scenarioPage) && !/runOverrides\(overrides, \[\.\.\.bound\.inputs/.test(scenarioPage));
 })();
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

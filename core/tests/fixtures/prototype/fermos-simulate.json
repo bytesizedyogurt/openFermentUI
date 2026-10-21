@@ -6575,7 +6575,7 @@
         "recordsByParam": {}
       },
       "body": {
-        "artifactId": "c8b79f33e34a5f8f",
+        "artifactId": "d2265dffe25ee653",
         "provenance": "demo",
         "family": "batch_v1",
         "title": "Batch",
@@ -8230,7 +8230,7 @@
         ],
         "basis": {
           "tool": "fermos.simulation",
-          "toolVersion": "kinetics batch_v1 1 · scipy 1.18.1",
+          "toolVersion": "kinetics batch_v1 2 · scipy 1.18.1",
           "inputs": [
             {
               "name": "family",
@@ -8684,7 +8684,7 @@
               }
             }
           ],
-          "artifactId": "c8b79f33e34a5f8f",
+          "artifactId": "d2265dffe25ee653",
           "at": "2026-09-15T09:00:00Z",
           "seed": null
         }
@@ -8692,7 +8692,7 @@
     },
     "simulations": [
       {
-        "artifactId": "c8b79f33e34a5f8f",
+        "artifactId": "d2265dffe25ee653",
         "family": "batch_v1",
         "title": "Batch",
         "strain": "s-cerevisiae-cenpk113-7d",
@@ -8707,12 +8707,12 @@
     "harvest": [
       {
         "request": {
-          "simulation": "c8b79f33e34a5f8f",
+          "simulation": "d2265dffe25ee653",
           "hour": null
         },
         "status": 200,
         "body": {
-          "artifactId": "c8b79f33e34a5f8f",
+          "artifactId": "d2265dffe25ee653",
           "family": "batch_v1",
           "strain": "s-cerevisiae-cenpk113-7d",
           "product": "ethanol",
@@ -8748,12 +8748,12 @@
       },
       {
         "request": {
-          "simulation": "c8b79f33e34a5f8f",
+          "simulation": "d2265dffe25ee653",
           "hour": 3.995199199954455
         },
         "status": 200,
         "body": {
-          "artifactId": "c8b79f33e34a5f8f",
+          "artifactId": "d2265dffe25ee653",
           "family": "batch_v1",
           "strain": "s-cerevisiae-cenpk113-7d",
           "product": "ethanol",
@@ -8789,12 +8789,12 @@
       },
       {
         "request": {
-          "simulation": "c8b79f33e34a5f8f",
+          "simulation": "d2265dffe25ee653",
           "hour": 15.980796799817819
         },
         "status": 422,
         "body": {
-          "detail": "the hour 15.9808 h lies outside simulation c8b79f33e34a5f8f, which keeps its broth from 0 to 7.9904 h"
+          "detail": "the hour 15.9808 h lies outside simulation d2265dffe25ee653, which keeps its broth from 0 to 7.9904 h"
         }
       }
     ]

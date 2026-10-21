@@ -427,6 +427,21 @@ export function runOverrides(scoped: Override[], keys: string[]): Override[] {
   return scoped.filter((o) => takes.has(o.key));
 }
 
+/**
+ * The overrides a scenario's run carries (OF-BLD-020 §6.R, main-15/26): for
+ * a scenario built from a vessel and a train (`composite`), every override
+ * of its scope, its Finance group's included, whether or not the parameter
+ * panel has answered (the service splits the finance from the inputs, and
+ * refuses in words a key it does not take); for any other, the overrides of
+ * the inputs its flowsheet takes, as before.
+ */
+export function scenarioRunOverrides(
+  scoped: Override[],
+  ask: { inputs: string[]; finance: string[]; composite: boolean },
+): Override[] {
+  return ask.composite ? [...scoped] : runOverrides(scoped, [...ask.inputs, ...ask.finance]);
+}
+
 /** The body `runProformaScenario` posts, as the service reads it (`ProformaRunRequest`). */
 export function runBody(ask: RunAsk): ProformaRunRequest {
   // `flowsheet` joins ProformaRunRequest in the service with OF-BLD-019 §2.3;
@@ -893,9 +908,30 @@ export interface ReadBackRow {
   label: string;
   unit: string;
   value: number | string;
-  /** 'setting': the package's, BioSTEAM's or a convention; 'case': set by this case's records and assumptions through BioSTEAM; 'read': not known here. */
-  origin: 'setting' | 'case' | 'read';
+  /**
+   * 'setting': the package's, BioSTEAM's or a convention; 'case': set by this case's records and assumptions through BioSTEAM;
+   * 'person': a named person's assumption, as the run's basis names it (OF-BLD-020 §6.R); 'read': not known here.
+   */
+  origin: 'setting' | 'case' | 'person' | 'read';
+  /** Who set a 'person' row, as the run's basis names them. */
+  by?: string | null;
 }
+
+/**
+ * A composite's read-back keys a person can set, and the basis input that
+ * says who did (OF-BLD-020 §6.R, main-11/23): each `finance.<key>` is the
+ * basis's own `finance.<key>` (a person's `assumption`, or the package's
+ * `model`); a vessel-carried setting is the basis's `fermenter.<key>`, the
+ * vessel design's value, which names the person when the design took theirs;
+ * the operating hours follow the operating days of the finance.
+ */
+const COMPOSITE_CREDIT: Record<string, string> = {
+  vesselTauH: 'fermenter.tau',
+  workingVolumeFraction: 'fermenter.V_wf',
+  cleaningTimeH: 'fermenter.tau_0',
+  temperatureK: 'fermenter.T',
+  operatingHours: 'finance.operating_days',
+};
 
 const READ_BACK: Record<string, { case: string[]; setting: string[] }> = {
   // OF-BLD-020 §6.1: the composite's case, and what its vessel design, train run and the package set (`finance.*` too, below).
@@ -925,17 +961,25 @@ const READ_BACK: Record<string, { case: string[]; setting: string[] }> = {
   },
 };
 
-export function readBackRows(readBack: Record<string, unknown>, flowsheet: FlowsheetInfo | null): ReadBackRow[] {
+export function readBackRows(readBack: Record<string, unknown>, flowsheet: FlowsheetInfo | null, basis: BasisInput[] = []): ReadBackRow[] {
   const declared = new Map((flowsheet?.inputs ?? []).map((i) => [i.key, i]));
   const known = flowsheet ? READ_BACK[flowsheet.id] : undefined;
+  const named = new Map(basis.map((i) => [i.name, i]));
+  const composite = flowsheet?.id === COMPOSITE_FLOWSHEET;
   return Object.entries(readBack)
     .filter((e): e is [string, number | string] => typeof e[1] === 'number' || typeof e[1] === 'string')
     .map(([key, value]) => {
       const d = declared.get(key);
+      const label = d?.name ?? key;
+      const unit = d?.unit ?? '';
       // A composite's finance as its TEA held it (OF-BLD-020 §6.1): the package's, or a person's, named in the basis.
-      const finance = flowsheet?.id === COMPOSITE_FLOWSHEET && key.startsWith('finance.');
+      const finance = composite && key.startsWith('finance.');
+      // OF-BLD-020 §6.R (main-11/23): a value a named person set is theirs, read from the run's own basis.
+      const credit = composite ? named.get(finance ? key : COMPOSITE_CREDIT[key] ?? '') : undefined;
+      const by = credit?.source.by ?? null;
+      if (by) return { key, label, unit, value, origin: 'person' as const, by };
       const origin: ReadBackRow['origin'] = flowsheet?.reference || finance ? 'setting' : known?.case.includes(key) ? 'case' : known?.setting.includes(key) ? 'setting' : 'read';
-      return { key, label: d?.name ?? key, unit: d?.unit ?? '', value, origin };
+      return { key, label, unit, value, origin };
     });
 }
 

@@ -577,6 +577,16 @@ def proforma_scope(scenario_id: str) -> str:
     return f"proforma:{scenario_id}"
 
 
+def held_to_scope(scenario_id: str, overrides: list) -> None:
+    """An override names the scope it changes: one sent for a run of
+    `scenario_id` under another scenario's scope is refused in words, an
+    input's and a composite's finance alike (OF-BLD-020 §6.R, main-28)."""
+    stray = sorted({o.scope for o in overrides if o.scope != proforma_scope(scenario_id)})
+    if stray:
+        raise ScenarioRefused(f"an override names the scope it changes, and these were sent for "
+                              f"{proforma_scope(scenario_id)}: {', '.join(stray)}")
+
+
 def named_values(scenario_id: str | None, overrides: list | None = None,
                  assumptions: list | None = None) -> tuple[list, str | None]:
     """A person's values for a scenario's inputs, as the binding lays them on:
@@ -592,10 +602,7 @@ def named_values(scenario_id: str | None, overrides: list | None = None,
     old = list(assumptions or [])
     scopes = sorted({o.scope for o in over})
     if scenario_id is not None:
-        stray = [sc for sc in scopes if sc != proforma_scope(scenario_id)]
-        if stray:
-            raise ScenarioRefused(f"an override names the scope it changes, and these were sent for "
-                                  f"{proforma_scope(scenario_id)}: {', '.join(stray)}")
+        held_to_scope(scenario_id, over)
     elif len(scopes) > 1 or (scopes and not scopes[0].startswith("proforma:")):
         raise ScenarioRefused(f"the overrides of one binding name one scenario's scope, proforma:<scenario id>; "
                               f"these name {', '.join(scopes)}")
@@ -1013,7 +1020,8 @@ def run(req, pool=None):
     # OF-BLD-020 §6.1 (D11): a composite names its vessel design and its
     # train run, each held to the rules (composite.parts_of); the finance
     # group's overrides are its own, apart from the inputs'.
-    parts, finance, overrides = _composite(flowsheet, req.vessel, req.trainRun, req.includeArchived, req.overrides)
+    parts, finance, overrides = _composite(flowsheet, req.vessel, req.trainRun, req.includeArchived, req.overrides,
+                                           scenario_id=req.scenarioId)
     # A run is a caller a person started by id: its records bind whatever the
     # program switch says (OF-BLD-016, "what keeps everything").
     # OF-BLD-020 §2.2 (D3): a person's overrides, and the older assumptions
@@ -1453,12 +1461,14 @@ def bind_flowsheet(flowsheet: str, *, include_archived: bool = False, host: str 
 
 
 def _composite(flowsheet: str, vessel: str | None, train_run: str | None, include_archived: bool,
-               overrides: list) -> tuple[Any, list | None, list]:
+               overrides: list, *, scenario_id: str | None = None) -> tuple[Any, list | None, list]:
     """OF-BLD-020 §6.1 (D11): for a flowsheet built from kept artifacts, the
     two parts the request names (composite.parts_of, refused in words), the
     finance group with the person's values laid on, and the overrides left
     for the inputs; for any other, (None, None, the overrides), and a vessel
-    or a train run named for it is refused."""
+    or a train run named for it is refused. With a scenario id (a run), every
+    override is held to its scope before the finance is split off, as the
+    inputs' are (§6.R, main-28)."""
     from . import composite, params
 
     info = _shelf.info(flowsheet, allow_toy=True)
@@ -1468,6 +1478,8 @@ def _composite(flowsheet: str, vessel: str | None, train_run: str | None, includ
             raise ScenarioRefused(f"{flowsheet} is not built from a vessel design or a train run: {' and '.join(named)} "
                                   f"belong to a scenario on {composite.FLOWSHEET}")
         return None, None, list(overrides)
+    if scenario_id is not None:
+        held_to_scope(scenario_id, list(overrides))
     parts = composite.parts_of(vessel, train_run, include_archived=include_archived)
     rest, mine = composite.split_overrides(overrides)
     try:

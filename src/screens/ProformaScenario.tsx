@@ -53,7 +53,7 @@ import {
   proformaShelf,
   proformaStatus,
   questionsText,
-  runOverrides,
+  scenarioRunOverrides,
   runProformaScenario,
   runViewOfArtifact,
   runViewOfResult,
@@ -1371,9 +1371,12 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     setRunProblem(null);
     // The run carries the scope's overrides of the inputs its flowsheet
     // takes, and the fits of the inputs no override names (OF-BLD-020 D3).
-    // A composite's Finance group is the scope's too (OF-BLD-020 §6.1): its overrides ride with the inputs'.
+    // A composite's Finance group is the scope's too (OF-BLD-020 §6.1): its
+    // run carries every override of its scope, whether or not the panel has
+    // answered, so a Finance value is never dropped while the scope loads or
+    // after it failed (§6.R, main-15/26); the service splits and checks them.
     const finance = (panel?.specs ?? []).filter((sp) => sp.group === 'Finance').map((sp) => sp.key);
-    const sent = runOverrides(overrides, [...bound.inputs.map((i) => i.key), ...finance]);
+    const sent = scenarioRunOverrides(overrides, { inputs: bound.inputs.map((i) => i.key), finance, composite: !!parts });
     const fits = Object.fromEntries(Object.entries(chosenFits).filter(([k]) => bound.inputs.find((i) => i.key === k)?.binding === 'artifact'));
     runProformaScenario({
       scenarioId: scenario.id,

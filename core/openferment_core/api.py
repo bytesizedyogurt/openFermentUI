@@ -644,7 +644,11 @@ def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool
     chosen = _fits_param(fits)
     typed = _overrides_param(overrides)
     try:
-        inputs, finance = composite.split_overrides(typed)
+        # A composite's Finance group is its own (the run lays it on, the
+        # panel resolves it); every other flowsheet takes no finance key, and
+        # one sent is refused as the run refuses it (OF-BLD-020 §6.R, main-30).
+        built = bool(proforma.runnable(flowsheet).builtFrom)
+        inputs, _finance = composite.split_overrides(typed) if built else (typed, [])
         values, _ = proforma.named_values(None, inputs)
         if values:
             proforma._check_keys(proforma.runnable(flowsheet), values)

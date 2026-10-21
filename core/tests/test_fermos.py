@@ -328,7 +328,7 @@ def test_a_simulation_is_kept_with_every_parameter_and_override_named(store):
     r = fermos.simulate(SimulationRequest(family=BATCH, overrides=typed(**STANDIN_TYPED)))
     art = artifacts.get(r.artifactId)
     assert art.tool == fermos.SIMULATION and set(art.output) == OUTPUT_KEYS
-    assert art.toolVersion == f"kinetics {BATCH} 1 · scipy {kinetics.versions()['scipy']}"
+    assert art.toolVersion == f"kinetics {BATCH} {fermos.SIMULATION_RUN} · scipy {kinetics.versions()['scipy']}"
     # An override is a named person's assumption, so the simulation is demo.
     assert r.provenance == "demo" == art.provenance
     by_name = {i.name: i for i in art.inputs}

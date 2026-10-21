@@ -23,8 +23,11 @@ financial parameters for the parameter panel.
         read and held to the rules: both named, both on file, each of its
         own tool, neither damaged, neither of an archived program with the
         switch off, the train of a program with a chemical set, the vessel of
-        no other program than the train's, and no unit id of the train that
-        the fermenter or its feed mixer takes; refused in words
+        no other program than the train's, a vessel designed at a plant scale
+        (one vessel's batch volume sizes no plant: §6.R, main-4/22), no unit
+        id of the train that the fermenter or its feed mixer takes, and no
+        unit of the train fed a side inlet (its flow is the run's own, not
+        scaled to the plant: §6.R, main-25); refused in words
         (proforma.ScenarioRefused) otherwise
     fermenter_of(vessel_art)      what the worker rebuilds the fermenter from
     train_of(train_art)           the train's units, as the worker builds them
@@ -37,7 +40,9 @@ financial parameters for the parameter panel.
         read from the installed file without importing it
         (shelf.package_tea_defaults)
     finance_refusal(values)       a schedule that does not sum to the whole,
-        a life that ends before it starts, a year that is no whole number
+        a life that ends before it starts, a year that is no whole number, a
+        depreciation schedule longer than the life (BioSTEAM's own table:
+        §6.R, main-29)
     basis_inputs(parts, finance)  what the run's basis names beyond a
         scenario run's: both artifacts (`artifact` sources, so their
         provenance follows into the run's), the fermenter's class, unit id,
@@ -166,14 +171,64 @@ def parts_of(vessel: str | None, train_run: str | None, *, include_archived: boo
     if vp and vp != tp:
         raise _refused(f"vessel design {v.id} is of {_program_name(vp)} and train run {t.id} of {_program_name(tp)}: "
                        "a composite is one program's vessel and train")
+    one = _batch_volume(v)
+    if one is not None:
+        raise _refused(one)
     unit_id = fermenter_of(v)["unitId"]
-    spec = train_of(t)["spec"]
+    tr = train_of(t)
+    spec = tr["spec"]
     clash = sorted({u.id for u in spec.units} & {MIXER_ID, unit_id})
     if clash:
         raise _refused(f"train run {t.id} names a unit {', '.join(clash)}, which {FLOWSHEET}'s feed mixer ({MIXER_ID}) or "
                        f"fermenter (the vessel design's unit {unit_id}) takes: give that unit another id in pureOS and "
                        "run the train again")
+    fed = _side_inlets(t, tr["units"])
+    if fed is not None:
+        raise _refused(fed)
     return Parts(vessel=v, train=t, program=tp)
+
+
+def _batch_volume(v: Artifact) -> str | None:
+    """Why a vessel designed for one vessel's batch volume cannot be a
+    composite's fermenter, in words, or None (OF-BLD-020 §6.R, main-4/22).
+
+    Its one vessel was sized for the batch volume fed over its cycle; the
+    composite feeds the fermenter the plant's flow from the plant scale, so
+    rebuilt as one vessel it would be one vessel of whatever size that flow
+    asks, priced as a vessel nobody designed. The smaller, reversible choice
+    of the two the review offered: refused here, before any worker runs, for
+    the binding, the panel and the run alike."""
+    bv = next((i for i in v.inputs if i.name == "batch_volume"), None)
+    if bv is None:
+        return None
+    size = f", {float(bv.value):g} {bv.unit}" if isinstance(bv.value, (int, float)) and not isinstance(bv.value, bool) else ""
+    return (f"vessel design {v.id} was designed for one vessel's batch volume (batch_volume){size}: {FLOWSHEET} prices a "
+            "plant fed at its plant scale, and one vessel of a batch volume sizes no plant (rebuilt for the plant's flow "
+            "it would be one vessel of whatever size that flow asks, not the vessel designed); design the vessel at a "
+            "plant scale in fermOS → Vessel, and its plant scale binds this flowsheet's")
+
+
+def _side_inlets(t: Artifact, units: list[dict[str, Any]]) -> str | None:
+    """Why a train run whose units are fed a side inlet cannot be a
+    composite's train, in words, or None (OF-BLD-020 §6.R, main-25).
+
+    A side inlet's flow (a solvent, say) is a person's kg h⁻¹ for the train
+    run's own inlet; the composite sets the beer from the plant scale, and
+    the train module feeds a side inlet at its absolute flow, so the
+    extraction priced would not be the one the run made. Whether to scale it
+    by the beer over the run's inlet is a decision the document leaves open:
+    refused here until it is made (the smaller, reversible choice)."""
+    fed = []
+    for u in units:
+        ports = [f"{port}: " + ", ".join(f"{chem} {float(kg):g} kg h⁻¹" for chem, kg in flows.items() if kg)
+                 for port, flows in (u.get("sides") or {}).items() if any(kg for kg in flows.values())]
+        if ports:
+            fed.append(f"unit {u['id']} a side inlet ({'; '.join(ports)})")
+    if not fed:
+        return None
+    return (f"train run {t.id} feeds {' and '.join(fed)} at that run's own rate, a flow for the run's own inlet: "
+            f"{FLOWSHEET} sets the beer from the plant scale, and a side inlet's flow is not scaled with it, so the "
+            "extraction priced would not be the one the run made; price a train run whose units are fed no side inlet")
 
 
 def fermenter_of(art: Artifact) -> dict[str, Any]:
@@ -229,18 +284,19 @@ def train_of(art: Artifact) -> dict[str, Any]:
 
 def vessel_scale(inputs: list, parts: Parts) -> None:
     """Bind `plant_scale` to the plant scale the vessel was designed at, in
-    place, unless a person's value already stands for it (D3: it wins); a
-    design of one vessel's batch volume names none, and the input then waits
-    for a named person, saying why."""
+    place, unless a person's value already stands for it (D3: it wins). A
+    design of one vessel's batch volume never reaches here: `parts_of`
+    refuses it (OF-BLD-020 §6.R, main-4/22); a design that names no plant
+    scale all the same leaves the input waiting for a named person, saying
+    why."""
     given = {i.name: i for i in parts.vessel.inputs}
     for inp in inputs:
         if inp.key not in VESSEL_BOUND or inp.binding != "waiting":
             continue
         scale = given.get("plant_scale")
         if scale is None:
-            how = ("one vessel's batch volume" if "batch_volume" in given else "no plant scale")
-            inp.flags.append(f"vessel design {parts.vessel.id} was designed for {how}, so it gives this flowsheet no "
-                             "plant scale: a named person's assumption sets it")
+            inp.flags.append(f"vessel design {parts.vessel.id} was designed for no plant scale, so it gives this "
+                             "flowsheet none: a named person's assumption sets it")
             continue
         low, high = given.get("plant_scale low"), given.get("plant_scale high")
         inp.binding = "artifact"
@@ -406,6 +462,16 @@ def finance_refusal(values: Iterable[ParameterValue]) -> str | None:
             said.append(f"the plant's {what} year, {y:g}, is no whole year")
     if isinstance(start, (int, float)) and isinstance(end, (int, float)) and not end > start:
         said.append(f"the plant's life ends ({end:g}) before it starts ({start:g})")
+    # OF-BLD-020 §6.R (main-29): BioSTEAM refuses a depreciation schedule
+    # longer than the plant's life in every case of a run; its table's
+    # length is read from its file (shelf.depreciation_lengths), never typed.
+    schedule = by.get(DEPRECIATION)
+    years = _shelf.depreciation_lengths().get(schedule) if isinstance(schedule, str) else None
+    if years and isinstance(start, (int, float)) and isinstance(end, (int, float)) and end > start \
+            and years > end - start:
+        said.append(f"the depreciation schedule {schedule} writes the capital off over {years} years by BioSTEAM's own "
+                    f"table, longer than the plant's life of {end - start:g} years ({start:g} to {end:g}): BioSTEAM "
+                    "refuses a schedule longer than the life; choose a shorter schedule or a longer life")
     return "; ".join(said) or None
 
 
@@ -487,8 +553,13 @@ def basis_inputs(parts: Parts, finance: list[ParameterValue]) -> list[BasisInput
                 continue
             words = (f"{i.source.kind}{f' by {i.source.by}' if i.source.by else ''}"
                      f"{f' {i.source.id}' if i.source.id else ''}{f': {i.source.note}' if i.source.note else ''}")
+            # `by` names the person a value the design took as their
+            # assumption (OF-BLD-020 §6.R, main-11/23): the run's read-back
+            # credits it to them, never to the package. The source stays the
+            # design, so the run's provenance follows the artifact.
             out.append(BasisInput(name=f"{FERMENTER}{key}{part}", value=i.value, unit=i.unit, source=BasisSource(
-                kind="artifact", id=v.id, note=f"as vessel design {v.id} holds it ({words})")))
+                kind="artifact", id=v.id, note=f"as vessel design {v.id} holds it ({words})",
+                by=i.source.by if i.source.kind == "assumption" else None)))
     if named.get("vessel type") is not None:
         vt = named["vessel type"]
         out.append(BasisInput(name=f"{FERMENTER}design", value=vt.value, unit="", source=BasisSource(

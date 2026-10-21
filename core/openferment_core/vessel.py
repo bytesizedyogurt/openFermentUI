@@ -107,8 +107,13 @@ TOOL = "fermos.vessel"
 # product ethanol), by its id in programs.ts (§8.R, finding 6).
 YEAST_PROGRAM = "yeast"
 # 2 since §4.R: the cross-check's oxygen, the scale at every size, the
-# duty's words and the stated peak changed what a design computes.
-VERSION_WORDS = "vessel 2"
+# duty's words and the stated peak changed what a design computes. 3 since
+# OF-BLD-020 §6.R (seam-1): a run past its harvest is read at the
+# simulation's own harvest hour, a kept point (§6.2 read the nearest kept
+# point under 2, before that the integration did), so a design keeps an id
+# of its own, and a design kept under 2 that replays otherwise names
+# toolVersion among its differences.
+VERSION_WORDS = "vessel 3"
 SIMULATION = "fermos.simulation"
 FIT_TOOLS = ("kinetic_fit", "growth_forecast")
 # The families whose simulation is one batch on glucose making ethanol and
@@ -240,15 +245,20 @@ def simulation_inputs(art: Artifact) -> dict[str, Any]:
         # it (OF-BLD-020 §4.2, reconciled with the real simulation).
         from . import fermos
 
-        read = fermos.harvest(art)
+        # OF-BLD-020 §6.R: the read is at the simulation's own harvest hour,
+        # a kept point since seam-0 (the broth the titre below describes); a
+        # simulation kept before, or whose series cannot be read, is refused
+        # in the read's words, a 422 like any refusal here (seam-2).
+        try:
+            read = fermos.harvest(art)
+        except fermos.SimulationRefused as e:
+            raise VesselRefused(str(e)) from None
         state = {x.state: x.value for x in read.states}
         X, S, P = (_number(state.get(k), f"{k} at harvest") for k in ("X", "S", "P"))
         keep = [i for i, h in enumerate(t) if float(h) <= harvest * (1 + HARVEST_EPS)]
         t, value = [t[i] for i in keep], [value[i] for i in keep]
         notes.append(f"the simulation runs on to {float(end_t):.4g} h; the vessel reads its broth at harvest, "
                      f"{harvest:.4g} h, the hour its sugar runs out, and its oxygen uptake up to that hour")
-        if not read.exact:
-            notes.append(f"its broth at harvest is {read.read}")
     else:
         X, S, P = (_number(end.get(k), f"{k} at harvest") for k in ("X", "S", "P"))
     # The peak the simulation states, read on its solver's own steps (§3.1),
