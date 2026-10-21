@@ -140,8 +140,10 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * fermOS → Vessel can also be driven with fits alone (§4.R).
    * `vesselDelayMs` (§4.R) holds each POST /api/fermos/vessel answer that
    * long, so a test can change the source while a design is in flight.
+   * `vesselScopeDelayMs` (§8.R) holds each GET of a vessel's parameter
+   * scope that long, as a cold service's first read waits on BioSTEAM.
    */
-  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true, vesselSimulationsOnFile: false, vesselDelayMs: 0 };
+  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true, vesselSimulationsOnFile: false, vesselDelayMs: 0, vesselScopeDelayMs: 0 };
   /** The ceiling checks the browser asked for (OF-BLD-019 §5.2): each query, as sent. */
   const ceilingChecks = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
@@ -595,6 +597,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
           const q = new URL(req.url ?? '/', 'http://double').searchParams;
           ask = { vesselType: q.get('vesselType') };
           paramScopes.push({ scope: `fermos:vessel:${id}`, ...Object.fromEntries(q) });
+          if (flags.vesselScopeDelayMs > 0) await new Promise((r) => setTimeout(r, flags.vesselScopeDelayMs));
         }
         const fx = await vesselFixture();
         // A scope is a kept simulation's or (§4.R) a kept fit's, served or refused as the real code answered.

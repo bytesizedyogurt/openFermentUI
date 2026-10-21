@@ -1115,7 +1115,8 @@ def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Pr
     except SimulationRefused as e:
         raise params.ParamRefused(str(e)) from None
     return params.Provided(title=f"{fam.title} ({fam.id})", specs=got.specs, sources=got.sources, notes=got.notes,
-                           unread=lambda values: _unread_words(fam, got.specs, values))
+                           unread=lambda values: _unread_words(fam, got.specs, values),
+                           refuses=lambda values: run_refusal(fam, got.specs, values))
 
 
 def _unread_words(fam: kinetics.Family, specs: list[ParameterSpec], values: list[ParameterValue]) -> dict[str, str]:
@@ -1283,6 +1284,52 @@ def _numbers(fam: kinetics.Family, specs: list[ParameterSpec],
     y0 = {state: p.pop(key) for key, state in kinetics.START_STATE.items() if key in p}
     t_end = p.pop("t_end", None)
     return p, y0, t_end
+
+
+def _source_words(v: ParameterValue) -> str:
+    """Where a value came from, in a few words, for a refusal naming it."""
+    src = v.source
+    if v.overriddenBy:
+        return f"typed by {v.overriddenBy}"
+    if v.origin == "fit" and src is not None and src.id:
+        return f"from fit {src.id}"
+    if v.origin == "simulation" and src is not None and src.id:
+        return f"from simulation {src.id}"
+    if v.origin == "record":
+        return f"from {len(v.recordIds)} record{'s' if len(v.recordIds) != 1 else ''}"
+    return f"its {v.origin}"
+
+
+def run_refusal(fam: kinetics.Family, specs: list[ParameterSpec], values: list[ParameterValue]) -> str | None:
+    """What a simulation of these values would be refused for though
+    nothing waits (OF-BLD-020 §8.R, findings 12 and 14), in the words the run
+    refuses with, or None when it would go ahead. One function for the run
+    (`simulate`), the panel's resolve (a 422) and `bind` (its `refused`, so
+    Simulate holds its button): a start value below zero names its key, its
+    value and where it came from (a logistic fit's P0 lands below zero on
+    noisy readings), and every other check is the family's own
+    (`_prepared`, `y0_of`, `check`), run before anything integrates. A value
+    that waits is said by `waiting`, not here."""
+    try:
+        p, y0, t_end = _numbers(fam, specs, values)
+    except SimulationRefused:
+        return None
+    by_key = {v.key: v for v in values}
+    unit_of = {s.key: s.unit for s in specs}
+    for key, state in kinetics.START_STATE.items():
+        x = y0.get(state)
+        if key in by_key and isinstance(x, (int, float)) and not isinstance(x, bool) and x < 0:
+            v = by_key[key]
+            unit = f" {unit_of.get(key)}" if unit_of.get(key) else ""
+            return (f"{key} is {x:g}{unit}, {_source_words(v)}: a start value cannot be negative; type {key} under your "
+                    "name in the panel, or choose another source")
+    try:
+        prepared = fam._prepared(p)
+        fam.y0_of(y0, prepared)
+        fam.check(prepared, t_end)
+    except kinetics.FamilyRefused as e:
+        return str(e)
+    return None
 
 
 def _ceiling_inputs(req: SimulationRequest) -> tuple[list[BasisInput], list[str]]:
@@ -2023,7 +2070,8 @@ def bind(req: SimulationRequest, *, pool: Any = None) -> FermosBinding:
     _own_scope(fam, req.overrides)
     got = _bound(fam, req, pool if pool is not None else _load_pool(req.includeArchived))
     values, waiting = _resolved(fam, got, req.overrides, None)
-    return FermosBinding(values=values, waiting=waiting, notes=got.notes)
+    refused = None if waiting else run_refusal(fam, got.specs, values)
+    return FermosBinding(values=values, waiting=waiting, refused=refused, notes=got.notes)
 
 
 def _own_scope(fam: kinetics.Family, overrides: list[Override]) -> None:
@@ -2081,6 +2129,9 @@ def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult
     specs = got.specs
     values, _ = _resolved(fam, got, req.overrides, None)
     _numbers(fam, specs, values)
+    why = run_refusal(fam, specs, values)
+    if why:
+        raise SimulationRefused(why)
     named = [BasisInput(name="family", value=fam.id, unit="",
                         source=BasisSource(kind="convention", note=f"the model family: {fam.title} (kinetics.py)"))]
     for word, value in (("strain", req.strain), ("product", req.product), ("sugar", req.sugar)):
@@ -2313,6 +2364,22 @@ def _run_simulation(inputs, seed):
 
 
 artifacts.register(SIMULATION, SIMULATION_STEM, _run_simulation, version_of=_simulation_version)
+
+
+# A kept vessel design replays on a service just started (OF-BLD-020 §8.R,
+# finding 1): `vessel` registers its tool when it is imported, and nothing
+# the service imports at start imports it, so this module, which the service
+# always imports, names the hook; the worker starts only when a replay runs.
+VESSEL_TOOL = "fermos.vessel"
+
+
+def _register_vessel() -> None:
+    from . import vessel
+
+    vessel._register()
+
+
+artifacts.register_lazy(VESSEL_TOOL, _register_vessel)
 
 
 def kept_simulation(key: Any) -> Any:

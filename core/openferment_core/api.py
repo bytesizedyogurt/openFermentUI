@@ -785,12 +785,13 @@ def fermos_vessel(req: VesselRequest) -> VesselDesign:
 
 
 @app.get("/api/fermos/vessels")
-def fermos_vessels() -> list[dict]:
+def fermos_vessels(includeArchived: bool = False) -> list[dict]:
     """Every kept vessel design, newest first (`VesselSummary`): a read,
-    which starts no simulator."""
+    which starts no simulator. One for an archived program's simulation is
+    left out unless asked (OF-BLD-020 §8.R, finding 3)."""
     from . import vessel
 
-    return [v.model_dump(mode="json") for v in vessel.designs()]
+    return [v.model_dump(mode="json") for v in vessel.designs(includeArchived)]
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────

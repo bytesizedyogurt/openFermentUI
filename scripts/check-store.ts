@@ -1147,7 +1147,7 @@ await (async () => {
     /const used = mine\.filter\(\(k\) => !\(k in overridden\)\)/.test(page) && /In use for \$\{used\.join/.test(page) && /data-testid="fermos-fit-overridden"/.test(page) &&
       !/In use for \{Object\.entries\(chosen\)/.test(page));
   check('the line under the panel says a person\u2019s value replaces the fit where one overrides it',
-    /key in overridden \?/.test(page) && /value replaces the fermOS fit/.test(page) && /data-overridden="true"/.test(page));
+    /key in overridden \?/.test(page) && /value replaces the fermOS \{fitWord\(key\)\}/.test(page) && /data-overridden="true"/.test(page));
   check('the panel tells the page when the service refuses the scope\u2019s overrides, and Run waits with its words',
     /onRefused=\{setRefused\}/.test(page) && /refused !== null\}/.test(page) && /data-testid="run-held"/.test(page) &&
       /if \(!down\) refusedRef\.current\?\.\(words\)/.test(panelText) && /refusedRef\.current\?\.\(null\)/.test(panelText));
@@ -1185,6 +1185,54 @@ await (async () => {
   // (16) What the other values leave unread is said so, never waiting.
   const row = read('../src/components/ParameterRow.tsx');
   check('a parameter its other values leave unread shows as not read here, never as waiting', /case 'not-read':/.test(row) && /not read here/.test(row));
+})();
+
+// OF-BLD-020 \u00a78.R \u2014 the final review of night one: a simulation fed to
+// Proforma is called a simulation wherever it feeds it (findings 0, 4, 10,
+// 11), Simulate holds what the run refuses (12, 14), Vessel says it is asking
+// (15), and operating mode's reference sits on Simulate (7). The service is
+// held by test_review_8r.
+await (async () => {
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const pf = (await import('../src/lib/proforma')) as unknown as Record<string, any>;
+  const simNote = 'the final product of simulation simA at harvest (its run\u2019s end)';
+  const batchNote = 'the harvest hour of simulation simA (its run\u2019s end); productivity is the simulation\u2019s final titre over it';
+  const src = (note: string) => ({ kind: 'artifact', id: 'simA', note });
+  const inp = (name: string, value: number, unit: string, note: string) => ({ name, value, unit, source: src(note) });
+  const view = { basis: { inputs: [
+    inp('titre fit', 8, 'g L-1', simNote), inp('titre fit low', 8, 'g L-1', simNote), inp('titre fit high', 8, 'g L-1', simNote),
+    inp('productivity fit', 1, 'g L-1 h-1', 'the final titre of simulation simA over its harvest hour'),
+    inp('fit batch time', 3, 'h', batchNote),
+  ] } };
+  const flowsheet = { inputs: ['titre', 'productivity'].map((key) => ({ key, name: key, unit: '', kind: 'bound' })) };
+  let rows: any[] = [];
+  try {
+    rows = pf.runInputs(view, flowsheet);
+  } catch (e) {
+    rows = [{ threw: String(e) }];
+  }
+  const titre = rows.find((r) => r.key === 'titre');
+  const prod = rows.find((r) => r.key === 'productivity');
+  check('a run\u2019s input fed by a simulation is never labelled a fermOS fit, and carries the service\u2019s words',
+    titre?.kind === 'artifact' && !/fermOS fit/.test(String(titre?.note)) && String(titre?.note).includes(simNote), titre);
+  check('\u2026and its productivity names the batch time as the service words it (the simulation\u2019s harvest hour)',
+    /batch time 3 h/.test(String(prod?.note)) && String(prod?.note).includes('harvest hour of simulation simA') && !/fit\u2019s batch time|fit's batch time/.test(String(prod?.note)), prod);
+  const page = read('../src/screens/ProformaScenario.tsx');
+  check('the fit card\u2019s batch time is worded by the tool that kept it, never a forecast\u2019s for every source',
+    /f\.batchTimeNote \?\?/.test(page) && !/where the forecast&rsquo;s median sugar runs out/.test(page));
+  check('the fit card says a simulation is computed, not measured, instead of naming no run',
+    /f\.tool === 'fermos\.simulation' \? 'computed, not measured'/.test(page));
+  check('the ceiling\u2019s yield chip and the fit line name a simulation as one',
+    /check\.yieldTool && FIT_TOOL_WORDS\[check\.yieldTool\]/.test(page) && /from the fermOS \{fitWord\(key\)\}/.test(page) &&
+      /origin === 'simulation' \? 'simulation' : 'fit'/.test(page) && !/>\s*fermOS fit \{src\.id\}/.test(page));
+  const sim = read('../src/screens/FermOSSimulate.tsx');
+  check('fermOS \u2192 Simulate holds its button on what the run would refuse, in the service\u2019s words',
+    /const refused = binding\?\.refused \?\? null/.test(sim) && /waiting\.length === 0 && !refused && !busy/.test(sim) && /data-testid="simulate-refused"/.test(sim));
+  check('fermOS \u2192 Simulate carries operating mode\u2019s reference', /<SubsystemReference id="fermos\.mode" \/>/.test(sim));
+  const vessel = read('../src/screens/FermOSVessel.tsx');
+  check('fermOS \u2192 Vessel says it is asking (BioSTEAM starting) until the panel answers, and holds Design and Scale until then',
+    /data-testid="vessel-panel-asking"/.test(vessel) && /\{!panel && !panelProblem && \(/.test(vessel) && /proformaStatus\(ctrl\.signal\)/.test(vessel) &&
+      /\{panel && \(\s*<div className="flex flex-wrap items-center gap-3">\s*<p className="text-body" data-testid="vessel-scale"/.test(vessel));
 })();
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

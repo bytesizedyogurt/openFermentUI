@@ -49,7 +49,7 @@ import { OxygenBalance } from '@/components/figures';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
 import { paramScope } from '@/lib/params';
-import { fermosFits, stamp } from '@/lib/proforma';
+import { fermosFits, proformaStatus, stamp } from '@/lib/proforma';
 import {
   FermosDown,
   FermosRefused,
@@ -339,14 +339,23 @@ export default function FermOSVessel() {
   const [busy, setBusy] = useState(false);
   const inFlight = useRef<AbortController | null>(null);
 
+  // §8.R (finding 15): the first read of a vessel's parameters on a service
+  // just started starts BioSTEAM's simulator (lib/params.ts), about half a
+  // minute; while it is in hand the page says so, as Proforma's status line
+  // does, and holds Design and the Scale line until the panel answers.
+  const [simulator, setSimulator] = useState<string | null>(null);
   useEffect(() => {
     setPanel(null);
     setPanelProblem(null);
+    setSimulator(null);
     if (!scope) return;
     const ctrl = new AbortController();
     paramScope(scope, ask, ctrl.signal)
       .then(setPanel)
       .catch((e: unknown) => !ctrl.signal.aborted && setPanelProblem(problemOf(e)));
+    proformaStatus(ctrl.signal)
+      .then((st) => !ctrl.signal.aborted && setSimulator(st.status))
+      .catch(() => undefined);
     return () => ctrl.abort();
   }, [scope, ask]);
 
@@ -442,6 +451,13 @@ export default function FermOSVessel() {
       {chosen && (
         <>
           {panelProblem && <Callout kind="warn">{panelProblem}</Callout>}
+          {!panel && !panelProblem && (
+            <p className="text-caption text-ink-soft" data-testid="vessel-panel-asking" data-simulator={simulator ?? ''}>
+              {simulator === 'cold' || simulator === 'starting'
+                ? 'BioSTEAM’s simulator is starting: the first read of a vessel’s parameters starts it, which takes about half a minute on a service just started. The parameters appear here when it answers.'
+                : 'Asking BioSTEAM for this vessel’s parameters…'}
+            </p>
+          )}
           {panel && (
             <section aria-labelledby="vessel-panel-title">
               <SectionTitle>
@@ -450,6 +466,7 @@ export default function FermOSVessel() {
               <ParameterPanel scope={scope} data={panel} request={ask} groups={VESSEL_GROUPS} />
             </section>
           )}
+          {panel && (
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-body" data-testid="vessel-scale" data-scale={scale}>
               {scale === 'none'
@@ -466,6 +483,7 @@ export default function FermOSVessel() {
               {busy ? 'Designing…' : 'Design'}
             </Button>
           </div>
+          )}
           {shownRefusal && (
             <Callout kind="warn">
               <p data-testid="vessel-refused">{shownRefusal}</p>

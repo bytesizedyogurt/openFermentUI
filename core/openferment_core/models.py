@@ -1716,9 +1716,13 @@ class FermosFitInfo(BaseModel):
     # The product and sugar series, by the labels the run gave them.
     productSeries: str | None = None
     substrateSeries: str | None = None
-    # The hour the forecast's median sugar runs out: the batch time a
-    # productivity is the titre over.
+    # The batch time a productivity is the titre over: the hour a forecast's
+    # median sugar runs out, or a simulation's harvest hour.
     batchTimeH: float | None = None
+    # How that hour was found, in words chosen by the tool that kept it (a
+    # forecast's grid or a simulation's harvest, OF-BLD-020 §8.R): what the
+    # run's `fit batch time` input and the page say of it.
+    batchTimeNote: str | None = None
     feeds: list[FitFeed] = Field(default_factory=list)
     # Words printed beside it, such as a product series that names no product.
     flags: list[str] = Field(default_factory=list)
@@ -1805,6 +1809,10 @@ class CeilingCheck(BaseModel):
     yieldHigh: float | None = None
     yieldUnit: str
     yieldSource: BasisSource | None = None
+    # The tool of the artifact a yield bound to one came from ('kinetic_fit',
+    # 'growth_forecast', 'fermos.simulation'), so the page names it as what
+    # it is (§8.R); None for any other binding.
+    yieldTool: str | None = None
     yieldRecords: int = 0
     yieldWords: str
     rows: list[CeilingRow] = Field(default_factory=list)
@@ -2695,6 +2703,11 @@ class FermosBinding(BaseModel):
     # The keys a simulation would refuse for, each named with the field that
     # would bind it in its value's detail.
     waiting: list[str]
+    # What the family would refuse these values for though nothing waits (a
+    # start value below zero, a yield of zero, a run length of none), in the
+    # words the run refuses with (OF-BLD-020 §8.R, findings 12 and 14);
+    # None when a run would go ahead.
+    refused: str | None = None
     # What bound from where: the program's papers, whose records, the sugar,
     # the fit and the kept simulation, and what they could not give.
     notes: list[str] = Field(default_factory=list)

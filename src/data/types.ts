@@ -2877,6 +2877,8 @@ export interface FermosFitInfo {
   substrateSeries: string | null;
   /** The hour the forecast's median sugar runs out: the batch time a productivity is the titre over. */
   batchTimeH: number | null;
+  /** How that hour was found, in the words of the tool that kept it (§8.R). */
+  batchTimeNote: string | null;
   feeds: FitFeed[];
   flags: string[];
   /** Why it feeds nothing at all, in words. */
@@ -2946,6 +2948,8 @@ export interface CeilingCheck {
   yieldSource: BasisSource | null;
   yieldRecords: number;
   yieldWords: string;
+  /** The tool of the artifact the yield came from, when one did (§8.R). */
+  yieldTool: string | null;
   rows: CeilingRow[];
   flagged: boolean;
   /** With no ceiling on file: what is missing, and where one is computed. */
@@ -3636,6 +3640,8 @@ export interface FermosBinding {
   values: ParameterValue[];
   /** The keys a simulation would refuse for; each value's detail names the field that would bind it. */
   waiting: string[];
+  /** What the family would refuse these values for though nothing waits (§8.R), else null. */
+  refused: string | null;
   /** What bound from where: the program's papers, whose records, the sugar, the fit, the kept simulation. */
   notes: string[];
 }

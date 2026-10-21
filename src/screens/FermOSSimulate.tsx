@@ -43,6 +43,7 @@ import { href, useRoute } from '@/router';
 import { Button, Callout, SectionTitle } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
+import { SubsystemReference } from '@/components/ReferenceView';
 import { SourceChip, shown } from '@/components/ParameterRow';
 import { TimeCourse } from '@/components/figures';
 import { CARBON_SOURCES } from '@/data/vocabulary';
@@ -472,7 +473,10 @@ export default function FermOSSimulate() {
   const specs = chosen?.specs ?? [];
   const label = (key: string) => specs.find((s) => s.key === key)?.label ?? key;
   const waiting = binding?.waiting ?? [];
-  const canRun = !!ask && ready && !!binding && waiting.length === 0 && !busy;
+  // §8.R (findings 12, 14): what the family would refuse though nothing
+  // waits holds the button, in the run's own words (fermos.run_refusal).
+  const refused = binding?.refused ?? null;
+  const canRun = !!ask && ready && !!binding && waiting.length === 0 && !refused && !busy;
 
   const simulate = () => {
     if (!ask || !canRun) return;
@@ -637,7 +641,12 @@ export default function FermOSSimulate() {
               <p className="text-ink-soft mt-1">Type each in the panel under your reviewer name, or choose a strain, sugar or fit whose records bind it.</p>
             </div>
           )}
-          {binding && waiting.length === 0 && (
+          {binding && waiting.length === 0 && refused && (
+            <p className="text-caption text-signal-warn" data-testid="simulate-refused">
+              Every parameter of {chosen.id} has a source, but the run would be refused: {refused}
+            </p>
+          )}
+          {binding && waiting.length === 0 && !refused && (
             <p className="text-caption text-ink-soft" data-testid="simulate-ready">
               Nothing waits: every parameter of {chosen.id} has a source.
             </p>
@@ -675,6 +684,11 @@ export default function FermOSSimulate() {
           <SendToProforma artifactId={result.artifactId} tool="fermos.simulation" />
         </div>
       )}
+      {/* §8.R (finding 7): the operating modes' reference sits where the mode
+          (the family) is chosen, as transport's and scale's sit on Vessel. */}
+      <section className="mt-8" aria-label="What the field says">
+        <SubsystemReference id="fermos.mode" />
+      </section>
     </div>
   );
 }

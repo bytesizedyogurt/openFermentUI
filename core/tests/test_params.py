@@ -263,7 +263,8 @@ def test_a_flowsheets_inputs_are_its_specs_with_bounds_and_their_reasons():
     assert list(specs) == [i.key for i in shelf.info(ETHANOL).inputs]
     feed, titre, scale, purity = specs["feed_glucose_conc"], specs["titre"], specs["plant_scale"], specs["ethanol_purity"]
     assert feed.sourceRule == ["record:medium_component_conc", "assumption"]
-    assert titre.sourceRule == ["fit", "record:ethanol_titre", "assumption"], "a chosen fit replaces the records"
+    assert titre.sourceRule == ["fit", "simulation", "record:ethanol_titre", "assumption"], \
+        "a chosen fit or kept simulation (§8.R: served as a simulation) replaces the records"
     from openferment_core import units
 
     lo, hi = units.field("ethanol_titre")["range"]

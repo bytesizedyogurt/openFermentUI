@@ -355,6 +355,8 @@ async function main() {
     // OF-BLD-020 §4.2 — transport and scale are live: their reference stays on fermOS → Vessel, off the shelf.
     ['/fermos/vessel', 'Oxygen transfer', 'Transport has no implementation'],
     ['/fermos/vessel', 'Scale-up criteria', 'Scale has no implementation'],
+    // OF-BLD-020 §8.R (finding 7) — operating mode is live: its reference sits on fermOS → Simulate, where the mode is chosen.
+    ['/fermos/simulate', 'Operating modes', 'Operating mode has no implementation'],
   ];
   let seededFails = 0;
   for (const [route, table, mustNotSay] of SEEDED) {
@@ -2298,6 +2300,26 @@ async function main() {
       const options = await page.locator('[data-testid="vessel-source"] option').evaluateAll((els) => els.map((e) => e.value));
       if (!options.includes(`simulation:${fx.aerobic}`) || !options.includes(`simulation:${fx.anaerobic}`))
         problems.push(`the chooser does not list the kept simulations (${options.join(', ')})`);
+      // §8.R (finding 15): while the scope's first read is in hand (a cold service starts BioSTEAM), the page
+      // says it is asking, and shows no Scale line and no Design until the panel answers. A page of its own,
+      // opened on the anaerobic simulation with its scope's answer held, so the flow below is untouched.
+      doubleState.flags.vesselScopeDelayMs = 4000;
+      const cold = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      cold.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+      try {
+        await cold.goto(`http://localhost:${PORT}/#/fermos/vessel?simulation=${encodeURIComponent(fx.anaerobic)}`, { waitUntil: 'domcontentloaded' });
+        await cold.locator('[data-testid="vessel-panel-asking"]').waitFor({ timeout: 3500 }).catch(() => {});
+        if (!(await cold.locator('[data-testid="vessel-panel-asking"]').count())) problems.push('while the vessel scope is read the page does not say it is asking');
+        if (await cold.locator('[data-testid="vessel-scale"]').count()) problems.push('the Scale line shows before the panel that holds Scale');
+        if (await cold.locator('[data-testid="vessel-design"]').count()) problems.push('Design shows before the panel has answered');
+        doubleState.flags.vesselScopeDelayMs = 0;
+        await cold.locator('[data-testid="vessel-design"]').waitFor({ timeout: 10000 }).catch(() => {});
+        if (await cold.locator('[data-testid="vessel-panel-asking"]').count()) problems.push('the asking line stays after the panel answered');
+        if (!(await cold.locator('[data-testid="vessel-design"]').count())) problems.push('Design does not show once the panel has answered');
+      } finally {
+        doubleState.flags.vesselScopeDelayMs = 0;
+        await cold.close();
+      }
       await page.locator('[data-testid="vessel-source"]').selectOption(`simulation:${fx.aerobic}`);
       await row('plant_scale').waitFor({ timeout: 8000 }).catch(() => {});
       const groups = await page.locator('[data-testid="param-group"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')).join());

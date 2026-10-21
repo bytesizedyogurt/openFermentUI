@@ -33,8 +33,9 @@
  * 9. OF-BLD-020 §4.2 (D14): OxygenBalance draws one row per hour of the
  *    simulated uptake, the vessel's transfer the one value the design gives
  *    on every row, the short hours exactly the service's intervals, every row
- *    the design's provenance; it finds no short hour of its own (no
- *    comparison of the uptake with the transfer in its source); it says what
+ *    the design's provenance; it finds no short hour of its own (rendered,
+ *    it shades exactly the intervals the service named, none when it named
+ *    none though the uptake rises above the transfer, §8.R); it says what
  *    would fill it when there is no uptake to draw; it stands on the grammar,
  *    is exported from the index, and fermOS → Vessel draws with it.
  */
@@ -51,7 +52,9 @@ import { toTable as tornadoTable } from '../src/components/figures/Tornado';
 import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger';
 import { emptyOf as recoveryEmpty, noBar, toTable as recoveryTable } from '../src/components/figures/RecoveryByUnit';
 import { bars as waterfallBars, toTable as waterfallTable } from '../src/components/figures/CostWaterfall';
-import { emptyOf as oxygenEmpty, toTable as oxygenTable } from '../src/components/figures/OxygenBalance';
+import { OxygenBalance as OxygenBalanceFigure, emptyOf as oxygenEmpty, toTable as oxygenTable } from '../src/components/figures/OxygenBalance';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { fmt } from '../src/engine/units';
 import { toTable as timeCourseTable, type TimeCourseProps } from '../src/components/figures/TimeCourse';
 import type { TrainUnit } from '../src/data/types';
@@ -327,6 +330,15 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
   if (!/from '\.\/encoding'/.test(src) || !/\bENCODING\[/.test(src)) problems.push('OxygenBalance does not take its marks from ENCODING');
   if (/['"]recharts/.test(src)) problems.push('OxygenBalance draws with recharts');
   if (/our\[[^\]]*\]\s*[<>]=?\s*props\.otr|props\.otr\s*[<>]=?\s*props\.our|\.otr\s*[<>]/.test(src)) problems.push('OxygenBalance compares the uptake with the transfer itself: the short hours are the service\'s');
+  // §8.R (finding 9): the drawing is held by what it draws, not by a spelling
+  // of its source. Rendered with the uptake above the transfer and the
+  // service naming no short hour, it shades nothing; with one interval named,
+  // exactly one; with two, two. A figure that found short hours of its own,
+  // however it spelled the comparison, shades where the service did not.
+  const shaded = (p: typeof props) =>
+    (renderToStaticMarkup(createElement(OxygenBalanceFigure, p)).match(/data-testid="oxygen-short"/g) ?? []).length;
+  const drawn = [shaded({ ...props, short: [] }), shaded(props), shaded({ ...props, short: [[0.5, 1], [2.5, 3.5]] })];
+  if (drawn.join() !== '0,1,2') problems.push(`OxygenBalance shades hours the service did not name: ${drawn.join(', ')} shaded where it named 0, 1 and 2`);
   if (!/export \{ OxygenBalance,/.test(readFileSync('src/components/figures/index.ts', 'utf8'))) problems.push('the figures index does not export OxygenBalance');
   if (!/<OxygenBalance\b/.test(readFileSync('src/screens/FermOSVessel.tsx', 'utf8'))) problems.push('fermOS → Vessel does not draw the oxygen balance through the grammar');
   ok.push(`tables: oxygen balance ${rows.length}, one row per hour of uptake, the transfer the design's value, the short hours the service's; OxygenBalance stands on toTable, ENCODING and FigureFrame`);

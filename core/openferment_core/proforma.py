@@ -1510,6 +1510,7 @@ def fit_info(art, flowsheet: str):
     else:
         batch_why = None
         out.batchTimeH = float(runs)
+        out.batchTimeNote = FORECAST_BATCH_NOTE
 
     feeds = []
     for key, inp in declared.items():
@@ -1557,6 +1558,18 @@ def fit_info(art, flowsheet: str):
     return out
 
 
+# How the batch time a productivity is the titre over was found, by the tool
+# that kept it (§8.R): the run's `fit batch time` input, its refusal of a
+# productivity fed apart from its titre, and the page all say these words.
+FORECAST_BATCH_NOTE = ("the hour the forecast's median sugar runs out, found between its grid points; productivity is "
+                       "the fit's titre over it, and titre is the same fit's")
+
+
+def simulation_batch_note(aid: str, where: str) -> str:
+    return (f"the harvest hour of simulation {aid} ({where}); productivity is the simulation's final titre over it, "
+            "and titre is the same simulation's")
+
+
 def _simulation_info(art, out, declared: dict, product: str, flowsheet: str, refuse_all):
     """What a kept simulation feeds (OF-BLD-020 §3.3): its end state as it
     was kept, read from the artifact and recomputed nowhere."""
@@ -1592,6 +1605,9 @@ def _simulation_info(art, out, declared: dict, product: str, flowsheet: str, ref
     where = ("the hour its sugar runs out" if harvest is not None else "its run's end")
     if sim.harvestH and sim.harvestH > 0:
         out.batchTimeH = float(sim.harvestH)
+        # §8.R (findings 0, 4, 10): a simulation has no forecast, no median
+        # and no grid; its batch time is its harvest hour, said as such.
+        out.batchTimeNote = simulation_batch_note(art.id, where)
     for flag in sim.flags:
         if "did not run out" in flag:
             out.flags.append(flag[:1].lower() + flag[1:].rstrip("."))
@@ -1707,15 +1723,18 @@ def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
         inp.leftOutNoCarbon = inp.leftOutOtherCarbon = 0
         inp.flags = ([f"chosen in place of the {had} record{'s' if had != 1 else ''} it bound"] if had else []) + list(info.flags)
         if key == "productivity" and paired:
+            # §8.R (finding 10): worded by the tool that kept it, never a
+            # forecast's words for a simulation.
+            what = ("its final titre over its harvest hour" if info.tool == "fermos.simulation"
+                    else "its titre over the hour its median sugar runs out")
             raise ScenarioRefused(
-                f"productivity from {info.tool} {aid} is its titre over the hour its median sugar runs out, so it feeds "
+                f"productivity from {info.tool} {aid} is {what}, so it feeds "
                 f"the fermenter only beside titre from {aid}: the fermenter's batch time is the titre over the "
                 f"productivity, and here {paired}. To use it, {remedy.format(aid=aid)}, or stop using it for "
                 "productivity")
         if key == "productivity" and info.batchTimeH is not None:
             extra.append(BasisInput(name="fit batch time", value=info.batchTimeH, unit="h", source=BasisSource(
-                kind="artifact", id=aid, note="the hour the forecast's median sugar runs out, found between its grid "
-                                              "points; productivity is the fit's titre over it, and titre is the same fit's")))
+                kind="artifact", id=aid, note=info.batchTimeNote or FORECAST_BATCH_NOTE)))
     return extra
 
 
@@ -1831,7 +1850,21 @@ def _species_words(species: str) -> str:
     return species[:1].upper() + species[1:]
 
 
-def _yield_words(inp) -> str:
+def artifact_tool(aid: str | None) -> str | None:
+    """The tool of a kept artifact, or None when it is not on file or
+    cannot be read: what names a fermOS source as a fit, a forecast or a
+    simulation (§8.R)."""
+    from . import artifacts
+
+    if not aid:
+        return None
+    try:
+        return artifacts.get(aid).tool
+    except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged):
+        return None
+
+
+def _yield_words(inp, tool: str | None = None) -> str:
     if inp.binding == "records":
         n = len(inp.records)
         return (f"the median of {n} records, with the lowest and the highest" if n >= 3 else
@@ -1841,6 +1874,11 @@ def _yield_words(inp) -> str:
         return f"a named person's assumption{f' ({by})' if by else ''}, with its low and its high"
     if inp.binding == "artifact":
         aid = inp.source.id if inp.source else None
+        if tool == "fermos.simulation":
+            # §8.R (findings 4, 11): a simulation's yield is what it
+            # achieved, product made over sugar used, one value held fixed.
+            return (f"a fermOS simulation's yield achieved{f' ({aid})' if aid else ''}: product made over sugar used to "
+                    "harvest, one value held fixed")
         return f"a fermOS fit's Yp/s{f' ({aid})' if aid else ''}, its median with its 5th and 95th percentile"
     return "nothing yet: the yield waits for a record, a named person's assumption or a fermOS fit"
 
@@ -1850,6 +1888,8 @@ _CHECK_WHAT = {
                "measured otherwise, another organism)",
     "assumption": "a reviewer should check what the assumption rests on, and the basis of the yield it was taken from",
     "artifact": "a reviewer should check the basis of the fit's readings (the product and sugar series, and their units)",
+    "simulation": "a reviewer should check the sources of the simulation's parameters (its basis names each) and the "
+                  "yields it was given",
 }
 
 
@@ -1916,6 +1956,7 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
     # name, else the program's one species; the line counts each kind, so a
     # few records of a catalogued strain never speak for the rest (§5.R).
     labels, program_species = _strain_labels()
+    tool = artifact_tool(inp.source.id if inp.source else None) if inp.binding == "artifact" else None
     by_id = getattr(pool, "records_by_id", None) or {r["id"]: r for r in pool.records}
     bound_rows = [by_id.get(r) or {} for r in (inp.recordIds if inp.binding == "records" else [])]
     n = len(bound_rows)
@@ -2017,7 +2058,8 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
             ceilingMolPerMol=float(mol) if isinstance(mol, (int, float)) else None, conventions=conventions,
             yieldGPerG=value, yieldLowGPerG=low, yieldHighGPerG=high,
             yieldMolPerMol=value * ratio if value is not None and ratio is not None else None,
-            flag=flag, words=_row_words(flag, inp.binding, value_above), recordsAbove=above))
+            flag=flag, words=_row_words(flag, "simulation" if tool == "fermos.simulation" else inp.binding,
+                                        value_above), recordsAbove=above))
 
     models = [m.id for m, _, _ in matched]
     compute_at = f"/geneos/model?product={product}&substrate={sugar}" + (f"&model={models[0]}" if models else "")
@@ -2052,6 +2094,7 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
                     f"the PHA draft's feed is a fermentable sugar; its yield cap reads the {sugar} ceiling, and so does this check"),
         host=host, strains=strains, species=species_list, organismWords=organism, models=models,
         yieldBinding=inp.binding, yieldValue=inp.value, yieldLow=inp.low, yieldHigh=inp.high, yieldUnit=inp.unit,
-        yieldSource=inp.source, yieldRecords=len(inp.records), yieldWords=_yield_words(inp), rows=rows,
+        yieldSource=inp.source, yieldRecords=len(inp.records), yieldWords=_yield_words(inp, tool), yieldTool=tool,
+        rows=rows,
         flagged=any(r.flag == "above" for r in rows), empty=empty, computeAt=compute_at,
         otherSugars=sorted(other_sugars), notes=notes)

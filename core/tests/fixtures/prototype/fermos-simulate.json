@@ -4527,6 +4527,7 @@
             "x0",
             "p0"
           ],
+          "refused": null,
           "notes": [
             "Records bind from the Yeast ethanol program's papers (the program whose flowsheet makes ethanol), through the aggregate gate, of every strain of the Yeast ethanol program's organism, Saccharomyces cerevisiae, naming glucose as their carbon source; each is converted into its parameter's unit, and the value is their median with their range (Proforma's statistic). A fit a person chose comes first; a person's override wins over all of them."
           ]
@@ -4861,6 +4862,7 @@
             "x0",
             "p0"
           ],
+          "refused": null,
           "notes": [
             "Records bind from the Yeast ethanol program's papers (the strain's program), through the aggregate gate, of Saccharomyces cerevisiae CEN.PK113-7D (by its aliases; the medium's records of every strain of the Yeast ethanol program's organism, Saccharomyces cerevisiae), naming glucose as their carbon source; each is converted into its parameter's unit, and the value is their median with their range (Proforma's statistic). A fit a person chose comes first; a person's override wins over all of them."
           ]
@@ -5293,6 +5295,7 @@
             "v0",
             "t_end"
           ],
+          "refused": null,
           "notes": [
             "Records bind from the Yeast ethanol program's papers (the program whose flowsheet makes ethanol), through the aggregate gate, of every strain of the Yeast ethanol program's organism, Saccharomyces cerevisiae, naming glucose as their carbon source; each is converted into its parameter's unit, and the value is their median with their range (Proforma's statistic). A fit a person chose comes first; a person's override wins over all of them."
           ]
@@ -5661,6 +5664,7 @@
             "p0",
             "t_end"
           ],
+          "refused": null,
           "notes": [
             "Records bind from the Yeast ethanol program's papers (the program whose flowsheet makes ethanol), through the aggregate gate, of every strain of the Yeast ethanol program's organism, Saccharomyces cerevisiae, naming glucose as their carbon source; each is converted into its parameter's unit, and the value is their median with their range (Proforma's statistic). A fit a person chose comes first; a person's override wins over all of them."
           ]
@@ -5971,6 +5975,7 @@
             "x0",
             "s0"
           ],
+          "refused": null,
           "notes": [
             "Records bind from the PHA program's papers (the family's program), through the aggregate gate, of every strain on the PHA program's papers (the family's program), naming glucose as their carbon source; each is converted into its parameter's unit, and the value is their median with their range (Proforma's statistic). A fit a person chose comes first; a person's override wins over all of them."
           ]
@@ -6043,6 +6048,7 @@
             "attenuation",
             "k_photoinhibition"
           ],
+          "refused": null,
           "notes": [
             "Records bind from the Yeast ethanol program's papers (the program whose flowsheet makes ethanol), through the aggregate gate, of every strain of the Yeast ethanol program's organism, Saccharomyces cerevisiae, naming glucose as their carbon source; each is converted into its parameter's unit, and the value is their median with their range (Proforma's statistic). A fit a person chose comes first; a person's override wins over all of them.",
             "light_v1 is declared and not built: it names incident irradiance, path length, attenuation and photoinhibition, and holds no rate law. What would build it: the mean irradiance over the path by Beer–Lambert on the cells' attenuation, a growth-on-light curve with photoinhibition fitted to a photobioreactor run, and a deposition that records irradiance."
@@ -6478,6 +6484,7 @@
           }
         ],
         "waiting": [],
+        "refused": null,
         "notes": [
           "Records bind from the Yeast ethanol program's papers (the strain's program), through the aggregate gate, of Saccharomyces cerevisiae CEN.PK113-7D (by its aliases; the medium's records of every strain of the Yeast ethanol program's organism, Saccharomyces cerevisiae), naming glucose as their carbon source; each is converted into its parameter's unit, and the value is their median with their range (Proforma's statistic). A fit a person chose comes first; a person's override wins over all of them."
         ]

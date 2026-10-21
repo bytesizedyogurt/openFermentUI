@@ -805,9 +805,10 @@ function FermosFitSlot({
         A fit of a deposited run can give the fermenter its titre, its yield on sugar and its batch time. The service computes each
         from the fit&rsquo;s forecast, drawn again to the hour its median sugar runs out (found between the forecast&rsquo;s points, so
         the length it was asked to run does not move them): titre from the final product, yield from product made over sugar used,
-        and productivity as that titre over that hour. A fit&rsquo;s productivity feeds the fermenter only beside its own titre, since
-        the batch time is the titre over the productivity. The run then names the fit as the source of each input it feeds; a value a
-        person types in the panel wins over the fit for that input.
+        and productivity as that titre over that hour. A simulation fermOS keeps gives its own end state instead, computed and never
+        measured: titre at harvest, the yield it achieved, and its harvest hour as the batch time. A productivity feeds the fermenter
+        only beside titre from the same fit or simulation, since the batch time is the titre over the productivity. The run then names
+        the fit or simulation as the source of each input it feeds; a value a person types in the panel wins over it for that input.
       </p>
       {arrived && (
         <p className="text-caption mb-2" data-testid="fermos-fit-arrived">
@@ -860,7 +861,7 @@ function FermosFitSlot({
                   </a>
                   <ProvenanceBadge p={f.provenance} />
                   <span className="text-caption text-ink-soft">
-                    run {f.depositionId ?? 'not named'}
+                    {f.tool === 'fermos.simulation' ? 'computed, not measured' : `run ${f.depositionId ?? 'not named'}`}
                     {f.productSeries && <> · product: {f.productSeries}</>}
                     {f.substrateSeries && <> · sugar: {f.substrateSeries}</>}
                   </span>
@@ -885,7 +886,8 @@ function FermosFitSlot({
                 </ul>
                 {f.batchTimeH != null && (
                   <div className="text-caption text-ink-soft">
-                    Batch time <span className="font-num">{fmt(f.batchTimeH, 4)}</span> h, where the forecast&rsquo;s median sugar runs out.
+                    {/* §8.R: the words of the tool that kept it (a forecast's grid, a simulation's harvest), never one tool's for all. */}
+                    Batch time <span className="font-num">{fmt(f.batchTimeH, 4)}</span> h: {f.batchTimeNote ?? 'the hour its sugar runs out'}.
                   </div>
                 )}
                 {f.flags.map((w) => (
@@ -950,7 +952,7 @@ function CeilingYieldSource({ check }: { check: CeilingCheck }) {
   if (check.yieldBinding === 'artifact' && src?.id)
     return (
       <a className="chip hover:text-accent" href={href(`/biorepo/artifacts/${src.id}`)} data-testid="ceiling-yield-source" data-binding="artifact">
-        fermOS fit {src.id}
+        fermOS {(check.yieldTool && FIT_TOOL_WORDS[check.yieldTool]) || 'fit'} {src.id}
       </a>
     );
   return (
@@ -1163,6 +1165,10 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   const [ceiling, setCeiling] = useState<CeilingCheck | null>(null);
   const [ceilingProblem, setCeilingProblem] = useState<string | null>(null);
   const [panel, setPanel] = useState<ParamScope | null>(null);
+  // §8.R: a fermOS source is named as what the service bound it as (the
+  // scope is read with no override, so an overridden key keeps its source's
+  // origin): a kept simulation is a simulation, never a fit.
+  const fitWord = (key: string) => (panel?.values.find((v) => v.key === key)?.origin === 'simulation' ? 'simulation' : 'fit');
   const [panelProblem, setPanelProblem] = useState<string | null>(null);
   // The service's refusal of the scope's overrides as they stand: the panel
   // binds them as a run binds them, so a run of them would be refused in
@@ -1471,15 +1477,15 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
                   {Object.entries(chosenFits).map(([key, id]) =>
                     key in overridden ? (
                       <span key={key} className="mr-3" data-testid="fit-line" data-key={key} data-overridden="true">
-                        {labels[key] ?? key}: {overridden[key]}&rsquo;s value replaces the fermOS fit <span className="font-num">{id}</span>, and the run
-                        does not use the fit here:{' '}
+                        {labels[key] ?? key}: {overridden[key]}&rsquo;s value replaces the fermOS {fitWord(key)} <span className="font-num">{id}</span>, and the run
+                        does not use the {fitWord(key)} here:{' '}
                         <button className="underline hover:text-accent min-h-[44px]" onClick={() => clearFit(scenario.id, key)} data-testid="fit-stop-input" data-key={key}>
                           stop using it here
                         </button>
                       </span>
                     ) : (
                       <span key={key} className="mr-3" data-testid="fit-line" data-key={key} data-overridden="false">
-                        {labels[key] ?? key} from the fermOS fit <span className="font-num">{id}</span>:{' '}
+                        {labels[key] ?? key} from the fermOS {fitWord(key)} <span className="font-num">{id}</span>:{' '}
                         <button className="underline hover:text-accent min-h-[44px]" onClick={() => clearFit(scenario.id, key)} data-testid="fit-stop-input" data-key={key}>
                           stop using it here
                         </button>

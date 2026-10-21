@@ -171,6 +171,11 @@ class Provided(NamedTuple):
     # fed-batch's mu_set under a constant feed): such a key waits for
     # nothing, and is served `not-read` (OF-BLD-020 §3.R, finding 16).
     unread: Callable[[list[ParameterValue]], dict[str, str]] | None = None
+    # What a run of these resolved values would be refused for though nothing
+    # waits, in the run's own words, or None: the resolve refuses with it
+    # (a 422), by the function the run refuses with (OF-BLD-020 §8.R,
+    # finding 14).
+    refuses: Callable[[list[ParameterValue]], str | None] | None = None
 
 
 Provider = Callable[[tuple[str, ...], ParamResolveRequest], Provided]
@@ -247,6 +252,9 @@ def resolve_scope(name: str, req: ParamResolveRequest) -> ParamResolveResult:
         raise ParamRefused(f"an override names the scope it changes, and these were sent to {name}: {', '.join(stray)}")
     _, got = _provided(name, req)
     values = _not_read(got, resolve(got.specs, got.sources, req.overrides))
+    why = got.refuses(values) if got.refuses is not None else None
+    if why:
+        raise ParamRefused(why)
     added = got.basis if got.basis is not None else basis_inputs(got.specs, [v for v in values if v.overriddenBy])
     return ParamResolveResult(
         scope=name, values=values, waiting=[v.key for v in values if v.origin == "waiting"],
@@ -551,7 +559,9 @@ def flowsheet_specs(info: FlowsheetInfo) -> list[ParameterSpec]:
             convention = stated.get(fi.name)
             group = _GROUPS[fi.kind]
         else:
-            rule = (["fit"] if fi.key in proforma.FIT_KEYS else []) + [f"record:{f}" for f in fi.fields] + ["assumption"]
+            # A fermOS fit or a kept simulation a person chose (§8.R: a
+            # simulation is served as one, never as a fit).
+            rule = (["fit", "simulation"] if fi.key in proforma.FIT_KEYS else []) + [f"record:{f}" for f in fi.fields] + ["assumption"]
             group = _GROUPS[fi.kind]
         low, high, reason = _bounds(info, fi, convention)
         out.append(ParameterSpec(
@@ -567,6 +577,8 @@ def _plural(n: int, word: str) -> str:
 
 def _input_sources(inp, pool, feed: str) -> dict[str, ParameterValue | None]:
     """The candidates one bound ScenarioInput gives, by sourceRule entry."""
+    from . import proforma
+
     flags = list(inp.flags)
     if inp.leftOutNoCarbon:
         flags.append(f"{_plural(inp.leftOutNoCarbon, 'record')} of its fields left out for naming no carbon source")
@@ -583,9 +595,18 @@ def _input_sources(inp, pool, feed: str) -> dict[str, ParameterValue | None]:
                                                   source=inp.source, origin="record", recordIds=list(inp.recordIds),
                                                   detail=detail)}
     if inp.binding == "artifact":
+        aid = inp.source.id if inp.source else None
+        if proforma.artifact_tool(aid) == "fermos.simulation":
+            # §8.R (findings 0, 5, 11): a kept simulation is no fit, and no
+            # run identified anything in it; it is served as a simulation,
+            # identified null (D2), its basis naming each parameter's source.
+            detail = (inp.source.note if inp.source and inp.source.note else "a fermOS simulation a person chose") + tail
+            return {"simulation": ParameterValue(key=inp.key, value=inp.value, low=inp.low, high=inp.high,
+                                                 source=inp.source, origin="simulation", identified=None, detail=detail)}
         detail = (inp.source.note if inp.source and inp.source.note else "a fermOS fit a person chose") + tail
         # proforma.apply_fits feeds no input from a fit whose μ or Xmax is
-        # unidentified (fit_info refuses it), so a fit that feeds is one.
+        # unidentified (fit_info refuses it), so a fit that feeds is one; a
+        # simulation, which fit_info never so refuses, is served above.
         return {"fit": ParameterValue(key=inp.key, value=inp.value, low=inp.low, high=inp.high, source=inp.source,
                                       origin="fit", identified=True, detail=detail)}
     if flags:

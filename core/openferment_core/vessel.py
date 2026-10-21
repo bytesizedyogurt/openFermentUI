@@ -102,6 +102,9 @@ from .models import (
 )
 
 TOOL = "fermos.vessel"
+# The program whose chemicals the vessel is built on (its cells Yeast, its
+# product ethanol), by its id in programs.ts (§8.R, finding 6).
+YEAST_PROGRAM = "yeast"
 # 2 since §4.R: the cross-check's oxygen, the scale at every size, the
 # duty's words and the stated peak changed what a design computes.
 VERSION_WORDS = "vessel 2"
@@ -193,6 +196,18 @@ def simulation_inputs(art: Artifact) -> dict[str, Any]:
     if product not in (None, "", "ethanol"):
         raise VesselRefused(f"simulation {art.id} makes {product}; the vessel is built on the yeast program's "
                             "chemicals, whose product is ethanol")
+    # §8.R (findings 6, 13): the vessel is built on the yeast program's
+    # chemicals, so it says what it took the simulation's cells and product
+    # to be, and refuses a strain of another organism.
+    assumed: list[dict[str, str]] = []
+    strain = (o.get("strain") or next((i.value for i in art.inputs if i.name == "strain"), None))
+    organism = _organism_read(art.id, str(strain) if strain else None)
+    if organism is not None:
+        assumed.append({"name": "cells read as", "value": "Yeast", "note": organism})
+    if not product:
+        assumed.append({"name": "product read as", "value": "ethanol", "note": (
+            f"simulation {art.id} names no product: its product state is read as ethanol, the product of the yeast "
+            "program's chemicals the vessel is built on")})
     sugar = (o.get("sugar") or next((i.value for i in art.inputs if i.name == "sugar"), None))
     if sugar not in (None, "", "glucose"):
         raise VesselRefused(f"simulation {art.id} runs on {sugar}; the vessel's reaction is on glucose")
@@ -245,8 +260,33 @@ def simulation_inputs(art: Artifact) -> dict[str, Any]:
         "harvestH": harvest, "finalTitre": float(o.get("finalTitre", P)),
         "our": {"t": [float(x) for x in t], "value": [float(x) for x in value]},
         "ourPeak": our_peak,
-        "readNotes": notes,
+        "readNotes": notes + [a["note"] for a in assumed],
+        "assumed": assumed,
     }
+
+
+def _organism_read(aid: str, strain: str | None) -> str | None:
+    """Words saying the simulation's cells are read as the yeast program's
+    Yeast when that is an assumption (no strain named, or one whose species
+    cannot be read here), None when its strain is of the program's species;
+    a strain of another species is refused in words (§8.R, finding 6)."""
+    from . import module_stores, proforma
+
+    labels, species_of_program = proforma._strain_labels()
+    yeast = species_of_program.get(YEAST_PROGRAM)
+    if not strain:
+        return (f"simulation {aid} names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the "
+                "yeast program's chemicals the vessel is built on")
+    label = labels.get(strain, strain)
+    species = module_stores.species_of(label)
+    if species and yeast and species != yeast:
+        raise VesselRefused(f"simulation {aid} is of {label}, not of the yeast program's organism ({yeast}): the vessel "
+                            "is built on the yeast program's chemicals, whose cells are thermosteam's Yeast, so it "
+                            "designs no vessel for another organism's cells")
+    if species and yeast:
+        return None
+    return (f"simulation {aid} is of {label}, whose species the service cannot read here: its cells are read as yeast "
+            "(thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on")
 
 
 def _past_harvest(end_t: Any, harvest: float) -> bool:
@@ -529,6 +569,12 @@ def _held(kind: str, ws: dict[str, Any], overrides: Iterable[Override]) -> None:
     num = {k: float(v) for k, v in typed.items()
            if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v))}
     refuses = ws.get("refuses") or {}
+    # §8.R (finding 14): the pairs a design refuses are refused here, where
+    # the panel's resolve and the design both ask, never in the design alone.
+    if "plant_scale" in num and "batch_volume" in num:
+        raise VesselRefused("give plant_scale or batch_volume, not both: one sets how much broth the vessels take")
+    if "N" in num and "V_max" in num:
+        raise VesselRefused("give N or V_max, not both: BioSTEAM sizes by one of them")
     if "N" in num and "batch_volume" in num:
         raise VesselRefused("N does not apply to a batch volume: a batch volume names one vessel's working volume; leave "
                             "N to it, or give a plant scale")
@@ -805,10 +851,8 @@ def basis_inputs(req: VesselRequest) -> tuple[list[BasisInput], list[ParameterSp
     if not ({"plant_scale", "batch_volume"} & has):
         raise VesselRefused("a vessel design needs plant_scale (tonnes of product a year) or batch_volume (one vessel's "
                             "working volume, m³), a named person's assumption; neither was given")
-    if {"plant_scale", "batch_volume"} <= has:
-        raise VesselRefused("give plant_scale or batch_volume, not both: one sets how much broth the vessels take")
-    if {"N", "V_max"} <= {v.key for v in values if v.overriddenBy}:
-        raise VesselRefused("give N or V_max, not both: BioSTEAM sizes by one of them")
+    # Both scales, and N beside V_max, are refused by `_held`, which
+    # `provided` ran above for the design and runs for the panel alike.
     waiting = [v.key for v in values if v.origin == "waiting" and v.key not in ("plant_scale", "batch_volume")]
     if waiting:
         raise VesselRefused("these design parameters wait for a source: " + ", ".join(waiting))
@@ -822,6 +866,9 @@ def basis_inputs(req: VesselRequest) -> tuple[list[BasisInput], list[ParameterSp
         BasisInput(name="chemicals", value=ws["chemicals"], unit="", source=BasisSource(
             kind="model", id=f"biorefineries@{ws['biorefineries']}",
             note="the yeast program's chemicals, as the ethanol flowsheet makes them")),
+        # What the vessel took the simulation's cells or product to be (§8.R).
+        *(BasisInput(name=a["name"], value=a["value"], unit="", source=BasisSource(kind="convention", note=a["note"]))
+          for a in read["source"].get("assumed", [])),
         proforma.utility_input(),
         BasisInput(name="unit id", value="R1", unit="", source=BasisSource(
             kind="convention", note="the BioSTEAM unit id the design is built under")),
@@ -1093,12 +1140,25 @@ def summary(a: Artifact) -> VesselSummary:
         installed=(o.get("cost") or {}).get("installed"))
 
 
-def designs() -> list[VesselSummary]:
+def designs(include_archived: bool = False) -> list[VesselSummary]:
     """GET /api/fermos/vessels: every kept vessel design, newest first; a
-    read, which starts no simulator."""
-    from . import artifacts
+    read, which starts no simulator. A design for an archived program's
+    simulation (`module_stores.artifact_program`, which follows the
+    simulation it rests on) is left out unless asked (§8.R, finding 3)."""
+    from . import artifacts, module_stores, programs
 
-    return [summary(a) for a in artifacts.all_artifacts() if a.tool == TOOL]
+    out = []
+    for a in artifacts.all_artifacts():
+        if a.tool != TOOL:
+            continue
+        if not include_archived:
+            try:
+                if programs.hides(module_stores.artifact_program(a), False):
+                    continue
+            except FileNotFoundError:
+                pass
+        out.append(summary(a))
+    return out
 
 
 # ── what a design cites (OF-BLD-020 §4.2, D13) ─────────────────────────

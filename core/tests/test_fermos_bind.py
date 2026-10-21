@@ -385,7 +385,8 @@ def test_the_bind_endpoint_and_the_family_scope_bind_alike(client):
     r = client.get("/api/fermos/bind", params=q)
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"values", "waiting", "notes"} and set(body["waiting"]) == {"alpha", "p_max", "x0", "p0"}
+    assert set(body) == {"values", "waiting", "refused", "notes"} and set(body["waiting"]) == {"alpha", "p_max", "x0", "p0"}
+    assert body["refused"] is None, "what waits is said by waiting; refused is for a run nothing holds back (§8.R)"
     got = {x["key"]: x for x in body["values"]}
     assert got["mu_max"]["origin"] == "record" and got["mu_max"]["recordIds"] == ["mu1", "mu2", "mu3"]
     assert any("Records bind from the Yeast ethanol program's papers" in n for n in body["notes"])

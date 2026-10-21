@@ -689,13 +689,17 @@ export function runInputs(view: RunView, flowsheet: FlowsheetInfo | null, labels
     const fitted = view.basis.inputs.find((i) => i.name === `${key} fit` && i.source.kind === 'artifact');
     if (fitted && !records.length) {
       const part = (p: string) => num(view.basis.inputs.find((i) => i.name === `${key} fit ${p}` && i.source.kind === 'artifact')?.value);
-      // A productivity the fit gave is its titre over the hour its median
-      // sugar runs out: the basis names that hour, and so does the row.
+      // A productivity a fit or a simulation gave is its titre over its
+      // batch time: the basis names that hour, and so does the row. The
+      // words of each are the service's, chosen by the tool that kept the
+      // source (§8.R): a simulation is never called a fit here.
       const batch = view.basis.inputs.find((i) => i.name === 'fit batch time' && i.source.kind === 'artifact' && i.source.id === fitted.source.id);
       const hours = num(batch?.value);
       const notes = [
-        `a fermOS fit${fitted.source.note ? `: ${fitted.source.note}` : ''}`,
-        key === 'productivity' && batch && hours != null ? `the fit's batch time ${String(Number(hours.toPrecision(4)))} ${batch.unit}`.trim() : null,
+        `from fermOS${fitted.source.note ? `: ${fitted.source.note}` : ''}`,
+        key === 'productivity' && batch && hours != null
+          ? `batch time ${String(Number(hours.toPrecision(4)))} ${batch.unit}${batch.source.note ? `, ${batch.source.note}` : ''}`.trim()
+          : null,
       ];
       return {
         key, label, kind: 'artifact', unit: fitted.unit || declared?.unit || '', count: 0,

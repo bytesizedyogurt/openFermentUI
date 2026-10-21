@@ -383,7 +383,9 @@ def test_a_real_simulation_is_read_as_kept(store):
         assert src["start"] == {"x0": SIM_STANDIN["x0"], "s0": SIM_STANDIN["s0"], "p0": SIM_STANDIN["p0"]}
         assert src["end"] == {k: sim.end[k] for k in ("X", "S", "P")} and src["harvestH"] == sim.harvestH
         assert src["finalTitre"] == sim.finalTitre and src["used"] == pytest.approx(SIM_STANDIN["s0"] - sim.end["S"])
-        assert src["our"]["t"] == sim.our.t and src["readNotes"] == []
+        # It names no strain: the vessel says it reads its cells as yeast (§8.R, finding 6), and nothing else.
+        assert src["our"]["t"] == sim.our.t and len(src["readNotes"]) == 1 and "names no strain" in src["readNotes"][0]
+        assert [a["name"] for a in src["assumed"]] == ["cells read as"]
         peak, _ = vessel.oxygen_uptake(src)
         # The peak the simulation states, read on its solver's steps (§4.R, finding 11).
         assert (peak == sim.our.peak and peak > 0) if aerobic else peak == 0

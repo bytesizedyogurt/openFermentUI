@@ -33,6 +33,7 @@
             "note": "3 records of ethanol_yield_substrate",
             "by": null
           },
+          "yieldTool": null,
           "yieldRecords": 3,
           "yieldWords": "the median of 3 records, with the lowest and the highest",
           "rows": [],
@@ -75,6 +76,7 @@
             "note": "3 records of pha_yield_substrate",
             "by": null
           },
+          "yieldTool": null,
           "yieldRecords": 3,
           "yieldWords": "the median of 3 records, with the lowest and the highest",
           "rows": [],
@@ -121,6 +123,7 @@
             "note": "3 records of ethanol_yield_substrate",
             "by": null
           },
+          "yieldTool": null,
           "yieldRecords": 3,
           "yieldWords": "the median of 3 records, with the lowest and the highest",
           "rows": [
@@ -194,6 +197,7 @@
             "note": "3 records of pha_yield_substrate",
             "by": null
           },
+          "yieldTool": null,
           "yieldRecords": 3,
           "yieldWords": "the median of 3 records, with the lowest and the highest",
           "rows": [],
@@ -244,6 +248,7 @@
               "note": "Yp/s, product made over sugar used, from forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
               "by": null
             },
+            "yieldTool": "growth_forecast",
             "yieldRecords": 0,
             "yieldWords": "a fermOS fit's Yp/s (9493894dbc27ffad), its median with its 5th and 95th percentile",
             "rows": [],
@@ -289,6 +294,7 @@
               "note": "Yp/s, product made over sugar used, from the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
               "by": null
             },
+            "yieldTool": "kinetic_fit",
             "yieldRecords": 0,
             "yieldWords": "a fermOS fit's Yp/s (a9074acb4eeb57d9), its median with its 5th and 95th percentile",
             "rows": [],
@@ -348,6 +354,7 @@
               "note": "Yp/s, product made over sugar used, from forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
               "by": null
             },
+            "yieldTool": "growth_forecast",
             "yieldRecords": 0,
             "yieldWords": "a fermOS fit's Yp/s (9493894dbc27ffad), its median with its 5th and 95th percentile",
             "rows": [
@@ -422,6 +429,7 @@
               "note": "Yp/s, product made over sugar used, from the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
               "by": null
             },
+            "yieldTool": "kinetic_fit",
             "yieldRecords": 0,
             "yieldWords": "a fermOS fit's Yp/s (a9074acb4eeb57d9), its median with its 5th and 95th percentile",
             "rows": [

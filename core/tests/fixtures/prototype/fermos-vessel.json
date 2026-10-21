@@ -1160,7 +1160,8 @@
             "One of plant_scale and batch_volume is needed: a plant scale sizes the vessels for a year's product over the corn TEA's operating hours; a batch volume designs one vessel of that working volume (with a loading time).",
             "Each default is AeratedBioreactor's own in BioSTEAM 2.54.0, read from its code at import in the worker; a value a person types is a named assumption, and the design's basis names it.",
             "Not offered: batch, batch is held on: BioSTEAM's continuous mode divides the oxygen transfer by one hour where the batch time belongs (measured: a kLa off by the reacting time), and fermOS's simulations are batches; adiabatic, held off: the vessel's duty is what the design reads; tau_phases, BioSTEAM's own: the phases a residence time counts; reactions, built from what the simulation made; kLa_kwargs, BioSTEAM's correlation coefficients, its own.",
-            "The air flow, its vvm and the gas velocity are BioSTEAM's to solve, and are read after the design."
+            "The air flow, its vvm and the gas velocity are BioSTEAM's to solve, and are read after the design.",
+            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
           ]
         }
       },
@@ -2282,7 +2283,8 @@
             "One of plant_scale and batch_volume is needed: a plant scale sizes the vessels for a year's product over the corn TEA's operating hours; a batch volume designs one vessel of that working volume (with a loading time).",
             "Each default is AeratedBioreactor's own in BioSTEAM 2.54.0, read from its code at import in the worker; a value a person types is a named assumption, and the design's basis names it.",
             "Not offered: batch, batch is held on: BioSTEAM's continuous mode divides the oxygen transfer by one hour where the batch time belongs (measured: a kLa off by the reacting time), and fermOS's simulations are batches; adiabatic, held off: the vessel's duty is what the design reads; tau_phases, BioSTEAM's own: the phases a residence time counts; reactions, built from what the simulation made; kLa_kwargs, BioSTEAM's correlation coefficients, its own.",
-            "The air flow, its vvm and the gas velocity are BioSTEAM's to solve, and are read after the design."
+            "The air flow, its vvm and the gas velocity are BioSTEAM's to solve, and are read after the design.",
+            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
           ]
         }
       },
@@ -2659,7 +2661,8 @@
           "notes": [
             "A plant scale is needed: it sizes the vessels for a year's product over the corn TEA's operating hours. BioSTEAM's NREL batch fermenter sizes two vessels or more, so a batch volume of one vessel is not offered.",
             "Each default is NRELAnaerobicBatchBioreactor's own in BioSTEAM 2.54.0, read from its code at import in the worker; a value a person types is a named assumption, and the design's basis names it.",
-            "Not offered: reactions, built from what the simulation made; Nmin, stored by the NREL vessel and never used (measured: a large flow gave more vessels); Nmax, stored by the NREL vessel and never used (measured: a large flow gave more vessels)."
+            "Not offered: reactions, built from what the simulation made; Nmin, stored by the NREL vessel and never used (measured: a large flow gave more vessels); Nmax, stored by the NREL vessel and never used (measured: a large flow gave more vessels).",
+            "simulation 0a131e039e37b30d names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
           ]
         }
       },
@@ -3087,7 +3090,7 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "d8295a1a3a60d221",
+          "artifactId": "e751e3051a3b58f6",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
           "source": "d0415fc497aca19f",
@@ -3183,19 +3186,19 @@
             },
             {
               "label": "Agitator power, each vessel",
-              "value": 142.29736317395256,
+              "value": 142.29739377974417,
               "unit": "kW",
               "readFrom": "the agitator auxiliary's power utility (none when kW_per_m3 is zero)"
             },
             {
               "label": "Agitation power per working volume",
-              "value": 0.5203940839319788,
+              "value": 0.5203941958600745,
               "unit": "kW/m3",
               "readFrom": "the unit's kW_per_m3 after the run (solved when optimize_power is on)"
             },
             {
               "label": "Compressor power",
-              "value": 5128.88448642793,
+              "value": 5128.883813100518,
               "unit": "kW",
               "readFrom": "the compressor auxiliary's power utility"
             },
@@ -3207,67 +3210,67 @@
             },
             {
               "label": "Air cooler duty",
-              "value": -14771187.32091243,
+              "value": -14771185.381729491,
               "unit": "kJ/hr",
               "readFrom": "the air cooler auxiliary's heat utility"
             },
             {
               "label": "Air fed",
-              "value": 116085.37715914744,
+              "value": 116085.36191929007,
               "unit": "m3/hr",
               "readFrom": "the air stream, at its own conditions"
             },
             {
               "label": "Air fed",
-              "value": 4637.199876649392,
+              "value": 4637.1992678710385,
               "unit": "kmol/hr",
               "readFrom": "the air stream"
             },
             {
               "label": "Recirculation pump power, each vessel",
-              "value": 36.53514643738963,
+              "value": 36.535146544118,
               "unit": "kW",
               "readFrom": "the recirculation pump auxiliary's power utility"
             },
             {
               "label": "kLa achieved",
-              "value": 302.68592074638,
+              "value": 302.68592801835365,
               "unit": "1/hr",
               "readFrom": "get_kLa(), by Riet"
             },
             {
               "label": "Superficial gas velocity",
-              "value": 0.039801203252867616,
+              "value": 0.03980119802770769,
               "unit": "m/s",
               "readFrom": "the unit's superficial_gas_flow"
             },
             {
               "label": "Aeration, vvm",
-              "value": 0.18937171483038107,
+              "value": 0.18937168996938655,
               "unit": "1/min",
               "readFrom": "the sparged gas per vessel while it reacts over its working volume, as BioSTEAM reckons the gas velocity"
             },
             {
               "label": "Reactor duty",
-              "value": -449457417.45535564,
+              "value": -449457418.8204298,
               "unit": "kJ/hr",
               "readFrom": "the unit's _get_duty(): the enthalpy and heats of formation out less in"
             },
             {
               "label": "Cooling duty, every heat utility",
-              "value": -464228604.7762576,
+              "value": -464228604.2021717,
               "unit": "kJ/hr",
               "readFrom": "the unit's heat utilities, auxiliaries included"
             },
             {
               "label": "Electricity, the whole unit",
-              "value": 9063.199697877459,
+              "value": 9063.199700225485,
               "unit": "kW",
               "readFrom": "the unit's power utility"
             },
             {
               "label": "Utility cost",
-              "value": 3029.885240255305,
+              "value": 3029.885237568491,
               "unit": "USD/hr",
               "readFrom": "the unit's utility_cost"
             }
@@ -3683,30 +3686,30 @@
               31.165350723239285,
               9.900899137190736
             ],
-            "otr": 52.49868139869822,
+            "otr": 52.49868139869823,
             "unit": "mmol L⁻¹ h⁻¹",
             "short": [],
-            "kLa": 302.68592074638,
-            "kLaNeededAtPeak": 302.68592074638,
+            "kLa": 302.68592801835365,
+            "kLaNeededAtPeak": 302.6859280183536,
             "kLaUnit": "h⁻¹",
             "method": "Riet",
             "aerated": true,
             "oxygenBasis": "peak",
             "targetUptake": 52.49868139869822,
-            "sized": 52.4986813986982,
+            "sized": 52.49868139869821,
             "balancedUptake": 217.3696881315551,
             "scale": 0.24151794967348575,
-            "cStar": 0.6298616529355925,
-            "cL": 0.31493082646779624,
-            "drivingForce": 0.17344275964089775,
+            "cStar": 0.6298616529355924,
+            "cL": 0.3149308264677962,
+            "drivingForce": 0.17344275547396745,
             "reactionO2KmolPerH": 950.5702856629334,
-            "scaledO2KmolPerH": 229.57978641385125,
+            "scaledO2KmolPerH": 229.57978641385128,
             "simulatedO2KmolPerH": 98.61231952279888,
             "floorKmolPerH": 0.036000000000000004
           },
           "oxygenNote": null,
           "heat": {
-            "bst": -449457417.45535564,
+            "bst": -449457418.8204298,
             "convention": -45385333.93717296,
             "conventionNote": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention set beside BioSTEAM's own duty as a cross-check; applied to the oxygen the simulation took up: the trapezoid integral of its uptake over the batch to harvest, 216.1 mmol L⁻¹, times each vessel's working volume, 273.4 m³, and the vessels, 22, over the 13.18 h cycle: 98.61 kmol/hr",
             "unit": "kJ/hr",
@@ -3716,8 +3719,8 @@
             "dutyNote": "from the reaction's enthalpy and heats of formation, out less in (AeratedBioreactor._get_duty, with no heat per oxygen forced)"
           },
           "cost": {
-            "purchase": 16699042.20488151,
-            "installed": 37942507.267473966,
+            "purchase": 16699042.11108464,
+            "installed": 37942506.81695423,
             "byItem": {
               "Vertical pressure vessel": {
                 "purchase": 6784969.892481726,
@@ -3728,31 +3731,31 @@
                 "installed": 1206062.2594276203
               },
               "Compressor - Compressor(s)": {
-                "purchase": 3377520.1547239744,
-                "installed": 7261668.332656545
+                "purchase": 3377519.8335651797,
+                "installed": 7261667.6421651365
               },
               "Air cooler - Floating head": {
-                "purchase": 35672.629341154054,
-                "installed": 114192.74205699709
+                "purchase": 35672.62721879997,
+                "installed": 114192.73526306468
               },
               "Heat exchanger - Floating head": {
-                "purchase": 2829939.3833646933,
-                "installed": 9086089.73561286
+                "purchase": 2829939.3903944856,
+                "installed": 9086089.758183423
               },
               "Recirculation pump - Pump": {
-                "purchase": 614471.4696988793,
-                "installed": 1321113.6598525902
+                "purchase": 614471.4709230228,
+                "installed": 1321113.6624844992
               },
               "Recirculation pump - Motor": {
-                "purchase": 47060.87407790898,
-                "installed": 155300.88445709963
+                "purchase": 47060.874222603816,
+                "installed": 155300.88493459258
               },
               "Agitator - Agitator": {
-                "purchase": 1803345.5417655534,
-                "installed": 1803345.5417655534
+                "purchase": 1803345.7628512015,
+                "installed": 1803345.7628512015
               }
             },
-            "utility": 3029.885240255305,
+            "utility": 3029.885237568491,
             "costIndex": 567.5,
             "costIndexYear": 2017,
             "note": "BioSTEAM's own cost correlations for this class and its auxiliaries, at the plant cost index it holds (its default, of 2017); installed is purchase times BioSTEAM's bare-module factors. The NREL vessel's correlations are scaled from their own base index to it."
@@ -4263,7 +4266,7 @@
             "N": null,
             "loading_time": null,
             "length_to_diameter": 3.0,
-            "kW_per_m3": 0.5203940839319788,
+            "kW_per_m3": 0.5203941958600745,
             "vessel_material": "Stainless steel 316",
             "vessel_type": "Vertical",
             "heat_exchanger_configuration": "recirculation loop",
@@ -4286,16 +4289,17 @@
             "equation": "Reaction('Glucose + 3.76 O2 -> 3.93 Water + 0.541 Ethanol + 4.37 CO2 + 0.552 Yeast', reactant='Glucose', X=0.999, basis='mol')",
             "stoichiometry": {
               "Glucose": -1.0,
-              "O2": -3.7559258153125463,
+              "O2": -3.7559258153125468,
               "Yeast": 0.5520404011459751,
               "Ethanol": 0.5414696114670323,
               "CO2": 4.36502037591996,
-              "Water": 3.931198642676393
+              "Water": 3.9311986426763936
             },
             "glucoseUsedShare": 0.9989999999999999,
             "impliedYxo": 0.10377599373199474
           },
           "flags": [
+            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
             "the reaction consumes 0.2415 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
             "the reaction's yields balance 950.6 kmol/hr of oxygen and the simulation took up 98.61 kmol/hr over the batch (0.104 times as much), apart by more than 0.1 of the reaction's, the stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up",
             "BioSTEAM warned: CostWarning: <AeratedBioreactor: R1> Vertical vessel length (51.72 ft) is out of bounds (12 to 40 ft) for cost correlation",
@@ -4308,7 +4312,7 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "d8295a1a3a60d221",
+            "id": "e751e3051a3b58f6",
             "label": "Vessel design for fermos.simulation d0415fc497aca19f: BioSTEAM's AeratedBioreactor, stirred tank, the number of vessels it sized (every other number is in the artifact)",
             "value": 22.0,
             "unit": "vessels",
@@ -4348,6 +4352,17 @@
                     "kind": "model",
                     "id": "biorefineries@2.35.1",
                     "note": "the yeast program's chemicals, as the ethanol flowsheet makes them",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "cells read as",
+                  "value": "Yeast",
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
                     "by": null
                   }
                 },
@@ -4671,7 +4686,7 @@
                   }
                 }
               ],
-              "artifactId": "d8295a1a3a60d221",
+              "artifactId": "e751e3051a3b58f6",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },
@@ -4711,7 +4726,7 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "8729d09ddf237999",
+          "artifactId": "6f076f5647ddae39",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
           "source": "d0415fc497aca19f",
@@ -5317,14 +5332,14 @@
             "aerated": true,
             "oxygenBasis": "peak",
             "targetUptake": 52.49868139869822,
-            "sized": 52.4986813986982,
+            "sized": 52.49868139869821,
             "balancedUptake": 217.3696881315551,
             "scale": 0.24151794967348575,
             "cStar": 0.6298616529355925,
             "cL": 0.31493082646779624,
             "drivingForce": 0.16840564283071785,
             "reactionO2KmolPerH": 950.5702856629334,
-            "scaledO2KmolPerH": 229.57978641385125,
+            "scaledO2KmolPerH": 229.57978641385128,
             "simulatedO2KmolPerH": 98.61231952279888,
             "floorKmolPerH": 0.036000000000000004
           },
@@ -5906,16 +5921,17 @@
             "equation": "Reaction('Glucose + 3.76 O2 -> 3.93 Water + 0.541 Ethanol + 4.37 CO2 + 0.552 Yeast', reactant='Glucose', X=0.999, basis='mol')",
             "stoichiometry": {
               "Glucose": -1.0,
-              "O2": -3.7559258153125463,
+              "O2": -3.7559258153125468,
               "Yeast": 0.5520404011459751,
               "Ethanol": 0.5414696114670323,
               "CO2": 4.36502037591996,
-              "Water": 3.931198642676393
+              "Water": 3.9311986426763936
             },
             "glucoseUsedShare": 0.9989999999999999,
             "impliedYxo": 0.10377599373199474
           },
           "flags": [
+            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
             "the reaction consumes 0.2415 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
             "the reaction's yields balance 950.6 kmol/hr of oxygen and the simulation took up 98.61 kmol/hr over the batch (0.104 times as much), apart by more than 0.1 of the reaction's, the stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up",
             "BioSTEAM warned: CostWarning: <AeratedBioreactor: R1> Vertical vessel length (51.72 ft) is out of bounds (12 to 40 ft) for cost correlation",
@@ -5927,7 +5943,7 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "8729d09ddf237999",
+            "id": "6f076f5647ddae39",
             "label": "Vessel design for fermos.simulation d0415fc497aca19f: BioSTEAM's AeratedBioreactor, bubble column, the number of vessels it sized (every other number is in the artifact)",
             "value": 22.0,
             "unit": "vessels",
@@ -5967,6 +5983,17 @@
                     "kind": "model",
                     "id": "biorefineries@2.35.1",
                     "note": "the yeast program's chemicals, as the ethanol flowsheet makes them",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "cells read as",
+                  "value": "Yeast",
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
                     "by": null
                   }
                 },
@@ -6290,7 +6317,7 @@
                   }
                 }
               ],
-              "artifactId": "8729d09ddf237999",
+              "artifactId": "6f076f5647ddae39",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },
@@ -6320,7 +6347,7 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "760e4449a856ea16",
+          "artifactId": "542ebfe70cd15063",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
           "source": "0a131e039e37b30d",
@@ -6653,7 +6680,8 @@
             "theoreticalEthanolYield": 0.5114286583374353
           },
           "flags": [
-            "the batch used 62.54 g L⁻¹ more glucose than ethanol and cell formation take by their stoichiometry (maintenance and by-products the family does not model); in the vessel it stays in the broth unconverted, as the ethanol flowsheet leaves it"
+            "the batch used 62.54 g L⁻¹ more glucose than ethanol and cell formation take by their stoichiometry (maintenance and by-products the family does not model); in the vessel it stays in the broth unconverted, as the ethanol flowsheet leaves it",
+            "simulation 0a131e039e37b30d names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
           ],
           "versions": {
             "biosteam": "2.54.0",
@@ -6661,7 +6689,7 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "760e4449a856ea16",
+            "id": "542ebfe70cd15063",
             "label": "Vessel design for fermos.simulation 0a131e039e37b30d: BioSTEAM's NRELAnaerobicBatchBioreactor, the number of vessels it sized (every other number is in the artifact)",
             "value": 3.0,
             "unit": "vessels",
@@ -6701,6 +6729,17 @@
                     "kind": "model",
                     "id": "biorefineries@2.35.1",
                     "note": "the yeast program's chemicals, as the ethanol flowsheet makes them",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "cells read as",
+                  "value": "Yeast",
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "simulation 0a131e039e37b30d names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
                     "by": null
                   }
                 },
@@ -6815,7 +6854,7 @@
                   }
                 }
               ],
-              "artifactId": "760e4449a856ea16",
+              "artifactId": "542ebfe70cd15063",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },
@@ -6855,7 +6894,7 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "8f0f32642dcd9e11",
+          "artifactId": "0c34e9f82967e2a3",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
           "source": "d0415fc497aca19f",
@@ -6951,19 +6990,19 @@
             },
             {
               "label": "Agitator power, each vessel",
-              "value": 142.29736317395256,
+              "value": 142.29739377974417,
               "unit": "kW",
               "readFrom": "the agitator auxiliary's power utility (none when kW_per_m3 is zero)"
             },
             {
               "label": "Agitation power per working volume",
-              "value": 0.5203940839319788,
+              "value": 0.5203941958600745,
               "unit": "kW/m3",
               "readFrom": "the unit's kW_per_m3 after the run (solved when optimize_power is on)"
             },
             {
               "label": "Compressor power",
-              "value": 5128.88448642793,
+              "value": 5128.883813100518,
               "unit": "kW",
               "readFrom": "the compressor auxiliary's power utility"
             },
@@ -6975,43 +7014,43 @@
             },
             {
               "label": "Air cooler duty",
-              "value": -14771187.32091243,
+              "value": -14771185.381729491,
               "unit": "kJ/hr",
               "readFrom": "the air cooler auxiliary's heat utility"
             },
             {
               "label": "Air fed",
-              "value": 116085.37715914744,
+              "value": 116085.36191929007,
               "unit": "m3/hr",
               "readFrom": "the air stream, at its own conditions"
             },
             {
               "label": "Air fed",
-              "value": 4637.199876649392,
+              "value": 4637.1992678710385,
               "unit": "kmol/hr",
               "readFrom": "the air stream"
             },
             {
               "label": "Recirculation pump power, each vessel",
-              "value": 8.667008650470098,
+              "value": 8.667008651134442,
               "unit": "kW",
               "readFrom": "the recirculation pump auxiliary's power utility"
             },
             {
               "label": "kLa achieved",
-              "value": 302.68592074638,
+              "value": 302.68592801835365,
               "unit": "1/hr",
               "readFrom": "get_kLa(), by Riet"
             },
             {
               "label": "Superficial gas velocity",
-              "value": 0.039801203252867616,
+              "value": 0.03980119802770769,
               "unit": "m/s",
               "readFrom": "the unit's superficial_gas_flow"
             },
             {
               "label": "Aeration, vvm",
-              "value": 0.18937171483038107,
+              "value": 0.18937168996938655,
               "unit": "1/min",
               "readFrom": "the sparged gas per vessel while it reacts over its working volume, as BioSTEAM reckons the gas velocity"
             },
@@ -7023,19 +7062,19 @@
             },
             {
               "label": "Cooling duty, every heat utility",
-              "value": -106603101.88645275,
+              "value": -106603099.9472698,
               "unit": "kJ/hr",
               "readFrom": "the unit's heat utilities, auxiliaries included"
             },
             {
               "label": "Electricity, the whole unit",
-              "value": 8450.100666565228,
+              "value": 8450.100666579847,
               "unit": "kW",
               "readFrom": "the unit's power utility"
             },
             {
               "label": "Utility cost",
-              "value": 1193.8133815576643,
+              "value": 1193.813371862893,
               "unit": "USD/hr",
               "readFrom": "the unit's utility_cost"
             }
@@ -7451,24 +7490,24 @@
               31.165350723239285,
               9.900899137190736
             ],
-            "otr": 52.49868139869822,
+            "otr": 52.49868139869823,
             "unit": "mmol L⁻¹ h⁻¹",
             "short": [],
-            "kLa": 302.68592074638,
-            "kLaNeededAtPeak": 302.68592074638,
+            "kLa": 302.68592801835365,
+            "kLaNeededAtPeak": 302.6859280183536,
             "kLaUnit": "h⁻¹",
             "method": "Riet",
             "aerated": true,
             "oxygenBasis": "peak",
             "targetUptake": 52.49868139869822,
-            "sized": 52.4986813986982,
+            "sized": 52.49868139869821,
             "balancedUptake": 217.3696881315551,
             "scale": 0.24151794967348575,
-            "cStar": 0.6298616529355925,
-            "cL": 0.31493082646779624,
-            "drivingForce": 0.17344275964089775,
+            "cStar": 0.6298616529355924,
+            "cL": 0.3149308264677962,
+            "drivingForce": 0.17344275547396745,
             "reactionO2KmolPerH": 950.5702856629334,
-            "scaledO2KmolPerH": 229.57978641385125,
+            "scaledO2KmolPerH": 229.57978641385128,
             "simulatedO2KmolPerH": 98.61231952279888,
             "floorKmolPerH": 0.036000000000000004
           },
@@ -7484,8 +7523,8 @@
             "dutyNote": "forced: Q_O2_consumption, -4e+05 kJ/kmol, typed by openFerment test fixture, times the oxygen the vessel consumed, 229.6 kmol/hr (AeratedBioreactor._get_duty with a heat per oxygen set); that oxygen is the reaction's scaled ×0.2415 to size the air for the simulation's peak uptake, so this duty is the heat at that uptake, not the batch's on average"
           },
           "cost": {
-            "purchase": 14330919.003549062,
-            "installed": 31000523.42042183,
+            "purchase": 14330918.90135939,
+            "installed": 31000522.944241382,
             "byItem": {
               "Vertical pressure vessel": {
                 "purchase": 6784969.892481726,
@@ -7496,31 +7535,31 @@
                 "installed": 1206062.2594276203
               },
               "Compressor - Compressor(s)": {
-                "purchase": 3377520.1547239744,
-                "installed": 7261668.332656545
+                "purchase": 3377519.8335651797,
+                "installed": 7261667.6421651365
               },
               "Air cooler - Floating head": {
-                "purchase": 35672.629341154054,
-                "installed": 114192.74205699709
+                "purchase": 35672.62721879997,
+                "installed": 114192.73526306468
               },
               "Heat exchanger - Floating head": {
                 "purchase": 968990.5029228533,
                 "installed": 3111138.957346023
               },
               "Recirculation pump - Pump": {
-                "purchase": 139611.07128694752,
-                "installed": 460716.5352469268
+                "purchase": 139611.07129216695,
+                "installed": 460716.5352641508
               },
               "Recirculation pump - Motor": {
-                "purchase": 14746.951599232274,
-                "installed": 48664.9402774665
+                "purchase": 14746.95159984363,
+                "installed": 48664.94027948398
               },
               "Agitator - Agitator": {
-                "purchase": 1803345.5417655534,
-                "installed": 1803345.5417655534
+                "purchase": 1803345.7628512015,
+                "installed": 1803345.7628512015
               }
             },
-            "utility": 1193.8133815576643,
+            "utility": 1193.813371862893,
             "costIndex": 567.5,
             "costIndexYear": 2017,
             "note": "BioSTEAM's own cost correlations for this class and its auxiliaries, at the plant cost index it holds (its default, of 2017); installed is purchase times BioSTEAM's bare-module factors. The NREL vessel's correlations are scaled from their own base index to it."
@@ -8031,7 +8070,7 @@
             "N": null,
             "loading_time": null,
             "length_to_diameter": 3.0,
-            "kW_per_m3": 0.5203940839319788,
+            "kW_per_m3": 0.5203941958600745,
             "vessel_material": "Stainless steel 316",
             "vessel_type": "Vertical",
             "heat_exchanger_configuration": "recirculation loop",
@@ -8054,16 +8093,17 @@
             "equation": "Reaction('Glucose + 3.76 O2 -> 3.93 Water + 0.541 Ethanol + 4.37 CO2 + 0.552 Yeast', reactant='Glucose', X=0.999, basis='mol')",
             "stoichiometry": {
               "Glucose": -1.0,
-              "O2": -3.7559258153125463,
+              "O2": -3.7559258153125468,
               "Yeast": 0.5520404011459751,
               "Ethanol": 0.5414696114670323,
               "CO2": 4.36502037591996,
-              "Water": 3.931198642676393
+              "Water": 3.9311986426763936
             },
             "glucoseUsedShare": 0.9989999999999999,
             "impliedYxo": 0.10377599373199474
           },
           "flags": [
+            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
             "the reaction consumes 0.2415 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
             "the reaction's yields balance 950.6 kmol/hr of oxygen and the simulation took up 98.61 kmol/hr over the batch (0.104 times as much), apart by more than 0.1 of the reaction's, the stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up",
             "BioSTEAM warned: CostWarning: <AeratedBioreactor: R1> Vertical vessel length (51.72 ft) is out of bounds (12 to 40 ft) for cost correlation",
@@ -8076,7 +8116,7 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "8f0f32642dcd9e11",
+            "id": "0c34e9f82967e2a3",
             "label": "Vessel design for fermos.simulation d0415fc497aca19f: BioSTEAM's AeratedBioreactor, stirred tank, the number of vessels it sized (every other number is in the artifact)",
             "value": 22.0,
             "unit": "vessels",
@@ -8116,6 +8156,17 @@
                     "kind": "model",
                     "id": "biorefineries@2.35.1",
                     "note": "the yeast program's chemicals, as the ethanol flowsheet makes them",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "cells read as",
+                  "value": "Yeast",
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
                     "by": null
                   }
                 },
@@ -8450,7 +8501,7 @@
                   }
                 }
               ],
-              "artifactId": "8f0f32642dcd9e11",
+              "artifactId": "0c34e9f82967e2a3",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },

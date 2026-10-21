@@ -50,6 +50,7 @@
               "group": "Process",
               "sourceRule": [
                 "fit",
+                "simulation",
                 "record:ethanol_titre",
                 "assumption"
               ],
@@ -72,6 +73,7 @@
               "group": "Process",
               "sourceRule": [
                 "fit",
+                "simulation",
                 "record:ethanol_yield_substrate",
                 "assumption"
               ],
@@ -94,6 +96,7 @@
               "group": "Process",
               "sourceRule": [
                 "fit",
+                "simulation",
                 "record:ethanol_productivity",
                 "assumption"
               ],
@@ -348,6 +351,7 @@
               "group": "Process",
               "sourceRule": [
                 "fit",
+                "simulation",
                 "record:ethanol_titre",
                 "assumption"
               ],
@@ -370,6 +374,7 @@
               "group": "Process",
               "sourceRule": [
                 "fit",
+                "simulation",
                 "record:ethanol_yield_substrate",
                 "assumption"
               ],
@@ -392,6 +397,7 @@
               "group": "Process",
               "sourceRule": [
                 "fit",
+                "simulation",
                 "record:ethanol_productivity",
                 "assumption"
               ],

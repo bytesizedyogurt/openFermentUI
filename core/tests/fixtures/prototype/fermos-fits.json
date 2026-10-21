@@ -56,6 +56,7 @@
             "productSeries": "Ethanol (STAND-IN)",
             "substrateSeries": "Glucose (STAND-IN)",
             "batchTimeH": null,
+            "batchTimeNote": null,
             "feeds": [
               {
                 "key": "titre",
@@ -99,6 +100,7 @@
             "productSeries": "Ethanol (STAND-IN)",
             "substrateSeries": "Glucose (STAND-IN)",
             "batchTimeH": 82.9164214090859,
+            "batchTimeNote": "the hour the forecast's median sugar runs out, found between its grid points; productivity is the fit's titre over it, and titre is the same fit's",
             "feeds": [
               {
                 "key": "titre",
@@ -147,6 +149,7 @@
             "productSeries": "Ethanol (STAND-IN)",
             "substrateSeries": "Glucose (STAND-IN)",
             "batchTimeH": null,
+            "batchTimeNote": null,
             "feeds": [
               {
                 "key": "titre",
@@ -190,6 +193,7 @@
             "productSeries": "Ethanol (STAND-IN)",
             "substrateSeries": "Glucose (STAND-IN)",
             "batchTimeH": null,
+            "batchTimeNote": null,
             "feeds": [
               {
                 "key": "titre",
