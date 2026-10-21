@@ -1,0 +1,2624 @@
+{
+  "id": "7206dec026253337",
+  "tool": "pureos.train_run",
+  "toolVersion": "train run 1 · biosteam 2.54.0 · thermosteam 0.54.2 · biorefineries 2.35.1",
+  "inputs": [
+    {
+      "name": "train",
+      "value": "{\"id\":\"tr-yeast-ethanol-n2\",\"inlet\":{\"kind\":\"run-stream\",\"params\":{},\"ref\":\"1b2f2c463c872086\",\"streamId\":\"s48\",\"vessel\":null},\"name\":\"Fuel ethanol from the corn plant's beer, from the catalogue\",\"product\":\"ethanol\",\"program\":\"yeast\",\"units\":[{\"id\":\"D1\",\"outlets\":{\"bottoms\":\"waste\",\"distillate\":\"onward\"},\"params\":{},\"readFrom\":{\"flowsheet\":\"ethanol_glucose_v0\",\"unit\":\"D302\"},\"records\":{},\"type\":\"distillation\"},{\"id\":\"M1\",\"outlets\":{\"outlet\":\"onward\"},\"params\":{},\"readFrom\":null,\"records\":{},\"type\":\"mixer\"},{\"id\":\"D2\",\"outlets\":{\"bottoms\":\"waste\",\"distillate\":\"onward\"},\"params\":{},\"readFrom\":{\"flowsheet\":\"ethanol_glucose_v0\",\"unit\":\"D303\"},\"records\":{},\"type\":\"distillation\"},{\"id\":\"MS1\",\"outlets\":{\"product\":\"recycle:M1\",\"regenerate\":\"onward\"},\"params\":{},\"readFrom\":{\"flowsheet\":\"ethanol_glucose_v0\",\"unit\":\"U301\"},\"records\":{},\"type\":\"molecular-sieve\"}]}",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the train as data (D9), as the request sent it: its inlet, its units in order, where each outlet goes, and every value a person typed, each also named below with its source",
+        "by": null
+      }
+    },
+    {
+      "name": "program",
+      "value": "yeast",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the train's program",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "ethanol",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the train's product",
+        "by": null
+      }
+    },
+    {
+      "name": "product chemical",
+      "value": "Ethanol",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "thermosteam's own name for ethanol, as thermo.CHEMICALS names it: the chemical the train traces",
+        "by": null
+      }
+    },
+    {
+      "name": "chemicals",
+      "value": "the yeast program's chemicals, as the ethanol flowsheet builds on them (biorefineries.corn.create_chemicals)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "the chemical set every unit of the train is built on",
+        "by": null
+      }
+    },
+    {
+      "name": "biorefineries",
+      "value": "2.35.1",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "the biorefineries version the worker ran",
+        "by": null
+      }
+    },
+    {
+      "name": "biosteam",
+      "value": "2.54.0",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "the biosteam version the worker ran",
+        "by": null
+      }
+    },
+    {
+      "name": "thermosteam",
+      "value": "0.54.2",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "thermosteam@0.54.2",
+        "note": "the thermosteam version the worker ran",
+        "by": null
+      }
+    },
+    {
+      "name": "utility prices and cost index",
+      "value": "biosteam.process_tools.default_utilities() and default_CEPCI()",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "BioSTEAM's own default prices of electricity and of each heating and cooling agent, and its default plant cost index, set at the start of every case and read back after it, each value the case used (cepci, electricityPrice, and each agent's price and temperature)",
+        "by": null
+      }
+    },
+    {
+      "name": "diagram",
+      "value": "not drawn: Graphviz's dot was not on the path of the host that made this run",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "D8: the flowsheet diagram is drawn with Graphviz when its dot is on the host's path; the run is the same plant either way, and a host with Graphviz keeps a run of its own",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet kind",
+      "value": "run-stream",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the inlet is a stream of a kept run, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet",
+      "value": "1b2f2c463c872086",
+      "unit": "",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "the proforma.reference the inlet is read from",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet stream",
+      "value": "s48",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the stream of that run the train takes",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.T",
+      "value": 365.4788105,
+      "unit": "K",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.P",
+      "value": 607950.0,
+      "unit": "Pa",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.Water",
+      "value": 111315.4701,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "Water in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.Ethanol",
+      "value": 15001.21739,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "Ethanol in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.Ash",
+      "value": 647.30225,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "Ash in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.Yeast",
+      "value": 295.8516171,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "Yeast in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.CaO",
+      "value": 4.73025,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "CaO in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.TriOlein",
+      "value": 1754.486328,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "TriOlein in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.H2SO4",
+      "value": 47.62605235,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "H2SO4 in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.Fiber",
+      "value": 5548.236778,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "Fiber in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.SolubleProtein",
+      "value": 1899.421316,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "SolubleProtein in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet.flow.InsolubleProtein",
+      "value": 2318.00016,
+      "unit": "kg/hr",
+      "source": {
+        "kind": "artifact",
+        "id": "1b2f2c463c872086",
+        "note": "InsolubleProtein in stream s48 of run 1b2f2c463c872086, as its stream table holds it",
+        "by": null
+      }
+    },
+    {
+      "name": "inlet phase",
+      "value": "l",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the phase stream s48 of run 1b2f2c463c872086 is in",
+        "by": null
+      }
+    },
+    {
+      "name": "D1 type",
+      "value": "distillation",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "BinaryDistillation: separates two keys by repeated boiling and condensing on trays: the lighter leaves at the top, the heavier at the bottom, each to the purity or recovery set",
+        "by": null
+      }
+    },
+    {
+      "name": "D1 class",
+      "value": "BinaryDistillation",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "BioSTEAM's BinaryDistillation, built as unit D1",
+        "by": null
+      }
+    },
+    {
+      "name": "D1 outlet distillate",
+      "value": "onward",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "where outlet distillate goes, as the train routes it (D9)",
+        "by": null
+      }
+    },
+    {
+      "name": "D1 outlet bottoms",
+      "value": "waste",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "where outlet bottoms goes, as the train routes it (D9)",
+        "by": null
+      }
+    },
+    {
+      "name": "D1 reads",
+      "value": "ethanol_glucose_v0 D302",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "the shelf flowsheet's own unit whose values unit D1 takes first",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.light_key",
+      "value": "Ethanol",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.heavy_key",
+      "value": "Water",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.k",
+      "value": 1.1,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.P",
+      "value": 212782.5,
+      "unit": "Pa",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.Rmin",
+      "value": 0.001,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.product_specification_format",
+      "value": "Composition",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.y_top",
+      "value": 0.28,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.x_bot",
+      "value": 3.9106e-6,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.vessel_material",
+      "value": "Stainless steel 304",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.tray_material",
+      "value": "Stainless steel 304",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.tray_type",
+      "value": "Sieve",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.tray_spacing",
+      "value": 450.0,
+      "unit": "mm",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.velocity_fraction",
+      "value": 0.8,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.foaming_factor",
+      "value": 1.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.open_tray_area",
+      "value": 0.1,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.is_divided",
+      "value": "false",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.vacuum_system_preference",
+      "value": "Liquid-ring pump",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.partial_condenser",
+      "value": "true",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D1.weir_height",
+      "value": 0.1,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "M1 type",
+      "value": "mixer",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "Mixer: joins its inlets into one stream",
+        "by": null
+      }
+    },
+    {
+      "name": "M1 class",
+      "value": "Mixer",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "BioSTEAM's Mixer, built as unit M1",
+        "by": null
+      }
+    },
+    {
+      "name": "M1 outlet outlet",
+      "value": "onward",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "where outlet outlet goes, as the train routes it (D9)",
+        "by": null
+      }
+    },
+    {
+      "name": "M1.rigorous",
+      "value": "false",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "Mixer's own default for rigorous, read from Mixer._init's signature",
+        "by": null
+      }
+    },
+    {
+      "name": "M1.conserve_phases",
+      "value": "false",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "Mixer's own default for conserve_phases, read from Mixer._init's signature",
+        "by": null
+      }
+    },
+    {
+      "name": "D2 type",
+      "value": "distillation",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "BinaryDistillation: separates two keys by repeated boiling and condensing on trays: the lighter leaves at the top, the heavier at the bottom, each to the purity or recovery set",
+        "by": null
+      }
+    },
+    {
+      "name": "D2 class",
+      "value": "BinaryDistillation",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "BioSTEAM's BinaryDistillation, built as unit D2",
+        "by": null
+      }
+    },
+    {
+      "name": "D2 outlet distillate",
+      "value": "onward",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "where outlet distillate goes, as the train routes it (D9)",
+        "by": null
+      }
+    },
+    {
+      "name": "D2 outlet bottoms",
+      "value": "waste",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "where outlet bottoms goes, as the train routes it (D9)",
+        "by": null
+      }
+    },
+    {
+      "name": "D2 reads",
+      "value": "ethanol_glucose_v0 D303",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "the shelf flowsheet's own unit whose values unit D2 takes first",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.light_key",
+      "value": "Ethanol",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.heavy_key",
+      "value": "Water",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.k",
+      "value": 1.2,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.P",
+      "value": 162120.0,
+      "unit": "Pa",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.Rmin",
+      "value": 0.01,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.product_specification_format",
+      "value": "Composition",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.y_top",
+      "value": 0.80805,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.x_bot",
+      "value": 3.9106e-6,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.vessel_material",
+      "value": "Stainless steel 304",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.tray_material",
+      "value": "Stainless steel 304",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.tray_type",
+      "value": "Sieve",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.tray_spacing",
+      "value": 450.0,
+      "unit": "mm",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.velocity_fraction",
+      "value": 0.8,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.foaming_factor",
+      "value": 1.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.open_tray_area",
+      "value": 0.1,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.is_divided",
+      "value": "true",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.vacuum_system_preference",
+      "value": "Liquid-ring pump",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.partial_condenser",
+      "value": "true",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "D2.weir_height",
+      "value": 0.1,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1 type",
+      "value": "molecular-sieve",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "Molecular sieve: adsorbs the water distillation cannot take past the azeotrope: each component splits between the dehydrated product and the regenerate",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1 class",
+      "value": "MolecularSieve",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "BioSTEAM's MolecularSieve, built as unit MS1",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1 outlet product",
+      "value": "recycle:M1",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "where outlet product goes, as the train routes it (D9)",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1 outlet regenerate",
+      "value": "onward",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "where outlet regenerate goes, as the train routes it (D9)",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1 reads",
+      "value": "ethanol_glucose_v0 U301",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "the shelf flowsheet's own unit whose values unit MS1 takes first",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.Ash",
+      "value": 0.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.CaO",
+      "value": 0.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.Ethanol",
+      "value": 0.16210942764472103,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.Fiber",
+      "value": 0.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.H2SO4",
+      "value": 0.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.InsolubleProtein",
+      "value": 0.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.SolubleProtein",
+      "value": 0.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.TriOlein",
+      "value": 0.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.Water",
+      "value": 0.9249990967229107,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.split.Yeast",
+      "value": 0.0,
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    },
+    {
+      "name": "MS1.approx_duty",
+      "value": "true",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries@2.35.1",
+        "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "train": {
+      "id": "tr-yeast-ethanol-n2",
+      "name": "Fuel ethanol from the corn plant's beer, from the catalogue",
+      "program": "yeast",
+      "product": "ethanol",
+      "inlet": {
+        "kind": "run-stream",
+        "ref": "1b2f2c463c872086",
+        "streamId": "s48",
+        "vessel": null,
+        "params": {}
+      },
+      "units": [
+        {
+          "id": "D1",
+          "type": "distillation",
+          "params": {},
+          "outlets": {
+            "bottoms": "waste",
+            "distillate": "onward"
+          },
+          "records": {},
+          "readFrom": {
+            "flowsheet": "ethanol_glucose_v0",
+            "unit": "D302"
+          }
+        },
+        {
+          "id": "M1",
+          "type": "mixer",
+          "params": {},
+          "outlets": {
+            "outlet": "onward"
+          },
+          "records": {},
+          "readFrom": null
+        },
+        {
+          "id": "D2",
+          "type": "distillation",
+          "params": {},
+          "outlets": {
+            "bottoms": "waste",
+            "distillate": "onward"
+          },
+          "records": {},
+          "readFrom": {
+            "flowsheet": "ethanol_glucose_v0",
+            "unit": "D303"
+          }
+        },
+        {
+          "id": "MS1",
+          "type": "molecular-sieve",
+          "params": {},
+          "outlets": {
+            "product": "recycle:M1",
+            "regenerate": "onward"
+          },
+          "records": {},
+          "readFrom": {
+            "flowsheet": "ethanol_glucose_v0",
+            "unit": "U301"
+          }
+        }
+      ]
+    },
+    "flowsheet": null,
+    "tablesSource": "BioSTEAM 2.54.0, thermosteam 0.54.2",
+    "streams": [
+      {
+        "id": "inlet",
+        "source": null,
+        "sink": "D1",
+        "phase": "l",
+        "T": 365.4788105,
+        "P": 607950.0,
+        "massFlow": 138832.34224145,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "D1_distillate",
+        "source": "D1",
+        "sink": "M1",
+        "phase": "g",
+        "T": 386.1565230421072,
+        "P": 212782.5,
+        "massFlow": 30084.049975600272,
+        "massFlows": {
+          "Water": 15083.794919156875,
+          "Ethanol": 15000.255056443397
+        },
+        "price": null
+      },
+      {
+        "id": "D1_bottoms",
+        "source": "D1",
+        "sink": null,
+        "phase": "l",
+        "T": 395.32826677446303,
+        "P": 212782.5,
+        "massFlow": 108748.29226584974,
+        "massFlows": {
+          "Water": 96231.67518084313,
+          "Ethanol": 0.9623335566031956,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "MS1_product",
+        "source": "MS1",
+        "sink": "M1",
+        "phase": "g",
+        "T": 363.9468943454389,
+        "P": 162120.0,
+        "massFlow": 4440.400549911765,
+        "massFlows": {
+          "Water": 1538.28111872291,
+          "Ethanol": 2902.1194311888553
+        },
+        "price": null
+      },
+      {
+        "id": "M1_outlet",
+        "source": "M1",
+        "sink": "D2",
+        "phase": "g",
+        "T": 383.37605325515176,
+        "P": 162120.0,
+        "massFlow": 34524.45052551204,
+        "massFlows": {
+          "Water": 16622.076037879786,
+          "Ethanol": 17902.374487632253
+        },
+        "price": null
+      },
+      {
+        "id": "D2_distillate",
+        "source": "D2",
+        "sink": "MS1",
+        "phase": "g",
+        "T": 363.9468943454389,
+        "P": 162120.0,
+        "massFlow": 19565.233133131336,
+        "massFlows": {
+          "Water": 1663.0082387893528,
+          "Ethanol": 17902.224894341984
+        },
+        "price": null
+      },
+      {
+        "id": "D2_bottoms",
+        "source": "D2",
+        "sink": null,
+        "phase": "l",
+        "T": 386.84602910017,
+        "P": 162120.0,
+        "massFlow": 14959.2173923807,
+        "massFlows": {
+          "Water": 14959.067799090433,
+          "Ethanol": 0.1495932902670012
+        },
+        "price": null
+      },
+      {
+        "id": "MS1_regenerate",
+        "source": "MS1",
+        "sink": null,
+        "phase": "g",
+        "T": 363.9468943454389,
+        "P": 162120.0,
+        "massFlow": 15124.832583219573,
+        "massFlows": {
+          "Water": 124.72712006644295,
+          "Ethanol": 15000.10546315313
+        },
+        "price": null
+      }
+    ],
+    "units": [
+      {
+        "id": "D1",
+        "unitClass": "BinaryDistillation",
+        "line": "Distillation Column",
+        "order": 0,
+        "ins": [
+          "inlet"
+        ],
+        "outs": [
+          "D1_distillate",
+          "D1_bottoms"
+        ],
+        "installedCost": 1145225.5470988585,
+        "purchaseCost": 389132.7089556384,
+        "heatingDuty": 63776350.96018731,
+        "coolingDuty": 51661.892006866634,
+        "power": 5.930983932880322
+      },
+      {
+        "id": "M1",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 1,
+        "ins": [
+          "D1_distillate",
+          "MS1_product"
+        ],
+        "outs": [
+          "M1_outlet"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "D2",
+        "unitClass": "BinaryDistillation",
+        "line": "Divided Distillation Column",
+        "order": 2,
+        "ins": [
+          "M1_outlet"
+        ],
+        "outs": [
+          "D2_distillate",
+          "D2_bottoms"
+        ],
+        "installedCost": 1361075.705643179,
+        "purchaseCost": 481018.9327746222,
+        "heatingDuty": 12586099.58311061,
+        "coolingDuty": 45148531.459306,
+        "power": 1.452427833313491
+      },
+      {
+        "id": "MS1",
+        "unitClass": "MolecularSieve",
+        "line": "Molecular sieve",
+        "order": 3,
+        "ins": [
+          "D2_distillate"
+        ],
+        "outs": [
+          "MS1_product",
+          "MS1_regenerate"
+        ],
+        "installedCost": 3991531.2097756015,
+        "purchaseCost": 2217517.3387642233,
+        "heatingDuty": 22761280.95010512,
+        "coolingDuty": 839579.4566945184,
+        "power": 100.66777097307512
+      }
+    ],
+    "utilities": {
+      "group": "every unit of the train",
+      "heating": 99.12373149340303,
+      "heatingUnit": "GJ/hr",
+      "cooling": 46.03977280800739,
+      "coolingUnit": "GJ/hr",
+      "electricityConsumption": 0.10805118273926893,
+      "electricityConsumptionUnit": "MW",
+      "electricityProduction": 0.0,
+      "electricityProductionUnit": "MW"
+    },
+    "diagram": null,
+    "diagramNote": "Graphviz was not on the host that made this run, so it has no diagram; a host that has it (brew install graphviz on the Mini) draws its own run of the same inputs. The units are listed in run order.",
+    "unitOrder": [
+      "D1",
+      "M1",
+      "D2",
+      "MS1"
+    ],
+    "tableUnits": {
+      "T": "K",
+      "P": "Pa",
+      "massFlow": "kg/hr",
+      "price": "USD/kg",
+      "cost": "USD",
+      "duty": "kJ/hr",
+      "power": "kW",
+      "annual": "USD/yr",
+      "perUnit": "USD per unit of the price's basis"
+    },
+    "product": "Ethanol",
+    "productId": "ethanol",
+    "productStream": "MS1_regenerate",
+    "purity": {
+      "product": "Ethanol",
+      "productStream": "MS1_regenerate",
+      "productFraction": 0.9917534875589418,
+      "streams": [
+        {
+          "stream": "inlet",
+          "massFlow": 138832.34224145,
+          "productFraction": 0.10805275736046188,
+          "impurities": [
+            {
+              "chemical": "Water",
+              "massFraction": 0.8017978253684283
+            },
+            {
+              "chemical": "Fiber",
+              "massFraction": 0.03996357540630406
+            },
+            {
+              "chemical": "InsolubleProtein",
+              "massFraction": 0.01669639885473267
+            }
+          ]
+        },
+        {
+          "stream": "D1_distillate",
+          "massFlow": 30084.049975600272,
+          "productFraction": 0.4986115589027868,
+          "impurities": [
+            {
+              "chemical": "Water",
+              "massFraction": 0.5013884410972131
+            }
+          ]
+        },
+        {
+          "stream": "D1_bottoms",
+          "massFlow": 108748.29226584974,
+          "productFraction": 8.84918316005039e-6,
+          "impurities": [
+            {
+              "chemical": "Water",
+              "massFraction": 0.8849028630775363
+            },
+            {
+              "chemical": "Fiber",
+              "massFraction": 0.05101907039088571
+            },
+            {
+              "chemical": "InsolubleProtein",
+              "massFraction": 0.02131527872027028
+            }
+          ]
+        },
+        {
+          "stream": "MS1_product",
+          "massFlow": 4440.400549911765,
+          "productFraction": 0.6535715412535302,
+          "impurities": [
+            {
+              "chemical": "Water",
+              "massFraction": 0.3464284587464699
+            }
+          ]
+        },
+        {
+          "stream": "M1_outlet",
+          "massFlow": 34524.45052551204,
+          "productFraction": 0.5185419091435848,
+          "impurities": [
+            {
+              "chemical": "Water",
+              "massFraction": 0.48145809085641517
+            }
+          ]
+        },
+        {
+          "stream": "D2_distillate",
+          "massFlow": 19565.233133131336,
+          "productFraction": 0.9150018695165328,
+          "impurities": [
+            {
+              "chemical": "Water",
+              "massFraction": 0.08499813048346719
+            }
+          ]
+        },
+        {
+          "stream": "D2_bottoms",
+          "massFlow": 14959.2173923807,
+          "productFraction": 0.000010000074625775193,
+          "impurities": [
+            {
+              "chemical": "Water",
+              "massFraction": 0.9999899999253742
+            }
+          ]
+        },
+        {
+          "stream": "MS1_regenerate",
+          "massFlow": 15124.832583219573,
+          "productFraction": 0.9917534875589418,
+          "impurities": [
+            {
+              "chemical": "Water",
+              "massFraction": 0.00824651244105822
+            }
+          ]
+        }
+      ],
+      "impuritiesShown": 3,
+      "note": "Ethanol's share of each stream's mass, and the 3 largest other components by mass, read from the stream table; a stream carrying nothing has no share"
+    },
+    "costs": [
+      {
+        "unit": "D1",
+        "type": "distillation",
+        "unitClass": "BinaryDistillation",
+        "costModel": true,
+        "purchaseCost": 389132.7089556384,
+        "installedCost": 1145225.5470988585,
+        "items": {
+          "Trays": 58881.14373548554,
+          "Tower": 161672.9090611444,
+          "Platform and ladders": 28968.460710421565,
+          "Condenser - Double pipe": 3128.9145100202536,
+          "Reflux drum - Vertical pressure vessel": 37391.325725732604,
+          "Reflux drum - Platform and ladders": 9441.949570281451,
+          "Pump - Pump": 5542.712542497307,
+          "Pump - Motor": 560.3831620062225,
+          "Reboiler - Floating head": 83544.90993804905
+        },
+        "note": null
+      },
+      {
+        "unit": "M1",
+        "type": "mixer",
+        "unitClass": "Mixer",
+        "costModel": true,
+        "purchaseCost": 0.0,
+        "installedCost": 0.0,
+        "items": {},
+        "note": "BioSTEAM costs a mixer at nothing: it is a junction."
+      },
+      {
+        "unit": "D2",
+        "type": "distillation",
+        "unitClass": "BinaryDistillation",
+        "costModel": true,
+        "purchaseCost": 481018.9327746222,
+        "installedCost": 1361075.705643179,
+        "items": {
+          "Rectifier trays": 67543.17210076554,
+          "Stripper trays": 20846.611865683975,
+          "Rectifier tower": 155716.0290428,
+          "Rectifier platform and ladders": 27371.260592169987,
+          "Stripper tower": 77080.940358612,
+          "Stripper platform and ladders": 13979.724402488397,
+          "Condenser - Floating head": 73545.39809440452,
+          "Reflux drum - Horizontal pressure vessel": 10712.769800697888,
+          "Reflux drum - Platform and ladders": 3016.798216210068,
+          "Pump - Pump": 4306.694637203389,
+          "Pump - Motor": 410.45192593935684,
+          "Reboiler - Floating head": 26489.081737647095
+        },
+        "note": null
+      },
+      {
+        "unit": "MS1",
+        "type": "molecular-sieve",
+        "unitClass": "MolecularSieve",
+        "costModel": true,
+        "purchaseCost": 2217517.3387642233,
+        "installedCost": 3991531.2097756015,
+        "items": {
+          "Column": 2217517.3387642233
+        },
+        "note": null
+      }
+    ],
+    "inlet": {
+      "kind": "run-stream",
+      "ref": "1b2f2c463c872086",
+      "refTool": "proforma.reference",
+      "streamId": "s48",
+      "vessel": null,
+      "chemicals": [
+        "Ash",
+        "CaO",
+        "Ethanol",
+        "Fiber",
+        "H2SO4",
+        "InsolubleProtein",
+        "SolubleProtein",
+        "TriOlein",
+        "Water",
+        "Yeast"
+      ],
+      "concentrations": null,
+      "flows": {
+        "Water": 111315.4701,
+        "Ethanol": 15001.21739,
+        "Ash": 647.30225,
+        "Yeast": 295.8516171,
+        "CaO": 4.73025,
+        "TriOlein": 1754.486328,
+        "H2SO4": 47.62605235,
+        "Fiber": 5548.236778,
+        "SolubleProtein": 1899.421316,
+        "InsolubleProtein": 2318.00016
+      },
+      "water": null,
+      "waterNote": null,
+      "brothFlow": null,
+      "harvestHour": null,
+      "T": 365.4788105,
+      "P": 607950.0,
+      "phase": "l",
+      "absent": null,
+      "notes": [
+        "the inlet is a stream of a kept run, as its stream table holds it"
+      ]
+    },
+    "parameters": [
+      {
+        "unit": "D1",
+        "type": "distillation",
+        "unitClass": "BinaryDistillation",
+        "values": [
+          {
+            "key": "light_key",
+            "value": "Ethanol",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "heavy_key",
+            "value": "Water",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "k",
+            "value": 1.1,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "P",
+            "value": 212782.5,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "Rmin",
+            "value": 0.001,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "product_specification_format",
+            "value": "Composition",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "y_top",
+            "value": 0.28,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "x_bot",
+            "value": 3.9106e-6,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "vessel_material",
+            "value": "Stainless steel 304",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "tray_material",
+            "value": "Stainless steel 304",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "tray_type",
+            "value": "Sieve",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "tray_spacing",
+            "value": 450.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "velocity_fraction",
+            "value": 0.8,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "foaming_factor",
+            "value": 1.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "open_tray_area",
+            "value": 0.1,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "is_divided",
+            "value": "false",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "vacuum_system_preference",
+            "value": "Liquid-ring pump",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "partial_condenser",
+            "value": "true",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "weir_height",
+            "value": 0.1,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D302 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          }
+        ]
+      },
+      {
+        "unit": "M1",
+        "type": "mixer",
+        "unitClass": "Mixer",
+        "values": [
+          {
+            "key": "rigorous",
+            "value": "false",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biosteam@2.54.0",
+              "note": "Mixer's own default for rigorous, read from Mixer._init's signature",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "Mixer's own default for rigorous, read from Mixer._init's signature",
+            "outOfBounds": null
+          },
+          {
+            "key": "conserve_phases",
+            "value": "false",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biosteam@2.54.0",
+              "note": "Mixer's own default for conserve_phases, read from Mixer._init's signature",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "Mixer's own default for conserve_phases, read from Mixer._init's signature",
+            "outOfBounds": null
+          }
+        ]
+      },
+      {
+        "unit": "D2",
+        "type": "distillation",
+        "unitClass": "BinaryDistillation",
+        "values": [
+          {
+            "key": "light_key",
+            "value": "Ethanol",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "heavy_key",
+            "value": "Water",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "k",
+            "value": 1.2,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "P",
+            "value": 162120.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "Rmin",
+            "value": 0.01,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "product_specification_format",
+            "value": "Composition",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "y_top",
+            "value": 0.80805,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "x_bot",
+            "value": 3.9106e-6,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "vessel_material",
+            "value": "Stainless steel 304",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "tray_material",
+            "value": "Stainless steel 304",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "tray_type",
+            "value": "Sieve",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "tray_spacing",
+            "value": 450.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "velocity_fraction",
+            "value": 0.8,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "foaming_factor",
+            "value": 1.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "open_tray_area",
+            "value": 0.1,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "is_divided",
+            "value": "true",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "vacuum_system_preference",
+            "value": "Liquid-ring pump",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "partial_condenser",
+            "value": "true",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "weir_height",
+            "value": 0.1,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit D303 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): BinaryDistillation's own value, read from the built unit",
+            "outOfBounds": null
+          }
+        ]
+      },
+      {
+        "unit": "MS1",
+        "type": "molecular-sieve",
+        "unitClass": "MolecularSieve",
+        "values": [
+          {
+            "key": "split.Ash",
+            "value": 0.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "split.CaO",
+            "value": 0.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "split.Ethanol",
+            "value": 0.16210942764472103,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "split.Fiber",
+            "value": 0.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "split.H2SO4",
+            "value": 0.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "split.InsolubleProtein",
+            "value": 0.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "split.SolubleProtein",
+            "value": 0.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "split.TriOlein",
+            "value": 0.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "split.Water",
+            "value": 0.9249990967229107,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "split.Yeast",
+            "value": 0.0,
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          },
+          {
+            "key": "approx_duty",
+            "value": "true",
+            "low": null,
+            "high": null,
+            "source": {
+              "kind": "model",
+              "id": "biorefineries@2.35.1",
+              "note": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+              "by": null
+            },
+            "origin": "library-default",
+            "identified": null,
+            "overriddenBy": null,
+            "libraryDefault": null,
+            "recordIds": [],
+            "detail": "unit U301 of ethanol_glucose_v0 as the worker builds it (its package biorefineries 2.35.1, BioSTEAM 2.54.0): MolecularSieve's own value, read from the built unit",
+            "outOfBounds": null
+          }
+        ]
+      }
+    ],
+    "outlets": {
+      "D1": {
+        "distillate": "D1_distillate",
+        "bottoms": "D1_bottoms"
+      },
+      "M1": {
+        "outlet": "M1_outlet"
+      },
+      "D2": {
+        "distillate": "D2_distillate",
+        "bottoms": "D2_bottoms"
+      },
+      "MS1": {
+        "product": "MS1_product",
+        "regenerate": "MS1_regenerate"
+      }
+    },
+    "utilitySettings": {
+      "cepci": 567.5,
+      "electricityPrice": 0.0782,
+      "coolingWaterRegenerationPrice": 0.00048785,
+      "coolingWaterHeatTransferPrice": 0.0,
+      "coolingWaterT": 305.372,
+      "lowPressureSteamRegenerationPrice": 0.2378,
+      "lowPressureSteamHeatTransferPrice": 0.0,
+      "lowPressureSteamT": 412.189,
+      "mediumPressureSteamRegenerationPrice": 0.2756,
+      "mediumPressureSteamHeatTransferPrice": 0.0,
+      "mediumPressureSteamT": 454.77
+    },
+    "versions": {
+      "biosteam": "2.54.0",
+      "thermosteam": "0.54.2",
+      "biorefineries": "2.35.1"
+    },
+    "notes": [],
+    "flags": []
+  },
+  "outputHash": "143becb910e198a4605a8f0c88538dda6636e11bcf106e8e37903fd2d1d0444d",
+  "provenance": "computed",
+  "createdAt": "2026-10-21T17:27:13Z",
+  "durationMs": 327,
+  "seed": null
+}

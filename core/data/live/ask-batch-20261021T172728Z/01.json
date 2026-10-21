@@ -1,0 +1,794 @@
+{
+  "question": "Build a train that recovers fuel-grade ethanol from the simulated beer and tell me the recovery at each step.",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "No simulated beer is on file to feed a train: the fermOS module holds no kept simulations, and no fits or forecasts that could supply a broth.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c2",
+      "text": "Proposed ethanol train for the CEN.PK113-7D host, with no inlet named: a beer column (distillation) that separates ethanol from the broth by boiling, followed by a molecular sieve for dehydration, because ethanol and water form a minimum-boiling azeotrope.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "d13905b95cfb80bf:boilingPoint",
+        "d13905b95cfb80bf:azeotrope",
+        "d13905b95cfb80bf:azeotropeMoleFraction",
+        "d13905b95cfb80bf:azeotropeMassFraction",
+        "d13905b95cfb80bf:azeotropeT"
+      ],
+      "moduleRefs": []
+    },
+    {
+      "id": "c3",
+      "text": "The proposed train has not been run, so no recovery at either step (beer column or molecular sieve) has been computed for ethanol.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "No simulated beer exists: fermos_simulate for the batch family on CEN.PK113-7D, ethanol, glucose refused because five parameters wait for a source: monod half-saturation constant (ks), growth-associated product coefficient (alpha), maximum product concentration (p_max), cells at the start, and product at the start. No record of monod_ks, ethanol_lp_alpha or ethanol_max_conc for this strain on glucose binds. A named person must supply these in fermOS → Simulate, or a kinetic fit must be kept, before a beer can be simulated.",
+    "The pureOS train was not built or run: pureos_build needs an inlet, and the proposal left the broth flow and composition waiting for a person in pureOS → Builder. The proposed units are at library defaults; no recovery was computed for the beer column or the molecular sieve, and I did not write a train artifact.",
+    "The proposal's unit parameters (for example column stages, reflux, sieve capacity) were not named by any record; they stay at library defaults until a person sets them.",
+    "Requested fuel-grade ethanol purity was not specified in the corpus, so I could not check the product's share of the product stream against a fuel standard."
+  ],
+  "declined": "The train cannot be run and no step recovery can be stated: the simulated beer the question depends on has not been produced, because fermOS has no kept simulation and its batch simulation waits for kinetic parameters a person must supply.",
+  "usage": {
+    "inputTokens": 12,
+    "outputTokens": 3358,
+    "cacheReadTokens": 118872,
+    "cacheWriteTokens": 34130,
+    "costUsd": 0.007135,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [
+    {
+      "id": "d13905b95cfb80bf:azeotrope",
+      "label": "Minimum-boiling azeotrope of Ethanol (product ethanol) and Water, at the library's default pressure, as thermosteam 0.54.2 computes it",
+      "value": "found",
+      "unit": "",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "volatility",
+        "toolVersion": "thermo volatility 1 · thermosteam 0.54.2",
+        "inputs": [
+          {
+            "name": "question",
+            "value": "volatility",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the chemical's normal boiling point as the library holds it (Tb), and whether the library's own vapour-liquid equilibrium gives it and water a minimum-boiling azeotrope at the library's default pressure",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the product, by its id",
+              "by": null
+            }
+          },
+          {
+            "name": "chemical",
+            "value": "Ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the library's own name for the product, from thermo.CHEMICALS",
+              "by": null
+            }
+          },
+          {
+            "name": "partner",
+            "value": "Water",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "an azeotrope is asked with water, the solvent a broth mostly is",
+              "by": null
+            }
+          },
+          {
+            "name": "azeotrope search",
+            "value": "the lower-boiling chemical's mole fraction in the liquid, scanned on the worker's grid between the two pure chemicals (both pure ends left out) for where its vapour's mole fraction turns from above the liquid's to not, then halved: the ethanol-water-azeotrope preset's search. None found means none on that grid at that pressure, and the answer names the grid (`searched`)",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "P",
+            "value": "thermosteam's Stream default",
+            "unit": "Pa",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "the library's own default for a Stream nobody set it on",
+              "by": null
+            }
+          },
+          {
+            "name": "library",
+            "value": "thermosteam 0.54.2",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "d13905b95cfb80bf",
+        "at": "2026-10-21T17:28:22Z",
+        "seed": null
+      },
+      "figure": null
+    },
+    {
+      "id": "d13905b95cfb80bf:azeotropeMassFraction",
+      "label": "The product's mass fraction at the minimum-boiling azeotrope of Ethanol (product ethanol) and Water, at the library's default pressure, as thermosteam 0.54.2 computes it",
+      "value": 0.9556433462216508,
+      "unit": "kg/kg",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "volatility",
+        "toolVersion": "thermo volatility 1 · thermosteam 0.54.2",
+        "inputs": [
+          {
+            "name": "question",
+            "value": "volatility",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the chemical's normal boiling point as the library holds it (Tb), and whether the library's own vapour-liquid equilibrium gives it and water a minimum-boiling azeotrope at the library's default pressure",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the product, by its id",
+              "by": null
+            }
+          },
+          {
+            "name": "chemical",
+            "value": "Ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the library's own name for the product, from thermo.CHEMICALS",
+              "by": null
+            }
+          },
+          {
+            "name": "partner",
+            "value": "Water",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "an azeotrope is asked with water, the solvent a broth mostly is",
+              "by": null
+            }
+          },
+          {
+            "name": "azeotrope search",
+            "value": "the lower-boiling chemical's mole fraction in the liquid, scanned on the worker's grid between the two pure chemicals (both pure ends left out) for where its vapour's mole fraction turns from above the liquid's to not, then halved: the ethanol-water-azeotrope preset's search. None found means none on that grid at that pressure, and the answer names the grid (`searched`)",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "P",
+            "value": "thermosteam's Stream default",
+            "unit": "Pa",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "the library's own default for a Stream nobody set it on",
+              "by": null
+            }
+          },
+          {
+            "name": "library",
+            "value": "thermosteam 0.54.2",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "d13905b95cfb80bf",
+        "at": "2026-10-21T17:28:22Z",
+        "seed": null
+      },
+      "figure": null
+    },
+    {
+      "id": "d13905b95cfb80bf:azeotropeMoleFraction",
+      "label": "The product's mole fraction at the minimum-boiling azeotrope of Ethanol (product ethanol) and Water, at the library's default pressure, as thermosteam 0.54.2 computes it",
+      "value": 0.8939002230378821,
+      "unit": "mol/mol",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "volatility",
+        "toolVersion": "thermo volatility 1 · thermosteam 0.54.2",
+        "inputs": [
+          {
+            "name": "question",
+            "value": "volatility",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the chemical's normal boiling point as the library holds it (Tb), and whether the library's own vapour-liquid equilibrium gives it and water a minimum-boiling azeotrope at the library's default pressure",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the product, by its id",
+              "by": null
+            }
+          },
+          {
+            "name": "chemical",
+            "value": "Ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the library's own name for the product, from thermo.CHEMICALS",
+              "by": null
+            }
+          },
+          {
+            "name": "partner",
+            "value": "Water",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "an azeotrope is asked with water, the solvent a broth mostly is",
+              "by": null
+            }
+          },
+          {
+            "name": "azeotrope search",
+            "value": "the lower-boiling chemical's mole fraction in the liquid, scanned on the worker's grid between the two pure chemicals (both pure ends left out) for where its vapour's mole fraction turns from above the liquid's to not, then halved: the ethanol-water-azeotrope preset's search. None found means none on that grid at that pressure, and the answer names the grid (`searched`)",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "P",
+            "value": "thermosteam's Stream default",
+            "unit": "Pa",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "the library's own default for a Stream nobody set it on",
+              "by": null
+            }
+          },
+          {
+            "name": "library",
+            "value": "thermosteam 0.54.2",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "d13905b95cfb80bf",
+        "at": "2026-10-21T17:28:22Z",
+        "seed": null
+      },
+      "figure": null
+    },
+    {
+      "id": "d13905b95cfb80bf:azeotropeT",
+      "label": "Boiling temperature of the minimum-boiling azeotrope of Ethanol (product ethanol) and Water, at the library's default pressure, as thermosteam 0.54.2 computes it",
+      "value": 351.39928704452467,
+      "unit": "K",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "volatility",
+        "toolVersion": "thermo volatility 1 · thermosteam 0.54.2",
+        "inputs": [
+          {
+            "name": "question",
+            "value": "volatility",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the chemical's normal boiling point as the library holds it (Tb), and whether the library's own vapour-liquid equilibrium gives it and water a minimum-boiling azeotrope at the library's default pressure",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the product, by its id",
+              "by": null
+            }
+          },
+          {
+            "name": "chemical",
+            "value": "Ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the library's own name for the product, from thermo.CHEMICALS",
+              "by": null
+            }
+          },
+          {
+            "name": "partner",
+            "value": "Water",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "an azeotrope is asked with water, the solvent a broth mostly is",
+              "by": null
+            }
+          },
+          {
+            "name": "azeotrope search",
+            "value": "the lower-boiling chemical's mole fraction in the liquid, scanned on the worker's grid between the two pure chemicals (both pure ends left out) for where its vapour's mole fraction turns from above the liquid's to not, then halved: the ethanol-water-azeotrope preset's search. None found means none on that grid at that pressure, and the answer names the grid (`searched`)",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "P",
+            "value": "thermosteam's Stream default",
+            "unit": "Pa",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "the library's own default for a Stream nobody set it on",
+              "by": null
+            }
+          },
+          {
+            "name": "library",
+            "value": "thermosteam 0.54.2",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "d13905b95cfb80bf",
+        "at": "2026-10-21T17:28:22Z",
+        "seed": null
+      },
+      "figure": null
+    },
+    {
+      "id": "d13905b95cfb80bf:boilingPoint",
+      "label": "Normal boiling point of Ethanol (product ethanol), as thermosteam 0.54.2 computes it",
+      "value": 351.570441659,
+      "unit": "K",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "volatility",
+        "toolVersion": "thermo volatility 1 · thermosteam 0.54.2",
+        "inputs": [
+          {
+            "name": "question",
+            "value": "volatility",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the chemical's normal boiling point as the library holds it (Tb), and whether the library's own vapour-liquid equilibrium gives it and water a minimum-boiling azeotrope at the library's default pressure",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the product, by its id",
+              "by": null
+            }
+          },
+          {
+            "name": "chemical",
+            "value": "Ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the library's own name for the product, from thermo.CHEMICALS",
+              "by": null
+            }
+          },
+          {
+            "name": "partner",
+            "value": "Water",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "an azeotrope is asked with water, the solvent a broth mostly is",
+              "by": null
+            }
+          },
+          {
+            "name": "azeotrope search",
+            "value": "the lower-boiling chemical's mole fraction in the liquid, scanned on the worker's grid between the two pure chemicals (both pure ends left out) for where its vapour's mole fraction turns from above the liquid's to not, then halved: the ethanol-water-azeotrope preset's search. None found means none on that grid at that pressure, and the answer names the grid (`searched`)",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "P",
+            "value": "thermosteam's Stream default",
+            "unit": "Pa",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "the library's own default for a Stream nobody set it on",
+              "by": null
+            }
+          },
+          {
+            "name": "library",
+            "value": "thermosteam 0.54.2",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "thermosteam@0.54.2",
+              "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "d13905b95cfb80bf",
+        "at": "2026-10-21T17:28:22Z",
+        "seed": null
+      },
+      "figure": null
+    }
+  ],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 0",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in none",
+      "ms": 108,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "fermos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "simulation",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read fermOS for simulation · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "pureos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "train",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read pureOS for train · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "fermos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "artifact",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read fermOS for artifact · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "host",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read geneOS for host · 13 rows",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "pureos_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "unit-operation",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read pureOS for unit-operation · 45 rows",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "fermos_simulate",
+      "input": {
+        "family": "batch_v1",
+        "strain": "s-cerevisiae-cenpk113-7d",
+        "product": "ethanol",
+        "sugar": "glucose",
+        "fitArtifact": "",
+        "recordsByParam": {},
+        "startFrom": "records",
+        "durationPreset": "until-sugar-runs-out"
+      },
+      "summary": "fermos_simulate refused: batch_v1 cannot run yet: 5 parameters wait. ks (half-saturation constant) waits for a source: a fit a person chooses, a record of monod_ks through the aggregate",
+      "ms": 12,
+      "ok": false
+    },
+    {
+      "n": 8,
+      "kind": "tool",
+      "tool": "pureos_propose",
+      "input": {
+        "product": "ethanol",
+        "host": "s-cerevisiae-cenpk113-7d",
+        "inletRef": ""
+      },
+      "summary": "Ran pureos_propose",
+      "ms": 22658,
+      "ok": true
+    },
+    {
+      "n": 9,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 3 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 0,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [],
+  "runbookDraft": null
+}

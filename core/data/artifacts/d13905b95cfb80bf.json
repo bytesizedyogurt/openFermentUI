@@ -1,0 +1,123 @@
+{
+  "id": "d13905b95cfb80bf",
+  "tool": "volatility",
+  "toolVersion": "thermo volatility 1 · thermosteam 0.54.2",
+  "inputs": [
+    {
+      "name": "question",
+      "value": "volatility",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the chemical's normal boiling point as the library holds it (Tb), and whether the library's own vapour-liquid equilibrium gives it and water a minimum-boiling azeotrope at the library's default pressure",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "ethanol",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the product, by its id",
+        "by": null
+      }
+    },
+    {
+      "name": "chemical",
+      "value": "Ethanol",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the library's own name for the product, from thermo.CHEMICALS",
+        "by": null
+      }
+    },
+    {
+      "name": "partner",
+      "value": "Water",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "an azeotrope is asked with water, the solvent a broth mostly is",
+        "by": null
+      }
+    },
+    {
+      "name": "azeotrope search",
+      "value": "the lower-boiling chemical's mole fraction in the liquid, scanned on the worker's grid between the two pure chemicals (both pure ends left out) for where its vapour's mole fraction turns from above the liquid's to not, then halved: the ethanol-water-azeotrope preset's search. None found means none on that grid at that pressure, and the answer names the grid (`searched`)",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "P",
+      "value": "thermosteam's Stream default",
+      "unit": "Pa",
+      "source": {
+        "kind": "model",
+        "id": "thermosteam@0.54.2",
+        "note": "the library's own default for a Stream nobody set it on",
+        "by": null
+      }
+    },
+    {
+      "name": "library",
+      "value": "thermosteam 0.54.2",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "thermosteam@0.54.2",
+        "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "product": "ethanol",
+    "chemical": "Ethanol",
+    "partner": "Water",
+    "subject": "Ethanol (product ethanol) beside Water",
+    "library": "thermosteam 0.54.2",
+    "P": 101325.0,
+    "PSource": "thermosteam's Stream default",
+    "boilingPoint": 351.570441659,
+    "partnerBoilingPoint": 373.124295848,
+    "lighter": "Ethanol",
+    "azeotrope": true,
+    "azeotropeMoleFraction": 0.8939002230378821,
+    "azeotropeMassFraction": 0.9556433462216508,
+    "azeotropeT": 351.39928704452467,
+    "searched": {
+      "of": "Ethanol",
+      "from": 0.01,
+      "to": 0.99,
+      "points": 99,
+      "halvings": 60
+    },
+    "units": {
+      "boilingPoint": "K",
+      "partnerBoilingPoint": "K",
+      "azeotropeT": "K",
+      "P": "Pa",
+      "azeotropeMoleFraction": "mol/mol",
+      "azeotropeMassFraction": "kg/kg",
+      "searched": "mol/mol"
+    },
+    "how": "each chemical's normal boiling point is the library's own Tb; the azeotrope is the liquid whose first bubble, by the library's own vapour-liquid equilibrium at this pressure, has the liquid's own composition, where y - x of the lower-boiling chemical turns from positive to not (a minimum-boiling azeotrope), scanned on the grid `searched` names and then halved",
+    "notes": []
+  },
+  "outputHash": "9c7883c1b1ace675b9b147b8cd6b8c6771227142ea794445068493bcf5c8cd45",
+  "provenance": "computed",
+  "createdAt": "2026-10-21T17:28:22Z",
+  "durationMs": 22649,
+  "seed": null
+}

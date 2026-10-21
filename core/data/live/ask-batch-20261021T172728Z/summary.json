@@ -1,0 +1,21 @@
+{
+  "rows": [
+    {
+      "n": 1,
+      "question": "Build a train that recovers fuel-grade ethanol from the simulated beer and tell me the recovery at each step.",
+      "kept": 3,
+      "dropped": 0,
+      "toolCalls": 7,
+      "rounds": 5,
+      "seconds": 62.81,
+      "costUsd": 0.007135,
+      "stopped": "done",
+      "declined": "The train cannot be run and no step recovery can be stated: the simulated beer the question depends on has not been produced, because fermOS has no kept simulation and its batch simulation waits for kinetic parameters a person must supply.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    }
+  ],
+  "costUsd": 0.007135
+}
