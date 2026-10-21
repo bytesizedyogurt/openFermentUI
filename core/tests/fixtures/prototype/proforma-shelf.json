@@ -20,7 +20,8 @@
       "priceBasis": "USD per gallon of ethanol, at the package's own ethanol density",
       "leavesOut": [],
       "gridInputs": [],
-      "packageTest": "biorefineries/tests/test_biorefineries.py::test_cornstover"
+      "packageTest": "biorefineries/tests/test_biorefineries.py::test_cornstover",
+      "builtFrom": []
     },
     {
       "id": "corn_drygrind",
@@ -243,7 +244,8 @@
       "priceBasis": "USD per kg of the ethanol product stream as the package makes it (ethanol with its denaturant): the package's own price, at which its TEA solves the internal rate of return",
       "leavesOut": [],
       "gridInputs": [],
-      "packageTest": "biorefineries/tests/test_biorefineries.py::test_corn"
+      "packageTest": "biorefineries/tests/test_biorefineries.py::test_corn",
+      "builtFrom": []
     },
     {
       "id": "ethanol_glucose_v0",
@@ -345,7 +347,104 @@
         "yield",
         "glucose_price"
       ],
-      "packageTest": null
+      "packageTest": null,
+      "builtFrom": []
+    },
+    {
+      "id": "custom_train_v1",
+      "title": "A vessel and a train, priced",
+      "description": "A glucose solution into the fermenter fermOS designed (a kept fermos.vessel design: BioSTEAM's AeratedBioreactor or NREL batch fermenter, rebuilt as the same class with every design parameter as the design holds it, running the reaction the design was built on), its beer through the units of a train pureOS ran (a kept pureos.train_run: each unit the same catalogue type, class and values as that run held them), priced with the dry-grind corn ethanol plant's TEA (biorefineries.corn.create_tea, ConventionalEthanolTEA), its financial parameters in the panel's Finance group as the package's defaults until a person sets one. A scenario on it names the vessel design and the train run. The train's own inlet is not an input: the fermenter's beer is its inlet. Only the yeast program has a chemical set, so a vessel or a train of another program is refused.",
+      "source": "this repository",
+      "program": "yeast",
+      "reference": false,
+      "inputs": [
+        {
+          "key": "feed_glucose_conc",
+          "name": "glucose in the fermenter's feed",
+          "dimension": "massConc",
+          "unit": "g L-1",
+          "fields": [
+            "medium_component_conc"
+          ],
+          "kind": "process",
+          "note": "records of a medium component whose carbon source is glucose; sets the water that dilutes the glucose, by thermosteam's volume of the solution"
+        },
+        {
+          "key": "titre",
+          "name": "ethanol titre at harvest",
+          "dimension": "massConc",
+          "unit": "g L-1",
+          "fields": [
+            "ethanol_titre"
+          ],
+          "kind": "process",
+          "note": "with the productivity, sets the fermenter's batch time; the reacting time the vessel was designed for is named beside it in the run's basis"
+        },
+        {
+          "key": "yield",
+          "name": "ethanol yield on glucose",
+          "dimension": "yield",
+          "unit": "g g-1",
+          "fields": [
+            "ethanol_yield_substrate"
+          ],
+          "kind": "process",
+          "note": "sets the conversion of the vessel's reaction: the yield over the ethanol that reaction makes of a gram of glucose; a case above it cannot run, and says so"
+        },
+        {
+          "key": "productivity",
+          "name": "ethanol volumetric productivity",
+          "dimension": "volProd",
+          "unit": "g L-1 h-1",
+          "fields": [
+            "ethanol_productivity"
+          ],
+          "kind": "process",
+          "note": "the batch time is the titre divided by it"
+        },
+        {
+          "key": "plant_scale",
+          "name": "ethanol fermented in a year",
+          "dimension": "massFlow",
+          "unit": "t yr-1",
+          "fields": [],
+          "kind": "economic",
+          "note": "the vessel's scale: the plant scale its design names (the vessel design is its source); a design of one vessel's batch volume names none, and then it is a named person's assumption. With the yield it sets the glucose fed, so the plant's size"
+        },
+        {
+          "key": "glucose_price",
+          "name": "price of glucose",
+          "dimension": "costUSD",
+          "unit": "USD kg-1",
+          "fields": [],
+          "kind": "economic",
+          "note": "a named person's assumption; the glucose alone is priced, not its water"
+        }
+      ],
+      "outputs": [
+        "pricePerKgProduct",
+        "productKgPerH",
+        "costLines",
+        "readBack"
+      ],
+      "priceOutput": "pricePerKgProduct",
+      "priceBasis": "USD per kg of the product the train traces (ethanol, for the yeast program), contained in the train's product stream as it leaves the train's last unit",
+      "leavesOut": [
+        "where the glucose comes from: it arrives as clean glucose, priced as such",
+        "every outlet the train does not send on leaves the plant unpriced: no co-product credit and no waste treatment",
+        "by-products the vessel's reaction does not make, and the scrubber that would recover product from the fermenter's gas",
+        "wastewater treatment and the boiler"
+      ],
+      "gridInputs": [
+        "titre",
+        "yield",
+        "glucose_price"
+      ],
+      "packageTest": null,
+      "builtFrom": [
+        "fermos.vessel",
+        "pureos.train_run"
+      ]
     }
   ]
 }

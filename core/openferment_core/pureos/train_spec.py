@@ -1270,6 +1270,40 @@ def purity_of(streams: list[dict[str, Any]], product: str, product_stream: str |
                            "mass, read from the stream table; a stream carrying nothing has no share"))
 
 
+def _unit_request(u: TrainUnitSpec, e: catalogue.Entry, mine: dict[str, BasisInput]) -> dict[str, Any]:
+    """One unit as the worker builds it, from its values as a run's basis
+    holds them (`mine`, by key): a value whose source is the class's own
+    default is left to the class; a side inlet's flows by chemical; every
+    other value passed."""
+    sides = {p.name for p in _side_ports(e)}
+    values: dict[str, Any] = {}
+    side_flows: dict[str, dict[str, float]] = {}
+    for key, i in mine.items():
+        if key.endswith(_SUFFIXES) or _class_default(i.source):
+            continue
+        base, _, item = key.partition(catalogue.SEP)
+        if base in sides and item:
+            side_flows.setdefault(base, {})[item] = float(i.value)  # type: ignore[arg-type]
+        else:
+            values[key] = i.value
+    return {"id": u.id, "type": e.id, "values": values, "outlets": routes(u, e), "sides": side_flows}
+
+
+def worker_units(art: Artifact) -> dict[str, Any]:
+    """A kept train run's units as the worker builds them, read from the
+    run's own basis as the run itself read them (OF-BLD-020 §6.1: the units a
+    `custom_train_v1` scenario rebuilds on its fermenter's beer, every value
+    as the train run held it), with the train as data and the chemical it
+    traces."""
+    if art.tool != TRAIN_RUN:
+        raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact, not a train run ({TRAIN_RUN})")
+    spec = TrainSpec.model_validate_json(str(_named(art.inputs, "train").value))  # type: ignore[union-attr]
+    chem = str(_named(art.inputs, "product chemical").value)  # type: ignore[union-attr]
+    units = [_unit_request(u, catalogue.entry(u.type), _prefixed(art.inputs, f"{u.id}{catalogue.SEP}"))
+             for u in spec.units]
+    return {"train": spec, "product": chem, "units": units}
+
+
 def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
     """The run, from its basis alone: the train as data, every value as the
     basis holds it, the inlet; the worker builds and runs it, and this reads
@@ -1299,18 +1333,7 @@ def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
     for u in spec.units:
         e = catalogue.entry(u.type)
         mine = _prefixed(inputs, f"{u.id}{catalogue.SEP}")
-        sides = {p.name for p in _side_ports(e)}
-        values: dict[str, Any] = {}
-        side_flows: dict[str, dict[str, float]] = {}
-        for key, i in mine.items():
-            if key.endswith(_SUFFIXES) or _class_default(i.source):
-                continue
-            base, _, item = key.partition(catalogue.SEP)
-            if base in sides and item:
-                side_flows.setdefault(base, {})[item] = float(i.value)  # type: ignore[arg-type]
-            else:
-                values[key] = i.value
-        units.append({"id": u.id, "type": e.id, "values": values, "outlets": routes(u, e), "sides": side_flows})
+        units.append(_unit_request(u, e, mine))
         vals = _values(mine, _spec_of(e))
         parameters.append(TrainUnitParameters(unit=u.id, type=e.id, unitClass=e.cls, values=vals))
         flags += [f"unit {u.id}: {v.outOfBounds}" for v in vals if v.outOfBounds]

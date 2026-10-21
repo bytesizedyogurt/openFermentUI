@@ -597,25 +597,32 @@ def proforma_scenarios(host: str | None = None, includeArchived: bool = False) -
 
 @app.get("/api/proforma/bind")
 def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool = False,  # noqa: N803
-                  fits: str | None = None, overrides: str | None = None) -> dict:
+                  fits: str | None = None, overrides: str | None = None, vessel: str | None = None,
+                  trainRun: str | None = None) -> dict:  # noqa: N803 (the wire name)
     """A shelf flowsheet's inputs bound, as a scenario a person made in the
     browser shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
     lays on the fermOS fits a person chose (§5.1), a JSON object of input
     key to artifact id, and `?overrides=` a person's overrides of one
-    scenario's scope over both (OF-BLD-020 D3), a JSON list. A reference
+    scenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet
+    built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1) names its
+    vessel design and its train run (`?vessel=`, `?trainRun=`). A reference
     biorefinery, the toy, an unknown id, a flowsheet of a program the switch
-    hides, a fit that cannot feed its input, or an override that cannot
-    stand is a 422 in words. A read: it starts no simulator."""
-    from . import proforma
+    hides, a fit that cannot feed its input, an override that cannot
+    stand, or a composite's part that cannot (missing, another tool's,
+    damaged, of another or an archived program) is a 422 in words. A read:
+    it starts no simulator."""
+    from . import composite, proforma
 
     chosen = _fits_param(fits)
     typed = _overrides_param(overrides)
     try:
-        values, _ = proforma.named_values(None, typed)
+        inputs, finance = composite.split_overrides(typed)
+        values, _ = proforma.named_values(None, inputs)
         if values:
             proforma._check_keys(proforma.runnable(flowsheet), values)
         return proforma.bind_flowsheet(flowsheet, include_archived=includeArchived, host=host,
-                                       assumptions=values, fits=chosen).model_dump(mode="json")
+                                       assumptions=values, fits=chosen, vessel=vessel,
+                                       train_run=trainRun).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -685,7 +692,8 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
                  vesselType: str | None = None, strain: str | None = None, product: str | None = None,  # noqa: N803
                  sugar: str | None = None, fit: str | None = None, startFrom: str | None = None,  # noqa: N803
                  durationPreset: str | None = None, includeArchived: bool = False,  # noqa: N803 (the wire name)
-                 unitType: str | None = None, train: str | None = None) -> dict:  # noqa: N803 (the wire name)
+                 unitType: str | None = None, train: str | None = None,  # noqa: N803 (the wire name)
+                 vessel: str | None = None, trainRun: str | None = None) -> dict:  # noqa: N803 (the wire name)
     """A scope's parameters (`ParamScope`): every spec with its bounds and
     their reason, and its value as the service binds it now, with its
     source. `proforma:<scenario id>` is a seed scenario, or with
@@ -702,7 +710,10 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     a 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is
     the train's own, its per-component keys expanded over the train's
     chemicals and its records bound by the train's program and product, and
-    `pureos:unit:<train>:inlet` is the train's inlet. 404 for a scope no provider here
+    `pureos:unit:<train>:inlet` is the train's inlet. A `proforma:` scope on
+    `custom_train_v1` names its vessel design and train run (`?vessel=`,
+    `?trainRun=`; OF-BLD-020 §6.1) and serves the group Finance, read from
+    the installed package with no worker. 404 for a scope no provider here
     knows; 422 in words for a malformed one or a refused binding; 409 for an
     artifact the scope names that is damaged on disk, as the vessel's own route
     answers it (§2.R, finding 17); 503 when the worker cannot answer."""
@@ -716,7 +727,7 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits), vesselType=vesselType,
                               strain=strain, product=product, sugar=sugar, fit=fit, startFrom=startFrom,
                               durationPreset=durationPreset, includeArchived=includeArchived, unitType=unitType,
-                              train=_train_param(train))
+                              train=_train_param(train), vessel=vessel, trainRun=trainRun)
     try:
         return params.scope(scope, req).model_dump(mode="json")
     except params.ScopeUnknown as e:

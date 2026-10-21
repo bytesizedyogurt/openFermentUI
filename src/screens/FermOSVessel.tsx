@@ -24,9 +24,11 @@
 // cost line names BioSTEAM's plant cost index. No numeric control is written
 // here (E.1‴): the panel is the only way to type a number.
 //
-// **Price this in Proforma** waits for night two's Phase 6, which adds
-// `custom_train_v1` to the shelf; until then the button says so and makes no
-// scenario.
+// **Price this in Proforma** (OF-BLD-020 §6.1) opens New scenario on
+// `custom_train_v1`, a vessel and a train priced, with this design chosen as
+// its fermenter; the dialog lists the train runs pureOS keeps and, when it
+// keeps none, says how one is made (pureOS → New train). Nothing is made
+// until a person chooses a train run and makes the scenario.
 //
 // OF-BLD-020 §4.R (the Phase 4 review). The chooser opens on a choice that
 // is no source when none is chosen, so a kept fit can be chosen when no
@@ -42,6 +44,7 @@ import type { FermosFitInfo, ParamScope, SimulationSummary, VesselDesign } from 
 import { overridesFor, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { Button, Callout, EmptyState, SectionTitle } from '@/components/ui';
+import { NewScenarioDialog } from '@/components/NewScenarioDialog';
 import { ParameterPanel } from '@/components/ParameterPanel';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { SubsystemReference } from '@/components/ReferenceView';
@@ -49,7 +52,7 @@ import { OxygenBalance } from '@/components/figures';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
 import { paramScope } from '@/lib/params';
-import { fermosFits, proformaStatus, stamp } from '@/lib/proforma';
+import { COMPOSITE_FLOWSHEET, fermosFits, proformaStatus, stamp } from '@/lib/proforma';
 import {
   FermosDown,
   FermosRefused,
@@ -65,9 +68,9 @@ import {
 /** The panel's groups, in Appendix 2 §C's order. */
 export const VESSEL_GROUPS = ['Scale', 'Vessel', 'Schedule', 'Aeration', 'Agitation', 'Heat'];
 
-/** What Phase 6 adds, said where the button would otherwise make a scenario. */
+/** What Price this in Proforma does, said beside it (OF-BLD-020 §6.1). */
 export const PRICE_WORDS =
-  'Pricing a vessel needs a flowsheet that takes one, and Proforma’s shelf has none yet: night two’s Phase 6 adds custom_train_v1, a fermenter built from this design and a train from pureOS, priced with the TEA the shelf flowsheets use. Until then nothing is made here: no scenario is created from this design.';
+  'Proforma prices this design as the fermenter of custom_train_v1, followed by a train pureOS ran on its beer, with the TEA the shelf flowsheets use. Choose the train run in New scenario; pureOS → New train builds and runs one when none is kept.';
 
 const problemOf = (e: unknown) =>
   e instanceof FermosDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof FermosRefused ? e.message : String(e);
@@ -281,12 +284,17 @@ function Result({ design }: { design: VesselDesign }) {
         <Button onClick={() => setPricing(true)} className="min-h-[44px]" data-testid="vessel-price">
           Price this in Proforma
         </Button>
-        {pricing && (
-          <p className="text-caption text-ink-soft max-w-3xl" role="status" data-testid="vessel-price-words">
-            {PRICE_WORDS}
-          </p>
-        )}
+        <p className="text-caption text-ink-soft max-w-3xl" data-testid="vessel-price-words">
+          {PRICE_WORDS}
+        </p>
       </div>
+      <NewScenarioDialog
+        key={design.artifactId}
+        open={pricing}
+        onClose={() => setPricing(false)}
+        initialFlowsheet={COMPOSITE_FLOWSHEET}
+        initialVessel={design.artifactId}
+      />
     </div>
   );
 }

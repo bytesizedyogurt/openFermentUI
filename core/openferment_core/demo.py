@@ -1049,9 +1049,17 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
     # OF-BLD-019 §2.3: the glucose-to-ethanol flowsheet has a closed form of
     # its own; every other call is the PHA draft's, as before.
     flowsheet = args.get("flowsheet") or "pha_sugar_v0"
-    ethanol = flowsheet == "ethanol_glucose_v0"
+    # OF-BLD-020 §6.1: a vessel and a train, priced, answers as the ethanol
+    # flowsheet's closed form does, under its own output names (the stand-in
+    # reads no structure: it builds nothing).
+    composite = flowsheet == "custom_train_v1"
+    ethanol = flowsheet == "ethanol_glucose_v0" or composite
 
     def evaluate(v: dict[str, float]) -> dict[str, Any]:
+        if composite:
+            out = _standin_ethanol_evaluate(v)
+            return {"pricePerKgProduct": out["pricePerKgEthanol"], "productKgPerH": out["ethanolKgPerH"],
+                    "costLines": out["costLines"], "readBack": out["readBack"]}
         if ethanol:
             return _standin_ethanol_evaluate(v)
         if v["yield"] / v["content"] > 0.5:
@@ -1092,8 +1100,9 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
         mc = _standin_call("montecarlo", {"flowsheet": flowsheet, "specs": args["specs"], "n": args["samples"],
                                           "seed": args["seed"], "base": args["base"]})
         tables = _standin_ethanol_tables if ethanol else _standin_tables
+        shaped = ({**base_out, "ethanolKgPerH": base_out["productKgPerH"]} if composite and base_out else base_out)
         return {"base": base_out, "baseInfeasible": base_infeasible,
-                "tables": tables(args["base"], base_out) if base_out else None, "grid": grid, "montecarlo": mc}
+                "tables": tables(args["base"], shaped) if base_out else None, "grid": grid, "montecarlo": mc}
     if op == "grid":
         keys = list(args["axes"])
         cells = []

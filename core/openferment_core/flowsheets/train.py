@@ -117,9 +117,17 @@ class Built:
     """The train's BioSTEAM objects: the inlet, the units in order, every
     outlet stream by unit and port, and the system."""
 
-    def __init__(self, spec: dict[str, Any], unit_class: Callable[[str], tuple[Any, Any]], chems: Any) -> None:
+    def __init__(self, spec: dict[str, Any], unit_class: Callable[[str], tuple[Any, Any]], chems: Any,
+                 upstream: Any = None) -> None:
         self.spec = spec
-        self.inlet, self.inlet_built = inlet_stream(chems, spec["inlet"])
+        # OF-BLD-020 §6.1: `custom_train_v1` hands its fermenter's beer in as
+        # the train's inlet (`upstream`) and makes the system itself, of the
+        # fermenter and these units together; else the train builds its own
+        # inlet from the spec and its own system.
+        if upstream is None:
+            self.inlet, self.inlet_built = inlet_stream(chems, spec["inlet"])
+        else:
+            self.inlet, self.inlet_built = upstream, None
         units = list(spec["units"])
         self.outlets: dict[str, dict[str, Any]] = {}
         self.entries: dict[str, Any] = {}
@@ -160,7 +168,7 @@ class Built:
             onward = [name for name, route in (u.get("outlets") or {}).items() if route == ONWARD]
             upstream = self.outlets[u["id"]][onward[0]]
         self.product = upstream
-        self.system = bst.System.from_units(spec["system"], units=self.units)
+        self.system = bst.System.from_units(spec["system"], units=self.units) if self.inlet_built is not None else None
 
     def simulate(self) -> None:
         """The whole train, recycles converged by BioSTEAM; a failure names

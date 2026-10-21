@@ -564,6 +564,23 @@ async function main() {
             await page.locator('[data-testid="new-scenario"]').click();
             await page.locator('[data-testid="new-scenario-dialog"]').waitFor({ timeout: 8000 }).catch(() => {});
           }
+          if ((off.find((f) => f.id === id)?.builtFrom ?? []).length > 0) {
+            // OF-BLD-020 §6.1: a flowsheet built from a vessel and a train
+            // asks for both; on a fresh install the service keeps neither, so
+            // each chooser says why it is empty and where one is made, and
+            // Make the scenario waits, saying so; nothing is made.
+            await page.locator(`[data-testid="new-scenario-flowsheet"][data-flowsheet="${id}"] input`).check();
+            const box = page.locator('[data-testid="new-scenario-composite"]');
+            await box.locator('[data-testid="new-scenario-composite-waits"]').waitFor({ timeout: 8000 }).catch(() => {});
+            const empty = await box.locator('[data-testid="new-scenario-composite-empty"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-part')).join());
+            const said = await box.innerText().catch(() => '');
+            if (empty !== 'vessel,train-run') problems.push(`New scenario on ${id} does not say both lists are empty (${empty || 'neither'})`);
+            if (!/No vessel design is kept/.test(said) || !/fermOS → Vessel/.test(said) || !/No train run is kept/.test(said) || !/pureOS → New train/.test(said))
+              problems.push(`New scenario on ${id} does not say where a vessel design and a train run are made (${said.slice(0, 160)})`);
+            if (!(await page.locator('[data-testid="new-scenario-create"]').isDisabled().catch(() => false))) problems.push(`Make the scenario does not wait for a vessel and a train on ${id}`);
+            await page.getByRole('button', { name: 'Cancel' }).click();
+            continue;
+          }
           await make(id, `From the shelf: ${id}`);
         }
       }
@@ -630,7 +647,7 @@ async function main() {
       proformaFails++;
       console.log(`✗ proforma     ${problems.join('; ')}`);
     } else {
-      console.log('✓ proforma     the index lists the shelf\u2019s reference runs with a run and a status line and its flowsheets with their inputs, says why a row is empty, disables nothing; New scenario makes a scenario that lands on its page saying it has not run, is listed as not run, and survives a reload; the palette opens the same chooser');
+      console.log('✓ proforma     the index lists the shelf\u2019s reference runs with a run and a status line and its flowsheets with their inputs, says why a row is empty, disables nothing; New scenario makes a scenario that lands on its page saying it has not run, is listed as not run, and survives a reload; on a vessel and a train it says why each list is empty and waits; the palette opens the same chooser');
     }
     await page.close();
   }
@@ -2431,10 +2448,22 @@ async function main() {
       await page.locator('[data-testid="vessel-basis"] summary').click();
       const basis = await page.locator('[data-testid="vessel-basis"]').innerText().catch(() => '');
       if (!basis.includes(`plant_scale: ${fx.plantScale}`) || !basis.includes(`assumption by ${REVIEWER}`)) problems.push("the design's basis does not name the person's plant scale");
-      // Price this in Proforma: words, and nothing made.
-      await page.locator('[data-testid="vessel-price"]').click();
+      // OF-BLD-020 §6.1: Price this in Proforma opens New scenario on
+      // custom_train_v1 with this design chosen; the double keeps no train run,
+      // so the dialog says how one is made and nothing is made.
       const words = await page.locator('[data-testid="vessel-price-words"]').innerText().catch(() => '');
-      if (!/custom_train_v1/.test(words) || !/no scenario is created/.test(words)) problems.push(`Price this in Proforma does not say what Phase 6 adds (${words.slice(0, 120)})`);
+      if (!/custom_train_v1/.test(words) || !/pureOS → New train/.test(words)) problems.push(`Price this in Proforma does not say what it prices (${words.slice(0, 120)})`);
+      await page.locator('[data-testid="vessel-price"]').click();
+      await page.locator('[data-testid="new-scenario-dialog"] [data-testid="new-scenario-composite-waits"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const designed = (await page.locator('[data-testid="vessel-result"]').getAttribute('data-artifact').catch(() => null)) ?? '';
+      if (!(await page.locator('[data-testid="new-scenario-flowsheet"][data-flowsheet="custom_train_v1"] input').isChecked().catch(() => false)))
+        problems.push('Price this in Proforma does not open New scenario on custom_train_v1');
+      if (!designed || (await page.locator('[data-testid="new-scenario-vessel"]').inputValue().catch(() => '')) !== designed)
+        problems.push(`New scenario does not open with this design chosen (${designed})`);
+      const trainWords = await page.locator('[data-testid="new-scenario-composite-empty"][data-part="train-run"]').innerText().catch(() => '');
+      if (!/No train run is kept/.test(trainWords) || !/pureOS → New train/.test(trainWords)) problems.push(`with no train run kept, New scenario does not say how one is made (${trainWords.slice(0, 120)})`);
+      if (!(await page.locator('[data-testid="new-scenario-create"]').isDisabled().catch(() => false))) problems.push('Make the scenario does not wait for a train run');
+      await page.getByRole('button', { name: 'Cancel' }).click();
       if (!page.url().includes('/fermos/vessel')) problems.push('Price this in Proforma left the page');
 
       // §4.R (findings 2, 7, 13): a person's heat per oxygen forces BioSTEAM's duty, and the heat line says so.
@@ -2528,7 +2557,7 @@ async function main() {
       vesselFails++;
       console.log(`✗ vessel       ${problems.join('; ')}`);
     } else {
-      console.log(`✓ vessel       fermOS → Vessel (${fx.worker.kind}): the kept simulations chosen; every design parameter in six groups with its source; the scale waits and Design says the service's words; a plant scale typed is the reviewer's assumption, posted signed; the design table, the oxygen balance as a rule and a curve, heat with how BioSTEAM found it and its convention on the simulated uptake, cost with BioSTEAM's index, the basis naming the person; Price this in Proforma says what Phase 6 adds; a person's heat per oxygen said as forced; a vessel type changed clears the design; a bubble column chosen in the panel designs by Dewes; a design in flight dropped when the source changes; the anaerobic batch is the NREL fermenter with no compressor and asks for a plant scale alone; with no simulation kept a fit is chosen from a chooser that opens on no source`);
+      console.log(`✓ vessel       fermOS → Vessel (${fx.worker.kind}): the kept simulations chosen; every design parameter in six groups with its source; the scale waits and Design says the service's words; a plant scale typed is the reviewer's assumption, posted signed; the design table, the oxygen balance as a rule and a curve, heat with how BioSTEAM found it and its convention on the simulated uptake, cost with BioSTEAM's index, the basis naming the person; Price this in Proforma opens New scenario on custom_train_v1 with the design chosen and says how a train run is made; a person's heat per oxygen said as forced; a vessel type changed clears the design; a bubble column chosen in the panel designs by Dewes; a design in flight dropped when the source changes; the anaerobic batch is the NREL fermenter with no compressor and asks for a plant scale alone; with no simulation kept a fit is chosen from a chooser that opens on no source`);
     }
     await page.close();
   }

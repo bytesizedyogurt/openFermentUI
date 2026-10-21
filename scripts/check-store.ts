@@ -46,7 +46,7 @@ import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
 import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, Override, ProformaScenarioInfo, Scenario } from '../src/data/types';
 import { visibleArtifacts } from '../src/lib/artifacts';
-import { inputCounts, referencePrice, runBody, runOverrides } from '../src/lib/proforma';
+import { COMPOSITE_FLOWSHEET, inputCounts, partsOf, referencePrice, runBody, runOverrides, scenarioFromVesselAndTrain } from '../src/lib/proforma';
 import { resolveRequest } from '../src/lib/params';
 import * as ts from 'typescript';
 import { readdirSync, statSync } from 'node:fs';
@@ -642,6 +642,45 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   const pha = st().createScenario('pha_sugar_v0', 'PHA, made with the switch on', 'pha');
   check('a scenario made in an archived program hides with the switch off and its link still names the program',
     !programVisible('scenario', pha, st()) && programOf('scenario', pha, st()) === 'pha');
+  // OF-BLD-020 §6.1 (D11): a scenario on custom_train_v1 keeps the vessel
+  // design and the train run it is built from, through a reload, a copy and
+  // the helper pureOS's Builder calls; a scenario on any other flowsheet keeps
+  // neither, and clearing this browser's data drops it with the rest.
+  const vesselId = 'a1a1a1a1a1a1a1a1';
+  const trainRunId = 'b2b2b2b2b2b2b2b2';
+  const seam = st().createScenario(COMPOSITE_FLOWSHEET, 'A vessel and a train', 'yeast', { vessel: vesselId, trainRun: trainRunId });
+  const seamSnap = snapshotOf(st());
+  const keptSeam = seamSnap.createdScenarios?.[seam];
+  check('the snapshot keeps a composite scenario with its vessel design and train run',
+    keptSeam?.flowsheetId === COMPOSITE_FLOWSHEET && keptSeam.vessel === vesselId && keptSeam.trainRun === trainRunId &&
+      seamSnap.createdScenarios?.[id]?.vessel === undefined, keptSeam);
+  useStore.setState((s) => ({ scenarios: s.scenarios.filter((x) => x.id !== seam), createdScenarioIds: s.createdScenarioIds.filter((x) => x !== seam) }));
+  st().applyDurable(seamSnap);
+  const seamBack = st().scenarios.find((x) => x.id === seam);
+  check('after a reload the composite scenario is back with both parts, and partsOf reads them',
+    JSON.stringify(partsOf(seamBack)) === JSON.stringify({ vessel: vesselId, trainRun: trainRunId }) && partsOf(st().scenarios.find((x) => x.id === id)) === null);
+  const seamCopyId = st().duplicateScenario(seam);
+  const seamCopy = st().scenarios.find((x) => x.id === seamCopyId);
+  check('a copy of a composite scenario keeps its parts', seamCopy?.vessel === vesselId && seamCopy?.trainRun === trainRunId && seamCopy.id !== seam);
+  const helpedId = scenarioFromVesselAndTrain(vesselId, trainRunId, 'yeast');
+  const helped = st().scenarios.find((x) => x.id === helpedId);
+  check('scenarioFromVesselAndTrain makes a Durable composite scenario in the train run\u2019s program, not run',
+    helped?.flowsheetId === COMPOSITE_FLOWSHEET && helped.vessel === vesselId && helped.trainRun === trainRunId && helped.program === 'yeast' &&
+      helped.lastRunId === null && st().createdScenarioIds.includes(helped.id));
+  const seamBody = runBody({ scenarioId: seam, flowsheet: COMPOSITE_FLOWSHEET, overrides: [], host: null, vessel: vesselId, trainRun: trainRunId, includeArchived: false });
+  check('a composite run carries its parts and the switch, and a run of any other flowsheet carries neither',
+    seamBody.vessel === vesselId && seamBody.trainRun === trainRunId && seamBody.includeArchived === false &&
+      !('vessel' in runBody({ scenarioId: id, flowsheet: 'ethanol_glucose_v0', overrides: [], host: null })));
+  const page = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
+  check('a composite scenario\u2019s page sends its parts with every binding, panel read and run, names them with links, and shows Finance',
+    /partsOf\(scenario\)/.test(page) && /vessel: vesselId, trainRun: trainRunId/.test(page) && /data-testid="scenario-parts"/.test(page) &&
+      /vesselDesignPath\(parts\.vessel\)/.test(page) && /trainRunPath\(parts\.trainRun\)/.test(page) &&
+      /const PROFORMA_GROUPS = \[[^\]]*'Finance'\]/.test(page) && /sp\.group === 'Finance'/.test(page));
+  const dialog = readFileSync(new URL('../src/components/NewScenarioDialog.tsx', import.meta.url), 'utf8');
+  check('New scenario reads the kept vessel designs and train runs for a flowsheet built from them, and says why a list is empty',
+    /compositeVessels\(/.test(dialog) && /compositeTrainRuns\(/.test(dialog) && /No vessel design is kept on this service yet/.test(dialog) &&
+      /No train run is kept on this service yet/.test(dialog) && /pureOS → New train/.test(dialog) &&
+      /disabled=\{[^}]*\(needsParts && !parts\)\} data-testid="new-scenario-create"/.test(dialog));
   st().clearBrowserData();
   check('Clearing this browser\u2019s data drops the scenarios made here, their newest runs and every pin',
     !st().scenarios.some((x) => x.createdAt) && st().createdScenarioIds.length === 0 && !st().scenarios.some((x) => x.lastRunId) &&

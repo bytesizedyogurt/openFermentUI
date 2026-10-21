@@ -44,6 +44,9 @@ export interface ParamAsk {
   startFrom?: string | null;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
   includeArchived?: boolean;
+  /** A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the vessel design and the train run it is built from. */
+  vessel?: string | null;
+  trainRun?: string | null;
 }
 
 /** The fermOS fields of an ask, as query parameters and as the resolve's body fields alike. */
@@ -63,6 +66,8 @@ const askQuery = (ask: ParamAsk) => {
     if (v) q.set(k, v);
   }
   if (ask.includeArchived) q.set('includeArchived', 'true');
+  if (ask.vessel) q.set('vessel', ask.vessel);
+  if (ask.trainRun) q.set('trainRun', ask.trainRun);
   const s = q.toString();
   return s ? `?${s}` : '';
 };
@@ -81,6 +86,8 @@ export function resolveRequest(overrides: Override[], ask: ParamAsk = {}): Param
     ...(ask.vesselType ? { vesselType: ask.vesselType } : {}),
     ...Object.fromEntries(FERMOS_ASK.filter((k) => ask[k]).map((k) => [k, ask[k]])),
     ...(ask.includeArchived ? { includeArchived: true } : {}),
+    ...(ask.vessel ? { vessel: ask.vessel } : {}),
+    ...(ask.trainRun ? { trainRun: ask.trainRun } : {}),
   };
 }
 

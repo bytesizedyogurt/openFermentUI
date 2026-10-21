@@ -15,7 +15,11 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
     run         one whole run (OF-BLD-019 §2.1): the base case, the tables
                 read from BioSTEAM's objects right after it (TEA breakdown,
                 streams, units, utility duties, the diagram), the grid and
-                the samples; proforma.py keeps it as one artifact (D1)
+                the samples; proforma.py keeps it as one artifact (D1). A
+                flowsheet built from a structure (OF-BLD-020 §6.1,
+                `custom_train_v1`: a vessel design's fermenter, a train run's
+                units and the TEA's finance) takes it as `structure`, and the
+                worker keeps a built plant per structure (STRUCTURES_KEPT)
     reference   a published reference biorefinery run whole on its
                 package's defaults (OF-BLD-019 §2.2): built afresh inside
                 `package_defaults()`, as the package's own test builds it;
@@ -129,7 +133,21 @@ class Refused(ValueError):
     """The request cannot be computed, in words."""
 
 
-def built(name: str) -> tuple[Any, Any]:
+# How many plants built from a structure (OF-BLD-020 §6.1: custom_train_v1,
+# one per vessel design, train run and finance) the worker keeps warm; the
+# oldest is let go past it. A setting, not a measurement.
+STRUCTURES_KEPT = 4
+
+
+def _structure_key(name: str, structure: dict[str, Any]) -> str:
+    import hashlib
+    import json
+
+    text = json.dumps(structure, sort_keys=True, separators=(",", ":"), default=str)
+    return f"{name}:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
+
+
+def built(name: str, structure: dict[str, Any] | None = None) -> tuple[Any, Any]:
     try:
         module = flowsheets.load(name)
     except KeyError as e:
@@ -137,19 +155,28 @@ def built(name: str) -> tuple[Any, Any]:
     if not hasattr(module, "build"):
         raise Refused(f"{name} is a reference biorefinery: it runs whole on its package's own defaults, "
                       "through its reference run, not case by case")
-    if name not in _BUILT:
+    takes = bool(getattr(module, "STRUCTURED", False))
+    if takes and structure is None:
+        raise Refused(f"{name} is built from a vessel design and a train run, which this request does not name")
+    if not takes and structure is not None:
+        raise Refused(f"{name} is built once, whole, and takes no structure")
+    key = name if structure is None else _structure_key(name, structure)
+    if key not in _BUILT:
         # Built as it would be in a worker that had built nothing before
         # (OF-BLD-019 §2.R): BioSTEAM's tickets start at one, so the streams a
         # package leaves unnamed take the same ids whichever plant this worker
         # built first; and every chemical comes from fresh caches, so nothing
         # this plant changes reaches a plant built later, nor the other way.
         with package_defaults():
-            _BUILT[name] = module.build()
-    return module, _BUILT[name]
+            _BUILT[key] = module.build(structure, unit_class) if takes else module.build()
+        made = [k for k in _BUILT if ":" in k]
+        for old in made[:-STRUCTURES_KEPT]:
+            del _BUILT[old]
+    return module, _BUILT[key]
 
 
-def evaluate(name: str, values: dict[str, float]) -> dict[str, float]:
-    module, system = built(name)
+def evaluate(name: str, values: dict[str, float], structure: dict[str, Any] | None = None) -> dict[str, float]:
+    module, system = built(name, structure)
     unknown = sorted(set(values) - set(module.INPUTS))
     if unknown:
         raise Refused(f"{name} has no input {', '.join(unknown)}; it takes {', '.join(module.INPUTS)}")
@@ -159,14 +186,15 @@ def evaluate(name: str, values: dict[str, float]) -> dict[str, float]:
         raise Refused(str(e)) from e
 
 
-def grid(name: str, axes: dict[str, list[float]], base: dict[str, float]) -> dict[str, Any]:
+def grid(name: str, axes: dict[str, list[float]], base: dict[str, float],
+         structure: dict[str, Any] | None = None) -> dict[str, Any]:
     if not 1 <= len(axes) <= 3:
         raise Refused("a grid runs over one to three inputs")
     keys = list(axes)
     cells = []
     for combo in itertools.product(*(axes[k] for k in keys)):
         values = {**base, **dict(zip(keys, combo))}
-        outputs, reason = _attempt(name, values)
+        outputs, reason = _attempt(name, values, structure)
         cells.append({"at": dict(zip(keys, combo)), "outputs": outputs, "infeasible": reason})
     return {"axes": axes, "base": base, "cells": cells}
 
@@ -187,11 +215,12 @@ def _sample(spec: dict[str, Any], u: float) -> float:
     raise Refused(f"there is no distribution {kind}")
 
 
-def _attempt(name: str, values: dict[str, float]) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
+def _attempt(name: str, values: dict[str, float],
+             structure: dict[str, Any] | None = None) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
     """One case. A case the flowsheet cannot hold is a result, named: its
     reason key (a flowsheet's `Infeasible.reason`, else `error`) and words."""
     try:
-        return evaluate(name, values), None
+        return evaluate(name, values, structure), None
     except Refused:
         raise
     except Exception as e:
@@ -199,13 +228,14 @@ def _attempt(name: str, values: dict[str, float]) -> tuple[dict[str, Any] | None
         return None, {"reason": str(reason), "detail": str(e) if reason != "error" else f"{type(e).__name__}: {e}"}
 
 
-def montecarlo(name: str, specs: dict[str, dict[str, Any]], n: int, seed: int, base: dict[str, float]) -> dict[str, Any]:
+def montecarlo(name: str, specs: dict[str, dict[str, Any]], n: int, seed: int, base: dict[str, float],
+               structure: dict[str, Any] | None = None) -> dict[str, Any]:
     keys = list(specs)
     lhs = qmc.LatinHypercube(d=max(1, len(keys)), seed=seed).random(n)
     samples = []
     for row in lhs:
         values = {**base, **{k: _sample(specs[k], float(row[i])) for i, k in enumerate(keys)}}
-        outputs, reason = _attempt(name, values)
+        outputs, reason = _attempt(name, values, structure)
         samples.append({"inputs": values, "outputs": outputs, "infeasible": reason})
     return {"n": n, "seed": seed, "samples": samples}
 
@@ -433,20 +463,24 @@ def tables(module: Any, b: Any, draw: bool | None = None) -> dict[str, Any]:
 
 
 def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], samples: int, seed: int,
-        axes: dict[str, list[float]] | None = None, draw: bool | None = None) -> dict[str, Any]:
+        axes: dict[str, list[float]] | None = None, draw: bool | None = None,
+        structure: dict[str, Any] | None = None) -> dict[str, Any]:
     """One whole run: the base case and its tables, read before any other
     case moves the objects; then the grid, when one is asked; then the
-    samples, Latin hypercube and seeded, as `montecarlo`."""
-    module, b = built(name)
+    samples, Latin hypercube and seeded, as `montecarlo`. A flowsheet built
+    from a structure (OF-BLD-020 §6.1, custom_train_v1) takes it here, and
+    every case of the run is of the one plant it builds."""
+    module, b = built(name, structure)
     try:
-        base_out, base_infeasible = evaluate(name, base), None
+        base_out, base_infeasible = evaluate(name, base, structure), None
     except Refused:
         raise
     except Exception as e:  # the base case cannot be held: said as the service says a worker error
         base_out, base_infeasible = None, f"{type(e).__name__}: {e}"
     out_tables = tables(module, b, draw) if base_out is not None else None
-    out_grid = grid(name, axes, base) if axes else None
-    mc = montecarlo(name, specs, samples, seed, base) if samples else {"n": 0, "seed": seed, "samples": []}
+    out_grid = grid(name, axes, base, structure) if axes else None
+    mc = (montecarlo(name, specs, samples, seed, base, structure) if samples
+          else {"n": 0, "seed": seed, "samples": []})
     return {"base": base_out, "baseInfeasible": base_infeasible, "tables": out_tables, "grid": out_grid, "montecarlo": mc}
 
 
@@ -880,11 +914,12 @@ def _op_volatility(args):
 
 def _op_run(args):
     return run(str(args["flowsheet"]), dict(args.get("base") or {}), dict(args.get("specs") or {}),
-               int(args.get("samples", 0)), int(args.get("seed", 0)), args.get("axes") or None, args.get("diagram"))
+               int(args.get("samples", 0)), int(args.get("seed", 0)), args.get("axes") or None, args.get("diagram"),
+               args.get("structure"))
 
 
 def _op_evaluate(args):
-    return evaluate(str(args["flowsheet"]), dict(args.get("values") or {}))
+    return evaluate(str(args["flowsheet"]), dict(args.get("values") or {}), args.get("structure"))
 
 
 def _op_grid(args):
@@ -1022,6 +1057,9 @@ def _op_flowsheet_unit_values(args):
     from ..flowsheets import train as train_fs
 
     name = str(args.get("flowsheet") or "")
+    if getattr(flowsheets.load(name) if name in flowsheets.KNOWN else None, "STRUCTURED", False):
+        raise Refused(f"{name} is built from a vessel design and a train run: its units are the fermenter and that "
+                      "train's own, read from the train run")
     _, b = built(name)
     system = b.system if hasattr(b, "system") else b
     by_id = {u.ID: u for u in system.units}

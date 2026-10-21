@@ -1624,6 +1624,18 @@ class ProformaRunRequest(BaseModel):
     # the artifact; a model never picks one. A fit that cannot feed an input
     # is refused in words naming the parameter.
     fits: dict[str, str] = Field(default_factory=dict)
+    # OF-BLD-020 §6.1 (D11): what a scenario on `custom_train_v1` is built
+    # from, as the scenario made in the browser keeps them: the kept
+    # `fermos.vessel` design its fermenter is rebuilt from, and the kept
+    # `pureos.train_run` whose units follow it. Both are needed for that
+    # flowsheet and refused for any other; each refused in words when it is
+    # not on file, is another tool's, is damaged, or is of another program.
+    vessel: str | None = None
+    trainRun: str | None = None
+    # The program switch, for the parts a run names (§6.1): a vessel design
+    # or a train run of an archived program is refused unless it is on. A
+    # run's records bind whatever it says (a person opened the scenario).
+    includeArchived: bool = False
 
 
 class HistogramBin(BaseModel):
@@ -1877,6 +1889,11 @@ class FlowsheetInfo(BaseModel):
     # ('biorefineries/tests/test_biorefineries.py::test_corn'); its values
     # are read from the installed file (PackageRegression), never retyped.
     packageTest: str | None = None
+    # OF-BLD-020 §6.1 (D11): the kept artifacts a scenario on this flowsheet
+    # names besides the flowsheet, by tool, in the order the flowsheet builds
+    # on them (`custom_train_v1`: a `fermos.vessel` design and a
+    # `pureos.train_run`); empty for a flowsheet that is whole on its own.
+    builtFrom: list[str] = Field(default_factory=list)
 
 
 # ── A reference biorefinery's run (OF-BLD-019 §2.2, D3) ──────────────────
@@ -2543,6 +2560,11 @@ class ParamResolveRequest(BaseModel):
     # scope `pureos:unit:<train id>:inlet` is the train's inlet. Its units'
     # typed values are not laid on here: a resolve's `overrides` are.
     train: TrainSpec | None = None
+    # A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the kept
+    # vessel design and train run it is built from, as ProformaRunRequest
+    # carries them.
+    vessel: str | None = None
+    trainRun: str | None = None
 
 
 class ParamResolveResult(BaseModel):

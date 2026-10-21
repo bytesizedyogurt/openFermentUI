@@ -144,6 +144,8 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * scope that long, as a cold service's first read waits on BioSTEAM.
    */
   const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true, vesselSimulationsOnFile: false, vesselDelayMs: 0, vesselScopeDelayMs: 0 };
+  /** OF-BLD-020 §6.1: the vessel designs this double answered, newest first, as GET /api/fermos/vessels lists them. */
+  const vesselsKept = [];
   /** The ceiling checks the browser asked for (OF-BLD-019 §5.2): each query, as sent. */
   const ceilingChecks = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
@@ -601,7 +603,10 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         res.writeHead(status, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify(body));
       };
-      if (url === '/api/fermos/vessels' && req.method === 'GET') return sendJson(200, []);
+      // OF-BLD-020 §6.1: the designs kept are the ones this double answered
+      // (none on a fresh install), each as VesselSummary lists it, newest
+      // first, so New scenario from a vessel and a train lists what was designed.
+      if (url === '/api/fermos/vessels' && req.method === 'GET') return sendJson(200, vesselsKept);
       const vm = /^\/api\/params\/fermos:vessel:([A-Za-z0-9][A-Za-z0-9._-]{0,127})(\/resolve)?$/.exec(url);
       if (vm) {
         const id = vm[1];
@@ -676,6 +681,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
           // The person's name laid on as the service lays it on: on each value they typed, and on its basis input.
           const named = (src, key) => (typed.has(key) && src?.kind === 'assumption' ? { ...src, by: String(typed.get(key).by).trim() } : src);
           const body = recorded.body;
+          const dr = body.designResults ?? {};
+          const summary = {
+            artifactId: body.artifactId, provenance: body.provenance, createdAt: body.createdAt, source: body.source,
+            sourceTool: body.sourceTool, unitClass: body.unitClass, vesselType: body.vesselType ?? null,
+            vessels: dr['Number of reactors'] ?? null, volume: dr['Reactor volume'] ?? null, installed: body.cost?.installed ?? null,
+          };
+          vesselsKept.splice(0, vesselsKept.length, summary, ...vesselsKept.filter((v) => v.artifactId !== summary.artifactId));
           return sendJson(200, {
             ...body,
             parameters: body.parameters.map((v) => (typed.has(v.key) ? { ...v, overriddenBy: String(typed.get(v.key).by).trim(), source: named(v.source, v.key) } : v)),
@@ -1066,6 +1078,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         await new Promise((r) => setTimeout(r, 700));
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(await readFile(OVERLAY_FIXTURE));
+      }
+      // OF-BLD-020 §6.1: the train runs pureOS keeps, as a fresh install has
+      // them (none), for New scenario from a vessel and a train. Last in the
+      // chain, so a handler that serves kept train runs answers first.
+      if (url === '/api/pureos/train-runs' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end('[]');
       }
       if (url.startsWith('/api/')) {
         res.writeHead(404, { 'Content-Type': 'application/json' });

@@ -27,9 +27,13 @@ import type {
   ScenarioInput,
   StreamRow,
   TeaBreakdown,
+  ProgramId,
+  TrainSummary,
   UnitRow,
   UtilityDuties,
+  VesselSummary,
 } from '@/data/types';
+import { useStore } from '@/store';
 import { RagDown, RagRefused, call } from './rag';
 
 export { RagDown as ProformaDown, RagRefused as ProformaRefused };
@@ -359,6 +363,9 @@ export interface BindAsk {
   includeArchived: boolean;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1); sent to (c) alone. */
   fits?: Record<string, string>;
+  /** OF-BLD-020 §6.1: a scenario on `custom_train_v1` names the vessel design and the train run it is built from. */
+  vessel?: string | null;
+  trainRun?: string | null;
 }
 
 const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
@@ -366,6 +373,8 @@ const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
   q.set('includeArchived', ask.includeArchived ? 'true' : 'false');
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
+  if (ask.vessel) q.set('vessel', ask.vessel);
+  if (ask.trainRun) q.set('trainRun', ask.trainRun);
   return q.toString();
 };
 
@@ -401,6 +410,11 @@ export interface RunAsk {
   host: string | null;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1). */
   fits?: Record<string, string>;
+  /** OF-BLD-020 §6.1: the vessel design and the train run a scenario on `custom_train_v1` is built from. */
+  vessel?: string | null;
+  trainRun?: string | null;
+  /** The program switch, for those parts (one of an archived program is refused unless it is on). */
+  includeArchived?: boolean;
 }
 
 /**
@@ -428,6 +442,8 @@ export function runBody(ask: RunAsk): ProformaRunRequest {
     seed: 0,
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
     ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
+    // OF-BLD-020 §6.1: a composite's parts, and the switch they are held to.
+    ...(ask.vessel || ask.trainRun ? { vessel: ask.vessel ?? null, trainRun: ask.trainRun ?? null, includeArchived: Boolean(ask.includeArchived) } : {}),
   };
 }
 
@@ -658,8 +674,14 @@ export interface RunInput {
   note: string | null;
 }
 
-/** A fit-fed input's basis names: `<key> fit`, `<key> fit low`, `<key> fit high` (proforma._FIT_NAME). */
-const FIT_NAME = /^(\w+) fit(?: (low|high))?$/;
+/**
+ * A fit-fed input's basis names: `<key> fit`, `<key> fit low`, `<key> fit high`
+ * (proforma._FIT_NAME); and a composite's vessel-bound input's, `<key> vessel`
+ * and its ends (proforma._VESSEL_NAME, OF-BLD-020 §6.1).
+ */
+const FIT_NAME = /^(\w+) (fit|vessel)(?: (low|high))?$/;
+/** What a composite run's basis carries of its parts (composite.PREFIXES): never an input of its own. */
+export const PART_PREFIXES = ['fermenter.', 'train.', 'finance.'];
 
 /**
  * Each input the run's flowsheet takes, as the run's basis names it (D1):
@@ -677,6 +699,7 @@ export function runInputs(view: RunView, flowsheet: FlowsheetInfo | null, labels
   // `<key> fit high` (proforma._FIT_NAME, OF-BLD-019 §5.1): its key is the
   // input's own, never `<key> fit` (§7.R).
   for (const i of view.basis.inputs) {
+    if (PART_PREFIXES.some((p) => i.name.startsWith(p))) continue;
     const fit = FIT_NAME.exec(i.name);
     const m = fit ? null : /^(.+?) (record|low|high)$/.exec(i.name);
     const key = fit ? fit[1] : m ? m[1] : null;
@@ -686,9 +709,10 @@ export function runInputs(view: RunView, flowsheet: FlowsheetInfo | null, labels
     const declared = flowsheet?.inputs.find((i) => i.key === key);
     const label = labels[key] ?? declared?.name ?? key;
     const records = view.basis.inputs.filter((i) => i.name === `${key} record` && i.source.kind === 'record');
-    const fitted = view.basis.inputs.find((i) => i.name === `${key} fit` && i.source.kind === 'artifact');
+    const fitted = view.basis.inputs.find((i) => (i.name === `${key} fit` || i.name === `${key} vessel`) && i.source.kind === 'artifact');
     if (fitted && !records.length) {
-      const part = (p: string) => num(view.basis.inputs.find((i) => i.name === `${key} fit ${p}` && i.source.kind === 'artifact')?.value);
+      const what = fitted.name.slice(key.length + 1);
+      const part = (p: string) => num(view.basis.inputs.find((i) => i.name === `${key} ${what} ${p}` && i.source.kind === 'artifact')?.value);
       // A productivity a fit or a simulation gave is its titre over its
       // batch time: the basis names that hour, and so does the row. The
       // words of each are the service's, chosen by the tool that kept the
@@ -696,7 +720,7 @@ export function runInputs(view: RunView, flowsheet: FlowsheetInfo | null, labels
       const batch = view.basis.inputs.find((i) => i.name === 'fit batch time' && i.source.kind === 'artifact' && i.source.id === fitted.source.id);
       const hours = num(batch?.value);
       const notes = [
-        `from fermOS${fitted.source.note ? `: ${fitted.source.note}` : ''}`,
+        what === 'vessel' ? `from the vessel design${fitted.source.note ? `: ${fitted.source.note}` : ''}` : `from fermOS${fitted.source.note ? `: ${fitted.source.note}` : ''}`,
         key === 'productivity' && batch && hours != null
           ? `batch time ${String(Number(hours.toPrecision(4)))} ${batch.unit}${batch.source.note ? `, ${batch.source.note}` : ''}`.trim()
           : null,
@@ -753,7 +777,7 @@ export const NO_DIAGRAM =
  */
 export const diagramSrc = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
-/** The words for an infeasible sample's reason (flowsheets/pha_sugar_v0.REASONS and ethanol_glucose_v0.REASONS). */
+/** The words for an infeasible sample's reason (flowsheets/pha_sugar_v0.REASONS, ethanol_glucose_v0.REASONS and custom_train_v1.REASONS). */
 export const INFEASIBLE_WORDS: Record<string, string> = {
   carbon: 'left no sugar for respiration',
   oxygen: 'asked for more oxygen than the aerated tank transfers',
@@ -761,8 +785,15 @@ export const INFEASIBLE_WORDS: Record<string, string> = {
   yield: 'asked for a yield above the theoretical yield of ethanol on glucose',
   concentration: 'asked for more glucose than a litre of feed can hold',
   convergence: 'did not converge in the simulator',
+  product: 'left no product in the train\u2019s product stream',
   error: 'failed in the simulator',
 };
+
+/** An infeasible reason's words for the flowsheet that gave it: a composite's yield is its vessel reaction's (OF-BLD-020 §6.1). */
+export function infeasibleWords(reason: string, flowsheet: string | null): string {
+  if (flowsheet === COMPOSITE_FLOWSHEET && reason === 'yield') return 'asked for a yield above what the vessel\u2019s reaction makes of the glucose';
+  return INFEASIBLE_WORDS[reason] ?? reason;
+}
 
 const COST_LINES: CostLine[] = ['capex', 'media', 'utilities', 'labor', 'downstream', 'other'];
 
@@ -800,6 +831,16 @@ export const QUESTIONS: Record<string, Record<string, string>> = {
     yield: 'What PHA yield on sugar holds at scale, and how far below the network ceiling does a real culture sit?',
     content: 'What PHA share of dry cell mass is reached at harvest without losing productivity?',
     productivity: 'What volumetric productivity holds across a full batch, including the growth phase?',
+  },
+  // OF-BLD-020 §6.1: a vessel and a train, priced. Its fermenter's inputs ask what the ethanol flowsheet's ask.
+  custom_train_v1: {
+    feed_glucose_conc:
+      'What glucose concentration in the fermenter’s feed does this yeast tolerate at scale, before the sugar or the ethanol it makes slows the batch?',
+    titre: 'What ethanol titre at harvest is credible for this strain on a glucose batch, before the ethanol stops the yeast?',
+    yield: 'What ethanol yield on glucose holds at scale, and does the vessel’s reaction, as its simulation built it, make that much of a gram of glucose?',
+    productivity: 'What volumetric productivity holds over a whole batch, and does the batch time it gives match the reacting time the vessel was designed for?',
+    plant_scale: 'What plant size, in ethanol fermented a year, is a sensible first commercial train, and was the vessel designed at it?',
+    glucose_price: 'What does a kilogram of glucose cost delivered to the fermenter, from the sugar this plant would buy?',
   },
   ethanol_glucose_v0: {
     feed_glucose_conc:
@@ -857,6 +898,17 @@ export interface ReadBackRow {
 }
 
 const READ_BACK: Record<string, { case: string[]; setting: string[] }> = {
+  // OF-BLD-020 §6.1: the composite's case, and what its vessel design, train run and the package set (`finance.*` too, below).
+  custom_train_v1: {
+    case: [
+      'fermenterConversion', 'batchTimeH', 'beerProductGPerL', 'glucoseFedKgPerH', 'waterFedKgPerH', 'productMassFraction', 'reactors',
+      'reactorVolumeM3',
+    ],
+    setting: [
+      'theoreticalYieldGPerG', 'reactionYieldGPerG', 'growthShare', 'vesselTauH', 'workingVolumeFraction', 'cleaningTimeH', 'temperatureK',
+      'operatingHours',
+    ],
+  },
   ethanol_glucose_v0: {
     case: ['fermenterConversion', 'batchTimeH', 'beerEthanolGPerL', 'glucoseFedKgPerH', 'waterFedKgPerH', 'productEthanolMassFraction', 'reactors', 'reactorVolumeM3'],
     setting: [
@@ -880,7 +932,9 @@ export function readBackRows(readBack: Record<string, unknown>, flowsheet: Flows
     .filter((e): e is [string, number | string] => typeof e[1] === 'number' || typeof e[1] === 'string')
     .map(([key, value]) => {
       const d = declared.get(key);
-      const origin: ReadBackRow['origin'] = flowsheet?.reference ? 'setting' : known?.case.includes(key) ? 'case' : known?.setting.includes(key) ? 'setting' : 'read';
+      // A composite's finance as its TEA held it (OF-BLD-020 §6.1): the package's, or a person's, named in the basis.
+      const finance = flowsheet?.id === COMPOSITE_FLOWSHEET && key.startsWith('finance.');
+      const origin: ReadBackRow['origin'] = flowsheet?.reference || finance ? 'setting' : known?.case.includes(key) ? 'case' : known?.setting.includes(key) ? 'setting' : 'read';
       return { key, label: d?.name ?? key, unit: d?.unit ?? '', value, origin };
     });
 }
@@ -917,4 +971,57 @@ export function questionsText(scenario: ProformaScenarioInfo, run: { sensitivity
     `The price is ${scenario.priceBasis}.`,
   ];
   return lines.join('\n') + '\n';
+}
+
+// ── A vessel and a train, priced (OF-BLD-020 §6.1, D11) ─────────────────
+//
+// `custom_train_v1` is built from two kept artifacts a scenario names: a
+// fermOS vessel design (`fermos.vessel`) and a pureOS train run
+// (`pureos.train_run`). A scenario made on it keeps both (Durable
+// `createdScenarios`: `vessel`, `trainRun`), and every binding, panel read,
+// ceiling check and run carries them. The service refuses a pair that cannot
+// stand, in its words; the browser computes nothing.
+
+/** The shelf flowsheet a vessel and a train become (flowsheets/shelf.COMPOSITE). */
+export const COMPOSITE_FLOWSHEET = 'custom_train_v1';
+
+/** Whether a shelf flowsheet is built from kept artifacts a scenario names (`builtFrom`). */
+export const builtFromParts = (f: Pick<FlowsheetInfo, 'builtFrom'> | null | undefined): boolean => Boolean(f?.builtFrom?.length);
+
+/** A scenario's parts, when it is built from a vessel and a train; else null. */
+export function partsOf(scenario: Pick<Scenario, 'vessel' | 'trainRun'> | null | undefined): { vessel: string; trainRun: string } | null {
+  return scenario?.vessel && scenario?.trainRun ? { vessel: scenario.vessel, trainRun: scenario.trainRun } : null;
+}
+
+/** Every vessel design the service keeps (`GET /api/fermos/vessels`), newest first; one of an archived program left out unless asked. */
+export const compositeVessels = (includeArchived: boolean, signal?: AbortSignal) =>
+  call<VesselSummary[]>(`/api/fermos/vessels?includeArchived=${includeArchived ? 'true' : 'false'}`, { signal });
+
+/** Every train run the service keeps (`GET /api/pureos/train-runs`), newest first; one of an archived program left out unless asked. */
+export const compositeTrainRuns = (includeArchived: boolean, signal?: AbortSignal) =>
+  call<TrainSummary[]>(`/api/pureos/train-runs?includeArchived=${includeArchived ? 'true' : 'false'}`, { signal });
+
+/** A kept vessel design in one line, for a chooser. */
+export const vesselWords = (v: VesselSummary) =>
+  `BioSTEAM's ${v.unitClass}${v.vesselType ? `, ${v.vesselType.replace('-', ' ')}` : ''} · ${v.artifactId} · for ${v.sourceTool} ${v.source}`;
+
+/** A kept train run in one line, for a chooser. */
+export const trainRunWords = (t: TrainSummary) =>
+  `${t.trainName ?? t.trainId ?? 'a train'} · ${t.unitCount} unit${t.unitCount === 1 ? '' : 's'}${t.product ? ` · ${t.product}` : ''} · ${t.artifactId}`;
+
+/** Where a composite scenario's fermenter and train are read: the vessel design's artifact, and the train run in pureOS. */
+export const vesselDesignPath = (artifactId: string) => `/biorepo/artifacts/${encodeURIComponent(artifactId)}`;
+export const trainRunPath = (artifactId: string) => `/pureos/train/${encodeURIComponent(artifactId)}`;
+
+/**
+ * Make a scenario on `custom_train_v1` from a vessel design and a train run,
+ * in the program the train run belongs to, and return its id: what pureOS's
+ * Builder's **Price this in Proforma** calls (OF-BLD-020 §6.2), and what the
+ * New scenario dialog makes when both are chosen. Durable, time-based id, not
+ * run; the scenario's page binds it and says what waits.
+ */
+export function scenarioFromVesselAndTrain(vesselId: string, trainRunId: string, program: ProgramId | null, name?: string): string {
+  return useStore
+    .getState()
+    .createScenario(COMPOSITE_FLOWSHEET, name?.trim() || 'A vessel and a train, priced', program, { vessel: vesselId, trainRun: trainRunId });
 }

@@ -236,8 +236,12 @@ def test_the_check_reads_every_declared_spec_and_names_one_with_no_reason(monkey
 
     # The shelf's inputs, fermOS's family specs (OF-BLD-020 §3.1), its
     # vessel declarations (§4.1), a forecast's start values and length
-    # (§3.3) and every unit type of pureOS's catalogue (§5.1).
-    assert n == (sum(len(info.inputs) for info in shelf.SHELF.values())
+    # (§3.3), every unit type of pureOS's catalogue (§5.1), and the group
+    # Finance of each flowsheet built from a vessel and a train (§6.1).
+    from openferment_core import composite
+
+    assert n == (sum(len(info.inputs) + (len(composite.finance_specs()) if info.builtFrom else 0)
+                     for info in shelf.SHELF.values())
                  + sum(len(f.specs()) for f in kinetics.FAMILIES.values())
                  + sum(len(s) for _, s in vessel._static())
                  + sum(len(s) for _, s in fermos._forecast_static())

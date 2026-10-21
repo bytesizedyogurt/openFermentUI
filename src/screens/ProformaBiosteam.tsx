@@ -25,7 +25,7 @@ import { Card } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
 import { CostWaterfall, Distribution, Tornado } from '@/components/figures';
 import {
-  INFEASIBLE_WORDS,
+  infeasibleWords,
   NO_DIAGRAM,
   asResultGrid,
   baseCaseRefusal,
@@ -266,7 +266,7 @@ export function PriceDistribution({ view, priceBasis, csvName }: { view: RunView
       quantiles={view.quantiles}
       provenance={view.provenance}
       samples={view.samples}
-      infeasible={Object.entries(view.infeasible).map(([reason, count]) => ({ reason: INFEASIBLE_WORDS[reason] ?? reason, count }))}
+      infeasible={Object.entries(view.infeasible).map(([reason, count]) => ({ reason: infeasibleWords(reason, view.flowsheet), count }))}
       basis={[view.basis]}
       notes={['The inputs are sampled independently; a real vessel links them, so the infeasible share is part of the result.']}
       csvName={`${csvName}-distribution`}

@@ -222,7 +222,8 @@
       "priceBasis": "USD per kg of the ethanol product stream as the package makes it (ethanol with its denaturant): the package's own price, at which its TEA solves the internal rate of return",
       "leavesOut": [],
       "gridInputs": [],
-      "packageTest": "biorefineries/tests/test_biorefineries.py::test_corn"
+      "packageTest": "biorefineries/tests/test_biorefineries.py::test_corn",
+      "builtFrom": []
     },
     "artifact": {
       "id": "1b2f2c463c872086",

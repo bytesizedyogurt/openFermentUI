@@ -694,6 +694,14 @@ export interface Scenario {
   lastRunId?: string | null;
   /** When a person made the scenario here (ISO time); absent on a seeded one. */
   createdAt?: string;
+  /**
+   * OF-BLD-020 §6.1 (D11): what a scenario on `custom_train_v1` is built
+   * from, kept with it in the Durable tier (`createdScenarios`) and sent with
+   * every binding and run: the kept `fermos.vessel` design (its artifact id)
+   * and the kept `pureos.train_run` (its artifact id). Absent on any other.
+   */
+  vessel?: string;
+  trainRun?: string;
 }
 
 export interface GridPointResult {
@@ -2867,6 +2875,15 @@ export interface ProformaRunRequest {
    * (OF-BLD-019 §5.1, D10). The service computes each value from it.
    */
   fits?: Record<string, string>;
+  /**
+   * OF-BLD-020 §6.1 (D11): a scenario on `custom_train_v1` names the kept
+   * `fermos.vessel` design its fermenter is rebuilt from and the kept
+   * `pureos.train_run` whose units follow it; refused for any other flowsheet.
+   */
+  vessel?: string | null;
+  trainRun?: string | null;
+  /** The program switch, for those parts: one of an archived program is refused unless it is on. */
+  includeArchived?: boolean;
 }
 
 /**
@@ -3079,6 +3096,12 @@ export interface FlowsheetInfo {
   gridInputs: string[];
   /** A reference biorefinery's own regression test, cited as file::test; its values come from the installed file (PackageRegression). */
   packageTest: string | null;
+  /**
+   * OF-BLD-020 §6.1 (D11): the kept artifacts a scenario on this flowsheet
+   * names besides the flowsheet, by tool (`custom_train_v1`: a `fermos.vessel`
+   * design and a `pureos.train_run`); empty for a flowsheet whole on its own.
+   */
+  builtFrom: string[];
 }
 
 // OF-BLD-019 §2.2 (D3) — a reference biorefinery runs whole on its package's
@@ -3549,6 +3572,9 @@ export interface ParamResolveRequest {
    * on here: the resolve's `overrides` are.
    */
   train?: TrainSpec | null;
+  /** A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the vessel design and the train run it is built from. */
+  vessel?: string | null;
+  trainRun?: string | null;
 }
 
 export interface ParamResolveResult {

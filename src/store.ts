@@ -475,7 +475,16 @@ export interface OFState {
    * its program (null for a general one), no inputs of its own, not run.
    * Durable, under a time-based id; returns the id.
    */
-  createScenario: (flowsheetId: string, name: string, program: ProgramId | null) => string;
+  /**
+   * OF-BLD-020 §6.1: `parts` names the vessel design and the train run a
+   * scenario on `custom_train_v1` is built from; kept with it (Durable).
+   */
+  createScenario: (
+    flowsheetId: string,
+    name: string,
+    program: ProgramId | null,
+    parts?: { vessel: string; trainRun: string } | null,
+  ) => string;
   /** The newest run artifact of a scenario, as a run on its page returned it (D6). */
   recordScenarioRun: (id: string, artifactId: string) => void;
 
@@ -2291,7 +2300,12 @@ export const useStore = create<OFState>()((set, get) => ({
     // A copy of a scenario on a shelf flowsheet is a scenario a person made:
     // Durable, time-based id, not run (OF-BLD-019 D6).
     if (src.kind === 'biosteam' && src.flowsheetId)
-      return get().createScenario(src.flowsheetId, `${src.name} (copy)`, src.program ?? null);
+      return get().createScenario(
+        src.flowsheetId,
+        `${src.name} (copy)`,
+        src.program ?? null,
+        src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
+      );
     const copy: Scenario = {
       ...structuredClone(src),
       id: nextId('sc'),
@@ -2307,7 +2321,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // and this outlives one (as adopted runbooks and Live conversations do).
   // It holds no input value: the service binds records, and a named person
   // types an assumption on its page, kept in proformaAssumptions under its id.
-  createScenario: (flowsheetId, name, program) => {
+  createScenario: (flowsheetId, name, program, parts) => {
     const id = timeId('sc');
     const made: Scenario = {
       id,
@@ -2322,6 +2336,8 @@ export const useStore = create<OFState>()((set, get) => ({
       assumptions: [],
       pinned: false,
       ...(program ? { program } : {}),
+      // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
+      ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun } : {}),
       lastRunId: null,
       createdAt: new Date().toISOString(),
     };

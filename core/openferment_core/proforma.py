@@ -665,12 +665,16 @@ def assumptions_read(words: str | None) -> list:
 
 
 def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = FLOWSHEET,
-                 samples: int = SAMPLES, scenario_id: str | None = None, fitted: list | None = None) -> list:
+                 samples: int = SAMPLES, scenario_id: str | None = None, fitted: list | None = None,
+                 parts: Any = None, finance: list | None = None) -> list:
     """The run's basis: the flowsheet, the scenario it belongs to, what it
     borrows from a package, the samples, and every record, assumption, the
     cap and the conventions; an input a fermOS fit feeds names the fit's
     artifact (OF-BLD-019 §5.1), and `fitted` adds what else the fit gave
-    (the batch time a productivity is the titre over)."""
+    (the batch time a productivity is the titre over). A composite run
+    (OF-BLD-020 §6.1) adds its vessel design, its train run and its finance
+    (`composite.basis_inputs`), and names the plant scale the vessel design
+    gave as `plant_scale vessel`."""
     from .models import BasisInput, BasisSource
 
     info = _shelf.info(flowsheet, allow_toy=True)
@@ -692,6 +696,10 @@ def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = F
                                note="create_tea and create_chemicals; PHB borrows Lignin's volume and heat capacity")))
     elif flowsheet == ETHANOL:
         out += ethanol_basis()
+    elif parts is not None:
+        from . import composite
+
+        out += composite.basis_inputs(parts, list(finance or []))
     if info.priceOutput:
         out.append(utility_input())
     out.append(diagram_input())
@@ -708,8 +716,11 @@ def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = F
         elif inp.binding == "assumption":
             out += assumption_inputs(inp)
         elif inp.binding == "artifact":
+            # A fermOS fit or simulation a person chose; a composite's vessel
+            # design for the plant scale it gives (OF-BLD-020 §6.1).
+            what = "vessel" if parts is not None and inp.source is not None and inp.source.id == parts.vessel.id else "fit"
             for part, v in (("", inp.value), (" low", inp.low), (" high", inp.high)):
-                out.append(BasisInput(name=f"{inp.key} fit{part}", value=v, unit=inp.unit, source=inp.source))
+                out.append(BasisInput(name=f"{inp.key} {what}{part}", value=v, unit=inp.unit, source=inp.source))
     out += fitted or []
     return out
 
@@ -752,8 +763,16 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
     assumed: dict[str, dict[str, float]] = {}
     fitted: dict[str, dict[str, float]] = {}
     cap = next((float(i.value) for i in inputs if i.name == "yield cap"), None)
+    from . import composite
+
     for i in inputs:
+        if i.name.startswith(composite.PREFIXES):
+            # OF-BLD-020 §6.1: what a composite run carries of its vessel
+            # design, its train run and its finance is built, not sampled.
+            continue
         named = _FIT_NAME.fullmatch(i.name)
+        if named is None:
+            named = _VESSEL_NAME.fullmatch(i.name)
         if named and i.source.kind == "artifact":
             fitted.setdefault(named[1], {})[named[2] or "value"] = float(i.value)
         elif i.name.endswith(" record"):
@@ -845,8 +864,21 @@ def _run_scenario(inputs, seed):
     for k in info.gridInputs:
         s = specs[k]
         axes[k] = [s["value"]] if s["kind"] == "fixed" else [float(v) for v in np.linspace(s["low"], s["high"], GRID_POINTS)]
-    r = call("run", {"flowsheet": flowsheet, "base": base, "specs": specs, "samples": _samples_of(inputs),
-                     "seed": int(seed or 0), "axes": axes or None, "diagram": _draws(inputs)})
+    from . import composite
+
+    ask = {"flowsheet": flowsheet, "base": base, "specs": specs, "samples": _samples_of(inputs),
+           "seed": int(seed or 0), "axes": axes or None, "diagram": _draws(inputs)}
+    if flowsheet == composite.FLOWSHEET:
+        # OF-BLD-020 §6.1: the vessel design's fermenter, the train run's
+        # units and the finance a person set, from the basis alone.
+        ask["structure"] = composite.structure_of(inputs)
+    try:
+        r = call("run", ask)
+    except WorkerError as e:
+        text = str(e)
+        if text.startswith("Refused: "):
+            raise ScenarioRefused(text.removeprefix("Refused: ")) from None
+        raise
     base_out, base_infeasible = r["base"], r["baseInfeasible"]
     mc = r["montecarlo"]
 
@@ -978,12 +1010,18 @@ def run(req, pool=None):
     info = _shelf.info(flowsheet)
     _check_samples(req.samples)
     _check_seed(req.seed)
+    # OF-BLD-020 §6.1 (D11): a composite names its vessel design and its
+    # train run, each held to the rules (composite.parts_of); the finance
+    # group's overrides are its own, apart from the inputs'.
+    parts, finance, overrides = _composite(flowsheet, req.vessel, req.trainRun, req.includeArchived, req.overrides)
     # A run is a caller a person started by id: its records bind whatever the
     # program switch says (OF-BLD-016, "what keeps everything").
     # OF-BLD-020 §2.2 (D3): a person's overrides, and the older assumptions
     # field read the same way for one release, each a named assumption that
     # wins over the records and any fit for its input.
-    typed, read = named_values(req.scenarioId, req.overrides, req.assumptions)
+    typed, read = named_values(req.scenarioId, overrides, req.assumptions)
+    if finance is not None and not read and any(v.overriddenBy for v in finance):
+        read = READ_WORDS[(True, bool(req.assumptions))]
     _check_keys(info, typed)
     pool = pool or evidence_pool.load(include_archived=True)
     if flowsheet == FLOWSHEET:
@@ -992,6 +1030,10 @@ def run(req, pool=None):
     else:
         cap = None
         inputs = bind_inputs(flowsheet, pool.records, req.host, typed)
+    if parts is not None:
+        from . import composite
+
+        composite.vessel_scale(inputs, parts)
     # OF-BLD-019 §5.1 (D10): the fermOS fits a person chose, each computed
     # from its artifact; one that cannot feed its input is refused in words.
     # An input a person's value overrides takes no fit (D3).
@@ -1000,7 +1042,7 @@ def run(req, pool=None):
     if waiting:
         raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
     art = artifacts.compute(RUN, basis_inputs(inputs, cap, flowsheet, req.samples, scenario_id=req.scenarioId,
-                                              fitted=fitted) + assumptions_read(read),
+                                              fitted=fitted, parts=parts, finance=finance) + assumptions_read(read),
                             records_by_id=pool.records_by_id, seed=req.seed)
     o = art.output
     q = o["quantiles"]
@@ -1021,7 +1063,9 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
     """Run a flowsheet whose every input is a named person's assumption, and
     return its one `proforma.run` artifact. The toy is refused unless the
     caller is a test or a fixture and says `allow_toy`; a reference
-    biorefinery runs whole through its own reference run, not here."""
+    biorefinery runs whole through its own reference run, not here; a
+    flowsheet built from kept artifacts (OF-BLD-020 §6.1) runs as a scenario
+    that names them."""
     from . import artifacts
     from .models import ScenarioInput
 
@@ -1031,6 +1075,9 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
         raise ScenarioRefused(str(e)) from None
     if info.reference:
         raise ScenarioRefused(f"{flowsheet} is a reference biorefinery: it runs whole on its package's own defaults")
+    if info.builtFrom:
+        raise ScenarioRefused(f"{flowsheet} is built from {' and '.join(info.builtFrom)} artifacts a scenario names: it "
+                              "runs as that scenario (POST /api/proforma/run with vessel and trainRun)")
     _check_samples(samples)
     _check_seed(seed)
     given = {a.key: a for a in assumptions}
@@ -1136,9 +1183,10 @@ YEAST_SCENARIO_ID = "sc-yeast-1"
 # The carbon source a record must name to bind a process input of a
 # flowsheet `bind_inputs` binds: the flowsheet's own feed. A record naming
 # none is left out and counted, as one naming another feed is.
-FEED_CARBON: dict[str, frozenset[str]] = {ETHANOL: frozenset({"glucose"})}
-# What a bound scenario says it makes, by flowsheet.
-PRODUCTS = {FLOWSHEET: "phb", ETHANOL: "ethanol"}
+FEED_CARBON: dict[str, frozenset[str]] = {ETHANOL: frozenset({"glucose"}), _shelf.COMPOSITE: frozenset({"glucose"})}
+# What a bound scenario says it makes, by flowsheet. A composite makes what
+# its train traces (OF-BLD-020 §6.1); its yeast program's train, ethanol.
+PRODUCTS = {FLOWSHEET: "phb", ETHANOL: "ethanol", _shelf.COMPOSITE: "ethanol"}
 
 
 def seed_scenarios() -> list[dict]:
@@ -1325,21 +1373,30 @@ def _hosts(records: list[dict], flowsheet: str) -> list[str]:
 
 
 def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | None = None,
-          assumptions: list | None = None, pool=None, fits: dict[str, str] | None = None):
+          assumptions: list | None = None, pool=None, fits: dict[str, str] | None = None,
+          vessel: str | None = None, train_run: str | None = None, include_archived: bool = True):
     """A flowsheet's inputs bound, in the shape GET /api/proforma/scenarios
     serves: a seed scenario's with its id and name, a flowsheet's alone with
     both empty (§2.3, c); with the fermOS fits a person chose laid on
     (OF-BLD-019 §5.1), and a person's named values over both (OF-BLD-020
-    D3: an input a value overrides takes no fit)."""
+    D3: an input a value overrides takes no fit). A composite (OF-BLD-020
+    §6.1) binds with the vessel design and the train run it names, held to
+    the rules (`include_archived` for their programs), and the plant scale
+    the vessel was designed at."""
     from . import evidence_pool
     from .models import ProformaScenarioInfo
 
+    parts, _, _ = _composite(flowsheet, vessel, train_run, include_archived, [])
     pool = pool or evidence_pool.load(include_archived=True)
     if flowsheet == FLOWSHEET:
         out = scenario(host, assumptions, pool).model_copy(update={"id": scenario_id, "name": name})
     else:
         info = _shelf.info(flowsheet, allow_toy=True)
         inputs = bind_inputs(flowsheet, pool.records, host, assumptions)
+        if parts is not None:
+            from . import composite
+
+            composite.vessel_scale(inputs, parts)
         out = ProformaScenarioInfo(
             id=scenario_id, name=name, product=PRODUCTS.get(flowsheet, flowsheet), flowsheet=flowsheet, host=host,
             hosts=_hosts(pool.records, flowsheet), inputs=inputs, waiting=[], leavesOut=info.leavesOut,
@@ -1375,7 +1432,8 @@ def scenarios(include_archived: bool = False, host: str | None = None, pool=None
 
 
 def bind_flowsheet(flowsheet: str, *, include_archived: bool = False, host: str | None = None,
-                   assumptions: list | None = None, pool=None, fits: dict[str, str] | None = None):
+                   assumptions: list | None = None, pool=None, fits: dict[str, str] | None = None,
+                   vessel: str | None = None, train_run: str | None = None):
     """GET /api/proforma/bind (§2.3, c): a shelf flowsheet's inputs bound as a
     scenario a person made here shows them, id and name empty, with the
     fermOS fits a person chose (OF-BLD-019 §5.1). The toy, an id the shelf
@@ -1390,7 +1448,33 @@ def bind_flowsheet(flowsheet: str, *, include_archived: bool = False, host: str 
         raise ScenarioRefused(
             f"{flowsheet} belongs to the archived program {held.name if held else info.program}; "
             "Settings → Programs → Show archived programs and examples binds it")
-    return bound(flowsheet, host=host, assumptions=assumptions, pool=pool, fits=fits)
+    return bound(flowsheet, host=host, assumptions=assumptions, pool=pool, fits=fits, vessel=vessel,
+                 train_run=train_run, include_archived=include_archived)
+
+
+def _composite(flowsheet: str, vessel: str | None, train_run: str | None, include_archived: bool,
+               overrides: list) -> tuple[Any, list | None, list]:
+    """OF-BLD-020 §6.1 (D11): for a flowsheet built from kept artifacts, the
+    two parts the request names (composite.parts_of, refused in words), the
+    finance group with the person's values laid on, and the overrides left
+    for the inputs; for any other, (None, None, the overrides), and a vessel
+    or a train run named for it is refused."""
+    from . import composite, params
+
+    info = _shelf.info(flowsheet, allow_toy=True)
+    if not info.builtFrom:
+        named = [w for w, x in (("vessel", vessel), ("trainRun", train_run)) if x]
+        if named:
+            raise ScenarioRefused(f"{flowsheet} is not built from a vessel design or a train run: {' and '.join(named)} "
+                                  f"belong to a scenario on {composite.FLOWSHEET}")
+        return None, None, list(overrides)
+    parts = composite.parts_of(vessel, train_run, include_archived=include_archived)
+    rest, mine = composite.split_overrides(overrides)
+    try:
+        finance = composite.finance_values(mine)
+    except params.ParamRefused as e:
+        raise ScenarioRefused(str(e)) from None
+    return parts, finance, rest
 
 
 # ── A fermOS fit feeds the fermenter (OF-BLD-019 §5.1, D10) ─────────────
@@ -1426,6 +1510,10 @@ def bind_flowsheet(flowsheet: str, *, include_archived: bool = False, host: str 
 FIT_KEYS = ("titre", "yield", "productivity")
 
 _FIT_NAME = re.compile(r"(\w+) fit(?: (low|high))?")
+# OF-BLD-020 §6.1: an input a composite's vessel design binds (its plant
+# scale), named `<key> vessel`, `… vessel low`, `… vessel high`, read back
+# into what the worker samples as a fit's are.
+_VESSEL_NAME = re.compile(r"(\w+) vessel(?: (low|high))?")
 # The words a series' label or measure id uses for what each shelf
 # flowsheet makes, to tell a fit of another product's series (PRODUCTS).
 PRODUCT_WORDS: dict[str, tuple[str, ...]] = {
@@ -1770,7 +1858,7 @@ def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
 # model, RehMBEL1391, is fed fructose on the shelf and takes up no glucose,
 # so that check finds no ceiling and says why, sending nobody to compute one
 # geneOS would refuse (§5.R).
-CEILING_SUGAR: dict[str, str] = {ETHANOL: "glucose", FLOWSHEET: "glucose"}
+CEILING_SUGAR: dict[str, str] = {ETHANOL: "glucose", FLOWSHEET: "glucose", _shelf.COMPOSITE: "glucose"}
 _G_PER_G = "g g-1"
 CEILING_KEPT = "Computed on read and kept nowhere: the binding and the run keep the yield as bound."
 PHA_CLIP_NOTE = ("The PHA draft's run clips record yields above the highest glucose ceiling on the shelf to it "

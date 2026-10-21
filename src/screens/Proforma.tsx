@@ -325,11 +325,16 @@ function BiosteamCard({
     if (!madeHere || info) return;
     const ctrl = new AbortController();
     const chosen = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
-    proformaBind(flowsheetId, { host: null, includeArchived: showArchived, fits: chosen }, ctrl.signal)
+    // OF-BLD-020 §6.1: a scenario on custom_train_v1 binds with the vessel design and train run it names.
+    proformaBind(
+      flowsheetId,
+      { host: null, includeArchived: showArchived, fits: chosen, vessel: scenario.vessel ?? null, trainRun: scenario.trainRun ?? null },
+      ctrl.signal,
+    )
       .then((b) => setMade({ info: b }))
       .catch(() => !ctrl.signal.aborted && setMade({ info: null }));
     return () => ctrl.abort();
-  }, [madeHere, info, flowsheetId, showArchived, fitsKey]);
+  }, [madeHere, info, flowsheetId, showArchived, fitsKey, scenario.vessel, scenario.trainRun]);
 
   useEffect(() => {
     setArt(null);

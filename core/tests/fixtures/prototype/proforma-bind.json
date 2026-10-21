@@ -279,10 +279,16 @@
           "detail": "pha_sugar_v0 belongs to the archived program PHA; Settings → Programs → Show archived programs and examples binds it"
         }
       },
+      "custom_train_v1": {
+        "status": 422,
+        "body": {
+          "detail": "custom_train_v1 is built from a kept vessel design (a fermos.vessel artifact) and a kept train run (a pureos.train_run artifact), named by the scenario; this names no vessel design (vessel) and no train run (trainRun). fermOS → Vessel designs one for a kept simulation; pureOS → New train builds and runs one"
+        }
+      },
       "toy": {
         "status": 422,
         "body": {
-          "detail": "toy is a STAND-IN for tests and is not on the shelf; the shelf holds cornstover_benchmark, corn_drygrind, ethanol_glucose_v0, pha_sugar_v0"
+          "detail": "toy is a STAND-IN for tests and is not on the shelf; the shelf holds cornstover_benchmark, corn_drygrind, ethanol_glucose_v0, pha_sugar_v0, custom_train_v1"
         }
       }
     },
@@ -824,10 +830,16 @@
           "priceBasis": "USD per kg of PHA contained in dried cell mass"
         }
       },
+      "custom_train_v1": {
+        "status": 422,
+        "body": {
+          "detail": "custom_train_v1 is built from a kept vessel design (a fermos.vessel artifact) and a kept train run (a pureos.train_run artifact), named by the scenario; this names no vessel design (vessel) and no train run (trainRun). fermOS → Vessel designs one for a kept simulation; pureOS → New train builds and runs one"
+        }
+      },
       "toy": {
         "status": 422,
         "body": {
-          "detail": "toy is a STAND-IN for tests and is not on the shelf; the shelf holds cornstover_benchmark, corn_drygrind, ethanol_glucose_v0, pha_sugar_v0"
+          "detail": "toy is a STAND-IN for tests and is not on the shelf; the shelf holds cornstover_benchmark, corn_drygrind, ethanol_glucose_v0, pha_sugar_v0, custom_train_v1"
         }
       }
     }

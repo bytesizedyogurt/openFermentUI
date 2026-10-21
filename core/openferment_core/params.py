@@ -565,8 +565,13 @@ def flowsheet_specs(info: FlowsheetInfo) -> list[ParameterSpec]:
             group = _GROUPS[fi.kind]
         else:
             # A fermOS fit or a kept simulation a person chose (§8.R: a
-            # simulation is served as one, never as a fit).
+            # simulation is served as one, never as a fit); a composite's
+            # vessel design for the scale it was designed at (§6.1).
+            from . import composite
+
             rule = (["fit", "simulation"] if fi.key in proforma.FIT_KEYS else []) + [f"record:{f}" for f in fi.fields] + ["assumption"]
+            if info.builtFrom and fi.key in composite.VESSEL_BOUND:
+                rule = ["artifact", *rule]
             group = _GROUPS[fi.kind]
         low, high, reason = _bounds(info, fi, convention)
         out.append(ParameterSpec(
@@ -601,6 +606,12 @@ def _input_sources(inp, pool, feed: str) -> dict[str, ParameterValue | None]:
                                                   detail=detail)}
     if inp.binding == "artifact":
         aid = inp.source.id if inp.source else None
+        if proforma.artifact_tool(aid) == "fermos.vessel":
+            # OF-BLD-020 §6.1: a composite's vessel design gives the plant
+            # scale it was designed at; an artifact, never a fit.
+            detail = (inp.source.note if inp.source and inp.source.note else "the vessel design the scenario names") + tail
+            return {"artifact": ParameterValue(key=inp.key, value=inp.value, low=inp.low, high=inp.high,
+                                               source=inp.source, origin="artifact", detail=detail)}
         if proforma.artifact_tool(aid) == "fermos.simulation":
             # §8.R (findings 0, 5, 11): a kept simulation is no fit, and no
             # run identified anything in it; it is served as a simulation,
@@ -642,31 +653,46 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         raise ScopeUnknown(f"there is no scenario {scenario_id}: the seed's BioSTEAM scenarios are "
                            f"{', '.join(seeds) or 'none'}, and a scenario made in a browser names the shelf flowsheet "
                            "it runs (?flowsheet=)")
+    from . import composite
+
+    finance: list[ParameterSpec] = []
     try:
         flowsheet = proforma.flowsheet_of(scenario_id, req.flowsheet)
         info = shelf.info(flowsheet)
         specs = flowsheet_specs(info)
+        # OF-BLD-020 §6.1: a composite's panel adds its group Finance, the
+        # TEA's parameters, the package's own until a person sets one.
+        finance = composite.finance_specs() if info.builtFrom else []
         # OF-BLD-020 §2.R (findings 0, 9, 13): the scope binds as a run of it
         # binds. A person's overrides, checked as `resolve` checks them, are
         # laid on as the run lays them on (`proforma.named_values`): each wins
         # over the records and any fit for its input (`bound` takes no fit
         # there), and a fit's productivity beside a titre a person typed is
         # refused in the run's own words.
-        typed, read = proforma.named_values(scenario_id, list(checked(specs, req.overrides).values()))
+        given = checked(specs + finance, req.overrides)
+        mine = {sp.key for sp in finance}
+        typed, read = proforma.named_values(scenario_id, [o for k, o in given.items() if k not in mine])
+        if finance and not read and any(k in mine for k in given):
+            read = proforma.READ_WORDS[(True, False)]
         proforma._check_keys(info, typed)
         # A scope names its scenario by id, so its records bind whatever the
         # program switch says, as a run's do (OF-BLD-016).
         pool = evidence_pool.load(include_archived=True)
         bound = proforma.bound(flowsheet, scenario_id=scenario_id, name=seeds.get(scenario_id, {}).get("name") or "",
-                               host=req.host, assumptions=typed, pool=pool, fits=req.fits)
+                               host=req.host, assumptions=typed, pool=pool, fits=req.fits, vessel=req.vessel,
+                               train_run=req.trainRun, include_archived=req.includeArchived)
     except proforma.ScenarioRefused as e:
         raise ParamRefused(str(e)) from None
     feed = feed_words(flowsheet)
     sources = {inp.key: _input_sources(inp, pool, feed) for inp in bound.inputs}
+    sources.update(composite.finance_sources() if finance else {})
     # What a run adds to its basis for these overrides, by the run's own
     # functions: each overridden input's value, low and high, then the line
     # saying the run read overrides (§2.R, findings 3 and 19).
     added = [b for inp in bound.inputs if inp.binding == "assumption" for b in proforma.assumption_inputs(inp)]
+    if finance:
+        fin = resolve(finance, composite.finance_sources(), [o for k, o in given.items() if k in mine])
+        added += composite.finance_basis([v for v in fin if v.overriddenBy])
     name = seeds.get(scenario_id, {}).get("name")
     title = f"{name} ({info.title})" if name else info.title
     notes = [
@@ -676,15 +702,23 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         "A person's override wins over the records and any fit for its input, here and in the run, which carries the "
         "overrides and names the person in its basis (OF-BLD-020 D3).",
     ]
-    return Provided(title=title, specs=specs, sources=sources, notes=notes,
-                    basis=added + proforma.assumptions_read(read))
+    if finance:
+        notes.append(f"Built from vessel design {req.vessel} and train run {req.trainRun} (OF-BLD-020 §6.1): the "
+                     "fermenter is that design's, every design parameter as the design holds it, and the train's units "
+                     "follow it with their values as that run held them; the train's own inlet is not an input, the "
+                     "fermenter's beer is. Finance is the dry-grind corn plant's TEA: each parameter the package's own "
+                     "default until a person sets one, held at its value across the run's samples.")
+    return Provided(title=title, specs=specs + finance, sources=sources, notes=notes,
+                    basis=added + proforma.assumptions_read(read),
+                    refuses=(composite.finance_refusal if finance else None))
 
 
 def _proforma_static() -> Iterable[tuple[str, list[ParameterSpec]]]:
+    from . import composite
     from .flowsheets import shelf
 
     for fid, info in shelf.SHELF.items():
-        yield f"proforma flowsheet {fid}", flowsheet_specs(info)
+        yield f"proforma flowsheet {fid}", flowsheet_specs(info) + (composite.finance_specs() if info.builtFrom else [])
 
 
 register("proforma", _proforma, _proforma_static)
