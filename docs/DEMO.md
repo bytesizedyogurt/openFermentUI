@@ -302,6 +302,61 @@ branch, over this checkout's data.
 - The diagram on the cloud copy: it lists the units in order; it draws on the Mini once `brew install graphviz` is done.
 - The archived PHA scenario (`sc-pha-1`) and the casein cost surfaces (S1–S3): hidden with the switch off; leave it off.
 
+
+## 7. fermOS: simulate a batch and size its vessel
+
+fermOS now simulates a culture and sizes the vessel it needs. The simulation runs on scipy, an open-source numerical
+library: here it steps the growth equations forward in time, hour by hour. The vessel is BioSTEAM's: the same
+open-source process simulator Proforma uses designs the fermenter, its agitation, its air and its cooling. Every
+parameter shows in one panel with the source of its value. A value a person types is an assumption under their name,
+and anything built on an assumption is marked *Modeled · not measured*. Measured 2026-10-21 at 05:16 UTC on this
+branch's service, over this checkout's data (thread Q: 163 unverified candidates, no seed record).
+
+### The four things a person does
+
+1. **Simulate.** fermOS → Simulate (`/fermos/simulate`). Choose the family (*Batch*: Monod growth, product
+   inhibition, Luedeking–Piret production), the strain (CEN.PK113-7D, or *Every strain of the program*), the product
+   (ethanol), the sugar (glucose), and *Start from* records. The panel lists every parameter with its chip: *record ×N*,
+   a *convention* the code states (kd, β and maintenance zero; Ki off; anaerobic), or *waiting*. **Simulate** stays
+   off while anything waits, and says what.
+2. **Type what waits.** Under your reviewer name, give each waiting value with what it rests on (the panel's value,
+   low, high and note). Then **Simulate**. Read the time course (cells, sugar, ethanol, and oxygen uptake when the run
+   is aerobic), the end-state card (final titre, yield achieved, productivity, the hour the sugar runs out), the ceiling
+   card (the run's Yp/s beside the Yeast9 and iMM904 ceilings: flagged when above, never clamped), and every parameter
+   with its source.
+3. **Design the vessel.** The button opens fermOS → Vessel (`/fermos/vessel`) on that simulation. An anaerobic yeast
+   batch gets NREL's batch fermenter; an aerobic run gets a stirred tank or a bubble column. Type a plant scale (tonnes
+   of ethanol a year) under your name, then **Design**. Read the design table (vessels, volume, working volume, batch
+   and cycle time, power, cooling duty, installed cost with BioSTEAM's cost index named), the oxygen balance (aerobic
+   only: the transfer the vessel reaches against the culture's uptake, the short hours shaded) and the heat line.
+4. **Send to Proforma.** A simulation's titre, yield and productivity can feed `sc-yeast-1`, as a fermOS fit does.
+
+### What tonight's live run showed
+
+- **What thread Q binds for a batch of CEN.PK113-7D on glucose:** μmax from 1 record, Yx/s from 3, Yp/s from 3, S₀
+  from 4 (20–100 g L⁻¹). Ks, α, Pmax, X₀ and P₀ wait.
+- **Over every strain:** Ks (1 record), Pmax (1) and Ki (2) also bind; α, X₀ and P₀ still wait. Thread Q holds no
+  Luedeking–Piret α, and a run's starting cells and ethanol are a person's or a fit's.
+- **So no simulation was kept tonight, and no vessel designed.** The session typed nothing: those values are Sean's
+  (STATE §3.5 and §4.3).
+- **Postdoc**, asked *Simulate a glucose batch for CEN.PK113-7D from the extracted kinetics and compare the predicted
+  yield with the Yeast9 ceiling*, four times: each run called `fermos_simulate`, quoted its refusal (the five that
+  wait), kept the Yeast9 ceiling as a claim and said in gaps that there is no simulated yield to compare. One to five
+  claims kept; $0.0036–$0.0073 a run.
+- **Asked to design a fermenter for that batch**, three times: `fermos_vessel` refused in words, since no simulation is
+  kept. Zero or one claim; $0.0015–$0.0046.
+
+### Steer around (fermOS)
+
+- **Simulate before the waiting values are typed.** The button stays off and says what waits. Show the panel's chips,
+  or type the values first.
+- **The Postdoc simulate question.** It cannot simulate until a person types the values, and one run called α an
+  "ethanol-lipid" parameter. α is Luedeking–Piret's growth-associated coefficient: say so if it comes up.
+- **The Postdoc vessel question before a simulation is kept.** It refuses in words.
+- **Price this in Proforma on the Vessel tab.** It says what night two adds (a vessel and a train priced together) and
+  does nothing yet.
+- **The storage family (PHA's shape).** It is hidden with the archive switch off. Leave the switch off.
+
 ---
 
 This file folds `docs/DEMO-YEAST.md` and `docs/build/DEMO-PHASE7.md`, which are removed.
