@@ -66,7 +66,11 @@ person's overrides and the family's stated conventions (fermos.py). §4.1
 registers `fermos-vessel`. §3.3 registers `fermos-forecast`
 (`fermos:forecast:<kinetic fit artifact id>`): a logistic_v0 fit's start
 values and run length, which a forecast takes from the fitted run unless a
-person names others. Later steps register `pureos-unit`.
+person names others. §5.1 registers `pureos-unit` in pureos/catalogue.py
+(`pureos:unit:<train id>:<unit id>`, the unit's type named by the request's
+`unitType` until trains are kept): a catalogue entry's specs, each value the
+class's own default read in the Proforma worker (so a read may start it, once
+per process and type), or waiting for a record or a named person.
 
 Rule 1 holds here: no value in this file. A bound is a convention with its
 reason written beside it (an ontology plausibility range read from
@@ -197,8 +201,9 @@ def register(kind: str, provider: Provider, static: Static | None = None) -> Non
 
 # The modules that register a provider beside this one (they import this
 # module, so they are imported here on first need, never at the top):
-# fermOS's vessel (OF-BLD-020 §4.1).
-PROVIDER_MODULES = ("vessel",)
+# fermOS's vessel (OF-BLD-020 §4.1) and pureOS's unit catalogue (§5.1), whose
+# module imports no BioSTEAM at its top.
+PROVIDER_MODULES = ("vessel", "pureos.catalogue")
 
 
 def _load_providers() -> None:

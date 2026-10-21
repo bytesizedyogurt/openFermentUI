@@ -40,6 +40,15 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 `AeratedBioreactor` or `NRELAnaerobicBatchBioreactor`, built
                 afresh inside `package_defaults()`, its design, costs and the
                 oxygen balance read; vessel.py keeps it as one artifact
+    catalogue_specs  what one of pureOS's unit types takes and its class's
+                own defaults, choices and refusals, read from its code at
+                import on the yeast program's chemicals (OF-BLD-020 §5.1):
+                `pureos/catalogue.py`'s `read_class`, handed the class
+                (BioSTEAM's, or the in-house one) and the chemical IDs
+    catalogue_unit_check  one unit of a type built alone on given inlets
+                and values (catalogue keys), simulated, and read: its streams,
+                design, costs and the attributes it holds (`build_unit`,
+                `unit_report`); the catalogue's sim test runs every type so
 
 NO WORKER STOPS IN A DEBUGGER. BioSTEAM 2.54.0's AeratedBioreactor answers a
 failure of its bubble-column correlation with a bare `breakpoint()`, which
@@ -902,9 +911,84 @@ def _op_vessel_design(args):
     return vessel.design(dict(args))
 
 
+# ── pureOS's unit catalogue (OF-BLD-020 §5.1) ──────────────────────────
+
+
+def unit_class(type_id: str) -> tuple[Any, Any]:
+    """A catalogue entry and its class: BioSTEAM's by name, or the in-house
+    one, which only this worker imports (E.3‴)."""
+    from ..pureos import catalogue, inhouse
+
+    e = catalogue.entry(type_id)
+    if e.inhouse:
+        return e, getattr(inhouse, e.inhouse)
+    return e, getattr(bst, e.biosteam)
+
+
+def yeast_chemicals() -> Any:
+    """The yeast program's chemicals, as the ethanol flowsheet builds on them."""
+    from ..flowsheets.ethanol_glucose_v0 import create_chemicals
+
+    return create_chemicals()
+
+
+def _op_catalogue_specs(args):
+    from ..pureos import catalogue
+
+    e, cls = unit_class(str(args.get("type") or ""))
+    with package_defaults():
+        chems = yeast_chemicals()
+        bst.settings.set_thermo(chems)
+        return catalogue.read_class(e.id, cls, list(chems.IDs))
+
+
+def _inlet(chems: Any, spec: dict[str, Any], n: int) -> Any:
+    """A stand-in or a train's inlet as the request gives it: kg/hr by
+    chemical, its phase (or, multi-phase, kg/hr by phase and chemical), and
+    its temperature and pressure where given; an empty dict is an empty
+    inlet the unit may fill."""
+    flows = dict(spec.get("flows") or {})
+    by_phase = dict(spec.get("byPhase") or {})
+    kw = {k: float(spec[k]) for k in ("T", "P") if spec.get(k) is not None}
+    if by_phase:
+        s = tmo.MultiStream(f"in{n}", thermo=chems, phases=tuple(sorted(by_phase)), **kw)
+        for phase, got in by_phase.items():
+            for chem, kg in got.items():
+                s.imass[phase, chem] = float(kg)
+        return s
+    s = bst.Stream(f"in{n}", thermo=chems, phase=str(spec.get("phase") or "l"), units="kg/hr", **kw)
+    for chem, kg in flows.items():
+        s.imass[chem] = float(kg)
+    return s
+
+
+def _op_catalogue_unit_check(args):
+    """One unit of a type built alone on the request's inlets and values,
+    inside `package_defaults()` on BioSTEAM's default utility prices and cost
+    index, simulated, and read. A failure is BioSTEAM's own words."""
+    from ..pureos import catalogue
+
+    e, cls = unit_class(str(args.get("type") or ""))
+    values = dict(args.get("values") or {})
+    keys = list(args.get("hold") or [])
+    with package_defaults():
+        chems = yeast_chemicals()
+        bst.settings.set_thermo(chems)
+        bst.process_tools.default_utilities()
+        bst.process_tools.default_CEPCI()
+        bst.main_flowsheet.set_flowsheet(bst.Flowsheet(f"pureos_check_{e.id.replace('-', '_')}"))
+        ins = [_inlet(chems, spec, n) for n, spec in enumerate(args.get("ins") or [])]
+        n_out = len([p for p in e.ports if p.side == "out"])
+        outs = [f"out{n}" for n in range(n_out)]
+        unit = catalogue.build_unit(e.id, cls, "U1", ins, outs, values)
+        unit.simulate()
+        return catalogue.unit_report(unit, keys)
+
+
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
             "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
-            "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design}
+            "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design,
+            "catalogue_specs": _op_catalogue_specs, "catalogue_unit_check": _op_catalogue_unit_check}
 
 HANDLERS["volatility"] = _op_volatility  # OF-BLD-020 §7.1
 

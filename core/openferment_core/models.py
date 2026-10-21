@@ -2524,6 +2524,9 @@ class ParamResolveRequest(BaseModel):
     startFrom: str | None = None
     durationPreset: Literal["until-sugar-runs-out", "fit-length"] | None = None
     includeArchived: bool = False
+    # pureOS's unit scope (OF-BLD-020 §5.1): the catalogue id of the unit's
+    # type, until a train is kept and names it (§5.2).
+    unitType: str | None = None
 
 
 class ParamResolveResult(BaseModel):
@@ -2917,6 +2920,118 @@ class SimulationSummary(BaseModel):
     harvestH: float | None = None
     createdAt: str
     provenance: Provenance
+
+
+# ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────
+#
+# Each entry is one unit type a train can hold: a BioSTEAM class, or one of
+# the three in-house `bst.Unit` subclasses BioSTEAM lacks, with every
+# parameter its constructor takes either declared as a ParameterSpec or named
+# as not offered, with why. Its id is the vocabulary's (src/data/vocabulary.ts
+# UNIT_OPERATIONS). pureos/catalogue.py holds the data; BioSTEAM's defaults
+# are read in the Proforma worker and never typed.
+
+# Where a unit sits in a train, fermenter to product.
+UnitStage = Literal["harvest", "disruption", "clarification", "concentration", "capture", "polish", "formulation",
+                    "drying", "utility"]
+
+
+class UnitPort(BaseModel):
+    """One inlet or outlet of a catalogue unit, in words."""
+
+    side: Literal["in", "out"]
+    index: int
+    name: str
+    what: str
+    # An outlet the product goes on by, by default; a train may route another.
+    onward: bool = False
+    # An inlet's stream: from the unit before ("upstream"), one the train
+    # supplies beside the line ("side": a solvent), or one the unit sizes
+    # itself ("unit": a buffer, air, fuel). None for an outlet.
+    source: Literal["upstream", "side", "unit"] | None = None
+    # Takes any number of streams here, which the class mixes.
+    many: bool = False
+
+
+class NotOffered(BaseModel):
+    """A parameter the class's constructor takes that the panel does not
+    offer, and why, in words."""
+
+    name: str
+    why: str
+
+
+class UnitNeed(BaseModel):
+    """What a unit needs set before it runs: one of `alternatives`, each a
+    list of keys that must all hold a value."""
+
+    alternatives: list[list[str]]
+    why: str
+
+
+class UnitType(BaseModel):
+    """A catalogue entry without its specs (GET /api/pureos/catalogue)."""
+
+    id: str
+    name: str
+    # What it does, in words.
+    line: str
+    stage: UnitStage
+    biosteamClass: str | None = None
+    inhouseClass: str | None = None
+    insOuts: list[UnitPort]
+    # Whether BioSTEAM costs it; the in-house units have no cost model.
+    costModel: bool
+    notes: list[str] = Field(default_factory=list)
+    notOffered: list[NotOffered] = Field(default_factory=list)
+    needs: list[UnitNeed] = Field(default_factory=list)
+    # The vocabulary ids it stands for beside its own (cell disruption:
+    # homogenisation and bead milling; chromatography: one per mode).
+    maps: list[str] = Field(default_factory=list)
+    specCount: int
+
+
+class UnitDefault(BaseModel):
+    """A parameter's default as the class gives it, read from its code in
+    the worker, and where it was read; None when the class gives none or
+    decides at run time."""
+
+    key: str
+    value: float | str | None = None
+    readFrom: str
+
+
+class UnitParamMap(BaseModel):
+    """How one spec reaches the class: under which of the class's own names,
+    as a constructor argument or an attribute set after construction, and
+    whether its key is a template expanded per component or per effect
+    (`split` → `split.<chemical>`, `P` → `P.<effect>`)."""
+
+    key: str
+    name: str
+    via: Literal["argument", "attribute"]
+    per: Literal["component", "effect"] | None = None
+    how: str | None = None
+
+
+class UnitSpecs(BaseModel):
+    """GET /api/pureos/catalogue/{id}/specs: an entry's ParameterSpecs with
+    the choices and bounds the class gives, each parameter's default read
+    from the class, and how each reaches it."""
+
+    id: str
+    biosteamClass: str | None = None
+    inhouseClass: str | None = None
+    specs: list[ParameterSpec]
+    defaults: list[UnitDefault]
+    params: list[UnitParamMap]
+    notOffered: list[NotOffered]
+    needs: list[UnitNeed]
+    # The chemicals a chemical-valued parameter chooses from: the yeast
+    # program's set, until a train names its own (§5.2).
+    chemicals: list[str] = Field(default_factory=list)
+    versions: dict[str, str] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
 
 
 # Claim and AnswerPlan name Passage and Evidence, which are defined further

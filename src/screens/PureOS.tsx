@@ -12,7 +12,7 @@
 // PUREOS READS THE TRAIN A FLOWSHEET RAN (OF-BLD-019 §4.1, D1). Proforma's run
 // is one artifact holding BioSTEAM's stream and unit tables for its base case;
 // the service reads that artifact unit by unit (`core/openferment_core/
-// pureos.py`) and this page lists the trains on file, one a scenario, with the
+// pureos/__init__.py`) and this page lists the trains on file, one a scenario, with the
 // overall recovery the service read from the stream table. Each opens at
 // /pureos/train/:scenarioId (PureOSTrain.tsx). Nothing here types a recovery
 // or simulates anything: a train exists when somebody ran a scenario.

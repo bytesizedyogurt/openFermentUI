@@ -1279,7 +1279,8 @@
         "fit": null,
         "startFrom": null,
         "durationPreset": null,
-        "includeArchived": false
+        "includeArchived": false,
+        "unitType": null
       },
       "body": {
         "scope": "proforma:sc-yeast-1",

@@ -111,10 +111,14 @@ def test_no_worker_starts_able_to_stop_in_a_debugger(monkeypatch):
 PKG = Path(__file__).resolve().parent.parent / "openferment_core"
 ALLOWED = {
     "cobra": {"workers/geneos_worker.py"},
-    "biosteam": {"workers/proforma_worker.py"},
+    # OF-BLD-020 E.3‴, §5.1: pureOS's unit catalogue reads a class's defaults
+    # in functions that import BioSTEAM inside themselves and run in the worker
+    # (its module imports none at the top: held below), and the in-house units
+    # subclass `bst.Unit`, so the worker alone imports them (held below).
+    "biosteam": {"workers/proforma_worker.py", "pureos/catalogue.py", "pureos/inhouse.py"},
     # OF-BLD-019 §4.2: BioSTEAM's property engine, which the service reaches
     # through the Proforma worker's `thermo_props` op and nowhere else.
-    "thermosteam": {"workers/proforma_worker.py"},
+    "thermosteam": {"workers/proforma_worker.py", "pureos/inhouse.py"},
     # OF-BLD-020 E.3‴: scipy in fermOS's kinetics and fits alone among the
     # service's modules. The workers and the flowsheets they run may use it
     # (worker side), and demo.py, the fixture builder no route imports,
@@ -140,3 +144,53 @@ def test_heavy_libraries_are_imported_in_their_worker_alone(lib):
         if pattern.search(path.read_text(encoding="utf-8")):
             offenders.append(rel)
     assert offenders == [], f"{lib} is imported outside its worker: {offenders}"
+
+
+# ── pureOS's unit catalogue (OF-BLD-020 §5.1, E.3‴) ────────────────────
+
+CORE = PKG.parent
+
+
+def test_the_catalogue_imports_no_biosteam_at_its_top():
+    """Its BioSTEAM side imports inside the functions the worker calls; the
+    module's own body imports neither library, so the service imports it."""
+    import ast
+
+    tree = ast.parse((PKG / "pureos" / "catalogue.py").read_text(encoding="utf-8"))
+    top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
+    named = {a.name.split(".")[0] for n in top for a in n.names} | {
+        (n.module or "").split(".")[0] for n in top if isinstance(n, ast.ImportFrom)}
+    assert not named & {"biosteam", "thermosteam", "biorefineries"}, named
+
+
+def test_the_service_lists_the_catalogue_and_its_specs_with_no_biosteam_loaded():
+    """Importing pureOS, its catalogue and the service, listing the catalogue
+    and reading every provider's static specs loads neither BioSTEAM nor
+    thermosteam, nor the in-house units, which subclass `bst.Unit`."""
+    import subprocess
+    import sys
+
+    code = ("import sys\n"
+            "from openferment_core import api, params, pureos\n"
+            "from openferment_core.pureos import catalogue\n"
+            "catalogue.listing(); params.check()\n"
+            "from fastapi.testclient import TestClient\n"
+            "assert TestClient(api.app, base_url='http://127.0.0.1').get('/api/pureos/catalogue').status_code == 200\n"
+            "steam = sorted(m for m in sys.modules if m.split('.')[0] in ('biosteam', 'thermosteam', 'biorefineries'))\n"
+            "assert not steam, steam\n"
+            "assert 'openferment_core.pureos.inhouse' not in sys.modules\n")
+    r = subprocess.run([sys.executable, "-c", code], cwd=CORE, capture_output=True, text=True, timeout=180)
+    assert r.returncode == 0, r.stderr[-2000:]
+
+
+def test_no_service_module_but_the_worker_imports_the_in_house_units():
+    pattern = re.compile(r"(from\s+[.\w]*pureos\s+import\s+[^\n]*\binhouse\b|from\s+[.\w]*pureos\.inhouse\s+import|"
+                         r"from\s+\.inhouse\s+import|import\s+[.\w]*pureos\.inhouse\b|import_module\(\s*[\"'][^\"']*inhouse)")
+    offenders = []
+    for path in PKG.rglob("*.py"):
+        rel = path.relative_to(PKG).as_posix()
+        if rel in ("workers/proforma_worker.py", "pureos/inhouse.py"):
+            continue
+        if pattern.search(path.read_text(encoding="utf-8")):
+            offenders.append(rel)
+    assert offenders == [], f"the in-house units are imported outside the worker: {offenders}"

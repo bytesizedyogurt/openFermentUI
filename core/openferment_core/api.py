@@ -667,7 +667,8 @@ def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
 def params_scope(scope: str, flowsheet: str | None = None, host: str | None = None, fits: str | None = None,
                  vesselType: str | None = None, strain: str | None = None, product: str | None = None,  # noqa: N803
                  sugar: str | None = None, fit: str | None = None, startFrom: str | None = None,  # noqa: N803
-                 durationPreset: str | None = None, includeArchived: bool = False) -> dict:  # noqa: N803 (the wire name)
+                 durationPreset: str | None = None, includeArchived: bool = False,  # noqa: N803 (the wire name)
+                 unitType: str | None = None) -> dict:  # noqa: N803 (the wire name)
     """A scope's parameters (`ParamScope`): every spec with its bounds and
     their reason, and its value as the service binds it now, with its
     source. `proforma:<scenario id>` is a seed scenario, or with
@@ -678,7 +679,10 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     which a read starts when it is cold (OF-BLD-020 §4.1). `fermos:family:<id>`
     binds as GET /api/fermos/bind does, from `?strain=`, `?product=`,
     `?sugar=`, `?fit=`, `?startFrom=`, `?durationPreset=` and
-    `?includeArchived=` (OF-BLD-020 §3.2). 404 for a scope no provider here
+    `?includeArchived=` (OF-BLD-020 §3.2). `pureos:unit:<train>:<unit>` takes
+    the unit's catalogue type as `?unitType=` and reads its class's defaults
+    through the Proforma worker as the vessel's do (§5.1); with no type it is
+    a 404 in words. 404 for a scope no provider here
     knows; 422 in words for a malformed one or a refused binding; 409 for an
     artifact the scope names that is damaged on disk, as the vessel's own route
     answers it (§2.R, finding 17); 503 when the worker cannot answer."""
@@ -691,7 +695,7 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
                                                     f"{durationPreset!r} is neither")
     req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits), vesselType=vesselType,
                               strain=strain, product=product, sugar=sugar, fit=fit, startFrom=startFrom,
-                              durationPreset=durationPreset, includeArchived=includeArchived)
+                              durationPreset=durationPreset, includeArchived=includeArchived, unitType=unitType)
     try:
         return params.scope(scope, req).model_dump(mode="json")
     except params.ScopeUnknown as e:
@@ -1362,6 +1366,39 @@ def pureos_train(key: str) -> dict:
         return pureos.train(key, record_lookup=_record_lookup()).model_dump(mode="json")
     except pureos.TrainNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
+
+
+# ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────
+
+
+@app.get("/api/pureos/catalogue")
+def pureos_catalogue() -> list[dict]:
+    """Every unit type a train can hold (`UnitType`), in stage order: its
+    BioSTEAM or in-house class, what each inlet and outlet is, whether
+    BioSTEAM costs it, what it needs set, what it does not offer and why.
+    From the catalogue's data alone: it starts no simulator."""
+    from .pureos import catalogue
+
+    return [u.model_dump(mode="json") for u in catalogue.listing()]
+
+
+@app.get("/api/pureos/catalogue/{type_id}/specs")
+def pureos_catalogue_specs(type_id: str) -> dict:
+    """One unit type's parameters (`UnitSpecs`): every ParameterSpec with the
+    choices and bounds its class gives, each default as the class gives it,
+    read from its code in the Proforma worker (which this starts when it is
+    cold, once per process and type), how each reaches the class, and what it
+    does not offer. 404 for an id not in the catalogue; 503 in words when the
+    worker cannot answer."""
+    from .pureos import catalogue
+
+    try:
+        return catalogue.specs_of(type_id).model_dump(mode="json")
+    except catalogue.CatalogueUnknown as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not read "
+                                                    f"{type_id}'s class: {e}") from e
 
 
 # ── Tools (OF-BLD-014 §3.4, E.6) ─────────────────────────────────────────

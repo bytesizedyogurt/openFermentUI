@@ -232,14 +232,17 @@ def test_the_check_reads_every_declared_spec_and_names_one_with_no_reason(monkey
     n, problems = params.check()
     assert problems == []
     from openferment_core import fermos, kinetics, vessel
+    from openferment_core.pureos import catalogue
 
     # The shelf's inputs, fermOS's family specs (OF-BLD-020 §3.1), its
-    # vessel declarations (§4.1) and a forecast's start values and length
-    # (§3.3).
+    # vessel declarations (§4.1), a forecast's start values and length
+    # (§3.3) and every unit type of pureOS's catalogue (§5.1).
     assert n == (sum(len(info.inputs) for info in shelf.SHELF.values())
                  + sum(len(f.specs()) for f in kinetics.FAMILIES.values())
                  + sum(len(s) for _, s in vessel._static())
-                 + sum(len(s) for _, s in fermos._forecast_static()))
+                 + sum(len(s) for _, s in fermos._forecast_static())
+                 + sum(len(s) for _, s in catalogue._static()))
+    assert "pureos-unit" in params.providers()
     assert params.main(["--check"]) == 0 and "every one has a written bounds reason" in capsys.readouterr().out
     unreasoned = ParameterSpec.model_construct(**{**spec().model_dump(), "boundsReason": " "})
     monkeypatch.setitem(params._STATIC, "fermos-family", lambda: [("a STAND-IN family", [spec(), unreasoned])])

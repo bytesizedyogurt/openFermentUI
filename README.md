@@ -1048,7 +1048,7 @@ still clips a yield above the glucose ceiling (OF-BLD-014 §8.3).
 **pureOS → Train** (`/pureos/train/:scenarioId`, or a run's artifact id in
 place of the scenario's) reads the newest Proforma run of a scenario from the
 one `proforma.run` artifact that run kept (OF-BLD-019 D1), through
-`core/openferment_core/pureos.py`. It lists the units in the order the
+`core/openferment_core/pureos/__init__.py`. It lists the units in the order the
 flowsheet ran them, each with its inlets and outlets, mass in and out, the
 product in and out, the product it passes on toward the product stream, what
 it loses and to which outlet, its recovery, and the share still on the path

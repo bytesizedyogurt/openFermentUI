@@ -35,12 +35,19 @@ WHICH SCENARIO a run belongs to: a basis input named `scenario`, when the
 run carries one; else the one seed scenario (modules.json, written by
 `pnpm export:corpus`) whose `modelId` is the run's flowsheet. A run no
 scenario claims is a train known by its artifact id.
+
+THE PACKAGE (OF-BLD-020 §5.1). This module was pureos.py; it became the
+package so the train's pieces live beside it. `pureos.catalogue` is the unit
+catalogue (data, served without BioSTEAM; the functions that read a class's
+defaults import BioSTEAM inside themselves and run in the Proforma worker),
+and `pureos.inhouse` holds the three `bst.Unit` subclasses BioSTEAM lacks,
+imported by the worker alone. This module imports neither.
 """
 from __future__ import annotations
 
 from typing import Any, Iterable
 
-from .models import Artifact, ProformaTables, StreamRow, Train, TrainSummary, TrainUnit
+from ..models import Artifact, ProformaTables, StreamRow, Train, TrainSummary, TrainUnit
 
 RUN = "proforma.run"
 # kg/hr: a flow at or below this carries nothing.
@@ -72,7 +79,7 @@ def seed_scenarios() -> list[dict[str, Any]]:
     """The seed's scenarios as `export:corpus` projects them; none when the
     projection is missing, and then only a run's own `scenario` input names
     its scenario."""
-    from . import module_stores
+    from .. import module_stores
 
     try:
         return list(module_stores._projection()["proforma"]["scenarios"])
@@ -98,8 +105,8 @@ def program_of(art: Artifact, scenario_id: str | None, scenarios: Iterable[dict[
     """A train's program: its scenario's, its flowsheet's on the shelf, and
     what its basis names (`programs.program_of_artifact`); an archived one
     among them wins, as it does for an artifact."""
-    from . import programs
-    from .flowsheets import shelf as _shelf
+    from .. import programs
+    from ..flowsheets import shelf as _shelf
 
     found: list[str | None] = [next((s.get("program") for s in scenarios if s["id"] == scenario_id), None)]
     try:
@@ -200,7 +207,7 @@ def _leads_on(product_stream: str | None, streams: list[StreamRow], units: list[
 def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None, provenance: str | None = None,
              runs: int = 1, record_lookup: Any = None) -> Train:
     """One run's train, read from its stream and unit tables alone."""
-    from . import proforma
+    from .. import proforma
 
     if art.tool != RUN:
         raise TrainNotFound(f"artifact {art.id} is a {art.tool} artifact, not a Proforma run; a train is read from a run")
@@ -303,12 +310,12 @@ class _Marks:
         self.records_by_id = records_by_id
 
     def __call__(self, art: Artifact) -> str:
-        from .artifacts import basis_of
-        from .basis import basis_provenance
+        from ..artifacts import basis_of
+        from ..basis import basis_provenance
 
         kinds = {i.source.kind for i in art.inputs}
         if "record" in kinds and self.records_by_id is None:
-            from . import evidence_pool
+            from .. import evidence_pool
 
             self.records_by_id = evidence_pool.load(include_archived=True).records_by_id
         records = self.records_by_id if "record" in kinds else {}
@@ -336,7 +343,7 @@ def trains(include_archived: bool = False, *, arts: Iterable[Artifact] | None = 
     scenario claims), newest first. A train of an archived program is left
     out unless the caller asks for archived programs (OF-BLD-016 §2.R). Each
     train's provenance is its run's worth now, as pureos_read gives it."""
-    from . import artifacts, programs
+    from .. import artifacts, programs
 
     scenarios = list(seed_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)
@@ -367,7 +374,7 @@ def train(key: str, *, arts: Iterable[Artifact] | None = None, scenarios: Iterab
     of that scenario, or that run. A deep link opens whatever program it
     belongs to, as every page opened by id does; the page says the program.
     Its provenance is the run's worth now, as pureos_read gives it."""
-    from . import artifacts
+    from .. import artifacts
 
     scenarios = list(seed_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)

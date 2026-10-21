@@ -59,7 +59,8 @@ export type ParameterFamily =
  * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — the
  * polymer family OF-BLD-014 §2.1 adds, and the kinetics family the
  * yeast-ethanol program (thread Q) adds, with the oxygen and maintenance fields
- * fermOS's simulations read (OF-BLD-020 §3.2): forty-four fields in seven.
+ * fermOS's simulations read (OF-BLD-020 §3.2) and the downstream fields
+ * pureOS's unit catalogue reads (§5.1): forty-nine fields in seven.
  */
 export type FieldId =
   // Family 1 — expression performance
@@ -91,6 +92,12 @@ export type FieldId =
   | 'disruption_protein_yield'
   | 'disruption_energy'
   | 'minimum_selling_price'
+  // OF-BLD-020 §5.1: what pureOS's unit catalogue binds
+  | 'step_recovery'
+  | 'product_purity'
+  | 'partition_coefficient'
+  | 'sieving_coefficient'
+  | 'cake_moisture'
   // Family 6 — polymer (OF-BLD-014 §2.1)
   | 'pha_content_cdw'
   | 'pha_titre'
@@ -916,7 +923,10 @@ export type UnitOperationStage =
   | 'purification'
   | 'drying'
   | 'formulation'
-  | 'finishing';
+  | 'finishing'
+  // OF-BLD-020 §5.1: a pump, a tank, a heat exchanger, a mixer or a splitter
+  // serves a train without being a step of it.
+  | 'utility';
 
 export interface UnitOperation {
   id: string;
@@ -3515,6 +3525,8 @@ export interface ParamResolveRequest {
   startFrom?: string | null;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
   includeArchived?: boolean;
+  /** pureOS's unit scope (OF-BLD-020 §5.1): the unit's catalogue type, until a train is kept and names it. */
+  unitType?: string | null;
 }
 
 export interface ParamResolveResult {
@@ -3835,4 +3847,102 @@ export interface SimulationSummary {
   harvestH: number | null;
   createdAt: string;
   provenance: Provenance;
+}
+
+// ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────
+//
+// Each entry is one unit type a train can hold: a BioSTEAM class, or one of
+// the three in-house units BioSTEAM lacks, with every parameter its
+// constructor takes either a ParameterSpec or named as not offered, with why.
+// Its id is a `UNIT_OPERATIONS` id. Served by `GET /api/pureos/catalogue`
+// (from data, no simulator) and `GET /api/pureos/catalogue/{id}/specs`
+// (BioSTEAM's defaults, read in the Proforma worker).
+
+/** Where a unit sits in a train, fermenter to product. */
+export type UnitStage =
+  | 'harvest'
+  | 'disruption'
+  | 'clarification'
+  | 'concentration'
+  | 'capture'
+  | 'polish'
+  | 'formulation'
+  | 'drying'
+  | 'utility';
+
+/** One inlet or outlet of a catalogue unit, in words. */
+export interface UnitPort {
+  side: 'in' | 'out';
+  index: number;
+  name: string;
+  what: string;
+  /** An outlet the product goes on by, by default. */
+  onward: boolean;
+  /** An inlet's stream: from the unit before, one the train supplies beside the line, or one the unit sizes itself. */
+  source: 'upstream' | 'side' | 'unit' | null;
+  /** Takes any number of streams here, which the class mixes. */
+  many: boolean;
+}
+
+/** A constructor parameter the panel does not offer, and why. */
+export interface NotOffered {
+  name: string;
+  why: string;
+}
+
+/** What a unit needs set before it runs: one of the alternatives, each a list of keys that must all hold a value. */
+export interface UnitNeed {
+  alternatives: string[][];
+  why: string;
+}
+
+/** A catalogue entry without its specs. */
+export interface UnitType {
+  id: string;
+  name: string;
+  line: string;
+  stage: UnitStage;
+  biosteamClass: string | null;
+  inhouseClass: string | null;
+  insOuts: UnitPort[];
+  /** Whether BioSTEAM costs it; the in-house units have no cost model. */
+  costModel: boolean;
+  notes: string[];
+  notOffered: NotOffered[];
+  needs: UnitNeed[];
+  /** The vocabulary ids it stands for beside its own. */
+  maps: string[];
+  specCount: number;
+}
+
+/** A parameter's default as the class gives it, read from its code, and where. */
+export interface UnitDefault {
+  key: string;
+  value: number | string | null;
+  readFrom: string;
+}
+
+/** How one spec reaches the class; a template key is expanded per component or per effect. */
+export interface UnitParamMap {
+  key: string;
+  name: string;
+  via: 'argument' | 'attribute';
+  per: 'component' | 'effect' | null;
+  how: string | null;
+}
+
+/** An entry's specs with the choices and bounds its class gives, each default as read, and how each reaches it. */
+export interface UnitSpecs {
+  id: string;
+  biosteamClass: string | null;
+  inhouseClass: string | null;
+  specs: ParameterSpec[];
+  defaults: UnitDefault[];
+  params: UnitParamMap[];
+  notOffered: NotOffered[];
+  needs: UnitNeed[];
+  /** The chemicals a chemical-valued parameter chooses from: the yeast program's set, until a train names its own. */
+  chemicals: string[];
+  versions: Record<string, string>;
+  notes: string[];
 }

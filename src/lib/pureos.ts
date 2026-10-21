@@ -1,7 +1,7 @@
 // The browser's side of pureOS's trains (OF-BLD-019 §4.1, D1).
 //
 // The service reads a train from one `proforma.run` artifact's stream and
-// unit tables (`core/openferment_core/pureos.py`); the browser shows it and
+// unit tables (`core/openferment_core/pureos/__init__.py`); the browser shows it and
 // computes nothing of its own: every mass, recovery and cumulative share on
 // the page is a field the service sent. With the service down this says so,
 // and nothing stands in for a train (E.2). Shares lib/rag.ts's call.

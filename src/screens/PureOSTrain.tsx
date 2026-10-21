@@ -5,7 +5,7 @@
 // run order: each unit's inlets and outlets, the product's mass in and out,
 // the share of it that leaves on the way to the product stream, and the
 // cumulative share still on the path. The SERVICE reads all of it from the one
-// artifact (`core/openferment_core/pureos.py`); this page shows those fields
+// artifact (`core/openferment_core/pureos/__init__.py`); this page shows those fields
 // and computes none. Clicking a unit cuts the stream table to its streams.
 //
 // A unit whose BioSTEAM class is a step in the unit-operation vocabulary
