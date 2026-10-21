@@ -17,6 +17,12 @@
 // `unitOperationIds`, `storageIds`, `regulatoryIds`, `pathwayIds`,
 // `clearanceState` and `scaleId` resolves against `vocabulary.ts`.
 // `scripts/check-seed.ts` holds both invariants.
+//
+// `sequence` (OF-BLD-020 §7.1) is the one-letter amino-acid sequence of a
+// product's own chain, with `sequenceSource` naming where it was read (a
+// UniProt accession and the residues). It is added only from such a source,
+// never invented, and no entry carries one yet: pureOS's proposer then says a
+// product's molecular weight and isoelectric point are missing.
 import type { Product, ProductCategory } from './types';
 
 export const PRODUCTS: Product[] = [

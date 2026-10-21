@@ -844,6 +844,98 @@ def thermo_props_stored(artifactId: str | None = None, streamId: str | None = No
     return {"artifact": art.model_dump(mode="json") if art else None}
 
 
+# ── a product's properties (OF-BLD-020 §7.1, D12) ──────────────────────
+#
+# What pureOS's proposer reads: ProtParam on a product entry's own sequence
+# (protparam.py) and its volatility by thermosteam (thermo.py). A request names
+# the product by id and nothing else. Imported here so each tool is registered
+# when the service starts, and a kept answer replays on a service just started.
+
+from . import protparam as _protparam  # noqa: E402,F401
+from .models import ProductPropertyRequest  # noqa: E402
+
+
+def _protparam_answer(fn, product: str):
+    from . import artifacts, protparam
+
+    try:
+        return fn(product)
+    except protparam.ProtParamMissing as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    except protparam.ProtParamRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
+    except FileNotFoundError as e:  # corpus.json not exported
+        raise HTTPException(status_code=503, detail=str(e)) from None
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
+
+
+@app.post("/api/protparam", response_model=Artifact)
+def protparam_compute(req: ProductPropertyRequest) -> Artifact:
+    """Biopython's ProtParam on a product entry's own sequence: its molecular
+    weight, isoelectric point, extinction coefficients and GRAVY, one
+    `protparam` artifact computed here or returned as stored. 404 for a
+    product with no sequence (the words say the entry carries none) or no
+    such product; 422 for a sequence ProtParam cannot read, in words naming
+    each letter and its positions; 409 for an answer damaged on disk."""
+    from . import protparam
+
+    return _protparam_answer(protparam.of_product, req.product)
+
+
+@app.get("/api/protparam")
+def protparam_stored(product: str = "") -> dict:
+    """The answer stored for the product's sequence, as `{"artifact": …}`, or
+    `{"artifact": null}` when it has not been computed here: a read, which
+    computes nothing. The same 404, 409 and 422 as the POST."""
+    from . import protparam
+
+    art = _protparam_answer(protparam.stored, product)
+    return {"artifact": art.model_dump(mode="json") if art else None}
+
+
+def _volatility_answer(fn, product: str):
+    from . import artifacts, thermo
+
+    try:
+        return fn(product)
+    except thermo.ThermoNotFound as e:  # VolatilityMissing: the product names no chemical of the library
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    except thermo.ThermoRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
+
+
+@app.post("/api/thermo/volatility", response_model=Artifact)
+def thermo_volatility(req: ProductPropertyRequest) -> Artifact:
+    """A product's volatility by thermosteam: its chemical's and water's
+    normal boiling points, and whether the library's own vapour-liquid
+    equilibrium gives the pair a minimum-boiling azeotrope, one `volatility`
+    artifact computed in the Proforma worker or returned as stored. 404 for a
+    product that names no chemical of the library here; 422 for a chemical
+    the library lacks, in words naming it; 409 for an answer damaged on disk;
+    503 when the worker cannot answer."""
+    from . import thermo
+    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        return _volatility_answer(thermo.volatility, req.product)
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where thermosteam runs, could not answer: {e}") from e
+
+
+@app.get("/api/thermo/volatility")
+def thermo_volatility_stored(product: str = "") -> dict:
+    """The volatility stored for the product, as `{"artifact": …}`, or
+    `{"artifact": null}`: a read, which starts no simulator. The same 404,
+    409 and 422 as the POST."""
+    from . import thermo
+
+    art = _volatility_answer(thermo.stored_volatility, product)
+    return {"artifact": art.model_dump(mode="json") if art else None}
+
+
 def _warm_proforma() -> None:
     from . import proforma
 

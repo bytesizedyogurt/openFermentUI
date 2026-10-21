@@ -217,6 +217,10 @@ const PAIRS = [
   // OF-BLD-019 §4.2 — thermosteam answers property questions.
   ['ThermoPropsRequest', 'ThermoPropsRequest'],
   ['ThermoProps', 'ThermoProps'],
+  // OF-BLD-020 §7.1 — a product's properties: ProtParam on its sequence, its volatility by thermosteam.
+  ['ProductPropertyRequest', 'ProductPropertyRequest'],
+  ['ProtParam', 'ProtParam'],
+  ['Volatility', 'Volatility'],
   // OF-BLD-020 §2.1 — one parameter panel: a parameter declared once,
   // resolved with its source, and a person's change a named assumption.
   ['ParameterSpec', 'ParameterSpec'],

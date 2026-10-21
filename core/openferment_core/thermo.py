@@ -36,12 +36,30 @@ the weakest of that and the record or the run otherwise.
     POST /api/thermo/props   computes (or returns the stored answer)
     GET  /api/thermo/props   the stored answer for the same question, or none;
                              it starts no simulator
+
+A PRODUCT'S VOLATILITY (OF-BLD-020 §7.1, D12) is its own question and its
+own artifact tool, `volatility`, beside `thermo_props`, so the contract above
+is unchanged. `volatility(product)` names a product by id; `CHEMICALS` maps
+it to the library's own name for it (ethanol → Ethanol), and a product with no
+name there is missing, never guessed (`VolatilityMissing`, a 404). The worker
+(op `volatility`) reads the library's normal boiling point (`Tb`) of the
+chemical and of water, and searches the pair for a minimum-boiling azeotrope
+at the library's default pressure with the search the
+`ethanol-water-azeotrope` preset runs, generalised to the named chemical and
+water: one found is the composition and temperature the library gives; none
+found is said with the grid searched (`AZEOTROPE_SEARCH`, a convention named
+in the basis). A chemical the library lacks is refused in words naming it
+(`ThermoRefused`, a 422). pureOS's proposer (§7.2) reads it.
+
+    POST /api/thermo/volatility   {product}: computes (or returns the stored answer)
+    GET  /api/thermo/volatility   ?product=: the stored answer, or none; it
+                                  starts no simulator
 """
 from __future__ import annotations
 
 from typing import Any
 
-from .models import Artifact, BasisInput, BasisSource, Evidence, ThermoProps, ThermoPropsRequest
+from .models import Artifact, BasisInput, BasisSource, Evidence, ThermoProps, ThermoPropsRequest, Volatility
 
 TOOL = "thermo_props"
 RUN = "proforma.run"
@@ -342,4 +360,168 @@ def evidence_of(art: Artifact) -> list[Evidence]:
             id=f"{art.id}:{key}",
             label=f"{what} of {o.subject}, {where.get(key, 'at its temperature and pressure')}, as {o.library} computes it",
             value=v, unit=o.units.get(key, ""), provenance=art.provenance, basis=artifacts.basis_of(art), figure=None))
+    return out
+
+
+# ── a product's volatility (OF-BLD-020 §7.1, D12) ───────────────────────
+
+VOLATILITY = "volatility"
+VOLATILITY_WORDS = "thermo volatility 1"
+# The library's own name for each product thermosteam is asked about, by the
+# product id fermOS, geneOS and Proforma use (the shelf's products). A product
+# not named here is missing: its volatility is not computed, and nothing is
+# guessed from its name. The products seed carries no small molecule with a
+# library name yet, and no ethanol entry.
+CHEMICALS: dict[str, str] = {"ethanol": ETHANOL}
+# An azeotrope is asked with water, the solvent a broth mostly is.
+PARTNER = WATER
+VOLATILITY_QUESTION = ("the chemical's normal boiling point as the library holds it (Tb), and whether the library's own "
+                       "vapour-liquid equilibrium gives it and water a minimum-boiling azeotrope at the library's "
+                       "default pressure")
+AZEOTROPE_SEARCH = ("the lower-boiling chemical's mole fraction in the liquid, scanned on the worker's grid between "
+                    "the two pure chemicals (both pure ends left out) for where its vapour's mole fraction turns from "
+                    "above the liquid's to not, then halved: the ethanol-water-azeotrope preset's search. None found "
+                    "means none on that grid at that pressure, and the answer names the grid (`searched`)")
+# What the evidence of a volatility names, in the order a page shows them.
+VOLATILITY_PROPERTIES = (
+    ("boilingPoint", "Normal boiling point"),
+    ("azeotrope", "Minimum-boiling azeotrope"),
+    ("azeotropeMoleFraction", "The product's mole fraction at the minimum-boiling azeotrope"),
+    ("azeotropeMassFraction", "The product's mass fraction at the minimum-boiling azeotrope"),
+    ("azeotropeT", "Boiling temperature of the minimum-boiling azeotrope"),
+)
+
+
+class VolatilityMissing(ThermoNotFound):
+    """The product names no chemical of the library here: the property is
+    missing, not refused (§7.2's proposer says which property it lacks)."""
+
+
+def volatility_version() -> str:
+    return f"{VOLATILITY_WORDS} · thermosteam {_installed('thermosteam')}"
+
+
+def chemical_of(product: str) -> str:
+    """The library's own name for `product`, or `VolatilityMissing` in words."""
+    pid = (product or "").strip()
+    if not pid:
+        raise ThermoRefused("a volatility names a product by its id")
+    name = CHEMICALS.get(pid)
+    if name is None:
+        named = ", ".join(f"{p} → {c}" for p, c in sorted(CHEMICALS.items()))
+        raise VolatilityMissing(f"product {pid!r} names no chemical of thermosteam's library here ({named} are named), "
+                                "so its volatility is not computed: a product enters by the library's own name for it, "
+                                "never by a guess from its name")
+    return name
+
+
+def volatility_inputs(product: str) -> list[BasisInput]:
+    """A volatility's basis: the product, the library's name for it, the
+    partner, the search and the library, every one named; no number of ours."""
+    pid = (product or "").strip()
+    chemical = chemical_of(pid)
+    lib = _library_input()
+    return [
+        BasisInput(name="question", value=VOLATILITY, unit="", source=BasisSource(
+            kind="convention", note=VOLATILITY_QUESTION)),
+        BasisInput(name="product", value=pid, unit="", source=BasisSource(kind="convention", note="the product, by its id")),
+        BasisInput(name="chemical", value=chemical, unit="", source=BasisSource(
+            kind="convention", note="the library's own name for the product, from thermo.CHEMICALS")),
+        BasisInput(name="partner", value=PARTNER, unit="", source=BasisSource(
+            kind="convention", note="an azeotrope is asked with water, the solvent a broth mostly is")),
+        BasisInput(name="azeotrope search", value=AZEOTROPE_SEARCH, unit="", source=BasisSource(kind="convention")),
+        BasisInput(name="P", value=LIBRARY_DEFAULT, unit="Pa", source=BasisSource(
+            kind="model", id=lib.source.id, note="the library's own default for a Stream nobody set it on")),
+        lib,
+    ]
+
+
+def _compute_volatility(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
+    """The answer, from the basis alone: the worker's `volatility` on the
+    chemical and the partner the basis names. Pure, so a replay recomputes it."""
+    from . import proforma
+    from .workers import WorkerError
+
+    product = str(_named(inputs, "product").value)
+    chemical, partner = str(_named(inputs, "chemical").value), str(_named(inputs, "partner").value)
+    try:
+        said = proforma.call(VOLATILITY, {"chemical": chemical, "partner": partner, "P": _number(_named(inputs, "P"))})
+    except WorkerError as e:
+        text = str(e)
+        if text.startswith("Refused: "):  # the worker's refusal, in its words
+            raise ThermoRefused(text.removeprefix("Refused: ")) from None
+        raise
+    out = {**said, "product": product, "subject": f"{chemical} (product {product}) beside {partner}"}
+    return Volatility.model_validate(out).model_dump(mode="json")
+
+
+def _register_volatility() -> None:
+    from . import artifacts
+
+    artifacts.register(VOLATILITY, volatility_version(), _compute_volatility)
+
+
+def _register_volatility_lazy() -> None:
+    from . import artifacts
+
+    artifacts.register_lazy(VOLATILITY, _register_volatility)
+
+
+_register_volatility_lazy()
+
+
+def volatility(product: str) -> Artifact:
+    """The product's volatility, computed in the Proforma worker or returned
+    as stored: one `volatility` artifact, `computed` (its inputs are the
+    library and conventions). `VolatilityMissing` when the product names no
+    chemical of the library here; `ThermoRefused` when the library lacks or
+    cannot build the one it names; a `WorkerError` when the worker cannot
+    answer."""
+    from . import artifacts
+
+    return artifacts.compute(VOLATILITY, volatility_inputs(product))
+
+
+def stored_volatility(product: str) -> Artifact | None:
+    """The volatility stored for the product, or None: a read, which starts
+    no simulator."""
+    from . import artifacts
+
+    inputs = volatility_inputs(product)
+    reg = artifacts.registered(VOLATILITY)
+    try:
+        return artifacts.get(artifacts.artifact_id(reg.tool, reg.version_for(inputs), inputs))
+    except artifacts.ArtifactNotFound:
+        return None
+
+
+def volatility_of(art: Artifact) -> Volatility:
+    if art.tool != VOLATILITY:
+        raise ThermoRefused(f"artifact {art.id} is a {art.tool} artifact, not a {VOLATILITY} answer")
+    return Volatility.model_validate(art.output)
+
+
+def volatility_evidence(art: Artifact) -> list[Evidence]:
+    """One Evidence a property the library answered (`<artifact id>:<key>`),
+    each carrying the artifact's basis. Whether an azeotrope was found is its
+    own evidence, its value the words `found` or `none found`; a property the
+    library could not give is no evidence."""
+    from . import artifacts
+
+    o = volatility_of(art)
+    out = []
+    for key, what in VOLATILITY_PROPERTIES:
+        v = getattr(o, key)
+        if v is None:
+            continue
+        if key == "azeotrope":
+            v = "found" if v else "none found"
+        if key == "boilingPoint":
+            of = f"{o.chemical} (product {o.product})"
+        else:
+            of = f"{o.chemical} (product {o.product}) and {o.partner}, " + (
+                "at its pressure" if o.PSource == "given" else "at the library's default pressure")
+        out.append(Evidence(
+            id=f"{art.id}:{key}", label=f"{what} of {of}, as {o.library} computes it", value=v,
+            unit=o.units.get(key, ""), provenance=art.provenance, basis=artifacts.basis_of(art), figure=None))
     return out

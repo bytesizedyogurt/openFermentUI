@@ -1096,6 +1096,17 @@ export interface Product {
    * is general and shows whatever programs are archived.
    */
   program?: ProgramId;
+  /**
+   * The one-letter amino-acid sequence of the product's own chain
+   * (OF-BLD-020 §7.1), from which Biopython's ProtParam computes its
+   * molecular weight, isoelectric point, extinction coefficients and GRAVY
+   * (`core/openferment_core/protparam.py`). Present only where it was read
+   * from a named source; never invented. No entry carries one yet, so every
+   * product's properties are missing and pureOS's proposer says so.
+   */
+  sequence?: string;
+  /** Where `sequence` was read, e.g. a UniProt accession and the chain's residues. Required beside a sequence. */
+  sequenceSource?: string;
 }
 
 /**
@@ -3313,6 +3324,72 @@ export interface ThermoProps {
   /** A preset's solve: what was found, and how, in words. */
   solved: Record<string, unknown> | null;
   /** A property the library could not compute, with its reason; what the mixture leaves out. */
+  notes: string[];
+}
+
+// ── A product's properties (OF-BLD-020 §7.1, D12) ──────────────────────
+//
+// What pureOS's proposer reads about a product: from its sequence, through
+// Biopython's ProtParam (one `protparam` artifact), and from its
+// thermodynamics, through thermosteam in the Proforma worker (one
+// `volatility` artifact). A question names a product by id, never a sequence
+// or a number.
+
+/** `POST /api/protparam` and `POST /api/thermo/volatility`: the product, by its id. */
+export interface ProductPropertyRequest {
+  product: string;
+}
+
+/** What a `protparam` artifact holds: Biopython's ProtParam on one sequence, every number the library's. */
+export interface ProtParam {
+  /** "the sequence of product <id>", "the sequence of record <id>". */
+  subject: string;
+  product: string | null;
+  /** Where the sequence was read, in words. */
+  sequenceSource: string;
+  /** Residues in the chain. */
+  length: number;
+  /** "Biopython <version>". */
+  library: string;
+  molecularWeight: number;
+  isoelectricPoint: number;
+  /** At 280 nm: every cysteine reduced, and every pair of cysteines a cystine. */
+  extinctionReduced: number;
+  extinctionCystines: number;
+  gravy: number;
+  /** The unit of each key above ("" for none). */
+  units: Record<string, string>;
+  /** How the library computes each, in words. */
+  how: Record<string, string>;
+  notes: string[];
+}
+
+/** What a `volatility` artifact holds: thermosteam's boiling points and whether the pair has a minimum-boiling azeotrope. */
+export interface Volatility {
+  product: string;
+  /** The library's own name for the product, and the partner it is asked with (water). */
+  chemical: string;
+  partner: string;
+  subject: string;
+  /** "thermosteam <version>", read in the worker. */
+  library: string;
+  P: number;
+  /** "given", or "thermosteam's Stream default". */
+  PSource: string;
+  /** The library's normal boiling point (Tb) of each; null when it holds none. */
+  boilingPoint: number | null;
+  partnerBoilingPoint: number | null;
+  /** Which of the two boils lower, the one whose mole fraction is scanned. */
+  lighter: string | null;
+  /** true: found; false: none on the grid searched; null: not searched, or the library could not say. */
+  azeotrope: boolean | null;
+  azeotropeMoleFraction: number | null;
+  azeotropeMassFraction: number | null;
+  azeotropeT: number | null;
+  /** The grid searched: the lighter chemical's mole fraction from, to, the points, and the halvings. */
+  searched: Record<string, unknown> | null;
+  units: Record<string, string>;
+  how: string;
   notes: string[];
 }
 

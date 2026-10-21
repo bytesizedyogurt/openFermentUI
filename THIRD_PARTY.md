@@ -21,6 +21,7 @@ accepted licence strings, and every package a person accepted, are in
 | appdirs | 1.4.4 | MIT | the geneOS worker, through cobra | allowed |
 | asttokens | 3.0.2 | Apache 2.0 | the geneOS worker, through biorefineries, biosteam | allowed |
 | attrs | 26.1.0 | MIT | extra agent, through mcp | allowed |
+| biopython | 1.88 | LicenseRef-Biopython-License-Agreement | service | allowed |
 | biorefineries | 2.35.1 | MIT | the geneOS worker | allowed |
 | biosteam | 2.54.0 | MIT | the geneOS worker | allowed |
 | certifi | 2026.7.22 | MPL-2.0 | service, through httpx | accepted by Sean Creighton on 2026-10-14 |
@@ -89,7 +90,7 @@ accepted licence strings, and every package a person accepted, are in
 | narwhals | 2.27.1 | MIT | the geneOS worker, through biorefineries | allowed |
 | numba | 0.68.0 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | numpoly | 1.3.9 | BSD-2-Clause | the geneOS worker, through biorefineries, biosteam | allowed |
-| numpy | 2.5.2 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | service, through rank-bm25 | allowed |
+| numpy | 2.5.2 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | service, through biopython, rank-bm25 | allowed |
 | onnxruntime | 1.31.0 | MIT License | extra rag, through fastembed | allowed |
 | openpyxl | 3.1.5 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | opentelemetry-api | 1.45.1 | Apache-2.0 | extra agent, through mcp | allowed |

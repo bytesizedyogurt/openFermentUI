@@ -47,6 +47,10 @@ allowed = [
   "License :: OSI Approved :: Python Software Foundation License",  # matplotlib, by classifier
   "ISC license",                  # pexpect
   "License :: OSI Approved :: ISC License (ISCL)",  # pexpect, ptyprocess, by classifier
+  # Added 2026-10-21 with biopython in the service (OF-BLD-020 §7.1; PROMPT-020 Part C.2 names it permissive).
+  # The Biopython License Agreement: use, copy, modify and distribute for any purpose without fee, keeping the
+  # notices (its LICENSE.rst, read 2026-10-21, also offers some files under BSD-3-Clause).
+  "LicenseRef-Biopython-License-Agreement",  # biopython, in its License-Expression
 ]
 
 [accepted.certifi]

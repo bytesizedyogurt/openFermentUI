@@ -2209,6 +2209,89 @@ class ThermoProps(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+# ── a product's properties (OF-BLD-020 §7.1, D12) ───────────────────────
+#
+# What pureOS's proposer reads about a product: from its sequence, through
+# Biopython's ProtParam (protparam.py, one `protparam` artifact), and from its
+# thermodynamics, through thermosteam in the Proforma worker (thermo.py, one
+# `volatility` artifact). A question names a product by id, never a sequence
+# or a number.
+
+
+class ProductPropertyRequest(BaseModel):
+    """`POST /api/protparam` and `POST /api/thermo/volatility`: the product,
+    by its id. Nothing else is taken, a sequence least of all."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    product: str
+
+
+class ProtParam(BaseModel):
+    """What a `protparam` artifact holds (its `output`): Biopython's
+    ProtParam on one sequence, every number the library's."""
+
+    # "the sequence of product <id>", "the sequence of record <id>".
+    subject: str
+    product: str | None = None
+    # Where the sequence was read, in words (the product entry's
+    # sequenceSource, or the record).
+    sequenceSource: str
+    # Residues in the chain.
+    length: int
+    # "Biopython <version>".
+    library: str
+    molecularWeight: float
+    isoelectricPoint: float
+    # At 280 nm: every cysteine reduced, and every pair of cysteines a cystine.
+    extinctionReduced: float
+    extinctionCystines: float
+    gravy: float
+    # The unit of each key above ("" for none).
+    units: dict[str, str] = Field(default_factory=dict)
+    # How the library computes each, in words.
+    how: dict[str, str] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+
+
+class Volatility(BaseModel):
+    """What a `volatility` artifact holds (its `output`): thermosteam's
+    normal boiling points for a product's chemical and its partner (water),
+    and whether the library's own vapour-liquid equilibrium gives the pair a
+    minimum-boiling azeotrope, every number the library's."""
+
+    product: str
+    # The library's own name for the product, and the partner it is asked with.
+    chemical: str
+    partner: str
+    subject: str
+    # "thermosteam <version>", read in the worker.
+    library: str
+    P: float
+    # "given", or "thermosteam's Stream default".
+    PSource: str
+    # The library's normal boiling point (Tb) of each; null when it holds none.
+    boilingPoint: float | None = None
+    partnerBoilingPoint: float | None = None
+    # Which of the two boils lower, the one whose mole fraction is scanned.
+    lighter: str | None = None
+    # true: found; false: none on the grid `searched`; null: not searched, or
+    # the library could not say (the notes say why).
+    azeotrope: bool | None = None
+    # The azeotrope's liquid as the chemical's mole and mass fractions, and the
+    # temperature it boils at, at P.
+    azeotropeMoleFraction: float | None = None
+    azeotropeMassFraction: float | None = None
+    azeotropeT: float | None = None
+    # The grid searched: the lighter chemical's mole fraction from, to, the
+    # points, and the halvings that refine a bracket.
+    searched: dict[str, Any] | None = None
+    # The library's unit for each key above.
+    units: dict[str, str] = Field(default_factory=dict)
+    how: str = ""
+    notes: list[str] = Field(default_factory=list)
+
+
 # ── Runbook drafts (OF-BLD-014 §9.2) ────────────────────────────────────
 
 

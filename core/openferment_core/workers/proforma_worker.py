@@ -27,6 +27,12 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 a Stream on the library's own chemicals at T and P, and its
                 density, heat capacity, viscosity, bubble and dew points;
                 thermo.py keeps it as one artifact
+    volatility  a chemical's volatility beside a partner (OF-BLD-020 §7.1,
+                D12): each one's normal boiling point as the library holds
+                it, and whether the library's own vapour-liquid equilibrium
+                gives the pair a minimum-boiling azeotrope at its default
+                pressure, by the preset's search; thermo.py keeps it as one
+                `volatility` artifact
     vessel_specs  what fermOS's vessel class takes and its own defaults,
                 read from BioSTEAM at import (OF-BLD-020 §4.1, E.3‴):
                 `flowsheets/vessel.py`'s `specs`
@@ -680,25 +686,43 @@ def _titre(th: Any, solute: str, solvent: str, kg_m3: float, T: float, P: float,
     raise Refused(f"the mass fraction for a titre of {kg_m3:g} kg/m^3 did not settle in {TITRE_ITERATIONS} steps")
 
 
-def _azeotrope(th: Any, light: str, heavy: str, T: float, P: float) -> tuple[float, dict]:
-    """The liquid whose first bubble, by thermosteam's own vapour-liquid
-    equilibrium at P, has the liquid's own composition: where y(x) - x for the
-    light chemical turns from positive to not, scanned and then halved."""
+def _azeotrope_grid() -> list[float]:
+    """The light chemical's mole fractions the azeotrope search scans: the
+    grid between the two pure chemicals, both pure ends left out."""
+    return [i / AZEOTROPE_SCAN for i in range(1, AZEOTROPE_SCAN)]
+
+
+def _minimum_boiling(th: Any, light: str, heavy: str, T: float, P: float) -> float | None:
+    """The light chemical's mole fraction in the liquid whose first bubble, by
+    thermosteam's own vapour-liquid equilibrium at P, has the liquid's own
+    composition, where y(x) - x for the light chemical turns from positive to
+    not (a minimum-boiling azeotrope): scanned on `_azeotrope_grid`, then
+    halved. None when it never turns on the grid (OF-BLD-020 §7.1 generalised
+    the ethanol–water preset's search to any two chemicals)."""
 
     def gap(x: float) -> float:
         b = _mixture(th, {light: x, heavy: 1.0 - x}, T, P, "l", by="mol").bubble_point_at_P(P)
         return float(dict(zip(b.IDs, b.y))[light]) - x
 
-    xs = [i / AZEOTROPE_SCAN for i in range(1, AZEOTROPE_SCAN)]
+    xs = _azeotrope_grid()
     gaps = [gap(x) for x in xs]
     bracket = next(((xs[i], xs[i + 1]) for i in range(len(xs) - 1) if gaps[i] > 0 >= gaps[i + 1]), None)
     if bracket is None:
-        raise Refused(f"thermosteam's own vapour-liquid equilibrium gives {light} and {heavy} no azeotrope at {P:g} Pa")
+        return None
     lo, hi = bracket
     for _ in range(AZEOTROPE_HALVINGS):
         mid = (lo + hi) / 2
         lo, hi = (mid, hi) if gap(mid) > 0 else (lo, mid)
-    x = (lo + hi) / 2
+    return (lo + hi) / 2
+
+
+def _azeotrope(th: Any, light: str, heavy: str, T: float, P: float) -> tuple[float, dict]:
+    """The liquid whose first bubble, by thermosteam's own vapour-liquid
+    equilibrium at P, has the liquid's own composition: where y(x) - x for the
+    light chemical turns from positive to not, scanned and then halved."""
+    x = _minimum_boiling(th, light, heavy, T, P)
+    if x is None:
+        raise Refused(f"thermosteam's own vapour-liquid equilibrium gives {light} and {heavy} no azeotrope at {P:g} Pa")
     return x, {"kind": "azeotrope", "light": light, "heavy": heavy, "moleFraction": x, "P": P,
                "how": "the liquid whose first bubble, by thermosteam's own vapour-liquid equilibrium at this pressure, "
                       "has the liquid's own composition: y - x of the lighter chemical scanned for its change of sign, "
@@ -762,6 +786,81 @@ def _op_thermo_props(args):
                         args.get("solve") or None)
 
 
+# ── a product's volatility (OF-BLD-020 §7.1, D12) ──────────────────────
+
+VOLATILITY_HOW = ("each chemical's normal boiling point is the library's own Tb; the azeotrope is the liquid whose first "
+                  "bubble, by the library's own vapour-liquid equilibrium at this pressure, has the liquid's own "
+                  "composition, where y - x of the lower-boiling chemical turns from positive to not (a minimum-boiling "
+                  "azeotrope), scanned on the grid `searched` names and then halved")
+
+
+def _boiling_point(th: Any, name: str, notes: list[str]) -> float | None:
+    tb = getattr(th.chemicals[name], "Tb", None)
+    if tb is None or not math.isfinite(float(tb)):
+        notes.append(f"Tb of {name}: thermosteam's library holds no normal boiling point for it")
+        return None
+    return float(tb)
+
+
+def volatility(chemical: str, partner: str, P: float | None = None) -> dict[str, Any]:
+    """D12's volatility, in thermosteam's words: each chemical's normal
+    boiling point as the library holds it (`Chemical.Tb`), which of the two
+    boils lower, and whether the library's own vapour-liquid equilibrium gives
+    the pair a minimum-boiling azeotrope at P (the library's Stream default
+    when not given): `_minimum_boiling` on the lower-boiling chemical, the
+    search the `ethanol-water-azeotrope` preset runs. One found is the
+    composition and the temperature the library gives; none found is said
+    with the grid searched; a search the library cannot carry out is left
+    unanswered with its reason, never guessed."""
+    T0, P0, _ = stream_defaults()
+    P_from = "given" if P is not None else "thermosteam's Stream default"
+    P = float(P if P is not None else P0)
+    if not chemical or not partner or chemical == partner:
+        raise Refused("a volatility names a chemical and a partner: two different chemicals of the library")
+    th = thermo_of([chemical, partner])
+    notes: list[str] = []
+    tb = {n: _boiling_point(th, n, notes) for n in (chemical, partner)}
+    su = library_units()
+    out: dict[str, Any] = {
+        "library": f"thermosteam {version('thermosteam')}", "chemical": chemical, "partner": partner, "P": P,
+        "PSource": P_from, "boilingPoint": tb[chemical], "partnerBoilingPoint": tb[partner], "lighter": None,
+        "azeotrope": None, "azeotropeMoleFraction": None, "azeotropeMassFraction": None, "azeotropeT": None,
+        "searched": None, "how": VOLATILITY_HOW, "notes": notes,
+        "units": {"boilingPoint": su["T"], "partnerBoilingPoint": su["T"], "azeotropeT": su["T"], "P": su["P"],
+                  "azeotropeMoleFraction": "mol/mol", "azeotropeMassFraction": "kg/kg", "searched": "mol/mol"},
+    }
+    if tb[chemical] is None or tb[partner] is None:
+        notes.append("azeotrope: not searched, since without both normal boiling points which chemical boils lower "
+                     "is not known")
+        return out
+    light, heavy = sorted((chemical, partner), key=lambda n: tb[n])
+    xs = _azeotrope_grid()
+    out.update(lighter=light, searched={"of": light, "from": xs[0], "to": xs[-1], "points": len(xs),
+                                        "halvings": AZEOTROPE_HALVINGS})
+    try:
+        x = _minimum_boiling(th, light, heavy, T0, P)
+    except Exception as e:  # the library could not give a bubble point the search reads
+        notes.append(f"azeotrope: thermosteam could not compute the bubble points the search reads for {light} and "
+                     f"{heavy} ({type(e).__name__}: {e})")
+        return out
+    if x is None:
+        out["azeotrope"] = False
+        notes.append(f"azeotrope: none found. The library's own vapour-liquid equilibrium at {P:g} Pa never turns "
+                     f"{light}'s vapour mole fraction from above its liquid's to not, on {len(xs)} {light} mole "
+                     f"fractions from {xs[0]:g} to {xs[-1]:g}")
+        return out
+    s = _mixture(th, {light: x, heavy: 1.0 - x}, T0, P, "l", by="mol")
+    mass = dict(zip(s.chemicals.IDs, (float(m) for m in s.mass)))
+    out.update(azeotrope=True, azeotropeMoleFraction=x if light == chemical else 1.0 - x,
+               azeotropeMassFraction=mass[chemical] / float(s.F_mass),
+               azeotropeT=_finite("azeotropeT", lambda: s.bubble_point_at_P(P).T, notes))
+    return out
+
+
+def _op_volatility(args):
+    return volatility(str(args.get("chemical") or ""), str(args.get("partner") or ""), args.get("P"))
+
+
 def _op_run(args):
     return run(str(args["flowsheet"]), dict(args.get("base") or {}), dict(args.get("specs") or {}),
                int(args.get("samples", 0)), int(args.get("seed", 0)), args.get("axes") or None, args.get("diagram"))
@@ -806,6 +905,8 @@ def _op_vessel_design(args):
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
             "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
             "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design}
+
+HANDLERS["volatility"] = _op_volatility  # OF-BLD-020 §7.1
 
 if __name__ == "__main__":
     serve(HANDLERS, name="proforma")
