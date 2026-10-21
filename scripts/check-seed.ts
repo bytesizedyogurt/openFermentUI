@@ -17,6 +17,7 @@ import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
 import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/components';
 import { ALL_SURFACES, ELEVEN, RAIL, REDIRECTS, SUB_VIEWS, redirectFor } from '../src/data/nav';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import * as ts from 'typescript';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
@@ -1323,6 +1324,27 @@ const seedDepositions = useStore.getState().depositions;
   if (isExample('module', 'm6')) fail('examples: m6 teaches methods from PR-OD-01 and PR-CIP-01 with no run behind them and must not be an example (OF-BLD-016 §3.3)');
 }
 
+// ── parameters (OF-BLD-020 §2.1, D4) ────────────────────────────────────
+//
+// A parameter is declared once, in Python, and its slider's bounds are a
+// convention: every spec a provider can name without a request (for Proforma,
+// every shelf flowsheet's inputs) carries a written `boundsReason`, a known
+// source rule, min no greater than max and a key of its own. `params.py`
+// holds the rule and this asks it, as check:anchors asks the anchoring
+// report; a spec without a reason is refused when it is built, and named.
+let parametersLine = '';
+{
+  const run = spawnSync('uv', ['run', 'python', '-m', 'openferment_core.params', '--check'], {
+    cwd: 'core',
+    encoding: 'utf-8',
+    maxBuffer: 8 * 1024 * 1024,
+    shell: process.platform === 'win32',
+  });
+  const said = `${run.stdout ?? ''}${run.stderr ?? ''}`.trim();
+  if (run.status !== 0) fail(`parameters: every declared parameter carries a written bounds reason (OF-BLD-020 D4), and params --check says otherwise:\n${said}`);
+  parametersLine = (run.stdout ?? '').trim().split('\n').pop()?.trim() ?? '';
+}
+
 // ── report ─────────────────────────────────────────────────────────────
 console.log('\nopenFerment seed check');
 console.log('──────────────────────');
@@ -1355,6 +1377,7 @@ console.log(`  eval flows        ${FLOWS.length} (graded against, never offered)
 console.log(`  postdoc prompts   ${LIVE_PROMPTS.length} (${YEAST_PROMPT_COUNT} yeast, ${LIVE_PROMPTS.length - YEAST_PROMPT_COUNT} across the modules)`);
 console.log(`  learn modules     ${MODULES.length} (${MODULES.reduce((n, m) => n + m.lessons.length, 0)} lessons, ${MODULES.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.checkpoint.length, 0), 0)} checkpoint questions)`);
 console.log(`  skills            ${SKILLS.length} in ${FAMILIES.length} families, tagged on ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.filter((st) => (st.skills ?? []).length > 0).length, 0), 0)} protocol steps across ${PROTOCOLS.filter((p) => p.versions.some((v) => v.steps.some((st) => (st.skills ?? []).length > 0))).length} protocols`);
+console.log(`  ${parametersLine || 'parameters        not read'}`);
 console.log(`  bench lessons     ${MODULES.reduce((n, m) => n + m.lessons.filter((l) => (l.skills ?? []).length > 0).length, 0)} counting toward ${new Set(MODULES.flatMap((m) => m.lessons.flatMap((l) => l.skills ?? []))).size} skills`);
 
 

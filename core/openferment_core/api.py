@@ -53,6 +53,7 @@ from .models import (
     FermosFitResponse,
     FetchResult,
     ForecastRequest,
+    ParamResolveRequest,
     ProformaRunRequest,
     ThermoPropsRequest,
     ForecastResult,
@@ -549,6 +550,46 @@ def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
         raise HTTPException(status_code=422, detail="a read of a scenario's runs names the scenario it belongs to")
     art = proforma.latest_run(sid)
     return {"scenarioId": sid, "artifact": art.model_dump(mode="json") if art else None}
+
+
+# ── one parameter panel (OF-BLD-020 §2.1, D2–D4) ────────────────────────
+
+
+@app.get("/api/params/{scope:path}")
+def params_scope(scope: str, flowsheet: str | None = None, host: str | None = None, fits: str | None = None) -> dict:
+    """A scope's parameters (`ParamScope`): every spec with its bounds and
+    their reason, and its value as the service binds it now, with its
+    source. `proforma:<scenario id>` is a seed scenario, or with
+    `?flowsheet=` a scenario made in a browser; `?host=` and `?fits=` (JSON)
+    bind as `/api/proforma/bind` does. Binding only: it starts no worker,
+    integrates nothing and keeps nothing. 404 for a scope no provider here
+    knows; 422 in words for a malformed one or a refused binding."""
+    from . import params
+
+    req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits))
+    try:
+        return params.scope(scope, req).model_dump(mode="json")
+    except params.ScopeUnknown as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except params.ParamRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/params/{scope:path}/resolve")
+def params_resolve(scope: str, req: ParamResolveRequest) -> dict:
+    """A person's overrides laid on a scope's values (`ParamResolveResult`):
+    each override an `assumption` by the person it names, the basis inputs
+    the overrides would add to a run, and every value outside its bounds in
+    words (kept, never clamped). Runs nothing and keeps nothing: the service
+    keeps no override (D3). 404 and 422 as the GET answers them."""
+    from . import params
+
+    try:
+        return params.resolve_scope(scope, req).model_dump(mode="json")
+    except params.ScopeUnknown as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except params.ParamRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────

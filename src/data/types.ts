@@ -3276,3 +3276,123 @@ export interface ThermoProps {
   /** A property the library could not compute, with its reason; what the mixture leaves out. */
   notes: string[];
 }
+
+// ── One parameter panel (OF-BLD-020 §2.1, D2–D4) ────────────────────────
+//
+// Every model family, vessel design, catalogue unit and shelf flowsheet
+// declares its parameters once, in Python (`core/openferment_core/params.py`);
+// `GET /api/params/{scope}` serves a scope's specs with each value and where
+// it came from. A person's change is an `Override`: a named assumption this
+// browser keeps in the Durable tier (`parameterOverrides`, D3) and a run
+// carries; the basis names it as an `assumption`, so the result is `demo`.
+// Bounds are conventions with a written reason (D4): a value outside them is
+// kept and flagged in words, never clamped. A model never sets one.
+
+/** The chip a value shows: finer than `BasisSourceKind` (a fit and a simulation are artifacts; a library default is a model source). */
+export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'convention' | 'library-default' | 'waiting';
+
+/** What a scope parameterises. */
+export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'pureos-unit' | 'proforma';
+
+/** One parameter as its model, unit or flowsheet declares it. */
+export interface ParameterSpec {
+  key: string;
+  label: string;
+  /** As written in the equations, plain Unicode; '' when it has none. */
+  symbol: string;
+  /** What the symbol means, in words: the panel's Why. */
+  gloss: string;
+  /** A units.ts family (massConc, yield, volProd, costUSD) or a word. */
+  dimension: string;
+  /** '' for a share, a dimensionless number or a choice. */
+  unit: string;
+  min: number | null;
+  max: number | null;
+  step: number | null;
+  scale: 'linear' | 'log';
+  group: string;
+  /**
+   * Ordered: 'fit', 'record:<field id>', 'artifact', 'simulation',
+   * 'assumption', 'convention', 'library-default'. The first with a value
+   * wins; an Override wins over all of them.
+   */
+  sourceRule: string[];
+  note: string | null;
+  /** Required (D4): a physical limit, an ontology plausibility range, or the library's validity range. */
+  boundsReason: string;
+  /** A parameter chosen from words (a feed profile, a kLa method); null for a number. */
+  choices: string[] | null;
+  /** The stated convention, when the rule holds 'convention'; its reason is in `note`. */
+  convention: number | string | null;
+}
+
+/** A parameter's value in one scope, with where it came from. */
+export interface ParameterValue {
+  key: string;
+  /** null while it waits. */
+  value: number | string | null;
+  low: number | null;
+  high: number | null;
+  /** null while it waits. */
+  source: BasisSource | null;
+  origin: ParamOrigin;
+  /** Set only when the origin is a fit. */
+  identified: boolean | null;
+  /** The person's name, when an Override set it. */
+  overriddenBy: string | null;
+  /** BioSTEAM's default read from its code at import, else null. */
+  libraryDefault: number | string | null;
+  /** The records behind it, when its origin is records. */
+  recordIds: string[];
+  /** Words: how many records and their range, or why it waits and which field would bind it. */
+  detail: string | null;
+  /** The warning in words when the value lies outside the bounds; kept, never clamped. */
+  outOfBounds: string | null;
+}
+
+/** A person's change to one parameter of one scope: a named assumption, kept here and sent with the run (D3). */
+export interface Override {
+  scope: string;
+  key: string;
+  value: number | string;
+  low: number | null;
+  high: number | null;
+  by: string;
+  at: string;
+  note: string | null;
+}
+
+/** `GET /api/params/{scope}`: a scope's specs with their current values. */
+export interface ParamScope {
+  scope: string;
+  kind: ParamScopeKind;
+  title: string;
+  specs: ParameterSpec[];
+  values: ParameterValue[];
+  /** The keys with no source yet. */
+  waiting: string[];
+  notes: string[];
+}
+
+/** `POST /api/params/{scope}/resolve`. Runs nothing. */
+export interface ParamResolveRequest {
+  overrides: Override[];
+  /** A Proforma scenario made in this browser names the shelf flowsheet it runs. */
+  flowsheet?: string | null;
+  /** A strain filter on the records, as `/api/proforma/bind` takes it. */
+  host?: string | null;
+  /** The fermOS fits a person chose, by parameter key (artifact ids). */
+  fits?: Record<string, string>;
+}
+
+export interface ParamResolveResult {
+  scope: string;
+  values: ParameterValue[];
+  waiting: string[];
+  /** What the overrides would add to a run's basis, each an `assumption` naming the person. */
+  basisInputs: BasisInput[];
+  /** A value outside its bounds, in words. */
+  warnings: string[];
+  /** What the scope's provider says of its values. */
+  notes: string[];
+}

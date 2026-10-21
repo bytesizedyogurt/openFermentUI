@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Mirrors the Provenance union in src/data/types.ts, weakest last. The order IS
 # the ranking: `weakest_provenance` walks this list, so adding a class in the
@@ -2228,6 +2228,164 @@ class RunbookDraft(BaseModel):
     strainId: str
     predictions: list[Prediction]
     measures: list[Measure]
+
+
+# ── One parameter panel (OF-BLD-020 §2.1, D2–D4) ────────────────────────
+#
+# Every model family, vessel design, catalogue unit and shelf flowsheet
+# declares its parameters once, in Python, as `ParameterSpec`s; the service
+# resolves each to a `ParameterValue` naming where its value came from, in
+# the order its `sourceRule` gives. A person's change is an `Override`: a
+# named assumption the browser keeps (D3) and a run carries, which the
+# basis names as an `assumption`, so the result's provenance is `demo`.
+# Bounds are conventions with a written reason (D4): a value outside them
+# is kept and flagged in words, never clamped. `params.py` holds the rules.
+
+# The chip a value shows: finer than BasisSource.kind, because a fit and a
+# simulation are both artifacts and a library's default is a model source.
+ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "convention", "library-default", "waiting"]
+# What a scope parameterises: a fermOS model family, a vessel designed for
+# a simulation, one unit of a pureOS train, or a Proforma scenario.
+ParamScopeKind = Literal["fermos-family", "fermos-vessel", "pureos-unit", "proforma"]
+# The entries a sourceRule may hold besides a record's, which names its
+# field as "record:<ontology field id>".
+SOURCE_RULE_ENTRIES = ("fit", "artifact", "simulation", "assumption", "convention", "library-default")
+
+
+class ParameterSpec(BaseModel):
+    """One parameter as its model, unit or flowsheet declares it. No value
+    lives here but the stated convention and the bounds, each with its
+    reason."""
+
+    key: str
+    label: str
+    # As written in the equations, plain Unicode; empty when it has none.
+    symbol: str
+    # What the symbol means, in words: the panel's Why.
+    gloss: str
+    # A units.ts family (massConc, yield, volProd, costUSD) or a word.
+    dimension: str
+    # Empty for a share, a dimensionless number or a choice.
+    unit: str
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+    scale: Literal["linear", "log"] = "linear"
+    group: str
+    # Ordered: fit, record:<field id>, artifact, simulation, assumption,
+    # convention, library-default. The first with a value wins; an Override
+    # wins over all of them.
+    sourceRule: list[str]
+    note: str | None = None
+    # Required (D4): a physical limit, an ontology plausibility range, or
+    # the library's validity range, said in words.
+    boundsReason: str
+    # A parameter chosen from words (a feed profile, a kLa method, a vessel
+    # material); None for a number.
+    choices: list[str] | None = None
+    # The stated convention, when the rule holds "convention"; its reason
+    # is in `note`.
+    convention: float | str | None = None
+
+    @field_validator("boundsReason")
+    @classmethod
+    def _bounds_have_a_reason(cls, v: str) -> str:
+        if not (v or "").strip():
+            raise ValueError("every parameter's bounds carry a written reason (OF-BLD-020 D4)")
+        return v
+
+    @field_validator("sourceRule")
+    @classmethod
+    def _rule_is_known(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("a parameter names where its value comes from")
+        for entry in v:
+            if entry in SOURCE_RULE_ENTRIES or (entry.startswith("record:") and entry[len("record:"):].strip()):
+                continue
+            raise ValueError(f"{entry!r} is not a source: a rule holds fit, record:<field id>, artifact, simulation, "
+                             "assumption, convention or library-default")
+        return v
+
+
+class ParameterValue(BaseModel):
+    """A parameter's value in one scope, with where it came from."""
+
+    key: str
+    # None while it waits.
+    value: float | str | None
+    low: float | None = None
+    high: float | None = None
+    # None while it waits.
+    source: BasisSource | None
+    origin: ParamOrigin
+    # Set only when the origin is a fit.
+    identified: bool | None = None
+    # The person's name, when an Override set it.
+    overriddenBy: str | None = None
+    # BioSTEAM's default read from its code at import, else None.
+    libraryDefault: float | str | None = None
+    # The records behind it, when its origin is records.
+    recordIds: list[str] = Field(default_factory=list)
+    # Words: how many records and their range, or why it waits and which
+    # field would bind it.
+    detail: str | None = None
+    # The warning in words when the value lies outside the bounds; the value
+    # is kept, never clamped.
+    outOfBounds: str | None = None
+
+
+class Override(BaseModel):
+    """A person's change to one parameter of one scope: a named assumption,
+    kept in the browser that typed it and sent with the run (D3)."""
+
+    scope: str
+    key: str
+    value: float | str
+    low: float | None = None
+    high: float | None = None
+    by: str
+    at: str
+    note: str | None = None
+
+
+class ParamScope(BaseModel):
+    """GET /api/params/{scope}: a scope's specs with their current values."""
+
+    scope: str
+    kind: ParamScopeKind
+    title: str
+    specs: list[ParameterSpec]
+    values: list[ParameterValue]
+    # The keys with no source yet.
+    waiting: list[str]
+    notes: list[str] = Field(default_factory=list)
+
+
+class ParamResolveRequest(BaseModel):
+    """POST /api/params/{scope}/resolve. Runs nothing."""
+
+    overrides: list[Override] = Field(default_factory=list)
+    # A Proforma scenario made in the browser names the shelf flowsheet it
+    # runs, as ProformaRunRequest.flowsheet does; a seed scenario needs none.
+    flowsheet: str | None = None
+    # A strain filter on the records, as GET /api/proforma/bind takes it.
+    host: str | None = None
+    # The fermOS fits a person chose, by parameter key (artifact ids), as
+    # ProformaRunRequest.fits carries them.
+    fits: dict[str, str] = Field(default_factory=dict)
+
+
+class ParamResolveResult(BaseModel):
+    scope: str
+    values: list[ParameterValue]
+    waiting: list[str]
+    # What the overrides would add to a run's basis, each an `assumption`
+    # naming the person and what it rests on.
+    basisInputs: list[BasisInput]
+    # A value outside its bounds, in words.
+    warnings: list[str]
+    # What the scope's provider says of its values (as ParamScope.notes).
+    notes: list[str] = Field(default_factory=list)
 
 
 # Claim and AnswerPlan name Passage and Evidence, which are defined further

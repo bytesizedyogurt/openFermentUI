@@ -514,7 +514,7 @@ def _settle(inp, bound: list, field_id: str) -> None:
 
 
 def _assume(inp, a) -> None:
-    from .models import BasisSource
+    from .basis import assumption_source
     from .threadp import reviewer_refusal
 
     why = reviewer_refusal(a.by)
@@ -528,7 +528,7 @@ def _assume(inp, a) -> None:
     inp.binding = "assumption"
     inp.value, inp.low, inp.high = a.value, a.low, a.high
     inp.sampling = "fixed" if a.low == a.high else "uniform"
-    inp.source = BasisSource(kind="assumption", by=a.by.strip(), note=f"typed on {a.at}" + (f": {a.note}" if a.note else ""))
+    inp.source = assumption_source(a.by, a.at, a.note)
 
 
 def scenario(host: str | None = None, assumptions: list | None = None, pool=None):

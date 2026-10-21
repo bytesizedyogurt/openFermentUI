@@ -27,12 +27,12 @@
  * wondering why a record they rejected came back.
  */
 import { readFileSync } from 'node:fs';
-import { isExample, mergeAssumptions, programOf, programVisible, snapshotOf, useStore } from '../src/store';
+import { isExample, mergeAssumptions, overrideOfAssumption, overridesFor, programOf, programVisible, proformaScope, snapshotOf, useStore } from '../src/store';
 import { RECORDS } from '../src/data/records';
 import { PRODUCTS } from '../src/data/products';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
-import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, ProformaScenarioInfo, Scenario } from '../src/data/types';
+import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, Override, ProformaScenarioInfo, Scenario } from '../src/data/types';
 import { visibleArtifacts } from '../src/lib/artifacts';
 import { inputCounts, referencePrice } from '../src/lib/proforma';
 
@@ -899,6 +899,73 @@ await (async () => {
   const compareSrc = readFileSync(new URL('../src/screens/Compare.tsx', import.meta.url), 'utf8');
   check('Compare links an artifact-fed input to its artifact', /data-testid="compare-input-artifact"/.test(compareSrc));
 })();
+
+// OF-BLD-020 §2.1 (D3) — a person's change to a parameter is an Override,
+// kept in this browser by scope and key and round-tripped through the
+// Durable tier; a snapshot written before the panel, holding only
+// proformaAssumptions, is read once into `proforma:<id>` and the old field
+// still answers; Proforma's assumptions are the overrides of its scope, so
+// the scenario page reads them unchanged; clearing this browser's data drops
+// both.
+{
+  const st = () => useStore.getState();
+  const scope = 'fermos:family:batch_v1';
+  const typed: Override = { scope, key: 'mu_max', value: 0.3, low: 0.2, high: 0.4, by: 'Sean Creighton', at: '2026-10-21', note: 'a check-store fixture' };
+  st().setOverride(typed);
+  st().setOverride({ ...typed, key: 'kla_method', value: 'Riet', low: null, high: null });
+  st().setOverride({ ...typed, value: 0.35 });
+  check('an override replaces the one for its scope and key, and keeps the rest',
+    JSON.stringify(st().parameterOverrides[scope]?.map((o) => `${o.key}=${o.value}`)) === JSON.stringify(['kla_method=Riet', 'mu_max=0.35']),
+    st().parameterOverrides[scope]);
+  check('overridesFor(scope) reads one scope, and the same empty list for a scope with none',
+    overridesFor(scope)(st()).length === 2 && overridesFor('proforma:nowhere')(st()) === overridesFor('pureos:unit:t:u')(st()));
+  st().setProformaAssumption('sc-yeast-1', { key: 'glucose_price', value: 0.4, low: 0.3, high: 0.5, by: 'Sean Creighton', at: '2026-10-21', note: null });
+  const yeast = st().parameterOverrides[proformaScope('sc-yeast-1')]?.[0];
+  check('a Proforma assumption is the override of its scenario’s scope, and proformaAssumptions reads it back',
+    yeast?.scope === 'proforma:sc-yeast-1' && yeast.key === 'glucose_price' && yeast.value === 0.4 && yeast.by === 'Sean Creighton' &&
+      st().proformaAssumptions['sc-yeast-1']?.[0]?.value === 0.4, { yeast, assumptions: st().proformaAssumptions['sc-yeast-1'] });
+  st().setOverride({ scope: 'proforma:sc-yeast-1', key: 'plant_scale', value: 100000, low: null, high: null, by: 'Sean Creighton', at: '2026-10-21', note: null });
+  const scale = st().proformaAssumptions['sc-yeast-1']?.find((a) => a.key === 'plant_scale');
+  check('an override typed in a proforma scope reaches proformaAssumptions, a value with no range held at itself',
+    scale?.value === 100000 && scale.low === 100000 && scale.high === 100000, scale);
+  const snap = snapshotOf(st());
+  check('the snapshot keeps every scope’s overrides, and writes proformaAssumptions from them',
+    snap.parameterOverrides?.[scope]?.length === 2 && snap.parameterOverrides?.['proforma:sc-yeast-1']?.length === 2 &&
+      snap.proformaAssumptions?.['sc-yeast-1']?.length === 2, snap.parameterOverrides);
+  // A reload: a store that has lost them.
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  st().applyDurable(snap);
+  check('after a reload every override is back by scope and key, a value in words with it',
+    JSON.stringify(st().parameterOverrides[scope]?.map((o) => `${o.key}=${o.value}`)) === JSON.stringify(['kla_method=Riet', 'mu_max=0.35']) &&
+      st().parameterOverrides['proforma:sc-yeast-1']?.length === 2, st().parameterOverrides);
+  check('…and the scenario’s assumptions answer from them', st().proformaAssumptions['sc-yeast-1']?.map((a) => a.key).sort().join() === 'glucose_price,plant_scale');
+  st().clearOverride(proformaScope('sc-yeast-1'), 'plant_scale');
+  check('Reset to source drops one override, and the assumption with it',
+    st().parameterOverrides['proforma:sc-yeast-1']?.map((o) => o.key).join() === 'glucose_price' &&
+      st().proformaAssumptions['sc-yeast-1']?.map((a) => a.key).join() === 'glucose_price');
+  // The migration: a snapshot written before the panel holds proformaAssumptions alone.
+  const old = (key: string, value: number) => ({ key, value, low: value, high: value, by: 'Sean Creighton', at: '2026-10-20', note: 'typed before the panel' });
+  const before = { ...snap, parameterOverrides: undefined, proformaAssumptions: { 'sc-old-1': [old('glucose_price', 0.5), old('plant_scale', 50000)] } };
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  st().applyDurable(before);
+  const migrated = st().parameterOverrides['proforma:sc-old-1'] ?? [];
+  check('a snapshot holding only proformaAssumptions comes back as overrides under proforma:<id>, each named',
+    migrated.length === 2 && migrated.every((o) => o.scope === 'proforma:sc-old-1' && o.by === 'Sean Creighton' && o.note === 'typed before the panel') &&
+      migrated.find((o) => o.key === 'plant_scale')?.value === 50000, migrated);
+  check('…and the old field still answers for the scenario', st().proformaAssumptions['sc-old-1']?.map((a) => `${a.key}=${a.value}`).sort().join() === 'glucose_price=0.5,plant_scale=50000');
+  check('…and the next save writes the new field', snapshotOf(st()).parameterOverrides?.['proforma:sc-old-1']?.length === 2);
+  const both = { ...snap, parameterOverrides: { 'proforma:sc-old-1': [overrideOfAssumption('sc-old-1', old('glucose_price', 0.6))] },
+    proformaAssumptions: { 'sc-old-1': [old('glucose_price', 0.5), old('plant_scale', 50000)] } };
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  st().applyDurable(both);
+  check('the old field is read only for a scope the snapshot holds no overrides for',
+    st().parameterOverrides['proforma:sc-old-1']?.map((o) => `${o.key}=${o.value}`).join() === 'glucose_price=0.6');
+  st().clearBrowserData();
+  check('Clearing this browser’s data drops every override and every assumption',
+    Object.keys(st().parameterOverrides).length === 0 && Object.keys(st().proformaAssumptions).length === 0);
+  const durable = readFileSync(new URL('../src/lib/durable.ts', import.meta.url), 'utf8');
+  check('the Durable snapshot names parameterOverrides as a record of Override lists by scope', /parameterOverrides\?: Record<string, Override\[\]>/.test(durable));
+}
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

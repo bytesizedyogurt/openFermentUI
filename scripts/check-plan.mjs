@@ -217,6 +217,14 @@ const PAIRS = [
   // OF-BLD-019 §4.2 — thermosteam answers property questions.
   ['ThermoPropsRequest', 'ThermoPropsRequest'],
   ['ThermoProps', 'ThermoProps'],
+  // OF-BLD-020 §2.1 — one parameter panel: a parameter declared once,
+  // resolved with its source, and a person's change a named assumption.
+  ['ParameterSpec', 'ParameterSpec'],
+  ['ParameterValue', 'ParameterValue'],
+  ['Override', 'Override'],
+  ['ParamScope', 'ParamScope'],
+  ['ParamResolveRequest', 'ParamResolveRequest'],
+  ['ParamResolveResult', 'ParamResolveResult'],
 ];
 
 let compared = 0;
