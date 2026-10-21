@@ -2503,6 +2503,8 @@ export interface FermosFitRequest {
   series: FermosSeries[];
   /** The sample run: computed inline, kept nowhere. */
   sample: boolean;
+  /** The model fitted: 'logistic_v0' (the default) or a kinetics family by id ('batch_v1'). */
+  family?: string;
 }
 
 /** One fitted parameter, its 95 % interval and its unit. */
@@ -2541,6 +2543,10 @@ export interface KineticFit {
   covariance: number[][];
   series: FermosSeries[];
   reason: string | null;
+  /** The model fitted; a fit kept before OF-BLD-020 holds none and reads as 'logistic_v0'. */
+  model?: string;
+  /** What the fit says of itself in words: the terms it held, a parameter unidentified by rule. */
+  notes?: string[];
 }
 
 export interface FermosFitResponse {
@@ -3522,4 +3528,156 @@ export interface VesselSummary {
   vessels: number | null;
   volume: number | null;
   installed: number | null;
+}
+
+// ── fermOS simulates (OF-BLD-020 §3.1, D1, D5) ─────────────────────────
+//
+// A model family (`core/openferment_core/kinetics.py`) is code with its
+// equations in its docstring and its parameters declared as
+// `ParameterSpec`s; a simulation resolves them with their sources, integrates
+// on scipy, and keeps one `fermos.simulation` artifact whose basis names
+// every parameter, start value and override. A person's override makes it
+// `demo`; nothing here is computed in the browser.
+
+/** `GET /api/fermos/families`: a model family as the panel shows it. */
+export interface FamilyInfo {
+  id: string;
+  title: string;
+  /** One plain line: what it is. */
+  what: string;
+  /** Its equations, plain Unicode, as its docstring writes them. */
+  equations: string;
+  states: string[];
+  /** 'g L⁻¹' for a concentration, 'L' for V. */
+  stateUnits: Record<string, string>;
+  /** A socket is declared with its parameters and refuses to run. */
+  socket: boolean;
+  specs: ParameterSpec[];
+  /** The panel's groups this family's specs fall into, in order. */
+  groups: string[];
+  /** The program the family is archived with (storage_v1: 'pha'), or null for a general one. */
+  program: string | null;
+}
+
+/** `POST /api/fermos/simulate`. */
+export interface SimulationRequest {
+  family: string;
+  strain?: string | null;
+  product?: string | null;
+  sugar?: string | null;
+  /** A person's changes, each an Override of scope `fermos:family:<family>`. */
+  overrides?: Override[];
+  fitArtifact?: string | null;
+  /** 'records', 'fit', or 'simulation:<artifact id>'. */
+  startFrom?: string;
+  durationPreset?: 'until-sugar-runs-out' | 'fit-length';
+  includeArchived?: boolean;
+}
+
+/** OUR(t) = qO2·X on the time course's hours; its peak read on the solver's own steps. */
+export interface OxygenUptake {
+  t: number[];
+  value: number[];
+  unit: string;
+  peak: number;
+  peakH: number | null;
+  /** Why it is zero, when the culture is anaerobic. */
+  note: string | null;
+}
+
+export interface MassBalance {
+  /** The larger relative error of the two checks. */
+  closure: number;
+  ok: boolean;
+  note: string;
+}
+
+/** Yp/s beside the newest stored geneOS ceiling of one host model on the sugar: read, never clamped. */
+export interface SimulationCeilingRow {
+  modelId: string;
+  modelName: string;
+  match: 'strain' | 'species';
+  matchWords: string;
+  artifactId: string;
+  provenance: Provenance;
+  ceilingGPerG: number;
+  ypsGPerG: number | null;
+  yieldAchievedGPerG: number | null;
+  above: boolean;
+  words: string;
+}
+
+export interface SimulationCeiling {
+  product: string;
+  sugar: string;
+  strain: string;
+  rows: SimulationCeilingRow[];
+  flagged: boolean;
+  /** Why no row, in words. */
+  empty: string | null;
+  /** Where a ceiling is computed (geneOS → Model). */
+  computeAt: string;
+}
+
+/** chemostat_v1's steady state and washout. */
+export interface SteadyState {
+  washout: boolean;
+  dilutionRate: number;
+  /** The general washout rate, μ(Sf, P = 0) − kd, and D5's expression. */
+  dWashout: number;
+  dWashoutD5: number;
+  X: number;
+  S: number;
+  P: number;
+  /** D·P at the steady state; null at washout. */
+  productivity: number | null;
+  words: string;
+}
+
+/** One kept `fermos.simulation` artifact as every reader reads it. */
+export interface SimulationResult {
+  artifactId: string;
+  provenance: Provenance;
+  family: string;
+  title: string;
+  strain: string | null;
+  product: string | null;
+  sugar: string | null;
+  parameters: ParameterValue[];
+  start: ParameterValue[];
+  /** { t: hours, <state>: values } in `units`. */
+  series: Record<string, number[]>;
+  units: Record<string, string>;
+  our: OxygenUptake;
+  /** The state where the integration ended, and its hour as `t`. */
+  end: Record<string, number>;
+  sugarRunsOutH: number | null;
+  harvestH: number;
+  /** The product (the store, for storage_v1) at harvest, g L⁻¹. */
+  finalTitre: number | null;
+  /** Product made over sugar used to harvest, g g⁻¹. */
+  yieldAchieved: number | null;
+  /** The final titre over the harvest hour, g L⁻¹ h⁻¹. */
+  productivity: number | null;
+  massBalance: MassBalance;
+  ceiling: SimulationCeiling | null;
+  flags: string[];
+  aerobic: boolean;
+  steadyState: SteadyState | null;
+  notes: string[];
+  basis: ComputedBasis;
+}
+
+/** `GET /api/fermos/simulations`: one kept simulation, newest first. */
+export interface SimulationSummary {
+  artifactId: string;
+  family: string;
+  title: string;
+  strain: string | null;
+  product: string | null;
+  sugar: string | null;
+  finalTitre: number | null;
+  harvestH: number | null;
+  createdAt: string;
+  provenance: Provenance;
 }

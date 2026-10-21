@@ -1,11 +1,17 @@
-"""fermOS fits what a run measured (OF-BLD-014 §7.2).
+"""fermOS fits what a run measured (OF-BLD-014 §7.2), and simulates a run
+from its sources (OF-BLD-020 §3.1).
 
-The browser sends a deposition's series, the way Practice sends runs; the
-service fits them and keeps the fit as an artifact, and nothing else. No
-parameter from a paper enters fermOS (D6): the browser sends a deposition's
-own readings. Depositions live in the browser's Durable tier, which the
-service cannot see, so it takes the readings as sent and says so in each
-fit's basis (§7.R).
+THE RULE, AS OF-BLD-020 D1 AMENDS IT. A *fit* takes only a deposition's
+measured series: the browser sends a deposition's own readings, the way
+Practice sends runs, and the service fits them and keeps the fit as an
+artifact. Depositions live in the browser's Durable tier, which the service
+cannot see, so it takes the readings as sent and says so in each fit's basis
+(§7.R). A *simulation* (kinetics.py's model families) may take its
+parameters from records through the aggregate gate, a fit or forecast, a
+kept simulation, a named person's assumption or a stated convention, each
+named in its basis, and its provenance is basis_provenance over them. This
+step binds a person's overrides and the families' stated conventions; the
+fits, records and kept simulations bind in OF-BLD-020 §3.2.
 
 GROWTH FIT. For a biomass series of four or more readings: least squares of
 ln X on t over every contiguous window of four or more readings. Among the
@@ -34,28 +40,61 @@ assay scatters in proportion to its reading, the intervals at the high end
 come out too narrow; the screen says so beside every interval.
 
 WHAT THE MODEL IS. It holds no nutrient: Xmax stands for whatever stopped
-growth in that run, so a fit describes that medium.
+growth in that run, so a fit describes that medium. It is `logistic_v0`
+(LOGISTIC), a fit family only: a kinetic fit names its model, and one kept
+before OF-BLD-020 names none and reads as logistic_v0.
+
+A FAMILY FIT. `fit(..., family="batch_v1")` fits kinetics.py's batch family
+to the same series on least_squares (Family.fit), starting from the logistic
+fit's own first estimates read off the readings (_batch_start says why not
+its final curve), with the terms one batch's readings cannot pin held as
+conventions named in the basis (no death, no maintenance, Ki and Pmax off,
+anaerobic). It keeps a `kinetic_fit` whose `model` is the family; with no
+biomass series μmax is reported unidentified (OF-BLD-018 D4).
+
+SIMULATION. `simulate(SimulationRequest)` resolves a family's specs
+(params.resolve), refuses in words naming every parameter that waits and
+what would bind it, integrates (kinetics.py), and keeps one
+`fermos.simulation` artifact (`SIMULATION`): the parameters and start values
+with their sources, the time course by state, OUR(t), the end state, the
+hour the sugar runs out, the harvest, the mass balance, Yp/s beside the
+newest stored geneOS ceiling of the strain's host models (read, never
+clamped), and its flags. `harvest(artifact, hour)` reads one, keeping nothing.
 """
 from __future__ import annotations
 
 import json
 import math
+import re
 from typing import Any
 
 import numpy as np
 from scipy.optimize import least_squares, lsq_linear
 from scipy.stats import t as student_t
 
-from . import artifacts, units
+from . import artifacts, kinetics, params, units
 from .models import (
     Band,
     BasisInput,
     BasisSource,
     Evidence,
+    FamilyInfo,
     FermosFitResponse,
+    FermosPoint,
     ForecastResult,
     Interval,
+    MassBalance,
+    OxygenUptake,
+    ParameterSpec,
+    ParameterValue,
+    ParamResolveRequest,
+    SimulationCeiling,
+    SimulationCeilingRow,
+    SimulationRequest,
+    SimulationResult,
+    SimulationSummary,
     StartValues,
+    SteadyState,
     FermosSeries,
     FitParam,
     GrowthFit,
@@ -65,6 +104,12 @@ from .models import (
 
 GROWTH, KINETIC = "growth_fit", "kinetic_fit"
 VERSION = "fermos-1"
+# A kinetic fit names its model since OF-BLD-020 §3.1, so its output changed
+# shape: one kept under fermos-1 is stale, and reads as logistic_v0.
+KINETIC_VERSION = "fermos-2"
+# The closed-form logistic fit below: a fit family only, not in
+# kinetics.FAMILIES.
+LOGISTIC = "logistic_v0"
 
 # Conventions (E.1): the shortest window a growth rate is read over, the
 # fewest readings a kinetic fit takes, and the interval's coverage.
@@ -281,7 +326,12 @@ def _inputs(deposition_id: str, series: list[FermosSeries]) -> list[BasisInput]:
 
 
 def _series_of(inputs: list[BasisInput]) -> list[FermosSeries]:
-    return [FermosSeries.model_validate_json(str(i.value)) for i in inputs]
+    return [FermosSeries.model_validate_json(str(i.value)) for i in inputs if i.source.kind == "deposition"]
+
+
+def _model_of(inputs: list[BasisInput]) -> str:
+    """The model a kinetic fit's basis names; none is logistic_v0."""
+    return next((str(i.value) for i in inputs if i.name == "model"), LOGISTIC)
 
 
 def _run_growth(inputs, seed):
@@ -293,31 +343,220 @@ def _run_growth(inputs, seed):
 
 def _run_kinetic(inputs, seed):
     series = _series_of(inputs)
+    model = _model_of(inputs)
+    if model != LOGISTIC:
+        return family_fit(model, series, _held_of(inputs)).model_dump(mode="json")
     bio = _role(series, "biomass")
     return kinetic_fit(series, growth_fit(bio) if bio else None).model_dump(mode="json")
 
 
 artifacts.register(GROWTH, VERSION, _run_growth)
-artifacts.register(KINETIC, VERSION, _run_kinetic)
+artifacts.register(KINETIC, KINETIC_VERSION, _run_kinetic)
 
 
-def fit(deposition_id: str, series: list[FermosSeries], *, sample: bool = False) -> FermosFitResponse:
-    """Both fits for one run. A sample run is computed inline and kept nowhere."""
+# ── a kinetics family fitted to a run (OF-BLD-020 §3.1) ────────────────
+
+G_L = kinetics.G_L
+# The fit families: the logistic, and the kinetics families a deposition's
+# series can carry. A fed-batch, a chemostat and a storage run need what a
+# deposition does not record (the feed, the dilution, the second nutrient).
+FIT_FAMILIES = (LOGISTIC, "batch_v1")
+STATE_OF_ROLE = {"biomass": "X", "substrate": "S", "product": "P"}
+# What one batch's readings cannot pin, held in a family fit, each a
+# convention its basis names: (key, value, why). A word is the term off.
+FIT_HELD = (
+    ("kd", 0, "held at zero: one batch's readings do not tell a death rate from slower growth"),
+    ("maintenance", 0, "held at zero: one batch's readings do not tell maintenance from a lower yield"),
+    ("ki_substrate", kinetics.OFF, "held off: one batch's readings do not tell substrate inhibition from a lower μmax"),
+    ("p_max", kinetics.OFF, "held off: a fit takes only measurements (D1), and a batch that never nears Pmax "
+                            "does not pin it, so product inhibition is left out"),
+    ("n_inhibition", 1, "1 by convention (Appendix 2 §A); with Pmax off it changes nothing"),
+    ("yxo", kinetics.ANAEROBIC, "no oxygen series is fitted"),
+    ("mo", 0, "no oxygen series is fitted"),
+)
+# With no biomass series these scale with X0 (X → cX, Yx/s → cYx/s,
+# α → α/c, β → β/c leaves S and P unchanged when kd and m are held at zero).
+SCALED_WITH_X = ("yxs", "alpha", "beta")
+FIT_GAUGE_NOTE = ("No biomass series: the scale of the cells is free, so X0, Yx/s, α and β are known only together; "
+                  "X0 is held at one gram per litre, a gauge, not a reading.")
+
+
+def _held_inputs(family: str) -> list[BasisInput]:
+    specs = {s.key: s for s in kinetics.family(family).specs()}
+    out = [BasisInput(name="model", value=family, unit="",
+                      source=BasisSource(kind="convention", note=f"the model family fitted: {kinetics.family(family).title} "
+                                                                 f"({family}, kinetics.py)"))]
+    for key, value, why in FIT_HELD:
+        out.append(BasisInput(name=key, value=value, unit=specs[key].unit if key in specs else "",
+                              source=BasisSource(kind="convention", note=why)))
+    return out
+
+
+def _held_of(inputs: list[BasisInput]) -> dict[str, Any]:
+    keys = {k for k, _, _ in FIT_HELD}
+    return {i.name: (None if isinstance(i.value, str) else float(i.value)) for i in inputs
+            if i.name in keys and i.source.kind == "convention"}
+
+
+def _in_g_per_l(s: FermosSeries) -> FermosSeries:
+    """The series in g L⁻¹, through units.py, or the refusal in words."""
+    try:
+        points = [p.model_copy(update={"value": units.convert(float(p.value), s.unit, G_L)}) for p in s.points]
+    except (TypeError, ValueError):
+        raise FitRefused(f"a kinetics family integrates in {G_L}; the {s.role} series is in {s.unit}, which does not "
+                         f"convert (fit it as {LOGISTIC}, which reads any unit)") from None
+    return s.model_copy(update={"unit": G_L, "points": points})
+
+
+def _window_rate(t: np.ndarray, y: np.ndarray) -> float | None:
+    """growth_fit's rate on an arbitrary positive series, or None."""
+    ok = y > 0
+    if ok.sum() < MIN_WINDOW:
+        return None
+    pts = [FermosPoint(t=float(a), value=float(b), entryId=str(k)) for k, (a, b) in enumerate(zip(t[ok], y[ok]))]
+    g = growth_fit(FermosSeries(measureId="", label="", unit="", role="biomass", points=pts))
+    return g.mu.value if g.mu else None
+
+
+def _trapz(t: np.ndarray, y: np.ndarray) -> np.ndarray:
+    out = np.zeros_like(y)
+    out[1:] = np.cumsum((y[1:] + y[:-1]) / 2 * np.diff(t))
+    return out
+
+
+def _batch_start(data: dict[str, tuple[np.ndarray, np.ndarray]]) -> tuple[dict[str, float], list[str]]:
+    """Where a batch_v1 fit starts: the logistic fit's own first estimates,
+    read off the readings (kinetic_fit's steps 1 and 2), never its final
+    curve, which starts a Monod fit far off (on test_fermos' stand-in the
+    logistic's X0 came out 0.017 against 0.2, its μ 0.93 against 0.40).
+    X0, S0 and P0 are the first readings (D6); μmax the growth window's rate
+    (growth_fit); α and β by bounded linear least squares of P − P0 on X − X0
+    and ∫X; 1/Yx/s and 1/Yp/s the same of S0 − S on X − X0 and P − P0. Ks
+    has no estimator and starts at half the starting sugar. An estimate of
+    zero has no logarithm, and starts at RUN_OUT_SHARE of the most it could
+    be.
+
+    With no biomass series X0 is a gauge, one gram per litre; μmax is the
+    rate at which the sugar's consumption grows; X is read as growing by
+    e^(μmax·t) to the hour of the lowest sugar reading, in step with the sugar
+    used; half the sugar used is read as going to growth and half to the
+    product, and β starts as above."""
+    notes: list[str] = []
+    tS, S = data["S"]
+    tP, P = data["P"]
+    s0, p0 = float(S[0]), float(P[0])
+    used = max(s0 - float(S.min()), kinetics.ATOL)
+    made = max(float(P.max()) - p0, kinetics.ATOL)
+    span = float(max(tS.max(), tP.max()))
+    start: dict[str, float] = {"ks": s0 / 2, "s0": s0, "p0": p0}
+    if "X" not in data:
+        x0 = 1.0
+        notes.append(FIT_GAUGE_NOTE)
+        mu = _window_rate(tS, s0 - S) or 1 / span
+        t_low = float(tS[int(np.argmin(S))])
+        x_made = x0 * math.expm1(mu * t_low)
+        tX = np.union1d(tS, tP)
+        X = x0 + x_made * (s0 - np.interp(tX, tS, S)) / used
+        ix = _trapz(tX, X)
+        start.update(x0=x0, mu_max=mu, yps=2 * made / used, yxs=2 * x_made / used, alpha=made / x_made,
+                     beta=kinetics.RUN_OUT_SHARE * made / max(float(ix[-1]), kinetics.ATOL))
+        return start, notes
+    tX, X = data["X"]
+    x0 = float(X[0])
+    mu = _window_rate(tX, X) or 1 / span
+    ix = _trapz(tX, X)
+    x_at_p, i_at_p = np.interp(tP, tX, X) - x0, np.interp(tP, tX, ix)
+    ab = lsq_linear(np.column_stack([x_at_p, i_at_p]), P - p0, bounds=([0, 0], [np.inf, np.inf])).x
+    x_at_s = np.interp(tS, tX, X) - x0
+    p_at_s = np.interp(tS, tP, P) - p0
+    inv = lsq_linear(np.column_stack([x_at_s, p_at_s]), s0 - S, bounds=([0, 0], [np.inf, np.inf])).x
+    x_made = max(float(x_at_p.max()), kinetics.ATOL)
+    start.update(x0=x0, mu_max=float(mu),
+                 alpha=float(ab[0]) if ab[0] > 0 else kinetics.RUN_OUT_SHARE * made / x_made,
+                 beta=float(ab[1]) if ab[1] > 0 else kinetics.RUN_OUT_SHARE * made / max(float(i_at_p.max()), kinetics.ATOL),
+                 yxs=1 / float(inv[0]) if inv[0] > 0 else x_made / used,
+                 yps=1 / float(inv[1]) if inv[1] > 0 else made / used)
+    return start, notes
+
+
+def family_fit(family: str, series: list[FermosSeries], held: dict[str, Any]) -> KineticFit:
+    """A kinetics family fitted to a run's series (Family.fit): a KineticFit
+    whose `model` is the family, its parameters named as the family's specs
+    and in their units. A run it cannot fit is a KineticFit with a reason."""
+    fam = kinetics.family(family)
+    specs = {s.key: s for s in fam.specs()}
+    present = [s for s in series if s.role in STATE_OF_ROLE and len(s.points) >= 2]
+    roles = {s.role for s in present}
+    if not {"product", "substrate"} <= roles:
+        return KineticFit(model=family, reason=f"{family} fits product and substrate together; this run has "
+                                               f"{', '.join(sorted(roles)) or 'neither'}")
+    try:
+        converted = [_in_g_per_l(s) for s in present]
+    except FitRefused as e:
+        return KineticFit(model=family, reason=str(e))
+    data = {STATE_OF_ROLE[s.role]: _arrays(s) for s in converted}
+    start, notes = _batch_start(data)
+    keys = ["mu_max", "ks", "yxs", "yps", "alpha", "beta", "x0", "s0", "p0"]
+    fixed: dict[str, Any] = {k: v for k, v in held.items() if k in specs}
+    fixed["v0"] = None
+    gauged = "X" not in data
+    if gauged:
+        # The scale of X is free: hold X0 at the gauge, so the optimizer has
+        # no null direction to wander along, and report what scales with it
+        # as unidentified, whatever the numbers say.
+        keys.remove("x0")
+        fixed["x0"] = start["x0"]
+    try:
+        r = fam.fit(data, {k: start[k] for k in keys}, fixed, unbounded=SCALED_WITH_X if gauged else ())
+    except kinetics.FamilyRefused as e:
+        return KineticFit(model=family, reason=str(e))
+    if gauged:
+        for k in SCALED_WITH_X:
+            r.identified[k] = False
+        notes.append("Yx/s, α and β scale with the gauge X0, so they are reported unidentified, whatever their "
+                     "intervals say.")
+    fparams = []
+    for k in r.keys:
+        fp = FitParam(name=k, value=r.values[k], low=r.low[k], high=r.high[k], unit=specs[k].unit,
+                      identified=r.identified[k])
+        if k in ("alpha", "beta"):
+            fp.indistinguishableFromZero = r.low[k] <= 0 <= r.high[k] or r.values[k] == 0
+        fparams.append(fp)
+    quality = [SeriesFitQuality(measureId=s.measureId, role=s.role, r2=r.quality[STATE_OF_ROLE[s.role]]["r2"],
+                                scatter=r.quality[STATE_OF_ROLE[s.role]]["scatter"],
+                                residuals=r.quality[STATE_OF_ROLE[s.role]]["residuals"])
+               for s in present if STATE_OF_ROLE[s.role] in r.quality]
+    return KineticFit(params=fparams, quality=quality, covariance=r.covariance, series=present, model=family,
+                      notes=notes + r.notes)
+
+
+def fit(deposition_id: str, series: list[FermosSeries], *, sample: bool = False,
+        family: str = LOGISTIC) -> FermosFitResponse:
+    """Both fits for one run: the growth rate, and the kinetic fit of
+    `family` (logistic_v0, or batch_v1). A sample run is computed inline and
+    kept nowhere."""
+    if family not in FIT_FAMILIES:
+        known = kinetics.FAMILIES.get(family)
+        if known is not None and known.socket:
+            raise FitRefused(known.refusal())
+        raise FitRefused(f"a run's series fit {' or '.join(FIT_FAMILIES)}; {family!r} is not one"
+                         + (": a fed-batch, a chemostat and a storage run need what a deposition does not record "
+                            "(the feed, the dilution, the second nutrient)" if known is not None else ""))
     series = [s.model_copy(update={"points": sorted(s.points, key=lambda p: p.t)}) for s in series]
     bio = _role(series, "biomass")
-    if bio is None:
+    if bio is None and family == LOGISTIC:
         raise FitRefused("mark one series as biomass: the fits read the growth rate from it")
     readings = [p for s in series for p in s.points]
     share = sum(1 for p in readings if p.confirmed) / len(readings) if readings else 0.0
     inputs = _inputs(deposition_id, [s for s in series if s.role])
     keep = not sample
-    g_art = artifacts.compute(GROWTH, inputs, keep=keep)
-    k_art = artifacts.compute(KINETIC, inputs, keep=keep)
-    growth = GrowthFit.model_validate(g_art.output)
+    g_art = artifacts.compute(GROWTH, inputs, keep=keep) if bio is not None else None
+    k_art = artifacts.compute(KINETIC, inputs + ([] if family == LOGISTIC else _held_inputs(family)), keep=keep)
+    growth = GrowthFit.model_validate(g_art.output) if g_art is not None else None
     kinetic = KineticFit.model_validate(k_art.output)
     return FermosFitResponse(
         depositionId=deposition_id, growth=growth, kinetic=kinetic,
-        growthArtifactId=None if sample else g_art.id, kineticArtifactId=None if sample else k_art.id,
+        growthArtifactId=None if sample or g_art is None else g_art.id, kineticArtifactId=None if sample else k_art.id,
         confirmedShare=share, sample=sample, notes=list(NOTES),
     )
 
@@ -363,7 +602,14 @@ def unidentified(fit_: KineticFit) -> str | None:
     return None
 
 
+def _logistic_only(fit_: KineticFit) -> None:
+    if fit_.model != LOGISTIC:
+        raise FitRefused(f"a forecast draws from a {LOGISTIC} fit; this one fits {fit_.model}, which is simulated, "
+                         "not forecast, from its parameters")
+
+
 def check_forecastable(fit_: KineticFit) -> None:
+    _logistic_only(fit_)
     if fit_.reason or not fit_.params:
         raise FitRefused(f"there is no kinetic fit to forecast from: {fit_.reason or 'no parameters'}")
     name = unidentified(fit_)
@@ -666,6 +912,7 @@ def forecast_for(art: Any) -> tuple[dict[str, Any], str]:
     sugar runs out is drawn again to that hour (to_run_out), so what it feeds
     does not depend on the length it was asked to run."""
     fit_ = fit_of(art)
+    _logistic_only(fit_)
     if fit_.reason or not fit_.params:
         raise FitRefused(f"it holds no kinetic fit: {fit_.reason or 'no parameters'}")
     name = unidentified(fit_)
@@ -686,3 +933,410 @@ def forecast_for(art: Any) -> tuple[dict[str, Any], str]:
     return again, (f"{how}, drawn again to the hour its median sugar runs out, found between its grid points "
                    f"(the same fit, starting values and seed; kept nowhere)")
 
+
+
+# ── simulation (OF-BLD-020 §3.1, D1, D5, E.2‴) ─────────────────────────
+
+SIMULATION = "fermos.simulation"
+SIMULATION_STEM = f"kinetics 1 · scipy {kinetics.versions()['scipy']}"
+OUR_UNIT = "g O2 L⁻¹ h⁻¹"
+ANAEROBIC_NOTE = ("Yx/o is absent, so the culture is taken as anaerobic: it takes up no oxygen and its OUR is zero, "
+                  "said so (D5).")
+START_GROUP = "Start values"
+SimulationRefused = kinetics.FamilyRefused
+
+
+def _named(inputs: list[BasisInput], name: str) -> BasisInput | None:
+    return next((i for i in inputs if i.name == name), None)
+
+
+def _simulation_version(inputs) -> str:
+    fid = _named(list(inputs), "family")
+    return f"kinetics {fid.value if fid else '?'} 1 · scipy {kinetics.versions()['scipy']}"
+
+
+def family_scope(family_id: str) -> str:
+    return params.scope_name("fermos-family", family_id)
+
+
+def family_info(family_id: str) -> FamilyInfo:
+    fam = kinetics.family(family_id)
+    return FamilyInfo(id=fam.id, title=fam.title, what=fam.what, equations=fam.equations, states=list(fam.states),
+                      stateUnits=fam.state_units, socket=fam.socket, specs=fam.specs(), groups=fam.groups(),
+                      program=fam.program)
+
+
+def families(include_archived: bool = False) -> list[FamilyInfo]:
+    """Every model family, a family of an archived program (storage_v1,
+    PHA's) left out unless asked; GET /api/fermos/families/{id} serves any."""
+    from . import programs
+
+    def hidden(program: str | None) -> bool:
+        try:
+            return programs.hides(program, include_archived)
+        except FileNotFoundError:  # no corpus exported here: nothing is known to be archived
+            return False
+
+    return [family_info(f) for f, fam in kinetics.FAMILIES.items() if not hidden(fam.program)]
+
+
+def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
+    """The `fermos-family` scope (`fermos:family:<id>`): the family's specs,
+    bound from its stated conventions; a person's overrides lie on them."""
+    (fid,) = ids
+    fam = kinetics.FAMILIES.get(fid)
+    if fam is None:
+        raise params.ScopeUnknown(f"there is no model family {fid}: the families are {', '.join(kinetics.FAMILIES)}")
+    notes = ["A family's parameters bind here from a person's overrides and the family's stated conventions; binding "
+             "from a fit, the records and a kept simulation is not built yet, so every other parameter waits for a "
+             "named person's value."]
+    if fam.socket:
+        notes.insert(0, fam.refusal())
+    return params.Provided(title=f"{fam.title} ({fam.id})", specs=fam.specs(), sources={}, notes=notes)
+
+
+def _family_static():
+    for fid, fam in kinetics.FAMILIES.items():
+        yield f"fermos family {fid}", fam.specs()
+
+
+def _check_request(req: SimulationRequest) -> None:
+    """What this step does not bind yet, refused in words, never ignored."""
+    start = req.startFrom or "records"
+    if start != "records" and start != "fit" and not start.startswith("simulation:"):
+        raise SimulationRefused(f"a simulation starts from records, a fit or simulation:<artifact id>; "
+                                f"{start!r} is none of them")
+    if req.fitArtifact or start != "records" or req.durationPreset == "fit-length":
+        raise SimulationRefused("a simulation does not yet start from a fit or a kept simulation, nor run a fit's "
+                                "length: this service binds a family's parameters from a person's overrides and the "
+                                "stated conventions, and the binding from fits, records and kept simulations is still "
+                                "to be built")
+    for word, value in (("strain", req.strain), ("product", req.product), ("sugar", req.sugar)):
+        if value is not None and not re.fullmatch(params._ID, value):
+            raise SimulationRefused(f"a {word} is named by its id (letters, digits, dots, dashes, underscores); "
+                                    f"{value!r} is not one")
+
+
+def _numbers(fam: kinetics.Family, specs: list[ParameterSpec],
+             values: list[ParameterValue]) -> tuple[dict[str, Any], dict[str, Any], float | None]:
+    """The parameters as kinetics reads them (a convention in words is the
+    term off: None), the start values by state, and the run length; or the
+    refusal naming every parameter that waits and what would bind it."""
+    by_key = {v.key: v for v in values}
+    spec_of = {s.key: s for s in specs}
+    p: dict[str, Any] = {}
+    for key, v in by_key.items():
+        x = v.value
+        if isinstance(x, str):
+            p[key] = x if spec_of[key].choices else None
+        elif x is None:
+            p[key] = None
+        else:
+            p[key] = float(x)
+    skip = fam.irrelevant(p)
+    waiting = [by_key[s.key] for s in specs if by_key[s.key].origin == "waiting" and s.key not in skip]
+    if waiting:
+        lines = "; ".join(f"{v.key} ({spec_of[v.key].label}) {v.detail}" for v in waiting)
+        raise SimulationRefused(f"{fam.id} cannot run yet: {len(waiting)} parameter"
+                                f"{'s wait' if len(waiting) != 1 else ' waits'}. {lines}")
+    y0 = {state: p.pop(key) for key, state in kinetics.START_STATE.items() if key in p}
+    t_end = p.pop("t_end", None)
+    return p, y0, t_end
+
+
+def _ceiling_inputs(req: SimulationRequest) -> tuple[list[BasisInput], list[str]]:
+    """The newest stored geneOS ceiling of each host model of the strain, on
+    the sugar, named in the basis (an artifact input, compared beside the
+    result, never a bound), or a convention input saying none is on file."""
+    from . import geneos_models, proforma
+
+    if not (req.strain and req.product and req.sugar):
+        return [], ["No strain, product and sugar were all named, so no geneOS ceiling is read beside this simulation."]
+    if req.product not in geneos_models.PRODUCTS:
+        return [], [f"geneOS computes no ceiling for {req.product}, so none is read beside this simulation."]
+    out = []
+    for m, how, words in proforma.host_models(req.product, req.strain):
+        on = proforma.stored_ceilings(m.id, req.product, req.sugar)
+        if on:
+            out.append(BasisInput(name=f"ceiling {m.id}", value=on[0].id, unit="g g⁻¹",
+                                  source=BasisSource(kind="artifact", id=on[0].id,
+                                                     note=f"{how}: {words}; set beside Yp/s, never a bound")))
+        else:
+            out.append(BasisInput(name=f"ceiling {m.id}", value="none on file", unit="",
+                                  source=BasisSource(kind="convention", note=f"{how}: {words}; no geneOS ceiling on "
+                                                                              f"{req.sugar} is on file for it")))
+    return out, []
+
+
+def _solver_inputs() -> list[BasisInput]:
+    s = kinetics.SETTINGS
+    return [
+        BasisInput(name="solver", value="scipy solve_ivp, LSODA", unit="",
+                   source=BasisSource(kind="convention", note=f"the integrator (scipy {kinetics.versions()['scipy']})")),
+        BasisInput(name="rtol", value=kinetics.RTOL, unit="", source=BasisSource(kind="convention", note=s["RTOL"])),
+        BasisInput(name="atol", value=kinetics.ATOL, unit=G_L, source=BasisSource(kind="convention", note=s["ATOL"])),
+        BasisInput(name="run-out share", value=kinetics.RUN_OUT_SHARE, unit="",
+                   source=BasisSource(kind="convention", note=s["RUN_OUT_SHARE"])),
+        BasisInput(name="mass balance closure", value=kinetics.BALANCE_TOL, unit="",
+                   source=BasisSource(kind="convention", note=s["BALANCE_TOL"])),
+        BasisInput(name="points", value=kinetics.POINTS, unit="", source=BasisSource(kind="convention", note=s["POINTS"])),
+    ]
+
+
+def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult:
+    """One simulation, kept as a `fermos.simulation` artifact. The family's
+    specs resolve through params.resolve: a person's override (an
+    `assumption` by name) wins, else the spec's stated convention; anything
+    else waits, and a waiting parameter refuses the run naming it and the
+    record field that would bind it (SimulationRefused, a 422). `by_pool`
+    is for the binding from records (§3.2) and is not read yet."""
+    fam = kinetics.family(req.family)
+    if fam.socket:
+        raise SimulationRefused(fam.refusal())
+    _check_request(req)
+    scope = family_scope(fam.id)
+    stray = sorted({o.scope for o in req.overrides if o.scope != scope})
+    if stray:
+        raise SimulationRefused(f"an override names the scope it changes, and these were sent to {scope}: "
+                                f"{', '.join(stray)}")
+    specs = fam.specs()
+    try:
+        values = params.resolve(specs, {}, req.overrides)
+    except params.ParamRefused as e:
+        raise SimulationRefused(str(e)) from None
+    _numbers(fam, specs, values)
+    named = [BasisInput(name="family", value=fam.id, unit="",
+                        source=BasisSource(kind="convention", note=f"the model family: {fam.title} (kinetics.py)"))]
+    for word, value in (("strain", req.strain), ("product", req.product), ("sugar", req.sugar)):
+        if value:
+            named.append(BasisInput(name=word, value=value, unit="",
+                                    source=BasisSource(kind="convention", note=f"the {word} simulated, as named")))
+    ceilings, _ = _ceiling_inputs(req)
+    inputs = named + params.basis_inputs(specs, values) + _solver_inputs() + ceilings
+    art = artifacts.compute(SIMULATION, inputs)
+    return result_of(art)
+
+
+def result_of(art: Any) -> SimulationResult:
+    return SimulationResult(**art.output, artifactId=art.id, provenance=art.provenance, basis=artifacts.basis_of(art))
+
+
+def _values_of(specs: list[ParameterSpec], inputs: list[BasisInput]) -> list[ParameterValue]:
+    """Each spec's value read back from a simulation's basis: its input,
+    its low and high, the records behind it, and its origin from its
+    source (the inverse of params.basis_inputs)."""
+    by_name: dict[str, BasisInput] = {i.name: i for i in inputs}
+    out = []
+    for spec in specs:
+        i = by_name.get(spec.key)
+        if i is None:
+            out.append(ParameterValue(key=spec.key, value=None, source=None, origin="waiting",
+                                      detail=params._waiting_words(spec)))
+            continue
+        records = [str(x.value) for x in inputs if x.name == f"{spec.key} record" and x.source.kind == "record"]
+        low, high = by_name.get(f"{spec.key} low"), by_name.get(f"{spec.key} high")
+        kind = i.source.kind
+        origin = ("record" if records else "assumption" if kind == "assumption" else "artifact" if kind == "artifact"
+                  else "fit" if kind == "deposition" else "convention")
+        v = ParameterValue(key=spec.key, value=i.value, low=float(low.value) if low else None,
+                           high=float(high.value) if high else None, source=i.source, origin=origin,
+                           overriddenBy=i.source.by if kind == "assumption" else None, recordIds=records,
+                           detail=i.source.note)
+        v.outOfBounds = params.bounds_check(spec, v.value, v.low, v.high)
+        out.append(v)
+    return out
+
+
+def _trajectory(inputs: list[BasisInput]) -> tuple[kinetics.Family, list[ParameterSpec], list[ParameterValue],
+                                                    dict[str, Any], kinetics.Trajectory]:
+    fid = _named(inputs, "family")
+    if fid is None:
+        raise SimulationRefused("a simulation's basis names its family")
+    fam = kinetics.family(str(fid.value))
+    specs = fam.specs()
+    values = _values_of(specs, inputs)
+    p, y0, t_end = _numbers(fam, specs, values)
+    return fam, specs, values, p, fam.simulate(p, y0, t_end)
+
+
+def _ceiling_block(inputs: list[BasisInput], yps: float | None, achieved: float | None) -> SimulationCeiling | None:
+    from . import geneos_models
+
+    strain, product, sugar = (_named(inputs, k) for k in ("strain", "product", "sugar"))
+    marks = [i for i in inputs if i.name.startswith("ceiling ")]
+    if not (strain and product and sugar) or str(product.value) not in geneos_models.PRODUCTS:
+        return None
+    product_label = geneos_models.PRODUCTS[str(product.value)]["label"]
+    rows, waiting = [], []
+    for i in marks:
+        model_id = i.name.split(" ", 1)[1]
+        how, _, words = (i.source.note or "").partition(": ")
+        words = words.rsplit("; ", 1)[0]
+        if i.source.kind != "artifact":
+            waiting.append(model_id)
+            continue
+        art = artifacts.get(str(i.source.id))
+        ceiling = float(art.output["gPerG"])
+        above = yps is not None and yps > ceiling
+        m = geneos_models.SHELF.get(model_id)
+        rows.append(SimulationCeilingRow(
+            modelId=model_id, modelName=m.name if m else model_id, match="strain" if how == "strain" else "species",
+            matchWords=words, artifactId=art.id, provenance=art.provenance, ceilingGPerG=ceiling, ypsGPerG=yps,
+            yieldAchievedGPerG=achieved, above=above,
+            words=(f"Yp/s is above the most {model_id} makes from {sugar.value}: a yield above the network's ceiling "
+                   "rests on another basis, or is wrong, so a reviewer should check what it was typed or bound from. "
+                   "It is flagged, not clamped." if above else
+                   f"Yp/s is at or under the most {model_id} makes from {sugar.value}.")))
+    first = (rows[0].modelId if rows else waiting[0] if waiting else "")
+    compute_at = f"/geneos/model?product={product.value}&substrate={sugar.value}" + (f"&model={first}" if first else "")
+    empty = None
+    if not marks:
+        empty = (f"No reaction network on geneOS's shelf is of {strain.value}'s strain or species with a route to "
+                 f"{product_label}, so no ceiling is read beside this simulation.")
+    elif not rows:
+        empty = (f"No geneOS ceiling for {product_label} on {sugar.value} is on file for {', '.join(waiting)}. One is "
+                 f"computed in geneOS → Model, and a simulation made after it reads it.")
+    return SimulationCeiling(product=str(product.value), sugar=str(sugar.value), strain=str(strain.value), rows=rows,
+                             flagged=any(r.above for r in rows), empty=empty, computeAt=compute_at)
+
+
+def _harvest_hour(fam: kinetics.Family, traj: kinetics.Trajectory) -> float:
+    """A batch is harvested the hour its sugar runs out; a fed culture, and
+    a batch whose sugar does not run out in its run, at the run's end."""
+    return traj.runout_h if fam.feed == "none" and traj.runout_h is not None else traj.t_final
+
+
+def _run_simulation(inputs, seed):
+    fam, specs, values, p, traj = _trajectory(inputs)
+    group = {s.key: s.group for s in specs}
+    times = traj.times()
+    Y = traj.sample(times)
+    series = {"t": [float(t) for t in times], **{s: [float(x) for x in Y[kinetics.IX[s]]] for s in fam.states}}
+    our = kinetics.oxygen(p, traj, times)
+    peak, peak_h = kinetics.oxygen_peak(p, traj)
+    aerobic = p.get("yxo") is not None
+    harvest_h = _harvest_hour(fam, traj)
+    at_harvest = kinetics.harvest(traj, harvest_h)
+    product = fam.product_state()
+    final_titre = at_harvest["state"][product] if product else None
+    made, used = kinetics.made_and_used(traj, harvest_h)
+    achieved = made / used if used > 0 else None
+    productivity = final_titre / harvest_h if final_titre is not None and harvest_h > 0 else None
+    mb = traj.balance
+    ok = mb["closure"] <= kinetics.BALANCE_TOL
+    balance = MassBalance(
+        closure=mb["closure"], ok=ok,
+        note=(f"Sugar consumed, {mb['consumed']:.6g} g, against the consumption states and against what the cells, "
+              f"product and store say through the yields: within {mb['closure']:.2g} of it"
+              + ("" if ok else f", outside the {kinetics.BALANCE_TOL:.0%} closure, so the rate laws or their "
+                               "parameters do not hold together")
+              + ". The check catches a wrong rate law, not the integrator's error, which the tests hold."))
+    flags = [v.outOfBounds for v in values if v.outOfBounds]
+    if not ok:
+        flags.append(f"The mass balance does not close: {mb['closure']:.2g} against {kinetics.BALANCE_TOL:.0%}.")
+    if traj.runout_h is None and fam.id in ("batch_v1", "storage_v1"):
+        flags.append("The sugar did not run out within the run length; the harvest is at the run's end.")
+    yps = p.get("yps")
+    ceiling = _ceiling_block(inputs, yps, achieved)
+    if ceiling and ceiling.flagged:
+        flags.append("Yp/s is above a geneOS ceiling for this strain on this sugar: flagged, not clamped.")
+    steady = None
+    notes = list(traj.notes)
+    if isinstance(fam, kinetics.ChemostatV1):
+        ss = fam.steady_state(p)
+        prod = None if ss["washout"] else ss["dilutionRate"] * ss["P"]
+        words = (f"Washout: D = {ss['dilutionRate']:.4g} h⁻¹ is at or above the washout rate, "
+                 f"{ss['dWashout']:.4g} h⁻¹ (μ(Sf) − kd; D5's μmax·Sf/(Ks + Sf) reads {ss['dWashoutD5']:.4g}), so the "
+                 "cells wash out." if ss["washout"] else
+                 f"Steady state at D = {ss['dilutionRate']:.4g} h⁻¹, under the washout rate {ss['dWashout']:.4g} h⁻¹ "
+                 f"(μ(Sf) − kd; D5's μmax·Sf/(Ks + Sf) reads {ss['dWashoutD5']:.4g}). Its productivity is D·P.")
+        steady = SteadyState(washout=ss["washout"], dilutionRate=ss["dilutionRate"], dWashout=ss["dWashout"],
+                             dWashoutD5=ss["dWashoutD5"], X=ss["X"], S=ss["S"], P=ss["P"], productivity=prod,
+                             words=words)
+        if ss["washout"]:
+            flags.append("The dilution rate is at or above the washout rate: the cells wash out.")
+        notes.append("A chemostat's productivity is D·P at its steady state (steadyState.productivity); the "
+                     "productivity above is the final titre over the run's hours, as for a batch.")
+    if isinstance(fam, kinetics.StorageV1):
+        notes.append("Q starts at zero, said so (Appendix 2 §A names no starting store).")
+        if (p.get("kd") or 0) > 0:
+            notes.append("With kd set, the decay of the cells alone lifts the store's share of the dry weight past "
+                          "Qmax: the share is read as Q/(X + Q).")
+    for v in values:
+        if v.origin == "convention" and isinstance(v.value, str) and v.detail:
+            notes.append(f"{v.key}: {v.detail}")
+    out = {
+        "family": fam.id, "title": fam.title,
+        "strain": (_named(inputs, "strain").value if _named(inputs, "strain") else None),
+        "product": (_named(inputs, "product").value if _named(inputs, "product") else None),
+        "sugar": (_named(inputs, "sugar").value if _named(inputs, "sugar") else None),
+        "parameters": [v.model_dump(mode="json") for v in values if group[v.key] != START_GROUP],
+        "start": [v.model_dump(mode="json") for v in values if group[v.key] == START_GROUP],
+        "series": series, "units": {"t": "h", **fam.state_units},
+        "our": OxygenUptake(t=series["t"], value=our, unit=OUR_UNIT, peak=peak, peakH=peak_h,
+                            note=None if aerobic else ANAEROBIC_NOTE).model_dump(mode="json"),
+        "end": {**{s: float(traj.y_final[kinetics.IX[s]]) for s in fam.states}, "t": float(traj.t_final)},
+        "sugarRunsOutH": traj.runout_h, "harvestH": float(harvest_h), "finalTitre": final_titre,
+        "yieldAchieved": achieved, "productivity": productivity, "massBalance": balance.model_dump(mode="json"),
+        "ceiling": ceiling.model_dump(mode="json") if ceiling else None, "flags": flags, "aerobic": aerobic,
+        "steadyState": steady.model_dump(mode="json") if steady else None, "notes": notes,
+    }
+    return out
+
+
+artifacts.register(SIMULATION, SIMULATION_STEM, _run_simulation, version_of=_simulation_version)
+
+
+def kept_simulation(key: Any) -> Any:
+    """A kept simulation, by id or as given; refused in words otherwise."""
+    if isinstance(key, str):
+        try:
+            art = artifacts.get(key)
+        except artifacts.ArtifactNotFound:
+            raise SimulationRefused(f"there is no kept simulation {key}") from None
+    else:
+        art = key
+    if art.tool != SIMULATION:
+        raise SimulationRefused(f"{art.id} is a {art.tool}, not a simulation fermOS keeps")
+    return art
+
+
+def harvest(simulation_artifact: Any, hour: float | None = None) -> dict[str, Any]:
+    """The broth at harvest of a kept simulation (its id, or the artifact):
+    the hour its sugar runs out, else its run's end, or `hour`. Integrated
+    again from the artifact's own basis, as it was kept; keeps nothing."""
+    art = kept_simulation(simulation_artifact)
+    fam, _, _, _, traj = _trajectory(art.inputs)
+    when = hour if hour is not None else _harvest_hour(fam, traj)
+    out = kinetics.harvest(traj, when)
+    if hour is None:
+        out["how"] = ("the hour the sugar runs out" if when == traj.runout_h else
+                      "the run's end: a fed culture's sugar is fed again" if fam.feed != "none" else
+                      "the run's end: the sugar does not run out in this simulation")
+    return {"artifactId": art.id, "family": fam.id, **out}
+
+
+def simulations(include_archived: bool = False) -> list[SimulationSummary]:
+    """The kept simulations, newest first; one of an archived program (what
+    its basis names) left out unless asked. A file that does not read as a
+    simulation is skipped."""
+    from . import module_stores, programs
+
+    out = []
+    for a in artifacts.all_artifacts():
+        if a.tool != SIMULATION:
+            continue
+        try:
+            if programs.hides(module_stores.artifact_program(a), include_archived):
+                continue
+        except FileNotFoundError:
+            pass
+        o = a.output
+        try:
+            out.append(SimulationSummary(artifactId=a.id, family=o["family"], title=o.get("title") or o["family"],
+                                         strain=o.get("strain"), product=o.get("product"), sugar=o.get("sugar"),
+                                         finalTitre=o.get("finalTitre"), harvestH=o.get("harvestH"),
+                                         createdAt=a.createdAt, provenance=a.provenance))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out

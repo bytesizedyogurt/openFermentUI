@@ -1264,6 +1264,9 @@ class FermosFitRequest(BaseModel):
     series: list[FermosSeries]
     # The sample run: computed inline, kept nowhere (§7.4).
     sample: bool = False
+    # The model fitted (OF-BLD-020 §3.1): the closed-form logistic,
+    # `logistic_v0`, as before, or a kinetics family by id (`batch_v1`).
+    family: str = "logistic_v0"
 
 
 class FitParam(BaseModel):
@@ -1303,7 +1306,9 @@ class SeriesFitQuality(BaseModel):
 
 
 class KineticFit(BaseModel):
-    """Logistic growth, Luedeking–Piret production and the substrate balance."""
+    """Logistic growth, Luedeking–Piret production and the substrate balance
+    (`logistic_v0`), or a kinetics family fitted to the same series
+    (OF-BLD-020 §3.1)."""
 
     params: list[FitParam] = Field(default_factory=list)
     quality: list[SeriesFitQuality] = Field(default_factory=list)
@@ -1311,6 +1316,12 @@ class KineticFit(BaseModel):
     covariance: list[list[float]] = Field(default_factory=list)
     series: list[FermosSeries] = Field(default_factory=list)
     reason: str | None = None
+    # The model fitted. A fit kept before OF-BLD-020 holds no `model` and
+    # reads as `logistic_v0`, which it is.
+    model: str = "logistic_v0"
+    # What the fit says of itself in words: the terms it held, a parameter
+    # reported unidentified by rule, the optimizer's passes.
+    notes: list[str] = Field(default_factory=list)
 
 
 class FermosFitResponse(BaseModel):
@@ -2550,6 +2561,169 @@ class VesselSummary(BaseModel):
     vessels: float | None = None
     volume: float | None = None
     installed: float | None = None
+
+
+# ── fermOS simulates (OF-BLD-020 §3.1, D1, D5) ─────────────────────────
+#
+# A model family (kinetics.py) is code with its equations in its docstring
+# and its parameters declared as ParameterSpecs; a simulation resolves them
+# with their sources (params.resolve), integrates on scipy, and keeps one
+# `fermos.simulation` artifact whose basis names every parameter, start
+# value and override, and whose provenance is basis_provenance over them
+# (a person's override makes it `demo`).
+
+
+class FamilyInfo(BaseModel):
+    """GET /api/fermos/families: a model family as the panel shows it."""
+
+    id: str
+    title: str
+    # One plain line: what it is.
+    what: str
+    # Its equations, plain Unicode, as its docstring writes them.
+    equations: str
+    states: list[str]
+    # g L⁻¹ for a concentration, L for V.
+    stateUnits: dict[str, str]
+    # A socket is declared with its parameters and refuses to run.
+    socket: bool
+    specs: list[ParameterSpec]
+    # The panel's groups this family's specs fall into, in order.
+    groups: list[str]
+    # The program the family is archived with (storage_v1: PHA), or None for
+    # a general one.
+    program: str | None = None
+
+
+class SimulationRequest(BaseModel):
+    """POST /api/fermos/simulate."""
+
+    family: str
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    # A person's changes, each an Override of scope fermos:family:<family>.
+    overrides: list[Override] = Field(default_factory=list)
+    fitArtifact: str | None = None
+    # `records`, `fit`, or `simulation:<artifact id>`.
+    startFrom: str = "records"
+    durationPreset: Literal["until-sugar-runs-out", "fit-length"] = "until-sugar-runs-out"
+    includeArchived: bool = False
+
+
+class OxygenUptake(BaseModel):
+    """OUR(t) = qO2·X on the time course's hours, and its peak read on the
+    solver's own steps."""
+
+    t: list[float]
+    value: list[float]
+    unit: str
+    peak: float
+    peakH: float | None = None
+    # Why it is zero, when the culture is anaerobic.
+    note: str | None = None
+
+
+class MassBalance(BaseModel):
+    # The larger relative error of the two checks (kinetics.mass_balance).
+    closure: float
+    ok: bool
+    note: str
+
+
+class SimulationCeilingRow(BaseModel):
+    """Yp/s beside the newest stored geneOS ceiling of one host model on
+    the sugar, read and never clamped."""
+
+    modelId: str
+    modelName: str
+    match: Literal["strain", "species"]
+    matchWords: str
+    artifactId: str
+    provenance: Provenance
+    ceilingGPerG: float
+    ypsGPerG: float | None = None
+    yieldAchievedGPerG: float | None = None
+    above: bool
+    words: str
+
+
+class SimulationCeiling(BaseModel):
+    product: str
+    sugar: str
+    strain: str
+    rows: list[SimulationCeilingRow] = Field(default_factory=list)
+    flagged: bool = False
+    # Why no row, in words: no host model, or no ceiling on file yet.
+    empty: str | None = None
+    # Where a ceiling is computed (geneOS → Model).
+    computeAt: str
+
+
+class SteadyState(BaseModel):
+    """chemostat_v1's steady state and washout (D5 as built, 6)."""
+
+    washout: bool
+    dilutionRate: float
+    # The general washout rate, μ(Sf, P = 0) − kd, and D5's expression.
+    dWashout: float
+    dWashoutD5: float
+    X: float
+    S: float
+    P: float
+    # D·P at the steady state, g L⁻¹ h⁻¹; None at washout.
+    productivity: float | None = None
+    words: str
+
+
+class SimulationResult(BaseModel):
+    """One kept `fermos.simulation` artifact as every reader reads it."""
+
+    artifactId: str
+    provenance: Provenance
+    family: str
+    title: str
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    parameters: list[ParameterValue]
+    start: list[ParameterValue]
+    # {"t": hours, "<state>": values} in `units`.
+    series: dict[str, list[float]]
+    units: dict[str, str]
+    our: OxygenUptake
+    # The state where the integration ended, and its hour as "t".
+    end: dict[str, float]
+    sugarRunsOutH: float | None = None
+    harvestH: float
+    # The product (the store, for storage_v1) at harvest, g L⁻¹.
+    finalTitre: float | None = None
+    # Product made over sugar used to harvest, g g⁻¹.
+    yieldAchieved: float | None = None
+    # The final titre over the harvest hour, g L⁻¹ h⁻¹.
+    productivity: float | None = None
+    massBalance: MassBalance
+    ceiling: SimulationCeiling | None = None
+    flags: list[str] = Field(default_factory=list)
+    aerobic: bool
+    steadyState: SteadyState | None = None
+    notes: list[str] = Field(default_factory=list)
+    basis: ComputedBasis
+
+
+class SimulationSummary(BaseModel):
+    """GET /api/fermos/simulations: one kept simulation, newest first."""
+
+    artifactId: str
+    family: str
+    title: str
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    finalTitre: float | None = None
+    harvestH: float | None = None
+    createdAt: str
+    provenance: Provenance
 
 
 # Claim and AnswerPlan name Passage and Evidence, which are defined further

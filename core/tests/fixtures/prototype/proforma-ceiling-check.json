@@ -212,9 +212,9 @@
       "none": [
         {
           "fits": {
-            "titre": "da439bc5419ed413",
-            "yield": "da439bc5419ed413",
-            "productivity": "da439bc5419ed413"
+            "titre": "9493894dbc27ffad",
+            "yield": "9493894dbc27ffad",
+            "productivity": "9493894dbc27ffad"
           },
           "status": 200,
           "body": {
@@ -240,12 +240,12 @@
             "yieldUnit": "g g-1",
             "yieldSource": {
               "kind": "artifact",
-              "id": "da439bc5419ed413",
-              "note": "Yp/s, product made over sugar used, from forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
+              "id": "9493894dbc27ffad",
+              "note": "Yp/s, product made over sugar used, from forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
               "by": null
             },
             "yieldRecords": 0,
-            "yieldWords": "a fermOS fit's Yp/s (da439bc5419ed413), its median with its 5th and 95th percentile",
+            "yieldWords": "a fermOS fit's Yp/s (9493894dbc27ffad), its median with its 5th and 95th percentile",
             "rows": [],
             "flagged": false,
             "empty": "No geneOS ceiling for ethanol on glucose is on file for iMM904, Yeast9. One is computed in geneOS → Model: choose ethanol, glucose and the model, and the ceiling is kept.",
@@ -258,8 +258,8 @@
         },
         {
           "fits": {
-            "titre": "45abd7656f83a2a6",
-            "yield": "45abd7656f83a2a6"
+            "titre": "a9074acb4eeb57d9",
+            "yield": "a9074acb4eeb57d9"
           },
           "status": 200,
           "body": {
@@ -285,12 +285,12 @@
             "yieldUnit": "g g-1",
             "yieldSource": {
               "kind": "artifact",
-              "id": "45abd7656f83a2a6",
-              "note": "Yp/s, product made over sugar used, from the forecast of fit 45abd7656f83a2a6 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
+              "id": "a9074acb4eeb57d9",
+              "note": "Yp/s, product made over sugar used, from the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
               "by": null
             },
             "yieldRecords": 0,
-            "yieldWords": "a fermOS fit's Yp/s (45abd7656f83a2a6), its median with its 5th and 95th percentile",
+            "yieldWords": "a fermOS fit's Yp/s (a9074acb4eeb57d9), its median with its 5th and 95th percentile",
             "rows": [],
             "flagged": false,
             "empty": "No geneOS ceiling for ethanol on glucose is on file for iMM904, Yeast9. One is computed in geneOS → Model: choose ethanol, glucose and the model, and the ceiling is kept.",
@@ -303,22 +303,22 @@
         },
         {
           "fits": {
-            "titre": "45abd7656f83a2a6",
-            "yield": "45abd7656f83a2a6",
-            "productivity": "da439bc5419ed413"
+            "titre": "a9074acb4eeb57d9",
+            "yield": "a9074acb4eeb57d9",
+            "productivity": "9493894dbc27ffad"
           },
           "status": 422,
           "body": {
-            "detail": "productivity from growth_forecast da439bc5419ed413 is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from da439bc5419ed413: the fermenter's batch time is the titre over the productivity, and here titre is from 45abd7656f83a2a6. To use it, choose da439bc5419ed413 for titre as well, or stop using it for productivity"
+            "detail": "productivity from growth_forecast 9493894dbc27ffad is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from 9493894dbc27ffad: the fermenter's batch time is the titre over the productivity, and here titre is from a9074acb4eeb57d9. To use it, choose 9493894dbc27ffad for titre as well, or stop using it for productivity"
           }
         }
       ],
       "onFile": [
         {
           "fits": {
-            "titre": "da439bc5419ed413",
-            "yield": "da439bc5419ed413",
-            "productivity": "da439bc5419ed413"
+            "titre": "9493894dbc27ffad",
+            "yield": "9493894dbc27ffad",
+            "productivity": "9493894dbc27ffad"
           },
           "status": 200,
           "body": {
@@ -344,12 +344,12 @@
             "yieldUnit": "g g-1",
             "yieldSource": {
               "kind": "artifact",
-              "id": "da439bc5419ed413",
-              "note": "Yp/s, product made over sugar used, from forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
+              "id": "9493894dbc27ffad",
+              "note": "Yp/s, product made over sugar used, from forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
               "by": null
             },
             "yieldRecords": 0,
-            "yieldWords": "a fermOS fit's Yp/s (da439bc5419ed413), its median with its 5th and 95th percentile",
+            "yieldWords": "a fermOS fit's Yp/s (9493894dbc27ffad), its median with its 5th and 95th percentile",
             "rows": [
               {
                 "modelId": "Yeast9",
@@ -391,8 +391,8 @@
         },
         {
           "fits": {
-            "titre": "45abd7656f83a2a6",
-            "yield": "45abd7656f83a2a6"
+            "titre": "a9074acb4eeb57d9",
+            "yield": "a9074acb4eeb57d9"
           },
           "status": 200,
           "body": {
@@ -418,12 +418,12 @@
             "yieldUnit": "g g-1",
             "yieldSource": {
               "kind": "artifact",
-              "id": "45abd7656f83a2a6",
-              "note": "Yp/s, product made over sugar used, from the forecast of fit 45abd7656f83a2a6 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
+              "id": "a9074acb4eeb57d9",
+              "note": "Yp/s, product made over sugar used, from the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
               "by": null
             },
             "yieldRecords": 0,
-            "yieldWords": "a fermOS fit's Yp/s (45abd7656f83a2a6), its median with its 5th and 95th percentile",
+            "yieldWords": "a fermOS fit's Yp/s (a9074acb4eeb57d9), its median with its 5th and 95th percentile",
             "rows": [
               {
                 "modelId": "Yeast9",
@@ -465,13 +465,13 @@
         },
         {
           "fits": {
-            "titre": "45abd7656f83a2a6",
-            "yield": "45abd7656f83a2a6",
-            "productivity": "da439bc5419ed413"
+            "titre": "a9074acb4eeb57d9",
+            "yield": "a9074acb4eeb57d9",
+            "productivity": "9493894dbc27ffad"
           },
           "status": 422,
           "body": {
-            "detail": "productivity from growth_forecast da439bc5419ed413 is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from da439bc5419ed413: the fermenter's batch time is the titre over the productivity, and here titre is from 45abd7656f83a2a6. To use it, choose da439bc5419ed413 for titre as well, or stop using it for productivity"
+            "detail": "productivity from growth_forecast 9493894dbc27ffad is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from 9493894dbc27ffad: the fermenter's batch time is the titre over the productivity, and here titre is from a9074acb4eeb57d9. To use it, choose 9493894dbc27ffad for titre as well, or stop using it for productivity"
           }
         }
       ]

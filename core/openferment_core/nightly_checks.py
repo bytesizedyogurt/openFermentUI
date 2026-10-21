@@ -46,7 +46,7 @@ def replay_newest(n: int = REPLAY_NEWEST) -> list[str]:
     problems = []
     for a in newest:
         try:
-            now = artifacts.registered(a.tool).version
+            now = artifacts.registered(a.tool).version_for(a.inputs)
         except Exception as e:
             problems.append(f"artifact {a.id} ({a.tool}) could not be replayed: {type(e).__name__}: {e}")
             continue

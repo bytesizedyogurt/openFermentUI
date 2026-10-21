@@ -229,3 +229,189 @@ def test_the_forecast_endpoint_and_the_tool(store):
     assert wrong.status_code == 422 and "not a kinetic fit" in wrong.json()["detail"]
     t = tools.run("growth_forecast", {"fitArtifactId": fit.kineticArtifactId})
     assert t.error is None and t.evidence[0].figure == "trajectory" and t.summary["evidenceId"] == t.evidence[0].id
+
+
+# ── OF-BLD-020 §3.1: a kinetics family fitted, and a simulation kept ───
+#
+# Every number below is a STAND-IN for a synthetic case, chosen here; none
+# is a measurement or a result.
+
+from openferment_core import artifacts, kinetics  # noqa: E402
+from openferment_core.models import Override, SimulationRequest  # noqa: E402
+
+BY = "openFerment test fixture"
+BATCH = "batch_v1"
+SCOPE = f"fermos:family:{BATCH}"
+# What one batch_v1 fit can pin: its terms held as fermos.FIT_HELD holds them.
+STANDIN_BATCH = dict(mu_max=0.40, ks=0.20, kd=0.0, yxs=0.15, alpha=2.0, beta=0.05, yps=0.45, maintenance=0.0,
+                     p_max=None, n_inhibition=1.0, ki_substrate=None, yxo=None, mo=0.0)
+STANDIN_BATCH_START = {"X": 0.2, "S": 50.0, "P": 0.0}
+STANDIN_BATCH_TIMES = np.linspace(0.0, 12.0, 13)
+# What a person types into the panel for a batch_v1 simulation.
+STANDIN_TYPED = dict(mu_max=0.40, ks=0.20, yxs=0.15, alpha=2.0, yps=0.45, p_max=90.0, x0=0.2, s0=50.0, p0=0.0)
+OUTPUT_KEYS = {"family", "title", "strain", "product", "sugar", "parameters", "start", "series", "units", "our", "end",
+               "sugarRunsOutH", "harvestH", "finalTitre", "yieldAchieved", "productivity", "massBalance", "ceiling",
+               "flags", "aerobic", "steadyState", "notes"}
+
+
+def synthetic_batch(monkeypatch, roles=("biomass", "substrate", "product")):
+    """A batch_v1 run made at a tight tolerance and read at thirteen hours."""
+    with monkeypatch.context() as m:
+        m.setattr(kinetics, "RTOL", 1e-12)
+        m.setattr(kinetics, "ATOL", 1e-14)
+        tr = kinetics.FAMILIES[BATCH].simulate(STANDIN_BATCH, STANDIN_BATCH_START, float(STANDIN_BATCH_TIMES[-1]))
+    Y = tr.sample(STANDIN_BATCH_TIMES)
+    state = {"biomass": "X", "substrate": "S", "product": "P"}
+    return [series(role, STANDIN_BATCH_TIMES, Y[kinetics.IX[state[role]]]) for role in roles]
+
+
+def typed(**values):
+    return [Override(scope=SCOPE, key=k, value=v, by=BY, at="2026-10-21", note="a STAND-IN for a test")
+            for k, v in values.items()]
+
+
+def test_a_batch_v1_fit_recovers_its_parameters_and_is_kept_naming_its_model(store, monkeypatch):
+    out = fermos.fit("dep-k", synthetic_batch(monkeypatch), family=BATCH)
+    k = out.kinetic
+    assert k.reason is None and k.model == BATCH
+    got = {p.name: p for p in k.params}
+    for name in ("mu_max", "ks", "yxs", "yps", "alpha", "beta"):
+        assert got[name].value == pytest.approx(STANDIN_BATCH[name], rel=0.01), name
+        assert got[name].identified, name
+    assert got["ks"].unit == "g L⁻¹" and got["mu_max"].unit == "h⁻¹"
+    art = artifacts.get(out.kineticArtifactId)
+    assert art.tool == fermos.KINETIC and art.toolVersion == fermos.KINETIC_VERSION and art.output["model"] == BATCH
+    held = {i.name: i for i in art.inputs if i.source.kind == "convention"}
+    assert held["model"].value == BATCH and held["p_max"].value == "off" and held["kd"].value == 0
+    assert art.provenance == "computed", "a fit takes only measurements and conventions (D1)"
+    assert artifacts.replay(art.id).identical
+    # A batch_v1 fit is simulated, not forecast.
+    with pytest.raises(fermos.FitRefused, match="a forecast draws from a logistic_v0 fit"):
+        fermos.forecast_run(fit_artifact=out.kineticArtifactId)
+
+
+def test_a_product_and_substrate_only_batch_v1_fit_reports_mu_unidentified(store, monkeypatch):
+    monkeypatch.setattr(kinetics, "FIT_MAX_NFEV", 20)
+    out = fermos.fit("dep-ps", synthetic_batch(monkeypatch, ("substrate", "product")), family=BATCH)
+    k = out.kinetic
+    assert out.growth is None and out.growthArtifactId is None and k.model == BATCH and k.reason is None
+    got = {p.name: p for p in k.params}
+    assert got["mu_max"].identified is False and "x0" not in got
+    assert all(got[n].identified is False for n in fermos.SCALED_WITH_X)
+    assert any("μmax is reported unidentified by rule" in n for n in k.notes)
+    assert any("gauge" in n for n in k.notes)
+
+
+def test_the_logistic_fit_is_unchanged_and_an_old_one_reads_as_logistic(store):
+    out = fermos.fit("dep-l", batch(np.linspace(0, 30, 16)))
+    assert out.kinetic.model == fermos.LOGISTIC and [p.name for p in out.kinetic.params] == list(TRUE)
+    stored = artifacts.get(out.kineticArtifactId).output
+    assert stored["model"] == fermos.LOGISTIC
+    old = {k: v for k, v in stored.items() if k not in ("model", "notes")}
+    assert fermos.KineticFit.model_validate(old).model == fermos.LOGISTIC
+    with pytest.raises(fermos.FitRefused, match="'fedbatch_v1' is not one.*the feed"):
+        fermos.fit("dep-l", batch(np.linspace(0, 30, 16)), family="fedbatch_v1")
+    with pytest.raises(fermos.FitRefused, match="light_v1 is declared and not built"):
+        fermos.fit("dep-l", batch(np.linspace(0, 30, 16)), family="light_v1")
+
+
+def test_a_simulation_is_kept_with_every_parameter_and_override_named(store):
+    r = fermos.simulate(SimulationRequest(family=BATCH, overrides=typed(**STANDIN_TYPED)))
+    art = artifacts.get(r.artifactId)
+    assert art.tool == fermos.SIMULATION and set(art.output) == OUTPUT_KEYS
+    assert art.toolVersion == f"kinetics {BATCH} 1 · scipy {kinetics.versions()['scipy']}"
+    # An override is a named person's assumption, so the simulation is demo.
+    assert r.provenance == "demo" == art.provenance
+    by_name = {i.name: i for i in art.inputs}
+    for key in STANDIN_TYPED:
+        assert by_name[key].source.kind == "assumption" and by_name[key].source.by == BY, key
+    for key, word in (("kd", 0), ("beta", 0), ("ki_substrate", "off"), ("yxo", "anaerobic")):
+        assert by_name[key].source.kind == "convention" and by_name[key].value == word, key
+    assert by_name["solver"].value == "scipy solve_ivp, LSODA" and by_name["rtol"].value == kinetics.RTOL
+    params_ = {p.key: p for p in r.parameters}
+    assert params_["mu_max"].origin == "assumption" and params_["mu_max"].overriddenBy == BY
+    assert params_["ki_substrate"].origin == "convention" and {p.key for p in r.start} == {"x0", "s0", "p0", "v0"}
+    assert set(r.series) == {"t", "X", "S", "P"} and len(r.series["t"]) >= kinetics.POINTS
+    assert r.units["X"] == "g L⁻¹" and r.our.unit == "g O2 L⁻¹ h⁻¹" and not r.aerobic and "anaerobic" in r.our.note
+    assert r.sugarRunsOutH == r.harvestH == r.end["t"] and r.massBalance.ok and r.massBalance.closure < 1e-3
+    assert r.finalTitre > 0 and 0 < r.yieldAchieved < STANDIN_TYPED["yps"]
+    assert r.productivity == pytest.approx(r.finalTitre / r.harvestH)
+    assert r.ceiling is None and r.flags == []
+    # The same request again is the same artifact.
+    assert fermos.simulate(SimulationRequest(family=BATCH, overrides=typed(**STANDIN_TYPED))).artifactId == r.artifactId
+    assert artifacts.replay(r.artifactId).identical
+    h = fermos.harvest(r.artifactId)
+    assert h["hour"] == pytest.approx(r.harvestH) and h["state"]["P"] == pytest.approx(r.finalTitre)
+    assert fermos.harvest(r.artifactId, 4.0)["how"] == "an hour a person set"
+    assert [s.artifactId for s in fermos.simulations()] == [r.artifactId]
+
+
+def test_a_waiting_parameter_refuses_the_simulation_naming_it_and_its_field(store):
+    with pytest.raises(fermos.SimulationRefused, match="batch_v1 cannot run yet") as e:
+        fermos.simulate(SimulationRequest(family=BATCH, overrides=typed(**{k: v for k, v in STANDIN_TYPED.items()
+                                                                           if k != "p_max"})))
+    assert "p_max (maximum product concentration)" in str(e.value) and "ethanol_max_conc" in str(e.value)
+    assert "mu_max" not in str(e.value)
+    for req, words in (
+        (SimulationRequest(family="light_v1"), "light_v1 is declared and not built"),
+        (SimulationRequest(family="nowhere_v1"), "there is no model family 'nowhere_v1'"),
+        (SimulationRequest(family=BATCH, fitArtifact="0123456789abcdef"), "does not yet start from a fit"),
+        (SimulationRequest(family=BATCH, overrides=typed(nothing=1.0)), "there is no parameter nothing"),
+        (SimulationRequest(family=BATCH, overrides=[Override(scope="fermos:family:chemostat_v1", key="ks", value=1.0,
+                                                             by=BY, at="2026-10-21")]), "an override names the scope"),
+    ):
+        with pytest.raises(fermos.SimulationRefused, match=words):
+            fermos.simulate(req)
+    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+
+
+def test_yps_is_set_beside_the_newest_stored_ceiling_and_flagged_above_it(store):
+    from openferment_core import demo
+
+    demo.standin_ceiling("Yeast9", "ethanol", "glucose", STANDIN_TYPED["yps"] * 0.9)
+    req = SimulationRequest(family=BATCH, strain="s-cerevisiae-cenpk113-7d", product="ethanol", sugar="glucose",
+                            overrides=typed(**STANDIN_TYPED))
+    r = fermos.simulate(req)
+    c = r.ceiling
+    assert c is not None and c.strain == req.strain and c.flagged
+    row = next(x for x in c.rows if x.modelId == "Yeast9")
+    assert row.match == "species" and row.above and row.ypsGPerG == STANDIN_TYPED["yps"]
+    assert row.ceilingGPerG == pytest.approx(STANDIN_TYPED["yps"] * 0.9)
+    assert any("geneOS ceiling" in f for f in r.flags)
+    # Read, never clamped: the parameter is the person's.
+    assert next(p for p in r.parameters if p.key == "yps").value == STANDIN_TYPED["yps"]
+    ceiling_inputs = [i for i in artifacts.get(r.artifactId).inputs if i.name.startswith("ceiling ")]
+    assert {i.name for i in ceiling_inputs} == {"ceiling iMM904", "ceiling Yeast9"}
+    assert {i.source.kind for i in ceiling_inputs} == {"artifact", "convention"}
+
+
+def test_the_family_endpoints_and_the_simulation_endpoints(store):
+    from fastapi.testclient import TestClient
+
+    from openferment_core import api
+
+    c = TestClient(api.app, base_url="http://127.0.0.1")
+    listed = c.get("/api/fermos/families")
+    assert listed.status_code == 200
+    ids = [f["id"] for f in listed.json()]
+    assert ids == ["batch_v1", "fedbatch_v1", "chemostat_v1", "light_v1"], "storage_v1 is archived with PHA"
+    assert "storage_v1" in [f["id"] for f in c.get("/api/fermos/families?includeArchived=true").json()]
+    one = c.get("/api/fermos/families/batch_v1").json()
+    assert one["groups"][0] == "Growth" and "dX/dt = μ·X − kd·X" in one["equations"] and not one["socket"]
+    assert c.get("/api/fermos/families/storage_v1").json()["program"] == "pha"
+    missing = c.get("/api/fermos/families/nowhere_v1")
+    assert missing.status_code == 404 and "there is no model family" in missing.json()["detail"]
+    scope = c.get(f"/api/params/{SCOPE}")
+    assert scope.status_code == 200 and scope.json()["kind"] == "fermos-family"
+    assert "mu_max" in scope.json()["waiting"] and "kd" not in scope.json()["waiting"]
+    body = {"family": BATCH, "overrides": [o.model_dump(mode="json") for o in typed(**STANDIN_TYPED)]}
+    ok = c.post("/api/fermos/simulate", json=body)
+    assert ok.status_code == 200 and ok.json()["provenance"] == "demo" and ok.json()["basis"]["tool"] == fermos.SIMULATION
+    for bad, words in (({"family": BATCH}, "cannot run yet"), ({"family": "light_v1"}, "not built"),
+                       ({**body, "overrides": body["overrides"][:1] + [{**body["overrides"][1], "value": "words"}]},
+                        "takes a number")):
+        r = c.post("/api/fermos/simulate", json=bad)
+        assert r.status_code == 422 and words in r.json()["detail"], (bad, r.json())
+    kept = c.get("/api/fermos/simulations").json()
+    assert [k["artifactId"] for k in kept] == [ok.json()["artifactId"]] and kept[0]["provenance"] == "demo"
+    assert c.post("/api/fermos/simulate", json=body, headers={"Origin": "https://evil.example"}).status_code == 403

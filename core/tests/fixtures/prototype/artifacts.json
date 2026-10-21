@@ -113,9 +113,9 @@
       "seed": null
     },
     {
-      "id": "bf73d708a9f9276d",
+      "id": "9b9e475abbb34936",
       "tool": "kinetic_fit",
-      "toolVersion": "fermos-1",
+      "toolVersion": "fermos-2",
       "inputs": [
         {
           "name": "biomass series: Dry cell weight (sample)",
@@ -682,26 +682,28 @@
             ]
           }
         ],
-        "reason": null
+        "reason": null,
+        "model": "logistic_v0",
+        "notes": []
       },
-      "outputHash": "05c09d234fc0d787e360ee348b30638bedc1d8cc5425e39a2b478b8989402b0f",
+      "outputHash": "b57b158318c247c0e896e0035c5d8292549d5ad9c16ab43279a3607412c350e1",
       "provenance": "computed",
       "createdAt": "2026-09-15T09:00:00Z",
       "durationMs": 0,
       "seed": null
     },
     {
-      "id": "c7ebffdcaf11883e",
+      "id": "1eff1c7080a68c7f",
       "tool": "growth_forecast",
       "toolVersion": "fermos-1",
       "inputs": [
         {
           "name": "kinetic fit",
-          "value": "bf73d708a9f9276d",
+          "value": "9b9e475abbb34936",
           "unit": "",
           "source": {
             "kind": "artifact",
-            "id": "bf73d708a9f9276d",
+            "id": "9b9e475abbb34936",
             "note": null,
             "by": null
           }
@@ -5108,9 +5110,9 @@
       "seed": 0
     },
     {
-      "id": "45abd7656f83a2a6",
+      "id": "a9074acb4eeb57d9",
       "tool": "kinetic_fit",
-      "toolVersion": "fermos-1",
+      "toolVersion": "fermos-2",
       "inputs": [
         {
           "name": "biomass series: Dry cell weight (STAND-IN)",
@@ -5677,26 +5679,28 @@
             ]
           }
         ],
-        "reason": null
+        "reason": null,
+        "model": "logistic_v0",
+        "notes": []
       },
-      "outputHash": "2393c11fee2cc0d6b937ec74e34419dda8ab49e7d39b13c6f6cbe18df63c6631",
+      "outputHash": "da1bdb382887ba95701cd9baaa955ebf929638be2313c049ef358e735081acf9",
       "provenance": "computed",
       "createdAt": "2026-09-15T09:00:00Z",
       "durationMs": 0,
       "seed": null
     },
     {
-      "id": "da439bc5419ed413",
+      "id": "9493894dbc27ffad",
       "tool": "growth_forecast",
       "toolVersion": "fermos-1",
       "inputs": [
         {
           "name": "kinetic fit",
-          "value": "45abd7656f83a2a6",
+          "value": "a9074acb4eeb57d9",
           "unit": "",
           "source": {
             "kind": "artifact",
-            "id": "45abd7656f83a2a6",
+            "id": "a9074acb4eeb57d9",
             "note": null,
             "by": null
           }

@@ -3,9 +3,9 @@
   "response": {
     "flowsheet": "ethanol_glucose_v0",
     "fits": {
-      "titre": "da439bc5419ed413",
-      "yield": "da439bc5419ed413",
-      "productivity": "da439bc5419ed413"
+      "titre": "9493894dbc27ffad",
+      "yield": "9493894dbc27ffad",
+      "productivity": "9493894dbc27ffad"
     },
     "body": {
       "id": "",
@@ -78,8 +78,8 @@
           "sampling": "triangular",
           "source": {
             "kind": "artifact",
-            "id": "da439bc5419ed413",
-            "note": "the final product of forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile of its band for readings",
+            "id": "9493894dbc27ffad",
+            "note": "the final product of forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile of its band for readings",
             "by": null
           },
           "recordIds": [],
@@ -101,8 +101,8 @@
           "sampling": "triangular",
           "source": {
             "kind": "artifact",
-            "id": "da439bc5419ed413",
-            "note": "Yp/s, product made over sugar used, from forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
+            "id": "9493894dbc27ffad",
+            "note": "Yp/s, product made over sugar used, from forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
             "by": null
           },
           "recordIds": [],
@@ -124,8 +124,8 @@
           "sampling": "triangular",
           "source": {
             "kind": "artifact",
-            "id": "da439bc5419ed413",
-            "note": "titre over batch time: the final product of forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere) over the hour its median sugar runs out, the 5th and 95th percentile of the product over the same hour",
+            "id": "9493894dbc27ffad",
+            "note": "titre over batch time: the final product of forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere) over the hour its median sugar runs out, the 5th and 95th percentile of the product over the same hour",
             "by": null
           },
           "recordIds": [],
@@ -185,8 +185,8 @@
     "others": [
       {
         "fits": {
-          "titre": "45abd7656f83a2a6",
-          "yield": "45abd7656f83a2a6"
+          "titre": "a9074acb4eeb57d9",
+          "yield": "a9074acb4eeb57d9"
         },
         "status": 200,
         "body": {
@@ -260,8 +260,8 @@
               "sampling": "triangular",
               "source": {
                 "kind": "artifact",
-                "id": "45abd7656f83a2a6",
-                "note": "the final product of the forecast of fit 45abd7656f83a2a6 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile of its band for readings",
+                "id": "a9074acb4eeb57d9",
+                "note": "the final product of the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile of its band for readings",
                 "by": null
               },
               "recordIds": [],
@@ -283,8 +283,8 @@
               "sampling": "triangular",
               "source": {
                 "kind": "artifact",
-                "id": "45abd7656f83a2a6",
-                "note": "Yp/s, product made over sugar used, from the forecast of fit 45abd7656f83a2a6 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
+                "id": "a9074acb4eeb57d9",
+                "note": "Yp/s, product made over sugar used, from the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
                 "by": null
               },
               "recordIds": [],
@@ -394,13 +394,13 @@
       },
       {
         "fits": {
-          "titre": "45abd7656f83a2a6",
-          "yield": "45abd7656f83a2a6",
-          "productivity": "da439bc5419ed413"
+          "titre": "a9074acb4eeb57d9",
+          "yield": "a9074acb4eeb57d9",
+          "productivity": "9493894dbc27ffad"
         },
         "status": 422,
         "body": {
-          "detail": "productivity from growth_forecast da439bc5419ed413 is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from da439bc5419ed413: the fermenter's batch time is the titre over the productivity, and here titre is from 45abd7656f83a2a6. To use it, choose da439bc5419ed413 for titre as well, or stop using it for productivity"
+          "detail": "productivity from growth_forecast 9493894dbc27ffad is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from 9493894dbc27ffad: the fermenter's batch time is the titre over the productivity, and here titre is from a9074acb4eeb57d9. To use it, choose 9493894dbc27ffad for titre as well, or stop using it for productivity"
         }
       }
     ]

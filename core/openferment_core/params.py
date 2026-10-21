@@ -52,7 +52,10 @@ cold (and keeps its answer for the process's life). Its scope is
 its shelf flowsheet in the request. Its specs are the flowsheet's
 `FlowsheetInput`s; its values are what `proforma.bound` binds (records
 through the aggregate gate, the fermOS fits a person chose), called, never
-copied. Later steps register `fermos-family` and `pureos-unit`.
+copied. OF-BLD-020 §3.1 registers `fermos-family`
+(`fermos:family:<family id>`): a kinetics family's specs, bound from a
+person's overrides and the family's stated conventions (fermos.py). §4.1
+registers `fermos-vessel`. Later steps register `pureos-unit`.
 
 Rule 1 holds here: no value in this file. A bound is a convention with its
 reason written beside it (an ontology plausibility range read from
@@ -552,6 +555,24 @@ def _proforma_static() -> Iterable[tuple[str, list[ParameterSpec]]]:
 
 
 register("proforma", _proforma, _proforma_static)
+
+
+# ── fermOS's model families (`fermos:family:<family id>`) ───────────────
+
+
+def _fermos_family(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
+    from . import fermos
+
+    return fermos.family_provided(ids, req)
+
+
+def _fermos_family_static() -> Iterable[tuple[str, list[ParameterSpec]]]:
+    from . import fermos
+
+    yield from fermos._family_static()
+
+
+register("fermos-family", _fermos_family, _fermos_family_static)
 
 
 # ── the guard ──────────────────────────────────────────────────────────

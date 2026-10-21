@@ -554,7 +554,9 @@
           ]
         }
       ],
-      "reason": null
+      "reason": null,
+      "model": "logistic_v0",
+      "notes": []
     },
     "growthArtifactId": null,
     "kineticArtifactId": null,

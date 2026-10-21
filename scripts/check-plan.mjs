@@ -234,6 +234,16 @@ const PAIRS = [
   ['VesselCost', 'VesselCost'],
   ['VesselDesign', 'VesselDesign'],
   ['VesselSummary', 'VesselSummary'],
+  // OF-BLD-020 §3.1 — fermOS's model families, and what a simulation keeps.
+  ['FamilyInfo', 'FamilyInfo'],
+  ['SimulationRequest', 'SimulationRequest'],
+  ['OxygenUptake', 'OxygenUptake'],
+  ['MassBalance', 'MassBalance'],
+  ['SimulationCeilingRow', 'SimulationCeilingRow'],
+  ['SimulationCeiling', 'SimulationCeiling'],
+  ['SteadyState', 'SteadyState'],
+  ['SimulationResult', 'SimulationResult'],
+  ['SimulationSummary', 'SimulationSummary'],
 ];
 
 let compared = 0;

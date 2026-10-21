@@ -115,7 +115,14 @@ ALLOWED = {
     # OF-BLD-019 §4.2: BioSTEAM's property engine, which the service reaches
     # through the Proforma worker's `thermo_props` op and nowhere else.
     "thermosteam": {"workers/proforma_worker.py"},
+    # OF-BLD-020 E.3‴: scipy in fermOS's kinetics and fits alone among the
+    # service's modules. The workers and the flowsheets they run may use it
+    # (worker side), and demo.py, the fixture builder no route imports,
+    # samples its stand-in evaluator with scipy's qmc.
+    "scipy": {"kinetics.py", "fermos.py", "demo.py"},
 }
+# What runs in a worker's process, not the service's.
+WORKER_SIDE = ("workers/", "flowsheets/")
 
 
 @pytest.mark.parametrize("lib", sorted(ALLOWED))
@@ -125,6 +132,8 @@ def test_heavy_libraries_are_imported_in_their_worker_alone(lib):
     for path in PKG.rglob("*.py"):
         rel = path.relative_to(PKG).as_posix()
         if lib in ("biosteam", "thermosteam") and rel.startswith("flowsheets/"):
+            continue
+        if lib == "scipy" and rel.startswith(WORKER_SIDE):
             continue
         if rel in ALLOWED[lib]:
             continue

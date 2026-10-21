@@ -1673,6 +1673,43 @@ def _ceiling_of(art, name: str) -> str | None:
     return (str(i.source.id) if i.source.id else None) if name == "model" else str(i.value)
 
 
+def stored_ceilings(model_id: str, product: str, sugar: str | None = None, stored: list | None = None) -> list:
+    """The stored geneOS ceilings of one shelf model for one product, newest
+    first (all_artifacts' order), on `sugar` alone when it is named: the
+    lookup ceiling_check reads, and fermOS's simulation reads beside its
+    Yp/s (OF-BLD-020 §3.1)."""
+    from . import artifacts, geneos
+
+    stored = [a for a in artifacts.all_artifacts() if a.tool == geneos.CEILING] if stored is None else stored
+    mine = [a for a in stored if _ceiling_of(a, "model") == model_id and _ceiling_of(a, "product") == product
+            and isinstance(a.output.get("gPerG"), (int, float))]
+    return mine if sugar is None else [a for a in mine if _ceiling_of(a, "substrate") == sugar]
+
+
+def host_models(product: str, strain: str) -> list[tuple[Any, str, str]]:
+    """The geneOS shelf models with a route to `product` whose host is the
+    strain ('strain') or of its species ('species'), each with the words
+    that say so, as ceiling_check matches a scenario's organism, for one
+    named strain (OF-BLD-020 §3.1)."""
+    from . import geneos_models, module_stores
+
+    labels, _ = _strain_labels()
+    label = labels.get(strain, strain)
+    species = module_stores.species_of(label)
+    out: list[tuple[Any, str, str]] = []
+    for m in geneos_models.SHELF.values():
+        if product not in m.products or not m.host:
+            continue
+        host_label = labels.get(m.host) or m.name
+        if m.host == strain:
+            out.append((m, "strain", f"{m.id} is a reconstruction of {host_label}, the strain simulated"))
+        elif species and module_stores.species_of(host_label) == species:
+            out.append((m, "species", f"{m.id} is a reconstruction of {host_label}, and the strain simulated, {label}, "
+                                      f"is of its species, {_species_words(species)}: another strain's network bounds "
+                                      "it only as far as the two networks agree"))
+    return out
+
+
 def _strain_labels() -> tuple[dict[str, str], dict[str, str]]:
     """Each catalogued strain's label ('Saccharomyces cerevisiae S288C') and
     each program's one species, when every host it catalogues is of that
@@ -1858,8 +1895,7 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
     rows: list[CeilingRow] = []
     other_sugars: set[str] = set()
     for m, how, words in matched:
-        mine = [a for a in stored if _ceiling_of(a, "model") == m.id and _ceiling_of(a, "product") == product
-                and isinstance(a.output.get("gPerG"), (int, float))]
+        mine = stored_ceilings(m.id, product, None, stored)
         on = [a for a in mine if _ceiling_of(a, "substrate") == sugar]
         other_sugars |= {str(_ceiling_of(a, "substrate")) for a in mine if a not in on and _ceiling_of(a, "substrate")}
         if not on:

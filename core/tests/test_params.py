@@ -228,10 +228,13 @@ def test_a_spec_without_a_bounds_reason_or_with_an_unknown_source_is_refused():
 def test_the_check_reads_every_declared_spec_and_names_one_with_no_reason(monkeypatch, capsys):
     n, problems = params.check()
     assert problems == []
-    from openferment_core import vessel
+    from openferment_core import kinetics, vessel
 
-    # The shelf's inputs and fermOS's vessel declarations (OF-BLD-020 §4.1).
-    assert n == sum(len(info.inputs) for info in shelf.SHELF.values()) + sum(len(s) for _, s in vessel._static())
+    # The shelf's inputs, fermOS's family specs (OF-BLD-020 §3.1) and its
+    # vessel declarations (§4.1).
+    assert n == (sum(len(info.inputs) for info in shelf.SHELF.values())
+                 + sum(len(f.specs()) for f in kinetics.FAMILIES.values())
+                 + sum(len(s) for _, s in vessel._static()))
     assert params.main(["--check"]) == 0 and "every one has a written bounds reason" in capsys.readouterr().out
     unreasoned = ParameterSpec.model_construct(**{**spec().model_dump(), "boundsReason": " "})
     monkeypatch.setitem(params._STATIC, "fermos-family", lambda: [("a STAND-IN family", [spec(), unreasoned])])
@@ -336,7 +339,8 @@ def test_get_serves_a_scope_and_refuses_in_words(client):
     assert made.status_code == 200 and made.json()["waiting"] == body["waiting"]
     for path, status, words in (
         ("/api/params/proforma:nowhere", 404, "there is no scenario nowhere"),
-        ("/api/params/fermos:family:batch_v1", 404, "no parameters for fermOS's model families yet"),
+        ("/api/params/fermos:family:nowhere", 404, "there is no model family nowhere"),
+        ("/api/params/fermos:vessel:0123456789abcdef", 404, "no artifact '0123456789abcdef' is on file here"),
         ("/api/params/pureos:unit:t1:u1", 404, "pureOS's train units"),
         ("/api/params/nothing-at-all", 422, "a parameter scope is"),
         ("/api/params/proforma:sc-yeast-1/resolve", 422, "a parameter scope is"),

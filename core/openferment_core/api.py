@@ -55,6 +55,7 @@ from .models import (
     ForecastRequest,
     ParamResolveRequest,
     ProformaRunRequest,
+    SimulationRequest,
     ThermoPropsRequest,
     VesselDesign,
     VesselRequest,
@@ -334,7 +335,7 @@ def fermos_fit(req: FermosFitRequest) -> FermosFitResponse:
     """Fit a run's series. The browser sends them; the service keeps the
     fits as artifacts (a sample run's are kept nowhere) and nothing else."""
     try:
-        return fermos.fit(req.depositionId, req.series, sample=req.sample)
+        return fermos.fit(req.depositionId, req.series, sample=req.sample, family=req.family)
     except fermos.FitRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -348,6 +349,49 @@ def fermos_forecast(req: ForecastRequest) -> ForecastResult:
                                    start=req.start, changed_by=req.changedBy, duration_h=req.durationH, sample=req.sample)
     except fermos.FitRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+# ── fermOS simulates (OF-BLD-020 §3.1) ─────────────────────────────────
+
+
+@app.get("/api/fermos/families")
+def fermos_families(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The model families (`FamilyInfo`): each with its equations, states,
+    parameters (ParameterSpecs) and the panel's groups. A family of an
+    archived program (storage_v1, PHA's) is left out unless asked."""
+    return [f.model_dump(mode="json") for f in fermos.families(includeArchived)]
+
+
+@app.get("/api/fermos/families/{family_id}")
+def fermos_family(family_id: str) -> dict:
+    """One model family by id, archived or not; 404 in words for none."""
+    from . import kinetics
+
+    try:
+        return fermos.family_info(family_id).model_dump(mode="json")
+    except kinetics.FamilyRefused as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@app.post("/api/fermos/simulate")
+def fermos_simulate(req: SimulationRequest) -> dict:
+    """Simulate a model family (`SimulationResult`) and keep it as one
+    `fermos.simulation` artifact. Each parameter resolves with its source: a
+    person's override (an assumption by name, so the result is `demo`), else
+    the family's stated convention. 422 in words for a parameter that waits
+    (named with what would bind it), the light socket, a bad override, or a
+    run that cannot end."""
+    try:
+        return fermos.simulate(req).model_dump(mode="json")
+    except fermos.SimulationRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/fermos/simulations")
+def fermos_simulations(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The kept simulations, newest first (`SimulationSummary`); one of an
+    archived program is left out unless asked. A read: it runs nothing."""
+    return [s.model_dump(mode="json") for s in fermos.simulations(includeArchived)]
 
 
 @app.get("/api/fermos/fits")
