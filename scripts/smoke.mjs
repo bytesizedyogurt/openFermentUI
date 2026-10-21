@@ -55,6 +55,10 @@ const ROUTES = [
   ['/geneos/model', 'geneOS — Model: the ceiling beside what was reported'],
   ['/fermos', 'fermOS — Fits'],
   ['/fermos/forecast', 'fermOS — Forecast'],
+  // OF-BLD-020 §3.3 — a model family simulated from its sources.
+  ['/fermos/simulate', 'fermOS — Simulate'],
+  // OF-BLD-020 §4.2 — the vessel BioSTEAM designs for a kept simulation.
+  ['/fermos/vessel', 'fermOS — Vessel'],
   ['/pureos', 'pureOS'],
   // OF-BLD-019 §4.1 — the train of the run Proforma priced, by scenario; PHA's, so under its banner.
   ['/pureos/train/sc-pha-1', 'pureOS — train of a run, unit by unit'],
@@ -177,6 +181,31 @@ async function setShowArchived(page, on) {
   return (await sw.isChecked()) === on;
 }
 
+/**
+ * Type a person's value into the parameter panel's row for `key`
+ * (OF-BLD-020 §2.2), with its low, its high and what it rests on when given:
+ * the panel keeps each as an Override under the reviewer name.
+ */
+async function typeParam(page, key, value, { low = null, high = null, note = null } = {}) {
+  const row = page.locator(`[data-testid="param-row"][data-key="${key}"]`);
+  await row.waitFor({ timeout: 8000 }).catch(() => {});
+  await row.locator('[data-testid="param-value-input"]').fill(String(value));
+  if (low !== null || high !== null || note !== null) {
+    const more = row.locator('[data-testid="param-more"]');
+    if (!(await more.evaluate((d) => d.open).catch(() => false))) await more.locator('summary').click();
+    if (low !== null) await row.locator('[data-testid="param-low-input"]').fill(String(low));
+    if (high !== null) await row.locator('[data-testid="param-high-input"]').fill(String(high));
+    if (note !== null) await row.locator('[data-testid="param-note-input"]').fill(note);
+  }
+  await page.waitForTimeout(150);
+}
+
+/** The source chip of the panel's row for `key`: its origin and its words. */
+async function chipOf(page, key) {
+  const chip = page.locator(`[data-testid="param-row"][data-key="${key}"] [data-testid="param-chip"]`).first();
+  return { origin: await chip.getAttribute('data-origin', { timeout: 3000 }).catch(() => null), text: (await chip.innerText({ timeout: 3000 }).catch(() => '')).replace(/\s+/g, ' ') };
+}
+
 async function main() {
   await new Promise((r) => server.listen(PORT, LOOPBACK, r));
 
@@ -275,7 +304,9 @@ async function main() {
   const SHELVES = [
     ['/geneos', 'geneOS subsystems', 'EC top-level classes'],
     ['/pureos', 'pureOS subsystems', 'Loss mechanisms'],
-    ['/fermos', 'fermOS subsystems', 'Oxygen transfer'],
+    // OF-BLD-020 §4.2 — transport is live, so its table moved to the Vessel
+    // view (SEEDED below); control is still a stub on the shelf.
+    ['/fermos', 'fermOS subsystems', 'Measured online'],
     ['/dominion', 'Dominion subsystems', 'Limitation kinds'],
     ['/intake', 'Intake subsystems', 'Parse status ladder'],
     ['/biorepo', 'BioRepo subsystems', 'Provenance levels'],
@@ -321,6 +352,11 @@ async function main() {
     ['/geneos/pathway', 'Precursor pathways', 'Pathway has no implementation'],
     // §8.4 — Uncertainty is live: its reference stays on Proforma, off any shelf.
     ['/proforma', 'Uncertain inputs', 'Uncertainty has no implementation'],
+    // OF-BLD-020 §4.2 — transport and scale are live: their reference stays on fermOS → Vessel, off the shelf.
+    ['/fermos/vessel', 'Oxygen transfer', 'Transport has no implementation'],
+    ['/fermos/vessel', 'Scale-up criteria', 'Scale has no implementation'],
+    // OF-BLD-020 §8.R (finding 7) — operating mode is live: its reference sits on fermOS → Simulate, where the mode is chosen.
+    ['/fermos/simulate', 'Operating modes', 'Operating mode has no implementation'],
   ];
   let seededFails = 0;
   for (const [route, table, mustNotSay] of SEEDED) {
@@ -548,9 +584,10 @@ async function main() {
         problems.push('New scenario from this does not open on its flowsheet');
       if ((await page.locator('[data-testid="new-scenario-program"]').inputValue().catch(() => '')) !== 'pha') problems.push('a scenario on the PHA flowsheet does not start in PHA');
       const made = await make('pha_sugar_v0', 'PHA from the shelf');
-      // §3.2: the page lists the inputs the service bound for its flowsheet; wait for its rows.
-      await page.locator('[data-testid="proforma-inputs"] tbody tr').first().waitFor({ timeout: 8000 }).catch(() => {});
-      const pageRows = await page.locator('[data-testid="proforma-inputs"] tbody tr').count();
+      // §3.2: the page lists the inputs the service bound for its flowsheet,
+      // as the parameter panel's rows (OF-BLD-020 §2.2); wait for them.
+      await page.locator('[data-testid="proforma-inputs"] [data-testid="param-row"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      const pageRows = await page.locator('[data-testid="proforma-inputs"] [data-testid="param-row"]').count();
       if (pageRows !== 7) problems.push('the made scenario\u2019s page does not list the seven inputs a run needs');
       if (made) {
         await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
@@ -603,8 +640,9 @@ async function main() {
   //
   // With the switch on, sc-pha-1 (a seed scenario, run by its id) and a
   // scenario made from the shelf's pha_sugar_v0 (run by its flowsheet, bound
-  // as GET /api/proforma/bind binds it) each take the three assumptions that
-  // wait, under the reviewer's name, and run against the double. After Run
+  // as GET /api/proforma/bind binds it) each take the three inputs that wait,
+  // typed into the parameter panel under the reviewer's name (OF-BLD-020
+  // §2.2), and run against the double with them as overrides. After Run
   // every section is on the page and each table is as long as the stored
   // run's; after a reload the newest run reads back from its artifact, and
   // the index reads the made scenario's price from it. With the switch off,
@@ -620,14 +658,8 @@ async function main() {
     const run = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/proforma-run.json'), 'utf8')).response;
     const count = (sel) => page.locator(sel).count();
     const typeAssumptions = async () => {
-      for (const [key, vals] of [['recovery', ['0.95', '0.9', '0.98']], ['sugarPrice', ['0.4', '0.3', '0.5']], ['sugarFeed', ['10000', '10000', '10000']]]) {
-        const form = page.locator(`[data-testid="assume-${key}"]`);
-        await form.waitFor({ timeout: 8000 }).catch(() => {});
-        const boxes = form.locator('input');
-        for (let i = 0; i < 3; i++) await boxes.nth(i).fill(vals[i]);
-        await form.locator('button:has-text("Keep assumption")').click();
-        await page.waitForTimeout(150);
-      }
+      for (const [key, value, low, high] of [['recovery', 0.95, 0.9, 0.98], ['sugarPrice', 0.4, 0.3, 0.5], ['sugarFeed', 10000, null, null]])
+        await typeParam(page, key, value, { low, high });
     };
     const sections = async (who) => {
       await page.locator('[data-testid="run-result"]').waitFor({ timeout: 8000 }).catch(() => {});
@@ -704,7 +736,8 @@ async function main() {
       await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
       const made = /#\/proforma\/scenario\/(sc-[^/?]+)$/.exec(page.url())?.[1] ?? null;
       if (!made) throw new Error(`New scenario did not land on a scenario page (${page.url()})`);
-      if ((await count('[data-testid^="input-"]')) !== 7 || (await count('[data-testid="source-records"]')) !== 4)
+      await page.locator('[data-testid="param-row"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await count('[data-testid="param-row"]')) !== 7 || (await count('[data-testid="param-chip"][data-origin="record"]')) !== 4)
         problems.push('the made scenario does not list its seven inputs with four bound to records');
       if (!(await count('[data-testid="scenario-not-run"]'))) problems.push('the made scenario does not say it has not run');
       if (!(await page.getByRole('button', { name: 'Run the scenario' }).isDisabled())) problems.push('the made scenario is offered a run while inputs wait');
@@ -712,8 +745,9 @@ async function main() {
       await page.getByRole('button', { name: 'Run the scenario' }).click();
       await sections('a scenario made from pha_sugar_v0');
       const madePost = doubleState.proformaRuns.at(-1);
-      if (madePost?.scenarioId !== made || madePost?.flowsheet !== 'pha_sugar_v0' || madePost?.assumptions?.length !== 3 || madePost.assumptions.some((a) => a.by !== REVIEWER))
-        problems.push(`the made scenario was not run by its flowsheet with three signed assumptions: ${JSON.stringify(madePost).slice(0, 160)}`);
+      if (madePost?.scenarioId !== made || madePost?.flowsheet !== 'pha_sugar_v0' || madePost?.overrides?.length !== 3 ||
+        madePost.overrides.some((o) => o.by !== REVIEWER || o.scope !== `proforma:${made}`) || 'assumptions' in madePost)
+        problems.push(`the made scenario was not run by its flowsheet with three signed overrides of its scope: ${JSON.stringify(madePost).slice(0, 160)}`);
       await page.waitForTimeout(700);
       await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
       const card = page.locator(`[data-testid="biosteam-card"][data-scenario="${made}"]`);
@@ -756,7 +790,8 @@ async function main() {
       await page.goto(`http://localhost:${PORT}/#/proforma/scenario/${made}`, { waitUntil: 'networkidle' });
       await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
       if (!(await count('[data-archived-program="pha"]'))) problems.push('the made PHA scenario does not open under its banner with the switch off');
-      if ((await count('[data-testid^="input-"]')) !== 7) problems.push('with the switch off the made PHA scenario does not bind its own program\u2019s inputs');
+      await page.locator('[data-testid="param-row"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await count('[data-testid="param-row"]')) !== 7) problems.push('with the switch off the made PHA scenario does not bind its own program\u2019s inputs');
       await sections('the made PHA scenario with the switch off');
     } catch (e) {
       problems.push(String(e).slice(0, 160));
@@ -765,7 +800,131 @@ async function main() {
       scenarioPageFails++;
       console.log(`✗ scenario     ${problems.join('; ')}`);
     } else {
-      console.log('✓ scenario     sc-pha-1 by its id and a scenario made from pha_sugar_v0 by its flowsheet each take three signed assumptions and run; the price, the base case, the cost breakdown, the sensitivity, the distribution, the streams, the equipment, the utilities and the ordered units are each as long as the stored run, each table with its CSV, with pin, Compare and pureOS\u2019s train; the newest run reads back from its artifact after a reload and gives the index its price; with the switch off a scenario the double cannot bind says the service\u2019s words and that it has not run, and the made PHA scenario opens its own program under the banner');
+      console.log('✓ scenario     sc-pha-1 by its id and a scenario made from pha_sugar_v0 by its flowsheet each take three values typed in the parameter panel and run with them as signed overrides; the price, the base case, the cost breakdown, the sensitivity, the distribution, the streams, the equipment, the utilities and the ordered units are each as long as the stored run, each table with its CSV, with pin, Compare and pureOS\u2019s train; the newest run reads back from its artifact after a reload and gives the index its price; with the switch off a scenario the double cannot bind says the service\u2019s words and that it has not run, and the made PHA scenario opens its own program under the banner');
+    }
+    await page.close();
+  }
+
+  // ── OF-BLD-020 §2.2 — one parameter panel renders every input with its
+  //    source, and a person's change is a named assumption the run carries.
+  //
+  // With the switch off, on sc-yeast-1: the panel shows every parameter the
+  // scope serves, in its groups, each with the source the service bound; with
+  // no reviewer name every edit control is disabled and the rows say where to
+  // set one. With one: a record-bound row shows `record ×N` and opens its
+  // records; Why gives the gloss, the source chain with the one that
+  // answered, and the bounds' reason; a yield typed above its bounds makes the
+  // chip say `assumption by <name>`, is kept as typed, and carries the
+  // warning the service returned; the economic inputs typed with their low,
+  // high and basis take the inputs out of waiting; Run posts the three as
+  // overrides of the scenario's scope, signed, and no assumptions; the run's
+  // basis is read back with `assumption by`; Reset to source brings the
+  // records back; with the resolve unreachable the panel says so and keeps
+  // the override; a reload keeps them.
+  let panelFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const recorded = fixture('params-proforma.json');
+    const served = recorded.scopes['proforma:sc-yeast-1'].body;
+    const outside = recorded.resolve.body.values.find((v) => v.key === 'yield');
+    const yieldSpec = served.specs.find((sp) => sp.key === 'yield');
+    const yieldRecords = served.values.find((v) => v.key === 'yield').recordIds.length;
+    const yeastRun = fixture('proforma-run-yeast.json');
+    const row = (key) => page.locator(`[data-testid="param-row"][data-key="${key}"]`);
+    try {
+      doubleState.proformaRunsOnFile.clear();
+      if (!(await setShowArchived(page, false))) problems.push('the archive switch is not off');
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
+      await row('yield').waitFor({ timeout: 8000 }).catch(() => {});
+      const rows = await page.locator('[data-testid="param-row"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-origin')}`).join());
+      const want = served.values.map((v) => `${v.key}:${v.origin}`).join();
+      if (rows !== want) problems.push(`the panel does not show each parameter with the source the service served (${rows}; the service: ${want})`);
+      const groups = await page.locator('[data-testid="param-group"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')).join());
+      if (groups !== 'Process,Economics,Conventions') problems.push(`the panel's groups are ${groups}`);
+      if (!(await page.locator('[data-testid="param-need-reviewer"]').count()) || (await page.locator('[data-testid="param-value-input"]:enabled').count()) !== 0)
+        problems.push('with no reviewer name an edit control is enabled, or no row says where to set one');
+      if (await row('ethanol_purity').locator('[data-testid="param-edit"]').count()) problems.push('a convention stated in words offers an edit');
+
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
+      await row('yield').waitFor({ timeout: 8000 }).catch(() => {});
+      if (await page.locator('[data-testid="param-need-reviewer"]').count()) problems.push('with a reviewer name a row still asks for one');
+      const fromRecords = await chipOf(page, 'yield');
+      if (fromRecords.origin !== 'record' || !fromRecords.text.includes(`record ×${yieldRecords}`)) problems.push(`the yield's chip does not say record ×${yieldRecords} (${JSON.stringify(fromRecords)})`);
+      await row('yield').locator('[data-testid="param-records"] summary').click();
+      if ((await row('yield').locator('[data-testid="source-records"] > span.inline-flex').count()) !== yieldRecords) problems.push("the yield's records do not open from its chip");
+      await row('yield').locator('[data-testid="param-why"] summary').click();
+      const why = (await row('yield').locator('[data-testid="param-why"]').innerText().catch(() => '')).replace(/\s+/g, ' ');
+      const answered = await row('yield').locator('[data-testid="param-why-source"][data-answered="true"]').innerText().catch(() => '');
+      if (!why.includes(yieldSpec.boundsReason) || !why.includes(yieldSpec.gloss) || !/records of ethanol_yield_substrate/.test(answered))
+        problems.push(`Why does not give the gloss, the chain with the records that answered, and the bounds' reason (${JSON.stringify(why.slice(0, 160))})`);
+
+      // A yield above its bounds: kept as typed, named, and warned.
+      await typeParam(page, 'yield', outside.value);
+      await row('yield').locator('[data-testid="param-warning"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const typed = await chipOf(page, 'yield');
+      if (typed.origin !== 'assumption' || !typed.text.includes(`assumption by ${REVIEWER}`)) problems.push(`a typed yield's chip does not say assumption by ${REVIEWER} (${JSON.stringify(typed)})`);
+      if ((await row('yield').locator('[data-testid="param-warning"]').innerText().catch(() => '')) !== outside.outOfBounds) problems.push("a yield outside its bounds does not carry the service's warning");
+      if (!(await row('yield').locator('[data-testid="param-value"]').innerText().catch(() => '')).startsWith(String(outside.value))) problems.push('a yield outside its bounds is not kept as typed');
+      const asked = doubleState.paramResolves.at(-1);
+      if (asked?.scope !== 'proforma:sc-yeast-1' || !asked.overrides?.some((o) => o.key === 'yield' && o.value === outside.value && o.by === REVIEWER))
+        problems.push(`the panel did not ask the service to resolve the yield typed: ${JSON.stringify(asked).slice(0, 160)}`);
+      if (!(await row('yield').locator('[data-testid="param-value-input"]').getAttribute('aria-label').catch(() => null))) problems.push('the value box carries no label');
+
+      // The economic inputs, with a low, a high and what each rests on.
+      await typeParam(page, 'plant_scale', 100000, { note: 'a smoke test value' });
+      await typeParam(page, 'glucose_price', 0.4, { low: 0.3, high: 0.5, note: 'a smoke test value' });
+      await page.waitForTimeout(600);
+      if (await page.locator('[data-testid="proforma-waiting"]').count()) problems.push('inputs still wait with every value typed');
+      await page.getByRole('button', { name: 'Run the scenario' }).click();
+      await page.locator('[data-testid="run-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const posted = doubleState.proformaRuns.at(-1);
+      const sent = (posted?.overrides ?? []).map((o) => o.key).sort().join();
+      const price = (posted?.overrides ?? []).find((o) => o.key === 'glucose_price');
+      if (sent !== 'glucose_price,plant_scale,yield' || posted.overrides.some((o) => o.scope !== 'proforma:sc-yeast-1' || o.by !== REVIEWER) ||
+        price?.low !== 0.3 || price?.high !== 0.5 || price?.note !== 'a smoke test value' || 'assumptions' in posted)
+        problems.push(`the run did not post the scope's three overrides, signed, and no assumptions: ${JSON.stringify(posted).slice(0, 200)}`);
+      const by = yeastRun.evidence.basis.inputs.find((i) => i.name === 'glucose_price')?.source.by;
+      const basisLine = await page.locator('[data-testid="run-basis-assumptions"]').innerText().catch(() => '');
+      if (!by || !basisLine.includes(`assumption by ${by}`)) problems.push(`the run's basis is not read back with who each assumption is by (${JSON.stringify(basisLine.slice(0, 120))})`);
+
+      // Reset to source: the records come back, and the warning goes.
+      await row('yield').locator('[data-testid="param-reset"]').click();
+      await row('yield').locator('[data-testid="param-chip"][data-origin="record"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const back = await chipOf(page, 'yield');
+      if (back.origin !== 'record' || !back.text.includes(`record ×${yieldRecords}`) || (await row('yield').locator('[data-testid="param-warning"]').count()))
+        problems.push(`Reset to source does not bring the records back (${JSON.stringify(back)})`);
+      if (await row('yield').locator('[data-testid="param-reset"]').count()) problems.push('a row with no override still offers Reset to source');
+
+      // The resolve unreachable: the panel says so, and keeps the override.
+      await page.route('**/api/params/**/resolve', (r) => r.abort());
+      await typeParam(page, 'yield', 0.45);
+      await page.locator('[data-testid="param-problem"][data-down="true"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="param-problem"][data-down="true"]').count())) problems.push('with the service unreachable the panel does not say so');
+      if ((await chipOf(page, 'yield')).origin !== 'assumption') problems.push('with the service unreachable the override is not kept');
+      await page.unroute('**/api/params/**/resolve');
+
+      // A reload keeps every override.
+      await page.waitForTimeout(700);
+      await page.reload({ waitUntil: 'networkidle' });
+      await row('plant_scale').locator('[data-testid="param-chip"][data-origin="assumption"]').waitFor({ timeout: 8000 }).catch(() => {});
+      for (const key of ['plant_scale', 'glucose_price', 'yield']) {
+        const c = await chipOf(page, key);
+        if (c.origin !== 'assumption' || !c.text.includes(`assumption by ${REVIEWER}`)) problems.push(`${key}'s override did not survive a reload (${JSON.stringify(c)})`);
+      }
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      panelFails++;
+      console.log(`✗ panel        ${problems.join('; ')}`);
+    } else {
+      console.log("✓ panel        sc-yeast-1's inputs are the parameter panel: every parameter in its group with the source the service bound; no reviewer name, no edit; record ×N opens its records, Why gives the chain and the bounds' reason; a yield typed above its bounds is kept, named and warned; the run posts the scope's overrides, signed, and the basis reads back who each is by; Reset to source brings the records back; with the resolve unreachable the panel says so and keeps the override; a reload keeps them");
     }
     await page.close();
   }
@@ -942,14 +1101,8 @@ async function main() {
     const yeast = fixture('proforma-run-yeast.json');
     const shelfEntry = fixture('proforma-shelf.json').find((f) => f.id === 'ethanol_glucose_v0');
     const typeYeast = async () => {
-      for (const [key, vals] of [['plant_scale', ['100000', '100000', '100000']], ['glucose_price', ['0.4', '0.3', '0.5']]]) {
-        const form = page.locator(`[data-testid="assume-${key}"]`);
-        await form.waitFor({ timeout: 8000 }).catch(() => {});
-        const boxes = form.locator('input');
-        for (let i = 0; i < 3; i++) await boxes.nth(i).fill(vals[i]);
-        await form.locator('button:has-text("Keep assumption")').click();
-        await page.waitForTimeout(150);
-      }
+      await typeParam(page, 'plant_scale', 100000);
+      await typeParam(page, 'glucose_price', 0.4, { low: 0.3, high: 0.5 });
     };
     const runAndPin = async (who) => {
       await page.getByRole('button', { name: 'Run the scenario' }).click();
@@ -1120,11 +1273,11 @@ async function main() {
       if (!/does not run out within/.test(await fitOption.innerText({ timeout: 3000 }).catch(() => ''))) problems.push('the fit that gives no batch time does not say why');
       const option = page.locator(`[data-testid="fermos-fit-option"][data-artifact="${chosen}"]`);
       await option.locator('[data-testid="fermos-fit-use"]').click({ timeout: 8000 });
-      await page.locator('[data-testid="input-productivity"] [data-testid="source-artifact"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="param-row"][data-key="productivity"] [data-testid="param-chip"][data-origin="fit"]').waitFor({ timeout: 8000 }).catch(() => {});
       const shown = async () => {
         const lacks = [];
         for (const key of ['titre', 'yield', 'productivity']) {
-          const cell = page.locator(`[data-testid="input-${key}"] [data-testid="source-artifact"]`);
+          const cell = page.locator(`[data-testid="param-row"][data-key="${key}"] [data-testid="param-chip"][data-origin="fit"]`);
           if (!(await cell.count())) {
             lacks.push(key);
             continue;
@@ -1150,9 +1303,42 @@ async function main() {
         (await ceilingSource.getAttribute('href', { timeout: 3000 }).catch(() => null)) !== `#/biorepo/artifacts/${chosen}`
       )
         problems.push('the ceiling check does not read the yield the chosen forecast feeds');
+      // OF-BLD-020 §2.R (findings 8, 12, 13): a titre a person types beside the forecast chosen for every input wins over
+      // the fit there. The fit's card and the line under the panel say whose value wins, and Run waits with the service's
+      // words, which are the run's (the panel binds as the run binds); Reset to source takes the fit back and Run is free.
+      const heldBy = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/params-proforma-fits.json'), 'utf8')).response.resolves[0];
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-chip"][data-origin="fit"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await typeParam(page, 'plant_scale', 100000);
+      await typeParam(page, 'glucose_price', 0.4);
+      await typeParam(page, 'titre', 50);
+      await page.locator('[data-testid="run-held"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const held = await page.locator('[data-testid="run-held"]').innerText({ timeout: 3000 }).catch(() => '');
+      if (heldBy.status !== 422 || !held.includes(heldBy.body.detail) || !/titre is a named person's assumption/.test(held))
+        problems.push(`with titre typed beside the forecast, Run does not wait with the service's words: ${JSON.stringify(held.slice(0, 200))}`);
+      if (!(await page.getByRole('button', { name: /Run the scenario/ }).isDisabled().catch(() => false))) problems.push('Run is enabled for a run the service would refuse');
+      if (await page.locator('[data-testid="proforma-waiting"]').count()) problems.push('an input still waits with every value typed');
+      if ((await chipOf(page, 'titre')).origin !== 'assumption') problems.push('the typed titre is not the person\u2019s assumption');
+      const card = (await option.innerText({ timeout: 3000 }).catch(() => '')).replace(/\s+/g, ' ');
+      if (!/In use for yield, productivity\./.test(card) || /In use for titre/.test(card) || !card.includes(`titre, where ${REVIEWER}\u2019s value wins`))
+        problems.push(`the forecast's card claims it feeds titre over the person's value: ${JSON.stringify(card.slice(-220))}`);
+      const titreLine = page.locator('[data-testid="fit-line"][data-key="titre"]');
+      if ((await titreLine.getAttribute('data-overridden', { timeout: 3000 }).catch(() => null)) !== 'true' ||
+        !(await titreLine.innerText({ timeout: 3000 }).catch(() => '')).includes(`${REVIEWER}\u2019s value replaces the fermOS fit ${chosen}`))
+        problems.push('the line under the panel still says titre is from the fit');
+      await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-reset"]').click({ timeout: 8000 });
+      await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-chip"][data-origin="fit"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(800);
+      if (await page.locator('[data-testid="run-held"]').count()) problems.push('Run still waits once titre is reset to the fit');
+      if (await page.getByRole('button', { name: /Run the scenario/ }).isDisabled().catch(() => true)) problems.push('Run stays disabled once titre is reset to the fit');
+      if (!/In use for titre, yield, productivity\./.test(await option.innerText({ timeout: 3000 }).catch(() => ''))) problems.push('the reset titre is not the fit\u2019s again on its card');
+      for (const key of ['plant_scale', 'glucose_price']) await page.locator(`[data-testid="param-row"][data-key="${key}"] [data-testid="param-reset"]`).click({ timeout: 8000 });
       await page.waitForTimeout(700);
       await page.reload({ waitUntil: 'networkidle' });
-      await page.locator('[data-testid="input-titre"] [data-testid="source-artifact"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-chip"][data-origin="fit"]').waitFor({ timeout: 8000 }).catch(() => {});
       if ((await shown()).length) problems.push('the fit chosen does not survive a reload');
       // §5.R (8): the index binds without the fits, so it says a fit is chosen, never that one is bound.
       await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
@@ -1162,7 +1348,7 @@ async function main() {
       if (!/3 with a fermOS fit chosen/.test(counted) || /from a fermOS fit/.test(counted))
         problems.push(`the index does not say the inputs have a fit chosen: ${JSON.stringify(counted.slice(0, 160))}`);
       await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
-      await page.locator('[data-testid="input-titre"] [data-testid="source-artifact"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-chip"][data-origin="fit"]').waitFor({ timeout: 8000 }).catch(() => {});
       // §5.R (1): the kinetic fit for titre and yield leaves the forecast's productivity beside another titre: refused, naming titre.
       const kinetic = await fitOption.getAttribute('data-artifact', { timeout: 3000 }).catch(() => null);
       await fitOption.locator('[data-testid="fermos-fit-use"]').click({ timeout: 8000 });
@@ -1174,16 +1360,16 @@ async function main() {
         problems.push("the forecast's card does not say it is in use for productivity alone");
       // §5.R (6): stopping the forecast clears its productivity alone; the fit's titre and yield stay.
       await option.locator('[data-testid="fermos-fit-stop"]').click({ timeout: 8000 });
-      await page.locator('[data-testid="input-productivity"] [data-testid="source-records"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="param-row"][data-key="productivity"] [data-testid="param-chip"][data-origin="record"]').waitFor({ timeout: 8000 }).catch(() => {});
       for (const key of ['titre', 'yield']) {
-        const link = await page.locator(`[data-testid="input-${key}"] [data-testid="source-artifact"]`).getAttribute('href', { timeout: 3000 }).catch(() => null);
+        const link = await page.locator(`[data-testid="param-row"][data-key="${key}"] [data-testid="param-chip"][data-origin="fit"]`).getAttribute('href', { timeout: 3000 }).catch(() => null);
         if (link !== `#/biorepo/artifacts/${kinetic}`) problems.push(`stopping the forecast cleared the fit chosen for ${key} (${link})`);
       }
-      if (!(await page.locator('[data-testid="input-productivity"] [data-testid="source-records"]').count())) problems.push('stopping the forecast does not put the records back under productivity');
+      if (!(await page.locator('[data-testid="param-row"][data-key="productivity"] [data-testid="param-chip"][data-origin="record"]').count())) problems.push('stopping the forecast does not put the records back under productivity');
       if (!/In use for titre, yield\./.test(await fitOption.innerText({ timeout: 3000 }).catch(() => ''))) problems.push("the fit's card no longer says it is in use for titre and yield");
       await fitOption.locator('[data-testid="fermos-fit-stop"]').click({ timeout: 8000 });
-      await page.locator('[data-testid="input-titre"] [data-testid="source-records"]').waitFor({ timeout: 8000 }).catch(() => {});
-      if ((await page.locator('[data-testid="source-artifact"]').count()) !== 0) problems.push('stopping the fit does not put the records back');
+      await page.locator('[data-testid="param-row"][data-key="titre"] [data-testid="param-chip"][data-origin="record"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="param-chip"][data-origin="fit"]').count()) !== 0) problems.push('stopping the fit does not put the records back');
     } catch (e) {
       problems.push(String(e).slice(0, 160));
     } finally {
@@ -1193,7 +1379,7 @@ async function main() {
       fitFails++;
       console.log(`✗ fermos fit   ${problems.join('; ')}`);
     } else {
-      console.log("✓ fermos fit   sc-yeast-1 with no fit on file says how one gets made; with the fit and the forecast on file each says what it can feed and why not, choosing the forecast binds titre, yield and productivity to its artifact, asked of the service with the fits, read by the ceiling check, kept across a reload and counted on the index as chosen; the fit's titre beside the forecast's productivity is refused naming titre, stopping the forecast clears its productivity alone, and stopping the fit puts the records back");
+      console.log("✓ fermos fit   sc-yeast-1 with no fit on file says how one gets made; with the fit and the forecast on file each says what it can feed and why not, choosing the forecast binds titre, yield and productivity to its artifact, asked of the service with the fits, read by the ceiling check, kept across a reload and counted on the index as chosen; a titre typed beside it wins there, the card and the line under the panel say whose value wins, and Run waits with the service's words until titre is reset; the fit's titre beside the forecast's productivity is refused naming titre, stopping the forecast clears its productivity alone, and stopping the fit puts the records back");
     }
     await page.close();
   }
@@ -1757,8 +1943,10 @@ async function main() {
       // questions for a process modeller, strongest mover first.
       await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-pha-1`, { waitUntil: 'networkidle' });
       await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
-      if (!/An assumption carries a person's name: set yours in/.test(await page.locator('body').innerText()))
-        problems.push('an unnamed person is offered an assumption to type');
+      await page.locator('[data-testid="param-row"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/Set a reviewer name in Settings/.test(await page.locator('body').innerText()) ||
+        !(await page.locator('[data-testid="param-row"][data-key="recovery"] [data-testid="param-value-input"]').isDisabled().catch(() => false)))
+        problems.push('an unnamed person is offered a value to type');
       await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
       await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
       await page.waitForTimeout(400);
@@ -1768,14 +1956,9 @@ async function main() {
       if (!/BioSTEAM flowsheet, draft v0 — fermentation, harvest and drying only/.test(pf)) problems.push('sc-pha-1 does not carry its draft header');
       if (!/Waiting for a source: solids recovered at harvest, price of fermentable sugar, sugar fed/.test(pf)) problems.push('the inputs waiting for a source are not named');
       if (!(await page.getByRole('button', { name: 'Run the scenario' }).isDisabled())) problems.push('the run is offered while inputs wait for a source');
-      for (const [key, vals] of [['recovery', ['0.95', '0.9', '0.98']], ['sugarPrice', ['0.4', '0.3', '0.5']], ['sugarFeed', ['10000', '10000', '10000']]]) {
-        const form = page.locator(`[data-testid="assume-${key}"]`);
-        const boxes = form.locator('input');
-        for (let i = 0; i < 3; i++) await boxes.nth(i).fill(vals[i]);
-        await form.locator('button:has-text("Keep assumption")').click();
-        await page.waitForTimeout(150);
-      }
-      if ((await page.locator('[data-testid="assumption-chip"]').count()) !== 3) problems.push('three typed assumptions do not each show who made them');
+      for (const [key, value, low, high] of [['recovery', 0.95, 0.9, 0.98], ['sugarPrice', 0.4, 0.3, 0.5], ['sugarFeed', 10000, null, null]])
+        await typeParam(page, key, value, { low, high });
+      if ((await page.locator('[data-testid="param-chip"][data-origin="assumption"]').count()) !== 3) problems.push('three typed values do not each show who made them');
       await page.getByRole('button', { name: 'Run the scenario' }).click();
       await page.locator('[data-testid="distribution"]').waitFor({ timeout: 8000 }).catch(() => {});
       if ((await page.locator('[data-testid="distribution-bin"]').count()) !== 20) problems.push('the distribution does not draw twenty bins');
@@ -1786,8 +1969,8 @@ async function main() {
       const qs = await page.locator('[data-testid="modeller-questions"] li').allInnerTexts();
       if (!/^price of fermentable sugar/.test(qs[0] ?? '')) problems.push('the questions do not lead with the input that moves the price most');
       const posted = doubleState.proformaRuns.at(-1);
-      if (!posted || posted.assumptions?.length !== 3 || posted.assumptions.some((a) => a.by !== REVIEWER))
-        problems.push('the run did not post the three assumptions signed with the reviewer\'s name');
+      if (!posted || posted.overrides?.length !== 3 || posted.overrides.some((o) => o.by !== REVIEWER))
+        problems.push('the run did not post the three overrides signed with the reviewer\'s name');
       // OF-BLD-014 §9.2 and §9.4 — Postdoc drafts a runbook from a forecast,
       // a price and a record; the service wrote every number; adopting it
       // opens an unlocked research runbook whose page draws its predictions
@@ -2066,6 +2249,363 @@ async function main() {
   }
   // ── end §4.R
 
+  // ── OF-BLD-020 §4.2 — fermOS → Vessel against the double.
+  //
+  // The chooser lists the kept simulations; the aerobic one's scope is the
+  // parameter panel in Appendix 2 §C's six groups, each value with its
+  // source (the harvest hour and the oxygen uptake the simulation's), and
+  // the scale waits: Design says the service's words for it. A plant scale
+  // typed under the reviewer name is that person's assumption; Design posts
+  // the scope's overrides, signed, and shows the design table with where
+  // BioSTEAM put each row, the oxygen balance through the grammar, the heat
+  // line with its convention labelled, the cost line with BioSTEAM's cost
+  // index and the basis naming the person. Price this in Proforma says what
+  // Phase 6 adds and makes nothing. A bubble column chosen in the panel's
+  // vessel type refetches the scope (Dewes) and designs it; the anaerobic
+  // simulation designs the NREL fermenter, with no compressor and no
+  // oxygen balance, said so.
+  //
+  // §4.R (the Phase 4 review): the heat line says how BioSTEAM found its
+  // duty, and a person's heat per oxygen is said as forced, never as the
+  // heats of formation; a vessel type changed clears the design shown; a
+  // design in flight when the source changes never lands under the new
+  // one; the anaerobic line above Design names no batch volume; and with
+  // no simulation kept the chooser opens on no source, so a kept fit can be
+  // chosen and its panel loads.
+  let vesselFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fx = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/fermos-vessel.json'), 'utf8')).response;
+    const row = (key) => page.locator(`[data-testid="param-row"][data-key="${key}"]`);
+    const recorded = (sim, vesselType) =>
+      fx.designs.find((d) => d.status === 200 && d.request.simulation === sim && (d.request.vesselType ?? null) === vesselType)?.body;
+    const design = async () => {
+      const before = doubleState.vesselPosts.length;
+      await page.locator('[data-testid="vessel-design"]').click();
+      for (let i = 0; i < 40 && doubleState.vesselPosts.length === before; i++) await page.waitForTimeout(100);
+      await page.waitForTimeout(400);
+      return doubleState.vesselPosts.at(-1);
+    };
+    // The double lists the fixture's two simulations for this flow alone; the
+    // Simulate flow below starts, as a fresh install does, with none.
+    doubleState.flags.vesselSimulationsOnFile = true;
+    try {
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/fermos/vessel`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="vessel-source"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const options = await page.locator('[data-testid="vessel-source"] option').evaluateAll((els) => els.map((e) => e.value));
+      if (!options.includes(`simulation:${fx.aerobic}`) || !options.includes(`simulation:${fx.anaerobic}`))
+        problems.push(`the chooser does not list the kept simulations (${options.join(', ')})`);
+      // §8.R (finding 15): while the scope's first read is in hand (a cold service starts BioSTEAM), the page
+      // says it is asking, and shows no Scale line and no Design until the panel answers. A page of its own,
+      // opened on the anaerobic simulation with its scope's answer held, so the flow below is untouched.
+      doubleState.flags.vesselScopeDelayMs = 4000;
+      const cold = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      cold.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+      try {
+        await cold.goto(`http://localhost:${PORT}/#/fermos/vessel?simulation=${encodeURIComponent(fx.anaerobic)}`, { waitUntil: 'domcontentloaded' });
+        await cold.locator('[data-testid="vessel-panel-asking"]').waitFor({ timeout: 3500 }).catch(() => {});
+        if (!(await cold.locator('[data-testid="vessel-panel-asking"]').count())) problems.push('while the vessel scope is read the page does not say it is asking');
+        if (await cold.locator('[data-testid="vessel-scale"]').count()) problems.push('the Scale line shows before the panel that holds Scale');
+        if (await cold.locator('[data-testid="vessel-design"]').count()) problems.push('Design shows before the panel has answered');
+        doubleState.flags.vesselScopeDelayMs = 0;
+        await cold.locator('[data-testid="vessel-design"]').waitFor({ timeout: 10000 }).catch(() => {});
+        if (await cold.locator('[data-testid="vessel-panel-asking"]').count()) problems.push('the asking line stays after the panel answered');
+        if (!(await cold.locator('[data-testid="vessel-design"]').count())) problems.push('Design does not show once the panel has answered');
+      } finally {
+        doubleState.flags.vesselScopeDelayMs = 0;
+        await cold.close();
+      }
+      await page.locator('[data-testid="vessel-source"]').selectOption(`simulation:${fx.aerobic}`);
+      await row('plant_scale').waitFor({ timeout: 8000 }).catch(() => {});
+      const groups = await page.locator('[data-testid="param-group"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')).join());
+      if (groups !== 'Scale,Vessel,Schedule,Aeration,Agitation,Heat') problems.push(`the vessel panel's groups are ${groups}`);
+      const served = fx.scopes.find((sc) => sc.simulation === fx.aerobic && sc.vesselType === null).body;
+      const rows = await page.locator('[data-testid="param-row"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-origin')}`).join());
+      const want = served.values.map((v) => `${v.key}:${v.origin}`).join();
+      if (rows !== want) problems.push(`the vessel panel does not show each parameter with the source the service served (${rows}; the service: ${want})`);
+      for (const key of ['tau', 'our_peak']) if ((await chipOf(page, key)).origin !== 'simulation') problems.push(`${key} is not shown as the simulation's`);
+      if ((await chipOf(page, 'plant_scale')).origin !== 'waiting') problems.push('the plant scale does not wait');
+      if ((await page.locator('[data-testid="vessel-scale"]').getAttribute('data-scale')) !== 'none') problems.push('Design does not say a scale is needed');
+      // Design with no scale: the service's words.
+      await design();
+      const refusedWords = fx.designs.find((d) => d.status === 422).body.detail;
+      if ((await page.locator('[data-testid="vessel-refused"]').innerText().catch(() => '')) !== refusedWords) problems.push("Design with no scale does not say the service's words");
+
+      // A plant scale typed under the reviewer name.
+      await typeParam(page, 'plant_scale', fx.plantScale);
+      await row('plant_scale').locator('[data-testid="param-chip"][data-origin="assumption"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const typed = await chipOf(page, 'plant_scale');
+      if (typed.origin !== 'assumption' || !typed.text.includes(`assumption by ${REVIEWER}`)) problems.push(`the plant scale's chip does not say assumption by ${REVIEWER} (${JSON.stringify(typed)})`);
+      if ((await page.locator('[data-testid="vessel-scale"]').getAttribute('data-scale')) !== 'one') problems.push('Design does not see the scale typed');
+      const posted = await design();
+      await page.locator('[data-testid="vessel-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const scaleSent = (posted?.overrides ?? []).find((o) => o.key === 'plant_scale');
+      if (posted?.simulation !== fx.aerobic || scaleSent?.value !== fx.plantScale || scaleSent?.by !== REVIEWER || scaleSent?.scope !== `fermos:vessel:${fx.aerobic}` || posted.vesselType)
+        problems.push(`Design did not post the scope's override, signed: ${JSON.stringify(posted).slice(0, 200)}`);
+      const stirred = recorded(fx.aerobic, null);
+      const labels = await page.locator('[data-testid="vessel-design-row"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-label')));
+      if (labels.join('|') !== stirred.design.map((r) => r.label).join('|')) problems.push(`the design table is not the design's rows (${labels.length} of ${stirred.design.length})`);
+      const vessels = await page.locator('[data-testid="vessel-design-row"][data-label="Vessels"] td').nth(1).innerText().catch(() => '');
+      if (!vessels || vessels === '—') problems.push('the design table does not show the number of vessels');
+      if (!(await page.locator('[data-testid="oxygen-balance"]').count()) || !(await page.locator('[data-testid="oxygen-otr"]').count()) || !(await page.locator('[data-testid="oxygen-our"]').count()))
+        problems.push('the oxygen balance is not drawn, its transfer as a rule and its uptake as a curve');
+      const heat = await page.locator('[data-testid="vessel-heat"]').innerText().catch(() => '');
+      if (!/BioSTEAM.s duty/.test(heat) || !/a convention/.test(heat)) problems.push(`the heat line does not set BioSTEAM's duty beside the convention, labelled (${heat.slice(0, 120)})`);
+      if (!heat.includes(stirred.heat.dutyNote) || !/the simulation took up/.test(heat) || !heat.includes(stirred.heat.conventionNote.slice(-60)))
+        problems.push(`the heat line does not say how BioSTEAM found its duty and what the cross-check rests on (${heat.slice(0, 160)})`);
+      const cost = await page.locator('[data-testid="vessel-cost"]').innerText().catch(() => '');
+      if (!/plant cost index/.test(cost)) problems.push("the cost line does not name BioSTEAM's cost index");
+      await page.locator('[data-testid="vessel-basis"] summary').click();
+      const basis = await page.locator('[data-testid="vessel-basis"]').innerText().catch(() => '');
+      if (!basis.includes(`plant_scale: ${fx.plantScale}`) || !basis.includes(`assumption by ${REVIEWER}`)) problems.push("the design's basis does not name the person's plant scale");
+      // Price this in Proforma: words, and nothing made.
+      await page.locator('[data-testid="vessel-price"]').click();
+      const words = await page.locator('[data-testid="vessel-price-words"]').innerText().catch(() => '');
+      if (!/custom_train_v1/.test(words) || !/no scenario is created/.test(words)) problems.push(`Price this in Proforma does not say what Phase 6 adds (${words.slice(0, 120)})`);
+      if (!page.url().includes('/fermos/vessel')) problems.push('Price this in Proforma left the page');
+
+      // §4.R (findings 2, 7, 13): a person's heat per oxygen forces BioSTEAM's duty, and the heat line says so.
+      const forcedAsk = fx.designs.find((d) => d.status === 200 && (d.request.overrides ?? []).some((o) => o.key === 'Q_O2_consumption'));
+      const q = forcedAsk.request.overrides.find((o) => o.key === 'Q_O2_consumption').value;
+      await typeParam(page, 'Q_O2_consumption', q);
+      await page.waitForTimeout(400);
+      const forcedPost = await design();
+      await page.waitForFunction(() => document.querySelector('[data-testid="vessel-heat"]')?.getAttribute('data-method') === 'forced-per-oxygen', null, { timeout: 8000 }).catch(() => {});
+      const forcedHeat = await page.locator('[data-testid="vessel-heat"]').innerText().catch(() => '');
+      if (!(forcedPost?.overrides ?? []).some((o) => o.key === 'Q_O2_consumption' && o.value === q && o.by === REVIEWER)) problems.push("the heat per oxygen was not posted as the person's");
+      if ((await page.locator('[data-testid="vessel-heat"]').getAttribute('data-method').catch(() => null)) !== 'forced-per-oxygen' || /heats of formation/.test(forcedHeat) || !/forced: Q_O2_consumption/.test(forcedHeat))
+        problems.push(`with a person's heat per oxygen the heat line still claims the heats of formation (${forcedHeat.slice(0, 160)})`);
+      await row('Q_O2_consumption').locator('[data-testid="param-reset"]').click();
+      await page.waitForTimeout(400);
+
+      // A bubble column, chosen as the panel's vessel type: the stirred tank's design is cleared (§4.R, finding 15).
+      await row('design').locator('[data-testid="param-choice"]').selectOption('Bubble column');
+      await page.waitForTimeout(300);
+      if (await page.locator('[data-testid="vessel-result"]').count()) problems.push("the stirred tank's design stays on screen after the vessel type changed");
+      await page.waitForFunction(() => document.querySelector('[data-testid="param-row"][data-key="method"] [data-testid="param-value"]')?.textContent?.includes('Dewes'), null, { timeout: 8000 }).catch(() => {});
+      if (!doubleState.paramScopes.some((q) => q.scope === `fermos:vessel:${fx.aerobic}` && q.vesselType === 'bubble-column')) problems.push("choosing a bubble column does not ask for the bubble column's scope");
+      if (!(await row('method').locator('[data-testid="param-value"]').innerText().catch(() => '')).includes('Dewes')) problems.push("the bubble column's kLa correlation is not Dewes");
+      const bubblePost = await design();
+      await page.waitForFunction(() => /bubble column/.test(document.querySelector('[data-testid="vessel-result"]')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => {});
+      if (bubblePost?.vesselType !== 'bubble-column' || !(bubblePost.overrides ?? []).some((o) => o.key === 'design' && o.value === 'Bubble column' && o.by === REVIEWER))
+        problems.push(`the bubble column was not posted as the person's choice: ${JSON.stringify(bubblePost).slice(0, 200)}`);
+      if (!/bubble column/.test(await page.locator('[data-testid="vessel-result"]').innerText().catch(() => ''))) problems.push('the bubble column is not designed');
+
+      // §4.R (finding 15): a design in flight when the source changes never lands under the new source.
+      doubleState.flags.vesselDelayMs = 1500;
+      const inFlight = doubleState.vesselPosts.length;
+      await page.locator('[data-testid="vessel-design"]').click();
+      for (let i = 0; i < 40 && doubleState.vesselPosts.length === inFlight; i++) await page.waitForTimeout(50);
+      await page.locator('[data-testid="vessel-source"]').selectOption(`simulation:${fx.anaerobic}`);
+      await page.waitForTimeout(2200);
+      doubleState.flags.vesselDelayMs = 0;
+      if (doubleState.vesselPosts.length === inFlight) problems.push('the design in flight was never posted');
+      if (await page.locator('[data-testid="vessel-result"]').count()) problems.push("a design in flight for the aerobic simulation landed under the anaerobic one");
+      if (/Designing/.test(await page.locator('[data-testid="vessel-design"]').innerText().catch(() => ''))) problems.push('Design still says it is designing after the source changed');
+
+      // The anaerobic simulation: the NREL fermenter, no compressor, no oxygen balance.
+      await page.locator('[data-testid="vessel-source"]').selectOption(`simulation:${fx.anaerobic}`);
+      await row('plant_scale').waitFor({ timeout: 8000 }).catch(() => {});
+      if (await row('batch_volume').count()) problems.push('an anaerobic vessel offers a batch volume');
+      // §4.R (finding 14): the line above Design names only the scale the panel offers.
+      const anaerobicScale = await page.locator('[data-testid="vessel-scale"]').innerText().catch(() => '');
+      if (/batch volume/i.test(anaerobicScale) || !/A plant scale is needed/.test(anaerobicScale)) problems.push(`the anaerobic line above Design asks for a scale the panel does not offer (${anaerobicScale})`);
+      await typeParam(page, 'plant_scale', fx.plantScale);
+      await page.waitForTimeout(500);
+      await design();
+      await page.locator('[data-testid="vessel-anaerobic"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const result = await page.locator('[data-testid="vessel-result"]').innerText().catch(() => '');
+      if (!result.includes('Anaerobic: no compressor, no oxygen balance') || (await page.locator('[data-testid="oxygen-balance"]').count()))
+        problems.push('the anaerobic design does not say it has no compressor and no oxygen balance');
+      if ((await page.locator('[data-testid="vessel-result"]').getAttribute('data-unit-class')) !== 'NRELAnaerobicBatchBioreactor') problems.push('the anaerobic simulation is not designed as the NREL fermenter');
+
+      // §4.R (finding 12): no simulation kept, a fit on file. The chooser opens on no source, so the fit can be
+      // chosen; its panel loads, the anaerobic NREL fermenter's.
+      const fitScope = fx.scopes.find((sc) => sc.fit && sc.status === 200);
+      doubleState.flags.vesselSimulationsOnFile = false;
+      doubleState.flags.fermosFitsOnFile = true;
+      const fresh = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      fresh.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+      try {
+        await fresh.goto(`http://localhost:${PORT}/#/fermos/vessel`, { waitUntil: 'networkidle' });
+        await fresh.locator(`[data-testid="vessel-source"] option[value="fit:${fitScope.fit}"]`).waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+        const first = await fresh.locator('[data-testid="vessel-source"] option').first().evaluate((o) => ({ value: o.value, disabled: o.disabled })).catch(() => null);
+        const value = await fresh.locator('[data-testid="vessel-source"]').inputValue().catch(() => null);
+        if (first?.value !== '' || !first?.disabled || value !== '') problems.push(`with no simulation kept the chooser does not open on no source (${JSON.stringify(first)}, ${value})`);
+        if (await fresh.locator('[data-testid="vessel-empty"]').count()) problems.push('with a fit kept the page says nothing is kept');
+        if (!(await fresh.locator('[data-testid="vessel-choose"]').count())) problems.push('with no simulation kept the page does not say a fit can be chosen');
+        const asked = doubleState.paramScopes.length;
+        await fresh.locator('[data-testid="vessel-source"]').selectOption(`fit:${fitScope.fit}`);
+        await fresh.locator('[data-testid="param-row"][data-key="plant_scale"]').waitFor({ timeout: 8000 }).catch(() => {});
+        if (!fresh.url().includes(`fit=${fitScope.fit}`)) problems.push(`choosing the fit did not open it (${fresh.url()})`);
+        if (!doubleState.paramScopes.slice(asked).some((q2) => q2.scope === `fermos:vessel:${fitScope.fit}`)) problems.push("choosing the fit did not ask for the fit's vessel scope");
+        if (!/NRELAnaerobicBatchBioreactor/.test(await fresh.locator('#vessel-panel-title').innerText().catch(() => ''))) problems.push("the fit's panel is not the NREL fermenter's");
+        const fitScale = await fresh.locator('[data-testid="vessel-scale"]').innerText().catch(() => '');
+        if (/batch volume/i.test(fitScale)) problems.push(`a fit's line above Design asks for a batch volume (${fitScale})`);
+      } finally {
+        doubleState.flags.vesselSimulationsOnFile = true;
+        doubleState.flags.fermosFitsOnFile = false;
+        await fresh.close();
+      }
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    doubleState.flags.vesselSimulationsOnFile = false;
+    if (problems.length) {
+      vesselFails++;
+      console.log(`✗ vessel       ${problems.join('; ')}`);
+    } else {
+      console.log(`✓ vessel       fermOS → Vessel (${fx.worker.kind}): the kept simulations chosen; every design parameter in six groups with its source; the scale waits and Design says the service's words; a plant scale typed is the reviewer's assumption, posted signed; the design table, the oxygen balance as a rule and a curve, heat with how BioSTEAM found it and its convention on the simulated uptake, cost with BioSTEAM's index, the basis naming the person; Price this in Proforma says what Phase 6 adds; a person's heat per oxygen said as forced; a vessel type changed clears the design; a bubble column chosen in the panel designs by Dewes; a design in flight dropped when the source changes; the anaerobic batch is the NREL fermenter with no compressor and asks for a plant scale alone; with no simulation kept a fit is chosen from a chooser that opens on no source`);
+    }
+    await page.close();
+  }
+  // ── end §4.2
+
+  // ── OF-BLD-020 §3.3 — fermOS → Simulate, against the double.
+  //
+  // With the switch off and a reviewer name: the families the service lists
+  // are offered with their equations, the light socket listed and not
+  // choosable; the strain chooser offers every strain of the program first;
+  // choosing CEN.PK113-7D binds the panel over the double's recorded scope,
+  // and what waits is said above Simulate, which is disabled. Typing each
+  // waiting value (the fixture's STAND-INs) under the reviewer name makes
+  // each an assumption by that name and nothing waits; Simulate posts the
+  // scope's overrides, signed; the result draws the time course from the
+  // artifact (its curves the simulation's provenance), the end state, the
+  // ceiling card, the parameters and what it was built from; Design the
+  // vessel, Fit this family and Send to Proforma point where they should;
+  // the kept simulation is offered to start from; Reset one override and it
+  // waits again, and Simulate says so.
+  let simulateFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const sim = fixture('fermos-simulate.json');
+    const families = fixture('fermos-families.json').off;
+    const want = sim.simulate.request;
+    const result = sim.simulate.body;
+    const key = `${want.family}|${want.strain}`;
+    const served = sim.scopes[key].body;
+    const waiting = sim.bind[key].body.waiting;
+    const row = (k) => page.locator(`[data-testid="simulate-panel"] [data-testid="param-row"][data-key="${k}"]`);
+    try {
+      if (!(await setShowArchived(page, false))) problems.push('the archive switch is not off');
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/fermos/simulate`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="simulate-family"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      const listed = await page.locator('[data-testid="simulate-family"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-family')).join());
+      if (listed !== families.map((f) => f.id).join()) problems.push(`the families offered are ${listed}, not the service's ${families.map((f) => f.id).join()}`);
+      const socket = page.locator('[data-testid="simulate-family"][data-socket="true"]');
+      if (!(await socket.count()) || !(await socket.locator('button[role="radio"]').isDisabled())) problems.push('the light socket is choosable');
+      if (!(await socket.innerText().catch(() => '')).includes(families.find((f) => f.socket).what)) problems.push('the light socket does not say what it is in its own words');
+      if (!/dX\/dt = μ·X − kd·X/.test(await page.locator('[data-testid="simulate-family"][data-family="batch_v1"] [data-testid="simulate-equations"]').innerText().catch(() => '')))
+        problems.push("batch_v1's equations are not shown in plain Unicode");
+      const firstStrain = await page.locator('[data-testid="simulate-strain"] option').first().innerText().catch(() => '');
+      if (firstStrain !== 'Every strain of the program') problems.push(`the strain chooser offers "${firstStrain}" first`);
+      await page.locator('[data-testid="simulate-strain"]').selectOption(want.strain);
+      if ((await page.locator('[data-testid="simulate-product"]').inputValue()) !== want.product || (await page.locator('[data-testid="simulate-sugar"]').inputValue()) !== want.sugar)
+        problems.push('the product and sugar do not open on ethanol and glucose');
+      await row('mu_max').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="simulate-panel"] [data-testid="param-row"]').count()) !== served.specs.length)
+        problems.push(`the panel shows ${await page.locator('[data-testid="simulate-panel"] [data-testid="param-row"]').count()} rows for the scope's ${served.specs.length}`);
+      const groups = await page.locator('[data-testid="simulate-panel"] [data-testid="param-group"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')).join());
+      if (groups !== 'Growth,Product,Inhibition,Oxygen,Start values,Run length') problems.push(`the panel's groups are ${groups}`);
+      if ((await chipOf(page, 'yps')).origin !== 'record') problems.push('Yp/s is not bound to the records');
+      await page.locator('[data-testid="simulate-waiting"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="simulate-waiting"]').getAttribute('data-keys').catch(() => null)) !== waiting.join(','))
+        problems.push(`what waits is not said above Simulate as the service binds it (${waiting.join(',')})`);
+      if (!(await page.locator('[data-testid="simulate-button"]').isDisabled())) problems.push('Simulate is enabled while parameters wait');
+      for (const o of sim.typed) await typeParam(page, o.key, o.value);
+      await page.locator('[data-testid="simulate-ready"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="simulate-ready"]').count()) || (await page.locator('[data-testid="simulate-button"]').isDisabled()))
+        problems.push('with every waiting value typed, Simulate is still disabled');
+      const typedChip = await chipOf(page, 'mu_max');
+      if (typedChip.origin !== 'assumption' || !typedChip.text.includes(`assumption by ${REVIEWER}`)) problems.push(`a typed value is not an assumption by the reviewer (${JSON.stringify(typedChip)})`);
+      await page.locator('[data-testid="simulate-button"]').click();
+      await page.locator('[data-testid="simulation-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const posted = doubleState.fermosSimulates.at(-1);
+      if (!posted || posted.family !== want.family || posted.strain !== want.strain || posted.product !== want.product || posted.sugar !== want.sugar)
+        problems.push(`Simulate did not post the family, strain, product and sugar chosen (${JSON.stringify(posted ?? {}).slice(0, 160)})`);
+      else if (
+        posted.overrides.length !== sim.typed.length ||
+        posted.overrides.some((o) => o.scope !== `fermos:family:${want.family}` || o.by !== REVIEWER || !sim.typed.some((t) => t.key === o.key && t.value === o.value))
+      )
+        problems.push("Simulate did not post the scope's overrides, each signed by the reviewer");
+      if ((await page.locator('[data-testid="simulation-result"]').getAttribute('data-artifact').catch(() => null)) !== result.artifactId) problems.push('the result is not the simulation the service kept');
+      const curves = await page.locator('[data-testid="timecourse-curve"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-provenance')));
+      if (curves.length !== 3 || curves.some((p) => p !== result.provenance)) problems.push(`the time course draws ${curves.length} curves as ${curves.join()}, not X, S and P as ${result.provenance}`);
+      const titre = Number.parseFloat(await page.locator('[data-testid="simulation-titre"]').innerText().catch(() => 'NaN'));
+      if (!(Math.abs(titre - result.finalTitre) <= 1e-3 * Math.abs(result.finalTitre))) problems.push(`the end state shows a titre of ${titre}, not the artifact's ${result.finalTitre}`);
+      if (!(await page.locator('[data-testid="simulation-runs-out"]').innerText().catch(() => '')).includes('The sugar runs out at')) problems.push('the end state does not give the hour the sugar runs out');
+      const ceilingRow = page.locator(`[data-testid="simulation-ceiling-row"][data-model="${result.ceiling.rows[0].modelId}"]`);
+      if (!(await ceilingRow.count()) || (await ceilingRow.getAttribute('data-above')) !== String(result.ceiling.rows[0].above)) problems.push('the ceiling card does not set Yp/s beside the ceiling the service read');
+      if ((await page.locator('[data-testid="simulation-built-from"]').getAttribute('data-provenance').catch(() => null)) !== result.provenance) problems.push('the card does not say what the simulation was built from, with its provenance');
+      if (!/not a measurement/.test(await page.locator('[data-testid="simulation-built-from"]').innerText().catch(() => ''))) problems.push('the simulation does not say it is not a measurement');
+      if ((await page.locator('[data-testid="simulation-param"]').count()) !== result.parameters.length + result.start.length) problems.push("the parameter table does not list every parameter and start value");
+      if ((await page.locator('[data-testid="simulation-vessel-link"]').getAttribute('href')) !== `#/fermos/vessel?simulation=${result.artifactId}`) problems.push('Design the vessel does not name the simulation');
+      if ((await page.locator('[data-testid="simulation-fit-link"]').getAttribute('href')) !== `#/fermos?family=${want.family}`) problems.push('Fit this family does not open Fits with the family');
+      await page.locator('[data-testid="simulation-result"] [data-testid="send-to-proforma"] button').first().click();
+      const to = await page.locator('[data-testid="send-to-proforma-scenario"]').first().getAttribute('data-to', { timeout: 3000 }).catch(() => null);
+      if (to !== `/proforma/scenario/sc-yeast-1?fit=${result.artifactId}`) problems.push(`Send to Proforma offers ${to}`);
+      // §3.R (findings 1, 17): a chemostat's end-state card shows its steady
+      // state, the service's X, S, P and D·P, and says the run-hours
+      // productivity is a batch's measure; no note points at a field name.
+      // kinetics.py's own chemostat simulation (fermos-chemostat.json, which
+      // demo.py --prototype writes) answers Simulate once.
+      const chemo = fixture('fermos-chemostat.json').body;
+      await page.route('**/api/fermos/simulate', (route) => route.fulfill({ json: chemo }));
+      await page.locator('[data-testid="simulate-button"]').click();
+      await page.locator(`[data-testid="simulation-result"][data-artifact="${chemo.artifactId}"]`).waitFor({ timeout: 8000 }).catch(() => {});
+      const steady = page.locator('[data-testid="simulation-steady"]');
+      if ((await steady.getAttribute('data-washout').catch(() => null)) !== String(chemo.steadyState.washout) || (await steady.getAttribute('data-reached').catch(() => null)) !== chemo.steadyState.reached)
+        problems.push("a chemostat's end-state card does not show its steady state as the service found it");
+      const shownSteady = Object.fromEntries(
+        await steady.locator('[data-testid="steady-value"]').evaluateAll((els) => els.map((e) => [e.getAttribute('data-key'), Number(e.getAttribute('data-value'))])),
+      );
+      for (const k of ['X', 'S', 'P', 'productivity'])
+        if (shownSteady[k] !== chemo.steadyState[k]) problems.push(`the steady state's ${k} on the card is ${shownSteady[k]}, not the service's ${chemo.steadyState[k]}`);
+      if (!(await steady.innerText().catch(() => '')).includes(chemo.steadyState.words)) problems.push("the steady state's words are not on the card");
+      if (!/a batch's measure/.test(await page.locator('[data-testid="simulation-productivity"]').innerText().catch(() => '')))
+        problems.push("a chemostat's run-hours productivity is not said to be a batch's measure");
+      if ((await page.locator('[data-testid="simulation-result"]').innerText().catch(() => '')).includes('steadyState.')) problems.push('a note on the page names a field instead of a number');
+      await page.unroute('**/api/fermos/simulate');
+      // Reset one override: it waits again, and Simulate says so.
+      await row('p0').locator('[data-testid="param-reset"]').click();
+      await page.locator('[data-testid="simulate-waiting"][data-keys="p0"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="simulate-waiting"][data-keys="p0"]').count()) || !(await page.locator('[data-testid="simulate-button"]').isDisabled()))
+        problems.push('a reset override does not wait again with Simulate disabled');
+      // The kept simulation is offered to start from.
+      await page.locator('[data-testid="simulate-start"]').selectOption('simulation');
+      await page.locator('[data-testid="simulate-kept"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator(`[data-testid="simulate-kept"] option[value="${result.artifactId}"]`).count())) problems.push('the kept simulation is not offered to start from');
+      await page.goto(`http://localhost:${PORT}/#/fermos/vessel?simulation=${result.artifactId}`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="vessel-source"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="vessel-source"]').inputValue().catch(() => '')) !== `simulation:${result.artifactId}`)
+        problems.push('/fermos/vessel?simulation= does not land on fermOS → Vessel with the simulation chosen');
+      await page.goto(`http://localhost:${PORT}/#/fermos?family=batch_v1`, { waitUntil: 'networkidle' });
+      if ((await page.locator('[data-testid="fit-family"]').inputValue().catch(() => '')) !== 'batch_v1') problems.push('Fits does not open with the family chosen');
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    if (problems.length) {
+      simulateFails++;
+      console.log(`✗ simulate     ${problems.join('; ')}`);
+    } else {
+      console.log("✓ simulate     fermOS → Simulate offers the service's families with their equations and the light socket not choosable; every strain of the program first; the panel binds as the service does and what waits is said above a disabled Simulate; the waiting values typed are assumptions by the reviewer, Simulate posts them signed, and the time course, the end state, the ceiling card, the parameters and what it was built from are the artifact's; Design the vessel, Fit this family and Send to Proforma point at it; a chemostat's card shows the service's steady state, X, S, P and D·P, and calls the run-hours productivity a batch's measure; it is offered to start from; a reset override waits again");
+    }
+    await page.close();
+  }
+  // ── end §3.3
+
   await browser.close();
   server.close();
 
@@ -2075,6 +2615,7 @@ async function main() {
   console.log(`${1 - programFails}/1 programs — archived hidden by default, a deep link under its banner, the switch brings them back`);
   console.log(`${1 - proformaFails}/1 Proforma index — the shelf, the reference runs, New scenario makes one that opens and survives a reload`);
   console.log(`${1 - scenarioPageFails}/1 Proforma scenario page — a seed and a made scenario run, every section read from the run`);
+  console.log(`${1 - panelFails}/1 parameter panel — every input with its source, a change a named assumption the run carries, Reset to source`);
   console.log(`${1 - referenceFails}/1 Proforma reference pages — each held to its package's own test, every section read from its run`);
   console.log(`${1 - compareFails}/1 Compare — BioSTEAM scenarios side by side from their newest runs, pins kept`);
   console.log(`${1 - fitFails}/1 fermOS fit — the slot says how a fit gets made, and a chosen forecast feeds titre, yield and productivity`);
@@ -2086,7 +2627,9 @@ async function main() {
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
   console.log(`${1 - brothFails}/1 fermOS Properties — the card answers the record it names, and asks again after a 503`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails || ceilingFails) process.exit(1);
+  console.log(`${1 - vesselFails}/1 fermOS Vessel — every design parameter in the panel, a scale a named assumption, the design and its oxygen balance read from the service`);
+  console.log(`${1 - simulateFails}/1 fermOS Simulate — a family simulated from its sources, what waits typed under a name, the result read from the artifact`);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails || ceilingFails || vesselFails || simulateFails) process.exit(1);
 }
 
 main();

@@ -1,7 +1,9 @@
 // Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families,
 // replacing the 16-field synthetic ontology of OF-DES-001 Appendix C — the
 // polymer family OF-BLD-014 §2.1 adds for thread P, and the kinetics family
-// the yeast-ethanol program adds for thread Q: 40 fields in seven.
+// the yeast-ethanol program adds for thread Q, with the four oxygen and
+// maintenance fields OF-BLD-020 §3.2 adds to it for fermOS's simulations: 44
+// fields in seven.
 //
 // Two rules this literature forces and the synthetic version did not:
 //
@@ -39,6 +41,16 @@ const D9_RANGE_NOTE =
  */
 const Y1_RANGE_NOTE =
   'Validation range proposed on 2026-10-20 for the yeast-ethanol program (thread Q) and accepted by Sean Creighton on 2026-10-20. It rejects implausible extractions and states nothing about what has been achieved.';
+
+/**
+ * The same, for the oxygen and maintenance fields OF-BLD-020 §3.2 adds so a
+ * record can bind fermOS's maintenance, oxygen yield, oxygen uptake and kLa
+ * (its Appendix 2). Each range is a convention that build writes under its
+ * decision D4, a guard on extraction and not a result, and it waits for Sean
+ * Creighton to accept it as he accepted D9's and thread Q's.
+ */
+const F1_RANGE_NOTE =
+  'Validation range proposed on 2026-10-21 by OF-BLD-020 (§3.2, Appendix 2) as a convention, awaiting acceptance by Sean Creighton. It rejects implausible extractions and states nothing about what has been achieved.';
 
 export const ONTOLOGY: ParameterDef[] = [
   // ── Family 1 — expression performance ───────────────────────────────
@@ -511,6 +523,50 @@ export const ONTOLOGY: ParameterDef[] = [
           'Needs the density of the product the analysis assumes. Without it, a price per gallon cannot become a price per kilogram.',
       },
     ],
+  },
+  // OF-BLD-020 §3.2: what fermOS's model families and vessel design name
+  // and no field held (its Appendix 2). A simulation binds maintenance from
+  // the first and Yx/o from the second; the vessel reads the last two. Each
+  // definition names what it must not be mistaken for and carries no number.
+  {
+    id: 'maintenance_coefficient',
+    family: 'kinetics',
+    name: 'Maintenance coefficient (m)',
+    definition:
+      'Grams of substrate consumed per gram of dry biomass per hour to keep the cells alive rather than to grow, as the maintenance term of a Pirt-type substrate balance, whether fitted or reported. A model parameter: not a specific substrate uptake rate measured in a run, not an oxygen maintenance coefficient, and not a yield on substrate (biomass_yield_substrate).',
+    canonicalUnit: 'g g⁻¹ h⁻¹',
+    range: [0, 5],
+    notes: F1_RANGE_NOTE,
+  },
+  {
+    id: 'biomass_yield_oxygen',
+    family: 'kinetics',
+    name: 'Biomass yield on oxygen (Yx/o)',
+    definition:
+      'Grams of dry biomass formed per gram of oxygen consumed, over the phase or run the quote states, whether observed or fitted as a model parameter. Not a yield on substrate (biomass_yield_substrate), and not a yield per mole of oxygen or a respiratory quotient, which belong to no field.',
+    canonicalUnit: 'g g⁻¹',
+    range: [0.01, 10],
+    notes: F1_RANGE_NOTE,
+  },
+  {
+    id: 'specific_oxygen_uptake',
+    family: 'kinetics',
+    name: 'Specific oxygen uptake rate (qO2)',
+    definition:
+      'Oxygen consumed per gram of dry biomass per hour, in moles, as measured in a run or fitted as a model parameter. Not a volumetric oxygen uptake or transfer rate per litre of broth, and not a mass-transfer coefficient (kla_measured).',
+    canonicalUnit: 'mmol g⁻¹ h⁻¹',
+    range: [0.01, 100],
+    notes: F1_RANGE_NOTE,
+  },
+  {
+    id: 'kla_measured',
+    family: 'kinetics',
+    name: 'Volumetric oxygen mass-transfer coefficient (kLa)',
+    definition:
+      'The volumetric mass-transfer coefficient of oxygen from gas to liquid that a paper measured or reports for its vessel and conditions, per unit time. A property of the vessel, the broth and how it is stirred and aerated, not of the cells: not an oxygen uptake rate (specific_oxygen_uptake) and not a transfer rate per litre of broth.',
+    canonicalUnit: 'h⁻¹',
+    range: [0.01, 5000],
+    notes: F1_RANGE_NOTE,
   },
 ];
 

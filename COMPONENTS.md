@@ -107,6 +107,17 @@ is already loaded. The service names a run's stream or a preset, never a
 number, and keeps the answer as a `thermo_props` artifact; fermOS asks the same
 worker about water and ethanol at a measured titre.
 
+**fermOS → BioSTEAM goes through the same worker** (OF-BLD-020 Phase 4). A
+vessel design is BioSTEAM's: the service sends the worker what a kept
+simulation (or, anaerobic, a kept fit) holds, what a person typed in the
+parameter panel and the stated conventions its basis names; every other value
+is BioSTEAM's own default for the class. The worker builds BioSTEAM's
+`AeratedBioreactor` or its NREL batch fermenter, sizes and costs it, and
+answers; the service reads the oxygen balance against the simulation's own
+uptake and keeps the design as one `fermos.vessel` artifact. The vessel reaches
+neither Proforma's price nor pureOS's inlet yet: night two's `custom_train_v1`
+and harvest stream join them (OF-BLD-020 Phase 6).
+
 One more carries records into a flowsheet, and it is built too (OF-BLD-019
 Phase 2).
 
@@ -117,14 +128,17 @@ fields on its program's papers that pass the aggregate gate and name a feed the 
 takes as their carbon source, converted by `units.py`. Glucose to ethanol binds
 its feed concentration, titre and yield to thread Q's records today; its
 productivity waits, because no thread Q productivity record names a carbon
-source. What no record binds waits for a named person's assumption (or, for
-titre, yield and productivity, a fermOS fit a person chooses, below), and the
-run's basis names every record, assumption and fit it used.
+source. What no record binds waits for a named person's assumption, typed into
+the parameter panel. A fermOS fit a person chooses (below) replaces the records
+for titre, yield and productivity, and a person's value replaces the records
+and any fit for its input, not only where no record binds (OF-BLD-020 D3). The
+run's basis names every record, assumption and fit it used, each assumption
+with the person who typed it.
 
 Two more carry the reactor and the organism into the price, and both are built
 (OF-BLD-019 Phase 5).
 
-**fermOS → Proforma is a fit a person chooses.** A kept kinetic fit or
+**fermOS → Proforma is a fit, or a simulation, a person chooses.** A kept kinetic fit or
 forecast can be the source of a scenario's titre, yield and productivity
 (`proforma.fit_info` and `apply_fits`, `GET /api/fermos/fits`): titre the
 forecast's final product, yield its product made over sugar used, productivity
@@ -132,8 +146,14 @@ the titre over the hour its median sugar runs out, found between grid points
 and drawn again to that hour (`fermos.to_run_out`). Nothing is copied: the run's
 basis names the fit for each input it feeds, so the run's provenance follows
 the fit's. A person chooses it, on the scenario page or with Send to Proforma on
-fermOS → Forecast, and a fit's productivity feeds only beside its own titre; a
-fit that cannot give an input is refused naming the parameter.
+fermOS → Forecast or Simulate, and a fit's productivity feeds only beside its own titre; a
+fit that cannot give an input is refused naming the parameter. A kept
+simulation feeds the same three from its end state as it was kept (OF-BLD-020
+§3.3): its final titre, the product made over the sugar used to harvest, and
+that titre over the harvest hour, each one value, with the simulation's own
+provenance and a flag saying it is a simulation, not a measurement; a
+chemostat, a family whose product is stored inside the cells (`storage_v1`) or a
+simulation of another product feeds nothing, and says why.
 
 **geneOS → Proforma is a flag, never a bound.** The ceiling check
 (`proforma.ceiling_check`, `GET /api/proforma/ceiling-check`) sets a scenario's
@@ -145,10 +165,13 @@ records' strains and species, a model matches by strain or by species, and the
 check is computed when read and kept nowhere. geneOS → Model lists the
 scenarios above a model's ceiling.
 
-**fermOS cannot be seeded from literature.** Kinetic parameters are fitted to
-real runs in a specific vessel, so they come from Deposition. fermOS is the
-component that most needs the Assay loop and the one that cannot be built out of
-papers.
+**A fermOS fit takes only measurements; a simulation names every source**
+(OF-BLD-020 D1). Kinetic parameters *fitted* to a run come from Deposition and
+nothing else. A *simulation* may take a parameter from a paper's records
+through the aggregate gate, a fit, a kept artifact, a named person's assumption
+or a stated convention, each labelled in the parameter panel and in its basis,
+and its provenance follows the weakest of them: it is never a measurement.
+fermOS is still the component that most needs the Assay loop.
 
 ## The eleven
 
@@ -217,19 +240,25 @@ Views: [Hosts](#) `/geneos/hosts` · [Pathway](#) `/geneos/pathway`
 
 **Reactor, kinetics, scale.** `/fermos` · chord `g f`
 
-The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. A fit or forecast can feed a Proforma scenario's titre, yield and productivity when a person chooses it (fermOS → Proforma, above). Transport, operating mode, scale-up and control are not built.
+The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, and a fit takes only measurements**: a run's readings become time series, the service fits a growth rate and a kinetic model (the closed-form logistic, or the batch family) and keeps each fit as an artifact, and a forecast is a band drawn from one logistic fit (a batch-family fit is simulated from instead). **Operating modes are built** (OF-BLD-020 §3.3): fermOS → Simulate integrates on scipy a model family (batch, fed-batch, chemostat; growth then storage with the PHA program; light-limited as a socket) from parameters each bound to a fit, the records, a kept simulation, a named person or a stated convention, shown with its source in the parameter panel, and keeps the run as a `fermos.simulation` artifact whose provenance follows those sources: a simulation is never a measurement. A fit, forecast or simulation can feed a Proforma scenario's titre, yield and productivity when a person chooses it (fermOS → Proforma, above). **The vessel is BioSTEAM's** (OF-BLD-020 §4.2): fermOS → Vessel (`/fermos/vessel`, `src/screens/FermOSVessel.tsx`) designs the vessel a kept simulation needs in the Proforma worker (`core/openferment_core/vessel.py`, `POST /api/fermos/vessel`), an AeratedBioreactor (stirred tank or bubble column) or the NREL batch fermenter, every design parameter in the parameter panel with its source and a plant scale a named person's assumption, and draws the oxygen balance (`OxygenBalance`): what the culture takes up against what the vessel transfers. Postdoc asks for one with `fermos_vessel`, and simulates with `fermos_simulate`. Control is not built.
+
+Views: [Simulate](#) `/fermos/simulate` · [Vessel](#) `/fermos/vessel` · [Forecast](#) `/fermos/forecast`
 
 | Subsystem | Key | State |
 |---|---|---|
 | Kinetics | `fermos.kinetics` | live |
-| Transport | `fermos.transport` | stub |
-| Operating mode | `fermos.mode` | stub |
-| Scale | `fermos.scale` | stub |
+| Transport | `fermos.transport` | live |
+| Operating mode | `fermos.mode` | live |
+| Scale | `fermos.scale` | live |
 | Control | `fermos.control` | stub |
+
+**Operating mode is the model families, integrated on scipy** (OF-BLD-020 Phase 3). scipy, an open-source library of numerical methods, steps a family's rate equations forward in time (`solve_ivp`) and fits them to readings (`least_squares`); it runs in the service, in `core/openferment_core/kinetics.py` and `fermos.py` alone, and starts no worker. Five families, each with its equations in plain Unicode: `batch_v1` (Monod growth with substrate and product inhibition, Luedeking–Piret production and maintenance), `fedbatch_v1` (the same, fed sugar at a constant rate or one that holds a set growth rate), `chemostat_v1` (one dilution rate, its steady state or washout), `storage_v1` (growth until a second nutrient runs out, then a product stored in the cells; archived with PHA) and `light_v1` (a socket that declares its parameters and refuses to run); every family that runs reports its oxygen uptake, zero and said so when it is anaerobic. Each parameter takes its value from the first of its sources that has one: a fit a person chose, records through the aggregate gate (the program's papers, the strain or every strain of its organism, the sugar), a kept simulation, then the stated convention; a person's value typed in the panel wins over all of them, and a parameter with none waits, refusing the run by name. The family's scope is `fermos:family:<id>` in the parameter panel. fermOS → Simulate (`src/screens/FermOSSimulate.tsx`) runs it (`POST /api/fermos/simulate`) and keeps one `fermos.simulation` artifact, drawn by `TimeCourse` (`src/components/figures/TimeCourse.tsx`: each state a computed curve, OUR on a second axis, Yp/s beside each geneOS ceiling as a rule, flagged and never clamped), with the end state, the ceiling card and every parameter with its source; from there it is fitted to a deposition, sized as a vessel or sent to Proforma. fermOS → Forecast sets a logistic fit's start values and length in the panel too (`fermos:forecast:<fit id>`), and simulates from a batch-family fit. `fermos_simulate` and `fermos_write`'s `simulate` are one free, audited function, ids and words in, and `fermos_read`'s kind `simulation` lists the kept runs. On thread Q tonight a glucose batch of CEN.PK113-7D binds μmax, Yx/s, Yp/s and the starting sugar, and Ks, α, Pmax and the starting cells and ethanol wait for a person, so no simulation is kept yet (STATE.md §3.5).
+
+**Transport and scale are the vessel, sized on BioSTEAM** (OF-BLD-020 Phase 4). A kept `batch_v1` simulation that takes up oxygen gets BioSTEAM's `AeratedBioreactor`, a stirred tank (kLa by Riet's correlation) or a bubble column (by Dewes'), the only two correlations the class runs; an anaerobic one, and a kept kinetic fit or forecast, gets the NREL batch fermenter, with no air (other model families are not designed yet). Every design parameter is in the panel over `fermos:vessel:<artifact id>` (27 for the aerated vessel, 9 for the NREL one), each from BioSTEAM's own default for the class read from its code at import, the simulation's harvest hour and oxygen uptake, a stated convention, or a named person. A design needs a person's plant scale (or, aerated, one vessel's batch volume), so every design is `demo`. BioSTEAM's aerated class sizes the air for what its reaction consumes, not for a demand it is given, so the Proforma worker (`core/openferment_core/flowsheets/vessel.py`) builds the reaction from what the simulation made and scales its oxygen to the simulation's peak uptake. Transport is the oxygen balance after the design, what the vessel transfers against what the simulation takes up hour by hour, with the short hours named, and the heat line, BioSTEAM's duty beside a convention's estimate from the oxygen the culture took up. Scale is the design itself: vessels, volumes, the batch cycle, power, cooling and BioSTEAM's own cost, kept as one `fermos.vessel` artifact. `fermos_vessel` and `fermos_write`'s `design_vessel` are one function, free and audited. Scale-down to the bench, and pricing the vessel in Proforma (night two's `custom_train_v1`), are not built.
 
 | Component | Implemented in |
 |---|---|
-| fermOS | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` |
+| fermOS | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/screens/FermOSSimulate.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py`, `core/openferment_core/kinetics.py`, `src/screens/FermOSVessel.tsx`, `core/openferment_core/vessel.py` |
 
 ### pureOS
 
@@ -254,11 +283,11 @@ Techno-economics on BioSTEAM: published reference biorefineries run whole, and s
 
 Views: [Corn ethanol reference](#) `/proforma/reference/corn_drygrind` · [Corn stover benchmark](#) `/proforma/reference/cornstover_benchmark`
 
-**Proforma runs flowsheets from a shelf** (OF-BLD-019 Phase 2). The shelf is data (`core/openferment_core/flowsheets/shelf.py`, `GET /api/proforma/shelf`): two published reference biorefineries from the `biorefineries` package, the NREL corn stover design (`cornstover_benchmark`) and the dry-grind corn ethanol plant (`corn_drygrind`, the yeast program's reference), each run whole on its package's own defaults and held to its package's own test values, read from the installed test file; and two flowsheets of this repository that a scenario runs, glucose to ethanol (`ethanol_glucose_v0`, run by `sc-yeast-1`, yeast ethanol) and PHA from sugar (`pha_sugar_v0`, run by `sc-pha-1`, archived). BioSTEAM runs in the Proforma worker, where every plant builds as it would in a worker that had built nothing before. Each run is one artifact holding the price, the sensitivity and the base case's TEA breakdown, stream table, unit table, utility duties and diagram (`proforma.run` for a scenario, `proforma.reference` for a reference biorefinery), and every reader reads that artifact; nothing is computed again on read. A scenario flowsheet's file holds no input value: an input the shelf ties to ontology fields binds to records of its program's papers, and one no record binds takes a fermOS fit a person chose or waits for a named person's assumption. `model` is a kind of basis source (a value the package, BioSTEAM or thermosteam sets as its own default, named with its version), not a provenance: a reference run, whose inputs are all `model` or stated conventions, is `computed`, and a scenario's run is the weakest of `computed` and its records', `demo` while an assumption remains. Postdoc and the MCP server run a seed scenario (`run_flowsheet`), read a run's streams (`stream_table`) and its price (`selling_price`), and ask thermosteam (`thermo_props`), through the same functions the screens call.
+**Proforma runs flowsheets from a shelf** (OF-BLD-019 Phase 2). The shelf is data (`core/openferment_core/flowsheets/shelf.py`, `GET /api/proforma/shelf`): two published reference biorefineries from the `biorefineries` package, the NREL corn stover design (`cornstover_benchmark`) and the dry-grind corn ethanol plant (`corn_drygrind`, the yeast program's reference), each run whole on its package's own defaults and held to its package's own test values, read from the installed test file; and two flowsheets of this repository that a scenario runs, glucose to ethanol (`ethanol_glucose_v0`, run by `sc-yeast-1`, yeast ethanol) and PHA from sugar (`pha_sugar_v0`, run by `sc-pha-1`, archived). BioSTEAM runs in the Proforma worker, where every plant builds as it would in a worker that had built nothing before. Each run is one artifact holding the price, the sensitivity and the base case's TEA breakdown, stream table, unit table, utility duties and diagram (`proforma.run` for a scenario, `proforma.reference` for a reference biorefinery), and every reader reads that artifact; nothing is computed again on read. A scenario flowsheet's file holds no input value: an input the shelf ties to ontology fields binds to records of its program's papers; a fermOS fit a person chose replaces them for titre, yield and productivity; a named person's value, typed into the parameter panel, wins over both (OF-BLD-020 D3); and an input with none of these waits. `model` is a kind of basis source (a value the package, BioSTEAM or thermosteam sets as its own default, named with its version), not a provenance: a reference run, whose inputs are all `model` or stated conventions, is `computed`, and a scenario's run is the weakest of `computed` and its records', `demo` while an assumption remains. Postdoc and the MCP server run a seed scenario (`run_flowsheet`), read a run's streams (`stream_table`) and its price (`selling_price`), and ask thermosteam (`thermo_props`), through the same functions the screens call.
 
 **A reference biorefinery has a page** (OF-BLD-019 §3.3): `/proforma/reference/:id` (`src/screens/ProformaReference.tsx`) shows a published biorefinery from the `biorefineries` package run whole on its own defaults, its price as the shelf names it, and each value of the package's own regression test beside what the run measured, read from the run's `proforma.reference` artifact, then the same tables a scenario page shows. BioRepo → Compare (`/biorepo/compare`) sets two or more pinned BioSTEAM scenarios side by side from each one's newest run.
 
-**Proforma's screens read the run and price nothing** (OF-BLD-019 Phase 3). The index (`src/screens/Proforma.tsx`) has three rows: the reference runs, each with its newest stored price, when it ran, its provenance and how many of its package test's values it holds; the other flowsheets on the shelf, each with **New scenario from this**; and the scenarios of the programs the switch shows, with the newest run's price or *Not run yet*. **New scenario** (`src/components/NewScenarioDialog.tsx`) makes a `biosteam` scenario on a non-reference flowsheet, in that flowsheet's own program, and nothing is disabled because a list is empty. The scenario page (`/proforma/scenario/:id`, `src/screens/ProformaScenario.tsx`) is one page for a seed scenario and one made here: its inputs with their sources, Run with the worker's status, and every section of the newest run (`src/screens/ProformaBiosteam.tsx`): price, the TEA's cost breakdown as a waterfall closing on the run's own price, the tornado, the distribution, streams, equipment, utilities, diagram, the values read back and who set each, and the flowsheet's own questions; the newest run is the service's (`GET /api/proforma/runs`), else this browser's. Scenarios made here, the pins, the assumptions and the fermOS fits chosen are kept in this browser's Durable tier; the runs are kept by the service. The authored branch and the authored compare open the archived casein examples alone, and recharts stays there.
+**Proforma's screens read the run and price nothing** (OF-BLD-019 Phase 3). The index (`src/screens/Proforma.tsx`) has three rows: the reference runs, each with its newest stored price, when it ran, its provenance and how many of its package test's values it holds; the other flowsheets on the shelf, each with **New scenario from this**; and the scenarios of the programs the switch shows, with the newest run's price or *Not run yet*. **New scenario** (`src/components/NewScenarioDialog.tsx`) makes a `biosteam` scenario on a non-reference flowsheet, in that flowsheet's own program, and nothing is disabled because a list is empty. The scenario page (`/proforma/scenario/:id`, `src/screens/ProformaScenario.tsx`) is one page for a seed scenario and one made here: its inputs with their sources in the parameter panel (`src/components/ParameterPanel.tsx`, over the scope `proforma:<id>`; *One panel for every parameter*, below), **Use a fermOS fit** beside it, Run with the worker's status (held, in the service's words, while the service refuses the values as they stand), and every section of the newest run (`src/screens/ProformaBiosteam.tsx`): price, the TEA's cost breakdown as a waterfall closing on the run's own price, the tornado, the distribution, streams, equipment, utilities, diagram, the values read back and who set each, and the flowsheet's own questions; the newest run is the service's (`GET /api/proforma/runs`), else this browser's. Scenarios made here, the pins, a person's values typed into the panel (`parameterOverrides`, by scope) and the fermOS fits chosen are kept in this browser's Durable tier; the values and the fits go with each run, and the runs are kept by the service, which keeps no person's value. The authored branch and the authored compare open the archived casein examples alone, and recharts stays there.
 
 | Component | Implemented in |
 |---|---|
@@ -330,7 +359,7 @@ for the ones with a rail entry.
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |
-| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` | the rail, /fermos |
+| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/screens/FermOSSimulate.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py`, `core/openferment_core/kinetics.py`, `src/screens/FermOSVessel.tsx`, `core/openferment_core/vessel.py` | the rail, /fermos |
 | Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/screens/ProformaReference.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` | the rail, /proforma |
 | Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts`, `core/openferment_core/basis.py` | provenance ticks and their labels |
@@ -365,10 +394,11 @@ is a smaller problem than a system with no name for the thing it is missing.
 the unit-operation vocabulary and no process model of its own: it reads the
 train a Proforma run simulated, and decides nothing yet. fermOS had a screen and five
 named subsystems with no code until kinetics arrived, fitted from depositions
-alone; transport, operating mode, scale and control are still named and not
-built. Putting them in the navigation from day one means that when the work
-arrives the question is what the destination does with it, not where in the
-navigation it should go. Each screen says what it lacks rather than implying
+alone; operating mode followed (OF-BLD-020 Phase 3, the model families),
+then transport and scale (Phase 4, the vessel on BioSTEAM), and control is
+still named and not built. Putting them in the navigation from day one means
+that when the work arrives the question is what the destination does with it,
+not where in the navigation it should go. Each screen says what it lacks rather than implying
 otherwise.
 
 **A program is not a destination.** The corpus serves three research programs
@@ -378,6 +408,33 @@ hosts in geneOS, its scenarios in Proforma, its runbooks and protocols in
 Runbooks. So it is a filter every destination applies through one selector in
 the store, not a twelfth entry, and the one switch that shows archived programs
 lives in Settings → Programs.
+
+**One panel for every parameter, and no destination owns it** (OF-BLD-020
+Phase 2). A number a person may set for a model is declared once,
+in Python (`core/openferment_core/params.py`): what it means, its unit, bounds
+with a written reason, and the order of the places its value comes from (a fit,
+records, a kept artifact, a named person, a stated convention, the library's own
+default). `GET /api/params/{scope}` serves a scope's parameters with their values
+and sources, for four kinds of scope: a Proforma scenario (`proforma:<scenario
+id>`), a model family (`fermos:family:<id>`), a logistic fit's forecast
+(`fermos:forecast:<fit id>`) or a vessel design (`fermos:vessel:<id>`);
+`pureos:unit:…` answers 404 until pureOS's units arrive in night two. 160
+parameters are declared: 36 for Proforma's flowsheets, 84 for fermOS's five
+model families, 4 for a forecast and 36 for the vessel. One component,
+`src/components/ParameterPanel.tsx`, draws every scope the same way, each value
+with its source chip, **Reset to source** and **Why**, and it is live on
+Proforma's scenario page and on fermOS → Simulate, Vessel and Forecast. A
+person's change is an `Override` under their reviewer name, kept in this
+browser's Durable tier (`parameterOverrides`) and sent with the run; the service
+keeps none, and the run's basis names each one as an `assumption` by that person,
+so the run is `demo`. It wins over the records and any fit. A model never sets
+one. `check:seed` holds the rest: every parameter has a bounds reason (D4), and
+Proforma's, pureOS's and fermOS's screens (`ProformaScenario.tsx`,
+`ProformaBiosteam.tsx`, `PureOS*.tsx`, `FermOS*.tsx`) render no number box or
+slider of their own outside the panel (E.1‴), apart from three named views over
+a computed grid.
+The panel's code has no row in the map, because no one destination owns it;
+each destination that uses it says so.
 
 **The Assay layer is where the arrow reverses.** Everything above Runbook is
 software reasoning about the world. Deposition is the world reporting back.

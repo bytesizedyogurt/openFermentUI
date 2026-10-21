@@ -29,6 +29,13 @@ ONE RUN, TWO NAMES (OF-BLD-019 §6.1). `proforma_write`'s `run` and the
 registry's `run_flowsheet` (tools/proforma.py) both run a scenario through
 `run_scenario` below, so the one call to `proforma.run` stays in this file,
 where `check:tools` reads it, and both are refused, run and audited alike.
+So with a simulation (OF-BLD-020 §3.4): `fermos_write`'s `simulate` and the
+registry's `fermos_simulate` (tools/fermos.py) both run `run_simulation`
+below, the one call to `fermos.simulate`, free (compute, no model money) and
+at no gate, audited with the model as agent. So with a vessel (OF-BLD-020
+§4.2): `fermos_write`'s `design_vessel` and the registry's `fermos_vessel`
+(tools/fermos.py) both design through `design_vessel` below, the one call to
+`vessel.design`.
 
 Inputs carry ids and words, as every tool's do: `action`, `target` (an id or
 ref), `fields` (names to words, what the action needs), `note` (the model's
@@ -70,6 +77,14 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
     "fermos": {
         "forecast": ("forecast a run from a kept kinetic fit and keep it", ("fitArtifactId",)),
         "fit": ("fit a deposited run's series", ("depositionId",)),
+        "simulate": ("simulate the model family named in target (batch_v1 and the rest) and keep the simulation, as "
+                     "fermos_simulate does: each parameter binds from a fit, the records, a kept simulation or a stated "
+                     "convention, and the call refuses naming each parameter nothing binds; records.<parameter key> "
+                     "names the record ids, comma-separated, that bind that parameter",
+                     ("strain", "product", "sugar", "fitArtifact", "startFrom", "durationPreset", "records.<key>")),
+        "design_vessel": ("design on BioSTEAM the vessel a kept simulation (or, anaerobic, a kept kinetic fit) needs and "
+                          "keep it, as fermos_vessel does; refused in words while its plant scale waits for a person",
+                          ("simulationArtifact", "fitArtifact", "vesselType", "klaMethod")),
     },
     "pureos": {},
     "proforma": {
@@ -239,6 +254,94 @@ def _fermos_forecast(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
                       evidence=[r.evidence])
 
 
+VESSEL_WAITS = ("A named person types the plant scale (or one vessel's batch volume) in fermOS → Vessel, under their "
+                "reviewer name; a model never supplies one. Say in gaps that the design waits for it.")
+
+
+def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_method: str, note: str,
+                  ctx: ToolContext) -> ToolResult:
+    """Design the vessel a kept simulation (or, anaerobic, a kept fit) needs
+    on BioSTEAM, keep it as one `fermos.vessel` artifact, and mark it as the
+    model's (OF-BLD-020 §4.2, D13). `fermos_vessel` and `fermos_write`'s
+    `design_vessel` both run here, so the one call to `vessel.design` stays
+    in this file. Ids and words in: the artifact, the vessel type, the kLa
+    correlation by BioSTEAM's name. The service holds no person's plant scale
+    or batch volume (they are typed in the panel, in a browser), so none is
+    passed, and the design is refused in vessel.design's own words until a
+    person's design is asked for on the screen."""
+    from .. import artifacts, vessel
+    from ..models import VesselRequest
+    from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    sim, fitted = (simulation or "").strip(), (fit or "").strip()
+    if bool(sim) == bool(fitted):
+        return ToolResult(error=f"{tool} refused: name one kept simulation (simulationArtifact) or one kept kinetic fit "
+                                "(fitArtifact) by its artifact id, not both; fermos_read lists them")
+    kind = (vessel_type or "").strip() or None
+    if kind is not None and kind not in vessel.VESSEL_TYPES:
+        return ToolResult(error=f"{tool} refused: a vessel type is {' or '.join(vessel.VESSEL_TYPES)}; {kind!r} is neither")
+    try:
+        d = vessel.design(VesselRequest(simulation=sim or None, fit=fitted or None, vesselType=kind,
+                                        klaMethod=(kla_method or "").strip() or None,
+                                        includeArchived=ctx.include_archived))
+    except vessel.VesselRefused as e:
+        waits = f" {VESSEL_WAITS}" if "plant_scale" in str(e) else ""
+        return ToolResult(error=f"{tool} refused: {e}.{waits}")
+    except (vessel.VesselNotFound, artifacts.ArtifactDamaged) as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        return ToolResult(error=f"{tool} could not design the vessel: {e}")
+    ev = d.evidence
+    _audit(ctx, "fermos", "design_vessel", "open", sim or fitted, {"artifactId": d.artifactId, "evidenceId": ev.id,
+                                                                   "tool": tool, "note": note})
+    return ToolResult(summary={"state": "open", **_vessel_summary(d), "evidenceId": ev.id,
+                               "meaning": "the vessel is designed on BioSTEAM and kept as one artifact in the open lane, "
+                                          "marked as the model's in the audit log; cite its numbers by the evidence id, "
+                                          "which is its artifact id; never state them yourself"},
+                      evidence=[ev])
+
+
+# The design table's rows a summary carries, by the label the worker reads
+# them under; the whole table is in the artifact (get_artifact).
+VESSEL_ROWS = ("Vessels", "Volume of each vessel", "Working volume of each vessel", "Batch time (reacting)",
+               "Cycle time", "Dead time", "Agitator power, each vessel", "Compressor power", "kLa achieved",
+               "Superficial gas velocity", "Aeration, vvm", "Reactor duty", "Cooling duty, every heat utility",
+               "Electricity, the whole unit")
+
+
+def _vessel_summary(d: Any) -> dict[str, Any]:
+    """What a model reads of a design, copied from it: the rows a reader
+    asks for first, the oxygen balance in brief, heat, cost with its index,
+    who assumed what, and the flags. Nothing is computed here."""
+    ox = d.oxygen
+    return {
+        "artifactId": d.artifactId, "provenance": d.provenance, "source": d.source, "sourceTool": d.sourceTool,
+        "unitClass": d.unitClass, "vesselType": d.vesselType, "aerobic": d.aerobic,
+        "design": [{"label": r.label, "value": r.value, "unit": r.unit} for r in d.design if r.label in VESSEL_ROWS],
+        "oxygen": None if ox is None else {
+            "method": ox.method, "kLa": ox.kLa, "kLaNeededAtPeak": ox.kLaNeededAtPeak, "kLaUnit": ox.kLaUnit,
+            "otr": ox.otr, "unit": ox.unit, "short": ox.short, "oxygenBasis": ox.oxygenBasis, "aerated": ox.aerated},
+        "oxygenNote": d.oxygenNote,
+        # How BioSTEAM found its duty and what the cross-check rests on, in the service's words (§4.R).
+        "heat": {"bst": d.heat.bst, "method": d.heat.method, "dutyNote": d.heat.dutyNote,
+                 "convention": d.heat.convention, "conventionNote": d.heat.conventionNote, "unit": d.heat.unit},
+        "cost": {"purchase": d.cost.purchase, "installed": d.cost.installed, "unit": "USD",
+                 "costIndex": d.cost.costIndex, "costIndexYear": d.cost.costIndexYear},
+        "assumedBy": sorted({p.overriddenBy for p in d.parameters if p.overriddenBy}),
+        "flags": d.flags,
+    }
+
+
+def _fermos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
+    if action == "simulate":
+        return _fermos_simulate(inp, ctx)
+    if action == "design_vessel":
+        f = inp.fields
+        return design_vessel("fermos_write", f.get("simulationArtifact", ""), f.get("fitArtifact", ""),
+                             f.get("vesselType", ""), f.get("klaMethod", ""), inp.note, ctx)
+    return _fermos_forecast(inp, ctx)
+
+
 RUN_WAITS = ("A named person types each waiting input in Proforma, on the scenario's page, under their reviewer "
              "name; a model never supplies one. Say in gaps which inputs wait.")
 
@@ -313,6 +416,192 @@ def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> To
 
 def _proforma_run(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     return run_scenario("proforma_write", inp.target, inp.note, ctx)
+
+
+# ── a simulation (OF-BLD-020 §3.4) ────────────────────────────────────────
+
+SIM_WAITS = ("A named person types each waiting parameter in fermOS → Simulate under their reviewer name; a model "
+             "never supplies one. Where a waiting parameter names a record field, records of that field can be named "
+             "for it in recordsByParam. Say in gaps which parameters wait.")
+# How each origin is said, in words: what bound the parameter, never its value.
+BOUND_BY = {"fit": "a fit", "record": "records", "simulation": "a kept simulation", "assumption": "a named person",
+            "convention": "a stated convention", "library-default": "the library's own default", "artifact": "an artifact"}
+MAX_FLAG_CHARS = 300
+
+
+def _bound_by(v: Any, named: set[str], fields_of: dict[str, str]) -> dict[str, Any]:
+    """What bound one parameter, in words and counts: the records by how many
+    and of which field, and whether they were named for it; a fit or a kept
+    simulation by its artifact id; a convention by its word when it is one.
+    Never a number of the parameter's, which the artifact holds."""
+    line: dict[str, Any] = {"key": v.key, "origin": v.origin}
+    src = v.source
+    if v.origin == "record":
+        n = len(v.recordIds)
+        fields = sorted({fields_of[r] for r in v.recordIds if r in fields_of})
+        line["records"] = n
+        line["boundBy"] = (f"{n} record{'' if n == 1 else 's'}" + (f" of {' and '.join(fields)}" if fields else "")
+                           + (", named for it" if v.key in named else ", found by the rule for the strain and sugar"))
+    elif v.origin in ("fit", "simulation", "artifact"):
+        line["boundBy"] = f"{BOUND_BY[v.origin]}, {src.id}" if src and src.id else BOUND_BY[v.origin]
+        if v.origin == "fit" and v.identified is False:
+            line["identified"] = False
+    elif v.origin == "assumption":
+        line["boundBy"] = f"{BOUND_BY['assumption']}, {v.overriddenBy}"
+    elif v.origin == "waiting":
+        line["boundBy"] = "nothing: this setting of the family does not read it"
+    else:
+        line["boundBy"] = BOUND_BY.get(v.origin, v.origin) + (f": {v.value}" if isinstance(v.value, str) else "")
+    return line
+
+
+def _simulation_evidence(r: Any) -> Any:
+    """A kept simulation as the one `Evidence` a claim cites it by: its id is
+    the artifact's, its value the product's titre at harvest as the artifact
+    holds it, its provenance and basis the artifact's."""
+    from .. import kinetics
+    from ..models import Evidence
+
+    state = kinetics.FAMILIES[r.family].product_state() if r.family in kinetics.FAMILIES else None
+    who = r.strain or "every strain of the program's organism"
+    on = f" on {r.sugar}" if r.sugar else ""
+    made = r.product or "product"
+    value: float | str = r.finalTitre if r.finalTitre is not None else "no product state"
+    return Evidence(id=r.artifactId, label=f"{r.title} simulation ({r.family}) of {who}{on}: the {made} titre at harvest",
+                    value=value, unit=(r.units.get(state, "") if state else ""), provenance=r.provenance,
+                    basis=r.basis, figure="trajectory")
+
+
+def _summary_flags(r: Any) -> list[str]:
+    """The simulation's flags as the summary says them (OF-BLD-020 §3.R,
+    finding 20): a value outside its bounds by its key alone, never the
+    value or its ends, which the artifact holds with the bounds and their
+    reason; any other flag whole, or cut at a sentence or clause under
+    MAX_FLAG_CHARS and said to be cut; each ending at a full stop."""
+    outside = {v.outOfBounds: v.key for v in [*r.parameters, *r.start] if v.outOfBounds}
+    out = []
+    for f in r.flags:
+        if f in outside:
+            f = (f"{outside[f]} lies outside its bounds; it is kept as given, and the artifact holds the value, its "
+                 "bounds and their reason")
+        elif len(f) > MAX_FLAG_CHARS:
+            head = f[:MAX_FLAG_CHARS]
+            at = max(head.rfind(". "), head.rfind("; "))
+            head = head[:at] if at > 0 else head[:head.rfind(" ")]
+            f = head.rstrip(" ,;:.") + " (cut here; the artifact holds the whole flag)"
+        f = f.rstrip()
+        out.append(f if f.endswith(".") else f"{f}.")
+    return out
+
+
+def _sig(x: Any) -> Any:
+    """A number of the end state to four significant digits, for the summary
+    alone; the artifact holds every number whole."""
+    return float(f"{x:.4g}") if isinstance(x, float) else x
+
+
+def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResult:
+    """Simulate one model family as the service binds it, keep it and mark it
+    as the model's (OF-BLD-020 §3.4). The request carries ids and words: a
+    family, a strain, a product, a sugar, the records named for a parameter,
+    a fit, a start and a run-length preset; the service holds no person's
+    assumption (they live in the browser's Durable tier), so none is passed:
+    a parameter nothing binds waits, and the refusal is fermos.simulate's own
+    words (what `POST /api/fermos/simulate` answers with a 422)."""
+    from .. import fermos, kinetics, programs
+
+    family = (req.family or "").strip()
+    if not family:
+        return ToolResult(error=f"{tool} refused: name the model family to simulate by its id ({', '.join(kinetics.FAMILIES)})")
+    fam = kinetics.FAMILIES.get(family)
+    if fam is not None and not ctx.include_archived:
+        try:
+            hidden = programs.hides(fam.program, False)
+        except FileNotFoundError:  # no projection here: nothing is known to be archived
+            hidden = False
+        if hidden:
+            p = programs.program_by_id(fam.program)
+            return ToolResult(error=f"{tool} refused: {family} belongs to {p.name if p else fam.program}, archived "
+                                    f"(hidden). {programs.SWITCH}")
+    try:
+        refused = programs.archived_refusal(tool, [("strain", req.strain or ""), ("product", req.product or "")],
+                                            ctx.include_archived)
+    except FileNotFoundError:
+        refused = None
+    if refused:
+        return ToolResult(error=refused)
+    req = req.model_copy(update={"family": family, "includeArchived": ctx.include_archived, "overrides": []})
+    try:
+        r = fermos.simulate(req, by_pool=ctx.pool)
+    except fermos.SimulationRefused as e:
+        waits = f" {SIM_WAITS}" if "cannot run yet" in str(e) else ""
+        return ToolResult(error=f"{tool} refused: {str(e).rstrip('.')}.{waits}")
+    ev = _simulation_evidence(r)
+    _audit(ctx, "fermos", "simulate", "open", family, {"artifactId": r.artifactId, "evidenceId": ev.id, "tool": tool,
+                                                       "strain": r.strain, "product": r.product, "sugar": r.sugar,
+                                                       "note": note})
+    ceiling = r.ceiling
+    # Which keys the request named records for, as the basis says (`<key>
+    # origin`), and each bound record's field, from the pool it was bound on.
+    named = {i.name.rsplit(" ", 1)[0] for i in r.basis.inputs
+             if i.name.endswith(f" {fermos.ORIGIN}") and i.value == fermos.NAMED}
+    by_id = getattr(ctx.pool, "records_by_id", None) or {}
+    fields_of = {rid: str(by_id[rid].get("field") or "") for v in [*r.parameters, *r.start] for rid in v.recordIds
+                 if rid in by_id}
+    return ToolResult(
+        summary={
+            "state": "open",
+            "artifactId": r.artifactId,
+            "evidenceId": ev.id,
+            "family": r.family,
+            "title": r.title,
+            "strain": r.strain,
+            "product": r.product,
+            "sugar": r.sugar,
+            "provenance": r.provenance,
+            "parameters": [_bound_by(v, named, fields_of) for v in r.parameters],
+            "start": [_bound_by(v, named, fields_of) for v in r.start],
+            "end": {"finalTitre": _sig(r.finalTitre), "yieldAchieved": _sig(r.yieldAchieved),
+                    "productivity": _sig(r.productivity), "harvestH": _sig(r.harvestH),
+                    "sugarRunsOutH": _sig(r.sugarRunsOutH), "aerobic": r.aerobic, "units": r.units,
+                    "read": "from the artifact, to four significant digits; cite the evidence id, never the number"},
+            "ceiling": ({"rows": [{"modelId": c.modelId, "above": c.above, "words": c.words} for c in ceiling.rows],
+                         "flagged": ceiling.flagged, "empty": ceiling.empty} if ceiling else None),
+            "massBalanceCloses": r.massBalance.ok,
+            "flags": _summary_flags(r),
+            "meaning": "the family ran as the service binds it and is kept as one simulation artifact in the open lane, "
+                       "marked as the model's in the audit log; each parameter says what bound it, and its value is in "
+                       "the artifact. Its numbers are read from the artifact, never stated: cite the simulation by the "
+                       "evidence id, which is its artifact id; fermos_read reads it again as kind simulation",
+        },
+        evidence=[ev],
+    )
+
+
+def _fermos_simulate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
+    """`fermos_write`'s `simulate`: the family in `target`, the rest in
+    `fields` as words, a parameter's records as `records.<key>`, their ids
+    separated by commas or spaces; any other field is refused, never passed
+    on and never guessed at."""
+    from ..models import SimulationRequest
+
+    words = ("strain", "product", "sugar", "fitArtifact", "startFrom", "durationPreset")
+    unknown = [k for k in inp.fields if k not in words and not (k.startswith("records.") and k[len("records."):])]
+    if unknown:
+        return ToolResult(error=f"fermos_write refused simulate: {', '.join(unknown)} "
+                                f"{'is' if len(unknown) == 1 else 'are'} not a field of it; the fields are "
+                                f"{', '.join(words)} and records.<parameter key>")
+    f = {k: (v or "").strip() for k, v in inp.fields.items()}
+    preset = f.get("durationPreset") or "until-sugar-runs-out"
+    if preset not in ("until-sugar-runs-out", "fit-length"):
+        return ToolResult(error=f"fermos_write refused simulate: durationPreset is until-sugar-runs-out or fit-length; "
+                                f"{preset!r} is neither")
+    named = {k[len("records."):]: [x for x in v.replace(",", " ").split() if x] for k, v in f.items()
+             if k.startswith("records.")}
+    req = SimulationRequest(family=inp.target, strain=f.get("strain") or None, product=f.get("product") or None,
+                            sugar=f.get("sugar") or None, fitArtifact=f.get("fitArtifact") or None,
+                            startFrom=f.get("startFrom") or "records", durationPreset=preset, recordsByParam=named)
+    return run_simulation("fermos_write", req, inp.note, ctx)
 
 
 def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
@@ -426,7 +715,7 @@ def _runner(module: str) -> Callable[[ModuleWriteInput, ToolContext], ToolResult
         if module == "geneos":
             return _geneos(action, inp, ctx)
         if module == "fermos":
-            return _fermos_forecast(inp, ctx)
+            return _fermos(action, inp, ctx)
         if module == "proforma":
             return _proforma_run(inp, ctx)
         if module == "biorepo":

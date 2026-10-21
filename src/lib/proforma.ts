@@ -12,7 +12,7 @@ import type {
   FermosFitInfo,
   FlowsheetInfo,
   HistogramBin,
-  InputAssumption,
+  Override,
   InputSensitivity,
   PackageRegression,
   ProformaGrid,
@@ -257,28 +257,33 @@ export function inputCounts(
   scenario: Scenario,
   info: ProformaScenarioInfo | null,
   shelf: FlowsheetInfo[],
-  assumptions: InputAssumption[],
+  /** The scenario's overrides (OF-BLD-020 D3): each wins over the records and any fit for its input. */
+  typedValues: { key: string }[],
   fits: Record<string, string> = {},
 ): InputCounts | null {
-  const typed = new Set(assumptions.map((a) => a.key));
+  const typed = new Set(typedValues.map((a) => a.key));
+  const flowsheet = shelf.find((f) => f.id === (scenario.flowsheetId ?? scenario.modelId));
   if (info) {
-    const c = { total: info.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: true };
+    // The binding holds no convention (a run states it in its basis), and the
+    // scenario page lists it among the inputs, so the card counts it from the
+    // shelf as the page does (OF-BLD-020 §2.R, finding 16).
+    const conventions = flowsheet ? flowsheet.inputs.filter((i) => i.kind === 'convention').length : 0;
+    const c = { total: info.inputs.length + conventions, records: 0, computed: 0, assumed: 0, conventions, waiting: 0, bound: true };
     for (const i of info.inputs) {
-      if (i.binding === 'artifact' || fits[i.key]) c.computed++;
+      if (typed.has(i.key) || i.binding === 'assumption') c.assumed++;
+      else if (i.binding === 'artifact' || fits[i.key]) c.computed++;
       else if (i.binding === 'records') c.records++;
-      else if (i.binding === 'assumption' || typed.has(i.key)) c.assumed++;
       else c.waiting++;
     }
     return c;
   }
-  const flowsheet = shelf.find((f) => f.id === (scenario.flowsheetId ?? scenario.modelId));
   if (!flowsheet) return null;
   const c = { total: flowsheet.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: false };
   for (const i of flowsheet.inputs) {
-    if (fits[i.key]) c.computed++;
-    else if (i.fields.length > 0) c.records++;
-    else if (i.kind === 'convention') c.conventions++;
+    if (i.kind === 'convention') c.conventions++;
     else if (typed.has(i.key)) c.assumed++;
+    else if (fits[i.key]) c.computed++;
+    else if (i.fields.length > 0) c.records++;
     else c.waiting++;
   }
   return c;
@@ -387,26 +392,48 @@ export interface RunAsk {
   scenarioId: string;
   /** Sent for a scenario made here alone: the service runs a seed scenario by its id. */
   flowsheet?: string | null;
-  assumptions: InputAssumption[];
+  /**
+   * A person's changes in the parameter panel (OF-BLD-020 D3): the scope
+   * `proforma:<scenarioId>`'s overrides, each a named assumption that wins
+   * over the records and any fit for its input (`runOverrides`).
+   */
+  overrides: Override[];
   host: string | null;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1). */
   fits?: Record<string, string>;
 }
 
-/** (d) Run a scenario; the service keeps the run as one `proforma.run` artifact (D1). */
-export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
+/**
+ * The overrides a run carries (OF-BLD-020 §2.2): the scenario's scope's
+ * own, of the inputs its flowsheet takes; an override of an input the
+ * flowsheet no longer takes stays in this browser and is not sent.
+ */
+export function runOverrides(scoped: Override[], keys: string[]): Override[] {
+  const takes = new Set(keys);
+  return scoped.filter((o) => takes.has(o.key));
+}
+
+/** The body `runProformaScenario` posts, as the service reads it (`ProformaRunRequest`). */
+export function runBody(ask: RunAsk): ProformaRunRequest {
   // `flowsheet` joins ProformaRunRequest in the service with OF-BLD-019 §2.3;
   // a service that predates it ignores the field and refuses a scenario it
   // does not hold, in words. It is sent only for a scenario made here, and
-  // `fits` only when a person chose one (§5.1).
-  const body: ProformaRunRequest = {
+  // `fits` only when a person chose one (§5.1). A person's values go as
+  // `overrides` (OF-BLD-020 §2.2); the older `assumptions` field, which the
+  // service still reads for one release, is no longer sent.
+  return {
     scenarioId: ask.scenarioId,
-    assumptions: ask.assumptions,
+    overrides: ask.overrides,
     host: ask.host,
     seed: 0,
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
     ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
   };
+}
+
+/** (d) Run a scenario; the service keeps the run as one `proforma.run` artifact (D1). */
+export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
+  const body = runBody(ask);
   return call<ProformaRunResult>('/api/proforma/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -422,10 +449,16 @@ export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
 // artifact: the browser shows them and keeps which artifact a person chose
 // for which input (`proformaFits`, Durable), and computes no value.
 
-/** Every kinetic fit and forecast fermOS keeps, with what it can feed `flowsheet`: `GET /api/fermos/fits`. */
-export async function fermosFits(flowsheet: string, signal?: AbortSignal): Promise<FermosFitInfo[]> {
+/**
+ * Every kinetic fit, forecast and simulation fermOS keeps, with what it can feed `flowsheet`: `GET /api/fermos/fits`.
+ * The program switch rides along (OF-BLD-020 §3.R): one of an archived program is left out unless it is on.
+ */
+export async function fermosFits(flowsheet: string, includeArchived: boolean, signal?: AbortSignal): Promise<FermosFitInfo[]> {
   try {
-    return await call<FermosFitInfo[]>(`/api/fermos/fits?flowsheet=${encodeURIComponent(flowsheet)}`, { signal });
+    return await call<FermosFitInfo[]>(
+      `/api/fermos/fits?flowsheet=${encodeURIComponent(flowsheet)}&includeArchived=${includeArchived ? 'true' : 'false'}`,
+      { signal },
+    );
   } catch (e) {
     if (!noEndpoint(e)) throw e;
     throw new RagRefused(404, 'This service has no fermOS fit list, so it cannot offer a fit to this scenario yet.');
@@ -437,7 +470,7 @@ export const fitsFrom = (info: FermosFitInfo): Record<string, string> =>
   info.refused ? {} : Object.fromEntries(info.feeds.filter((f) => !f.refused && f.value != null).map((f) => [f.key, info.artifactId]));
 
 /** What a fermOS artifact is, in words. */
-export const FIT_TOOL_WORDS: Record<string, string> = { kinetic_fit: 'kinetic fit', growth_forecast: 'forecast' };
+export const FIT_TOOL_WORDS: Record<string, string> = { kinetic_fit: 'kinetic fit', growth_forecast: 'forecast', 'fermos.simulation': 'simulation' };
 
 /** The scenario page a fit is sent to, with the fit to attach when it opens. */
 export const sendFitPath = (scenarioId: string, artifactId: string) =>
@@ -459,8 +492,8 @@ export interface CeilingAsk {
   includeArchived: boolean;
   /** The fermOS fits a person chose, by input key (§5.1). */
   fits?: Record<string, string>;
-  /** The yield's assumption, when a person typed one; the rest do not bear on the check. */
-  assumptions?: InputAssumption[];
+  /** The yield's override, when a person typed one (OF-BLD-020 D3); the rest do not bear on the check. */
+  overrides?: Override[];
 }
 
 /** `GET /api/proforma/ceiling-check`: a service that predates it says so in words. */
@@ -469,7 +502,7 @@ export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promi
   if (ask.flowsheet) q.set('flowsheet', ask.flowsheet);
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
-  if (ask.assumptions && ask.assumptions.length > 0) q.set('assumptions', JSON.stringify(ask.assumptions));
+  if (ask.overrides && ask.overrides.length > 0) q.set('overrides', JSON.stringify(ask.overrides));
   try {
     return await call<CeilingCheck>(`/api/proforma/ceiling-check?${q.toString()}`, { signal });
   } catch (e) {
@@ -656,13 +689,17 @@ export function runInputs(view: RunView, flowsheet: FlowsheetInfo | null, labels
     const fitted = view.basis.inputs.find((i) => i.name === `${key} fit` && i.source.kind === 'artifact');
     if (fitted && !records.length) {
       const part = (p: string) => num(view.basis.inputs.find((i) => i.name === `${key} fit ${p}` && i.source.kind === 'artifact')?.value);
-      // A productivity the fit gave is its titre over the hour its median
-      // sugar runs out: the basis names that hour, and so does the row.
+      // A productivity a fit or a simulation gave is its titre over its
+      // batch time: the basis names that hour, and so does the row. The
+      // words of each are the service's, chosen by the tool that kept the
+      // source (§8.R): a simulation is never called a fit here.
       const batch = view.basis.inputs.find((i) => i.name === 'fit batch time' && i.source.kind === 'artifact' && i.source.id === fitted.source.id);
       const hours = num(batch?.value);
       const notes = [
-        `a fermOS fit${fitted.source.note ? `: ${fitted.source.note}` : ''}`,
-        key === 'productivity' && batch && hours != null ? `the fit's batch time ${String(Number(hours.toPrecision(4)))} ${batch.unit}`.trim() : null,
+        `from fermOS${fitted.source.note ? `: ${fitted.source.note}` : ''}`,
+        key === 'productivity' && batch && hours != null
+          ? `batch time ${String(Number(hours.toPrecision(4)))} ${batch.unit}${batch.source.note ? `, ${batch.source.note}` : ''}`.trim()
+          : null,
       ];
       return {
         key, label, kind: 'artifact', unit: fitted.unit || declared?.unit || '', count: 0,
@@ -796,12 +833,9 @@ export function modellerQuestions(
     .map(({ n: _n, ...q }) => q);
 }
 
-/** What a record left out of a binding was fed, in words, by the flowsheet's own feed (§3.R, finding 27). */
-const FEED_WORDS: Record<string, string> = { pha_sugar_v0: 'a sugar or a hydrolysate', ethanol_glucose_v0: 'glucose' };
-
-/** The inputs table's line on the records a binding left out, naming the flowsheet's own feed. */
-export const leftOutWords = (i: { leftOutNoCarbon: number; leftOutOtherCarbon: number }, flowsheet: string | null) =>
-  `Left out: ${i.leftOutNoCarbon} naming no carbon source, ${i.leftOutOtherCarbon} on a feed other than ${FEED_WORDS[flowsheet ?? ''] ?? 'this flowsheet’s own feed'}.`;
+// The line on the records a binding left out is the service's own now
+// (`params._input_sources`, with the flowsheet's feed in `params.feed_words`;
+// OF-BLD-020 §2.R, finding 15): no screen writes it, and test_params holds it.
 
 // ── What a run read back, credited to whoever set it (§3.R, findings 6, 20) ──
 //

@@ -193,7 +193,8 @@ READS = [f"{m}_read" for m in MODULES] + [f"{m}_write" for m in MODULES]
 # The one literal list of the registry's names the tests hold it to; every
 # other test derives its count from tools.WHITELIST (OF-BLD-019 §6.1).
 NAMES = (["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast", "selling_price",
-          "draft_runbook"] + READS + ["thermo_props", "run_flowsheet", "stream_table"])
+          "draft_runbook"] + READS + ["thermo_props", "run_flowsheet", "stream_table", "fermos_simulate",
+                                       "fermos_vessel"])
 
 
 def test_only_the_whitelisted_names_may_register():
@@ -653,3 +654,157 @@ def test_an_archived_run_that_names_no_record_is_hidden_from_every_reader_with_t
     # BioRepo → Artifacts asks the endpoint with the switch, and the endpoint agrees.
     assert art.id not in [a.id for a in api.artifacts_list()]
     assert art.id in [a.id for a in api.artifacts_list(includeArchived=True)]
+
+
+# ── fermos_simulate (OF-BLD-020 §3.4, D13) ─────────────────────────────
+
+
+@pytest.fixture()
+def fermos_store(tmp_path, monkeypatch):
+    """A throwaway store with the audit log and the proposals in it, and
+    test_fermos_bind's STAND-IN batch_v1 pool (records written in the test
+    on thread Q paper ids, none a paper's value)."""
+    from openferment_core import audit, proposals
+    from test_fermos_bind import STANDIN, pool_of, rec
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
+    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
+    monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
+    monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
+    return pool_of(*STANDIN, rec("pm1", "ethanol_max_conc", 90.0), rec("al1", "ethanol_lp_alpha", 2.0, "g g-1"),
+                   rec("mu-rej", "growth_rate_mu", 0.9, "h-1", status="rejected"),
+                   rec("mu-cites", "growth_rate_mu", 0.9, "h-1", primary=False),
+                   rec("mu-odd", "growth_rate_mu", 0.3, "g/L"))
+
+
+def _kept_start(pool_):
+    """A kept simulation a named person's STAND-IN values made, whose start
+    values a model's simulation takes (`startFrom: simulation:<id>`): the
+    service holds no person's assumption, and x0 and p0 bind from no record."""
+    from openferment_core import fermos
+    from openferment_core.models import SimulationRequest
+    from test_fermos_bind import typed
+
+    return fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose",
+                                             overrides=typed(x0=0.2, p0=0.0)), by_pool=pool_).artifactId
+
+
+def _sim(start, **over):
+    return {"family": "batch_v1", "strain": "", "product": "ethanol", "sugar": "glucose",
+            "recordsByParam": {"mu_max": ["mu1", "mu3"]}, "fitArtifact": "", "startFrom": f"simulation:{start}",
+            "durationPreset": "until-sugar-runs-out", **over}
+
+
+def test_fermos_simulate_runs_a_family_from_record_ids_keeps_one_simulation_and_marks_it_as_the_models(fermos_store):
+    from openferment_core import audit, fermos, proposals
+
+    start = _kept_start(fermos_store)
+    r = tools.run("fermos_simulate", _sim(start), _pcx(fermos_store))
+    assert r.error is None, r.error
+    s = r.summary
+    (ev,) = r.evidence
+    assert s["state"] == "open" and s["family"] == "batch_v1" and ev.id == s["artifactId"] == s["evidenceId"]
+    art = artifacts.get(ev.id)
+    assert art.tool == fermos.SIMULATION and ev.basis.tool == fermos.SIMULATION and ev.basis.artifactId == ev.id
+    assert ev.provenance == s["provenance"] == art.provenance == "demo", "its start rests on a person's values"
+    assert ev.value == pytest.approx(art.output["finalTitre"]) and ev.unit == art.output["units"]["P"]
+    assert len(json.dumps(s, ensure_ascii=False)) <= tools.MAX_SUMMARY_CHARS
+    # What bound each parameter, in words and counts; its value is in the artifact.
+    lines = {x["key"]: x for x in s["parameters"] + s["start"]}
+    assert lines["mu_max"] == {"key": "mu_max", "origin": "record", "records": 2,
+                               "boundBy": "2 records of growth_rate_mu, named for it"}
+    assert lines["yps"]["boundBy"] == "2 records of ethanol_yield_substrate, found by the rule for the strain and sugar"
+    assert lines["x0"]["boundBy"] == f"a kept simulation, {start}" and lines["kd"]["boundBy"] == "a stated convention"
+    assert lines["ki_substrate"]["boundBy"] == "a stated convention: off"
+    assert {x["key"] for x in s["parameters"] + s["start"]} == {v.key for v in fermos.result_of(art).parameters} | {
+        v.key for v in fermos.result_of(art).start}
+    # The records named bind exactly that parameter, and the basis says they were named.
+    named = {i.name: i for i in art.inputs}
+    assert [i.value for i in art.inputs if i.name == "mu_max record"] == ["mu1", "mu3"]
+    assert named["mu_max origin"].value == fermos.NAMED and named["records of"].value.startswith("every strain")
+    [line] = audit.read()
+    assert (line.agent, line.who, line.module, line.action, line.state, line.target, line.askId, line.effort) == (
+        "model", "claude-haiku-5-5", "fermos", "simulate", "open", "batch_v1", "ask-61", "medium")
+    assert line.detail["tool"] == "fermos_simulate" and line.detail["artifactId"] == ev.id
+    # At no gate: nothing was proposed.
+    assert proposals.read().proposals == []
+    # fermos_write's simulate is the same run, marked with its own name.
+    w = tools.run("fermos_write", {"action": "simulate", "target": "batch_v1", "note": "again",
+                                   "fields": {"product": "ethanol", "sugar": "glucose", "records.mu_max": "mu1, mu3",
+                                              "startFrom": f"simulation:{start}"}}, _pcx(fermos_store))
+    assert w.error is None and w.evidence[0].id == ev.id
+    assert audit.read()[-1].detail["tool"] == "fermos_write" and audit.read()[-1].detail["note"] == "again"
+
+
+def test_fermos_simulate_with_a_parameter_waiting_returns_the_refusals_words_and_keeps_nothing(fermos_store):
+    from openferment_core import audit
+
+    r = tools.run("fermos_simulate", {"family": "batch_v1", "product": "ethanol", "sugar": "glucose"},
+                  _pcx(fermos_store))
+    assert r.error and r.error.startswith("fermos_simulate refused: batch_v1 cannot run yet")
+    assert "x0 (cells at the start)" in r.error and "p0 (product at the start)" in r.error
+    assert "a model never supplies one" in r.error and "recordsByParam" in r.error
+    assert r.evidence == [] and audit.read() == [] and artifacts.all_artifacts() == []
+    w = tools.run("fermos_write", {"action": "simulate", "target": "batch_v1", "note": "",
+                                   "fields": {"product": "ethanol", "sugar": "glucose"}}, _pcx(fermos_store))
+    assert w.error == r.error.replace("fermos_simulate", "fermos_write", 1)
+
+
+@pytest.mark.parametrize("named, words", [
+    ({"mu_max": ["nowhere-1"]}, "record nowhere-1, named for mu_max, is not in the evidence pool"),
+    ({"mu_max": ["ks1"]}, "record ks1 is a record of monod_ks, and mu_max (maximum specific growth rate) binds from "
+                          "growth_rate_mu"),
+    ({"mu_max": ["mu-rej"]}, "record mu-rej, named for mu_max, is kept out by the aggregate gate: rejected"),
+    ({"mu_max": ["mu-cites"]}, "record mu-cites, named for mu_max, is kept out by the aggregate gate: not-primary"),
+    ({"mu_max": ["mu-odd"]}, "record mu-odd, named for mu_max, is in 'g/L', which units.py does not convert into h⁻¹"),
+    ({"mu_max": []}, "recordsByParam names no record for mu_max"),
+    ({"mu_max": ["mu1", "mu1"]}, "record mu1 is named twice for mu_max"),
+    ({"mu_max": ["../corpus"]}, "a record is named by its id"),
+    ({"x0": ["s01"]}, "x0 (cells at the start) binds from no record field here"),
+    ({"growth": ["mu1"]}, "recordsByParam names growth, which is no parameter of batch_v1"),
+])
+def test_fermos_simulate_refuses_a_named_record_that_cannot_bind_in_words(fermos_store, named, words):
+    from openferment_core import audit
+
+    start = _kept_start(fermos_store)
+    before = {a.id for a in artifacts.all_artifacts()}
+    r = tools.run("fermos_simulate", _sim(start, recordsByParam=named), _pcx(fermos_store))
+    assert r.error and r.error.startswith("fermos_simulate refused: ") and words in r.error, r.error
+    assert r.evidence == [] and audit.read() == [] and {a.id for a in artifacts.all_artifacts()} == before
+
+
+def test_a_number_in_fermos_simulates_input_is_refused_and_its_schema_holds_none(fermos_store):
+    start = _kept_start(fermos_store)
+    for raw in (_sim(start, recordsByParam={"mu_max": [0.4]}), _sim(start, mu_max=0.4), _sim(start, family=1)):
+        r = tools.run("fermos_simulate", raw, _pcx(fermos_store))
+        assert r.error and "a number was typed" in r.error and r.evidence == []
+    assert "refused its input" in tools.run("fermos_simulate", _sim(start, overrides=[]), _pcx(fermos_store)).error
+    schema = json.dumps(tools.REGISTRY["fermos_simulate"].info().inputSchema)
+    assert '"number"' not in schema and '"integer"' not in schema
+    assert tools.REGISTRY["fermos_simulate"].strict is False
+
+
+def test_fermos_simulate_refuses_an_archived_family_with_the_switch_off(fermos_store):
+    off = tools.run("fermos_simulate", {"family": "storage_v1", "product": "phb", "sugar": "glucose"},
+                    _pcx(fermos_store, archived=False))
+    assert off.error and "storage_v1 belongs to PHA, archived (hidden)" in off.error and "Settings → Programs" in off.error
+    strain = tools.run("fermos_simulate", {"family": "batch_v1", "strain": "c-necator-h16", "product": "ethanol",
+                                           "sugar": "glucose"}, _pcx(fermos_store, archived=False))
+    assert strain.error and "PHA, archived (hidden)" in strain.error
+    # With the switch on, the family runs into its own refusal: what waits.
+    on = tools.run("fermos_simulate", {"family": "storage_v1", "product": "phb", "sugar": "glucose"},
+                   _pcx(fermos_store, archived=True))
+    assert on.error and "storage_v1 cannot run yet" in on.error
+    socket = tools.run("fermos_simulate", {"family": "light_v1"}, _pcx(fermos_store))
+    assert socket.error and "light_v1 is declared and not built" in socket.error
+
+
+def test_fermos_write_simulate_refuses_a_field_it_does_not_take(fermos_store):
+    r = tools.run("fermos_write", {"action": "simulate", "target": "batch_v1", "note": "",
+                                   "fields": {"product": "ethanol", "mu_max": "fast"}}, _pcx(fermos_store))
+    assert r.error and "mu_max is not a field of it" in r.error and "records.<parameter key>" in r.error
+    preset = tools.run("fermos_write", {"action": "simulate", "target": "batch_v1", "note": "",
+                                        "fields": {"durationPreset": "forever"}}, _pcx(fermos_store))
+    assert preset.error and "until-sugar-runs-out or fit-length" in preset.error
+    assert "simulate:" in tools.REGISTRY["fermos_write"].description

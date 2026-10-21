@@ -1,0 +1,644 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "scope": "proforma:sc-yeast-1",
+    "answers": [
+      {
+        "fits": {
+          "titre": "9493894dbc27ffad",
+          "yield": "9493894dbc27ffad",
+          "productivity": "9493894dbc27ffad"
+        },
+        "status": 200,
+        "body": {
+          "scope": "proforma:sc-yeast-1",
+          "kind": "proforma",
+          "title": "Glucose to ethanol — draft flowsheet (Glucose to ethanol, draft v0)",
+          "specs": [
+            {
+              "key": "feed_glucose_conc",
+              "label": "glucose in the fermenter's feed",
+              "symbol": "",
+              "gloss": "records of a medium component whose carbon source is glucose; sets the water that dilutes the glucose, by thermosteam's volume of the solution",
+              "dimension": "massConc",
+              "unit": "g L-1",
+              "min": 1e-05,
+              "max": 120.0,
+              "step": null,
+              "scale": "linear",
+              "group": "Process",
+              "sourceRule": [
+                "record:medium_component_conc",
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "the ontology's plausibility range for medium_component_conc (Medium component concentration), 1e-05 to 120 g L⁻¹, in g L-1: the validation range that refuses an implausible extraction, not a result",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "titre",
+              "label": "ethanol titre at harvest",
+              "symbol": "",
+              "gloss": "with the productivity, sets the batch time; the beer's own ethanol follows from the feed's glucose and the yield, and the run reads it back",
+              "dimension": "massConc",
+              "unit": "g L-1",
+              "min": 0.01,
+              "max": 250.0,
+              "step": null,
+              "scale": "linear",
+              "group": "Process",
+              "sourceRule": [
+                "fit",
+                "simulation",
+                "record:ethanol_titre",
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "the ontology's plausibility range for ethanol_titre (Ethanol titre), 0.01 to 250 g L⁻¹, in g L-1: the validation range that refuses an implausible extraction, not a result",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "yield",
+              "label": "ethanol yield on glucose",
+              "symbol": "",
+              "gloss": "the fermenter's conversion is this yield over the theoretical yield of the reaction; a case above the theoretical yield cannot run, and says so",
+              "dimension": "yield",
+              "unit": "g g-1",
+              "min": 0.001,
+              "max": 0.6,
+              "step": null,
+              "scale": "linear",
+              "group": "Process",
+              "sourceRule": [
+                "fit",
+                "simulation",
+                "record:ethanol_yield_substrate",
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "the ontology's plausibility range for ethanol_yield_substrate (Ethanol yield on substrate (Yp/s)), 0.001 to 0.6 g g⁻¹, in g g-1: the validation range that refuses an implausible extraction, not a result",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "productivity",
+              "label": "ethanol volumetric productivity",
+              "symbol": "",
+              "gloss": "the batch time is the titre divided by it",
+              "dimension": "volProd",
+              "unit": "g L-1 h-1",
+              "min": 0.001,
+              "max": 100.0,
+              "step": null,
+              "scale": "linear",
+              "group": "Process",
+              "sourceRule": [
+                "fit",
+                "simulation",
+                "record:ethanol_productivity",
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "the ontology's plausibility range for ethanol_productivity (Ethanol volumetric productivity), 0.001 to 100 g L⁻¹ h⁻¹, in g L-1 h-1: the validation range that refuses an implausible extraction, not a result",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "plant_scale",
+              "label": "ethanol fermented in a year",
+              "symbol": "",
+              "gloss": "a named person's assumption; with the yield it sets the glucose fed, so the plant's size",
+              "dimension": "massFlow",
+              "unit": "t yr-1",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Economics",
+              "sourceRule": [
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "a physical limit: no negative ethanol fermented in a year",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "glucose_price",
+              "label": "price of glucose",
+              "symbol": "",
+              "gloss": "a named person's assumption; the glucose alone is priced, not its water",
+              "dimension": "costUSD",
+              "unit": "USD kg-1",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Economics",
+              "sourceRule": [
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "a physical limit: no negative price of glucose",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "ethanol_purity",
+              "label": "ethanol purity",
+              "symbol": "",
+              "gloss": "fuel grade: the ethanol the package's molecular sieves give, with no denaturant blended; a convention every run's basis names, and the run reads the purity back",
+              "dimension": "fraction",
+              "unit": "",
+              "min": null,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Conventions",
+              "sourceRule": [
+                "convention"
+              ],
+              "note": "fuel grade: the ethanol the package's molecular sieves give, with no denaturant blended; a convention every run's basis names, and the run reads the purity back",
+              "boundsReason": "a convention stated in words: it takes no number, so it has no bounds",
+              "choices": null,
+              "convention": "fuel grade"
+            }
+          ],
+          "values": [
+            {
+              "key": "feed_glucose_conc",
+              "value": 60.0,
+              "low": 20.0,
+              "high": 100.0,
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of medium_component_conc",
+                "by": null
+              },
+              "origin": "record",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [
+                "standin-medium_component_conc-0",
+                "standin-medium_component_conc-1",
+                "standin-medium_component_conc-2"
+              ],
+              "detail": "3 records of medium_component_conc, 20 to 100 g L-1, median 60",
+              "outOfBounds": null
+            },
+            {
+              "key": "titre",
+              "value": 12.402460413209695,
+              "low": 11.969078154412315,
+              "high": 12.899758675277175,
+              "source": {
+                "kind": "artifact",
+                "id": "9493894dbc27ffad",
+                "note": "the final product of forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile of its band for readings",
+                "by": null
+              },
+              "origin": "fit",
+              "identified": true,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "the final product of forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile of its band for readings; chosen in place of the 3 records it bound",
+              "outOfBounds": null
+            },
+            {
+              "key": "yield",
+              "value": 0.20523209622693878,
+              "low": 0.1934502858639274,
+              "high": 0.21756178245739488,
+              "source": {
+                "kind": "artifact",
+                "id": "9493894dbc27ffad",
+                "note": "Yp/s, product made over sugar used, from forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
+                "by": null
+              },
+              "origin": "fit",
+              "identified": true,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "Yp/s, product made over sugar used, from forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile; chosen in place of the 3 records it bound",
+              "outOfBounds": null
+            },
+            {
+              "key": "productivity",
+              "value": 0.14957785445200902,
+              "low": 0.14435111828283456,
+              "high": 0.15557543917185543,
+              "source": {
+                "kind": "artifact",
+                "id": "9493894dbc27ffad",
+                "note": "titre over batch time: the final product of forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere) over the hour its median sugar runs out, the 5th and 95th percentile of the product over the same hour",
+                "by": null
+              },
+              "origin": "fit",
+              "identified": true,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "titre over batch time: the final product of forecast 9493894dbc27ffad, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere) over the hour its median sugar runs out, the 5th and 95th percentile of the product over the same hour; chosen in place of the 3 records it bound",
+              "outOfBounds": null
+            },
+            {
+              "key": "plant_scale",
+              "value": null,
+              "low": null,
+              "high": null,
+              "source": null,
+              "origin": "waiting",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "waits for a source: a named person's assumption",
+              "outOfBounds": null
+            },
+            {
+              "key": "glucose_price",
+              "value": null,
+              "low": null,
+              "high": null,
+              "source": null,
+              "origin": "waiting",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "waits for a source: a named person's assumption",
+              "outOfBounds": null
+            },
+            {
+              "key": "ethanol_purity",
+              "value": "fuel grade",
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "fuel grade: the ethanol the package's molecular sieves give, with no denaturant blended; a convention every run's basis names, and the run reads the purity back",
+                "by": null
+              },
+              "origin": "convention",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "fuel grade: the ethanol the package's molecular sieves give, with no denaturant blended; a convention every run's basis names, and the run reads the purity back",
+              "outOfBounds": null
+            }
+          ],
+          "waiting": [
+            "plant_scale",
+            "glucose_price"
+          ],
+          "notes": [
+            "Bound as a run of ethanol_glucose_v0 binds it: each process input to the records of its fields on its program's papers that pass the aggregate gate and name glucose as their carbon source, converted into the input's unit; a fermOS fit a person chose replaces them for titre, yield and productivity.",
+            "A person's override wins over the records and any fit for its input, here and in the run, which carries the overrides and names the person in its basis (OF-BLD-020 D3)."
+          ]
+        }
+      },
+      {
+        "fits": {
+          "titre": "a9074acb4eeb57d9",
+          "yield": "a9074acb4eeb57d9"
+        },
+        "status": 200,
+        "body": {
+          "scope": "proforma:sc-yeast-1",
+          "kind": "proforma",
+          "title": "Glucose to ethanol — draft flowsheet (Glucose to ethanol, draft v0)",
+          "specs": [
+            {
+              "key": "feed_glucose_conc",
+              "label": "glucose in the fermenter's feed",
+              "symbol": "",
+              "gloss": "records of a medium component whose carbon source is glucose; sets the water that dilutes the glucose, by thermosteam's volume of the solution",
+              "dimension": "massConc",
+              "unit": "g L-1",
+              "min": 1e-05,
+              "max": 120.0,
+              "step": null,
+              "scale": "linear",
+              "group": "Process",
+              "sourceRule": [
+                "record:medium_component_conc",
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "the ontology's plausibility range for medium_component_conc (Medium component concentration), 1e-05 to 120 g L⁻¹, in g L-1: the validation range that refuses an implausible extraction, not a result",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "titre",
+              "label": "ethanol titre at harvest",
+              "symbol": "",
+              "gloss": "with the productivity, sets the batch time; the beer's own ethanol follows from the feed's glucose and the yield, and the run reads it back",
+              "dimension": "massConc",
+              "unit": "g L-1",
+              "min": 0.01,
+              "max": 250.0,
+              "step": null,
+              "scale": "linear",
+              "group": "Process",
+              "sourceRule": [
+                "fit",
+                "simulation",
+                "record:ethanol_titre",
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "the ontology's plausibility range for ethanol_titre (Ethanol titre), 0.01 to 250 g L⁻¹, in g L-1: the validation range that refuses an implausible extraction, not a result",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "yield",
+              "label": "ethanol yield on glucose",
+              "symbol": "",
+              "gloss": "the fermenter's conversion is this yield over the theoretical yield of the reaction; a case above the theoretical yield cannot run, and says so",
+              "dimension": "yield",
+              "unit": "g g-1",
+              "min": 0.001,
+              "max": 0.6,
+              "step": null,
+              "scale": "linear",
+              "group": "Process",
+              "sourceRule": [
+                "fit",
+                "simulation",
+                "record:ethanol_yield_substrate",
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "the ontology's plausibility range for ethanol_yield_substrate (Ethanol yield on substrate (Yp/s)), 0.001 to 0.6 g g⁻¹, in g g-1: the validation range that refuses an implausible extraction, not a result",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "productivity",
+              "label": "ethanol volumetric productivity",
+              "symbol": "",
+              "gloss": "the batch time is the titre divided by it",
+              "dimension": "volProd",
+              "unit": "g L-1 h-1",
+              "min": 0.001,
+              "max": 100.0,
+              "step": null,
+              "scale": "linear",
+              "group": "Process",
+              "sourceRule": [
+                "fit",
+                "simulation",
+                "record:ethanol_productivity",
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "the ontology's plausibility range for ethanol_productivity (Ethanol volumetric productivity), 0.001 to 100 g L⁻¹ h⁻¹, in g L-1 h-1: the validation range that refuses an implausible extraction, not a result",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "plant_scale",
+              "label": "ethanol fermented in a year",
+              "symbol": "",
+              "gloss": "a named person's assumption; with the yield it sets the glucose fed, so the plant's size",
+              "dimension": "massFlow",
+              "unit": "t yr-1",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Economics",
+              "sourceRule": [
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "a physical limit: no negative ethanol fermented in a year",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "glucose_price",
+              "label": "price of glucose",
+              "symbol": "",
+              "gloss": "a named person's assumption; the glucose alone is priced, not its water",
+              "dimension": "costUSD",
+              "unit": "USD kg-1",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Economics",
+              "sourceRule": [
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "a physical limit: no negative price of glucose",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "ethanol_purity",
+              "label": "ethanol purity",
+              "symbol": "",
+              "gloss": "fuel grade: the ethanol the package's molecular sieves give, with no denaturant blended; a convention every run's basis names, and the run reads the purity back",
+              "dimension": "fraction",
+              "unit": "",
+              "min": null,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Conventions",
+              "sourceRule": [
+                "convention"
+              ],
+              "note": "fuel grade: the ethanol the package's molecular sieves give, with no denaturant blended; a convention every run's basis names, and the run reads the purity back",
+              "boundsReason": "a convention stated in words: it takes no number, so it has no bounds",
+              "choices": null,
+              "convention": "fuel grade"
+            }
+          ],
+          "values": [
+            {
+              "key": "feed_glucose_conc",
+              "value": 60.0,
+              "low": 20.0,
+              "high": 100.0,
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of medium_component_conc",
+                "by": null
+              },
+              "origin": "record",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [
+                "standin-medium_component_conc-0",
+                "standin-medium_component_conc-1",
+                "standin-medium_component_conc-2"
+              ],
+              "detail": "3 records of medium_component_conc, 20 to 100 g L-1, median 60",
+              "outOfBounds": null
+            },
+            {
+              "key": "titre",
+              "value": 5.578025286513549,
+              "low": 5.484919564233223,
+              "high": 5.663757900788552,
+              "source": {
+                "kind": "artifact",
+                "id": "a9074acb4eeb57d9",
+                "note": "the final product of the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile of its band for readings",
+                "by": null
+              },
+              "origin": "fit",
+              "identified": true,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "the final product of the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile of its band for readings; chosen in place of the 3 records it bound",
+              "outOfBounds": null
+            },
+            {
+              "key": "yield",
+              "value": 0.12604466085650495,
+              "low": 0.1243969589074855,
+              "high": 0.12784207888996105,
+              "source": {
+                "kind": "artifact",
+                "id": "a9074acb4eeb57d9",
+                "note": "Yp/s, product made over sugar used, from the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
+                "by": null
+              },
+              "origin": "fit",
+              "identified": true,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "Yp/s, product made over sugar used, from the forecast of fit a9074acb4eeb57d9 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile; chosen in place of the 3 records it bound",
+              "outOfBounds": null
+            },
+            {
+              "key": "productivity",
+              "value": 1.8,
+              "low": 1.0,
+              "high": 2.5,
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of ethanol_productivity",
+                "by": null
+              },
+              "origin": "record",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [
+                "standin-ethanol_productivity-0",
+                "standin-ethanol_productivity-1",
+                "standin-ethanol_productivity-2"
+              ],
+              "detail": "3 records of ethanol_productivity, 1 to 2.5 g L-1 h-1, median 1.8",
+              "outOfBounds": null
+            },
+            {
+              "key": "plant_scale",
+              "value": null,
+              "low": null,
+              "high": null,
+              "source": null,
+              "origin": "waiting",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "waits for a source: a named person's assumption",
+              "outOfBounds": null
+            },
+            {
+              "key": "glucose_price",
+              "value": null,
+              "low": null,
+              "high": null,
+              "source": null,
+              "origin": "waiting",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "waits for a source: a named person's assumption",
+              "outOfBounds": null
+            },
+            {
+              "key": "ethanol_purity",
+              "value": "fuel grade",
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "fuel grade: the ethanol the package's molecular sieves give, with no denaturant blended; a convention every run's basis names, and the run reads the purity back",
+                "by": null
+              },
+              "origin": "convention",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "fuel grade: the ethanol the package's molecular sieves give, with no denaturant blended; a convention every run's basis names, and the run reads the purity back",
+              "outOfBounds": null
+            }
+          ],
+          "waiting": [
+            "plant_scale",
+            "glucose_price"
+          ],
+          "notes": [
+            "Bound as a run of ethanol_glucose_v0 binds it: each process input to the records of its fields on its program's papers that pass the aggregate gate and name glucose as their carbon source, converted into the input's unit; a fermOS fit a person chose replaces them for titre, yield and productivity.",
+            "A person's override wins over the records and any fit for its input, here and in the run, which carries the overrides and names the person in its basis (OF-BLD-020 D3)."
+          ]
+        }
+      },
+      {
+        "fits": {
+          "titre": "a9074acb4eeb57d9",
+          "yield": "a9074acb4eeb57d9",
+          "productivity": "9493894dbc27ffad"
+        },
+        "status": 422,
+        "body": {
+          "detail": "productivity from growth_forecast 9493894dbc27ffad is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from 9493894dbc27ffad: the fermenter's batch time is the titre over the productivity, and here titre is from a9074acb4eeb57d9. To use it, choose 9493894dbc27ffad for titre as well, or stop using it for productivity"
+        }
+      }
+    ],
+    "resolves": [
+      {
+        "fits": {
+          "titre": "9493894dbc27ffad",
+          "yield": "9493894dbc27ffad",
+          "productivity": "9493894dbc27ffad"
+        },
+        "keys": [
+          "glucose_price",
+          "plant_scale",
+          "titre"
+        ],
+        "status": 422,
+        "body": {
+          "detail": "productivity from growth_forecast 9493894dbc27ffad is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from 9493894dbc27ffad: the fermenter's batch time is the titre over the productivity, and here titre is a named person's assumption, which wins over any fit. To use it, reset titre to its source and choose 9493894dbc27ffad for titre, or stop using it for productivity"
+        }
+      }
+    ]
+  }
+}

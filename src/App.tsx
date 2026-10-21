@@ -182,8 +182,10 @@ function Screen() {
       if (b === 'hosts' && c) return <StrainPage strainId={c} />;
       return <GeneOS />;
     case 'fermos':
-      // Nothing under it. OF-BLD-011 §3 moved the strain catalogue to geneOS
-      // and left fermOS as the five reactor subsystems, none of which is built.
+      // OF-BLD-011 §3 moved the strain catalogue to geneOS. 'simulate',
+      // 'vessel' and 'forecast' are reserved second segments (OF-BLD-020
+      // §3.3): FermOS reads the path and shows the view; nothing under it
+      // takes an id.
       return <FermOS />;
     case 'pureos':
       // OF-BLD-019 §4.1 — 'train' is a reserved second segment: the units of

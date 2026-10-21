@@ -2,7 +2,7 @@
   "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
   "response": {
     "scenarioId": "sc-yeast-1",
-    "artifactId": "77a6c3ec1f9c6739",
+    "artifactId": "01c59ce34e14736d",
     "provenance": "demo",
     "inputs": [
       {
@@ -1335,7 +1335,7 @@
     ],
     "priceBasis": "USD per kg of fuel-grade ethanol, as the product leaves its tank",
     "evidence": {
-      "id": "77a6c3ec1f9c6739",
+      "id": "01c59ce34e14736d",
       "label": "Minimum selling price, sc-yeast-1 (Glucose to ethanol, draft v0)",
       "value": 1.1232697772553721,
       "unit": "USD per kg of fuel-grade ethanol, as the product leaves its tank",
@@ -1666,9 +1666,20 @@
               "note": "typed on 2026-10-15: STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM",
               "by": "openFerment test fixture"
             }
+          },
+          {
+            "name": "assumptions read from",
+            "value": "overrides",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "where the named persons' values in this basis came from: the parameter panel's overrides, and any the older assumptions field gave, which the service reads as overrides for one release; a basis without this input read the older field alone",
+              "by": null
+            }
           }
         ],
-        "artifactId": "77a6c3ec1f9c6739",
+        "artifactId": "01c59ce34e14736d",
         "at": "2026-09-15T09:00:00Z",
         "seed": 0
       },

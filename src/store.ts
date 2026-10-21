@@ -6,6 +6,7 @@ import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
 import type {
   InputAssumption,
+  Override,
   RunbookDraft,
   AuditEvent,
   Candidate,
@@ -327,10 +328,31 @@ export interface OFState {
   createdScenarioIds: string[];
   /** A research runbook, unlocked, from a draft; returns its id. */
   adoptRunbookDraft: (draft: RunbookDraft) => string;
-  /** Proforma's typed assumptions, by scenario id (§8.4). Durable. */
+  /**
+   * Proforma's typed assumptions, by scenario id (§8.4). Durable. Since
+   * OF-BLD-020 §2.1 it is DERIVED from `parameterOverrides`: each
+   * `proforma:<id>` scope's numeric overrides, as `assumptionsFromOverrides`
+   * reads them, kept in step by every action that writes an override. Since
+   * OF-BLD-020 §2.2 no screen reads it: the scenario page, the index and
+   * geneOS read the overrides, and the field is kept, derived, for the
+   * snapshot an older build reads and the one-time migration.
+   */
   proformaAssumptions: Record<string, InputAssumption[]>;
+  /** Writes the override `proforma:<scenarioId>` holds for the input, through `setOverride`. */
   setProformaAssumption: (scenarioId: string, a: InputAssumption) => void;
+  /** Removes it, through `clearOverride`. */
   clearProformaAssumption: (scenarioId: string, key: string) => void;
+  /**
+   * Every change a person made in the parameter panel, by scope
+   * (OF-BLD-020 D3): a named assumption this browser keeps and a run
+   * carries. Durable; the service keeps none. Read one scope with
+   * `useStore(overridesFor(scope))`.
+   */
+  parameterOverrides: Record<string, Override[]>;
+  /** Keep a person's override, replacing any for the same scope and key. */
+  setOverride: (o: Override) => void;
+  /** Reset to source: drop the override of one parameter in one scope. */
+  clearOverride: (scope: string, key: string) => void;
   /**
    * The fermOS fits a person chose for a scenario's inputs, by scenario id
    * and then input key: the id of a kept kinetic fit or forecast
@@ -807,6 +829,7 @@ const seedState = () => ({
   undoStack: [] as UndoFrame[],
   learnProgress: {} as Record<string, boolean>,
   proformaAssumptions: {} as Record<string, InputAssumption[]>,
+  parameterOverrides: {} as Record<string, Override[]>,
   proformaFits: {} as Record<string, Record<string, string>>,
   adoptedRunbookIds: [] as string[],
   createdScenarioIds: [] as string[],
@@ -867,7 +890,13 @@ export const useStore = create<OFState>()((set, get) => ({
   guildPendingWithdrawals: [] as GuildWithdrawal[],
   guildActingId: null as string | null,
   fermosFits: {} as Record<string, FermosFitResponse>,
-  keepFermosFit: (fit: FermosFitResponse) => set((s) => ({ fermosFits: { ...s.fermosFits, [fit.depositionId]: fit } })),
+  // By run, and by family when it is not the logistic (OF-BLD-020 §3.3): a run keeps one fit of each family.
+  keepFermosFit: (fit: FermosFitResponse) =>
+    set((s) => {
+      const model = fit.kinetic?.model ?? 'logistic_v0';
+      const key = model === 'logistic_v0' ? fit.depositionId : `${fit.depositionId} · ${model}`;
+      return { fermosFits: { ...s.fermosFits, [key]: fit } };
+    }),
   guildHydrated: false,
   practice: null as Practice | null,
   checks: null as Checks | null,
@@ -2336,21 +2365,31 @@ export const useStore = create<OFState>()((set, get) => ({
 
   // ── Proforma's assumptions (OF-BLD-014 §8.4) ──────────────────────────
   // A typed value carries the person and the day; the service refuses one
-  // without a name, so the screen asks for a reviewer name first.
-  setProformaAssumption: (scenarioId, a) =>
-    set((s) => ({
-      proformaAssumptions: {
-        ...s.proformaAssumptions,
-        [scenarioId]: [...(s.proformaAssumptions[scenarioId] ?? []).filter((x) => x.key !== a.key), a],
-      },
-    })),
-  clearProformaAssumption: (scenarioId, key) =>
-    set((s) => ({
-      proformaAssumptions: {
-        ...s.proformaAssumptions,
-        [scenarioId]: (s.proformaAssumptions[scenarioId] ?? []).filter((x) => x.key !== key),
-      },
-    })),
+  // without a name, so the screen asks for a reviewer name first. Since
+  // OF-BLD-020 §2.1 an assumption is the override its scenario's scope
+  // holds for the input, and proformaAssumptions is read from the overrides.
+  setProformaAssumption: (scenarioId, a) => get().setOverride(overrideOfAssumption(scenarioId, a)),
+  clearProformaAssumption: (scenarioId, key) => get().clearOverride(proformaScope(scenarioId), key),
+
+  // ── the parameter panel's overrides (OF-BLD-020 §2.1, D3) ─────────────
+  // A person's change, under their name, by scope and key: one a parameter.
+  // Reset to source removes it. proformaAssumptions follows every write.
+  setOverride: (o) =>
+    set((s) => {
+      const parameterOverrides = {
+        ...s.parameterOverrides,
+        [o.scope]: [...(s.parameterOverrides[o.scope] ?? []).filter((x) => x.key !== o.key), o],
+      };
+      return { parameterOverrides, proformaAssumptions: assumptionsFromOverrides(parameterOverrides) };
+    }),
+  clearOverride: (scope, key) =>
+    set((s) => {
+      const parameterOverrides = {
+        ...s.parameterOverrides,
+        [scope]: (s.parameterOverrides[scope] ?? []).filter((x) => x.key !== key),
+      };
+      return { parameterOverrides, proformaAssumptions: assumptionsFromOverrides(parameterOverrides) };
+    }),
 
   // ── Proforma's fermOS fits (OF-BLD-019 §5.1, D10) ─────────────────────
   // A person picks the fit; the browser keeps which artifact feeds which
@@ -2472,6 +2511,11 @@ export const useStore = create<OFState>()((set, get) => ({
   // round-trips a snapshot through it with no IndexedDB (§9.2).
   applyDurable: (snap) => {
     set((s) => {
+      // OF-BLD-020 §2.1 (D3) — the overrides typed here, the snapshot's
+      // older proformaAssumptions read once into `proforma:<id>` where it
+      // holds no entry for that scope; anything typed since load wins, by
+      // scope and key. proformaAssumptions is read from the result.
+      const parameterOverrides = mergeOverrides(overridesOfSnapshot(snap), s.parameterOverrides);
       // Review decisions are re-applied over the seeded records rather than
       // replacing them, so a corpus update ships new records without
       // discarding what a reviewer already decided.
@@ -2540,7 +2584,9 @@ export const useStore = create<OFState>()((set, get) => ({
         // page loaded is kept beside what the snapshot remembers.
         learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
         // §8.4 — assumptions typed here; anything typed since load wins.
-        proformaAssumptions: mergeAssumptions(snap.proformaAssumptions ?? {}, s.proformaAssumptions),
+        // Since OF-BLD-020 §2.1 they are the overrides of each proforma scope.
+        parameterOverrides,
+        proformaAssumptions: assumptionsFromOverrides(parameterOverrides),
         // OF-BLD-019 §5.1 — the fermOS fits chosen here; a scenario's choice
         // made since load wins over the snapshot's.
         proformaFits: { ...(snap.proformaFits ?? {}), ...s.proformaFits },
@@ -3277,7 +3323,7 @@ export const useStore = create<OFState>()((set, get) => ({
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished, conversations and Proforma scenarios kept here are gone, archived programs are hidden again, and the corpus is as it shipped',
+      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished, conversations, Proforma scenarios and the parameters changed here are gone, archived programs are hidden again, and the corpus is as it shipped',
       kind: 'info',
     });
   },
@@ -3386,6 +3432,104 @@ export function mergeAssumptions(
   return out;
 }
 
+// ── the parameter panel's overrides (OF-BLD-020 §2.1, D3) ────────────────
+//
+// An override is a person's change to one parameter of one scope, kept in
+// this browser and sent with the run; the service keeps none. Proforma's
+// older `proformaAssumptions` is the same thing for one kind of scope: a
+// scenario's assumptions are the overrides of `proforma:<scenario id>`, and
+// the old field is derived from them. Since OF-BLD-020 §2.2 the scenario page
+// is the panel and nothing on a screen reads the old field.
+
+const PROFORMA_SCOPE = 'proforma:';
+const NO_OVERRIDES: Override[] = [];
+
+/** The scope a Proforma scenario's parameters live under. */
+export function proformaScope(scenarioId: string): string {
+  return `${PROFORMA_SCOPE}${scenarioId}`;
+}
+
+/** One scope's overrides, for `useStore(overridesFor(scope))`: the same empty list every time when there are none. */
+export function overridesFor(scope: string): (s: Pick<OFState, 'parameterOverrides'>) => Override[] {
+  return (s) => s.parameterOverrides[scope] ?? NO_OVERRIDES;
+}
+
+/**
+ * A Proforma assumption as the override of its scenario's scope. The old
+ * form (OF-BLD-019's Keep assumption) asked for a value, a low and a high
+ * every time, so a fixed value was typed with both ends at itself; such ends
+ * say nothing the value does not, and are read as none (OF-BLD-020 §2.R,
+ * finding 10: kept, they held every later value to the old one, and the
+ * service refused it as outside its own low and high).
+ */
+export function overrideOfAssumption(scenarioId: string, a: InputAssumption): Override {
+  const fixed = a.low === a.value && a.high === a.value;
+  return {
+    scope: proformaScope(scenarioId),
+    key: a.key,
+    value: a.value,
+    low: fixed ? null : a.low,
+    high: fixed ? null : a.high,
+    by: a.by,
+    at: a.at,
+    note: a.note ?? null,
+  };
+}
+
+/**
+ * An override's interval as every reader takes it (OF-BLD-020 §2.R,
+ * findings 1 and 14; the service's `params.held`): one end typed and the
+ * other left empty, the empty end is the value itself; with neither, the
+ * value is held at itself and both stay empty. The panel's row, the
+ * scenario page's binding and `assumptionOfOverride` read it so, as the
+ * service's resolve and run do.
+ */
+export function overrideEnds(o: Pick<Override, 'value' | 'low' | 'high'>): { low: number | null; high: number | null } {
+  if (typeof o.value !== 'number' || (o.low == null && o.high == null)) return { low: o.low ?? null, high: o.high ?? null };
+  return { low: o.low ?? o.value, high: o.high ?? o.value };
+}
+
+/** An override as a Proforma assumption; null for a value in words, which no Proforma input takes. */
+export function assumptionOfOverride(o: Override): InputAssumption | null {
+  if (typeof o.value !== 'number' || !Number.isFinite(o.value)) return null;
+  const ends = overrideEnds(o);
+  return { key: o.key, value: o.value, low: ends.low ?? o.value, high: ends.high ?? o.value, by: o.by, at: o.at, note: o.note ?? null };
+}
+
+/** `proformaAssumptions` as the overrides of every `proforma:` scope give it, by scenario id. */
+export function assumptionsFromOverrides(overrides: Record<string, Override[]>): Record<string, InputAssumption[]> {
+  const out: Record<string, InputAssumption[]> = {};
+  for (const [scope, list] of Object.entries(overrides)) {
+    if (!scope.startsWith(PROFORMA_SCOPE)) continue;
+    out[scope.slice(PROFORMA_SCOPE.length)] = list.map(assumptionOfOverride).filter((a): a is InputAssumption => a !== null);
+  }
+  return out;
+}
+
+/**
+ * A snapshot's overrides, with its `proformaAssumptions` read once into
+ * `proforma:<id>` for every scenario whose scope the snapshot holds no entry
+ * for (D3: a snapshot written before the panel carries only the old field).
+ */
+export function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverrides' | 'proformaAssumptions'>): Record<string, Override[]> {
+  const out: Record<string, Override[]> = { ...(snap.parameterOverrides ?? {}) };
+  for (const [id, typed] of Object.entries(snap.proformaAssumptions ?? {})) {
+    const scope = proformaScope(id);
+    if (!(scope in out)) out[scope] = typed.map((a) => overrideOfAssumption(id, a));
+  }
+  return out;
+}
+
+/** The snapshot's overrides under those typed since load, merged by key within each scope (as `mergeAssumptions`). */
+export function mergeOverrides(saved: Record<string, Override[]>, since: Record<string, Override[]>): Record<string, Override[]> {
+  const out: Record<string, Override[]> = { ...saved };
+  for (const [scope, typed] of Object.entries(since)) {
+    const keys = new Set(typed.map((o) => o.key));
+    out[scope] = [...(saved[scope] ?? []).filter((o) => !keys.has(o.key)), ...typed];
+  }
+  return out;
+}
+
 export function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
   for (const r of s.records) {
@@ -3425,6 +3569,8 @@ export function snapshotOf(s: OFState): DurableSnapshot {
     },
     learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
     proformaAssumptions: s.proformaAssumptions,
+    // OF-BLD-020 §2.1 (D3) — the parameter panel's overrides, by scope.
+    parameterOverrides: s.parameterOverrides,
     proformaFits: s.proformaFits,
     // Unlocked content as adopted; a lock rides in runbookLocks like any other.
     adoptedRunbooks: s.runbooks
@@ -3477,6 +3623,7 @@ if (durableAvailable()) {
       s.guildActingId === prev.guildActingId &&
       s.learnProgress === prev.learnProgress &&
       s.proformaAssumptions === prev.proformaAssumptions &&
+      s.parameterOverrides === prev.parameterOverrides &&
       s.proformaFits === prev.proformaFits &&
       s.adoptedRunbookIds === prev.adoptedRunbookIds &&
       s.liveConversations === prev.liveConversations &&

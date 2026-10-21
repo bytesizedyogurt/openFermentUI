@@ -9,9 +9,10 @@ outside `k` and `limit` refuses the call, and every refusal is a result with
 `data` is emptied with it; a tool whose whole output is longer
 (`stream_table`) cuts its own summary, says how much it left out, and carries
 the whole in `ToolResult.data`, which the endpoint and the MCP server return
-and no model reads. The registry is closed at thirty-two names;
-`test_tools.NAMES` is the one literal list of them in the tests, and every
-other count there is derived from `WHITELIST`.
+and no model reads. The registry holds thirty-four names (OF-BLD-020 §3.4
+added `fermos_simulate` and §4.2 `fermos_vessel`); `test_tools.NAMES` is the
+one literal list of them in the tests, and every other count there is
+derived from `WHITELIST`.
 
 The names below are the registry's. The build document writes `dominion.read`;
 the Messages API refuses a dot in a tool name, so the registry uses an
@@ -41,9 +42,10 @@ it spends no model money, and **it is at no gate** (`gates.py` is unchanged:
 a run keeps one artifact in the open lane, as a ceiling does). It is audited
 like every module write, `agent: model` with the model id, the effort and the
 ask id, `module: proforma`, `action: run`, and the tool's name in `detail`.
-The service holds no person's assumption (they are typed in Proforma and kept
-in the browser's Durable tier), so the model never supplies one: an input no
-record binds waits, and the call refuses naming it. A scenario made with New
+The service holds no person's assumption (they are typed into Proforma's
+parameter panel and kept in the browser's Durable tier; *A person's value*,
+below), so the model never supplies one: an input no record binds waits, and
+the call refuses naming it. A scenario made with New
 scenario lives in the browser that made it and is refused in words, as is an
 authored cost surface and, with the switch off, an archived scenario. The run
 is `tools/writes.py`'s `run_scenario`, the same function `proforma_write`'s
@@ -83,6 +85,139 @@ tool returned in this conversation is dropped. Postdoc's prompt (rule 8)
 says a price, a cost or a recovery read from a run cites that run's evidence
 id.
 
+## fermOS simulates (OF-BLD-020 §3.4)
+
+| Tool | In | Out |
+|---|---|---|
+| `fermos_simulate` | a model family's id (`batch_v1`, `fedbatch_v1`, `chemostat_v1`; `storage_v1` with the switch on; `light_v1` refuses in words), a strain, a product and a sugar by their ids (each may be empty), `recordsByParam` (a parameter's key to the record ids that bind it, exactly those records), a kept kinetic fit's or forecast's artifact id (`fitArtifact`), `startFrom` (`records`, `fit` or `simulation:<artifact id>`) and `durationPreset` (`until-sugar-runs-out` or `fit-length`) | runs `fermos.simulate` as the service binds the family's parameters, keeps one `fermos.simulation` artifact and returns its evidence id (the artifact id; its value the product's titre at harvest), what bound each parameter in words and counts (never the value, which the artifact holds), the end state, the ceiling rows beside Yp/s in words, and the flags (a value outside its bounds by its key alone, the value and its bounds left to the artifact; a long flag cut at a sentence or clause and said to be cut; each ending at a full stop, OF-BLD-020 §3.R); or refuses with `fermos.simulate`'s own words (the 422's) naming each parameter that waits and the field that would bind it, and, with the switch off, a start from a kept simulation, a fit or a forecast of an archived program (a storage_v1 simulation is PHA's, as is one built on it) |
+
+Offered loose, as the module tools are. Ids and words only (D13): a JSON
+number anywhere refuses the call, as for every tool, and no field of its
+schema is numeric (E.4‴, below). A parameter named in `recordsByParam` binds
+to exactly those records: each must be in the evidence pool the switch shows,
+a record of a field the parameter binds from (`ethanol_yield_substrate` for
+`yps`, say; the product's own field for another product), kept by the
+aggregate gate and in a unit `units.py` converts into the parameter's; one
+that is not refuses the call, naming the record and why. Named records bind
+ahead of a fit or a kept simulation (a person's override still wins, in the
+browser), their value is Proforma's statistic over them, the basis names
+each as a `record` input and says beside the value (`<key> origin`,
+`records named`) that they were named. The same field rides on
+`POST /api/fermos/simulate` (`SimulationRequest.recordsByParam`).
+
+It is a free write: compute, no model money, and **at no gate** (`gates.py`
+is unchanged, as for a flowsheet run). The integration is scipy's, in the
+service itself (`kinetics.py`: an open-source numerical library steps the
+family's rate equations forward in time), so it starts no worker; README.md
+(*fermOS simulates on scipy*) has the families and where each value comes
+from. It is audited like every module write,
+`agent: model` with the model id, the effort and the ask id, `module:
+fermos`, `action: simulate`, the family as target and the tool's name in
+`detail`. The service holds no person's assumption (they are typed in fermOS →
+Simulate and kept in the browser's Durable tier), so the model never supplies
+one: a parameter nothing binds waits, and the call refuses naming it. With the
+switch off an archived family (`storage_v1`, PHA's), strain or product is
+refused with *archived (hidden)* and names Settings → Programs. The run is
+`tools/writes.py`'s `run_simulation`, the same function `fermos_write`'s
+`simulate` calls, so `check:tools` reads the one call to `fermos.simulate`
+there.
+
+A simulation is cited like any computed value: the tool returns it as one
+`Evidence` whose id is the artifact's, so it enters `SeenSet` and a claim
+citing it is kept; a claim citing a simulation no tool returned in this
+conversation is dropped. `SeenSet.runs` learns every kept simulation a tool
+returned, from that `Evidence` and from a `fermos_read` row
+(`validate.KEPT_RUNS`): a simulation a read returned only as a row is cited by
+its ref in `moduleRefs`, and a claim citing it by evidence id is dropped with
+words that say so. Postdoc's prompt (rule 15) says a simulation's numbers are
+read from its artifact and never stated, and the simulation is cited by its
+artifact id.
+
+**Rule 2b and E.4‴** (`check:tools`). Rule 2b's kept runs grow from
+Proforma's to a `fermos.simulation`, a `fermos.vessel` and a
+`pureos.train_run` artifact: every function that keeps one is found by the
+same call-graph walk, never listed, and no tool file but `tools/writes.py`
+reaches one. A tool file may not reach a module by name at run time either:
+`__import__`, `importlib`, `sys.modules`, `vars()`, `globals()`, `locals()`
+or a module's `__dict__` each fail the rule (OF-BLD-020 §3.R). Rule 6 is E.4‴: no tool named `fermos_*` or `pureos_*` has a
+numeric field (`number` or `integer` anywhere in its input schema, a numeric
+`enum` or `const` included); the registry's two count fields, `k` and
+`limit`, at the top of an input stand aside, as `tools.numbers_in` lets them
+(`fermos_read` and `pureos_read` take `limit`). `core/tests/test_check_tools.py`
+plants each way round.
+
+## fermOS's vessel (OF-BLD-020 §4.2)
+
+| Tool | In | Out |
+|---|---|---|
+| `fermos_vessel` | a kept simulation's artifact id (`simulationArtifact`) or, for an anaerobic vessel, a kept kinetic fit's or forecast's (`fitArtifact`); `vesselType` (`stirred-tank` or `bubble-column`, or empty for BioSTEAM's own); `klaMethod` (a kLa correlation by the name BioSTEAM registers it and its class runs for the design, `Riet` or `Dewes`, or empty) | designs the vessel on BioSTEAM through `vessel.design` (the Proforma worker), keeps one `fermos.vessel` artifact and returns it as one evidence id (the artifact id): the vessels, volumes, times, powers, kLa, the oxygen balance in brief, heat (BioSTEAM's duty with how it found it, and the cross-check on the oxygen the simulation took up, each in the service's words) and cost with BioSTEAM's cost index, who assumed what, and the flags; or refuses in `vessel.design`'s own words |
+
+Offered loose, as the module tools are; every field is a string, an empty
+one meaning "none", and E.4‴ holds the schema to no numeric field. It is a
+free write at no gate, audited like every module write (`agent: model`,
+`module: fermos`, `action: design_vessel`, the tool's name in `detail`), and
+it is `tools/writes.py`'s `design_vessel`, the function `fermos_write`'s
+`design_vessel` action calls, so the one call to `vessel.design` stays where
+`check:tools` reads it (`vessel.design` is in `ALLOWED_WRITES`, and `vessel`
+among the stores rule 2 polices). A design needs a plant scale or one
+vessel's batch volume, a named person's assumption typed in fermOS → Vessel;
+the service holds none, so without one the tool returns the refusal's words
+and Postdoc says in gaps that the design waits for a person. The vessel type
+and the kLa correlation a call names are conventions of that request, named
+in the basis; a person's choice of either in the panel is an assumption by
+them, and the two must agree. A design is cited like any computed value: its
+`Evidence` id is the artifact's, so `SeenSet` keeps it, and a claim citing a
+design no tool returned in this conversation is dropped. `fermos_read`'s kind
+`vessel` lists the kept designs (`fermos/vessel/<artifact id>`, read by the
+design's id or the simulation's). A design is a kept run as a simulation is
+(`validate.KEPT_RUNS` maps `fermos.vessel` to the `vessel` row): `SeenSet.runs`
+learns it from the `Evidence` and from the row, so a design a read returned
+only as a row is cited by its ref in `moduleRefs`, and a claim citing it by
+evidence id is dropped with words that say so. Postdoc's prompt (rule 16)
+says a vessel's numbers are read from its artifact, never stated.
+
+The `Evidence`'s value is the number of vessels BioSTEAM sized; every other
+number stays in the artifact, which the MCP server's `get_artifact` reads
+whole. With the program switch off, a simulation of an archived program is
+refused like any other archived target. The design itself is BioSTEAM's, made in the Proforma
+worker, and spends no model money; what it computes, and where BioSTEAM
+overruled the build document, are in README.md (*fermOS sizes the vessel on
+BioSTEAM*).
+
+## A person's value (OF-BLD-020 Phase 2)
+
+A number a person sets for a model reaches a run one way, and no tool is on it.
+
+1. The service declares the parameter (`params.py`) and serves it in a scope:
+   `GET /api/params/{scope}` gives its value and where the value came from.
+2. A person types a value into the parameter panel, under their reviewer
+   name. It is an `Override` (scope, key, value, low, high, by, at, note),
+   kept in that browser's Durable tier (`parameterOverrides`). The service
+   keeps none. `POST /api/params/{scope}/resolve` shows what it would change
+   and keeps nothing.
+3. The browser sends the scope's overrides with the run, as `overrides` in the
+   body of `POST /api/proforma/run`, `POST /api/fermos/vessel` or
+   `POST /api/fermos/simulate`. `GET /api/proforma/bind`, the ceiling check
+   and `GET /api/fermos/bind` take them as `?overrides=`. A logistic fit's
+   forecast scope (`fermos:forecast:<fit id>`) travels as the forecast's own
+   fields on `POST /api/fermos/forecast`: its start values, its length, and
+   who typed each (`changedBy`, `durationBy`). Proforma still reads the older
+   field, `assumptions`, the same way for one release.
+4. The service checks each one (a real name, when it was typed, a number or
+   one of the offered words, a parameter whose rule takes a person's value, a
+   value inside its own low and high) and refuses one that fails, in words. A
+   person's value wins over the records and any fit for its parameter. The
+   run's basis names it as an `assumption` by that person, so the run is
+   `demo`.
+
+No tool takes a person's value, and no tool input carries an override: tool
+inputs carry ids and words. `run_flowsheet`, `proforma_write`'s `run`,
+`fermos_simulate`, `fermos_write`'s `simulate`, `fermos_vessel` and
+`fermos_write`'s `design_vessel` run as the service binds the scenario, the
+simulation or the design, with no person's value, so an input that waits for
+one refuses the call, naming it. `proforma_write`'s `bind` is refused (the
+table below).
+
 ## The read tools (OF-BLD-015 §7.2)
 
 One a module: `dominion_read`, `runbooks_read`, `geneos_read`, `fermos_read`,
@@ -97,6 +232,20 @@ module read in part says so. An artifact row's `provenance` is worked out
 when the row is read, by `basis_provenance` over its inputs as they stand
 then, never copied from the stored file: a record rejected since it was
 computed brings the row, and a claim citing it, down with it.
+
+**fermOS reads its simulations** (OF-BLD-020 §3.4). `fermos_read` holds three
+kinds: `artifact` (the growth fits and forecasts), `simulation`, one row a
+kept `fermos.simulation`, ref `fermos/simulation/<artifact id>`, labelled with
+its family and strain, `open` and `computed`, its mark worked out from its
+inputs when it is read, and a `detail` of words, ids and flags alone (its
+family, title, strain, product and sugar, which keys each source bound, whether
+it is aerobic, whether its Yp/s is above a ceiling): its numbers stay in the
+artifact; and `vessel` (§4.2), one row a kept `fermos.vessel` design, ref
+`fermos/vessel/<artifact id>`, found by its own id or its simulation's,
+labelled with BioSTEAM's class and the vessel type, `open` and `computed`, its
+mark worked out from its inputs when it is read; its `detail` names the class,
+the vessel type and the source, and copies from the artifact the number of
+vessels, each vessel's volume and the installed cost.
 
 **pureOS reads trains** (OF-BLD-019 §4.1). `pureos_read` holds three kinds:
 `unit-operation` (the vocabulary, each with the BioSTEAM classes that perform
@@ -129,7 +278,7 @@ word and never by a model:
 
 | State | Means | Computed from |
 |---|---|---|
-| `open` | free to use, read or make | a clearance of `clear-expired` or `clear-none`; a draft or running runbook; a host, pathway, model or unit operation in the catalogue; an artifact, and a train or a unit of one read from a run; an active person; a scheduled check |
+| `open` | free to use, read or make | a clearance of `clear-expired` or `clear-none`; a draft or running runbook; a host, pathway, model or unit operation in the catalogue; an artifact, a kept simulation, and a train or a unit of one read from a run; an active person; a scheduled check |
 | `fenced` | held back | a clearance of `watch-*`, `blocked` or `unknown` (Dominion's action for it is to run clearance first); a runbook `blocked_unverified`; a fetch that failed; a model not fetched |
 | `approved` | a person or a source stands behind it | a record `measured`, `gold`, `verified` or `curated`; a protocol's current version; a lesson; a paper fetched with full text |
 | `locked` | frozen for a test | a runbook with `lockedAt`; a check run |
@@ -143,9 +292,11 @@ modules it holds for.
 ## thermosteam answers property questions (OF-BLD-019 §4.2)
 
 The thirtieth name, added by the build document's authority (OF-BLD-019
-Part C.8 and §4.2), before Proforma's two (§6.1), which close the registry at
-thirty-two; `check:tools` (rule 5) fails when a name in `WHITELIST` has no
-tool registered or no mention here.
+Part C.8 and §4.2), before Proforma's two (§6.1), which brought the registry
+to thirty-two (OF-BLD-020 §3.4's `fermos_simulate` is the thirty-third and
+§4.2's `fermos_vessel` the thirty-fourth);
+`check:tools` (rule 5) fails when a name in `WHITELIST` has no tool registered
+or no mention here.
 
 | Tool | In | Out |
 |---|---|---|
@@ -252,8 +403,10 @@ audited as `finding`.
 | `geneos_write` | `ceiling`, `frontier`, `mix` | computes and keeps an artifact; returns an evidence id | `geneos.ceiling` and kin |
 | `fermos_write` | `forecast` | forecasts from a kept fit and keeps it | `fermos.forecast_run` |
 | `fermos_write` | `fit` | refused: a deposition's series lives in the browser | — |
+| `fermos_write` | `simulate` | simulates the model family named in `target` as the service binds it, the same run as `fermos_simulate` (`run_simulation`); `fields` carry `strain`, `product`, `sugar`, `fitArtifact`, `startFrom`, `durationPreset` and `records.<parameter key>` (record ids, separated by commas or spaces), any other field refused; refuses naming each parameter that waits | `fermos.simulate` |
+| `fermos_write` | `design_vessel` | designs the vessel a kept simulation (or, anaerobic, a kept fit) needs on BioSTEAM, the same design as `fermos_vessel` (`design_vessel`); fields `simulationArtifact` or `fitArtifact`, `vesselType`, `klaMethod`; refuses in words while no plant scale (or, aerated, one vessel's batch volume) is given, which only a named person types in fermOS → Vessel | `vessel.design` |
 | `proforma_write` | `run` | runs the BioSTEAM scenario named in `target` as the service binds it, the same run as `run_flowsheet` (`run_scenario`); refuses naming what waits, an empty target, or a scenario the service does not hold | `proforma.run` |
-| `proforma_write` | `bind` | refused: an assumption is a named person's, in the Durable tier | — |
+| `proforma_write` | `bind` | refused: an assumption is a named person's, typed into the parameter panel and kept in the browser's Durable tier (*A person's value*, above) | — |
 | `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…`, kept in `candidates/hand/` apart from the extractor's file, so it never counts as an extraction; fields the action lists only, `negativeResult` and `isPrimary` as the word true or false | `extract.add_candidate` (§2.4's rules) |
 | `biorepo_write` | `decide` | refused: a decision is a person's | — |
 | `intake_write` | `fetch` | fetches and prepares a corpus paper's full text | `intake.fetch_paper` |
@@ -287,7 +440,12 @@ places.
 
 No gate covers a Proforma run (OF-BLD-019 §6.1): `run_flowsheet` and
 `proforma_write`'s `run` keep one `proforma.run` artifact in the open lane and
-spend no model money, so `gates.py` and this table are unchanged by them.
+spend no model money, so `gates.py` and this table are unchanged by them. Nor
+a simulation (OF-BLD-020 §3.4): `fermos_simulate` and `fermos_write`'s
+`simulate` keep one `fermos.simulation` artifact the same way. Nor a vessel
+design (§4.2): `fermos_vessel` and `fermos_write`'s `design_vessel` keep one
+`fermos.vessel` artifact the same way, and BioSTEAM's design spends no model
+money.
 
 A proposal is carried out or dismissed by a named person (the reviewer name
 in Settings; placeholders are refused), and each carries their name and the
@@ -329,6 +487,6 @@ The rules a proposal holds to (OF-BLD-016 §1.R, as `proposals.propose`, `_held_
 `core/openferment_core/mcp_server.py` lists `tools.infos()` and calls
 `tools.run`, so every tool above, with its marks, refusals and gates, is what
 Claude Desktop or Claude Code sees, plus `ask_postdoc` and `get_artifact`:
-thirty-four in all. `test_mcp` counts them from `WHITELIST`, and holds
-`run_flowsheet` and `stream_table` to the registry's own descriptions and
-schemas.
+thirty-six in all. `test_mcp` counts them from `WHITELIST`, and holds
+`run_flowsheet`, `stream_table` and `fermos_simulate` to the registry's own
+descriptions and schemas.

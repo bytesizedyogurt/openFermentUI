@@ -133,8 +133,17 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * `pureosYeastOnFile` (OF-BLD-019 §7.R) lists and serves sc-yeast-1's
    * train beside sc-pha-1's; off, the double holds the PHA run alone, so
    * pureOS's empty list for the active program is drawn.
+   * `vesselSimulationsOnFile` (OF-BLD-020 §4.2, stacked on §3.3) adds
+   * fermos-vessel.json's two simulations to GET /api/fermos/simulations,
+   * which the vessel flow chooses from; off, the list holds only what
+   * Simulate's recorded run kept, empty as a fresh install starts, so
+   * fermOS → Vessel can also be driven with fits alone (§4.R).
+   * `vesselDelayMs` (§4.R) holds each POST /api/fermos/vessel answer that
+   * long, so a test can change the source while a design is in flight.
+   * `vesselScopeDelayMs` (§8.R) holds each GET of a vessel's parameter
+   * scope that long, as a cold service's first read waits on BioSTEAM.
    */
-  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true };
+  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true, vesselSimulationsOnFile: false, vesselDelayMs: 0, vesselScopeDelayMs: 0 };
   /** The ceiling checks the browser asked for (OF-BLD-019 §5.2): each query, as sent. */
   const ceilingChecks = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
@@ -149,6 +158,70 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   /** thermosteam's answers the browser asked for and got (OF-BLD-019 §4.2), by question. */
   const thermoKept = new Map();
   const thermoCalls = [];
+  /**
+   * The parameter panel (OF-BLD-020 §2.2): each scope the browser asked for
+   * (GET /api/params/{scope}, with its query) and each resolve it posted
+   * (POST /api/params/{scope}/resolve, with its body), as sent.
+   */
+  const paramScopes = [];
+  const paramResolves = [];
+  /**
+   * fermOS → Vessel (OF-BLD-020 §4.2): each design the browser posted
+   * (POST /api/fermos/vessel), as sent. The answers are fermos-vessel.json's,
+   * which demo.py --prototype made from two simulations of the real
+   * fermos.simulate and, with the sim extra installed, designs by the real
+   * Proforma worker on BioSTEAM (its `worker.kind` says which).
+   */
+  const vesselPosts = [];
+  /**
+   * fermOS → Simulate (OF-BLD-020 §3.3): what the browser asked to bind
+   * (GET /api/fermos/bind, with its query) and to simulate (POST
+   * /api/fermos/simulate, with its body), as sent; and the simulations the
+   * double holds, empty as a fresh install starts, the fixture's one once a
+   * simulation it recorded was asked for.
+   */
+  const fermosBinds = [];
+  const fermosSimulates = [];
+  const fermosSimulationsOnFile = [];
+  /** The fixture's binding key for an ask: its family and strain (none: every strain). */
+  const simKey = (ask) => `${ask.family}|${ask.strain ?? ''}`;
+  /** Whether the double recorded this ask: ethanol on glucose from the records, until the sugar runs out. */
+  const simAskRecorded = (ask) =>
+    (ask.product ?? null) === 'ethanol' && (ask.sugar ?? null) === 'glucose' && (ask.startFrom ?? 'records') === 'records' &&
+    !ask.fit && !ask.fitArtifact && (ask.durationPreset ?? 'until-sugar-runs-out') === 'until-sugar-runs-out';
+  /**
+   * A person's overrides laid on recorded values as the service lays them on:
+   * each an assumption by the person it names, its interval's empty end the
+   * value when one end is typed (params.held, OF-BLD-020 §2.R).
+   */
+  const laidOn = (values, overrides) => {
+    const byKey = new Map(overrides.map((o) => [o.key, o]));
+    return values.map((v) => {
+      const o = byKey.get(v.key);
+      if (!o) return v;
+      const by = String(o.by).trim();
+      const ends = o.low == null && o.high == null ? [null, null] : [o.low ?? o.value, o.high ?? o.value];
+      return {
+        key: v.key, value: o.value, low: ends[0], high: ends[1],
+        source: { kind: 'assumption', id: null, note: `typed on ${o.at}${o.note ? `: ${o.note}` : ''}`, by },
+        origin: 'assumption', identified: null, overriddenBy: by, libraryDefault: v.libraryDefault ?? null,
+        recordIds: [], detail: `typed by ${by} on ${o.at}${o.note ? `: ${o.note}` : ''}`, outOfBounds: null,
+      };
+    });
+  };
+  /** The service's refusal of an override it cannot lay on, in its words, or null. */
+  const overrideRefusal = (scope, overrides, keys) => {
+    const stray = [...new Set(overrides.map((o) => o.scope).filter((sc) => sc !== scope))].sort();
+    if (stray.length) return `an override names the scope it changes, and these were sent to ${scope}: ${stray.join(', ')}`;
+    const seen = new Set();
+    for (const o of overrides) {
+      if (!keys.includes(o.key)) return `there is no parameter ${o.key} here; the parameters are ${keys.join(', ')}`;
+      if (seen.has(o.key)) return `two overrides of ${o.key}: one person's value a parameter`;
+      seen.add(o.key);
+      if (!String(o.by ?? '').trim()) return `the override of ${o.key} needs a person's name: a decision needs a reviewer name`;
+    }
+    return null;
+  };
 
   const server = createServer(async (req, res) => {
     try {
@@ -319,6 +392,76 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(fixture));
     }
+    // OF-BLD-020 §3.3 — fermOS → Simulate. The families, the switch off and
+    // on; what binds and waits with the person's overrides laid on; the run,
+    // answered with the simulation the real kinetics.py made of the
+    // fixture's STAND-IN values when those are what was typed (a parameter
+    // that waits is the service's 422, in its words); and the simulations on
+    // file, which that run adds to.
+    if (url === '/api/fermos/families' && req.method === 'GET') {
+      const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
+      const families = await prototype('fermos-families.json');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(on ? families.on : families.off));
+    }
+    if ((url === '/api/fermos/bind' && req.method === 'GET') || (url === '/api/fermos/simulate' && req.method === 'POST')) {
+      const send = (status, body) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(body));
+      };
+      const sim = await prototype('fermos-simulate.json');
+      let ask;
+      if (req.method === 'GET') {
+        const q = new URL(req.url ?? '/', 'http://double').searchParams;
+        let overrides = [];
+        try {
+          overrides = q.get('overrides') ? JSON.parse(q.get('overrides')) : [];
+        } catch {
+          return send(422, { detail: 'overrides is a JSON list of overrides, each with scope, key, value, by and at, as a run takes them' });
+        }
+        ask = { ...Object.fromEntries(q), strain: q.get('strain'), overrides };
+        fermosBinds.push(ask);
+      } else {
+        let raw = '';
+        for await (const chunk of req) raw += chunk;
+        ask = JSON.parse(raw || '{}');
+        fermosSimulates.push(ask);
+      }
+      const recorded = simAskRecorded(ask) ? sim.bind[simKey(ask)] : null;
+      if (!recorded) return send(422, { detail: `the double holds no binding of ${ask.family} for this ask: it holds ethanol on glucose from the records` });
+      if (recorded.status !== 200) return send(recorded.status, recorded.body);
+      const overrides = ask.overrides ?? [];
+      const scope = `fermos:family:${ask.family}`;
+      const keys = recorded.body.values.map((v) => v.key);
+      const why = overrideRefusal(scope, overrides, keys);
+      if (why) return send(422, { detail: why });
+      const values = laidOn(recorded.body.values, overrides);
+      const typed = new Set(overrides.map((o) => o.key));
+      const waiting = recorded.body.waiting.filter((k) => !typed.has(k));
+      if (url === '/api/fermos/bind') return send(200, { values, waiting, notes: recorded.body.notes });
+      if (waiting.length) {
+        const family = (await prototype('fermos-families.json')).on.find((f) => f.id === ask.family);
+        const label = (k) => family?.specs.find((sp) => sp.key === k)?.label ?? k;
+        const lines = waiting.map((k) => `${k} (${label(k)}) ${values.find((v) => v.key === k)?.detail ?? ''}`).join('; ');
+        return send(422, { detail: `${ask.family} cannot run yet: ${waiting.length} parameter${waiting.length === 1 ? ' waits' : 's wait'}. ${lines}` });
+      }
+      const want = sim.simulate.request;
+      const same = (a, b) => JSON.stringify(a.map((o) => [o.key, o.value]).sort()) === JSON.stringify(b.map((o) => [o.key, o.value]).sort());
+      if (simKey(ask) !== simKey(want) || !same(overrides, want.overrides))
+        return send(422, { detail: `the double holds one simulation, of ${want.family} for ${want.strain} with the fixture's typed values; it cannot integrate another` });
+      if (!fermosSimulationsOnFile.length) fermosSimulationsOnFile.push(...sim.simulations);
+      return send(200, sim.simulate.body);
+    }
+    // The one list of kept simulations, newest first, that Simulate and
+    // Vessel both read: the simulation Simulate's recorded run kept (none
+    // until it runs), then, with flags.vesselSimulationsOnFile, the two
+    // fermos-vessel.json's designs were made for.
+    if (url === '/api/fermos/simulations' && req.method === 'GET') {
+      const vessel = flags.vesselSimulationsOnFile ? (await prototype('fermos-vessel.json')).simulations : [];
+      const seen = new Set(fermosSimulationsOnFile.map((s) => s.artifactId));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify([...fermosSimulationsOnFile, ...vessel.filter((s) => !seen.has(s.artifactId))]));
+    }
     // OF-BLD-019 §5.1 — the fits fermOS keeps, with what each can feed a
     // flowsheet, as the real code listed them over an empty store and over
     // the stand-in fit and forecast (flags.fermosFitsOnFile picks which);
@@ -423,6 +566,281 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(entry.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(entry.body));
     }
+    // OF-BLD-020 §4.2 — fermOS → Vessel. The kept simulations are the one
+    // list above (flags.vesselSimulationsOnFile); the vessel
+    // scope of each as the real code served it (by its vesselType); a
+    // resolve that lays each override on as the service does, an assumption
+    // by the person it names; and a design answered by its request: the
+    // recorded body for the same source, vessel type and overrides (by key
+    // and value), with the person's name laid on as the service lays it on;
+    // a request with no scale the real code's refusal; any other a 422 in
+    // words. A scope or source the fixture lacks is the service's 404.
+    {
+      const vesselFixture = () => prototype('fermos-vessel.json');
+      const sendJson = (status, body) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(body));
+      };
+      if (url === '/api/fermos/vessels' && req.method === 'GET') return sendJson(200, []);
+      const vm = /^\/api\/params\/fermos:vessel:([A-Za-z0-9][A-Za-z0-9._-]{0,127})(\/resolve)?$/.exec(url);
+      if (vm) {
+        const id = vm[1];
+        const resolving = Boolean(vm[2]);
+        if (resolving !== (req.method === 'POST')) return sendJson(405, { detail: 'Method Not Allowed' });
+        let ask;
+        if (resolving) {
+          let raw = '';
+          for await (const chunk of req) raw += chunk;
+          ask = JSON.parse(raw || '{}');
+          paramResolves.push({ scope: `fermos:vessel:${id}`, ...ask });
+        } else {
+          const q = new URL(req.url ?? '/', 'http://double').searchParams;
+          ask = { vesselType: q.get('vesselType') };
+          paramScopes.push({ scope: `fermos:vessel:${id}`, ...Object.fromEntries(q) });
+          if (flags.vesselScopeDelayMs > 0) await new Promise((r) => setTimeout(r, flags.vesselScopeDelayMs));
+        }
+        const fx = await vesselFixture();
+        // A scope is a kept simulation's or (§4.R) a kept fit's, served or refused as the real code answered.
+        const sourceOf = (sc) => sc.simulation ?? sc.fit;
+        const entry = fx.scopes.find((sc) => sourceOf(sc) === id && (sc.vesselType ?? null) === (ask.vesselType ?? null));
+        if (entry && entry.status !== 200) return sendJson(entry.status, entry.body);
+        if (!entry) {
+          const known = fx.scopes.some((sc) => sourceOf(sc) === id);
+          return known
+            ? sendJson(422, { detail: `the double holds no ${ask.vesselType} scope of ${id}` })
+            : sendJson(404, { detail: `no artifact '${id}' is on file here: a vessel is designed for a fermOS simulation (fermOS → Simulate keeps one) or, anaerobic, a kinetic fit or forecast` });
+        }
+        const served = entry.body;
+        if (!resolving) return sendJson(200, served);
+        const overrides = ask.overrides ?? [];
+        const specs = new Map(served.specs.map((sp) => [sp.key, sp]));
+        const scope = served.scope;
+        const stray = [...new Set(overrides.map((o) => o.scope).filter((sc) => sc !== scope))].sort();
+        if (stray.length) return sendJson(422, { detail: `an override names the scope it changes, and these were sent to ${scope}: ${stray.join(', ')}` });
+        for (const o of overrides) {
+          if (!specs.has(o.key)) return sendJson(422, { detail: `there is no parameter ${o.key} here; the parameters are ${[...specs.keys()].join(', ')}` });
+          if (!String(o.by ?? '').trim()) return sendJson(422, { detail: `the override of ${o.key} needs a person's name: a decision needs a reviewer name` });
+        }
+        const byKey = new Map(overrides.map((o) => [o.key, o]));
+        const values = served.values.map((v) => {
+          const o = byKey.get(v.key);
+          if (!o) return v;
+          const who = String(o.by).trim();
+          return {
+            key: v.key, value: o.value, low: o.low ?? null, high: o.high ?? null,
+            source: { kind: 'assumption', id: null, note: `typed on ${o.at}${o.note ? `: ${o.note}` : ''}`, by: who },
+            origin: 'assumption', identified: null, overriddenBy: who, libraryDefault: v.libraryDefault ?? null,
+            recordIds: [], detail: `typed by ${who} on ${o.at}${o.note ? `: ${o.note}` : ''}`, outOfBounds: null,
+          };
+        });
+        return sendJson(200, {
+          scope, values, waiting: values.filter((v) => v.origin === 'waiting').map((v) => v.key),
+          basisInputs: values.filter((v) => v.overriddenBy).map((v) => ({ name: v.key, value: v.value, unit: specs.get(v.key).unit, source: v.source })),
+          warnings: [], notes: served.notes,
+        });
+      }
+      if (url === '/api/fermos/vessel' && req.method === 'POST') {
+        let raw = '';
+        for await (const chunk of req) raw += chunk;
+        const asked = JSON.parse(raw || '{}');
+        vesselPosts.push(asked);
+        if (flags.vesselDelayMs > 0) await new Promise((r) => setTimeout(r, flags.vesselDelayMs));
+        const fx = await vesselFixture();
+        const keyed = (os) => JSON.stringify((os ?? []).map((o) => [o.key, o.value]).sort());
+        const source = asked.simulation ?? asked.fit ?? null;
+        const typed = new Map((asked.overrides ?? []).map((o) => [o.key, o]));
+        const scaled = typed.has('plant_scale') || typed.has('batch_volume');
+        const recorded = fx.designs.find((d) => d.status === 200 && (d.request.simulation ?? d.request.fit) === source &&
+          (d.request.vesselType ?? null) === (asked.vesselType ?? null) && keyed(d.request.overrides) === keyed(asked.overrides));
+        if (recorded) {
+          // The person's name laid on as the service lays it on: on each value they typed, and on its basis input.
+          const named = (src, key) => (typed.has(key) && src?.kind === 'assumption' ? { ...src, by: String(typed.get(key).by).trim() } : src);
+          const body = recorded.body;
+          return sendJson(200, {
+            ...body,
+            parameters: body.parameters.map((v) => (typed.has(v.key) ? { ...v, overriddenBy: String(typed.get(v.key).by).trim(), source: named(v.source, v.key) } : v)),
+            evidence: { ...body.evidence, basis: { ...body.evidence.basis, inputs: body.evidence.basis.inputs.map((i) => ({ ...i, source: named(i.source, i.name) })) } },
+          });
+        }
+        if (!fx.scopes.some((sc) => (sc.simulation ?? sc.fit) === source)) return sendJson(422, { detail: `no artifact '${source}' is on file here` });
+        const refusal = fx.designs.find((d) => d.status === 422);
+        if (!scaled && refusal) return sendJson(422, refusal.body);
+        return sendJson(422, { detail: 'the double holds no design for this request: it holds the designs the browser tests ask for' });
+      }
+    }
+    // OF-BLD-020 §2.2 — the parameter panel. GET /api/params/{scope}: a seed
+    // scenario's scope, or a scenario made here by the flowsheet it names
+    // (answered under the id asked), each as demo.py --prototype recorded the
+    // real code's answer over the stand-in records; with fermOS fits chosen,
+    // the yeast scope as the real code bound it with that choice (the choices
+    // the browser tests make), any other a 422 in words. A scope no provider
+    // serves yet is the service's 404; a malformed one its 422.
+    // POST .../resolve lays each override on as the service does, an
+    // assumption by the person it names, its interval's empty end the value
+    // when one end is typed (params.held), with the basis inputs a run adds
+    // for it (the value, its low and high, and the line saying the run read
+    // overrides, copied from the recorded resolve), and returns the words the
+    // real code returned for the recorded override outside its bounds; a key
+    // the scope does not have, an override of another scope, one naming
+    // nobody or one of a parameter whose rule takes no person's value is
+    // refused in the service's words. OF-BLD-020 §2.R: the service binds the
+    // overrides as a run binds them, so a titre typed beside a fermOS fit
+    // chosen for every input is refused in the run's words; that resolve is
+    // answered as demo.py recorded the real code's answer (`resolves`).
+    {
+      const m = /^\/api\/params\/(.+?)(\/resolve)?$/.exec(url);
+      if (m) {
+        const scope = m[1];
+        const resolving = Boolean(m[2]);
+        const send = (status, body) => {
+          res.writeHead(status, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify(body));
+        };
+        if (resolving !== (req.method === 'POST')) return send(405, { detail: 'Method Not Allowed' });
+        let ask;
+        if (resolving) {
+          let raw = '';
+          for await (const chunk of req) raw += chunk;
+          ask = JSON.parse(raw || '{}');
+          paramResolves.push({ scope, ...ask });
+        } else {
+          const q = new URL(req.url ?? '/', 'http://double').searchParams;
+          ask = { flowsheet: q.get('flowsheet'), host: q.get('host'), fits: q.get('fits') ? JSON.parse(q.get('fits')) : {} };
+          paramScopes.push({ scope, ...Object.fromEntries(q) });
+        }
+        // OF-BLD-020 §3.3 — a family's scope, as demo.py --prototype recorded
+        // the real code binding it over the stand-in yeast records (ethanol
+        // on glucose, from the records, for every strain and for
+        // CEN.PK113-7D); another ask is the double's 422 in its own words.
+        const family = /^fermos:family:([A-Za-z0-9][A-Za-z0-9._-]{0,127})$/.exec(scope)?.[1];
+        if (family) {
+          const sim = await prototype('fermos-simulate.json');
+          const asked = { family, ...ask, strain: ask.strain ?? null };
+          if (!resolving) {
+            const q = new URL(req.url ?? '/', 'http://double').searchParams;
+            for (const k of ['strain', 'product', 'sugar', 'fit', 'startFrom', 'durationPreset']) asked[k] = q.get(k);
+          }
+          const answer = simAskRecorded(asked) ? sim.scopes[simKey(asked)] : null;
+          if (!answer) return send(422, { detail: `the double holds no binding of ${scope} for this ask: it holds ethanol on glucose from the records` });
+          if (answer.status !== 200) return send(answer.status, answer.body);
+          const served = { ...answer.body, scope };
+          if (!resolving) return send(200, served);
+          const overrides = ask.overrides ?? [];
+          const why = overrideRefusal(scope, overrides, served.specs.map((sp) => sp.key));
+          if (why) return send(422, { detail: why });
+          const specs = new Map(served.specs.map((sp) => [sp.key, sp]));
+          const values = laidOn(served.values, overrides);
+          const basisInputs = values
+            .filter((v) => v.overriddenBy)
+            .flatMap((v) => [
+              { name: v.key, value: v.value, unit: specs.get(v.key).unit, source: v.source },
+              ...(v.low != null ? [{ name: `${v.key} low`, value: v.low, unit: specs.get(v.key).unit, source: v.source }] : []),
+              ...(v.high != null ? [{ name: `${v.key} high`, value: v.high, unit: specs.get(v.key).unit, source: v.source }] : []),
+            ]);
+          return send(200, { scope, values, waiting: values.filter((v) => v.origin === 'waiting').map((v) => v.key), basisInputs, warnings: [], notes: served.notes });
+        }
+        const kinds = {
+          'fermos:family': "fermOS's model families",
+          'fermos:vessel': "fermOS's vessel designs",
+          'fermos:forecast': "fermOS's forecasts",
+          'pureos:unit': "pureOS's train units",
+        };
+        const other = Object.keys(kinds).find((k) => scope.startsWith(`${k}:`));
+        if (other) return send(404, { detail: `this service serves no parameters for ${kinds[other]} yet` });
+        const id = /^proforma:([A-Za-z0-9][A-Za-z0-9._-]{0,127})$/.exec(scope)?.[1];
+        if (!id)
+          return send(422, {
+            detail: `a parameter scope is fermos:family:<family id>, fermos:vessel:<simulation artifact id>, fermos:forecast:<kinetic fit artifact id>, pureos:unit:<train id>:<unit id> or proforma:<scenario id>, each id letters, digits, dots, dashes and underscores; '${scope}' is none of them`,
+          });
+        const recorded = await prototype('params-proforma.json');
+        const fits = ask.fits ?? {};
+        const typed = new Set((ask.overrides ?? []).map((o) => o.key));
+        const kept = Object.fromEntries(Object.entries(fits).filter(([k]) => !typed.has(k)));
+        if (resolving && typed.size > 0 && Object.keys(fits).length > 0) {
+          const withFits = await prototype('params-proforma-fits.json');
+          const keys = [...typed].sort().join();
+          const heard = scope === withFits.scope && (withFits.resolves ?? []).find((r) => sameFits(fits, r.fits) && [...r.keys].sort().join() === keys);
+          if (heard) return send(heard.status, heard.body);
+        }
+        let answer;
+        if (Object.keys(kept).length > 0) {
+          const withFits = await prototype('params-proforma-fits.json');
+          answer = (scope === withFits.scope || ask.flowsheet === 'ethanol_glucose_v0') && fitsAnswer(JSON.stringify(kept), withFits.answers);
+          if (!answer) return send(422, { detail: `the double holds no binding of ${scope} with these fits` });
+        } else if (recorded.scopes[scope]) answer = recorded.scopes[scope];
+        else if (ask.flowsheet && recorded.flowsheets[ask.flowsheet]) answer = recorded.flowsheets[ask.flowsheet];
+        else if (ask.flowsheet)
+          answer = { status: 422, body: { detail: `there is no flowsheet ${ask.flowsheet} on the shelf; it holds ${Object.keys(recorded.flowsheets).filter((k) => k !== 'toy').join(', ')}` } };
+        else
+          answer = {
+            status: 404,
+            body: {
+              detail: `there is no scenario ${id}: the seed's BioSTEAM scenarios are ${Object.keys(recorded.scopes).map((k) => k.slice('proforma:'.length)).join(', ')}, and a scenario made in a browser names the shelf flowsheet it runs (?flowsheet=)`,
+            },
+          };
+        if (answer.status !== 200) return send(answer.status, answer.body);
+        const served = { ...answer.body, scope };
+        if (!resolving) return send(200, served);
+        // The resolve: each override laid on as the service lays it on.
+        const specs = new Map(served.specs.map((sp) => [sp.key, sp]));
+        const overrides = ask.overrides ?? [];
+        const stray = [...new Set(overrides.map((o) => o.scope).filter((sc) => sc !== scope))].sort();
+        if (stray.length) return send(422, { detail: `an override names the scope it changes, and these were sent to ${scope}: ${stray.join(', ')}` });
+        const seen = new Set();
+        for (const o of overrides) {
+          if (!specs.has(o.key)) return send(422, { detail: `there is no parameter ${o.key} here; the parameters are ${[...specs.keys()].join(', ')}` });
+          if (seen.has(o.key)) return send(422, { detail: `two overrides of ${o.key}: one person's value a parameter` });
+          seen.add(o.key);
+          const sp = specs.get(o.key);
+          if (!sp.sourceRule.includes('assumption'))
+            return send(422, {
+              detail: sp.sourceRule.includes('convention')
+                ? `${o.key} is a convention${sp.convention != null ? `, ${sp.convention},` : ''} that every run states in its basis, and takes no person's value: its source rule takes no assumption`
+                : `${o.key} is the library's own default, read from its code, and takes no person's value`,
+            });
+          if (!String(o.by ?? '').trim()) return send(422, { detail: `the override of ${o.key} needs a person's name: a decision needs a reviewer name` });
+        }
+        const out = recorded.resolve.body.values;
+        // The recorded override outside its bounds, on the flowsheet it was recorded on, gets the real code's words.
+        const flowsheet = ask.flowsheet ?? recorded.flowsheetOf[scope] ?? null;
+        const flagged = (o) => {
+          const r = recorded.resolve.request.overrides.find((x) => x.key === o.key && x.value === o.value && (x.low ?? null) === (o.low ?? null) && (x.high ?? null) === (o.high ?? null));
+          return r && flowsheet === recorded.resolve.flowsheet ? (out.find((v) => v.key === o.key)?.outOfBounds ?? null) : null;
+        };
+        const byKey = new Map(overrides.map((o) => [o.key, o]));
+        // params.held: one end typed, the other is the value; neither, held at itself.
+        const held = (o) => (o.low == null && o.high == null ? [null, null] : [o.low ?? o.value, o.high ?? o.value]);
+        const values = served.values.map((v) => {
+          const o = byKey.get(v.key);
+          if (!o) return v;
+          const [low, high] = held(o);
+          return {
+            key: v.key, value: o.value, low, high,
+            source: { kind: 'assumption', id: null, note: `typed on ${o.at}${o.note ? `: ${o.note}` : ''}`, by: String(o.by).trim() },
+            origin: 'assumption', identified: null, overriddenBy: String(o.by).trim(), libraryDefault: v.libraryDefault ?? null,
+            recordIds: [], detail: `typed by ${String(o.by).trim()} on ${o.at}${o.note ? `: ${o.note}` : ''}`, outOfBounds: flagged(o),
+          };
+        });
+        // What a run adds for them (proforma.assumption_inputs): the value, its low and its high, then the line saying it read overrides.
+        const readLine = recorded.resolve.body.basisInputs.find((i) => i.name === 'assumptions read from');
+        const basisInputs = values
+          .filter((v) => v.overriddenBy)
+          .flatMap((v) => [
+            { name: v.key, value: v.value, unit: specs.get(v.key).unit, source: v.source },
+            { name: `${v.key} low`, value: v.low ?? v.value, unit: specs.get(v.key).unit, source: v.source },
+            { name: `${v.key} high`, value: v.high ?? v.value, unit: specs.get(v.key).unit, source: v.source },
+          ])
+          .concat(overrides.length && readLine ? [readLine] : []);
+        return send(200, {
+          scope,
+          values,
+          waiting: values.filter((v) => v.origin === 'waiting').map((v) => v.key),
+          basisInputs,
+          warnings: values.map((v) => v.outOfBounds).filter(Boolean),
+          notes: served.notes,
+        });
+      }
+    }
     // OF-BLD-014 §8.4 — the BioSTEAM scenarios, bound over stand-in records,
     // and runs made through the real code with a stand-in evaluator.
     // OF-BLD-019 §2.3 (b): the seed's scenarios with the program switch off
@@ -524,7 +942,8 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       // Inputs that still wait are refused as the service refuses them (§3.2).
       const seed = seeds.find((sc) => sc.id === asked.scenarioId);
       const bound = seed ?? seeds.find((sc) => sc.flowsheet === asked.flowsheet);
-      const typed = new Set([...(asked.assumptions ?? []).map((a) => a.key), ...Object.keys(asked.fits ?? {})]);
+      // OF-BLD-020 §2.2: the panel's overrides, and the older assumptions field the service still reads.
+      const typed = new Set([...(asked.overrides ?? []).map((o) => o.key), ...(asked.assumptions ?? []).map((a) => a.key), ...Object.keys(asked.fits ?? {})]);
       const waiting = (bound?.inputs ?? []).filter((i) => i.binding === 'waiting' && !typed.has(i.key)).map((i) => i.key);
       if (waiting.length) return refuse(`these inputs wait for a source, a record or a named person's assumption: ${waiting.join(', ')}`);
       const run = await prototype(name);
@@ -638,5 +1057,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, flags } };
 }

@@ -11,9 +11,12 @@ read tool per module (OF-BLD-015 §7.2), written `<module>_read` because the
 Messages API refuses a dot in a tool name, and its write pair (§7.3); then
 `thermo_props` (OF-BLD-019 §4.2), a read offered loose; then Proforma's two
 (OF-BLD-019 §6.1): `run_flowsheet`, a free write through `proforma.run`, and
-`stream_table`, a read of a kept run's streams. Thirty-two names. A tool
-outside it is a new document. `test_tools.NAMES` is the one literal list the
-tests hold the registry to; every other count is derived from `WHITELIST`.
+`stream_table`, a read of a kept run's streams; then fermOS's two (OF-BLD-020):
+`fermos_simulate` (§3.4), a free write through `fermos.simulate`, and
+`fermos_vessel` (§4.2), a free write through `fermos_write`'s `design_vessel`.
+Thirty-four names. A tool outside it is a new document. `test_tools.NAMES` is
+the one literal list the tests hold the registry to; every other count is
+derived from `WHITELIST`.
 
 TOOL INPUTS CARRY IDS AND WORDS. A model names a record, an artifact, a model
 file, a field or a scenario, and the service looks the quantity up. A JSON
@@ -44,7 +47,7 @@ from pydantic import BaseModel, ValidationError
 
 from ..models import ToolInfo, ToolResult
 
-# The names E.6, OF-BLD-015 and OF-BLD-019 §6.1 allow, whichever have been built.
+# The names E.6, OF-BLD-015, OF-BLD-019 §6.1 and OF-BLD-020 allow, whichever have been built.
 WHITELIST = (
     "search_records",
     "convert_units",
@@ -83,6 +86,12 @@ WHITELIST = (
     # loose (the module tools' grammar, §7.2).
     "run_flowsheet",
     "stream_table",
+    # OF-BLD-020 §3.4 — a simulation from a model family, record ids and
+    # words, a free write, loose like the module tools.
+    "fermos_simulate",
+    # OF-BLD-020 §4.2 — the vessel a kept simulation needs, designed on
+    # BioSTEAM: a free write through fermos_write's design_vessel, loose.
+    "fermos_vessel",
 )
 # The only fields a number may stand in: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})

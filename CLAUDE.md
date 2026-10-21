@@ -4,19 +4,33 @@ Read this before touching anything. Each line below is something a previous
 session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 §4.2.
 
-## The active build (OF-BLD-019)
+## The active build (OF-BLD-020)
+
+OF-BLD-020 (fermOS and pureOS on BioSTEAM: the vessel and the train, every parameter in
+hand) runs over two nights. Night one runs on `claude/of-bld-020-vessel-train`, cut from
+`main` at `1a92325`: Phases 1–4, then Phase 8. Night two, after Sean's merge, runs on
+`claude/of-bld-020-vessel-train-2` from `main`: Phases 5–7, then Phase 8 again. Its
+document is `docs/build/OF-BLD-020.md` (prompt `docs/build/PROMPT-020.md`); its commits are
+`OF-BLD-020 §n.m: <what>`; it follows OF-BLD-014 Part A with OF-BLD-016's amendments below,
+a 10:30 UTC clock and a 2.00 USD cap a night. "Next phase" means the first `OF-BLD-020 §`
+step missing from the log, in the document's Part D order (Phase 7 drops first). A
+reviewer name this build types on a live service is `OF-BLD-020 session`, a test entry Sean
+may withdraw. **Night one is built** (§1.1 through §8.T; STATE.md's `## OF-BLD-020 night
+one` section is its log; what it built is *One parameter panel* and *fermOS simulates and
+sizes the vessel* below). Its pull request is `claude/of-bld-020-vessel-train → main`; Sean
+merges it, follows the document's Appendix 1 on the Mini, and types the first
+simulation's waiting values (α, X₀, P₀). Night two begins at §5.1.
+
+## The previous build (OF-BLD-019)
 
 OF-BLD-019 (Proforma stands on BioSTEAM) ran on `claude/of-bld-019-proforma`, cut from
 `main` at `a261f30`. Its document is `docs/build/OF-BLD-019.md` (prompt
 `docs/build/PROMPT-019.md`); its commits are `OF-BLD-019 §n.m: <what>`; it followed
 OF-BLD-014 Part A with OF-BLD-016's amendments below, a nine-hour clock and a 2.00 USD cap.
-**Every step of it is built** (§7.R and §7.T the last two; what it built is *Proforma on
-BioSTEAM* below, and STATE.md's `## OF-BLD-019` section is its log). Its pull request is
-`claude/of-bld-019-proforma → main`; Sean merges it, then follows the document's
-Appendix 1 on the Mini (`deploy.sh --keep-decisions`, `pnpm data:pull`, the kickstart,
-`pnpm ready`, `brew install graphviz`) and types `sc-yeast-1`'s three assumptions.
+**Every step of it is built and merged** (PR #12, `1a92325`; what it built is *Proforma on
+BioSTEAM* below, and STATE.md's `## OF-BLD-019` section is its log).
 
-## The previous build (OF-BLD-016)
+## The build before (OF-BLD-016)
 
 OF-BLD-016 (one active program, nothing invented on screen, Postdoc with every
 tool) runs on `claude/of-bld-016-demo`, cut from `main` at `7e3ebb0`, with
@@ -79,9 +93,12 @@ Mini, which serves `main` (D8).
   question is which one owns it — never whether to add a twelfth.
 - The three OS components are the three stages of making something: geneOS the
   organism (stoichiometry), fermOS the reactor (dynamics), pureOS downstream
-  (separation). fermOS computes from depositions: no parameter from a paper
-  enters it. `src/screens/FermOS.tsx` may be extended, and its header keeps
-  the reasoning.
+  (separation). A fermOS *fit* takes only a deposition's measured series; a
+  fermOS *simulation* may take its parameters from records, fits, kept
+  artifacts, a named person's assumptions and stated conventions, each
+  named, its provenance following them (OF-BLD-020 D1; *fermOS simulates and
+  sizes the vessel* below). `src/screens/FermOS.tsx` may be extended, and
+  its header keeps the reasoning.
 
 ## Stack rules that are not negotiable
 
@@ -103,8 +120,9 @@ Mini, which serves `main` (D8).
   use (`tool_choice` "tool"/"any" is a 400); never reintroduce it. Prices
   live in `llm.PRICES`; `usage.models` records which model answered. The
   seven OF-BLD-014 tools go out strict; the twenty-two module tools,
-  `thermo_props` and OF-BLD-019's `run_flowsheet` and `stream_table` go out
-  loose, because eighteen strict tools compile to a grammar the API refuses
+  `thermo_props`, OF-BLD-019's `run_flowsheet` and `stream_table` and
+  OF-BLD-020's `fermos_simulate` and `fermos_vessel` go out loose (a loose
+  tool's maps go out whole: `strict_schema(keep_maps=True)`), because eighteen strict tools compile to a grammar the API refuses
   (OF-BLD-015 §7.2, measured 2026-10-19), and `tools.run` validates every
   input alike before anything runs.
 
@@ -469,17 +487,18 @@ Mini, which serves `main` (D8).
   otherwise, and Haiku 5.5's long tier past 100,000 prompt tokens.
   Offline tests charge a file of their own (`core/tests/conftest.py`).
 - **`converse` is one tool turn on one model.** Each tool strict unless the
-  registry marks it loose (the twenty-two module tools, `thermo_props` and
-  the two Proforma tools, see above),
+  registry marks it loose (the twenty-two module tools, `thermo_props`, the
+  two Proforma tools and the two fermOS tools, see above),
   `tool_choice` `auto` or `none` and nothing else (anything else is refused
   before it is sent), the answer schema in `output_config.format`, top-level
   `cache_control`. It falls back nowhere; the loop that owns the
   conversation decides.
-- **One tool registry, closed at thirty-two names** (`tools/__init__.py`, E.6
+- **One tool registry, closed at thirty-four names** (`tools/__init__.py`, E.6
   and OF-BLD-015 §7.2–§7.3: the seven below, then one read and one write tool
   a module, named `<module>_read` and `<module>_write`; then `thermo_props`,
   OF-BLD-019 §4.2, thermosteam's answer for a run's stream or a preset, kept
-  as an artifact; then OF-BLD-019 §6.1's `run_flowsheet` and `stream_table`).
+  as an artifact; then OF-BLD-019 §6.1's `run_flowsheet` and `stream_table`;
+  then OF-BLD-020's `fermos_simulate` (§3.4) and `fermos_vessel` (§4.2)).
   `check:tools` fails when a name in `WHITELIST` is not registered or not
   named in `docs/TOOLS.md`. `test_tools.NAMES` is the one literal list of
   them in the tests; every other test derives its count from `WHITELIST`.
@@ -502,7 +521,9 @@ Mini, which serves `main` (D8).
   duplicate of fd 1 with fd 1 pointed at stderr, so a library's printing
   never reaches the stream. `cobra` is imported in the geneOS worker alone
   and `biosteam` and `thermosteam` in the Proforma worker and `flowsheets/`
-  alone; `test_workers` greps for all three.
+  alone; among the service's own modules `scipy` is imported in
+  `kinetics.py` and `fermos.py` alone (OF-BLD-020 E.3‴); `test_workers`
+  greps for all four. The Proforma worker runs with `PYTHONBREAKPOINT=0`.
 
 ## Passages and search (OF-BLD-014 Phase 4)
 
@@ -690,7 +711,7 @@ Mini, which serves `main` (D8).
   `core/data/live/eval-o.json`.
 - **The MCP server needs no change for any of it**: it lists `tools.infos()`
   and calls `tools.run`, so the module tools appear there with the same marks
-  and gates; `test_mcp` counts thirty-four (the registry's thirty-two and
+  and gates; `test_mcp` counts thirty-six (the registry's thirty-four and
   its own two, derived from `WHITELIST`).
 
 ## Figures and geneOS's ceiling (OF-BLD-014 Phase 6)
@@ -777,6 +798,137 @@ Mini, which serves `main` (D8).
   or more times, product and substrate at the same times) and where
   (Runbooks → Depositions, the Time series panel). `growth_forecast` is the
   fifth tool.
+
+## One parameter panel (OF-BLD-020 Phase 2)
+
+- **A parameter is declared or it does not exist** (D2, E.1‴). `ParameterSpec`
+  (key, label, symbol, gloss, dimension, unit, min, max, step, scale, group,
+  `sourceRule`, note, `boundsReason`, plus `choices` for a word and
+  `convention` for a stated value) is declared in Python; `params.py`
+  resolves each spec's value with its source (`ParameterValue`: value, low,
+  high, `source`, `origin` — fit, record, artifact, simulation, assumption,
+  convention, library-default, waiting, not-read — `identified`,
+  `overriddenBy`, `libraryDefault`, `recordIds`, `detail`, `outOfBounds`).
+  `GET /api/params/{scope}` serves a scope (`proforma:<scenario>`,
+  `fermos:family:<id>`, `fermos:forecast:<fit>`, `fermos:vessel:<simulation
+  or fit>`; `pureos:unit:…` is night two's and answers 404), `POST
+  …/resolve` lays a person's overrides on and runs nothing. Providers
+  register with `params.register(kind, provider, static)`; a provider module
+  imported on first need is listed in `params.PROVIDER_MODULES`.
+- **One component renders them all.** `src/components/ParameterPanel.tsx`
+  and `ParameterRow.tsx`: value, slider inside the bounds, the source chip,
+  **Reset to source**, **Why**. A screen never hand-writes a numeric
+  control: `check:seed`'s E.1‴ walks `ProformaScenario.tsx`,
+  `ProformaBiosteam.tsx`, `PureOS*.tsx` and `FermOS*.tsx` for
+  `<input type="number">` and `type="range"` outside the panel, with an
+  `ALLOWED` list of three grid views over computed runs, each with why.
+- **A person's change is a named assumption** (D3). `Override` (scope, key,
+  value, low, high, by, at, note) in the Durable tier's `parameterOverrides`
+  (scope → overrides; `proformaAssumptions` migrated once and now derived
+  from the `proforma:` scopes), sent with the run, refused without a
+  reviewer name, refused for a spec whose `sourceRule` has no `assumption`
+  (`params.checked`, the one check the resolve and the run share), a
+  one-sided interval filled the same way everywhere (`params.held`, its
+  browser twin `overrideEnds`). The service keeps no override. An override
+  **wins over records and fits** (in Proforma since §2.2: an input it
+  replaces says "chosen in place of the N records it bound"); the basis
+  names it as an `assumption` with the person, so the result is `demo`.
+- **Bounds are conventions** (D4): every spec has a `boundsReason`;
+  `check:seed` runs `params --check` over every provider's static specs and
+  fails on a blank one. A value outside the bounds is kept and warned in
+  words, never clamped.
+
+## fermOS simulates and sizes the vessel (OF-BLD-020 Phases 3–4)
+
+- **The fermOS rule, amended (D1).** A *fit* takes only a deposition's
+  measured series. A *simulation* may take its parameters from records
+  through the aggregate gate, a fit or forecast, a kept simulation, a named
+  person's assumption or a stated convention, each named in its basis; its
+  provenance is `basis_provenance` over them (unverified records make it
+  unverified, any assumption `demo`). A simulation never presents itself as
+  a measurement: its curve is a computed line and its card says what it was
+  built from. The `FermOS.tsx` header says so.
+- **Model families are code** (`kinetics.py`, D5; scipy is imported there
+  and in `fermos.py` alone among the service's modules, `test_workers`
+  greps): `batch_v1` (Monod, product and substrate inhibition,
+  Luedeking–Piret, maintenance, death), `fedbatch_v1` (constant or
+  exponential feed, the volume a state), `chemostat_v1` (steady state by a
+  low-S scan, washout and a second stable state said), `storage_v1` (PHA's
+  shape, archived with PHA), and `light_v1`, a socket that refuses in
+  words. Each integrates on `solve_ivp` (LSODA), checks its mass balance,
+  reads OUR = (μ/Yx/o + mO)·X on the solver's own steps, and fits on
+  `least_squares`. What the tree overruled in D5 is in `kinetics.py`'s
+  docstring ("as built"): the sugar held at zero by an event, the run-out
+  hour at a stated share of S₀, β gated by the Pmax factor, Ki absent means
+  off, the exponential feed paying the whole demand.
+- **Where a value comes from, in order** (D6; `fermos.bind_parameters`,
+  shared with Proforma through `binding.py`): the records a request names
+  (`recordsByParam`), a fit a person chose (a batch fit with no biomass
+  keeps its X₀ gauge, and a person's X₀ rescales Yx/s, α and β, named), the
+  records of the spec's fields on the strain (or every strain of the
+  program) and the sugar, a kept simulation, a person's override, a stated
+  convention. Nothing → the run is refused in words naming the field that
+  would bind it. On thread Q tonight a CEN.PK113-7D batch waits on Ks, α,
+  Pmax, X₀ and P₀; every strain waits on α, X₀ and P₀ (STATE §3.5).
+- **One artifact per simulation, every reader reads it.** `fermos.simulate`
+  keeps one `fermos.simulation` (family, parameters and start values with
+  sources, series by state, OUR, end state, harvest hour, titre, yield,
+  productivity, mass balance, the Yp/s ceiling comparison read never
+  clamped, a chemostat's steady state). `GET /api/fermos/families`,
+  `/families/{id}`, `/bind`, `/simulations`, `POST /api/fermos/simulate`.
+  A simulation takes its program from its family and its inputs
+  (`module_stores._fermos_program`), and every list, read, bind and start
+  honours the switch. fermOS → Simulate (`/fermos/simulate`) draws it with
+  `TimeCourse` and shows operating mode's reference tables; **Simulate**
+  stays off while a value waits or the run would refuse (`fermos.run_refusal`:
+  `bind` returns it as `FermosBinding.refused`, the panel's resolve refuses
+  in the same words through `Provided.refuses`). **Send to Proforma** feeds
+  a scenario's titre, yield and productivity from it: Proforma names it a
+  simulation everywhere (the panel's origin `simulation`, `identified` null;
+  `FermosFitInfo.batchTimeNote` names its harvest hour in the run's basis;
+  the ceiling check's `yieldTool`), never a fit or a forecast. Forecast runs
+  through the panel too (its length a person's, named).
+- **The vessel is BioSTEAM's** (D7; `workers/proforma_worker.py` ops
+  `vessel_specs`, `vessel_design`, `flowsheets/vessel.py`; `vessel.py`):
+  an aerobic simulation gets `AeratedBioreactor` (stirred tank by Riet's
+  kLa, bubble column by Dewes': the only two that run in the class), an
+  anaerobic one `NRELAnaerobicBatchBioreactor` (`V_max` from
+  `AnaerobicBioreactor.V_max_default`, N ≥ 2 as its setter refuses). BioSTEAM
+  takes its oxygen demand from the reaction (`Q_O2_consumption` is a heat
+  per oxygen), so the reaction's O₂ is scaled to the simulated peak (or
+  batch-average) uptake and the design runs again on a fresh unit; the
+  oxygen balance sets the OTR the vessel reaches against OUR(t) to harvest;
+  the heat line sets BioSTEAM's duty beside Cooney's estimate from the
+  oxygen the culture took up (the heat per O₂ read from biorefineries'
+  cane fermenter). Every design parameter is in the panel with its source
+  (the class's defaults read at import, the simulation's harvest hour and
+  uptake, a person's plant scale or, aerobic, one vessel's batch volume);
+  a design keeps one `fermos.vessel` artifact. `GET
+  /api/fermos/vessel/specs`, `POST /api/fermos/vessel`, `GET
+  /api/fermos/vessels?includeArchived=` (a design takes its simulation's
+  program). The vessel refuses a simulation of another species and, for one
+  naming no strain or product, says what it read them as (`cells read as`,
+  `product read as`, conventions in its basis). `fermos.py` registers the
+  `fermos.vessel` tool at import, so a kept design replays on a service just
+  started. The worker runs with `PYTHONBREAKPOINT=0` (the Dewes path holds a
+  bare `breakpoint()`); `check:figures` part 9 renders `OxygenBalance` and
+  counts its shaded hours.
+- **Tools carry ids and words** (D13, E.4‴): `fermos_simulate` (a family,
+  strain, product, sugar, record ids per parameter, a fit or kept
+  simulation, a run-length preset) and `fermos_vessel` (a simulation or fit
+  id, a vessel type, a kLa method), both free writes through `writes.py`
+  (`run_simulation`, `design_vessel`; `fermos_write`'s `simulate` and
+  `design_vessel`), audited with the model as agent; `fermos_read` reads
+  kinds `artifact`, `simulation` and `vessel`. Postdoc's prompt rules 15
+  and 16: a simulation's and a vessel's numbers are read from the artifact
+  and cited by its id. `check:tools` rule 2b finds every function that
+  keeps a `proforma.*`, `fermos.simulation`, `fermos.vessel` or
+  `pureos.train_run` artifact or writes an audit line and holds them to
+  `writes.py`; rule 6 refuses a numeric field in any `fermos_*` or
+  `pureos_*` input (top-level whole `k` and `limit` aside).
+- **What waits for Sean** (STATE §3.5, §4.3): the first simulation (α, X₀,
+  P₀, and for CEN.PK113-7D Ks and Pmax, typed under his name) and then the
+  vessel's plant scale.
 
 ## Proforma on BioSTEAM (OF-BLD-014 Phase 8, OF-BLD-019)
 
@@ -886,9 +1038,12 @@ Mini, which serves `main` (D8).
   `ethanol_*` fields; plant scale and glucose price are assumptions;
   `ethanol_purity` is a convention in every basis, never a scenario input.
   `proforma.bind` binds the PHA draft to thread P records of a sugar or
-  hydrolysate feed. Otherwise an input takes a named person's assumption
-  (Durable, merged by input key) or a fermOS fit a person chose (below), or
-  it waits, and a run with an input waiting is a 422 naming it.
+  hydrolysate feed. Otherwise an input takes a fermOS fit or simulation a
+  person chose (below), or it waits, and a run with an input waiting is a
+  422 naming it. A named person's override (OF-BLD-020 D3, *One parameter
+  panel* above) wins over records and fits alike and is named in the basis;
+  the run request carries `overrides` (the older `assumptions` field is read
+  for one release).
 - **The run contract.** `GET /api/proforma/scenarios` binds each seed
   BioSTEAM scenario the switch shows (`seed_scenarios`, from
   `modules.json`) over its own program's records whatever the switch says;
@@ -921,7 +1076,8 @@ Mini, which serves `main` (D8).
   palette's *New Proforma scenario* opens it. `createScenario` gives a
   time-based `sc-…` id (`nextId` restarts on a reload), `modelId` =
   `flowsheetId`. **Durable (D6):** `createdScenarios`, `scenarioRuns`,
-  `pinnedScenarios`, `proformaAssumptions` and `proformaFits`, through
+  `pinnedScenarios`, `proformaFits` and (OF-BLD-020) `parameterOverrides`,
+  which `proformaAssumptions` migrated into, through
   `snapshotOf` / `applyDurable`, all dropped by *Clear this browser's data*;
   `check:store` round-trips each. The service keeps the runs and no scenario
   made here.
@@ -985,8 +1141,9 @@ Mini, which serves `main` (D8).
   Refused in words naming the parameter: μ or Xmax unidentified, no Yp/s, no
   sugar series, sugar that does not run out, another product
   (`PRODUCT_WORDS`), a damaged fit file (the list keeps the rest).
-  `forecast` compares units through `units.normalize`; `fermos-1` is not
-  bumped.
+  `forecast` compares units through `units.normalize`. OF-BLD-020 §3.1
+  bumped the kinetic fit to `fermos-2` (its output names its `model`), so a
+  `fermos-1` fit reads stale.
 - **A person chooses the fit, input by input; a model never does.**
   `ProformaRunRequest.fits` and `?fits=` on `/bind` and the ceiling check
   carry the choice; `apply_fits` binds each chosen input to the artifact
@@ -1229,8 +1386,10 @@ Mini, which serves `main` (D8).
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,
   this browser's copy of Guild's ledger with what it still owes the service,
-  the lessons finished here, Postdoc's Live conversations and the program
-  switch (`showArchived`) across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
+  the lessons finished here, Postdoc's Live conversations, the program
+  switch (`showArchived`), Proforma's made scenarios, runs, pins and fits, and
+  every parameter override a person typed (`parameterOverrides`, OF-BLD-020
+  D3) across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
   `saveDurable` in `src/store.ts`). Reference and Ephemeral tiers stay in
   memory. The review queue and its `accept` / `reject` / `skip` / `gold`
   actions already exist in `src/screens/Guild.tsx` and `reviewRecord` —
@@ -1265,8 +1424,9 @@ Mini, which serves `main` (D8).
 - `docs/DEMO.md` — the one run sheet. `docs/TOOLS.md` — the tool registry,
   the gates, the program switch and the proposal rules.
 - A build's own document is the exception, for the length of its build
-  (OF-BLD-014's decision D1, kept by OF-BLD-015, OF-BLD-016 and OF-BLD-019):
-  `docs/build/` holds OF-BLD-014's, OF-BLD-015 Phase 7's, OF-BLD-016's and
-  OF-BLD-019's documents and prompts on the work branch, and OF-BLD-015's closing truth
+  (OF-BLD-014's decision D1, kept by OF-BLD-015, OF-BLD-016, OF-BLD-019 and
+  OF-BLD-020): `docs/build/` holds OF-BLD-014's, OF-BLD-015 Phase 7's,
+  OF-BLD-016's, OF-BLD-019's and OF-BLD-020's documents and prompts on the work
+  branch, and OF-BLD-015's closing truth
   pass deletes the folder. OF-BLD-014's `docs/build/OF-BLD-014.md` and
   `PROMPT.md` are still on `main`, its §10.4 having been left undone.

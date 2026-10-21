@@ -312,14 +312,16 @@ async function main() {
 
   // ── 10e. Proforma: the yeast scenario runs, with archived programs hidden ──
   // OF-BLD-019 §3.3 — the demo's Proforma beat is the yeast program's now:
-  // with the switch off, sc-yeast-1 opens with its inputs, those bound to
-  // records and those waiting; the two economic assumptions are typed under
-  // the reviewer's name, the run goes to the double, and the result and its
-  // tables show, each as long as the stored run's. The PHA beat below keeps
-  // its place under the switch.
+  // with the switch off, sc-yeast-1 opens with its inputs in the parameter
+  // panel (OF-BLD-020 §2.2), those bound to records and those waiting; the
+  // two economic values are typed in the panel under the reviewer's name,
+  // the run goes to the double with them as overrides, and the result and
+  // its tables show, each as long as the stored run's. The PHA beat below
+  // keeps its place under the switch.
   const prototype = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
   const yeastRun = prototype('proforma-run-yeast.json');
   const yeastBound = prototype('proforma-scenarios.json').find((sc) => sc.id === 'sc-yeast-1');
+  const yeastScope = prototype('params-proforma.json').scopes['proforma:sc-yeast-1'].body;
   const yeastWaits = yeastBound.inputs.filter((i) => i.binding === 'waiting').map((i) => i.label);
   const yeastRecords = yeastBound.inputs.filter((i) => i.binding === 'records').length;
   await go('/settings/programs');
@@ -331,23 +333,26 @@ async function main() {
   await go('/settings/corpus');
   await page.locator('input[aria-label="Reviewer name"]').fill('Sam Okonkwo').catch(() => {});
   await go('/proforma/scenario/sc-yeast-1');
-  await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.locator('[data-testid="proforma-inputs"] [data-testid="param-row"]').first().waitFor({ timeout: 10000 }).catch(() => {});
   const waits = await page.locator('[data-testid="proforma-waiting"]').innerText().catch(() => '');
   check(
     'With archived programs hidden, the yeast scenario shows what bound to records and what waits',
     hiddenNow &&
-      (await page.locator('[data-testid^="input-"]').count()) === yeastBound.inputs.length &&
-      (await page.locator('[data-testid="source-records"]').count()) === yeastRecords &&
+      (await page.locator('[data-testid="param-row"]').count()) === yeastScope.specs.length &&
+      (await page.locator('[data-testid="param-chip"][data-origin="record"]').count()) === yeastRecords &&
       yeastWaits.length === 2 && yeastWaits.every((l) => waits.includes(l)) &&
       (await page.locator('[data-archived-program]').count()) === 0,
     waits,
   );
-  for (const [key, vals] of [['plant_scale', ['100000', '100000', '100000']], ['glucose_price', ['0.4', '0.3', '0.5']]]) {
-    const form = page.locator(`[data-testid="assume-${key}"]`);
-    await form.waitFor({ timeout: 8000 }).catch(() => {});
-    const boxes = form.locator('input');
-    for (let i = 0; i < 3; i++) await boxes.nth(i).fill(vals[i]).catch(() => {});
-    await form.locator('button:has-text("Keep assumption")').click().catch(() => {});
+  for (const [key, value, low, high] of [['plant_scale', '100000', null, null], ['glucose_price', '0.4', '0.3', '0.5']]) {
+    const row = page.locator(`[data-testid="param-row"][data-key="${key}"]`);
+    await row.waitFor({ timeout: 8000 }).catch(() => {});
+    await row.locator('[data-testid="param-value-input"]').fill(value).catch(() => {});
+    if (low !== null) {
+      await row.locator('[data-testid="param-more"] summary').click().catch(() => {});
+      await row.locator('[data-testid="param-low-input"]').fill(low).catch(() => {});
+      await row.locator('[data-testid="param-high-input"]').fill(high).catch(() => {});
+    }
     await page.waitForTimeout(150);
   }
   await page.getByRole('button', { name: 'Run the scenario' }).click().catch(() => {});
@@ -373,9 +378,9 @@ async function main() {
   // OF-BLD-014 §10.3, the demo's beat 7 before OF-BLD-019, over the double's
   // stand-in binding, under the switch.
   await go('/proforma/scenario/sc-pha-1');
-  await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.locator('[data-testid="proforma-inputs"] [data-testid="param-row"]').first().waitFor({ timeout: 10000 }).catch(() => {});
   const pha = await page.locator('body').innerText();
-  check('Proforma\'s PHA scenario shows each input and its source', (await page.locator('[data-testid^="input-"]').count()) === 7 && /Waiting for a source/.test(pha));
+  check('Proforma\'s PHA scenario shows each input and its source', (await page.locator('[data-testid="param-row"] [data-testid="param-chip"]').count()) === 7 && /Waiting for a source/.test(pha));
 
   // ── 10g. Runbooks: an answer becomes a runbook that keeps score ─────
   // The demo's beat 8: Postdoc drafts, a person adopts, the page draws the

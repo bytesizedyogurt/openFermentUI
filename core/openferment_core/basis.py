@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .models import ComputedBasis, weakest_provenance
+from .models import BasisSource, ComputedBasis, weakest_provenance
 
 # A provenance `weakest_provenance` does not know sorts as the weakest there
 # is. A record or artifact the caller cannot find gets this, so a missing
@@ -36,6 +36,15 @@ def _provenance_of(item: Any) -> str:
     else:
         p = getattr(item, "provenance", None)
     return p if isinstance(p, str) and p else _UNKNOWN
+
+
+def assumption_source(by: str, at: str, note: str | None = None) -> BasisSource:
+    """The source of a value a named person typed: a Proforma assumption, or
+    an `Override` from the parameter panel (OF-BLD-020 D3). Its kind is
+    `assumption`, the person is `by`, and `note` says the day it was typed and
+    what it rests on, so the basis names both and `basis_provenance` makes
+    whatever rests on it `demo`."""
+    return BasisSource(kind="assumption", by=by.strip(), note=f"typed on {at}" + (f": {note}" if note else ""))
 
 
 def basis_provenance(

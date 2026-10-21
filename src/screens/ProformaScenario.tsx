@@ -31,9 +31,9 @@ import {
   Legend,
 } from 'recharts';
 import { AlertTriangle, Copy, Download, GitCompare, Pin, PinOff, Play, Route, Table2, SlidersHorizontal } from 'lucide-react';
-import { archivedProgramOf, useProgramLookup, useStore } from '@/store';
+import { archivedProgramOf, overrideEnds, overridesFor, proformaScope, useProgramLookup, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
-import type { Artifact, CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, InputAssumption, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
+import type { Artifact, BasisInput, CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, ParamScope, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
 import { PROGRAM_BY_ID } from '@/data/programs';
 import { durableAvailable } from '@/lib/durable';
 import {
@@ -43,7 +43,6 @@ import {
   ceilingCheck,
   fermosFits,
   fitsFrom,
-  leftOutWords,
   modellerQuestions,
   newestRunId,
   proformaArtifact,
@@ -53,6 +52,7 @@ import {
   proformaShelf,
   proformaStatus,
   questionsText,
+  runOverrides,
   runProformaScenario,
   runViewOfArtifact,
   runViewOfResult,
@@ -61,6 +61,9 @@ import {
   type SimulatorStatus,
 } from '@/lib/proforma';
 import { trainPath } from '@/lib/pureos';
+import { paramScope } from '@/lib/params';
+import { ParameterPanel } from '@/components/ParameterPanel';
+import { TOUCH_CHIP } from '@/components/ParameterRow';
 import { inputSourceWords } from '@/components/NewScenarioDialog';
 import { evaluateGrid, mspSweep, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
 import { fmt } from '@/engine/units';
@@ -71,7 +74,7 @@ import { CitationChip } from '@/components/Chip';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
 import { CEILING_NOTES, Tornado } from '@/components/figures';
 import { ArchivedBanner } from '@/components/ArchivedBanner';
-import { RunReport, SOURCE_WORDS, inputLabels } from './ProformaBiosteam';
+import { RunReport, inputLabels } from './ProformaBiosteam';
 
 
 /** A "view as table" disclosure — the accessibility floor for every chart (§6.6). */
@@ -654,9 +657,17 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
 //                   made here from GET /api/proforma/bind?flowsheet= (the
 //                   scenario run contract, src/lib/proforma.ts), each input
 //                   bound to records, an artifact, a named person's
-//                   assumption, or waiting; this browser's assumptions are
-//                   laid over the inputs that wait, as the service lays them
-//                   on the run;
+//                   assumption, or waiting: its host list, what it leaves
+//                   out, and the questions for a modeller read it;
+//   the inputs      OF-BLD-020 §2.2: the parameter panel over scope
+//                   `proforma:<scenario id>` (GET /api/params/{scope}, a
+//                   scenario made here naming its flowsheet), every input
+//                   with its value and source, a slider inside its bounds,
+//                   Reset to source and Why. A person's change is an
+//                   Override in this browser under the reviewer name, the
+//                   one thing a run carries of a person (`overrides`), and it
+//                   wins over the records and any fermOS fit for its input,
+//                   here and in the service alike;
 //   the run         POST /api/proforma/run, one `proforma.run` artifact
 //                   (D1); after a run the store keeps its id
 //                   (recordScenarioRun), and on load the page reads the newest
@@ -672,177 +683,51 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
 
 const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
 
-/** Where one input's value comes from, as the inputs table says it. */
-function SourceCell({ input }: { input: ScenarioInput }) {
-  const src = input.source;
-  if (input.binding === 'records') {
-    const n = input.records.length;
-    const range = input.low == null || input.high == null || input.low === input.high ? fmt(input.value ?? Number.NaN, 4) : `${fmt(input.low, 4)}–${fmt(input.high, 4)}`;
-    return (
-      <div data-testid="source-records">
-        <span className="chip">
-          {n} record{n === 1 ? '' : 's'}, <span className="font-num">{range}</span>
-          {input.unit && <span className="font-num">&nbsp;{input.unit}</span>}
-        </span>
-        <details className="mt-1">
-          <summary className="text-caption text-ink-soft cursor-pointer hover:text-accent">{src?.note ?? 'the records'}</summary>
-          <div className="flex flex-col gap-1 mt-1">
-            {input.records.map((r) => (
-              <span key={r.id} className="inline-flex flex-wrap items-center gap-1">
-                <CitationChip recordId={r.id} paperId={r.paperId} />
-                <span className="text-caption text-ink-soft">
-                  {r.organism ?? 'organism not stated'} · {r.carbonSource ?? 'carbon source not stated'} ·{' '}
-                  <span className="font-num">{fmt(r.value, 3)}</span>
-                </span>
-              </span>
-            ))}
-          </div>
-        </details>
-      </div>
-    );
-  }
-  if (src?.kind === 'artifact' && src.id) {
-    return (
-      <a className="chip font-num hover:text-accent" href={href(`/biorepo/artifacts/${src.id}`)} data-testid="source-artifact">
-        artifact {src.id}
-        {src.note ? ` · ${src.note}` : ''}
-      </a>
-    );
-  }
-  if (input.binding === 'assumption' && src) {
-    return (
-      <span className="chip" data-testid="assumption-chip">
-        assumption by {src.by ?? 'nobody named'} · <span className="font-num">{fmt(input.value ?? Number.NaN, 4)}</span>, low{' '}
-        <span className="font-num">{fmt(input.low ?? Number.NaN, 4)}</span>, high <span className="font-num">{fmt(input.high ?? Number.NaN, 4)}</span>
-        {src.note ? ` · ${src.note}` : ''}
-      </span>
-    );
-  }
-  if (src && input.binding !== 'waiting') {
-    return (
-      <span className="chip">
-        {SOURCE_WORDS[src.kind] ?? src.kind}
-        {src.note ? `: ${src.note}` : ''}
-      </span>
-    );
-  }
-  return <span className="chip text-signal-warn">waiting for a source</span>;
-}
-
-function AssumptionForm({ input, onSave }: { input: ScenarioInput; onSave: (a: { value: number; low: number; high: number; note: string }) => void }) {
-  const [value, setValue] = useState('');
-  const [low, setLow] = useState('');
-  const [high, setHigh] = useState('');
-  const [note, setNote] = useState('');
-  const v = Number(value);
-  const lo = Number(low);
-  const hi = Number(high);
-  const ok = value !== '' && low !== '' && high !== '' && [v, lo, hi].every(Number.isFinite) && lo <= v && v <= hi;
+/**
+ * The records an input binds, as the binding lists them: each a citation
+ * chip on its paper, with the organism, the carbon source and its value in
+ * the input's unit. The parameter panel opens it from the input's
+ * `record ×N` chip (OF-BLD-020 §2.2: the records chooser this page had
+ * became the panel's record link). Rendered inside the panel, its chips are
+ * the panel's 44 px touch targets (§2.R, finding 11; check:store walks it).
+ */
+function RecordsChooser({ input }: { input: ScenarioInput | undefined }) {
+  if (!input || input.records.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-end gap-2 mt-1" data-testid={`assume-${input.key}`}>
-      {(
-        [
-          ['Value', value, setValue],
-          ['Low', low, setLow],
-          ['High', high, setHigh],
-        ] as const
-      ).map(([label, val, set]) => (
-        <label key={label} className="text-caption text-ink-soft">
-          <span className="block">{label}</span>
-          <input className="input w-[88px] font-num" inputMode="decimal" aria-label={`${input.label} ${label.toLowerCase()}`} value={val} onChange={(e) => set(e.target.value)} />
-        </label>
+    <div className="flex flex-col gap-1" data-testid="source-records">
+      {input.source?.note && <span className="text-caption text-ink-soft">{input.source.note}</span>}
+      {input.records.map((r) => (
+        <span key={r.id} className="inline-flex flex-wrap items-center gap-1">
+          <CitationChip recordId={r.id} paperId={r.paperId} className={TOUCH_CHIP} />
+          <span className="text-caption text-ink-soft">
+            {r.organism ?? 'organism not stated'} · {r.carbonSource ?? 'carbon source not stated'} ·{' '}
+            <span className="font-num">{fmt(r.value, 3)}</span>
+          </span>
+        </span>
       ))}
-      <label className="text-caption text-ink-soft flex-1 min-w-[140px]">
-        <span className="block">What it rests on</span>
-        <input className="input w-full" aria-label={`${input.label} basis`} value={note} onChange={(e) => setNote(e.target.value)} />
-      </label>
-      <Button disabled={!ok} onClick={() => onSave({ value: v, low: lo, high: hi, note })}>
-        Keep assumption
-      </Button>
     </div>
   );
 }
 
-function InputsTable({
-  inputs,
-  flowsheet,
-  onAssume,
-  onClear,
-  onClearFit,
-}: {
-  inputs: ScenarioInput[];
-  flowsheet: FlowsheetInfo | null;
-  onAssume: (key: string, a: { value: number; low: number; high: number; note: string }) => void;
-  onClear: (key: string) => void;
-  onClearFit: (key: string) => void;
-}) {
-  const reviewer = useStore((s) => s.reviewer);
-  const declared = new Map((flowsheet?.inputs ?? []).map((i) => [i.key, i]));
+/**
+ * Who a run's basis names for each assumption it rests on, read from the
+ * run (OF-BLD-020 §2.2): the panel's chip says who typed a value here, and
+ * this line says whose values the run that is shown was made with.
+ */
+function BasisAssumptions({ inputs, labels }: { inputs: BasisInput[]; labels: Record<string, string> }) {
+  const named = inputs.filter((i) => i.source.kind === 'assumption' && !/ (low|high)$/.test(i.name));
+  if (named.length === 0) return null;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-body" data-testid="proforma-inputs">
-        <thead>
-          <tr className="text-caption text-ink-soft text-left">
-            <th className="py-1 pr-2 font-medium">Input</th>
-            <th className="py-1 pr-2 font-medium">Dimension</th>
-            <th className="py-1 pr-2 font-medium">Unit</th>
-            <th className="py-1 pr-2 font-medium">Value</th>
-            <th className="py-1 font-medium">Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {inputs.map((i) => (
-            <tr key={i.key} className="border-t border-line/60 align-top" data-testid={`input-${i.key}`}>
-              <td className="py-1.5 pr-2">
-                <div className="font-medium">{i.label}</div>
-                {declared.get(i.key)?.note && <div className="text-caption text-ink-soft">{declared.get(i.key)?.note}</div>}
-              </td>
-              <td className="py-1.5 pr-2 text-caption">{declared.get(i.key)?.dimension ?? '—'}</td>
-              <td className="py-1.5 pr-2 font-num text-caption">{i.unit || 'share'}</td>
-              <td className="py-1.5 pr-2 font-num">
-                {i.value == null ? '—' : fmt(i.value, 4)}
-                {i.sampling && <div className="text-caption text-ink-soft">{i.sampling}</div>}
-              </td>
-              <td className="py-1.5">
-                <SourceCell input={i} />
-                {i.flags.map((f) => (
-                  <div key={f} className="text-caption text-signal-warn">
-                    {f}
-                  </div>
-                ))}
-                {(i.leftOutNoCarbon > 0 || i.leftOutOtherCarbon > 0) && (
-                  <div className="text-caption text-ink-soft">
-                    {leftOutWords(i, flowsheet?.id ?? null)}
-                  </div>
-                )}
-                {i.binding === 'assumption' && (
-                  <button className="text-caption text-ink-soft hover:text-accent underline" onClick={() => onClear(i.key)}>
-                    Withdraw this assumption
-                  </button>
-                )}
-                {i.binding === 'artifact' && (
-                  <button className="text-caption text-ink-soft hover:text-accent underline" onClick={() => onClearFit(i.key)}>
-                    Stop using the fermOS fit here
-                  </button>
-                )}
-                {i.binding === 'waiting' &&
-                  (reviewer.trim() ? (
-                    <AssumptionForm input={i} onSave={(a) => onAssume(i.key, a)} />
-                  ) : (
-                    <div className="text-caption text-ink-soft">
-                      An assumption carries a person's name: set yours in{' '}
-                      <a className="text-accent hover:underline" href={href('/settings/corpus')}>
-                        Settings
-                      </a>{' '}
-                      to type one.
-                    </div>
-                  ))}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <p className="text-caption text-ink-soft mt-2" data-testid="run-basis-assumptions">
+      The run shown rests on{' '}
+      {named.map((i, n) => (
+        <span key={i.name}>
+          {n > 0 && (n === named.length - 1 ? ' and ' : ', ')}
+          {labels[i.name] ?? i.name} as an assumption by {i.source.by ?? 'nobody named'}
+        </span>
+      ))}
+      , as its basis names them.
+    </p>
   );
 }
 
@@ -855,16 +740,22 @@ function InputsTable({
  * feeds which input (`proformaFits`, Durable, like assumptions), and the
  * binding then names it as the inputs' source. A fit sent from fermOS →
  * Forecast arrives as `?fit=` and is attached here, once, for the inputs it
- * can feed. With no fit on file it says how one gets made.
+ * can feed. With no fit on file it says how one gets made. A value a person
+ * typed for an input wins over a fit chosen for it (OF-BLD-020 D3), so a
+ * card never says it is in use for that input: it says whose value wins
+ * there (§2.R, findings 8 and 12).
  */
 function FermosFitSlot({
   flowsheetId,
   chosen,
+  overridden,
   onChoose,
   onStop,
 }: {
   flowsheetId: string;
   chosen: Record<string, string>;
+  /** The inputs a person's value overrides, each with the person's name: no fit feeds them. */
+  overridden: Record<string, string>;
   onChoose: (fits: Record<string, string>) => void;
   /** Stop using these artifacts: only the inputs each feeds are cleared (§5.R). */
   onStop: (artifactIds: string[]) => void;
@@ -874,16 +765,18 @@ function FermosFitSlot({
   const [fits, setFits] = useState<FermosFitInfo[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [arrived, setArrived] = useState<string | null>(null);
+  const showArchived = useStore((s) => s.showArchived);
 
   useEffect(() => {
     const ctrl = new AbortController();
     setFits(null);
     setProblem(null);
-    fermosFits(flowsheetId, ctrl.signal)
+    // The switch rides along: an archived program's simulation is not offered with it off (OF-BLD-020 §3.R).
+    fermosFits(flowsheetId, showArchived, ctrl.signal)
       .then(setFits)
       .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [flowsheetId]);
+  }, [flowsheetId, showArchived]);
 
   // A fit sent from fermOS → Forecast: attached once, for the inputs it can
   // feed, then the address loses its ?fit= so a reload attaches nothing.
@@ -912,8 +805,10 @@ function FermosFitSlot({
         A fit of a deposited run can give the fermenter its titre, its yield on sugar and its batch time. The service computes each
         from the fit&rsquo;s forecast, drawn again to the hour its median sugar runs out (found between the forecast&rsquo;s points, so
         the length it was asked to run does not move them): titre from the final product, yield from product made over sugar used,
-        and productivity as that titre over that hour. A fit&rsquo;s productivity feeds the fermenter only beside its own titre, since
-        the batch time is the titre over the productivity. The run then names the fit as the source of each.
+        and productivity as that titre over that hour. A simulation fermOS keeps gives its own end state instead, computed and never
+        measured: titre at harvest, the yield it achieved, and its harvest hour as the batch time. A productivity feeds the fermenter
+        only beside titre from the same fit or simulation, since the batch time is the titre over the productivity. The run then names
+        the fit or simulation as the source of each input it feeds; a value a person types in the panel wins over it for that input.
       </p>
       {arrived && (
         <p className="text-caption mb-2" data-testid="fermos-fit-arrived">
@@ -952,6 +847,11 @@ function FermosFitSlot({
           {fits.map((f) => {
             const feeds = fitsFrom(f);
             const inUse = using.has(f.artifactId);
+            const mine = Object.entries(chosen)
+              .filter(([, id]) => id === f.artifactId)
+              .map(([k]) => k);
+            const used = mine.filter((k) => !(k in overridden));
+            const beaten = mine.filter((k) => k in overridden);
             return (
               <li key={f.artifactId} className="card p-3" data-testid="fermos-fit-option" data-artifact={f.artifactId} data-feeds={Object.keys(feeds).length}>
                 <div className="flex flex-wrap items-center gap-2">
@@ -961,7 +861,7 @@ function FermosFitSlot({
                   </a>
                   <ProvenanceBadge p={f.provenance} />
                   <span className="text-caption text-ink-soft">
-                    run {f.depositionId ?? 'not named'}
+                    {f.tool === 'fermos.simulation' ? 'computed, not measured' : `run ${f.depositionId ?? 'not named'}`}
                     {f.productSeries && <> · product: {f.productSeries}</>}
                     {f.substrateSeries && <> · sugar: {f.substrateSeries}</>}
                   </span>
@@ -986,7 +886,8 @@ function FermosFitSlot({
                 </ul>
                 {f.batchTimeH != null && (
                   <div className="text-caption text-ink-soft">
-                    Batch time <span className="font-num">{fmt(f.batchTimeH, 4)}</span> h, where the forecast&rsquo;s median sugar runs out.
+                    {/* §8.R: the words of the tool that kept it (a forecast's grid, a simulation's harvest), never one tool's for all. */}
+                    Batch time <span className="font-num">{fmt(f.batchTimeH, 4)}</span> h: {f.batchTimeNote ?? 'the hour its sugar runs out'}.
                   </div>
                 )}
                 {f.flags.map((w) => (
@@ -997,7 +898,13 @@ function FermosFitSlot({
                 <div className="mt-2">
                   {inUse ? (
                     <span className="text-caption">
-                      In use for {Object.entries(chosen).filter(([, id]) => id === f.artifactId).map(([k]) => k).join(', ')}.{' '}
+                      {used.length > 0 ? `In use for ${used.join(', ')}.` : 'In use for no input: a person’s value wins wherever it was chosen.'}{' '}
+                      {beaten.length > 0 && (
+                        <span data-testid="fermos-fit-overridden">
+                          Chosen for {beaten.map((k) => `${k}, where ${overridden[k]}’s value wins`).join('; ')}: the run does not use the fit
+                          there.{' '}
+                        </span>
+                      )}
                       <button className="underline hover:text-accent" onClick={() => onStop([f.artifactId])} data-testid="fermos-fit-stop">
                         Stop using this fit
                       </button>
@@ -1045,7 +952,7 @@ function CeilingYieldSource({ check }: { check: CeilingCheck }) {
   if (check.yieldBinding === 'artifact' && src?.id)
     return (
       <a className="chip hover:text-accent" href={href(`/biorepo/artifacts/${src.id}`)} data-testid="ceiling-yield-source" data-binding="artifact">
-        fermOS fit {src.id}
+        fermOS {(check.yieldTool && FIT_TOOL_WORDS[check.yieldTool]) || 'fit'} {src.id}
       </a>
     );
   return (
@@ -1228,15 +1135,15 @@ function StatusLine({ status, problem, running, elapsed }: { status: SimulatorSt
 }
 
 function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere: boolean }) {
-  const assumptions = useStore((s) => s.proformaAssumptions[scenario.id]) ?? EMPTY;
-  const setAssumption = useStore((s) => s.setProformaAssumption);
-  const clearAssumption = useStore((s) => s.clearProformaAssumption);
+  // OF-BLD-020 §2.2 (D3): a person's changes to this scenario's inputs, kept
+  // in this browser under the scenario's scope and sent with the run.
+  const scope = proformaScope(scenario.id);
+  const overrides = useStore(overridesFor(scope));
   const chosenFits = useStore((s) => s.proformaFits[scenario.id]) ?? EMPTY_FITS;
   const setFits = useStore((s) => s.setProformaFits);
   const clearFit = useStore((s) => s.clearProformaFit);
   const togglePin = useStore((s) => s.togglePin);
   const recordScenarioRun = useStore((s) => s.recordScenarioRun);
-  const reviewer = useStore((s) => s.reviewer);
   const showArchived = useStore((s) => s.showArchived);
   const lookup = useProgramLookup();
   const ownArchived = archivedProgramOf('scenario', scenario.id, lookup) !== null;
@@ -1257,6 +1164,16 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   const [elapsed, setElapsed] = useState(0);
   const [ceiling, setCeiling] = useState<CeilingCheck | null>(null);
   const [ceilingProblem, setCeilingProblem] = useState<string | null>(null);
+  const [panel, setPanel] = useState<ParamScope | null>(null);
+  // §8.R: a fermOS source is named as what the service bound it as (the
+  // scope is read with no override, so an overridden key keeps its source's
+  // origin): a kept simulation is a simulation, never a fit.
+  const fitWord = (key: string) => (panel?.values.find((v) => v.key === key)?.origin === 'simulation' ? 'simulation' : 'fit');
+  const [panelProblem, setPanelProblem] = useState<string | null>(null);
+  // The service's refusal of the scope's overrides as they stand: the panel
+  // binds them as a run binds them, so a run of them would be refused in
+  // the same words, and Run waits until they stand (OF-BLD-020 §2.R).
+  const [refused, setRefused] = useState<string | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -1291,23 +1208,40 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     return () => ctrl.abort();
   }, [madeHere, flowsheetId, scenario.id, host, includeArchived, fitsKey]);
 
+  // The inputs as the parameter panel shows them (OF-BLD-020 §2.2): the
+  // scenario's scope, bound by the service as a run binds it, a scenario made
+  // here naming its flowsheet, with the host and the fits chosen.
+  const ask = useMemo(
+    () => ({ flowsheet: madeHere ? flowsheetId : null, host, fits: Object.fromEntries(JSON.parse(fitsKey) as [string, string][]) }),
+    [madeHere, flowsheetId, host, fitsKey],
+  );
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setPanel(null);
+    setPanelProblem(null);
+    paramScope(scope, ask, ctrl.signal)
+      .then(setPanel)
+      .catch((e: unknown) => !ctrl.signal.aborted && setPanelProblem(problemOf(e)));
+    return () => ctrl.abort();
+  }, [scope, ask]);
+
   // The ceiling check (OF-BLD-019 §5.2, D11): the yield as this page binds
-  // it (host, fits, and the yield's assumption when a person typed one),
+  // it (host, fits, and the yield's override when a person typed one),
   // read by the service against the newest stored geneOS ceilings.
-  const yieldAssumed = JSON.stringify(assumptions.filter((a) => a.key === 'yield'));
+  const yieldTyped = JSON.stringify(overrides.filter((o) => o.key === 'yield'));
   useEffect(() => {
     const ctrl = new AbortController();
     setCeiling(null);
     setCeilingProblem(null);
     const fits = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
     ceilingCheck(
-      { scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, host, includeArchived, fits, assumptions: JSON.parse(yieldAssumed) as InputAssumption[] },
+      { scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, host, includeArchived, fits, overrides: JSON.parse(yieldTyped) as typeof overrides },
       ctrl.signal,
     )
       .then(setCeiling)
       .catch((e: unknown) => !ctrl.signal.aborted && setCeilingProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [madeHere, flowsheetId, scenario.id, host, includeArchived, fitsKey, yieldAssumed]);
+  }, [madeHere, flowsheetId, scenario.id, host, includeArchived, fitsKey, yieldTyped]);
 
 
   // The newest run: the service's, which holds every run any browser, the
@@ -1371,41 +1305,55 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
 
   const flowsheet = shelf?.find((f) => f.id === flowsheetId) ?? null;
 
-  // What the service bound, with this browser's assumptions laid over the
-  // inputs that wait for one; the service applies the same rule on the run.
+  // What the service bound, with this browser's overrides laid over every
+  // input they name, records and fits included (OF-BLD-020 D3); the service
+  // applies the same rule on the run, and the panel shows its own answer.
   const bound = useMemo<ProformaScenarioInfo | null>(() => {
     if (!info) return null;
-    const by = new Map(assumptions.map((a) => [a.key, a]));
+    const by = new Map(overrides.filter((o) => typeof o.value === 'number').map((o) => [o.key, o]));
     const inputs = info.inputs.map((i): ScenarioInput => {
-      const a = by.get(i.key);
-      if (i.binding !== 'waiting' || !a) return i;
+      const o = by.get(i.key);
+      if (!o || typeof o.value !== 'number') return i;
+      // One end typed, the other is the value; neither, held at the value (overrideEnds, as the service reads it).
+      const ends = overrideEnds(o);
+      const low = ends.low ?? o.value;
+      const high = ends.high ?? o.value;
       return {
         ...i,
         binding: 'assumption',
-        value: a.value,
-        low: a.low,
-        high: a.high,
-        sampling: a.low === a.high ? 'fixed' : 'uniform',
-        source: { kind: 'assumption', id: null, by: a.by, note: `typed on ${a.at}${a.note ? `: ${a.note}` : ''}` },
+        value: o.value,
+        low,
+        high,
+        sampling: low === high ? 'fixed' : 'uniform',
+        source: { kind: 'assumption', id: null, by: o.by, note: `typed on ${o.at}${o.note ? `: ${o.note}` : ''}` },
+        records: [],
+        recordIds: [],
       };
     });
     return { ...info, id: scenario.id, name: scenario.name, inputs, waiting: inputs.filter((i) => i.binding === 'waiting').map((i) => i.key) };
-  }, [info, assumptions, scenario.id, scenario.name]);
+  }, [info, overrides, scenario.id, scenario.name]);
+
+  // The inputs a person's value overrides, with the person: a fit chosen for one does not feed it (D3).
+  const overridden = useMemo(
+    () => Object.fromEntries(overrides.filter((o) => typeof o.value === 'number').map((o) => [o.key, o.by])) as Record<string, string>,
+    [overrides],
+  );
 
   const priceBasis = bound?.priceBasis || flowsheet?.priceBasis || 'on the basis its flowsheet states';
   const labels = inputLabels(bound?.inputs ?? null, flowsheet);
   const unitLabels = inputLabels(bound?.inputs ?? null, flowsheet, true);
   const programId = scenario.program ?? (flowsheet?.program as Scenario['program'] | null | undefined) ?? null;
   const program = programId ? PROGRAM_BY_ID[programId] : null;
-  const today = new Date().toISOString().slice(0, 10);
 
   const go = () => {
     if (!bound) return;
     setRunning(true);
     setRunProblem(null);
-    const used = assumptions.filter((a) => bound.inputs.find((i) => i.key === a.key)?.binding === 'assumption');
+    // The run carries the scope's overrides of the inputs its flowsheet
+    // takes, and the fits of the inputs no override names (OF-BLD-020 D3).
+    const sent = runOverrides(overrides, bound.inputs.map((i) => i.key));
     const fits = Object.fromEntries(Object.entries(chosenFits).filter(([k]) => bound.inputs.find((i) => i.key === k)?.binding === 'artifact'));
-    runProformaScenario({ scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, assumptions: used, host, fits })
+    runProformaScenario({ scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, overrides: sent, host, fits })
       .then((r) => {
         setView(runViewOfResult(r));
         // The index and this page read the newest run from its artifact (D6).
@@ -1509,17 +1457,47 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
               <span data-testid="bind-problem">The service could not bind this scenario&rsquo;s inputs: {bindProblem}</span>
             </Callout>
           )}
-          {bound ? (
-            <InputsTable
-              inputs={bound.inputs}
-              flowsheet={flowsheet}
-              onAssume={(key, a) => setAssumption(scenario.id, { key, ...a, by: reviewer.trim(), at: today, note: a.note || null } satisfies InputAssumption)}
-              onClear={(key) => clearAssumption(scenario.id, key)}
-              onClearFit={(key) => clearFit(scenario.id, key)}
-            />
+          {panelProblem && (
+            <Callout kind="warn">
+              <span data-testid="panel-problem">The service could not serve this scenario&rsquo;s parameters: {panelProblem}</span>
+            </Callout>
+          )}
+          {panel ? (
+            <div data-testid="proforma-inputs">
+              <ParameterPanel
+                scope={scope}
+                data={panel}
+                request={ask}
+                onRefused={setRefused}
+                groups={PROFORMA_GROUPS}
+                recordsOf={(key) => <RecordsChooser input={info?.inputs.find((i) => i.key === key)} />}
+              />
+              {Object.keys(chosenFits).length > 0 && (
+                <p className="text-caption text-ink-soft">
+                  {Object.entries(chosenFits).map(([key, id]) =>
+                    key in overridden ? (
+                      <span key={key} className="mr-3" data-testid="fit-line" data-key={key} data-overridden="true">
+                        {labels[key] ?? key}: {overridden[key]}&rsquo;s value replaces the fermOS {fitWord(key)} <span className="font-num">{id}</span>, and the run
+                        does not use the {fitWord(key)} here:{' '}
+                        <button className="underline hover:text-accent min-h-[44px]" onClick={() => clearFit(scenario.id, key)} data-testid="fit-stop-input" data-key={key}>
+                          stop using it here
+                        </button>
+                      </span>
+                    ) : (
+                      <span key={key} className="mr-3" data-testid="fit-line" data-key={key} data-overridden="false">
+                        {labels[key] ?? key} from the fermOS {fitWord(key)} <span className="font-num">{id}</span>:{' '}
+                        <button className="underline hover:text-accent min-h-[44px]" onClick={() => clearFit(scenario.id, key)} data-testid="fit-stop-input" data-key={key}>
+                          stop using it here
+                        </button>
+                      </span>
+                    ),
+                  )}
+                </p>
+              )}
+            </div>
           ) : (
             flowsheet &&
-            bindProblem && (
+            (bindProblem || panelProblem) && (
               <table className="w-full text-body mt-2" data-testid="shelf-inputs">
                 <thead>
                   <tr className="text-caption text-ink-soft text-left">
@@ -1546,6 +1524,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
             <FermosFitSlot
               flowsheetId={flowsheetId}
               chosen={chosenFits}
+              overridden={overridden}
               onChoose={(fits) => setFits(scenario.id, fits)}
               onStop={(ids) =>
                 Object.entries(chosenFits)
@@ -1561,7 +1540,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
             )}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button variant="primary" onClick={go} disabled={running || starting || !bound || bound.waiting.length > 0}>
+            <Button variant="primary" onClick={go} disabled={running || starting || !bound || bound.waiting.length > 0 || refused !== null}>
               <Play size={14} /> {running ? 'Simulating…' : view ? 'Run the scenario again' : 'Run the scenario'}
             </Button>
             <StatusLine status={status} problem={statusProblem} running={running} elapsed={elapsed} />
@@ -1571,6 +1550,11 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
               </span>
             )}
           </div>
+          {refused !== null && (
+            <p className="text-caption text-signal-warn mt-2" data-testid="run-held">
+              Run waits until the service takes these values, since a run of them would be refused in the same words: {refused}
+            </p>
+          )}
           {bound && bound.waiting.length > 0 && (
             <p className="text-caption text-signal-warn mt-2" data-testid="proforma-waiting">
               Waiting for a source: {bound.waiting.map((k) => bound.inputs.find((i) => i.key === k)?.label ?? k).join(', ')}.
@@ -1583,6 +1567,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
               </Callout>
             </div>
           )}
+          {view && <BasisAssumptions inputs={view.basis.inputs} labels={labels} />}
         </Card>
 
         <CeilingCheckSlot check={ceiling} problem={ceilingProblem} />
@@ -1638,7 +1623,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   );
 }
 
-const EMPTY: InputAssumption[] = [];
+/** The order the panel shows a scenario's inputs in: the shelf's kinds (params._GROUPS). */
+const PROFORMA_GROUPS = ['Process', 'Economics', 'Conventions'];
 const EMPTY_FITS: Record<string, string> = {};
 /** The inputs a fermOS fit can feed (proforma.FIT_KEYS). */
 const FIT_INPUTS = ['titre', 'yield', 'productivity'];

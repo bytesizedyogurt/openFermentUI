@@ -27,14 +27,30 @@
  * wondering why a record they rejected came back.
  */
 import { readFileSync } from 'node:fs';
-import { isExample, mergeAssumptions, programOf, programVisible, snapshotOf, useStore } from '../src/store';
+import {
+  assumptionOfOverride,
+  isExample,
+  mergeAssumptions,
+  overrideEnds,
+  overrideOfAssumption,
+  overridesFor,
+  programOf,
+  programVisible,
+  proformaScope,
+  snapshotOf,
+  useStore,
+} from '../src/store';
 import { RECORDS } from '../src/data/records';
 import { PRODUCTS } from '../src/data/products';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
-import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, ProformaScenarioInfo, Scenario } from '../src/data/types';
+import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, Override, ProformaScenarioInfo, Scenario } from '../src/data/types';
 import { visibleArtifacts } from '../src/lib/artifacts';
-import { inputCounts, referencePrice } from '../src/lib/proforma';
+import { inputCounts, referencePrice, runBody, runOverrides } from '../src/lib/proforma';
+import { resolveRequest } from '../src/lib/params';
+import * as ts from 'typescript';
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra: unknown = '') => {
@@ -671,9 +687,21 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   const made = { id: 'sc-made-1', kind: 'biosteam', flowsheetId: 'ethanol_glucose_v0', modelId: 'ethanol_glucose_v0' } as unknown as Scenario;
   const bound = fixture<{ off: Record<string, { status: number; body: ProformaScenarioInfo }> }>('proforma-bind.json').off.ethanol_glucose_v0.body;
   const byService = inputCounts(made, bound, shelf, []);
-  check('a made scenario\u2019s card counts the inputs the service binds, as its page lists them',
-    !!byService && byService.bound && byService.total === bound.inputs.length &&
+  // OF-BLD-020 §2.R (finding 16): the page lists the flowsheet's convention
+  // among its inputs (the panel's Conventions group), and the binding holds
+  // none, so the card counts it from the shelf, as the page shows it.
+  const stated = ethanol?.inputs.filter((i) => i.kind === 'convention').length ?? 0;
+  check('a made scenario\u2019s card counts the inputs the service binds, and the convention its page lists, as its page lists them',
+    !!byService && byService.bound && stated === 1 && byService.total === bound.inputs.length + stated && byService.conventions === stated &&
       byService.waiting === bound.inputs.filter((i) => i.binding === 'waiting').length, byService);
+  const scenarios = fixture<ProformaScenarioInfo[]>('proforma-scenarios.json');
+  const yeastInfo = scenarios.find((x) => x.id === 'sc-yeast-1') ?? null;
+  const panelSpecs = JSON.parse(readFileSync(new URL('../core/tests/fixtures/prototype/params-proforma.json', import.meta.url), 'utf8'))
+    .response.scopes['proforma:sc-yeast-1'].body.specs as { key: string }[];
+  const yeastCard = inputCounts({ id: 'sc-yeast-1', kind: 'biosteam', flowsheetId: 'ethanol_glucose_v0', modelId: 'ethanol_glucose_v0' } as unknown as Scenario,
+    yeastInfo, shelf, []);
+  check('sc-yeast-1\u2019s card counts as many inputs as its page\u2019s panel lists, the convention among them',
+    !!yeastCard && yeastCard.total === panelSpecs.length && yeastCard.conventions === 1, { card: yeastCard, panel: panelSpecs.length });
   const index = readFileSync(new URL('../src/screens/Proforma.tsx', import.meta.url), 'utf8');
   check('the index asks the service to bind a scenario made here, and says only what can bind when it cannot ask',
     /proformaBind\(/.test(index) && /can bind to records/.test(index) && !/bind to records when it runs/.test(index) && !!ethanol);
@@ -769,10 +797,13 @@ await (async () => {
   check('a reference plant\u2019s read-back names each default and its unit, as the shelf lists it, and credits the package',
     cornFeed?.label === 'corn fed' && cornFeed?.unit === 'kg h-1' && cornRb.every((r) => r.origin === 'setting'), cornRb);
 
-  // (27) The left-out line names the flowsheet's own feed.
-  const left = String(call('leftOutWords', { leftOutNoCarbon: 14, leftOutOtherCarbon: 2 }, 'ethanol_glucose_v0') ?? '');
-  check('the ethanol inputs\u2019 left-out line names glucose, not the PHA rule\u2019s sugar or hydrolysate',
-    /glucose/.test(left) && !/hydrolysate/.test(left) && /a sugar or a hydrolysate/.test(String(call('leftOutWords', { leftOutNoCarbon: 1, leftOutOtherCarbon: 1 }, 'pha_sugar_v0') ?? '')), left);
+  // (27) The left-out line names the flowsheet's own feed. Since OF-BLD-020
+  // §2.2 a person reads it from the service (the panel shows the value's
+  // detail), so test_params holds its words, and nothing here writes a line
+  // of its own (§2.R, finding 15: this check held a function no screen called).
+  const libText = readFileSync(new URL('../src/lib/proforma.ts', import.meta.url), 'utf8');
+  check('the left-out line is the service\u2019s alone: no browser function writes one of its own',
+    !/leftOutWords|on a feed other than/.test(libText) && call('leftOutWords', {}, 'ethanol_glucose_v0') === undefined);
 
   // (3) A flowsheet with a program files its scenario there and nowhere else.
   check('New scenario offers only the flowsheet\u2019s own program when it has one',
@@ -898,6 +929,310 @@ await (async () => {
     /fitA/.test(said) && /70/.test(said) && /90/.test(said) && !/not in this run/.test(said), said);
   const compareSrc = readFileSync(new URL('../src/screens/Compare.tsx', import.meta.url), 'utf8');
   check('Compare links an artifact-fed input to its artifact', /data-testid="compare-input-artifact"/.test(compareSrc));
+})();
+
+// OF-BLD-020 §2.1 (D3) — a person's change to a parameter is an Override,
+// kept in this browser by scope and key and round-tripped through the
+// Durable tier; a snapshot written before the panel, holding only
+// proformaAssumptions, is read once into `proforma:<id>` and the old field
+// still answers; Proforma's assumptions are the overrides of its scope, so
+// the scenario page reads them unchanged; clearing this browser's data drops
+// both.
+{
+  const st = () => useStore.getState();
+  const scope = 'fermos:family:batch_v1';
+  const typed: Override = { scope, key: 'mu_max', value: 0.3, low: 0.2, high: 0.4, by: 'Sean Creighton', at: '2026-10-21', note: 'a check-store fixture' };
+  st().setOverride(typed);
+  st().setOverride({ ...typed, key: 'kla_method', value: 'Riet', low: null, high: null });
+  st().setOverride({ ...typed, value: 0.35 });
+  check('an override replaces the one for its scope and key, and keeps the rest',
+    JSON.stringify(st().parameterOverrides[scope]?.map((o) => `${o.key}=${o.value}`)) === JSON.stringify(['kla_method=Riet', 'mu_max=0.35']),
+    st().parameterOverrides[scope]);
+  check('overridesFor(scope) reads one scope, and the same empty list for a scope with none',
+    overridesFor(scope)(st()).length === 2 && overridesFor('proforma:nowhere')(st()) === overridesFor('pureos:unit:t:u')(st()));
+  st().setProformaAssumption('sc-yeast-1', { key: 'glucose_price', value: 0.4, low: 0.3, high: 0.5, by: 'Sean Creighton', at: '2026-10-21', note: null });
+  const yeast = st().parameterOverrides[proformaScope('sc-yeast-1')]?.[0];
+  check('a Proforma assumption is the override of its scenario’s scope, and proformaAssumptions reads it back',
+    yeast?.scope === 'proforma:sc-yeast-1' && yeast.key === 'glucose_price' && yeast.value === 0.4 && yeast.by === 'Sean Creighton' &&
+      st().proformaAssumptions['sc-yeast-1']?.[0]?.value === 0.4, { yeast, assumptions: st().proformaAssumptions['sc-yeast-1'] });
+  st().setOverride({ scope: 'proforma:sc-yeast-1', key: 'plant_scale', value: 100000, low: null, high: null, by: 'Sean Creighton', at: '2026-10-21', note: null });
+  const scale = st().proformaAssumptions['sc-yeast-1']?.find((a) => a.key === 'plant_scale');
+  check('an override typed in a proforma scope reaches proformaAssumptions, a value with no range held at itself',
+    scale?.value === 100000 && scale.low === 100000 && scale.high === 100000, scale);
+  const snap = snapshotOf(st());
+  check('the snapshot keeps every scope’s overrides, and writes proformaAssumptions from them',
+    snap.parameterOverrides?.[scope]?.length === 2 && snap.parameterOverrides?.['proforma:sc-yeast-1']?.length === 2 &&
+      snap.proformaAssumptions?.['sc-yeast-1']?.length === 2, snap.parameterOverrides);
+  // A reload: a store that has lost them.
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  st().applyDurable(snap);
+  check('after a reload every override is back by scope and key, a value in words with it',
+    JSON.stringify(st().parameterOverrides[scope]?.map((o) => `${o.key}=${o.value}`)) === JSON.stringify(['kla_method=Riet', 'mu_max=0.35']) &&
+      st().parameterOverrides['proforma:sc-yeast-1']?.length === 2, st().parameterOverrides);
+  check('…and the scenario’s assumptions answer from them', st().proformaAssumptions['sc-yeast-1']?.map((a) => a.key).sort().join() === 'glucose_price,plant_scale');
+  st().clearOverride(proformaScope('sc-yeast-1'), 'plant_scale');
+  check('Reset to source drops one override, and the assumption with it',
+    st().parameterOverrides['proforma:sc-yeast-1']?.map((o) => o.key).join() === 'glucose_price' &&
+      st().proformaAssumptions['sc-yeast-1']?.map((a) => a.key).join() === 'glucose_price');
+  // The migration: a snapshot written before the panel holds proformaAssumptions alone.
+  const old = (key: string, value: number) => ({ key, value, low: value, high: value, by: 'Sean Creighton', at: '2026-10-20', note: 'typed before the panel' });
+  const before = { ...snap, parameterOverrides: undefined, proformaAssumptions: { 'sc-old-1': [old('glucose_price', 0.5), old('plant_scale', 50000)] } };
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  st().applyDurable(before);
+  const migrated = st().parameterOverrides['proforma:sc-old-1'] ?? [];
+  check('a snapshot holding only proformaAssumptions comes back as overrides under proforma:<id>, each named',
+    migrated.length === 2 && migrated.every((o) => o.scope === 'proforma:sc-old-1' && o.by === 'Sean Creighton' && o.note === 'typed before the panel') &&
+      migrated.find((o) => o.key === 'plant_scale')?.value === 50000, migrated);
+  check('…and the old field still answers for the scenario', st().proformaAssumptions['sc-old-1']?.map((a) => `${a.key}=${a.value}`).sort().join() === 'glucose_price=0.5,plant_scale=50000');
+  check('…and the next save writes the new field', snapshotOf(st()).parameterOverrides?.['proforma:sc-old-1']?.length === 2);
+  const both = { ...snap, parameterOverrides: { 'proforma:sc-old-1': [overrideOfAssumption('sc-old-1', old('glucose_price', 0.6))] },
+    proformaAssumptions: { 'sc-old-1': [old('glucose_price', 0.5), old('plant_scale', 50000)] } };
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  st().applyDurable(both);
+  check('the old field is read only for a scope the snapshot holds no overrides for',
+    st().parameterOverrides['proforma:sc-old-1']?.map((o) => `${o.key}=${o.value}`).join() === 'glucose_price=0.6');
+  st().clearBrowserData();
+  check('Clearing this browser’s data drops every override and every assumption',
+    Object.keys(st().parameterOverrides).length === 0 && Object.keys(st().proformaAssumptions).length === 0);
+  const durable = readFileSync(new URL('../src/lib/durable.ts', import.meta.url), 'utf8');
+  check('the Durable snapshot names parameterOverrides as a record of Override lists by scope', /parameterOverrides\?: Record<string, Override\[\]>/.test(durable));
+}
+
+// OF-BLD-020 §2.2 (D3) — the scenario page's inputs are the parameter
+// panel over `proforma:<id>`, and a run carries that scope's overrides and
+// nothing else of a person: the overrides of the inputs its flowsheet takes,
+// never another scope's, and no `assumptions` (the older field the service
+// still reads for one release). Reset to source removes exactly one
+// override. The panel's resolve carries the scope's overrides with what the
+// page binds by. Nothing under src/ reads `proformaAssumptions` but the
+// store's own migration, and the panel's every control is labelled and
+// bench-sized (Deposition.tsx's constraints).
+{
+  const st = () => useStore.getState();
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  const scope = proformaScope('sc-yeast-1');
+  const at = '2026-10-21T02:00:00Z';
+  const typed = (o: Partial<Override> & Pick<Override, 'scope' | 'key' | 'value'>): Override => ({ low: null, high: null, by: 'Sean Creighton', at, note: null, ...o });
+  st().setOverride(typed({ scope, key: 'plant_scale', value: 100000 }));
+  st().setOverride(typed({ scope, key: 'glucose_price', value: 0.4, low: 0.3, high: 0.5, note: 'a check-store fixture' }));
+  st().setOverride(typed({ scope, key: 'titre', value: 50 }));
+  st().setOverride(typed({ scope: proformaScope('sc-pha-1'), key: 'sugarPrice', value: 0.4 }));
+  st().setOverride(typed({ scope: 'fermos:family:batch_v1', key: 'mu_max', value: 0.3 }));
+  const keys = ['feed_glucose_conc', 'titre', 'yield', 'productivity', 'plant_scale', 'glucose_price'];
+  const body = runBody({ scenarioId: 'sc-yeast-1', overrides: runOverrides(overridesFor(scope)(st()), keys), host: null, fits: { yield: 'a1b2c3d4e5f60718' } });
+  check('a run request carries its scope\u2019s overrides, every one, and no other scope\u2019s',
+    (body.overrides ?? []).map((o) => o.key).sort().join() === 'glucose_price,plant_scale,titre' && (body.overrides ?? []).every((o) => o.scope === scope) &&
+      (body.overrides ?? []).find((o) => o.key === 'glucose_price')?.low === 0.3, body.overrides);
+  check('…and sends no assumptions, the older field', !('assumptions' in body), Object.keys(body));
+  check('an override of an input the flowsheet does not take stays in this browser and is not sent',
+    runOverrides([...overridesFor(scope)(st()), typed({ scope, key: 'recovery', value: 0.9 })], keys).map((o) => o.key).sort().join() === 'glucose_price,plant_scale,titre');
+  const resolve = resolveRequest(overridesFor(scope)(st()), { flowsheet: null, host: null, fits: {} });
+  check('the panel\u2019s resolve carries the scope\u2019s overrides and nothing it was not asked with',
+    resolve.overrides.length === 3 && !('flowsheet' in resolve) && !('fits' in resolve) &&
+      resolveRequest([], { flowsheet: 'ethanol_glucose_v0', fits: { titre: 'f' } }).flowsheet === 'ethanol_glucose_v0', resolve);
+  st().clearOverride(scope, 'titre');
+  check('Reset to source removes exactly one override: that input\u2019s, in that scope',
+    overridesFor(scope)(st()).map((o) => o.key).sort().join() === 'glucose_price,plant_scale' &&
+      overridesFor(proformaScope('sc-pha-1'))(st()).length === 1 && overridesFor('fermos:family:batch_v1')(st()).length === 1);
+  const snap = snapshotOf(st());
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  st().applyDurable(snap);
+  check('after a reload the run would carry the same overrides',
+    runOverrides(overridesFor(scope)(st()), keys).map((o) => `${o.key}=${o.value}`).sort().join() === 'glucose_price=0.4,plant_scale=100000');
+  const counted = inputCounts({ id: 'sc-yeast-1', kind: 'biosteam', flowsheetId: 'ethanol_glucose_v0', modelId: 'ethanol_glucose_v0' } as unknown as Scenario,
+    { inputs: [{ key: 'titre', binding: 'records' }, { key: 'plant_scale', binding: 'waiting' }] } as unknown as ProformaScenarioInfo, [], [{ key: 'titre' }], { titre: 'f' });
+  check('the index counts an input a person overrode as assumed, over its records and its fit', counted?.assumed === 1 && counted?.records === 0 && counted?.computed === 0 && counted?.waiting === 1, counted);
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+
+  const page = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
+  check('the scenario page\u2019s inputs are the parameter panel over its scope, and Keep assumption is gone',
+    /<ParameterPanel[\s\S]*?scope=\{scope\}/.test(page) && /proformaScope\(scenario\.id\)/.test(page) && !/Keep assumption/.test(page) && !/AssumptionForm/.test(page));
+  check('the scenario page runs with the scope\u2019s overrides', /runOverrides\(overrides,/.test(page) && /overrides: sent/.test(page));
+  const lib = readFileSync(new URL('../src/lib/proforma.ts', import.meta.url), 'utf8');
+  check('runProformaScenario posts what runBody makes', /const body = runBody\(ask\)/.test(lib));
+  // Nothing reads the older field but the store's migration (and this check's own tests of it).
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      return statSync(path).isDirectory() ? walk(path) : /\.tsx?$/.test(name) ? [path] : [];
+    });
+  const readers = walk('src').filter((f) => !/src[\\/](store\.ts|lib[\\/]durable\.ts|data[\\/]types\.ts)$/.test(f) && /proformaAssumptions|setProformaAssumption|clearProformaAssumption/.test(readFileSync(f, 'utf8')));
+  check('nothing under src/ reads proformaAssumptions but the store\u2019s migration', readers.length === 0, readers);
+
+  // The panel's controls: every input and select labelled, every one at least 44 px (Deposition.tsx's constraints).
+  // OF-BLD-020 §2.R (finding 11): a link and the controls a component renders
+  // (CitationChip's trigger, Button) are touch targets too, so the walk sees
+  // `<a>`, `<CitationChip>` and `<Button>` beside the intrinsic controls, and
+  // the records Proforma renders into a row (RecordsChooser) with the panel's
+  // two files: each must carry a 44 px class (TOUCH_CHIP for a chip).
+  const TARGETS = ['input', 'select', 'button', 'summary', 'a', 'CitationChip', 'Button'];
+  const within = [
+    { file: 'src/components/ParameterRow.tsx', fn: null },
+    { file: 'src/components/ParameterPanel.tsx', fn: null },
+    { file: 'src/screens/ProformaScenario.tsx', fn: 'RecordsChooser' },
+  ];
+  for (const { file, fn } of within) {
+    const text = readFileSync(file, 'utf8');
+    const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const unlabelled: string[] = [];
+    const small: string[] = [];
+    let seen = 0;
+    const visit = (node: ts.Node, inside: boolean): void => {
+      const here = inside || (ts.isFunctionDeclaration(node) && node.name?.getText(sf) === fn);
+      if (here && (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && TARGETS.includes(node.tagName.getText(sf))) {
+        const attrs = node.attributes.properties.filter(ts.isJsxAttribute);
+        const named = (n: string) => attrs.find((a) => a.name.getText(sf) === n);
+        const tag = node.tagName.getText(sf);
+        const line = sf.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+        seen++;
+        if ((tag === 'input' || tag === 'select') && !named('aria-label')) unlabelled.push(`${file}:${line}`);
+        const cls = named('className')?.getText(sf) ?? '';
+        if (!/min-h-\[44px\]|TOUCH_CHIP|linkClass/.test(cls)) small.push(`${file}:${line} <${tag}>`);
+      }
+      ts.forEachChild(node, (child) => visit(child, here));
+    };
+    visit(sf, fn === null);
+    const where = fn ? `${file} (${fn})` : file;
+    check(`${where}: every input and select carries a label`, unlabelled.length === 0, unlabelled);
+    check(`${where}: every control, link and chip is a 44 px touch target`, small.length === 0 && (fn === null || seen > 0), small);
+  }
+  check('TOUCH_CHIP and the links\u2019 class are 44 px',
+    /export const TOUCH_CHIP = '[^']*min-h-\[44px\]/.test(readFileSync('src/components/ParameterRow.tsx', 'utf8')) &&
+      /const linkClass = '[^']*min-h-\[44px\]/.test(readFileSync('src/components/ParameterRow.tsx', 'utf8')));
+  const row = readFileSync(new URL('../src/components/ParameterRow.tsx', import.meta.url), 'utf8');
+  check('a row offers Reset to source and Why, and says where a reviewer name is set when there is none',
+    /Reset to source/.test(row) && />Why</.test(row) && /Set a reviewer name in Settings/.test(row) && /disabled=\{!named/.test(row));
+  const panelSrc = readFileSync(new URL('../src/components/ParameterPanel.tsx', import.meta.url), 'utf8');
+  check('the panel keeps a change as an override under the reviewer name and asks the service to resolve it',
+    /setOverride\(\{ scope, key: spec\.key[^}]*by: reviewer/.test(panelSrc) && /resolveParams\(/.test(panelSrc) && /clearOverride\(scope, spec\.key\)/.test(panelSrc));
+}
+
+// OF-BLD-020 §2.R — the Phase 2 review. A migrated assumption whose ends
+// were its own value moves freely (10); one end of an interval typed is read
+// the same way by the row, the page's binding and the run (1, 14: the
+// service's `params.held`); an override wins over a fit on the scenario page
+// and the fit card, which never claim a fit feeds an input a person's value
+// overrides (8, 12); the panel tells the page when the service refuses the
+// scope's overrides, and Run waits with those words (13).
+{
+  const st = () => useStore.getState();
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+  const fixed = { key: 'plant_scale', value: 100000, low: 100000, high: 100000, by: 'Sean Creighton', at: '2026-10-20', note: 'typed before the panel' };
+  st().applyDurable({ ...snapshotOf(st()), parameterOverrides: undefined, proformaAssumptions: { 'sc-x': [fixed] } });
+  const migrated = st().parameterOverrides['proforma:sc-x']?.[0];
+  check('a migrated assumption with both ends at its value comes back with no ends, so the value is held at itself',
+    migrated?.value === 100000 && migrated.low === null && migrated.high === null, migrated);
+  // ParameterRow's keep: a new value keeps the override's ends.
+  if (migrated) st().setOverride({ ...migrated, value: 200000, low: migrated.low, high: migrated.high, by: 'Sean Creighton', at: '2026-10-21T04:00:00Z' });
+  const moved = st().parameterOverrides['proforma:sc-x']?.[0];
+  const asRun = moved ? assumptionOfOverride(moved) : null;
+  check('…and a new value typed over it stands inside its own ends, held at itself in the run',
+    moved?.value === 200000 && moved.low === null && moved.high === null && asRun?.low === 200000 && asRun.high === 200000, { moved, asRun });
+  const ranged = overrideOfAssumption('sc-x', { ...fixed, low: 90000, high: 110000 });
+  check('a migrated assumption with a range keeps it', ranged.low === 90000 && ranged.high === 110000, ranged);
+  useStore.setState({ parameterOverrides: {}, proformaAssumptions: {} });
+
+  const one = overrideEnds({ value: 50, low: 40, high: null });
+  const other = overrideEnds({ value: 50, low: null, high: 70 });
+  const none = overrideEnds({ value: 50, low: null, high: null });
+  check('one end typed, the other is the value; neither, held at itself with no interval (the service\u2019s params.held)',
+    one.low === 40 && one.high === 50 && other.low === 50 && other.high === 70 && none.low === null && none.high === null, { one, other, none });
+  const half = assumptionOfOverride({ scope: 'proforma:sc-x', key: 'titre', value: 50, low: 40, high: null, by: 'Sean Creighton', at: '2026-10-21', note: null });
+  check('…and the run\u2019s assumption takes the same interval', half?.low === 40 && half.high === 50, half);
+  const panelText = readFileSync(new URL('../src/components/ParameterPanel.tsx', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
+  check('the panel\u2019s row and the page\u2019s binding read an override\u2019s ends through overrideEnds',
+    /const ends = overrideEnds\(o\)/.test(panelText) && /low: ends\.low/.test(panelText) && /const ends = overrideEnds\(o\)/.test(page) && !/o\.low \?\? o\.value/.test(page));
+  check('the fit card says it is in use only for the inputs no person\u2019s value overrides, and whose value wins elsewhere',
+    /const used = mine\.filter\(\(k\) => !\(k in overridden\)\)/.test(page) && /In use for \$\{used\.join/.test(page) && /data-testid="fermos-fit-overridden"/.test(page) &&
+      !/In use for \{Object\.entries\(chosen\)/.test(page));
+  check('the line under the panel says a person\u2019s value replaces the fit where one overrides it',
+    /key in overridden \?/.test(page) && /value replaces the fermOS \{fitWord\(key\)\}/.test(page) && /data-overridden="true"/.test(page));
+  check('the panel tells the page when the service refuses the scope\u2019s overrides, and Run waits with its words',
+    /onRefused=\{setRefused\}/.test(page) && /refused !== null\}/.test(page) && /data-testid="run-held"/.test(page) &&
+      /if \(!down\) refusedRef\.current\?\.\(words\)/.test(panelText) && /refusedRef\.current\?\.\(null\)/.test(panelText));
+}
+
+// OF-BLD-020 \u00a73.R (part B) \u2014 the Phase 3 review's screen findings, held by
+// the pure function and the pages' source (test_fermos_3r holds the service).
+await (async () => {
+  const fl = (await import('../src/lib/fermos')) as unknown as Record<string, any>;
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const typedAs = (key: string, value: number, by: string) => ({ scope: 'fermos:forecast:0000000000000000', key, value, low: null, high: null, by, at: '2026-10-21', note: null });
+  // (7, 11) A forecast length typed in the panel goes with its person's name.
+  const alone = typeof fl.forecastAsk === 'function' ? fl.forecastAsk([typedAs('t_end', 12, 'Alice Example')]) : null;
+  check('a forecast length typed in the panel goes with the name of the person who typed it',
+    alone?.durationH === 12 && alone?.durationBy === 'Alice Example' && alone?.changedBy === null, alone);
+  const both = typeof fl.forecastAsk === 'function' ? fl.forecastAsk([typedAs('s0', 80, 'Bob Example'), typedAs('t_end', 12, 'Alice Example')]) : null;
+  check('\u2026and a changed start and a changed length each name who typed them', both?.changedBy === 'Bob Example' && both?.durationBy === 'Alice Example', both);
+  const forecastPage = read('../src/screens/FermOSForecast.tsx');
+  check('fermOS \u2192 Forecast sends who set the length with the forecast', /durationBy: a\.durationBy/.test(forecastPage));
+  // (4, 15) A batch fit's simulation sends only what its panel shows, and waits in words.
+  check('fermOS \u2192 Forecast sends a batch fit\u2019s simulation only the overrides of the keys its panel shows',
+    /scoped\.filter\(\(o\) => shownKeys\.has\(o\.key\)\)/.test(forecastPage) && /fermosSimulate\(batchAsk, overrides\)/.test(forecastPage));
+  check('\u2026and holds Simulate from this fit while anything waits, naming it',
+    /disabled=\{busy \|\| !fit \|\| held\}/.test(forecastPage) && /data-testid="forecast-waiting"/.test(forecastPage) && /setElsewhere\(d\.waiting\.filter/.test(forecastPage));
+  // (10, 12) Every fits list carries the program switch.
+  for (const [name, path] of [['the scenario page', '../src/screens/ProformaScenario.tsx'], ['Simulate', '../src/screens/FermOSSimulate.tsx'], ['Vessel', '../src/screens/FermOSVessel.tsx']]) {
+    const text = read(path);
+    const calls = text.match(/fermosFits\([^)]*\)/g) ?? [];
+    check(`${name} asks for the fits with the program switch`, calls.length > 0 && calls.every((c) => /, showArchived, /.test(c)), calls);
+  }
+  // (14) None named stays chosen, and a store family names no product by default.
+  const simulatePage = read('../src/screens/FermOSSimulate.tsx');
+  check('fermOS \u2192 Simulate keeps None named once chosen, and names no product by default for a family whose product is a store',
+    /product === '' \? ''/.test(simulatePage) && /chosen\.states\.includes\('P'\)/.test(simulatePage) && /useState<string \| null>\(route\.query\.get\('product'\)\)/.test(simulatePage));
+  // (16) What the other values leave unread is said so, never waiting.
+  const row = read('../src/components/ParameterRow.tsx');
+  check('a parameter its other values leave unread shows as not read here, never as waiting', /case 'not-read':/.test(row) && /not read here/.test(row));
+})();
+
+// OF-BLD-020 \u00a78.R \u2014 the final review of night one: a simulation fed to
+// Proforma is called a simulation wherever it feeds it (findings 0, 4, 10,
+// 11), Simulate holds what the run refuses (12, 14), Vessel says it is asking
+// (15), and operating mode's reference sits on Simulate (7). The service is
+// held by test_review_8r.
+await (async () => {
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const pf = (await import('../src/lib/proforma')) as unknown as Record<string, any>;
+  const simNote = 'the final product of simulation simA at harvest (its run\u2019s end)';
+  const batchNote = 'the harvest hour of simulation simA (its run\u2019s end); productivity is the simulation\u2019s final titre over it';
+  const src = (note: string) => ({ kind: 'artifact', id: 'simA', note });
+  const inp = (name: string, value: number, unit: string, note: string) => ({ name, value, unit, source: src(note) });
+  const view = { basis: { inputs: [
+    inp('titre fit', 8, 'g L-1', simNote), inp('titre fit low', 8, 'g L-1', simNote), inp('titre fit high', 8, 'g L-1', simNote),
+    inp('productivity fit', 1, 'g L-1 h-1', 'the final titre of simulation simA over its harvest hour'),
+    inp('fit batch time', 3, 'h', batchNote),
+  ] } };
+  const flowsheet = { inputs: ['titre', 'productivity'].map((key) => ({ key, name: key, unit: '', kind: 'bound' })) };
+  let rows: any[] = [];
+  try {
+    rows = pf.runInputs(view, flowsheet);
+  } catch (e) {
+    rows = [{ threw: String(e) }];
+  }
+  const titre = rows.find((r) => r.key === 'titre');
+  const prod = rows.find((r) => r.key === 'productivity');
+  check('a run\u2019s input fed by a simulation is never labelled a fermOS fit, and carries the service\u2019s words',
+    titre?.kind === 'artifact' && !/fermOS fit/.test(String(titre?.note)) && String(titre?.note).includes(simNote), titre);
+  check('\u2026and its productivity names the batch time as the service words it (the simulation\u2019s harvest hour)',
+    /batch time 3 h/.test(String(prod?.note)) && String(prod?.note).includes('harvest hour of simulation simA') && !/fit\u2019s batch time|fit's batch time/.test(String(prod?.note)), prod);
+  const page = read('../src/screens/ProformaScenario.tsx');
+  check('the fit card\u2019s batch time is worded by the tool that kept it, never a forecast\u2019s for every source',
+    /f\.batchTimeNote \?\?/.test(page) && !/where the forecast&rsquo;s median sugar runs out/.test(page));
+  check('the fit card says a simulation is computed, not measured, instead of naming no run',
+    /f\.tool === 'fermos\.simulation' \? 'computed, not measured'/.test(page));
+  check('the ceiling\u2019s yield chip and the fit line name a simulation as one',
+    /check\.yieldTool && FIT_TOOL_WORDS\[check\.yieldTool\]/.test(page) && /from the fermOS \{fitWord\(key\)\}/.test(page) &&
+      /origin === 'simulation' \? 'simulation' : 'fit'/.test(page) && !/>\s*fermOS fit \{src\.id\}/.test(page));
+  const sim = read('../src/screens/FermOSSimulate.tsx');
+  check('fermOS \u2192 Simulate holds its button on what the run would refuse, in the service\u2019s words',
+    /const refused = binding\?\.refused \?\? null/.test(sim) && /waiting\.length === 0 && !refused && !busy/.test(sim) && /data-testid="simulate-refused"/.test(sim));
+  check('fermOS \u2192 Simulate carries operating mode\u2019s reference', /<SubsystemReference id="fermos\.mode" \/>/.test(sim));
+  const vessel = read('../src/screens/FermOSVessel.tsx');
+  check('fermOS \u2192 Vessel says it is asking (BioSTEAM starting) until the panel answers, and holds Design and Scale until then',
+    /data-testid="vessel-panel-asking"/.test(vessel) && /\{!panel && !panelProblem && \(/.test(vessel) && /proformaStatus\(ctrl\.signal\)/.test(vessel) &&
+      /\{panel && \(\s*<div className="flex flex-wrap items-center gap-3">\s*<p className="text-body" data-testid="vessel-scale"/.test(vessel));
 })();
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

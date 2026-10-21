@@ -217,6 +217,35 @@ const PAIRS = [
   // OF-BLD-019 §4.2 — thermosteam answers property questions.
   ['ThermoPropsRequest', 'ThermoPropsRequest'],
   ['ThermoProps', 'ThermoProps'],
+  // OF-BLD-020 §2.1 — one parameter panel: a parameter declared once,
+  // resolved with its source, and a person's change a named assumption.
+  ['ParameterSpec', 'ParameterSpec'],
+  ['ParameterValue', 'ParameterValue'],
+  ['Override', 'Override'],
+  ['ParamScope', 'ParamScope'],
+  ['ParamResolveRequest', 'ParamResolveRequest'],
+  ['ParamResolveResult', 'ParamResolveResult'],
+  // OF-BLD-020 §4.1 — fermOS's vessel, designed by BioSTEAM in the worker.
+  ['VesselRequest', 'VesselRequest'],
+  ['VesselDesignRow', 'VesselDesignRow'],
+  ['VesselOxygen', 'VesselOxygen'],
+  ['VesselHeat', 'VesselHeat'],
+  ['VesselCostItem', 'VesselCostItem'],
+  ['VesselCost', 'VesselCost'],
+  ['VesselDesign', 'VesselDesign'],
+  ['VesselSummary', 'VesselSummary'],
+  // OF-BLD-020 §3.1 — fermOS's model families, and what a simulation keeps.
+  ['FamilyInfo', 'FamilyInfo'],
+  ['SimulationRequest', 'SimulationRequest'],
+  ['OxygenUptake', 'OxygenUptake'],
+  ['MassBalance', 'MassBalance'],
+  ['SimulationCeilingRow', 'SimulationCeilingRow'],
+  ['SimulationCeiling', 'SimulationCeiling'],
+  ['SteadyState', 'SteadyState'],
+  ['SimulationResult', 'SimulationResult'],
+  ['SimulationSummary', 'SimulationSummary'],
+  // OF-BLD-020 §3.2 — a family's parameters bound from a fit, the records, a kept simulation.
+  ['FermosBinding', 'FermosBinding'],
 ];
 
 let compared = 0;

@@ -146,9 +146,11 @@ export const SUBSYSTEMS: Subsystem[] = [
 
   // ── fermOS — the reactor (§3) ────────────────────────────────────────
   //
-  // All five. This makes fermOS the emptiest of the eleven, and honestly so:
-  // there is no kinetic model, no transport calculation and no scale-up logic
-  // anywhere in this codebase.
+  // All five. Kinetics went live with OF-BLD-014 Phase 7 (fits and forecasts
+  // of deposited runs); operating mode with OF-BLD-020 §3.3 (the model
+  // families, simulated from their sources); transport (the oxygen balance)
+  // and scale (the vessel design) with OF-BLD-020 §4.2 (D15). Control
+  // remains a stub.
   {
     id: 'fermos.kinetics',
     owner: 'fermOS',
@@ -165,10 +167,71 @@ export const SUBSYSTEMS: Subsystem[] = [
       'src/screens/FermOSForecast.tsx',
     ],
   },
-  { id: 'fermos.transport', owner: 'fermOS', label: 'Transport', status: 'stub', state: UNBUILT },
-  { id: 'fermos.mode', owner: 'fermOS', label: 'Operating mode', status: 'stub', state: UNBUILT },
-  { id: 'fermos.scale', owner: 'fermOS', label: 'Scale', status: 'stub', state: UNBUILT },
-  { id: 'fermos.control', owner: 'fermOS', label: 'Control', status: 'stub', state: UNBUILT },
+  {
+    // OF-BLD-020 §4.2, D15 — the oxygen balance of a designed vessel.
+    id: 'fermos.transport',
+    owner: 'fermOS',
+    label: 'Transport',
+    status: 'live',
+    state:
+      'Checks the oxygen a kept simulation takes up over its batch against what the vessel BioSTEAM designed transfers ' +
+      '(kLa by its named correlation times the driving force at the dissolved-oxygen setpoint), names the hours it falls ' +
+      'short, and sets BioSTEAM’s heat duty beside a convention’s estimate from the oxygen consumed. Dissolved oxygen is ' +
+      'not a state of the simulation: the balance is checked after it, not fed back into it.',
+    implementedIn: [
+      'core/openferment_core/vessel.py',
+      'core/openferment_core/flowsheets/vessel.py',
+      'src/screens/FermOSVessel.tsx',
+      'src/components/figures/OxygenBalance.tsx',
+    ],
+  },
+  {
+    // OF-BLD-020 §3.3, D15.
+    id: 'fermos.mode',
+    owner: 'fermOS',
+    label: 'Operating mode',
+    status: 'live',
+    state:
+      'Model families integrated on scipy: batch, fed-batch with a constant or exponential feed, chemostat with its ' +
+      'steady state and washout, growth then storage (with the PHA program), and light-limited growth as a socket that ' +
+      'refuses to run. Every parameter is bound to a fit, the records, a kept simulation, a named person or a stated ' +
+      'convention and shown with its source; each simulation is kept as an artifact whose provenance follows them.',
+    implementedIn: [
+      'core/openferment_core/kinetics.py',
+      'core/openferment_core/fermos.py',
+      'src/screens/FermOSSimulate.tsx',
+      'src/components/figures/TimeCourse.tsx',
+    ],
+  },
+  {
+    // OF-BLD-020 §4.2, D15 — the vessel design.
+    id: 'fermos.scale',
+    owner: 'fermOS',
+    label: 'Scale',
+    status: 'live',
+    state:
+      'Designs the vessel a kept simulation (or, anaerobic, a kept fit) needs on BioSTEAM in the Proforma worker: its ' +
+      'AeratedBioreactor, a stirred tank or a bubble column, or the NREL batch fermenter, sized for a plant scale or one ' +
+      'vessel’s batch volume a named person types, every design parameter in the panel with its source, kept as a ' +
+      'fermos.vessel artifact with BioSTEAM’s own cost. Scale-down to the bench and pricing the vessel in Proforma are not built.',
+    implementedIn: [
+      'core/openferment_core/vessel.py',
+      'core/openferment_core/flowsheets/vessel.py',
+      'core/openferment_core/workers/proforma_worker.py',
+      'src/screens/FermOSVessel.tsx',
+    ],
+  },
+  {
+    // OF-BLD-020 D15 — stays a stub, and says what would build it.
+    id: 'fermos.control',
+    owner: 'fermOS',
+    label: 'Control',
+    status: 'stub',
+    state:
+      'Not built. Nothing here computes, stores or retrieves anything yet. Dissolved oxygen as a state of the simulation ' +
+      'with a control loop on it, and an instrument such as a Pioreactor sending its readings to fermOS, would build it ' +
+      '(OF-BLD-020 Appendix 4).',
+  },
 
   // ── pureOS — downstream (§4) ─────────────────────────────────────────
   { id: 'pureos.harvest', owner: 'pureOS', label: 'Harvest', status: 'stub', state: UNBUILT },

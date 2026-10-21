@@ -62,6 +62,12 @@ class Registered:
     tool: str
     version: str
     fn: ToolFn
+    # A tool whose version depends on what it computes (fermOS's simulation
+    # names its family, OF-BLD-020 §3.1) reads it from the inputs.
+    version_of: Callable[[Sequence[BasisInput]], str] | None = None
+
+    def version_for(self, inputs: Sequence[BasisInput]) -> str:
+        return self.version_of(inputs) if self.version_of is not None else self.version
 
 
 _REGISTRY: dict[str, Registered] = {}
@@ -77,10 +83,13 @@ def folder() -> Path:
     return intake.DATA_DIR / "artifacts"
 
 
-def register(tool: str, version: str, fn: ToolFn) -> None:
+def register(tool: str, version: str, fn: ToolFn,
+             version_of: Callable[[Sequence[BasisInput]], str] | None = None) -> None:
     """Make `tool` computable and replayable. Registering a name again replaces
-    it: that is how a tool's code changes between versions."""
-    _REGISTRY[tool] = Registered(tool, version, fn)
+    it: that is how a tool's code changes between versions. `version_of`,
+    when given, reads the version from the inputs, so one tool name can
+    carry what it computes in its version (`version` is then its stem)."""
+    _REGISTRY[tool] = Registered(tool, version, fn, version_of)
 
 
 def register_lazy(tool: str, registrar: Callable[[], None]) -> None:
@@ -198,7 +207,8 @@ def compute(
     """
     reg = registered(tool)
     inputs = list(inputs)
-    aid = artifact_id(reg.tool, reg.version, inputs, seed)
+    version = reg.version_for(inputs)
+    aid = artifact_id(reg.tool, version, inputs, seed)
     records = _records_for(inputs, records_by_id)
     if keep:
         try:
@@ -218,11 +228,11 @@ def compute(
             return updated
 
     output, ms = _run(reg, inputs, seed)
-    basis = ComputedBasis(tool=reg.tool, toolVersion=reg.version, inputs=inputs, artifactId=aid, at=_now(), seed=seed)
+    basis = ComputedBasis(tool=reg.tool, toolVersion=version, inputs=inputs, artifactId=aid, at=_now(), seed=seed)
     artifact = Artifact(
         id=aid,
         tool=reg.tool,
-        toolVersion=reg.version,
+        toolVersion=version,
         inputs=inputs,
         output=output,
         outputHash=output_hash(output),
@@ -325,9 +335,10 @@ def replay(aid: str) -> ReplayResult:
         if len(differences) > MAX_DIFFERENCES:
             differences = differences[:MAX_DIFFERENCES]
             differences.append(ReplayDifference(path="…", stored="more differences not listed", replayed=None))
-        if reg.version != artifact.toolVersion:
+        now = reg.version_for(artifact.inputs)
+        if now != artifact.toolVersion:
             differences.insert(
-                0, ReplayDifference(path="toolVersion", stored=artifact.toolVersion, replayed=reg.version)
+                0, ReplayDifference(path="toolVersion", stored=artifact.toolVersion, replayed=now)
             )
     return ReplayResult(
         artifactId=aid,

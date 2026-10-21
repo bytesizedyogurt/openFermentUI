@@ -58,7 +58,8 @@ export type ParameterFamily =
 /**
  * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — the
  * polymer family OF-BLD-014 §2.1 adds, and the kinetics family the
- * yeast-ethanol program (thread Q) adds: forty fields in seven.
+ * yeast-ethanol program (thread Q) adds, with the oxygen and maintenance fields
+ * fermOS's simulations read (OF-BLD-020 §3.2): forty-four fields in seven.
  */
 export type FieldId =
   // Family 1 — expression performance
@@ -107,7 +108,12 @@ export type FieldId =
   | 'substrate_inhibition_ki'
   | 'ethanol_lp_alpha'
   | 'ethanol_lp_beta'
-  | 'ethanol_mesp';
+  | 'ethanol_mesp'
+  // The oxygen and maintenance fields fermOS's simulations and vessels read (OF-BLD-020 §3.2)
+  | 'maintenance_coefficient'
+  | 'biomass_yield_oxygen'
+  | 'specific_oxygen_uptake'
+  | 'kla_measured';
 
 /**
  * Analytical method behind a PTM or functional measurement (OF-COR-001 §17
@@ -2503,6 +2509,8 @@ export interface FermosFitRequest {
   series: FermosSeries[];
   /** The sample run: computed inline, kept nowhere. */
   sample: boolean;
+  /** The model fitted: 'logistic_v0' (the default) or a kinetics family by id ('batch_v1'). */
+  family?: string;
 }
 
 /** One fitted parameter, its 95 % interval and its unit. */
@@ -2514,7 +2522,16 @@ export interface FitParam {
   unit: string;
   identified: boolean | null;
   indistinguishableFromZero: boolean | null;
+  /**
+   * Why a kinetics family's fit reports it unidentified (OF-BLD-020 §3.R), in
+   * the order a reader names them; absent where it does not apply (a logistic
+   * fit's parameters, an identified one).
+   */
+  unidentifiedBy?: UnidentifiedReason[] | null;
 }
+
+/** Why a fitted parameter is unidentified: the gauge X0 of a run with no biomass series, the no-biomass rule on μmax, the optimizer's budget, the Jacobian's null space, the interval reaching zero. */
+export type UnidentifiedReason = 'gauge' | 'rule' | 'budget' | 'null-space' | 'interval';
 
 export interface GrowthFit {
   measureId: string;
@@ -2541,6 +2558,10 @@ export interface KineticFit {
   covariance: number[][];
   series: FermosSeries[];
   reason: string | null;
+  /** The model fitted; a fit kept before OF-BLD-020 holds none and reads as 'logistic_v0'. */
+  model?: string;
+  /** What the fit says of itself in words: the terms it held, a parameter unidentified by rule. */
+  notes?: string[];
 }
 
 export interface FermosFitResponse {
@@ -2569,6 +2590,8 @@ export interface ForecastRequest {
   /** Who changed a starting value; a changed one is that person's assumption. */
   changedBy: string | null;
   durationH: number | null;
+  /** Who set the length; a length a person set is that person's assumption (OF-BLD-020 §3.R). */
+  durationBy: string | null;
   sample: boolean;
 }
 
@@ -2787,7 +2810,19 @@ export interface ProformaScenarioInfo {
 
 export interface ProformaRunRequest {
   scenarioId: string;
-  assumptions: InputAssumption[];
+  /**
+   * The older field (OF-BLD-014 §8.4): a named person's values by input key.
+   * The service reads it as overrides for one release (OF-BLD-020 §2.2); this
+   * browser sends `overrides` instead.
+   */
+  assumptions?: InputAssumption[];
+  /**
+   * A person's changes in the parameter panel (OF-BLD-020 D3), each an
+   * Override of scope `proforma:<scenarioId>`: a named assumption that wins
+   * over the records and any fermOS fit for its input, named in the run's
+   * basis. The service keeps none.
+   */
+  overrides?: Override[];
   host: string | null;
   seed: number;
   /** Latin hypercube samples to draw (OF-BLD-019 D7); the service defaults it and caps it. */
@@ -2842,6 +2877,8 @@ export interface FermosFitInfo {
   substrateSeries: string | null;
   /** The hour the forecast's median sugar runs out: the batch time a productivity is the titre over. */
   batchTimeH: number | null;
+  /** How that hour was found, in the words of the tool that kept it (§8.R). */
+  batchTimeNote: string | null;
   feeds: FitFeed[];
   flags: string[];
   /** Why it feeds nothing at all, in words. */
@@ -2911,6 +2948,8 @@ export interface CeilingCheck {
   yieldSource: BasisSource | null;
   yieldRecords: number;
   yieldWords: string;
+  /** The tool of the artifact the yield came from, when one did (§8.R). */
+  yieldTool: string | null;
   rows: CeilingRow[];
   flagged: boolean;
   /** With no ceiling on file: what is missing, and where one is computed. */
@@ -3275,4 +3314,448 @@ export interface ThermoProps {
   solved: Record<string, unknown> | null;
   /** A property the library could not compute, with its reason; what the mixture leaves out. */
   notes: string[];
+}
+
+// ── One parameter panel (OF-BLD-020 §2.1, D2–D4) ────────────────────────
+//
+// Every model family, vessel design, catalogue unit and shelf flowsheet
+// declares its parameters once, in Python (`core/openferment_core/params.py`);
+// `GET /api/params/{scope}` serves a scope's specs with each value and where
+// it came from. A person's change is an `Override`: a named assumption this
+// browser keeps in the Durable tier (`parameterOverrides`, D3) and a run
+// carries; the basis names it as an `assumption`, so the result is `demo`.
+// Bounds are conventions with a written reason (D4): a value outside them is
+// kept and flagged in words, never clamped. A model never sets one.
+
+/** The chip a value shows: finer than `BasisSourceKind` (a fit and a simulation are artifacts; a library default is a model source). */
+export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'convention' | 'library-default' | 'waiting' | 'not-read';
+
+/** What a scope parameterises. */
+export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'fermos-forecast' | 'pureos-unit' | 'proforma';
+
+/** One parameter as its model, unit or flowsheet declares it. */
+export interface ParameterSpec {
+  key: string;
+  label: string;
+  /** As written in the equations, plain Unicode; '' when it has none. */
+  symbol: string;
+  /** What the symbol means, in words: the panel's Why. */
+  gloss: string;
+  /** A units.ts family (massConc, yield, volProd, costUSD) or a word. */
+  dimension: string;
+  /** '' for a share, a dimensionless number or a choice. */
+  unit: string;
+  min: number | null;
+  max: number | null;
+  step: number | null;
+  scale: 'linear' | 'log';
+  group: string;
+  /**
+   * Ordered: 'fit', 'record:<field id>', 'artifact', 'simulation',
+   * 'assumption', 'convention', 'library-default'. The first with a value
+   * wins; an Override wins over all of them.
+   */
+  sourceRule: string[];
+  note: string | null;
+  /** Required (D4): a physical limit, an ontology plausibility range, or the library's validity range. */
+  boundsReason: string;
+  /** A parameter chosen from words (a feed profile, a kLa method); null for a number. */
+  choices: string[] | null;
+  /** The stated convention, when the rule holds 'convention'; its reason is in `note`. */
+  convention: number | string | null;
+}
+
+/** A parameter's value in one scope, with where it came from. */
+export interface ParameterValue {
+  key: string;
+  /** null while it waits. */
+  value: number | string | null;
+  low: number | null;
+  high: number | null;
+  /** null while it waits. */
+  source: BasisSource | null;
+  origin: ParamOrigin;
+  /** Set only when the origin is a fit. */
+  identified: boolean | null;
+  /** The person's name, when an Override set it. */
+  overriddenBy: string | null;
+  /** BioSTEAM's default read from its code at import, else null. */
+  libraryDefault: number | string | null;
+  /** The records behind it, when its origin is records. */
+  recordIds: string[];
+  /** Words: how many records and their range, or why it waits and which field would bind it. */
+  detail: string | null;
+  /** The warning in words when the value lies outside the bounds; kept, never clamped. */
+  outOfBounds: string | null;
+}
+
+/** A person's change to one parameter of one scope: a named assumption, kept here and sent with the run (D3). */
+export interface Override {
+  scope: string;
+  key: string;
+  value: number | string;
+  low: number | null;
+  high: number | null;
+  by: string;
+  at: string;
+  note: string | null;
+}
+
+/** `GET /api/params/{scope}`: a scope's specs with their current values. */
+export interface ParamScope {
+  scope: string;
+  kind: ParamScopeKind;
+  title: string;
+  specs: ParameterSpec[];
+  values: ParameterValue[];
+  /** The keys with no source yet. */
+  waiting: string[];
+  notes: string[];
+}
+
+/** `POST /api/params/{scope}/resolve`. Runs nothing. */
+export interface ParamResolveRequest {
+  overrides: Override[];
+  /** A Proforma scenario made in this browser names the shelf flowsheet it runs. */
+  flowsheet?: string | null;
+  /** A strain filter on the records, as `/api/proforma/bind` takes it. */
+  host?: string | null;
+  /** The fermOS fits a person chose, by parameter key (artifact ids). */
+  fits?: Record<string, string>;
+  /** fermOS's vessel scope (OF-BLD-020 §4.1): the aerated design; null is BioSTEAM's own default. */
+  vesselType?: 'stirred-tank' | 'bubble-column' | null;
+  /**
+   * fermOS's family scope (OF-BLD-020 §3.2), bound as a simulation binds: the
+   * strain whose records bind (null: every strain of the program's organism),
+   * the product, the sugar the records must name, the fit a person chose, where
+   * the simulation starts ('records', 'fit', 'simulation:<artifact id>'), the
+   * run-length preset, and the program switch.
+   */
+  strain?: string | null;
+  product?: string | null;
+  sugar?: string | null;
+  fit?: string | null;
+  startFrom?: string | null;
+  durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
+  includeArchived?: boolean;
+}
+
+export interface ParamResolveResult {
+  scope: string;
+  values: ParameterValue[];
+  waiting: string[];
+  /** What the overrides would add to a run's basis, each an `assumption` naming the person. */
+  basisInputs: BasisInput[];
+  /** A value outside its bounds, in words. */
+  warnings: string[];
+  /** What the scope's provider says of its values. */
+  notes: string[];
+}
+
+// ── fermOS's vessel on BioSTEAM (OF-BLD-020 §4.1, D7) ──────────────────
+
+/** POST /api/fermos/vessel. Exactly one of `simulation` and `fit`. */
+export interface VesselRequest {
+  /** A `fermos.simulation` artifact id. */
+  simulation?: string | null;
+  /** A `kinetic_fit` or `growth_forecast` artifact id: anaerobic only. */
+  fit?: string | null;
+  /** The aerated design; null is BioSTEAM's own default. A person's override of `design` says the same, and the two must agree. */
+  vesselType?: 'stirred-tank' | 'bubble-column' | null;
+  /** A kLa correlation by BioSTEAM's registered name, one its class runs for the design (fermos_vessel's klaMethod); null is the class's own. */
+  klaMethod?: string | null;
+  /** A person's changes, each a named assumption, scope `fermos:vessel:<id>`. */
+  overrides: Override[];
+  includeArchived?: boolean;
+}
+
+/** One line of the design table, read from BioSTEAM's objects. */
+export interface VesselDesignRow {
+  label: string;
+  value: number | string | boolean | null;
+  /** BioSTEAM's unit for it; empty for a count or a word. */
+  unit: string;
+  /** Where it was read: a design_results key, an auxiliary unit, an attribute. */
+  readFrom: string;
+}
+
+/** The oxygen balance over the batch: the simulated uptake against the vessel's transfer. */
+export interface VesselOxygen {
+  t: number[];
+  our: number[];
+  otr: number;
+  unit: string;
+  /** [[from, to], …] hours the simulated uptake rises above `otr`. */
+  short: number[][];
+  kLa: number | null;
+  kLaNeededAtPeak: number | null;
+  kLaUnit: string;
+  method: string | null;
+  aerated: boolean;
+  oxygenBasis: string | null;
+  targetUptake: number | null;
+  sized: number | null;
+  balancedUptake: number | null;
+  scale: number;
+  cStar: number | null;
+  cL: number | null;
+  drivingForce: number | null;
+  reactionO2KmolPerH: number | null;
+  /** OF-BLD-020 §4.R: the oxygen the vessel's reaction consumes as designed, the oxygen the simulation took up per hour of the plant, and BioSTEAM's aeration floor, each kmol h⁻¹. */
+  scaledO2KmolPerH: number | null;
+  simulatedO2KmolPerH: number | null;
+  floorKmolPerH: number | null;
+}
+
+/** BioSTEAM's duty as it found it, beside a cross-check from the oxygen the simulation took up at a stated convention (D7, §4.R). */
+export interface VesselHeat {
+  bst: number;
+  convention: number | null;
+  conventionNote: string;
+  unit: string;
+  /** 'heats-of-formation' or 'forced-per-oxygen' (a person's Q_O2_consumption times the oxygen consumed); null on a design kept before §4.R. */
+  method: string | null;
+  consumedKmolPerH: number | null;
+  /** The oxygen the convention's estimate rests on (the simulation's), kmol h⁻¹. */
+  oxygenKmolPerH: number | null;
+  /** BioSTEAM's duty in words: how it was found, and whose heat per oxygen when a person forced one. */
+  dutyNote: string | null;
+}
+
+export interface VesselCostItem {
+  purchase: number;
+  installed: number;
+}
+
+/** BioSTEAM's own cost correlations, read; nothing summed here. */
+export interface VesselCost {
+  purchase: number;
+  installed: number;
+  byItem: Record<string, VesselCostItem>;
+  /** USD per hour. */
+  utility: number;
+  costIndex: number;
+  costIndexYear: number | null;
+  note: string;
+}
+
+/** POST /api/fermos/vessel: one `fermos.vessel` artifact, read. */
+export interface VesselDesign {
+  artifactId: string;
+  provenance: Provenance;
+  createdAt: string;
+  source: string;
+  sourceTool: string;
+  aerobic: boolean;
+  unitClass: string;
+  unitId: string;
+  vesselType: string | null;
+  design: VesselDesignRow[];
+  /** null for an anaerobic vessel, and `oxygenNote` says so. */
+  oxygen: VesselOxygen | null;
+  oxygenNote: string | null;
+  heat: VesselHeat;
+  cost: VesselCost;
+  parameters: ParameterValue[];
+  used: Record<string, number | string | boolean | null>;
+  scale: Record<string, unknown>;
+  reaction: Record<string, unknown>;
+  flags: string[];
+  versions: Record<string, string>;
+  /** The design as one citable value with its basis: its id is the artifact's, as fermos_vessel returns it. */
+  evidence: Evidence;
+}
+
+/** GET /api/fermos/vessels: one kept `fermos.vessel` artifact. */
+export interface VesselSummary {
+  artifactId: string;
+  provenance: Provenance;
+  createdAt: string;
+  source: string;
+  sourceTool: string;
+  unitClass: string;
+  vesselType: string | null;
+  vessels: number | null;
+  volume: number | null;
+  installed: number | null;
+}
+
+// ── fermOS simulates (OF-BLD-020 §3.1, D1, D5) ─────────────────────────
+//
+// A model family (`core/openferment_core/kinetics.py`) is code with its
+// equations in its docstring and its parameters declared as
+// `ParameterSpec`s; a simulation resolves them with their sources, integrates
+// on scipy, and keeps one `fermos.simulation` artifact whose basis names
+// every parameter, start value and override. A person's override makes it
+// `demo`; nothing here is computed in the browser.
+
+/** `GET /api/fermos/families`: a model family as the panel shows it. */
+export interface FamilyInfo {
+  id: string;
+  title: string;
+  /** One plain line: what it is. */
+  what: string;
+  /** Its equations, plain Unicode, as its docstring writes them. */
+  equations: string;
+  states: string[];
+  /** 'g L⁻¹' for a concentration, 'L' for V. */
+  stateUnits: Record<string, string>;
+  /** A socket is declared with its parameters and refuses to run. */
+  socket: boolean;
+  specs: ParameterSpec[];
+  /** The panel's groups this family's specs fall into, in order. */
+  groups: string[];
+  /** The program the family is archived with (storage_v1: 'pha'), or null for a general one. */
+  program: string | null;
+}
+
+/** `POST /api/fermos/simulate`. */
+export interface SimulationRequest {
+  family: string;
+  strain?: string | null;
+  product?: string | null;
+  sugar?: string | null;
+  /** A person's changes, each an Override of scope `fermos:family:<family>`. */
+  overrides?: Override[];
+  fitArtifact?: string | null;
+  /** 'records', 'fit', or 'simulation:<artifact id>'. */
+  startFrom?: string;
+  durationPreset?: 'until-sugar-runs-out' | 'fit-length';
+  includeArchived?: boolean;
+  /**
+   * A parameter bound to exactly these records of the evidence pool, by spec
+   * key (OF-BLD-020 §3.4, D13): each must be in the pool, carry a field the
+   * parameter binds from, pass the aggregate gate and convert into its unit,
+   * or the request is refused in words. Ids, never values.
+   */
+  recordsByParam?: Record<string, string[]>;
+}
+
+/**
+ * `GET /api/fermos/bind` (OF-BLD-020 §3.2): a family's parameters bound for a
+ * strain, product and sugar from a fit, the records, a kept simulation and the
+ * conventions, starting no integration.
+ */
+export interface FermosBinding {
+  values: ParameterValue[];
+  /** The keys a simulation would refuse for; each value's detail names the field that would bind it. */
+  waiting: string[];
+  /** What the family would refuse these values for though nothing waits (§8.R), else null. */
+  refused: string | null;
+  /** What bound from where: the program's papers, whose records, the sugar, the fit, the kept simulation. */
+  notes: string[];
+}
+
+/** OUR(t) = qO2·X on the time course's hours; its peak read on the solver's own steps. */
+export interface OxygenUptake {
+  t: number[];
+  value: number[];
+  unit: string;
+  peak: number;
+  peakH: number | null;
+  /** Why it is zero, when the culture is anaerobic. */
+  note: string | null;
+}
+
+export interface MassBalance {
+  /** The larger relative error of the two checks. */
+  closure: number;
+  ok: boolean;
+  note: string;
+}
+
+/** Yp/s beside the newest stored geneOS ceiling of one host model on the sugar: read, never clamped. */
+export interface SimulationCeilingRow {
+  modelId: string;
+  modelName: string;
+  match: 'strain' | 'species';
+  matchWords: string;
+  artifactId: string;
+  provenance: Provenance;
+  ceilingGPerG: number;
+  ypsGPerG: number | null;
+  yieldAchievedGPerG: number | null;
+  above: boolean;
+  words: string;
+}
+
+export interface SimulationCeiling {
+  product: string;
+  sugar: string;
+  strain: string;
+  rows: SimulationCeilingRow[];
+  flagged: boolean;
+  /** Why no row, in words. */
+  empty: string | null;
+  /** Where a ceiling is computed (geneOS → Model). */
+  computeAt: string;
+}
+
+/** chemostat_v1's steady state and washout. */
+export interface SteadyState {
+  washout: boolean;
+  dilutionRate: number;
+  /** The general washout rate, μ(Sf, P = 0) − kd, and D5's expression. */
+  dWashout: number;
+  dWashoutD5: number;
+  X: number;
+  S: number;
+  P: number;
+  /** D·P at the steady state; null at washout. */
+  productivity: number | null;
+  words: string;
+  /** The most μ(S, P = 0) − kd reaches over S from 0 to Sf: no culture holds at or above it (OF-BLD-020 §3.R). */
+  dWashoutMax: number | null;
+  /** A culture holds and washout is stable too: which one a run reaches depends on where it starts. */
+  bistable: boolean;
+  /** Which steady state this run's path reached by its end; null while it is still on its way to one. */
+  reached: 'culture' | 'washout' | null;
+}
+
+/** One kept `fermos.simulation` artifact as every reader reads it. */
+export interface SimulationResult {
+  artifactId: string;
+  provenance: Provenance;
+  family: string;
+  title: string;
+  strain: string | null;
+  product: string | null;
+  sugar: string | null;
+  parameters: ParameterValue[];
+  start: ParameterValue[];
+  /** { t: hours, <state>: values } in `units`. */
+  series: Record<string, number[]>;
+  units: Record<string, string>;
+  our: OxygenUptake;
+  /** The state where the integration ended, and its hour as `t`. */
+  end: Record<string, number>;
+  sugarRunsOutH: number | null;
+  harvestH: number;
+  /** The product (the store, for storage_v1) at harvest, g L⁻¹. */
+  finalTitre: number | null;
+  /** Product made over sugar used to harvest, g g⁻¹. */
+  yieldAchieved: number | null;
+  /** The final titre over the harvest hour, g L⁻¹ h⁻¹. */
+  productivity: number | null;
+  massBalance: MassBalance;
+  ceiling: SimulationCeiling | null;
+  flags: string[];
+  aerobic: boolean;
+  steadyState: SteadyState | null;
+  notes: string[];
+  basis: ComputedBasis;
+}
+
+/** `GET /api/fermos/simulations`: one kept simulation, newest first. */
+export interface SimulationSummary {
+  artifactId: string;
+  family: string;
+  title: string;
+  strain: string | null;
+  product: string | null;
+  sugar: string | null;
+  finalTitre: number | null;
+  harvestH: number | null;
+  createdAt: string;
+  provenance: Provenance;
 }

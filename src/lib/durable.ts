@@ -13,8 +13,9 @@
 //              there is nothing to persist. Reloading gets them from source.
 //   Durable    depositions, review decisions, runbook locks, this browser's
 //              copy of Guild's ledger, the lessons finished here,
-//              Postdoc's Live conversations, and whether archived
-//              programs show — must survive.
+//              Postdoc's Live conversations, whether archived programs
+//              show, and the parameter overrides typed here — must
+//              survive.
 //   Ephemeral  open panels, density, theme, sim speed — must NOT survive. A
 //              theme that follows you across sessions is a preference; a
 //              collapsed panel that does is a bug.
@@ -28,7 +29,7 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision, Scenario } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Override, Runbook, Provenance, RecordStatus, ReviewDecision, Scenario } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -124,9 +125,20 @@ export interface DurableSnapshot {
   /**
    * Proforma's typed assumptions, by scenario id (OF-BLD-014 §8.4): what a
    * named person entered for an input no record binds. Optional for the
-   * same reason as `guild`.
+   * same reason as `guild`. Since OF-BLD-020 §2.1 it is written from
+   * `parameterOverrides` (each `proforma:<id>` scope's numeric overrides),
+   * and a snapshot that holds it with no `parameterOverrides` entry for a
+   * scenario is read once into that scope (D3).
    */
   proformaAssumptions?: Record<string, InputAssumption[]>;
+  /**
+   * Every change a person made in the parameter panel, by scope
+   * (`proforma:<scenario id>`, `fermos:family:<id>`, `fermos:vessel:<id>`,
+   * `pureos:unit:<train>:<unit>`): a named assumption kept in this browser
+   * and sent with the run (OF-BLD-020 D3). Optional for the same reason as
+   * `guild`.
+   */
+  parameterOverrides?: Record<string, Override[]>;
   /**
    * The fermOS fits a person chose for a scenario's inputs, by scenario id
    * and input key: a kept kinetic fit's or forecast's artifact id

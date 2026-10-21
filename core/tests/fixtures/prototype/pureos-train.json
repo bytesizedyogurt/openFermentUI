@@ -3,7 +3,7 @@
   "response": {
     "scenarioId": "sc-pha-1",
     "scenarioName": "PHA from cellulosic sugar — draft flowsheet",
-    "artifactId": "965796f3dc87a2ff",
+    "artifactId": "3516aa9a2f4bca77",
     "flowsheet": "pha_sugar_v0",
     "createdAt": "2026-09-15T09:00:00Z",
     "provenance": "demo",

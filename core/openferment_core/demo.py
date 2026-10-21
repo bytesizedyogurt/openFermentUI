@@ -43,6 +43,7 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Iterator
 
 CORE = Path(__file__).parent.parent
@@ -408,7 +409,10 @@ def prototype_proposals() -> dict[str, Any]:
     return {"proposals.json": [made.model_dump(mode="json")]}
 
 
-def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
+def rebuild_prototype(out: Path = PROTOTYPE, *, real_worker: bool | None = None) -> list[Path]:
+    """Every prototype fixture. `real_worker` decides whether the vessel
+    fixture's designs come from BioSTEAM (None: when the sim extra is
+    installed); test:core passes False, so it never starts the worker."""
     from . import proforma
 
     # OF-BLD-019 §2.R: a run's basis says whether its diagram is drawn, from
@@ -417,12 +421,12 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
     drawn_here = proforma.drawn_here
     proforma.drawn_here = lambda: False
     try:
-        return _rebuild_prototype(out)
+        return _rebuild_prototype(out, real_worker)
     finally:
         proforma.drawn_here = drawn_here
 
 
-def _rebuild_prototype(out: Path) -> list[Path]:
+def _rebuild_prototype(out: Path, real_worker: bool | None = None) -> list[Path]:
     from . import artifacts
 
     art = prototype_artifact()
@@ -434,6 +438,7 @@ def _rebuild_prototype(out: Path) -> list[Path]:
     proforma_fixtures = prototype_proforma()
     run_artifacts = proforma_fixtures.pop(PROFORMA_RUN_ARTIFACTS)
     bridge, bridge_artifacts = prototype_fermos_bridge()
+    simulate_fixtures, simulate_artifacts = prototype_fermos_simulate()
     replay = artifacts.ReplayResult(
         artifactId=art.id, identical=True, storedHash=art.outputHash, replayedHash=art.outputHash, durationMs=0
     )
@@ -441,18 +446,22 @@ def _rebuild_prototype(out: Path) -> list[Path]:
     written = []
     for name, value in (
         ("artifacts.json", [art.model_dump(mode="json"), *(a.model_dump(mode="json") for a in draft_artifacts),
-                            *run_artifacts, *(a.model_dump(mode="json") for a in bridge_artifacts)]),
+                            *run_artifacts, *(a.model_dump(mode="json") for a in bridge_artifacts),
+                            *(a.model_dump(mode="json") for a in simulate_artifacts)]),
         ("ask-draft-stream.jsonl", draft_stream),
         ("artifact-replay.json", replay.model_dump(mode="json")),
         *prototype_rag().items(),
         *prototype_geneos().items(),
         *prototype_fermos().items(),
         *bridge.items(),
+        *simulate_fixtures.items(),
+        *prototype_fermos_chemostat().items(),
         *proforma_fixtures.items(),
         *prototype_ceiling_check().items(),
         *prototype_pureos().items(),
         *prototype_thermo().items(),
         *prototype_proposals().items(),
+        *prototype_vessel(real_worker).items(),
     ):
         path = out / name
         if name.endswith(".jsonl"):
@@ -635,7 +644,7 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
 
     from . import artifacts, fermos, geneos, postdoc_agent, proforma, tools
     from . import intake as _intake
-    from .models import FermosSeries, InputAssumption, ProformaRunRequest
+    from .models import FermosSeries, ProformaRunRequest
 
     pool = _stream_pool(overlay)
     # The ceiling is the toy network's, a STAND-IN the tool refuses outside
@@ -653,9 +662,8 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
             fit = fermos.fit(DRAFT_DEPOSITION, [FermosSeries.model_validate(x) for x in fermos_sample_series()])
             fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId)
             rs = _standin_records()
-            a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-                 for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
-            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a),
+            a = _standin_overrides(proforma.SCENARIO_ID, PHA_STANDIN_ASSUMED)
+            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, overrides=a),
                                pool=SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
             draft = {"title": "The stand-in run, forecast and priced", "productId": "taq-dna-polymerase",
                      "strainId": "c-necator-h16",
@@ -779,6 +787,123 @@ def prototype_fermos() -> dict[str, Any]:
     return {"fermos-fit.json": fit.model_dump(mode="json"), "fermos-forecast.json": fc.model_dump(mode="json")}
 
 
+# OF-BLD-020 §3.3: fermOS → Simulate for the double. The families as the
+# service lists them (the switch off and on); each family's parameter scope
+# and binding over the stand-in yeast records (demo's Proforma pool, on a
+# paper id no corpus holds) for ethanol on glucose, for every strain of the
+# program and for CEN.PK113-7D; the binding with the values a person would
+# type for what waits (STAND-INs, named as such, not a batch of anything);
+# one batch_v1 simulation run by the real kinetics.py on those values, beside
+# a STAND-IN Yeast9 ceiling, in a scratch store; and the simulations list
+# that run leaves. Dates are fixed so the files are the same on every run.
+SIM_STRAIN = "s-cerevisiae-cenpk113-7d"
+SIM_PRODUCT, SIM_SUGAR = "ethanol", "glucose"
+SIM_STANDIN = ("STAND-IN for the browser tests: a value typed for the fixture, not a parameter of any batch "
+               "(OF-BLD-020 §3.3)")
+# What the browser tests type for each parameter that waits on the stand-in
+# pool for CEN.PK113-7D: a STAND-IN each, inside its spec's bounds.
+SIM_TYPED = (("mu_max", 0.4), ("ks", 0.2), ("yxs", 0.1), ("alpha", 2.0), ("p_max", 90.0), ("x0", 0.2), ("p0", 0.0))
+
+
+def prototype_fermos_simulate() -> tuple[dict[str, Any], list[Any]]:
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import artifacts, fermos, kinetics
+    from . import intake as _intake
+    from .models import Override, ParamResolveRequest, SimulationRequest
+
+    rs = _standin_yeast_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}, hidden={})
+    asks = {"": False, SIM_STRAIN: False}
+
+    def ask_of(family: str, strain: str) -> dict[str, Any]:
+        archived = kinetics.FAMILIES[family].program is not None
+        return {"family": family, "strain": strain or None, "product": SIM_PRODUCT, "sugar": SIM_SUGAR,
+                "startFrom": "records", "durationPreset": fermos.UNTIL_RUN_OUT_PRESET, "includeArchived": archived}
+
+    def bound(req: SimulationRequest) -> dict[str, Any]:
+        try:
+            return {"status": 200, "body": fermos.bind(req, pool=pool).model_dump(mode="json")}
+        except fermos.SimulationRefused as e:
+            return {"status": 422, "body": {"detail": str(e)}}
+
+    typed = [Override(scope=fermos.family_scope("batch_v1"), key=k, value=v, by="openFerment test fixture",
+                      at="2026-10-21T04:00:00Z", note=SIM_STANDIN) for k, v in SIM_TYPED]
+    saved = _intake.DATA_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            scopes: dict[str, Any] = {}
+            binds: dict[str, Any] = {}
+            with _PoolLoaded(pool):
+                for family in kinetics.FAMILIES:
+                    for strain in (asks if family == "batch_v1" else {"": False}):
+                        a = ask_of(family, strain)
+                        key = f"{family}|{strain}"
+                        req = ParamResolveRequest(**{k: v for k, v in a.items() if k != "family"})
+                        scopes[key] = _param_answer(fermos.family_scope(family), req)
+                        binds[key] = bound(SimulationRequest(**a))
+                sim_ask = ask_of("batch_v1", SIM_STRAIN)
+                with_typed = bound(SimulationRequest(**sim_ask, overrides=typed))
+                assert with_typed["status"] == 200 and with_typed["body"]["waiting"] == [], \
+                    f"the stand-in values no longer cover what waits: {with_typed}"
+                standin_ceiling(STANDIN_CEILING_MODEL, SIM_PRODUCT, SIM_SUGAR, STANDIN_CEILING_G_PER_G)
+                request = SimulationRequest(**sim_ask, overrides=typed)
+                result = fermos.simulate(request, by_pool=pool)
+                result.basis.at = AT
+                art = artifacts.get(result.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0})
+                listed = [x.model_copy(update={"createdAt": AT}).model_dump(mode="json") for x in fermos.simulations()]
+        finally:
+            _intake.DATA_DIR = saved
+    families = {"off": [f.model_dump(mode="json") for f in fermos.families(False)],
+                "on": [f.model_dump(mode="json") for f in fermos.families(True)]}
+    return ({"fermos-families.json": families,
+             "fermos-simulate.json": {"note": SIM_STANDIN, "scopes": scopes, "bind": binds,
+                                      "typed": [o.model_dump(mode="json") for o in typed],
+                                      "boundTyped": with_typed,
+                                      "simulate": {"request": request.model_dump(mode="json"),
+                                                   "body": result.model_dump(mode="json")},
+                                      "simulations": listed}}, [art])
+
+
+# OF-BLD-020 §3.R (finding 17): one chemostat_v1 simulation run by the real
+# kinetics.py on values a person would type (STAND-INs, named as such, not a
+# culture of anything), over an empty pool, in a scratch store: the smoke
+# answers Simulate with it once to hold the end-state card to the steady
+# state the service computed (its X, S, P and D·P). The double does not
+# serve it; nothing else reads it.
+CHEMO_TYPED = (("mu_max", 0.4), ("ks", 0.2), ("yxs", 0.15), ("alpha", 2.0), ("yps", 0.45), ("p_max", 90.0),
+               ("dilution_rate", 0.1), ("feed_conc", 20.0), ("x0", 0.5), ("s0", 10.0), ("p0", 0.0),
+               ("t_end", 400.0))
+
+
+def prototype_fermos_chemostat() -> dict[str, Any]:
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import fermos
+    from . import intake as _intake
+    from .models import Override, SimulationRequest
+
+    empty = SimpleNamespace(records=[], records_by_id={}, hidden={})
+    typed = [Override(scope=fermos.family_scope("chemostat_v1"), key=k, value=v, by="openFerment test fixture",
+                      at="2026-10-21T07:00:00Z", note=SIM_STANDIN) for k, v in CHEMO_TYPED]
+    request = SimulationRequest(family="chemostat_v1", product=SIM_PRODUCT, sugar=SIM_SUGAR, overrides=typed)
+    saved = _intake.DATA_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            with _PoolLoaded(empty):
+                result = fermos.simulate(request, by_pool=empty)
+        finally:
+            _intake.DATA_DIR = saved
+    result.basis.at = AT
+    assert result.steadyState is not None and not result.steadyState.washout, "the stand-in no longer holds a culture"
+    return {"fermos-chemostat.json": {"note": SIM_STANDIN, "request": request.model_dump(mode="json"),
+                                      "body": result.model_dump(mode="json")}}
+
+
 # OF-BLD-019 §5.1: a fermOS fit feeds the fermenter. The sample time course
 # above (INVENTED) relabelled as a STAND-IN ethanol run on a deposition no
 # browser holds, fitted and forecast through the real code in a scratch
@@ -821,6 +946,7 @@ def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
     from . import artifacts, proforma
     from . import intake as _intake
     from .flowsheets import shelf as _shelf
+    from .models import Override, ParamResolveRequest
 
     rs = _standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
@@ -856,11 +982,30 @@ def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
                         proforma.ETHANOL, pool=pool, fits=chosen).model_dump(mode="json")})
                 except proforma.ScenarioRefused as e:
                     others.append({"fits": chosen, "status": 422, "body": {"detail": str(e)}})
+            # OF-BLD-020 §2.2: the parameter panel's scope of sc-yeast-1 with
+            # each of those choices, as GET /api/params/{scope}?fits= answers.
+            scope = f"proforma:{proforma.YEAST_SCENARIO_ID}"
+            with _PoolLoaded(pool):
+                panel = [{"fits": chosen, **_param_answer(scope, ParamResolveRequest(fits=chosen))}
+                         for chosen in (fits, *_bridge_choices(fit_id, fc_id))]
+                # OF-BLD-020 §2.R: the forecast chosen for every input it
+                # feeds, then titre typed by a person. The resolve binds as
+                # the run binds and refuses in the run's words, which the
+                # page shows as why Run waits (the double answers the
+                # panel's resolve with this recording for those fits and
+                # that key).
+                key, value = PARAMS_TYPED_BESIDE_A_FIT
+                typed = [*_standin_overrides(proforma.YEAST_SCENARIO_ID, YEAST_STANDIN_ASSUMED),
+                         Override(scope=scope, key=key, value=value, by="openFerment test fixture", at=AT,
+                                  note=PROFORMA_STANDIN)]
+                resolves = [{"fits": fits, "keys": sorted(o.key for o in typed), **_resolve_answer(
+                    scope, ParamResolveRequest(fits=fits, overrides=typed))}]
             kept = [artifacts.get(i).model_copy(update={"createdAt": AT, "durationMs": 0}) for i in (fit_id, fc_id)]
         finally:
             _intake.DATA_DIR = saved
     return ({"fermos-fits.json": {"none": none, "onFile": on_file},
-             "proforma-bind-fits.json": {"flowsheet": proforma.ETHANOL, "fits": fits, "body": body, "others": others}}, kept)
+             "proforma-bind-fits.json": {"flowsheet": proforma.ETHANOL, "fits": fits, "body": body, "others": others},
+             "params-proforma-fits.json": {"scope": scope, "answers": panel, "resolves": resolves}}, kept)
 
 
 # §8.4: Proforma's BioSTEAM scenario for the smoke double. The binding and
@@ -869,6 +1014,18 @@ def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
 # corpus holds, and BioSTEAM is replaced by a closed-form STAND-IN evaluator,
 # so test:core needs no simulator. Not a price of anything.
 PROFORMA_STANDIN = "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+# The economic inputs the PHA draft's stand-in runs take as a person's
+# values (a STAND-IN, not a price of anything).
+PHA_STANDIN_ASSUMED = (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))
+
+
+def _standin_overrides(scenario_id: str, rows) -> list[Any]:
+    """The stand-in runs' values as the parameter panel sends them
+    (OF-BLD-020 §2.2): each an Override of the scenario's scope, named."""
+    from .models import Override
+
+    return [Override(scope=f"proforma:{scenario_id}", key=k, value=v, low=lo, high=hi, by="openFerment test fixture",
+                     at="2026-10-15", note=PROFORMA_STANDIN) for k, v, lo, hi in rows]
 
 
 def _standin_records() -> list[dict[str, Any]]:
@@ -1216,6 +1373,91 @@ def _standin_ethanol_tables(v: dict[str, float], out: dict[str, Any]) -> dict[st
 # artifacts artifacts.json carries beside the others: not a file of its own.
 PROFORMA_RUN_ARTIFACTS = "(run artifacts for artifacts.json)"
 
+# OF-BLD-020 §2.2: the parameter panel's scopes for the double. A scenario
+# made in a browser takes a time-based id; its scope is recorded under this
+# one and the double answers it under the id asked.
+PARAMS_MADE_HERE = "sc-made-here"
+# A STAND-IN override the browser tests type, above the yield's bounds (the
+# ontology's plausibility range for ethanol_yield_substrate): the resolve is
+# recorded as the real code answers it, warning and all. Not a yield of
+# anything.
+PARAMS_OUT_OF_BOUNDS = ("yield", 0.7)
+# A STAND-IN titre the browser tests type beside a fermOS fit chosen for
+# titre, yield and productivity (OF-BLD-020 §2.R): the resolve is recorded as
+# the real code answers it, a refusal in the run's words. Not a titre of
+# anything; the words name no value.
+PARAMS_TYPED_BESIDE_A_FIT = ("titre", 50.0)
+
+
+class _PoolLoaded:
+    """evidence_pool.load answers the stand-in pool while the panel's
+    provider binds, as the tests' client fixture has it."""
+
+    def __init__(self, pool) -> None:
+        self.pool = pool
+
+    def __enter__(self):
+        from . import evidence_pool
+
+        self.saved = evidence_pool.load
+        evidence_pool.load = lambda include_archived=False: self.pool
+        return self
+
+    def __exit__(self, *exc) -> None:
+        from . import evidence_pool
+
+        evidence_pool.load = self.saved
+
+
+def _param_answer(scope: str, req=None) -> dict[str, Any]:
+    """GET /api/params/{scope} as the service answers it: the scope, or the
+    refusal in its words with its status."""
+    from . import params
+
+    try:
+        return {"status": 200, "body": params.scope(scope, req).model_dump(mode="json")}
+    except params.ScopeUnknown as e:
+        return {"status": 404, "body": {"detail": str(e)}}
+    except params.ParamRefused as e:
+        return {"status": 422, "body": {"detail": str(e)}}
+
+
+def _resolve_answer(scope: str, req) -> dict[str, Any]:
+    """POST /api/params/{scope}/resolve as the service answers it: the
+    result, or the refusal in its words with its status."""
+    from . import params
+
+    try:
+        return {"status": 200, "body": params.resolve_scope(scope, req).model_dump(mode="json")}
+    except params.ScopeUnknown as e:
+        return {"status": 404, "body": {"detail": str(e)}}
+    except params.ParamRefused as e:
+        return {"status": 422, "body": {"detail": str(e)}}
+
+
+def prototype_params(pool) -> dict[str, Any]:
+    """The parameter panel's Proforma scopes over the stand-in records: each
+    seed BioSTEAM scenario by its id, each shelf flowsheet as a scenario made
+    here names it (or the service's refusal), and one resolve with a yield
+    outside its bounds, each as the real code answers it."""
+    from . import params, proforma
+    from .flowsheets import shelf as _shelf
+    from .models import Override, ParamResolveRequest
+
+    with _PoolLoaded(pool):
+        scopes = {f"proforma:{sc['id']}": _param_answer(f"proforma:{sc['id']}") for sc in proforma.seed_scenarios()}
+        made = f"proforma:{PARAMS_MADE_HERE}"
+        flowsheets = {fid: _param_answer(made, ParamResolveRequest(flowsheet=fid)) for fid in (*_shelf.SHELF, *_shelf.TEST_ONLY)}
+        key, value = PARAMS_OUT_OF_BOUNDS
+        o = Override(scope=f"proforma:{proforma.YEAST_SCENARIO_ID}", key=key, value=value, by="openFerment test fixture",
+                     at="2026-10-15", note=PROFORMA_STANDIN)
+        req = ParamResolveRequest(overrides=[o])
+        resolved = params.resolve_scope(o.scope, req).model_dump(mode="json")
+    return {"params-proforma.json": {"scopes": scopes, "madeHere": PARAMS_MADE_HERE, "flowsheets": flowsheets,
+                                     "flowsheetOf": {f"proforma:{sc['id']}": sc["modelId"] for sc in proforma.seed_scenarios()},
+                                     "resolve": {"flowsheet": proforma.ETHANOL, "request": req.model_dump(mode="json"),
+                                                 "body": resolved}}}
+
 
 def prototype_proforma() -> dict[str, Any]:
     import tempfile
@@ -1225,22 +1467,20 @@ def prototype_proforma() -> dict[str, Any]:
     from . import intake as _intake
     from . import proforma
     from .flowsheets import shelf as _shelf
-    from .models import InputAssumption, ProformaRunRequest
+    from .models import ProformaRunRequest
 
     rs = _standin_records() + _standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
-    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
-    ay = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-          for k, v, lo, hi in YEAST_STANDIN_ASSUMED]
+    a = _standin_overrides(proforma.SCENARIO_ID, PHA_STANDIN_ASSUMED)
+    ay = _standin_overrides(proforma.YEAST_SCENARIO_ID, YEAST_STANDIN_ASSUMED)
     saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
     with tempfile.TemporaryDirectory() as tmp:
         try:
             _intake.DATA_DIR = Path(tmp)
             proforma.call = _standin_call
             proforma.yield_cap = lambda: None
-            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool)
-            yeast = proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, assumptions=ay), pool=pool)
+            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, overrides=a), pool=pool)
+            yeast = proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, overrides=ay), pool=pool)
             yeast_art = _artifacts.get(yeast.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0})
             # OF-BLD-019 §2.3 (b, c): the seed's scenarios bound with the
             # switch off and on, and every flowsheet a scenario made here
@@ -1255,6 +1495,7 @@ def prototype_proforma() -> dict[str, Any]:
                         bind[switch][fid] = {"status": 200, "body": body}
                     except proforma.ScenarioRefused as e:
                         bind[switch][fid] = {"status": 422, "body": {"detail": str(e)}}
+            panel = prototype_params(pool)
         finally:
             _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
     run.evidence.basis.at = AT
@@ -1284,7 +1525,7 @@ def prototype_proforma() -> dict[str, Any]:
     return {"proforma-scenarios.json": scenarios[False], "proforma-scenarios-archived.json": scenarios[True],
             "proforma-bind.json": bind, "proforma-run.json": run.model_dump(mode="json"),
             "proforma-run-yeast.json": yeast.model_dump(mode="json"),
-            "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True), **references,
+            "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True), **references, **panel,
             PROFORMA_RUN_ARTIFACTS: [yeast_art.model_dump(mode="json")]}
 
 
@@ -1389,24 +1630,22 @@ def _kept_standin_runs(then=None) -> list:
 
     from . import artifacts, proforma
     from . import intake as _intake
-    from .models import InputAssumption, ProformaRunRequest
+    from .models import ProformaRunRequest
 
     rs = _standin_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     ry = _standin_records() + _standin_yeast_records()
     pool_y = SimpleNamespace(records=ry, records_by_id={r["id"]: r for r in ry})
-    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
-    ay = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-          for k, v, lo, hi in YEAST_STANDIN_ASSUMED]
+    a = _standin_overrides(proforma.SCENARIO_ID, PHA_STANDIN_ASSUMED)
+    ay = _standin_overrides(proforma.YEAST_SCENARIO_ID, YEAST_STANDIN_ASSUMED)
     saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
     with tempfile.TemporaryDirectory() as tmp:
         try:
             _intake.DATA_DIR = Path(tmp)
             proforma.call = _standin_call
             proforma.yield_cap = lambda: None
-            runs = [proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool),
-                    proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, assumptions=ay), pool=pool_y)]
+            runs = [proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, overrides=a), pool=pool),
+                    proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, overrides=ay), pool=pool_y)]
             arts = [artifacts.get(r.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0}) for r in runs]
             if then is not None:
                 then(arts)
@@ -1565,6 +1804,189 @@ def rebuild_figure_samples(out: Path = FIGURE_SAMPLES) -> Path:
     out.write_text(json.dumps(figure_samples(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"wrote {out}")
     return out
+
+
+# OF-BLD-020 §4.2: fermOS → Vessel against the double. Two batch_v1 runs
+# made by the real fermos.simulate (scipy, no BioSTEAM) on STAND-IN overrides
+# named as such, aerobic (Yx/o set) and anaerobic; the vessel scope each
+# serves and the designs the browser tests ask for, made by the real Proforma
+# worker on BioSTEAM when the sim extra is installed, else by a STAND-IN
+# worker, the fixture saying which (`worker.kind`). A design from BioSTEAM
+# moves in its last digits from one process to the next (§4.1, measured), so
+# test_demo holds this file to the code by its requests and its simulations,
+# and test:sim holds its numbers to the worker within VESSEL_FIXTURE_RTOL.
+VESSEL_STANDIN = "STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result"
+VESSEL_BY = "openFerment test fixture"
+VESSEL_AT = "2026-10-21"
+VESSEL_SIM = {"mu_max": 0.3, "ks": 0.5, "yxs": 0.1, "alpha": 2.0, "yps": 0.45, "p_max": 95.0, "x0": 0.5,
+              "s0": 100.0, "p0": 0.0}
+VESSEL_AEROBIC = {"yxo": 1.0}
+VESSEL_PLANT_SCALE = 50000.0
+# §4.R: a STAND-IN person's heat per oxygen consumed (kJ kmol⁻¹), typed so the
+# browser tests see a duty BioSTEAM forces from it, said so on the screen.
+VESSEL_Q_STANDIN = -400000.0
+VESSEL_FIXTURE_RTOL = 1e-6
+
+
+def _biosteam_here() -> bool:
+    import importlib.util
+
+    return importlib.util.find_spec("biosteam") is not None
+
+
+def _standin_vessel_call(op: str, args: dict[str, Any]) -> Any:
+    """The Proforma worker's `vessel_specs` and `vessel_design` in the JSON
+    contract's shape, with STAND-IN defaults and an invented design, for a
+    machine without the sim extra. Nothing here is BioSTEAM's."""
+    from . import vessel
+
+    if op == "vessel_specs":
+        kind = args["kind"]
+        words = {"vessel_type": "Vertical", "vessel_material": "Stainless steel 316",
+                 "heat_exchanger_configuration": "recirculation loop", "design": "Stirred tank"}
+        keys = [d.key for d in vessel._decls(kind)] + ["batch", "Nmin", "Nmax", "reactions"]
+        out: dict[str, Any] = {
+            "kind": kind, "unitClass": "AeratedBioreactor" if kind == vessel.AEROBIC else "NRELAnaerobicBatchBioreactor",
+            "parameters": {k: {"default": None if k in ("N", "loading_time", "Q_O2_consumption") else words.get(k, 0.5),
+                               "from": VESSEL_STANDIN} for k in keys},
+            "biosteam": "stand-in", "thermosteam": "stand-in", "biorefineries": "stand-in", "chemicals": VESSEL_STANDIN,
+            "operatingHours": 1000.0, "operatingHoursFrom": VESSEL_STANDIN, "costIndex": 500.0, "costIndexYear": None}
+        if kind == vessel.AEROBIC:
+            out["designs"] = {
+                "Stirred tank": {"method": "Riet", "optimize_power": True, "kW_per_m3": 0.5, "runs": ["Riet"],
+                                 "solvesPower": ["Riet"], "registered": ["Riet"]},
+                "Bubble column": {"method": "Dewes", "optimize_power": False, "kW_per_m3": 0.5, "runs": ["Dewes"],
+                                  "solvesPower": [], "registered": ["Dewes"]},
+            }
+            out["defaultDesign"] = "Stirred tank"
+            out["choices"] = {"vessel_material": ["Carbon steel", "Stainless steel 316"],
+                              "vessel_type": ["Horizontal", "Vertical"],
+                              "heat_exchanger_configuration": ["jacketed", "recirculation loop"]}
+            out["heatPerO2"], out["heatPerO2From"] = -1.0, VESSEL_STANDIN
+            out["aerationFloorMolPerS"], out["aerationFloorFrom"] = 0.0, VESSEL_STANDIN
+            out["refuses"] = {}
+        else:
+            # What the NREL class's setters refuse, as the worker reads them from its code (§4.R).
+            out["refuses"] = {k: {"atOrBelow": 1.0, "from": VESSEL_STANDIN} for k in ("N", "V_max")}
+        return out
+    if op == "vessel_design":
+        aerobic = args["kind"] == vessel.AEROBIC
+        ox = None
+        if aerobic:
+            ys = list(args["our"]["value"])
+            ox = {"t": list(args["our"]["t"]), "our": ys, "unit": "mmol L⁻¹ h⁻¹", "otr": max(ys), "short": [],
+                  "kLa": 1.0, "kLaNeededAtPeak": 1.0, "kLaUnit": "h⁻¹",
+                  "method": (args["params"].get("method") or ("Dewes" if args["design"] == "Bubble column" else "Riet")),
+                  "aerated": True, "oxygenBasis": args["oxygenBasis"], "targetUptake": max(ys), "sized": max(ys),
+                  "balancedUptake": max(ys), "scale": 1.0, "cStar": 1.0, "cL": 0.5, "drivingForce": 0.5,
+                  "reactionO2KmolPerH": 1.0, "scaledO2KmolPerH": 1.0, "simulatedO2KmolPerH": 1.0, "floorKmolPerH": 0.0}
+        row = lambda label, value, unit: {"label": label, "value": value, "unit": unit, "readFrom": VESSEL_STANDIN}  # noqa: E731
+        return {"unitClass": "AeratedBioreactor" if aerobic else "NRELAnaerobicBatchBioreactor", "unitId": "R1",
+                "aerobic": aerobic, "design": [row("Vessels", 2.0, ""), row("Volume of each vessel", 10.0, "m3"),
+                                               row("Batch time (reacting)", args["tau"], "hr")],
+                "designResults": {"Number of reactors": 2.0, "Reactor volume": 10.0}, "auxiliaries": {},
+                "used": {}, "coolingAgents": [], "cost": {
+                    "purchase": 1.0, "installed": 2.0, "byItem": {"Vessel": {"purchase": 1.0, "installed": 2.0}},
+                    "utility": 1.0, "costIndex": 500.0, "costIndexYear": None, "note": VESSEL_STANDIN},
+                "versions": {"biosteam": "stand-in"}, "chemicals": VESSEL_STANDIN, "dutyRead": -1.0,
+                "scale": {"how": VESSEL_STANDIN}, "reaction": {"equation": VESSEL_STANDIN, "notes": []}, "oxygen": ox,
+                "warnings": [], "utilitySettings": {}, "designNotes": [],
+                "heat": {"bst": -1.0, "method": "heats-of-formation", "consumedKmolPerH": 1.0 if aerobic else None,
+                         "convention": -1.0 if aerobic else None, "oxygenKmolPerH": 1.0 if aerobic else None,
+                         "conventionNote": VESSEL_STANDIN}}
+    raise ValueError(f"the stand-in vessel worker has no op {op}")
+
+
+# The designs the browser tests ask for: (which simulation, vessel type,
+# the overrides beyond the plant scale), each with the plant scale typed.
+VESSEL_ASKS = (
+    ("aerobic", None, ()),
+    ("aerobic", "bubble-column", (("design", "Bubble column"),)),
+    ("anaerobic", None, ()),
+    ("aerobic", None, (("Q_O2_consumption", VESSEL_Q_STANDIN),)),
+)
+
+
+# The pool a fixture's simulation binds from: no records at all (see
+# prototype_vessel).
+_NO_RECORDS = SimpleNamespace(records=[], records_by_id={}, hidden={})
+
+
+def prototype_vessel(real_worker: bool | None = None) -> dict[str, Any]:
+    from . import fermos, params, proforma, vessel
+    from . import intake as _intake
+    from .models import Override, SimulationRequest, VesselRequest
+
+    real = _biosteam_here() if real_worker is None else real_worker
+    family = "fermos:family:batch_v1"
+
+    def simulate(extra: dict[str, float]) -> Any:
+        values = {**VESSEL_SIM, **extra}
+        # An empty evidence pool: the fixture's simulation binds the named
+        # stand-ins and the conventions alone, never this machine's thread Q
+        # candidates, so the fixture is the same wherever it is rebuilt.
+        return fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose", overrides=[
+            Override(scope=family, key=k, value=v, by=VESSEL_BY, at=VESSEL_AT, note=VESSEL_STANDIN)
+            for k, v in values.items()]), by_pool=_NO_RECORDS)
+
+    def typed(aid: str, key: str, value: Any) -> Override:
+        return Override(scope=f"fermos:vessel:{aid}", key=key, value=value, by=VESSEL_BY, at=VESSEL_AT,
+                        note=VESSEL_STANDIN if key in ("plant_scale", "Q_O2_consumption") else None)
+
+    def stamped(body: dict[str, Any]) -> dict[str, Any]:
+        out = {**body, "createdAt": AT}
+        out["evidence"] = {**body["evidence"], "basis": {**body["evidence"]["basis"], "at": AT}}
+        return out
+
+    saved = (_intake.DATA_DIR, proforma.call, dict(vessel._SPECS))
+    with _scratch() as scratch:
+        try:
+            _intake.DATA_DIR = scratch
+            vessel._SPECS.clear()
+            if not real:
+                proforma.call = _standin_vessel_call
+            sims = {"aerobic": simulate(VESSEL_AEROBIC), "anaerobic": simulate({})}
+            ids = {k: v.artifactId for k, v in sims.items()}
+            listed = {s.artifactId: s for s in fermos.simulations()}
+            simulations = [listed[ids[k]].model_copy(update={"createdAt": AT}).model_dump(mode="json")
+                           for k in ("aerobic", "anaerobic")]
+            scopes = []
+            for which, kind in (("aerobic", None), ("aerobic", "bubble-column"), ("anaerobic", None)):
+                body = vessel.scope(ids[which], kind).model_dump(mode="json")
+                scopes.append({"simulation": ids[which], "vesselType": kind, "status": 200, "body": body})
+            # §4.R: the bridge's STAND-IN fit and forecast (fermos-fits.json lists them), each one's vessel scope
+            # as the service serves or refuses it, so the browser can choose a fit when no simulation is kept.
+            for fid in _bridge_fits():
+                try:
+                    scopes.append({"fit": fid, "vesselType": None, "status": 200,
+                                   "body": vessel.scope(fid).model_dump(mode="json")})
+                except params.ParamRefused as e:
+                    scopes.append({"fit": fid, "vesselType": None, "status": 422, "body": {"detail": str(e)}})
+            designs = []
+            refused = VesselRequest(simulation=ids["aerobic"])
+            try:
+                vessel.design(refused)
+            except vessel.VesselRefused as e:
+                designs.append({"request": refused.model_dump(mode="json"), "status": 422, "body": {"detail": str(e)}})
+            for which, kind, more in VESSEL_ASKS:
+                aid = ids[which]
+                req = VesselRequest(simulation=aid, vesselType=kind, overrides=[
+                    *(typed(aid, k, v) for k, v in more), typed(aid, "plant_scale", VESSEL_PLANT_SCALE)])
+                body = stamped(vessel.design(req).model_dump(mode="json"))
+                designs.append({"request": req.model_dump(mode="json"), "status": 200, "body": body})
+            ws = vessel.worker_specs(vessel.AEROBIC)
+        finally:
+            _intake.DATA_DIR, proforma.call = saved[0], saved[1]
+            vessel._SPECS.clear()
+            vessel._SPECS.update(saved[2])
+    worker = {"kind": "biosteam" if real else "stand-in",
+              "note": ("designed by the real Proforma worker on BioSTEAM, from STAND-IN simulations and a STAND-IN plant "
+                       "scale" if real else VESSEL_STANDIN + "; the worker is a stand-in too, as the sim extra is not "
+                                                             "installed here"),
+              "versions": {k: ws[k] for k in ("biosteam", "thermosteam", "biorefineries")}}
+    return {"fermos-vessel.json": {"worker": worker, "aerobic": ids["aerobic"], "anaerobic": ids["anaerobic"],
+                                   "plantScale": VESSEL_PLANT_SCALE, "by": VESSEL_BY, "simulations": simulations,
+                                   "scopes": scopes, "designs": designs}}
 
 
 # §8.1: the fixtures that need BioSTEAM, which are the toy flowsheet's: one

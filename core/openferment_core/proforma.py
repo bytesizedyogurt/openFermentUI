@@ -15,6 +15,8 @@ import shutil
 import threading
 from typing import Any, Literal
 
+from . import binding as _binding
+from .binding import exclusion as _exclusion, in_program as _in_program
 from .flowsheets import shelf as _shelf
 from .workers import SimWorker, WorkerCrashed, WorkerError, WorkerTimeout
 
@@ -390,7 +392,7 @@ ASSUMED = {
 }
 KEYS = (*BOUND, *ASSUMED)
 SUGARS = frozenset({"glucose", "xylose", "fructose", "mixed-sugars", "hydrolysate"})
-SINGLE = "single source: held fixed in sampling"
+SINGLE = _binding.SINGLE
 
 
 class ScenarioRefused(ValueError):
@@ -403,17 +405,7 @@ def _thread_p(paper_id: str) -> bool:
     return re.fullmatch(r"P\d+\w*", paper_id or "") is not None
 
 
-def _exclusion(r: dict) -> str | None:
-    """`aggregateExclusion` in Python, over a pool record."""
-    if r.get("status") == "rejected":
-        return "rejected"
-    if r.get("provenance") == "industry-estimate":
-        return "industry-estimate"
-    if r.get("provenance") == "computed":
-        return "computed"
-    if r.get("primary") is False:
-        return "not-primary"
-    return None
+# `_exclusion`, the aggregate gate, lives in binding.py (OF-BLD-020 §3.2), imported above.
 
 
 def yield_cap() -> tuple[float, str] | None:
@@ -472,6 +464,13 @@ def bind(records: list[dict], host: str | None = None, assumptions: list | None 
                 _assume(inp, given[key])
             out.append(inp)
             continue
+        if key in given:
+            # OF-BLD-020 D3: a named person's value wins over the records,
+            # and the input says how many it stands in place of.
+            _in_place_of(inp, bound)
+            _assume(inp, given[key])
+            out.append(inp)
+            continue
         if key == "yield" and cap is not None:
             clipped = [b for b in bound if b.value > cap[0]]
             for b in clipped:
@@ -480,8 +479,6 @@ def bind(records: list[dict], host: str | None = None, assumptions: list | None 
                 inp.flags.append(f"{len(clipped)} above the highest glucose ceiling on the geneOS shelf, clipped to it")
         if bound:
             _settle(inp, bound, field_id)
-        elif key in given:
-            _assume(inp, given[key])
         out.append(inp)
     for key, (label, unit) in ASSUMED.items():
         inp = ScenarioInput(key=key, label=label, unit=unit, binding="waiting")
@@ -495,26 +492,28 @@ def _settle(inp, bound: list, field_id: str) -> None:
     """An input bound to records: their median with their range and a
     triangular draw from three on, a pair drawn uniform, one held fixed and
     flagged (§8.3)."""
-    import statistics
-
     from .models import BasisSource
 
-    vals = sorted(b.value for b in bound)
     inp.binding = "records"
     inp.records, inp.recordIds = bound, [b.id for b in bound]
     inp.source = BasisSource(kind="record", note=f"{len(bound)} record{'s' if len(bound) != 1 else ''} of {field_id}")
-    if len(vals) >= 3 and vals[0] != vals[-1]:
-        inp.value, inp.low, inp.high, inp.sampling = statistics.median(vals), vals[0], vals[-1], "triangular"
-    elif len(vals) == 2 and vals[0] != vals[1]:
-        inp.value, inp.low, inp.high, inp.sampling = (vals[0] + vals[1]) / 2, vals[0], vals[1], "uniform"
-    else:
-        inp.value = inp.low = inp.high = vals[0]
-        inp.sampling = "fixed"
-        inp.flags.append(SINGLE if len(vals) == 1 else "every bound record gives the same value: held fixed in sampling")
+    # The statistic lives in binding.py (OF-BLD-020 §3.2), which fermOS's
+    # simulation binds through too.
+    st = _binding.statistic([b.value for b in bound])
+    inp.value, inp.low, inp.high, inp.sampling = st.value, st.low, st.high, st.sampling
+    if st.flag:
+        inp.flags.append(st.flag)
+
+
+def _in_place_of(inp, bound: list) -> None:
+    """Say how many bound records a person's value stands in place of
+    (OF-BLD-020 D3), as a fermOS fit chosen in their place says it."""
+    if bound:
+        inp.flags.append(f"chosen in place of the {len(bound)} record{'s' if len(bound) != 1 else ''} it bound")
 
 
 def _assume(inp, a) -> None:
-    from .models import BasisSource
+    from .basis import assumption_source
     from .threadp import reviewer_refusal
 
     why = reviewer_refusal(a.by)
@@ -528,7 +527,7 @@ def _assume(inp, a) -> None:
     inp.binding = "assumption"
     inp.value, inp.low, inp.high = a.value, a.low, a.high
     inp.sampling = "fixed" if a.low == a.high else "uniform"
-    inp.source = BasisSource(kind="assumption", by=a.by.strip(), note=f"typed on {a.at}" + (f": {a.note}" if a.note else ""))
+    inp.source = assumption_source(a.by, a.at, a.note)
 
 
 def scenario(host: str | None = None, assumptions: list | None = None, pool=None):
@@ -546,6 +545,123 @@ def scenario(host: str | None = None, assumptions: list | None = None, pool=None
         id=SCENARIO_ID, name="PHA from cellulosic sugar — draft flowsheet", product="phb", flowsheet=FLOWSHEET,
         host=host, hosts=hosts, inputs=inputs, waiting=[i.key for i in inputs if i.binding == "waiting"],
         leavesOut=LEAVES_OUT, priceBasis=PRICE_BASIS)
+
+
+# ── A person's overrides (OF-BLD-020 §2.2, D3) ─────────────────────────
+#
+# The parameter panel keeps a person's change to a scenario's input as an
+# Override of scope `proforma:<scenario id>`, in the browser that typed it,
+# and a run, a binding or a ceiling check carries it. Each is laid on as the
+# named assumption it is: it wins over the records and over a fermOS fit
+# for its input, the input says how many records it stands in place of, and
+# the basis names the person (basis.assumption_source), so the run is
+# `demo`. The older `assumptions` field is read the same way for one
+# release, and so wins over the records too: before the panel an older-field
+# value of an input that bound records was ignored, so such a run now binds,
+# bases and is kept differently (§2.R, finding 4; a test holds it). The basis
+# says which field it read: a run that read overrides carries `assumptions
+# read from`; one that read the older field alone adds no such line, so a
+# run whose older-field values name only inputs no record binds keeps the
+# basis, and the artifact id, it had before the panel. The service keeps
+# none.
+
+ASSUMPTIONS_READ = "assumptions read from"
+READ_WORDS = {
+    (True, False): "overrides",
+    (True, True): "overrides, and assumptions, the older field, read as overrides for one release",
+}
+
+
+def proforma_scope(scenario_id: str) -> str:
+    """The parameter scope of a scenario (params.parse_scope's proforma form)."""
+    return f"proforma:{scenario_id}"
+
+
+def named_values(scenario_id: str | None, overrides: list | None = None,
+                 assumptions: list | None = None) -> tuple[list, str | None]:
+    """A person's values for a scenario's inputs, as the binding lays them on:
+    each Override of the scenario's scope, and the older `assumptions` field,
+    as `InputAssumption`s; and the words the basis says it read (None when
+    it read no override: the older field alone, or nothing, is what every
+    run before the panel read). With no scenario id (GET /api/proforma/bind) every
+    override names one proforma scope. Refused in words: an override of
+    another scope, a value in words, and an input named twice."""
+    from .models import InputAssumption
+
+    over = list(overrides or [])
+    old = list(assumptions or [])
+    scopes = sorted({o.scope for o in over})
+    if scenario_id is not None:
+        stray = [sc for sc in scopes if sc != proforma_scope(scenario_id)]
+        if stray:
+            raise ScenarioRefused(f"an override names the scope it changes, and these were sent for "
+                                  f"{proforma_scope(scenario_id)}: {', '.join(stray)}")
+    elif len(scopes) > 1 or (scopes and not scopes[0].startswith("proforma:")):
+        raise ScenarioRefused(f"the overrides of one binding name one scenario's scope, proforma:<scenario id>; "
+                              f"these name {', '.join(scopes)}")
+    from . import params
+
+    out: dict[str, InputAssumption] = {}
+    for o in over:
+        if isinstance(o.value, bool) or not isinstance(o.value, (int, float)):
+            raise ScenarioRefused(f"the override of {o.key} takes a number, not words")
+        if o.key in out:
+            raise ScenarioRefused(f"two overrides of {o.key}: one person's value an input")
+        when = params.unstamped(o)
+        if when:  # §2.R, finding 5: the resolve refused it, and the run kept a basis naming no day
+            raise ScenarioRefused(when)
+        value = float(o.value)
+        # One end typed, the other is the value (params.held, as the panel's
+        # resolve reads it); neither, the value is held fixed at itself.
+        low, high = params.held(value, o.low, o.high)
+        out[o.key] = InputAssumption(key=o.key, value=value, low=value if low is None else low,
+                                     high=value if high is None else high, by=o.by, at=o.at, note=o.note)
+    from_overrides = set(out)
+    for a in old:
+        if a.key in from_overrides:
+            raise ScenarioRefused(f"{a.key} is named in both overrides and assumptions, the older field: send it once, "
+                                  "as an override")
+        out[a.key] = a  # as before the panel, the last of the older field's values for a key stands
+    words = READ_WORDS.get((bool(over), bool(old)))
+    return list(out.values()), words
+
+
+def fits_beside(fits: dict[str, str] | None, typed: list) -> dict[str, str]:
+    """The fermOS fits a person chose, less any input a person's value
+    overrides: an override wins over a fit (D3), so the fit is not laid on
+    there, and a fit's productivity then stands beside titre as the binding
+    has it."""
+    named = {a.key for a in typed}
+    return {k: v for k, v in (fits or {}).items() if k not in named}
+
+
+def _check_keys(info, typed: list) -> None:
+    """Every input a person's value names is one the flowsheet takes a value
+    for; a convention is stated in the basis and takes none."""
+    takes = {i.key for i in info.inputs if i.kind != "convention"}
+    stated = sorted({a.key for a in typed} & {i.key for i in info.inputs if i.kind == "convention"})
+    if stated:
+        raise ScenarioRefused(f"{', '.join(stated)} {'is a convention' if len(stated) == 1 else 'are conventions'} every "
+                              f"run of {info.id} states in its basis, and takes no value")
+    unknown = sorted({a.key for a in typed} - takes)
+    if unknown:
+        raise ScenarioRefused(f"{info.id} takes no input {', '.join(unknown)}")
+
+
+def assumptions_read(words: str | None) -> list:
+    """The basis input that says a run's named values were read from the
+    panel's overrides (OF-BLD-020 §2.2): none for a run that carries no
+    override. A run with none whose older-field values name only inputs no
+    record binds keeps the basis, and the artifact id, it had before the
+    panel; an older-field value over records now wins over them (§2.R)."""
+    from .models import BasisInput, BasisSource
+
+    if not words:
+        return []
+    return [BasisInput(name=ASSUMPTIONS_READ, value=words, unit="", source=BasisSource(
+        kind="convention", note="where the named persons' values in this basis came from: the parameter panel's "
+                                "overrides, and any the older assumptions field gave, which the service reads as overrides "
+                                "for one release; a basis without this input read the older field alone"))]
 
 
 def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = FLOWSHEET,
@@ -590,13 +706,23 @@ def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = F
                 out.append(BasisInput(name=f"{inp.key} scale", value=BOUND[inp.key][4], unit="", source=BasisSource(
                     kind="convention", note=f"{BOUND[inp.key][3]} to a share")))
         elif inp.binding == "assumption":
-            for part, v in (("", inp.value), (" low", inp.low), (" high", inp.high)):
-                out.append(BasisInput(name=f"{inp.key}{part}", value=v, unit=inp.unit, source=inp.source))
+            out += assumption_inputs(inp)
         elif inp.binding == "artifact":
             for part, v in (("", inp.value), (" low", inp.low), (" high", inp.high)):
                 out.append(BasisInput(name=f"{inp.key} fit{part}", value=v, unit=inp.unit, source=inp.source))
     out += fitted or []
     return out
+
+
+def assumption_inputs(inp) -> list:
+    """The basis inputs a run writes for one input bound to a named person's
+    value: the value, its low and its high, each with the person as its
+    source. The parameter panel's resolve says what a run adds through this
+    same function (OF-BLD-020 §2.R)."""
+    from .models import BasisInput
+
+    return [BasisInput(name=f"{inp.key}{part}", value=v, unit=inp.unit, source=inp.source)
+            for part, v in (("", inp.value), (" low", inp.low), (" high", inp.high))]
 
 
 def utility_input():
@@ -854,21 +980,27 @@ def run(req, pool=None):
     _check_seed(req.seed)
     # A run is a caller a person started by id: its records bind whatever the
     # program switch says (OF-BLD-016, "what keeps everything").
+    # OF-BLD-020 §2.2 (D3): a person's overrides, and the older assumptions
+    # field read the same way for one release, each a named assumption that
+    # wins over the records and any fit for its input.
+    typed, read = named_values(req.scenarioId, req.overrides, req.assumptions)
+    _check_keys(info, typed)
     pool = pool or evidence_pool.load(include_archived=True)
     if flowsheet == FLOWSHEET:
         cap = yield_cap()
-        inputs = bind(pool.records, req.host, req.assumptions, cap)
+        inputs = bind(pool.records, req.host, typed, cap)
     else:
         cap = None
-        inputs = bind_inputs(flowsheet, pool.records, req.host, req.assumptions)
+        inputs = bind_inputs(flowsheet, pool.records, req.host, typed)
     # OF-BLD-019 §5.1 (D10): the fermOS fits a person chose, each computed
     # from its artifact; one that cannot feed its input is refused in words.
-    fitted = apply_fits(inputs, req.fits, flowsheet)
+    # An input a person's value overrides takes no fit (D3).
+    fitted = apply_fits(inputs, fits_beside(req.fits, typed), flowsheet)
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
         raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
     art = artifacts.compute(RUN, basis_inputs(inputs, cap, flowsheet, req.samples, scenario_id=req.scenarioId,
-                                              fitted=fitted),
+                                              fitted=fitted) + assumptions_read(read),
                             records_by_id=pool.records_by_id, seed=req.seed)
     o = art.output
     q = o["quantiles"]
@@ -1082,13 +1214,7 @@ def _unrunnable_seed(scenario_id: str) -> str | None:
     return str(row.get("kind") or "authored")
 
 
-def _in_program(paper_id: str, program: str | None) -> bool:
-    from . import programs
-
-    try:
-        return program is not None and programs.program_of_paper(paper_id or "") == program
-    except FileNotFoundError:  # no corpus exported here: no paper is known to be the program's
-        return False
+# `_in_program` lives in binding.py (OF-BLD-020 §3.2), imported at the top.
 
 
 def bind_inputs(flowsheet: str, records: list[dict], host: str | None = None, assumptions: list | None = None) -> list:
@@ -1096,8 +1222,9 @@ def bind_inputs(flowsheet: str, records: list[dict], host: str | None = None, as
     entry: a process input to the records of its fields (the first field
     with a bound record wins) on its program's papers that pass the
     aggregate gate and name the flowsheet's feed as their carbon source, each
-    converted by units.py into the input's unit; with none, or with the
-    binding stopped, a named person's assumption; else it waits. A
+    converted by units.py into the input's unit; else it waits. A named
+    person's assumption (an Override from the parameter panel, OF-BLD-020
+    D3) wins over the records and says how many it stands in place of. A
     convention takes no value: the run's basis states it."""
     from . import units, validate
     from .models import BoundRecord, ScenarioInput
@@ -1144,10 +1271,12 @@ def bind_inputs(flowsheet: str, records: list[dict], host: str | None = None, as
             inp.flags.append(f"the binding stopped: {refused}")
             if fi.key in given:
                 _assume(inp, given[fi.key])
+        elif fi.key in given:
+            # OF-BLD-020 D3: a named person's value wins over the records.
+            _in_place_of(inp, bound)
+            _assume(inp, given[fi.key])
         elif bound:
             _settle(inp, bound, used)
-        elif fi.key in given:
-            _assume(inp, given[fi.key])
         out.append(inp)
     return out
 
@@ -1200,7 +1329,8 @@ def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | 
     """A flowsheet's inputs bound, in the shape GET /api/proforma/scenarios
     serves: a seed scenario's with its id and name, a flowsheet's alone with
     both empty (§2.3, c); with the fermOS fits a person chose laid on
-    (OF-BLD-019 §5.1)."""
+    (OF-BLD-019 §5.1), and a person's named values over both (OF-BLD-020
+    D3: an input a value overrides takes no fit)."""
     from . import evidence_pool
     from .models import ProformaScenarioInfo
 
@@ -1214,7 +1344,7 @@ def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | 
             id=scenario_id, name=name, product=PRODUCTS.get(flowsheet, flowsheet), flowsheet=flowsheet, host=host,
             hosts=_hosts(pool.records, flowsheet), inputs=inputs, waiting=[], leavesOut=info.leavesOut,
             priceBasis=info.priceBasis or "")
-    apply_fits(out.inputs, fits or {}, flowsheet)
+    apply_fits(out.inputs, fits_beside(fits, assumptions or []), flowsheet)
     out.waiting = [i.key for i in out.inputs if i.binding == "waiting"]
     return out
 
@@ -1280,8 +1410,21 @@ def bind_flowsheet(flowsheet: str, *, include_archived: bool = False, host: str 
 # series names another product than the scenario's is refused whole.
 # `batch_simulation` does not exist in this tree; fermOS keeps
 # `kinetic_fit` and `growth_forecast` (fermos.FEEDABLE).
+#
+# A SIMULATION FEEDS TOO (OF-BLD-020 §3.3, D1). A kept `fermos.simulation`
+# gives the same three from its end state as it was kept: titre its final
+# product at harvest, yield the product made over the sugar used to harvest,
+# productivity that titre over the harvest hour, which is the batch time it
+# gives; each a single value (a simulation draws no band), fixed. Its
+# provenance is the artifact's own, basis_provenance over every source its
+# parameters came from (a person's value makes it `demo`), and it enters a
+# run through the `artifact` source as a fit's does. A simulation is never a
+# measurement, and its card says so. A chemostat runs continuously and gives
+# a batch flowsheet nothing; a simulation of another product is refused
+# whole, as a fit's product series is.
 
 FIT_KEYS = ("titre", "yield", "productivity")
+
 _FIT_NAME = re.compile(r"(\w+) fit(?: (low|high))?")
 # The words a series' label or measure id uses for what each shelf
 # flowsheet makes, to tell a fit of another product's series (PRODUCTS).
@@ -1325,6 +1468,8 @@ def fit_info(art, flowsheet: str):
         out.feeds = [FitFeed(key=k, unit=i.unit, derivation="", refused=why) for k, i in declared.items()]
         return out
 
+    if art.tool == fermos.SIMULATION:
+        return _simulation_info(art, out, declared, product, flowsheet, refuse_all)
     try:
         fit_ = fermos.fit_of(art)
     except fermos.FitRefused as e:
@@ -1365,6 +1510,7 @@ def fit_info(art, flowsheet: str):
     else:
         batch_why = None
         out.batchTimeH = float(runs)
+        out.batchTimeNote = FORECAST_BATCH_NOTE
 
     feeds = []
     for key, inp in declared.items():
@@ -1412,14 +1558,104 @@ def fit_info(art, flowsheet: str):
     return out
 
 
-def fermos_fits(flowsheet: str) -> list:
+# How the batch time a productivity is the titre over was found, by the tool
+# that kept it (§8.R): the run's `fit batch time` input, its refusal of a
+# productivity fed apart from its titre, and the page all say these words.
+FORECAST_BATCH_NOTE = ("the hour the forecast's median sugar runs out, found between its grid points; productivity is "
+                       "the fit's titre over it, and titre is the same fit's")
+
+
+def simulation_batch_note(aid: str, where: str) -> str:
+    return (f"the harvest hour of simulation {aid} ({where}); productivity is the simulation's final titre over it, "
+            "and titre is the same simulation's")
+
+
+def _simulation_info(art, out, declared: dict, product: str, flowsheet: str, refuse_all):
+    """What a kept simulation feeds (OF-BLD-020 §3.3): its end state as it
+    was kept, read from the artifact and recomputed nowhere."""
+    from . import fermos, kinetics, units
+    from .models import FitFeed
+
+    try:
+        sim = fermos.result_of(art)
+    except (KeyError, TypeError, ValueError) as e:
+        return refuse_all(f"simulation {art.id} cannot be read as one: {e}")
+    fam = kinetics.FAMILIES.get(sim.family)
+    out.flags.append(f"a {sim.family} simulation, not a measurement: each value it gives was computed from the sources "
+                     "its basis names, and its provenance follows them")
+    if isinstance(fam, kinetics.ChemostatV1):
+        return refuse_all(f"it simulates a chemostat ({sim.family}), which runs continuously and has no batch: "
+                          f"{flowsheet} takes a batch's titre, yield and batch time")
+    # OF-BLD-020 §3.R (finding 14): the titre a flowsheet takes is a product
+    # in the broth (the family's P); a store inside the cells (storage_v1's
+    # Q) is not one, whatever product the simulation names.
+    state = fam.product_state() if fam is not None else None
+    if state != "P":
+        kept = (f"a store inside the cells ({state}), not a product in the broth" if state else "no product state")
+        return refuse_all(f"it simulates {sim.family}, whose product is {kept}: {flowsheet} takes the titre of "
+                          f"{product} in the broth")
+    if sim.product and sim.product != product:
+        return refuse_all(f"it simulates {sim.product}, not {product}, the product of {flowsheet}")
+    if not sim.product:
+        out.flags.append(f"it names no product: it is read as {product} because a person chose it")
+    out.productSeries = sim.product
+    out.substrateSeries = sim.sugar
+    harvest = (sim.sugarRunsOutH if sim.sugarRunsOutH is not None and sim.harvestH == sim.sugarRunsOutH
+               else None)
+    where = ("the hour its sugar runs out" if harvest is not None else "its run's end")
+    if sim.harvestH and sim.harvestH > 0:
+        out.batchTimeH = float(sim.harvestH)
+        # §8.R (findings 0, 4, 10): a simulation has no forecast, no median
+        # and no grid; its batch time is its harvest hour, said as such.
+        out.batchTimeNote = simulation_batch_note(art.id, where)
+    for flag in sim.flags:
+        if "did not run out" in flag:
+            out.flags.append(flag[:1].lower() + flag[1:].rstrip("."))
+    G = kinetics.G_L
+    got = {
+        "titre": (sim.finalTitre, G, f"the final product of simulation {art.id} at harvest ({where})",
+                  "the family keeps no product state" if sim.finalTitre is None else None),
+        "yield": (sim.yieldAchieved, "g g⁻¹", f"product made over sugar used to harvest ({where}) in simulation {art.id}",
+                  "no sugar was used before harvest" if sim.yieldAchieved is None else None),
+        "productivity": (sim.productivity, f"{G} h⁻¹",
+                         f"the final titre of simulation {art.id} over its harvest hour ({where}), the batch time it gives",
+                         "it gives no titre or no harvest hour" if sim.productivity is None else None),
+    }
+    feeds = []
+    for key, inp in declared.items():
+        value, unit, derivation, why = got[key]
+        feed = FitFeed(key=key, unit=inp.unit, derivation=derivation)
+        if why:
+            feed.refused = why
+        else:
+            try:
+                feed.value = feed.low = feed.high = units.convert(float(value), unit, inp.unit)
+            except units.UnitError as e:
+                feed.refused = f"its value does not convert to {inp.unit}: {e}"
+        feeds.append(feed)
+    out.feeds = feeds
+    return out
+
+
+def fermos_fits(flowsheet: str, include_archived: bool = False) -> list:
     """GET /api/fermos/fits: every kinetic fit and forecast fermOS keeps,
-    newest first, each with what it can feed `flowsheet` and why not. A
-    read: it keeps nothing and starts no simulator."""
-    from . import artifacts, fermos
+    and every simulation (OF-BLD-020 §3.3), newest first, each with what it
+    can feed `flowsheet` and why not; one of an archived program (a storage_v1
+    simulation, one bound to an archived program's records or started from
+    one, `module_stores.artifact_program`) left out unless asked (§3.R,
+    findings 10 and 12). A read: it keeps nothing and starts no simulator."""
+    from . import artifacts, fermos, module_stores, programs
 
     runnable(flowsheet)
-    return [fit_info(a, flowsheet) for a in artifacts.all_artifacts() if a.tool in fermos.FEEDABLE]
+
+    def hidden(a) -> bool:
+        try:
+            return programs.hides(module_stores.artifact_program(a), include_archived)
+        except FileNotFoundError:  # no projection here: nothing is known to be archived
+            return False
+
+    return [fit_info(a, flowsheet) for a in artifacts.all_artifacts()
+            if a.tool in fermos.FEEDS_PROFORMA and not hidden(a)]
 
 
 def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
@@ -1453,8 +1689,12 @@ def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
         n = len(t.records) if t else 0
         paired = (f"titre is from {fits['titre']}" if fits.get("titre") else
                   f"titre binds {n} record{'s' if n != 1 else ''}" if t and t.binding == "records" else
-                  "titre is a named person's assumption" if t and t.binding == "assumption" else
+                  "titre is a named person's assumption, which wins over any fit" if t and t.binding == "assumption" else
                   "titre waits for a source")
+        # §2.R (finding 13): beside a titre a person typed, choosing the fit
+        # for titre is not enough, since the person's value wins over it.
+        remedy = ("reset titre to its source and choose {aid} for titre" if t and t.binding == "assumption"
+                  and not fits.get("titre") else "choose {aid} for titre as well")
     infos: dict[str, Any] = {}
     extra: list = []
     for key in FIT_KEYS:
@@ -1483,15 +1723,18 @@ def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
         inp.leftOutNoCarbon = inp.leftOutOtherCarbon = 0
         inp.flags = ([f"chosen in place of the {had} record{'s' if had != 1 else ''} it bound"] if had else []) + list(info.flags)
         if key == "productivity" and paired:
+            # §8.R (finding 10): worded by the tool that kept it, never a
+            # forecast's words for a simulation.
+            what = ("its final titre over its harvest hour" if info.tool == "fermos.simulation"
+                    else "its titre over the hour its median sugar runs out")
             raise ScenarioRefused(
-                f"productivity from {info.tool} {aid} is its titre over the hour its median sugar runs out, so it feeds "
+                f"productivity from {info.tool} {aid} is {what}, so it feeds "
                 f"the fermenter only beside titre from {aid}: the fermenter's batch time is the titre over the "
-                f"productivity, and here {paired}. To use it, choose {aid} for titre as well, or stop using it for "
+                f"productivity, and here {paired}. To use it, {remedy.format(aid=aid)}, or stop using it for "
                 "productivity")
         if key == "productivity" and info.batchTimeH is not None:
             extra.append(BasisInput(name="fit batch time", value=info.batchTimeH, unit="h", source=BasisSource(
-                kind="artifact", id=aid, note="the hour the forecast's median sugar runs out, found between its grid "
-                                              "points; productivity is the fit's titre over it, and titre is the same fit's")))
+                kind="artifact", id=aid, note=info.batchTimeNote or FORECAST_BATCH_NOTE)))
     return extra
 
 
@@ -1547,6 +1790,43 @@ def _ceiling_of(art, name: str) -> str | None:
     return (str(i.source.id) if i.source.id else None) if name == "model" else str(i.value)
 
 
+def stored_ceilings(model_id: str, product: str, sugar: str | None = None, stored: list | None = None) -> list:
+    """The stored geneOS ceilings of one shelf model for one product, newest
+    first (all_artifacts' order), on `sugar` alone when it is named: the
+    lookup ceiling_check reads, and fermOS's simulation reads beside its
+    Yp/s (OF-BLD-020 §3.1)."""
+    from . import artifacts, geneos
+
+    stored = [a for a in artifacts.all_artifacts() if a.tool == geneos.CEILING] if stored is None else stored
+    mine = [a for a in stored if _ceiling_of(a, "model") == model_id and _ceiling_of(a, "product") == product
+            and isinstance(a.output.get("gPerG"), (int, float))]
+    return mine if sugar is None else [a for a in mine if _ceiling_of(a, "substrate") == sugar]
+
+
+def host_models(product: str, strain: str) -> list[tuple[Any, str, str]]:
+    """The geneOS shelf models with a route to `product` whose host is the
+    strain ('strain') or of its species ('species'), each with the words
+    that say so, as ceiling_check matches a scenario's organism, for one
+    named strain (OF-BLD-020 §3.1)."""
+    from . import geneos_models, module_stores
+
+    labels, _ = _strain_labels()
+    label = labels.get(strain, strain)
+    species = module_stores.species_of(label)
+    out: list[tuple[Any, str, str]] = []
+    for m in geneos_models.SHELF.values():
+        if product not in m.products or not m.host:
+            continue
+        host_label = labels.get(m.host) or m.name
+        if m.host == strain:
+            out.append((m, "strain", f"{m.id} is a reconstruction of {host_label}, the strain simulated"))
+        elif species and module_stores.species_of(host_label) == species:
+            out.append((m, "species", f"{m.id} is a reconstruction of {host_label}, and the strain simulated, {label}, "
+                                      f"is of its species, {_species_words(species)}: another strain's network bounds "
+                                      "it only as far as the two networks agree"))
+    return out
+
+
 def _strain_labels() -> tuple[dict[str, str], dict[str, str]]:
     """Each catalogued strain's label ('Saccharomyces cerevisiae S288C') and
     each program's one species, when every host it catalogues is of that
@@ -1570,7 +1850,21 @@ def _species_words(species: str) -> str:
     return species[:1].upper() + species[1:]
 
 
-def _yield_words(inp) -> str:
+def artifact_tool(aid: str | None) -> str | None:
+    """The tool of a kept artifact, or None when it is not on file or
+    cannot be read: what names a fermOS source as a fit, a forecast or a
+    simulation (§8.R)."""
+    from . import artifacts
+
+    if not aid:
+        return None
+    try:
+        return artifacts.get(aid).tool
+    except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged):
+        return None
+
+
+def _yield_words(inp, tool: str | None = None) -> str:
     if inp.binding == "records":
         n = len(inp.records)
         return (f"the median of {n} records, with the lowest and the highest" if n >= 3 else
@@ -1580,6 +1874,11 @@ def _yield_words(inp) -> str:
         return f"a named person's assumption{f' ({by})' if by else ''}, with its low and its high"
     if inp.binding == "artifact":
         aid = inp.source.id if inp.source else None
+        if tool == "fermos.simulation":
+            # §8.R (findings 4, 11): a simulation's yield is what it
+            # achieved, product made over sugar used, one value held fixed.
+            return (f"a fermOS simulation's yield achieved{f' ({aid})' if aid else ''}: product made over sugar used to "
+                    "harvest, one value held fixed")
         return f"a fermOS fit's Yp/s{f' ({aid})' if aid else ''}, its median with its 5th and 95th percentile"
     return "nothing yet: the yield waits for a record, a named person's assumption or a fermOS fit"
 
@@ -1589,6 +1888,8 @@ _CHECK_WHAT = {
                "measured otherwise, another organism)",
     "assumption": "a reviewer should check what the assumption rests on, and the basis of the yield it was taken from",
     "artifact": "a reviewer should check the basis of the fit's readings (the product and sugar series, and their units)",
+    "simulation": "a reviewer should check the sources of the simulation's parameters (its basis names each) and the "
+                  "yields it was given",
 }
 
 
@@ -1606,13 +1907,13 @@ def _row_words(flag: str, binding: str, value_above: bool) -> str:
 
 def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_archived: bool = False,
                   host: str | None = None, assumptions: list | None = None, fits: dict[str, str] | None = None,
-                  pool=None):
+                  pool=None, overrides: list | None = None):
     """GET /api/proforma/ceiling-check: a scenario's fermenter yield beside
     the newest stored geneOS ceiling of each shelf model of its organism, on
     its flowsheet's sugar (D11). The scenario is a seed's by its id, or one
     made here by the flowsheet it names (flowsheet_of); its yield is bound as
-    its page binds it, with the person's assumptions and the fermOS fits
-    chosen. Refused in words as the binding is; a scenario of a program the
+    its page binds it, with the person's overrides (and the older
+    assumptions field, read the same way) and the fermOS fits chosen. Refused in words as the binding is; a scenario of a program the
     switch hides, as GET /api/proforma/bind refuses it. A read: it keeps
     nothing, starts no worker, and changes no binding or run."""
     from . import artifacts, evidence_pool, geneos, geneos_models, module_stores, programs, units
@@ -1629,12 +1930,14 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
     product = PRODUCTS.get(fid, fid)
     if sugar is None or product not in geneos_models.PRODUCTS:
         raise ScenarioRefused(f"{fid} names no product and sugar a geneOS ceiling is computed for")
+    typed, _ = named_values(scenario_id, overrides, assumptions)
+    _check_keys(info, typed)
     pool = pool or evidence_pool.load(include_archived=True)
     # The yield as the scenario binds it: the PHA draft's records unclipped
     # (cap=None), so the check reads each record as it is (D11).
-    inputs = bind(pool.records, host, assumptions, cap=None) if fid == FLOWSHEET else bind_inputs(
-        fid, pool.records, host, assumptions)
-    apply_fits(inputs, fits or {}, fid)
+    inputs = bind(pool.records, host, typed, cap=None) if fid == FLOWSHEET else bind_inputs(
+        fid, pool.records, host, typed)
+    apply_fits(inputs, fits_beside(fits, typed), fid)
     inp = next((i for i in inputs if i.key == "yield"), None)
     if inp is None:
         raise ScenarioRefused(f"{fid} takes no yield, so no ceiling bounds it")
@@ -1653,6 +1956,7 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
     # name, else the program's one species; the line counts each kind, so a
     # few records of a catalogued strain never speak for the rest (§5.R).
     labels, program_species = _strain_labels()
+    tool = artifact_tool(inp.source.id if inp.source else None) if inp.binding == "artifact" else None
     by_id = getattr(pool, "records_by_id", None) or {r["id"]: r for r in pool.records}
     bound_rows = [by_id.get(r) or {} for r in (inp.recordIds if inp.binding == "records" else [])]
     n = len(bound_rows)
@@ -1730,8 +2034,7 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
     rows: list[CeilingRow] = []
     other_sugars: set[str] = set()
     for m, how, words in matched:
-        mine = [a for a in stored if _ceiling_of(a, "model") == m.id and _ceiling_of(a, "product") == product
-                and isinstance(a.output.get("gPerG"), (int, float))]
+        mine = stored_ceilings(m.id, product, None, stored)
         on = [a for a in mine if _ceiling_of(a, "substrate") == sugar]
         other_sugars |= {str(_ceiling_of(a, "substrate")) for a in mine if a not in on and _ceiling_of(a, "substrate")}
         if not on:
@@ -1755,7 +2058,8 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
             ceilingMolPerMol=float(mol) if isinstance(mol, (int, float)) else None, conventions=conventions,
             yieldGPerG=value, yieldLowGPerG=low, yieldHighGPerG=high,
             yieldMolPerMol=value * ratio if value is not None and ratio is not None else None,
-            flag=flag, words=_row_words(flag, inp.binding, value_above), recordsAbove=above))
+            flag=flag, words=_row_words(flag, "simulation" if tool == "fermos.simulation" else inp.binding,
+                                        value_above), recordsAbove=above))
 
     models = [m.id for m, _, _ in matched]
     compute_at = f"/geneos/model?product={product}&substrate={sugar}" + (f"&model={models[0]}" if models else "")
@@ -1790,6 +2094,7 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
                     f"the PHA draft's feed is a fermentable sugar; its yield cap reads the {sugar} ceiling, and so does this check"),
         host=host, strains=strains, species=species_list, organismWords=organism, models=models,
         yieldBinding=inp.binding, yieldValue=inp.value, yieldLow=inp.low, yieldHigh=inp.high, yieldUnit=inp.unit,
-        yieldSource=inp.source, yieldRecords=len(inp.records), yieldWords=_yield_words(inp), rows=rows,
+        yieldSource=inp.source, yieldRecords=len(inp.records), yieldWords=_yield_words(inp, tool), yieldTool=tool,
+        rows=rows,
         flagged=any(r.flag == "above" for r in rows), empty=empty, computeAt=compute_at,
         otherSugars=sorted(other_sugars), notes=notes)

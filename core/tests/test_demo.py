@@ -156,16 +156,73 @@ def test_the_prototype_fixtures_are_what_demo_prototype_writes(tmp_path, monkeyp
     defaults, so the comparison is of the code and never of the environment."""
     for name in ("OPENFERMENT_MODEL", "OPENFERMENT_FALLBACK_MODEL", "OPENFERMENT_INDEX_MODEL", "OPENFERMENT_EFFORT"):
         monkeypatch.delenv(name, raising=False)
-    written = demo.rebuild_prototype(out=tmp_path)
+    # The vessel fixture's designs are BioSTEAM's, which test:sim holds; here
+    # its stand-in worker writes it, and it is held by what it asks.
+    written = demo.rebuild_prototype(out=tmp_path, real_worker=False)
     assert written
     for path in written:
         committed = demo.PROTOTYPE / path.name
         assert committed.is_file(), f"{committed} is missing: run python -m openferment_core.demo --prototype"
+        if path.name == VESSEL_FIXTURE:
+            _same_vessel_asks(json.loads(path.read_text(encoding="utf-8"))["response"],
+                              json.loads(committed.read_text(encoding="utf-8"))["response"])
+            continue
         assert path.read_text(encoding="utf-8") == committed.read_text(encoding="utf-8"), (
             f"{path.name} no longer matches the code: run python -m openferment_core.demo --prototype"
         )
     committed = sorted(p.name for p in demo.PROTOTYPE.glob("*.json*"))
     assert committed == sorted(p.name for p in written), "a fixture the command no longer writes is still committed"
+
+
+VESSEL_FIXTURE = "fermos-vessel.json"
+
+
+def _same_vessel_asks(written: dict, committed: dict) -> None:
+    """OF-BLD-020 §4.2: the vessel fixture asks what the code asks. Its
+    simulations are the real fermos.simulate's (no BioSTEAM), so their ids
+    and summaries are exact; its scopes and designs are asked alike, and
+    answered alike in status and in every parameter's key and origin."""
+    for key in ("aerobic", "anaerobic", "plantScale", "by", "simulations"):
+        assert written[key] == committed[key], f"{VESSEL_FIXTURE}'s {key} no longer matches the code"
+    # A scope is a simulation's or (§4.R) a fit's.
+    assert [(s.get("simulation"), s.get("fit"), s["vesselType"], s["status"]) for s in written["scopes"]] == \
+        [(s.get("simulation"), s.get("fit"), s["vesselType"], s["status"]) for s in committed["scopes"]]
+    for w, c in zip(written["scopes"], committed["scopes"]):
+        if w["status"] != 200:
+            assert w["body"] == c["body"]
+            continue
+        assert [(v["key"], v["origin"]) for v in w["body"]["values"]] == [(v["key"], v["origin"]) for v in c["body"]["values"]]
+    assert [(d["request"], d["status"]) for d in written["designs"]] == [(d["request"], d["status"]) for d in committed["designs"]]
+    refused = [d["body"] for d in committed["designs"] if d["status"] == 422]
+    assert refused == [d["body"] for d in written["designs"] if d["status"] == 422]
+    assert written["worker"]["kind"] == "stand-in" and committed["worker"]["kind"] in ("biosteam", "stand-in")
+
+
+@pytest.mark.sim
+def test_the_vessel_fixture_is_what_the_worker_designs():
+    """The vessel fixture's designs are the real worker's within
+    VESSEL_FIXTURE_RTOL: BioSTEAM's aerated design moves in its last digits
+    from one process to the next (OF-BLD-020 §4.1, measured)."""
+    committed = json.loads((demo.PROTOTYPE / VESSEL_FIXTURE).read_text(encoding="utf-8"))["response"]
+    written = demo.prototype_vessel(real_worker=True)[VESSEL_FIXTURE]
+    assert committed["worker"]["kind"] == "biosteam", "commit the fixture BioSTEAM designed: run demo --prototype"
+
+    def close(a, b, where="") -> None:
+        if isinstance(a, bool) or not isinstance(a, (int, float)):
+            if isinstance(a, dict):
+                assert isinstance(b, dict) and a.keys() == b.keys(), where
+                for k in a:
+                    close(a[k], b[k], f"{where}.{k}")
+            elif isinstance(a, list):
+                assert isinstance(b, list) and len(a) == len(b), where
+                for n, (x, y) in enumerate(zip(a, b)):
+                    close(x, y, f"{where}[{n}]")
+            else:
+                assert a == b, where
+            return
+        assert b == pytest.approx(a, rel=demo.VESSEL_FIXTURE_RTOL, abs=1e-9), where
+
+    close(json.loads(json.dumps(written)), committed)
 
 
 def test_the_figure_sample_is_what_demo_prototype_writes(tmp_path):

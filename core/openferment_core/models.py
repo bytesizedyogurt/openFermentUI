@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Mirrors the Provenance union in src/data/types.ts, weakest last. The order IS
 # the ranking: `weakest_provenance` walks this list, so adding a class in the
@@ -1264,6 +1264,9 @@ class FermosFitRequest(BaseModel):
     series: list[FermosSeries]
     # The sample run: computed inline, kept nowhere (§7.4).
     sample: bool = False
+    # The model fitted (OF-BLD-020 §3.1): the closed-form logistic,
+    # `logistic_v0`, as before, or a kinetics family by id (`batch_v1`).
+    family: str = "logistic_v0"
 
 
 class FitParam(BaseModel):
@@ -1278,6 +1281,14 @@ class FitParam(BaseModel):
     # includes zero, so the run cannot tell it from nothing.
     identified: bool | None = None
     indistinguishableFromZero: bool | None = None
+    # Why a kinetics family's fit reports it unidentified (OF-BLD-020 §3.R,
+    # finding 3), in the order a reader names them: the run's lack of a
+    # biomass series held X0 at a gauge it scales with ("gauge"), μmax by rule
+    # ("rule"), the optimizer's budget ("budget"), the Jacobian's null space
+    # ("null-space"), the interval reaching zero ("interval"). Left out of a
+    # parameter it does not apply to, so a logistic fit's file is unchanged.
+    unidentifiedBy: list[Literal["gauge", "rule", "budget", "null-space", "interval"]] | None = Field(
+        default=None, exclude_if=lambda v: v is None)
 
 
 class GrowthFit(BaseModel):
@@ -1303,7 +1314,9 @@ class SeriesFitQuality(BaseModel):
 
 
 class KineticFit(BaseModel):
-    """Logistic growth, Luedeking–Piret production and the substrate balance."""
+    """Logistic growth, Luedeking–Piret production and the substrate balance
+    (`logistic_v0`), or a kinetics family fitted to the same series
+    (OF-BLD-020 §3.1)."""
 
     params: list[FitParam] = Field(default_factory=list)
     quality: list[SeriesFitQuality] = Field(default_factory=list)
@@ -1311,6 +1324,12 @@ class KineticFit(BaseModel):
     covariance: list[list[float]] = Field(default_factory=list)
     series: list[FermosSeries] = Field(default_factory=list)
     reason: str | None = None
+    # The model fitted. A fit kept before OF-BLD-020 holds no `model` and
+    # reads as `logistic_v0`, which it is.
+    model: str = "logistic_v0"
+    # What the fit says of itself in words: the terms it held, a parameter
+    # reported unidentified by rule, the optimizer's passes.
+    notes: list[str] = Field(default_factory=list)
 
 
 class FermosFitResponse(BaseModel):
@@ -1342,6 +1361,9 @@ class ForecastRequest(BaseModel):
     changedBy: str | None = None
     # Hours; unset is the fitted run's own length.
     durationH: float | None = None
+    # Who set the length; a length a person set is that person's assumption
+    # (OF-BLD-020 §3.R). Unset: the one who changed a starting value, if any.
+    durationBy: str | None = None
     sample: bool = False
 
 
@@ -1574,7 +1596,16 @@ class ProformaScenarioInfo(BaseModel):
 
 class ProformaRunRequest(BaseModel):
     scenarioId: str
+    # The older field (OF-BLD-014 §8.4): a named person's values by input
+    # key. Accepted for one release as a shim (OF-BLD-020 §2.2): each is read
+    # as an Override of `proforma:<scenarioId>`, and the run's basis says
+    # which field it read.
     assumptions: list[InputAssumption] = Field(default_factory=list)
+    # A person's changes in the parameter panel (OF-BLD-020 D3), each an
+    # Override of scope `proforma:<scenarioId>`: a named assumption that wins
+    # over the records and any fermOS fit for its input, and that the run's
+    # basis names with the person. The service keeps none.
+    overrides: list[Override] = Field(default_factory=list)
     host: str | None = None
     seed: int = 0
     # How many Latin hypercube samples the run draws (OF-BLD-019 D7). The
@@ -1685,9 +1716,13 @@ class FermosFitInfo(BaseModel):
     # The product and sugar series, by the labels the run gave them.
     productSeries: str | None = None
     substrateSeries: str | None = None
-    # The hour the forecast's median sugar runs out: the batch time a
-    # productivity is the titre over.
+    # The batch time a productivity is the titre over: the hour a forecast's
+    # median sugar runs out, or a simulation's harvest hour.
     batchTimeH: float | None = None
+    # How that hour was found, in words chosen by the tool that kept it (a
+    # forecast's grid or a simulation's harvest, OF-BLD-020 §8.R): what the
+    # run's `fit batch time` input and the page say of it.
+    batchTimeNote: str | None = None
     feeds: list[FitFeed] = Field(default_factory=list)
     # Words printed beside it, such as a product series that names no product.
     flags: list[str] = Field(default_factory=list)
@@ -1774,6 +1809,10 @@ class CeilingCheck(BaseModel):
     yieldHigh: float | None = None
     yieldUnit: str
     yieldSource: BasisSource | None = None
+    # The tool of the artifact a yield bound to one came from ('kinetic_fit',
+    # 'growth_forecast', 'fermos.simulation'), so the page names it as what
+    # it is (§8.R); None for any other binding.
+    yieldTool: str | None = None
     yieldRecords: int = 0
     yieldWords: str
     rows: list[CeilingRow] = Field(default_factory=list)
@@ -2230,8 +2269,577 @@ class RunbookDraft(BaseModel):
     measures: list[Measure]
 
 
+# ── One parameter panel (OF-BLD-020 §2.1, D2–D4) ────────────────────────
+#
+# Every model family, vessel design, catalogue unit and shelf flowsheet
+# declares its parameters once, in Python, as `ParameterSpec`s; the service
+# resolves each to a `ParameterValue` naming where its value came from, in
+# the order its `sourceRule` gives. A person's change is an `Override`: a
+# named assumption the browser keeps (D3) and a run carries, which the
+# basis names as an `assumption`, so the result's provenance is `demo`.
+# Bounds are conventions with a written reason (D4): a value outside them
+# is kept and flagged in words, never clamped. `params.py` holds the rules.
+
+# The chip a value shows: finer than BasisSource.kind, because a fit and a
+# simulation are both artifacts and a library's default is a model source.
+# `not-read`: a parameter the request's other choices leave unread (a
+# fed-batch's mu_set under a constant feed), which waits for nothing
+# (OF-BLD-020 §3.R, finding 16).
+ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "convention", "library-default", "waiting",
+                      "not-read"]
+# What a scope parameterises: a fermOS model family, a vessel designed for
+# a simulation, one unit of a pureOS train, or a Proforma scenario.
+ParamScopeKind = Literal["fermos-family", "fermos-vessel", "fermos-forecast", "pureos-unit", "proforma"]
+# The entries a sourceRule may hold besides a record's, which names its
+# field as "record:<ontology field id>".
+SOURCE_RULE_ENTRIES = ("fit", "artifact", "simulation", "assumption", "convention", "library-default")
+
+
+class ParameterSpec(BaseModel):
+    """One parameter as its model, unit or flowsheet declares it. No value
+    lives here but the stated convention and the bounds, each with its
+    reason."""
+
+    key: str
+    label: str
+    # As written in the equations, plain Unicode; empty when it has none.
+    symbol: str
+    # What the symbol means, in words: the panel's Why.
+    gloss: str
+    # A units.ts family (massConc, yield, volProd, costUSD) or a word.
+    dimension: str
+    # Empty for a share, a dimensionless number or a choice.
+    unit: str
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+    scale: Literal["linear", "log"] = "linear"
+    group: str
+    # Ordered: fit, record:<field id>, artifact, simulation, assumption,
+    # convention, library-default. The first with a value wins; an Override
+    # wins over all of them.
+    sourceRule: list[str]
+    note: str | None = None
+    # Required (D4): a physical limit, an ontology plausibility range, or
+    # the library's validity range, said in words.
+    boundsReason: str
+    # A parameter chosen from words (a feed profile, a kLa method, a vessel
+    # material); None for a number.
+    choices: list[str] | None = None
+    # The stated convention, when the rule holds "convention"; its reason
+    # is in `note`.
+    convention: float | str | None = None
+
+    @field_validator("boundsReason")
+    @classmethod
+    def _bounds_have_a_reason(cls, v: str) -> str:
+        if not (v or "").strip():
+            raise ValueError("every parameter's bounds carry a written reason (OF-BLD-020 D4)")
+        return v
+
+    @field_validator("sourceRule")
+    @classmethod
+    def _rule_is_known(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("a parameter names where its value comes from")
+        for entry in v:
+            if entry in SOURCE_RULE_ENTRIES or (entry.startswith("record:") and entry[len("record:"):].strip()):
+                continue
+            raise ValueError(f"{entry!r} is not a source: a rule holds fit, record:<field id>, artifact, simulation, "
+                             "assumption, convention or library-default")
+        return v
+
+
+class ParameterValue(BaseModel):
+    """A parameter's value in one scope, with where it came from."""
+
+    key: str
+    # None while it waits.
+    value: float | str | None
+    low: float | None = None
+    high: float | None = None
+    # None while it waits.
+    source: BasisSource | None
+    origin: ParamOrigin
+    # Set only when the origin is a fit.
+    identified: bool | None = None
+    # The person's name, when an Override set it.
+    overriddenBy: str | None = None
+    # BioSTEAM's default read from its code at import, else None.
+    libraryDefault: float | str | None = None
+    # The records behind it, when its origin is records.
+    recordIds: list[str] = Field(default_factory=list)
+    # Words: how many records and their range, or why it waits and which
+    # field would bind it.
+    detail: str | None = None
+    # The warning in words when the value lies outside the bounds; the value
+    # is kept, never clamped.
+    outOfBounds: str | None = None
+
+
+class Override(BaseModel):
+    """A person's change to one parameter of one scope: a named assumption,
+    kept in the browser that typed it and sent with the run (D3)."""
+
+    scope: str
+    key: str
+    value: float | str
+    low: float | None = None
+    high: float | None = None
+    by: str
+    at: str
+    note: str | None = None
+
+    @field_validator("value", "low", "high", mode="before")
+    @classmethod
+    def _no_true_or_false(cls, v: Any) -> Any:
+        # OF-BLD-020 §2.R (finding 6): pydantic reads a JSON true or false as
+        # 1.0 or 0.0 before any check sees it, a number nobody typed.
+        if isinstance(v, bool):
+            raise ValueError("an override's value, low and high are numbers or words, never true or false")
+        return v
+
+
+class ParamScope(BaseModel):
+    """GET /api/params/{scope}: a scope's specs with their current values."""
+
+    scope: str
+    kind: ParamScopeKind
+    title: str
+    specs: list[ParameterSpec]
+    values: list[ParameterValue]
+    # The keys with no source yet.
+    waiting: list[str]
+    notes: list[str] = Field(default_factory=list)
+
+
+class ParamResolveRequest(BaseModel):
+    """POST /api/params/{scope}/resolve. Runs nothing."""
+
+    overrides: list[Override] = Field(default_factory=list)
+    # A Proforma scenario made in the browser names the shelf flowsheet it
+    # runs, as ProformaRunRequest.flowsheet does; a seed scenario needs none.
+    flowsheet: str | None = None
+    # A strain filter on the records, as GET /api/proforma/bind takes it.
+    host: str | None = None
+    # The fermOS fits a person chose, by parameter key (artifact ids), as
+    # ProformaRunRequest.fits carries them.
+    fits: dict[str, str] = Field(default_factory=dict)
+    # fermOS's vessel scope (OF-BLD-020 §4.1): the aerated design a scope is
+    # for; None is BioSTEAM's own default design. An anaerobic design takes none.
+    vesselType: Literal["stirred-tank", "bubble-column"] | None = None
+    # fermOS's family scope (OF-BLD-020 §3.2), bound as a simulation binds:
+    # the strain whose records bind (None: every strain of the program's
+    # organism), the product, the sugar the records must name, the fit a
+    # person chose, where the simulation starts (`records`, `fit` or
+    # `simulation:<artifact id>`), the run-length preset, and the program
+    # switch, which decides what the evidence pool shows.
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    fit: str | None = None
+    startFrom: str | None = None
+    durationPreset: Literal["until-sugar-runs-out", "fit-length"] | None = None
+    includeArchived: bool = False
+
+
+class ParamResolveResult(BaseModel):
+    scope: str
+    values: list[ParameterValue]
+    waiting: list[str]
+    # What the overrides would add to a run's basis, each an `assumption`
+    # naming the person and what it rests on: the inputs a run of the scope
+    # writes for them, built by the function the run builds them with (a
+    # Proforma scope's value, low and high, and the line saying the run read
+    # overrides; OF-BLD-020 §2.R).
+    basisInputs: list[BasisInput]
+    # A value outside its bounds, in words.
+    warnings: list[str]
+    # What the scope's provider says of its values (as ParamScope.notes).
+    notes: list[str] = Field(default_factory=list)
+
+
+# ── fermOS's vessel on BioSTEAM (OF-BLD-020 §4.1, D7) ──────────────────
+#
+# A vessel is designed for a kept simulation (or, anaerobic only, a kinetic
+# fit or forecast) in the Proforma worker: BioSTEAM's AeratedBioreactor or
+# NRELAnaerobicBatchBioreactor, every design parameter a ParameterValue with
+# its source, and one `fermos.vessel` artifact.
+
+
+class VesselRequest(BaseModel):
+    """POST /api/fermos/vessel. Exactly one of `simulation` and `fit`."""
+
+    # A `fermos.simulation` artifact id.
+    simulation: str | None = None
+    # A `kinetic_fit` or `growth_forecast` artifact id, read through
+    # proforma.fit_info for titre, yield and batch time: anaerobic only.
+    fit: str | None = None
+    # The aerated design; None is BioSTEAM's own default. An anaerobic
+    # design takes none. A person's override of `design` in the panel says
+    # the same in BioSTEAM's words, and the two must agree (§4.2).
+    vesselType: Literal["stirred-tank", "bubble-column"] | None = None
+    # A kLa correlation by the name BioSTEAM registers it ('Riet', 'Dewes'),
+    # one its class runs for the design; a convention of this request, as
+    # fermos_vessel names it (OF-BLD-020 §4.2, D13). None is the class's own.
+    klaMethod: str | None = None
+    # A person's changes, each a named assumption (D3), scope
+    # `fermos:vessel:<simulation or fit id>`.
+    overrides: list[Override] = Field(default_factory=list)
+    includeArchived: bool = False
+
+
+class VesselDesignRow(BaseModel):
+    """One line of the design table, read from BioSTEAM's objects."""
+
+    label: str
+    value: float | str | bool | None
+    # BioSTEAM's unit for it ('m3', 'hr', 'kW', 'kJ/hr'); empty for a count or a word.
+    unit: str
+    # Where it was read: a design_results key, an auxiliary unit, an attribute.
+    readFrom: str
+
+
+class VesselOxygen(BaseModel):
+    """The oxygen balance over the batch: the simulated uptake against the
+    transfer the vessel BioSTEAM sized gives (D7)."""
+
+    # Hours, and the simulated uptake at each, in `unit`.
+    t: list[float]
+    our: list[float]
+    # The transfer while the vessel reacts: kLa times the log-mean driving
+    # force the class sizes with, in `unit`.
+    otr: float
+    unit: str
+    # [[from, to], …] hours the simulated uptake rises above `otr`.
+    short: list[list[float]]
+    # kLa achieved and what the peak would need, in `kLaUnit`; None with no aeration.
+    kLa: float | None
+    kLaNeededAtPeak: float | None
+    kLaUnit: str
+    # BioSTEAM's correlation, by its registered name ('Riet', 'Dewes').
+    method: str | None
+    aerated: bool
+    # 'peak' or 'batch-average': what the air was sized for.
+    oxygenBasis: str | None = None
+    # The uptake the air was sized for, and the one the reaction's yields
+    # balance (before the scale), per working volume, in `unit`.
+    targetUptake: float | None = None
+    sized: float | None = None
+    balancedUptake: float | None = None
+    # The factor the reaction's oxygen was scaled by.
+    scale: float
+    # Oxygen saturation at the sparged gas, the broth at θ of it, and the
+    # log-mean driving force, mmol L⁻¹.
+    cStar: float | None = None
+    cL: float | None = None
+    drivingForce: float | None = None
+    # The reaction's oxygen as its yields balance it, kmol h⁻¹.
+    reactionO2KmolPerH: float | None = None
+    # OF-BLD-020 §4.R. The oxygen the vessel's reaction consumes as designed
+    # (after the scale), kmol h⁻¹; the oxygen the simulation took up, per
+    # hour of the plant (the trapezoid integral of its uptake over the batch
+    # to harvest, times each vessel's working volume and the vessels, over
+    # the cycle), kmol h⁻¹; and the floor at or below which BioSTEAM's
+    # AeratedBioreactor sizes no air, read from its code, kmol h⁻¹.
+    scaledO2KmolPerH: float | None = None
+    simulatedO2KmolPerH: float | None = None
+    floorKmolPerH: float | None = None
+
+
+class VesselHeat(BaseModel):
+    """The vessel's duty as BioSTEAM found it, beside a cross-check from the
+    oxygen the simulation took up at a stated convention (D7, §4.R)."""
+
+    bst: float
+    convention: float | None = None
+    conventionNote: str
+    unit: str = "kJ/hr"
+    # OF-BLD-020 §4.R. How BioSTEAM found `bst`: 'heats-of-formation' (the
+    # enthalpy and heats of formation out less in) or 'forced-per-oxygen'
+    # (a person's Q_O2_consumption times the oxygen the vessel consumed,
+    # `consumedKmolPerH`, kmol h⁻¹); None on a design kept before §4.R.
+    method: str | None = None
+    consumedKmolPerH: float | None = None
+    # The oxygen the convention's estimate rests on, kmol h⁻¹: the
+    # simulation's (VesselOxygen.simulatedO2KmolPerH).
+    oxygenKmolPerH: float | None = None
+    # BioSTEAM's duty in words: which way it was found, and whose heat per
+    # oxygen when a person forced one.
+    dutyNote: str | None = None
+
+
+class VesselCostItem(BaseModel):
+    purchase: float
+    installed: float
+
+
+class VesselCost(BaseModel):
+    """BioSTEAM's own cost correlations, read; nothing summed here."""
+
+    purchase: float
+    installed: float
+    byItem: dict[str, VesselCostItem]
+    # USD per hour.
+    utility: float
+    costIndex: float
+    # The year BioSTEAM's source says its default index is of; None when the
+    # index set is not that default.
+    costIndexYear: int | None = None
+    note: str
+
+
+class VesselDesign(BaseModel):
+    """POST /api/fermos/vessel: one `fermos.vessel` artifact, read."""
+
+    artifactId: str
+    provenance: Provenance
+    createdAt: str
+    # The simulation or fit the vessel was designed for, and its tool.
+    source: str
+    sourceTool: str
+    aerobic: bool
+    # BioSTEAM's class, and the unit id it was built under.
+    unitClass: str
+    unitId: str
+    # 'stirred-tank' or 'bubble-column' for an aerated vessel; None anaerobic.
+    vesselType: str | None = None
+    design: list[VesselDesignRow]
+    # None for an anaerobic vessel, and `oxygenNote` says so.
+    oxygen: VesselOxygen | None = None
+    oxygenNote: str | None = None
+    heat: VesselHeat
+    cost: VesselCost
+    # Every design parameter with its source (D2).
+    parameters: list[ParameterValue]
+    # What the unit held when it was simulated, read back.
+    used: dict[str, float | str | bool | None]
+    # How the broth fed per hour was found (plant scale or batch volume).
+    scale: dict[str, Any]
+    # The reaction set built from what the batch made.
+    reaction: dict[str, Any]
+    flags: list[str] = Field(default_factory=list)
+    versions: dict[str, str]
+    # The design as one citable value with its basis (OF-BLD-020 §4.2): its
+    # id is the artifact's, as fermos_vessel returns it to Postdoc; the
+    # screen reads the basis from it.
+    evidence: Evidence
+
+
+class VesselSummary(BaseModel):
+    """GET /api/fermos/vessels: one kept `fermos.vessel` artifact."""
+
+    artifactId: str
+    provenance: Provenance
+    createdAt: str
+    source: str
+    sourceTool: str
+    unitClass: str
+    vesselType: str | None = None
+    vessels: float | None = None
+    volume: float | None = None
+    installed: float | None = None
+
+
+# ── fermOS simulates (OF-BLD-020 §3.1, D1, D5) ─────────────────────────
+#
+# A model family (kinetics.py) is code with its equations in its docstring
+# and its parameters declared as ParameterSpecs; a simulation resolves them
+# with their sources (params.resolve), integrates on scipy, and keeps one
+# `fermos.simulation` artifact whose basis names every parameter, start
+# value and override, and whose provenance is basis_provenance over them
+# (a person's override makes it `demo`).
+
+
+class FamilyInfo(BaseModel):
+    """GET /api/fermos/families: a model family as the panel shows it."""
+
+    id: str
+    title: str
+    # One plain line: what it is.
+    what: str
+    # Its equations, plain Unicode, as its docstring writes them.
+    equations: str
+    states: list[str]
+    # g L⁻¹ for a concentration, L for V.
+    stateUnits: dict[str, str]
+    # A socket is declared with its parameters and refuses to run.
+    socket: bool
+    specs: list[ParameterSpec]
+    # The panel's groups this family's specs fall into, in order.
+    groups: list[str]
+    # The program the family is archived with (storage_v1: PHA), or None for
+    # a general one.
+    program: str | None = None
+
+
+class SimulationRequest(BaseModel):
+    """POST /api/fermos/simulate."""
+
+    family: str
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    # A person's changes, each an Override of scope fermos:family:<family>.
+    overrides: list[Override] = Field(default_factory=list)
+    fitArtifact: str | None = None
+    # `records`, `fit`, or `simulation:<artifact id>`.
+    startFrom: str = "records"
+    durationPreset: Literal["until-sugar-runs-out", "fit-length"] = "until-sugar-runs-out"
+    includeArchived: bool = False
+    # A parameter bound to exactly these records of the evidence pool, by
+    # spec key (OF-BLD-020 §3.4, D13): each must be in the pool, carry a
+    # field the parameter binds from, pass the aggregate gate and convert
+    # into its unit, or the request is refused in words. Ids, never values.
+    recordsByParam: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class FermosBinding(BaseModel):
+    """GET /api/fermos/bind (OF-BLD-020 §3.2): a family's parameters bound
+    for a strain, product and sugar from a fit, the records, a kept
+    simulation and the conventions, starting no integration."""
+
+    values: list[ParameterValue]
+    # The keys a simulation would refuse for, each named with the field that
+    # would bind it in its value's detail.
+    waiting: list[str]
+    # What the family would refuse these values for though nothing waits (a
+    # start value below zero, a yield of zero, a run length of none), in the
+    # words the run refuses with (OF-BLD-020 §8.R, findings 12 and 14);
+    # None when a run would go ahead.
+    refused: str | None = None
+    # What bound from where: the program's papers, whose records, the sugar,
+    # the fit and the kept simulation, and what they could not give.
+    notes: list[str] = Field(default_factory=list)
+
+
+class OxygenUptake(BaseModel):
+    """OUR(t) = qO2·X on the time course's hours, and its peak read on the
+    solver's own steps."""
+
+    t: list[float]
+    value: list[float]
+    unit: str
+    peak: float
+    peakH: float | None = None
+    # Why it is zero, when the culture is anaerobic.
+    note: str | None = None
+
+
+class MassBalance(BaseModel):
+    # The larger relative error of the two checks (kinetics.mass_balance).
+    closure: float
+    ok: bool
+    note: str
+
+
+class SimulationCeilingRow(BaseModel):
+    """Yp/s beside the newest stored geneOS ceiling of one host model on
+    the sugar, read and never clamped."""
+
+    modelId: str
+    modelName: str
+    match: Literal["strain", "species"]
+    matchWords: str
+    artifactId: str
+    provenance: Provenance
+    ceilingGPerG: float
+    ypsGPerG: float | None = None
+    yieldAchievedGPerG: float | None = None
+    above: bool
+    words: str
+
+
+class SimulationCeiling(BaseModel):
+    product: str
+    sugar: str
+    strain: str
+    rows: list[SimulationCeilingRow] = Field(default_factory=list)
+    flagged: bool = False
+    # Why no row, in words: no host model, or no ceiling on file yet.
+    empty: str | None = None
+    # Where a ceiling is computed (geneOS → Model).
+    computeAt: str
+
+
+class SteadyState(BaseModel):
+    """chemostat_v1's steady state and washout (D5 as built, 6)."""
+
+    washout: bool
+    dilutionRate: float
+    # The general washout rate, μ(Sf, P = 0) − kd, and D5's expression.
+    dWashout: float
+    dWashoutD5: float
+    X: float
+    S: float
+    P: float
+    # D·P at the steady state, g L⁻¹ h⁻¹; None at washout.
+    productivity: float | None = None
+    words: str
+    # OF-BLD-020 §3.R (finding 1): the most μ(S, P = 0) − kd reaches over S
+    # from 0 to Sf, at or above which no culture holds; whether a culture
+    # holds and washout is stable too (D ≥ dWashout), so a run reaches one or
+    # the other by where it starts; and which one this run's path reached
+    # by its end (None: still on its way to one).
+    dWashoutMax: float | None = None
+    bistable: bool = False
+    reached: Literal["culture", "washout"] | None = None
+
+
+class SimulationResult(BaseModel):
+    """One kept `fermos.simulation` artifact as every reader reads it."""
+
+    artifactId: str
+    provenance: Provenance
+    family: str
+    title: str
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    parameters: list[ParameterValue]
+    start: list[ParameterValue]
+    # {"t": hours, "<state>": values} in `units`.
+    series: dict[str, list[float]]
+    units: dict[str, str]
+    our: OxygenUptake
+    # The state where the integration ended, and its hour as "t".
+    end: dict[str, float]
+    sugarRunsOutH: float | None = None
+    harvestH: float
+    # The product (the store, for storage_v1) at harvest, g L⁻¹.
+    finalTitre: float | None = None
+    # Product made over sugar used to harvest, g g⁻¹.
+    yieldAchieved: float | None = None
+    # The final titre over the harvest hour, g L⁻¹ h⁻¹.
+    productivity: float | None = None
+    massBalance: MassBalance
+    ceiling: SimulationCeiling | None = None
+    flags: list[str] = Field(default_factory=list)
+    aerobic: bool
+    steadyState: SteadyState | None = None
+    notes: list[str] = Field(default_factory=list)
+    basis: ComputedBasis
+
+
+class SimulationSummary(BaseModel):
+    """GET /api/fermos/simulations: one kept simulation, newest first."""
+
+    artifactId: str
+    family: str
+    title: str
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    finalTitre: float | None = None
+    harvestH: float | None = None
+    createdAt: str
+    provenance: Provenance
+
+
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()
+# ProformaRunRequest names Override, which is defined further down (OF-BLD-020 §2.2).
+ProformaRunRequest.model_rebuild()
 AnswerPlan.model_rebuild()
 ToolResult.model_rebuild()

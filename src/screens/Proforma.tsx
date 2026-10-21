@@ -31,7 +31,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, FlaskConical, GitCompare, LineChart, Pin, PinOff, Play, Plus } from 'lucide-react';
 import type { Artifact, FlowsheetInfo, ProformaScenarioInfo, Scenario } from '@/data/types';
 import { PROGRAMS, PROGRAM_BY_ID } from '@/data/programs';
-import { programOf, useProgramFilter, useStore } from '@/store';
+import { overridesFor, programOf, proformaScope, useProgramFilter, useStore } from '@/store';
 import { href } from '@/router';
 import { evaluateGrid } from '@/engine/grids';
 import { fmt } from '@/engine/units';
@@ -293,7 +293,8 @@ function BiosteamCard({
   /** The service's binding of this scenario, when it holds it. */
   info: ProformaScenarioInfo | null;
 }) {
-  const assumptions = useStore((s) => s.proformaAssumptions[scenario.id]);
+  // OF-BLD-020 §2.2: a person's changes to the scenario's inputs, its scope's overrides.
+  const overrides = useStore(overridesFor(proformaScope(scenario.id)));
   const fits = useStore((s) => s.proformaFits[scenario.id]);
   const madeHere = useStore((s) => s.createdScenarioIds.includes(scenario.id));
   const showArchived = useStore((s) => s.showArchived);
@@ -347,7 +348,7 @@ function BiosteamCard({
 
   const flowsheet = shelf.find((f) => f.id === flowsheetId) ?? null;
   const asked = madeHere && !info;
-  const counts = asked && !made ? null : inputCounts(scenario, info ?? made?.info ?? null, shelf, assumptions ?? [], fits ?? {});
+  const counts = asked && !made ? null : inputCounts(scenario, info ?? made?.info ?? null, shelf, overrides, fits ?? {});
   const price = art ? runPrice(art, shelf) : null;
   return (
     <Card className="p-4 flex flex-col" data-testid="biosteam-card" data-scenario={scenario.id}>

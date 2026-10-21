@@ -53,8 +53,12 @@ from .models import (
     FermosFitResponse,
     FetchResult,
     ForecastRequest,
+    ParamResolveRequest,
     ProformaRunRequest,
+    SimulationRequest,
     ThermoPropsRequest,
+    VesselDesign,
+    VesselRequest,
     ForecastResult,
     GeneosModelInfo,
     GeneosResult,
@@ -331,7 +335,7 @@ def fermos_fit(req: FermosFitRequest) -> FermosFitResponse:
     """Fit a run's series. The browser sends them; the service keeps the
     fits as artifacts (a sample run's are kept nowhere) and nothing else."""
     try:
-        return fermos.fit(req.depositionId, req.series, sample=req.sample)
+        return fermos.fit(req.depositionId, req.series, sample=req.sample, family=req.family)
     except fermos.FitRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -342,21 +346,101 @@ def fermos_forecast(req: ForecastRequest) -> ForecastResult:
     parameter the run did not identify, and what run would."""
     try:
         return fermos.forecast_run(fit_artifact=req.fitArtifactId, fit_inline=req.fit if req.sample else None,
-                                   start=req.start, changed_by=req.changedBy, duration_h=req.durationH, sample=req.sample)
+                                   start=req.start, changed_by=req.changedBy, duration_h=req.durationH, sample=req.sample,
+                                   duration_by=req.durationBy)
     except fermos.FitRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+# ── fermOS simulates (OF-BLD-020 §3.1) ─────────────────────────────────
+
+
+@app.get("/api/fermos/families")
+def fermos_families(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The model families (`FamilyInfo`): each with its equations, states,
+    parameters (ParameterSpecs) and the panel's groups. A family of an
+    archived program (storage_v1, PHA's) is left out unless asked."""
+    return [f.model_dump(mode="json") for f in fermos.families(includeArchived)]
+
+
+@app.get("/api/fermos/families/{family_id}")
+def fermos_family(family_id: str) -> dict:
+    """One model family by id, archived or not; 404 in words for none."""
+    from . import kinetics
+
+    try:
+        return fermos.family_info(family_id).model_dump(mode="json")
+    except kinetics.FamilyRefused as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@app.post("/api/fermos/simulate")
+def fermos_simulate(req: SimulationRequest) -> dict:
+    """Simulate a model family (`SimulationResult`) and keep it as one
+    `fermos.simulation` artifact. Each parameter resolves with its source: a
+    person's override (an assumption by name, so the result is `demo`), else
+    the family's stated convention. 422 in words for a parameter that waits
+    (named with what would bind it), the light socket, a bad override, or a
+    run that cannot end."""
+    try:
+        return fermos.simulate(req).model_dump(mode="json")
+    except fermos.SimulationRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/fermos/bind")
+def fermos_bind(family: str, strain: str | None = None, product: str | None = None, sugar: str | None = None,
+                fit: str | None = None, startFrom: str = "records",  # noqa: N803 (the wire name)
+                durationPreset: str = "until-sugar-runs-out", includeArchived: bool = False,  # noqa: N803
+                overrides: str | None = None) -> dict:
+    """A family's parameters bound for a strain, product and sugar
+    (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
+    (`?fit=`), the records of the evidence pool the switch shows through the
+    aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
+    spec's convention, with its source; what waits, each named with the field
+    that would bind it; and notes saying what bound from where. `?overrides=`
+    (a JSON list of the person's overrides of `fermos:family:<family>`, as
+    the simulation would carry them; OF-BLD-020 §3.3) lays them on, so
+    `waiting` is what Simulate would refuse for. Starts no integration and
+    keeps nothing. 404 for a family no one declared; 422 in words for a fit
+    or simulation not on file, a fit of another family, a sugar or id that is
+    not one, or an override of another scope."""
+    from . import kinetics
+
+    if family not in kinetics.FAMILIES:
+        raise HTTPException(status_code=404, detail=f"there is no model family {family!r}: the families are "
+                                                    f"{', '.join(kinetics.FAMILIES)}")
+    if durationPreset not in ("until-sugar-runs-out", "fit-length"):
+        raise HTTPException(status_code=422, detail=f"a run-length preset is until-sugar-runs-out or fit-length; "
+                                                    f"{durationPreset!r} is neither")
+    req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar, fitArtifact=fit,
+                            startFrom=startFrom, durationPreset=durationPreset, includeArchived=includeArchived,
+                            overrides=_overrides_param(overrides))
+    try:
+        return fermos.bind(req).model_dump(mode="json")
+    except fermos.SimulationRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/fermos/simulations")
+def fermos_simulations(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The kept simulations, newest first (`SimulationSummary`); one of an
+    archived program is left out unless asked. A read: it runs nothing."""
+    return [s.model_dump(mode="json") for s in fermos.simulations(includeArchived)]
+
+
 @app.get("/api/fermos/fits")
-def fermos_fits(flowsheet: str) -> list[dict]:
-    """The kinetic fits and forecasts fermOS keeps, newest first, each with
-    what it can feed a shelf flowsheet's titre, yield and productivity and
-    why not (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
+def fermos_fits(flowsheet: str, includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The kinetic fits, forecasts and simulations fermOS keeps (a
+    simulation since OF-BLD-020 §3.3), newest first, each with what it can
+    feed a shelf flowsheet's titre, yield and productivity and why not
+    (OF-BLD-019 §5.1, D10); one of an archived program left out unless
+    `?includeArchived=true` (§3.R). A person picks one on the scenario page;
     a read: it keeps nothing. A flowsheet a scenario cannot run is a 422."""
     from . import proforma
 
     try:
-        return [f.model_dump(mode="json") for f in proforma.fermos_fits(flowsheet)]
+        return [f.model_dump(mode="json") for f in proforma.fermos_fits(flowsheet, includeArchived)]
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -392,6 +476,23 @@ def _assumptions_param(raw: str | None) -> list:
     except (ValidationError, RecursionError):
         raise HTTPException(status_code=422, detail="assumptions is a JSON list of assumptions, each with key, value, "
                                                     "low, high, by and at, as a run takes them") from None
+
+
+def _overrides_param(raw: str | None) -> list:
+    """`?overrides=` on GET /api/proforma/bind and the ceiling check: a JSON
+    list of a person's overrides from the parameter panel (OF-BLD-020 D3),
+    as ProformaRunRequest.overrides carries them."""
+    from pydantic import TypeAdapter, ValidationError
+
+    from .models import Override
+
+    if not raw:
+        return []
+    try:
+        return TypeAdapter(list[Override]).validate_json(raw)
+    except (ValidationError, RecursionError):
+        raise HTTPException(status_code=422, detail="overrides is a JSON list of overrides, each with scope, key, value, "
+                                                    "by and at, as a run takes them") from None
 
 
 @app.get("/api/proforma/status")
@@ -479,19 +580,25 @@ def proforma_scenarios(host: str | None = None, includeArchived: bool = False) -
 
 @app.get("/api/proforma/bind")
 def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool = False,  # noqa: N803
-                  fits: str | None = None) -> dict:
+                  fits: str | None = None, overrides: str | None = None) -> dict:
     """A shelf flowsheet's inputs bound, as a scenario a person made in the
     browser shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
     lays on the fermOS fits a person chose (§5.1), a JSON object of input
-    key to artifact id. A reference biorefinery, the toy, an unknown id, a
-    flowsheet of a program the switch hides, or a fit that cannot feed its
-    input is a 422 in words. A read: it starts no simulator."""
+    key to artifact id, and `?overrides=` a person's overrides of one
+    scenario's scope over both (OF-BLD-020 D3), a JSON list. A reference
+    biorefinery, the toy, an unknown id, a flowsheet of a program the switch
+    hides, a fit that cannot feed its input, or an override that cannot
+    stand is a 422 in words. A read: it starts no simulator."""
     from . import proforma
 
     chosen = _fits_param(fits)
+    typed = _overrides_param(overrides)
     try:
+        values, _ = proforma.named_values(None, typed)
+        if values:
+            proforma._check_keys(proforma.runnable(flowsheet), values)
         return proforma.bind_flowsheet(flowsheet, include_archived=includeArchived, host=host,
-                                       fits=chosen).model_dump(mode="json")
+                                       assumptions=values, fits=chosen).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -499,22 +606,24 @@ def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool
 @app.get("/api/proforma/ceiling-check")
 def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: str | None = None,  # noqa: N803
                            includeArchived: bool = False, fits: str | None = None,  # noqa: N803
-                           assumptions: str | None = None) -> dict:
+                           assumptions: str | None = None, overrides: str | None = None) -> dict:
     """A scenario's fermenter yield read against the newest stored geneOS
     ceiling of each shelf model of its organism, on its flowsheet's sugar
     (OF-BLD-019 §5.2, D11): `CeilingCheck`. A seed scenario by its id, one
     made in the browser by the flowsheet it names; `?fits=` and
-    `?assumptions=` (JSON) bind its yield as its page binds it. A yield above
-    a ceiling is flagged, never clamped. A read: it keeps nothing, starts no
-    worker and changes no binding or run. Refused in words (422) as the
-    binding is."""
+    `?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,
+    and `?assumptions=`, the older field, is read as overrides for one
+    release. A yield above a ceiling is flagged, never clamped. A read: it
+    keeps nothing, starts no worker and changes no binding or run. Refused
+    in words (422) as the binding is."""
     from . import proforma
 
     chosen = _fits_param(fits)
     typed = _assumptions_param(assumptions)
+    over = _overrides_param(overrides)
     try:
         return proforma.ceiling_check(scenarioId, flowsheet, include_archived=includeArchived, host=host,
-                                      assumptions=typed, fits=chosen).model_dump(mode="json")
+                                      assumptions=typed, fits=chosen, overrides=over).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -549,6 +658,140 @@ def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
         raise HTTPException(status_code=422, detail="a read of a scenario's runs names the scenario it belongs to")
     art = proforma.latest_run(sid)
     return {"scenarioId": sid, "artifact": art.model_dump(mode="json") if art else None}
+
+
+# ── one parameter panel (OF-BLD-020 §2.1, D2–D4) ────────────────────────
+
+
+@app.get("/api/params/{scope:path}")
+def params_scope(scope: str, flowsheet: str | None = None, host: str | None = None, fits: str | None = None,
+                 vesselType: str | None = None, strain: str | None = None, product: str | None = None,  # noqa: N803
+                 sugar: str | None = None, fit: str | None = None, startFrom: str | None = None,  # noqa: N803
+                 durationPreset: str | None = None, includeArchived: bool = False) -> dict:  # noqa: N803 (the wire name)
+    """A scope's parameters (`ParamScope`): every spec with its bounds and
+    their reason, and its value as the service binds it now, with its
+    source. `proforma:<scenario id>` is a seed scenario, or with
+    `?flowsheet=` a scenario made in a browser; `?host=` and `?fits=` (JSON)
+    bind as `/api/proforma/bind` does. Binding only: it starts no worker,
+    integrates nothing and keeps nothing. `fermos:vessel:<id>` (with
+    `?vesselType=`) reads its class's defaults through the Proforma worker,
+    which a read starts when it is cold (OF-BLD-020 §4.1). `fermos:family:<id>`
+    binds as GET /api/fermos/bind does, from `?strain=`, `?product=`,
+    `?sugar=`, `?fit=`, `?startFrom=`, `?durationPreset=` and
+    `?includeArchived=` (OF-BLD-020 §3.2). 404 for a scope no provider here
+    knows; 422 in words for a malformed one or a refused binding; 409 for an
+    artifact the scope names that is damaged on disk, as the vessel's own route
+    answers it (§2.R, finding 17); 503 when the worker cannot answer."""
+    from . import artifacts, params
+
+    if vesselType not in (None, "stirred-tank", "bubble-column"):
+        raise HTTPException(status_code=422, detail=f"a vessel type is stirred-tank or bubble-column; {vesselType!r} is neither")
+    if durationPreset not in (None, "until-sugar-runs-out", "fit-length"):
+        raise HTTPException(status_code=422, detail=f"a run-length preset is until-sugar-runs-out or fit-length; "
+                                                    f"{durationPreset!r} is neither")
+    req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits), vesselType=vesselType,
+                              strain=strain, product=product, sugar=sugar, fit=fit, startFrom=startFrom,
+                              durationPreset=durationPreset, includeArchived=includeArchived)
+    try:
+        return params.scope(scope, req).model_dump(mode="json")
+    except params.ScopeUnknown as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except params.ParamRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
+
+
+@app.post("/api/params/{scope:path}/resolve")
+def params_resolve(scope: str, req: ParamResolveRequest) -> dict:
+    """A person's overrides laid on a scope's values (`ParamResolveResult`):
+    each override an `assumption` by the person it names, the basis inputs
+    the overrides would add to a run, and every value outside its bounds in
+    words (kept, never clamped). The basis inputs are the ones a run of the
+    scope writes for those overrides (§2.R). Runs nothing and keeps nothing:
+    the service keeps no override (D3). 404, 422, 409 and 503 as the GET
+    answers them; a `fermos:vessel:` scope may start the worker as the GET
+    may."""
+    from . import artifacts, params
+
+    try:
+        return params.resolve_scope(scope, req).model_dump(mode="json")
+    except params.ScopeUnknown as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except params.ParamRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
+
+
+# ── fermOS sizes the vessel on BioSTEAM (OF-BLD-020 §4.1, D7) ──────────
+
+
+@app.get("/api/fermos/vessel/specs")
+def fermos_vessel_specs(simulation: str | None = None, fit: str | None = None,
+                        vesselType: str | None = None) -> dict:  # noqa: N803 (the wire name)
+    """The vessel scope `fermos:vessel:<simulation or fit id>` (a
+    `ParamScope`): every design parameter of Appendix 2 §C with its bounds
+    and their reason, and its value with its source: BioSTEAM's own default
+    for the class, read in the worker (which this starts when it is cold), the
+    simulation's harvest hour and oxygen uptake, or waiting for a named person
+    (plant scale or batch volume). 404 for an artifact not on file; 422 in
+    words for one no vessel is designed for; 503 when the worker cannot
+    answer."""
+    from . import artifacts, vessel
+
+    named = [x for x in (simulation, fit) if x]
+    if len(named) != 1:
+        raise HTTPException(status_code=422, detail="name one simulation (?simulation=) or one fit (?fit=)")
+    if vesselType not in (None, "stirred-tank", "bubble-column"):
+        raise HTTPException(status_code=422, detail=f"a vessel type is stirred-tank or bubble-column; {vesselType!r} is neither")
+    from . import params
+
+    try:
+        return vessel.scope(named[0], vesselType).model_dump(mode="json")
+    except params.ScopeUnknown as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except params.ParamRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
+
+
+@app.post("/api/fermos/vessel", response_model=VesselDesign)
+def fermos_vessel(req: VesselRequest) -> VesselDesign:
+    """Design the vessel a simulation (or, anaerobic only, a fit) needs, in
+    the Proforma worker on BioSTEAM: one `fermos.vessel` artifact, computed
+    or returned as kept for the same basis. 422 in words for a design that
+    cannot be made as asked (no plant scale and no batch volume, a fit asked
+    for an aerobic design, an artifact not on file, an override that cannot
+    stand, BioSTEAM's own refusal); 409 for a file damaged on disk; 503 when
+    the worker cannot answer."""
+    from . import artifacts, vessel
+
+    try:
+        return vessel.design(req)
+    except (vessel.VesselRefused, vessel.VesselNotFound) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
+
+
+@app.get("/api/fermos/vessels")
+def fermos_vessels(includeArchived: bool = False) -> list[dict]:
+    """Every kept vessel design, newest first (`VesselSummary`): a read,
+    which starts no simulator. One for an archived program's simulation is
+    left out unless asked (OF-BLD-020 §8.R, finding 3)."""
+    from . import vessel
+
+    return [v.model_dump(mode="json") for v in vessel.designs(includeArchived)]
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────

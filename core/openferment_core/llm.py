@@ -317,10 +317,14 @@ def _reserve(model: str, request: dict[str, Any], max_tokens: int, spent: Usage,
         ) from None
 
 
-def strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
+def strict_schema(schema: dict[str, Any], *, keep_maps: bool = False) -> dict[str, Any]:
     """A tool-style JSON schema made acceptable to structured outputs: every
     object closed (`additionalProperties: false`) and the keywords it rejects
-    moved into the description. The input is left untouched."""
+    moved into the description. The input is left untouched. With
+    `keep_maps` (a loose tool's input, OF-BLD-020 §3.4) an object whose
+    `additionalProperties` is a schema stays a map, that schema kept and
+    walked, so a model reads `recordsByParam` as keys to record ids and a
+    write's `fields` as names to words, not as objects that take nothing."""
     out = copy.deepcopy(schema)
 
     def walk(node: Any) -> None:
@@ -339,7 +343,11 @@ def strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
             isinstance(node.get("type"), list) and "object" in node["type"]
         ) or "properties" in node
         if is_object:
-            node["additionalProperties"] = False
+            extra = node.get("additionalProperties")
+            if keep_maps and isinstance(extra, dict):
+                walk(extra)
+            else:
+                node["additionalProperties"] = False
         for key in ("properties", "$defs", "definitions"):
             if isinstance(node.get(key), dict):
                 for child in node[key].values():
@@ -526,8 +534,9 @@ def _block_dict(block: Any) -> dict[str, Any]:
 
 def tool_param(name: str, description: str, input_schema: dict[str, Any], strict: bool = True) -> dict[str, Any]:
     """A tool as the API takes it: strict unless the registry says otherwise,
-    its schema made acceptable either way."""
-    return {"name": name, "description": description, "input_schema": strict_schema(input_schema), "strict": strict}
+    its schema made acceptable either way; a loose tool keeps its maps."""
+    return {"name": name, "description": description,
+            "input_schema": strict_schema(input_schema, keep_maps=not strict), "strict": strict}
 
 
 def converse(

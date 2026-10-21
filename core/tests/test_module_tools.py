@@ -293,3 +293,91 @@ def test_the_switch_is_not_a_tool_input(pool):  # noqa: F811
     refused = tools.run("geneos_read", {"ids": [], "words": "", "kind": "", "state": "", "limit": 5,
                                         "includeArchived": True}, ctx_for(pool, include_archived=False))
     assert refused.error and "includeArchived" in refused.error
+
+
+# ── fermOS reads its simulations (OF-BLD-020 §3.4) ─────────────────────────
+
+
+def _numbers_in(value):
+    """Every int or float under a row's detail (a boolean is a flag, not one)."""
+    if isinstance(value, bool) or value is None or isinstance(value, str):
+        return []
+    if isinstance(value, (int, float)):
+        return [value]
+    items = value.values() if isinstance(value, dict) else value
+    return [n for v in items for n in _numbers_in(v)]
+
+
+def _kept_simulation(tmp_path, monkeypatch):
+    """A batch_v1 simulation on a named person's STAND-IN values alone, kept
+    in a throwaway store: test_fermos_bind's typed values, none a result."""
+    from openferment_core import artifacts, fermos, intake
+    from openferment_core.models import SimulationRequest
+    from test_fermos_bind import TYPED, pool_of, typed
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    r = fermos.simulate(SimulationRequest(family="batch_v1", strain="s-cerevisiae-cenpk113-7d", product="ethanol",
+                                          sugar="glucose", overrides=typed(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3,
+                                                                           s0=50.0, **TYPED)), by_pool=pool_of())
+    return artifacts.get(r.artifactId)
+
+
+def test_fermos_reads_a_kept_simulation_as_its_own_kind_with_no_number_in_its_detail(pool, tmp_path, monkeypatch):  # noqa: F811
+    art = _kept_simulation(tmp_path, monkeypatch)
+    # The stored word says computed; the inputs say a person typed them, and the row says what they say now.
+    doctored = art.model_copy(update={"provenance": "computed"})
+    ctx = ctx_for(pool, artifacts=lambda: [doctored])
+    r = read("fermos", ctx, kind="simulation")
+    assert r.error is None
+    [row] = r.rows
+    assert row.ref == f"fermos/simulation/{art.id}" and row.kind == "simulation" and row.id == art.id
+    assert row.label == "Batch (batch_v1) simulation of Saccharomyces cerevisiae CEN.PK113-7D"
+    assert (row.state, row.status, row.provenance) == ("open", "computed", "demo")
+    assert row.detail["family"] == "batch_v1" and row.detail["strain"] == "s-cerevisiae-cenpk113-7d"
+    assert set(row.detail["boundBy"]["assumption"]) >= {"mu_max", "ks", "x0"} and "convention" in row.detail["boundBy"]
+    assert _numbers_in(row.detail) == [], "a simulation's numbers stay in its artifact"
+    # A read by its id finds it; the artifact kind lists fits and forecasts and not it.
+    assert [x.id for x in read("fermos", ctx, ids=[art.id]).rows] == [art.id]
+    assert read("fermos", ctx, kind="artifact").rows == []
+    assert "simulation" in tools.REGISTRY["fermos_read"].description
+
+
+def test_a_simulation_read_as_a_row_is_cited_by_its_ref_and_one_cited_by_evidence_id_is_told_so(pool, tmp_path,
+                                                                                                monkeypatch):  # noqa: F811
+    art = _kept_simulation(tmp_path, monkeypatch)
+    seen = SeenSet()
+    seen.add(read("fermos", ctx_for(pool, artifacts=lambda: [art]), kind="simulation"))
+    ref = f"fermos/simulation/{art.id}"
+    assert seen.runs == {art.id: ref}, "SeenSet learns the simulation from its row"
+    by_ref = {"id": "c1", "text": "The batch simulation ran until its sugar ran out.", "recordIds": [],
+              "support": "direct", "passages": [], "evidenceIds": [], "moduleRefs": [ref]}
+    by_id = dict(by_ref, id="c2", moduleRefs=[], evidenceIds=[art.id])
+    ghost = dict(by_ref, id="c3", moduleRefs=["fermos/simulation/0123456789abcdef"])
+    out = validate_plan([by_ref, by_id, ghost], seen, pool)
+    assert [c.id for c in out.claims] == ["c1"] and out.claims[0].provenance == "demo"
+    assert out.rejected == 2
+    assert out.reasons[0].startswith(f"c2: cites {art.id} by evidence id, which a read returned only as a row: cite {ref}")
+    assert out.reasons[1].startswith("c3: cites what no tool returned in this run")
+
+
+def test_a_loose_tool_keeps_its_maps_and_a_strict_one_stays_closed():
+    """recordsByParam is keys to record ids (OF-BLD-020 §3.4): closing every
+    object told the model it took nothing. A loose tool's map goes out with
+    its value schema; a strict tool's objects stay closed, as the API needs."""
+    from openferment_core import llm
+
+    sent = {t["name"]: llm.tool_param(t["name"], t["description"], t["input_schema"], t["strict"])
+            for t in postdoc_agent._tool_defs()}
+    sim = sent["fermos_simulate"]["input_schema"]
+    assert sim["additionalProperties"] is False
+    assert sim["properties"]["recordsByParam"]["additionalProperties"] == {"items": {"type": "string"}, "type": "array"}
+    assert sent["fermos_write"]["input_schema"]["properties"]["fields"]["additionalProperties"] == {"type": "string"}
+    closed = llm.strict_schema(tools.REGISTRY["fermos_simulate"].info().inputSchema)
+    assert closed["properties"]["recordsByParam"]["additionalProperties"] is False
+
+    def maps(node):
+        if isinstance(node, dict):
+            return int(isinstance(node.get("additionalProperties"), dict)) + sum(maps(v) for v in node.values())
+        return sum(maps(v) for v in node) if isinstance(node, list) else 0
+
+    assert not any(maps(t["input_schema"]) for t in sent.values() if t["strict"])

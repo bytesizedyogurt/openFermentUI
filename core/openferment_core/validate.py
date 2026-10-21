@@ -298,17 +298,34 @@ def validate_claims(
 MAX_QUOTE_CHARS = 300
 
 
+# The kept runs a claim cites by their artifact id (OF-BLD-020 §3.4): the
+# artifact's tool, and the module and kind of the row a read returns for one.
+# The tool that keeps one returns it as one Evidence whose id is the
+# artifact's; a read returns it as a row, cited by its ref. A simulation
+# (fermos_simulate, §3.4) and a vessel design (fermos_vessel, §4.2) alike.
+KEPT_RUNS = {"fermos.simulation": ("fermos", "simulation"), "fermos.vessel": ("fermos", "vessel")}
+
+
 @dataclass
 class SeenSet:
     """What this run's tool calls returned. A claim may cite only these: a
     record, passage or computed value the model never retrieved is one it
-    cannot have read."""
+    cannot have read. A vessel design (OF-BLD-020 §4.2) is learned as the
+    evidence fermos_vessel returns, by its `fermos.vessel` artifact id, and as
+    the `fermos/vessel/<id>` row fermos_read returns (a kept run, KEPT_RUNS,
+    as a simulation is); a refused call teaches it nothing, so a design
+    nobody returned in this run is not citable."""
 
     records: set[str] = field(default_factory=set)
     passages: dict[str, Any] = field(default_factory=dict)
     evidence: dict[str, Any] = field(default_factory=dict)
     # Module rows by ref (OF-BLD-015 §7.2).
     rows: dict[str, Any] = field(default_factory=dict)
+    # The kept runs this run's tools returned (KEPT_RUNS: a simulation or a
+    # vessel design), by artifact id, to the ref of the row a read returns
+    # for it: learned from the Evidence the tool that keeps one returns, and
+    # from a read's row (OF-BLD-020 §3.4, §4.2).
+    runs: dict[str, str] = field(default_factory=dict)
 
     def add(self, result: Any) -> None:
         # A refused result was read as a refusal: nothing in it is citable.
@@ -319,8 +336,13 @@ class SeenSet:
             self.passages[p.id] = p
         for e in getattr(result, "evidence", None) or []:
             self.evidence[e.id] = e
+            kind = KEPT_RUNS.get(getattr(getattr(e, "basis", None), "tool", None) or "")
+            if kind:
+                self.runs[e.id] = f"{kind[0]}/{kind[1]}/{e.id}"
         for r in getattr(result, "rows", None) or []:
             self.rows[r.ref] = r
+            if (r.module, r.kind) in KEPT_RUNS.values():
+                self.runs[r.id] = r.ref
 
 
 def _whole_sentences(quote: str, passage: Any) -> bool:
@@ -336,7 +358,10 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
     1. Its text holds a number.
     2. A record id does not resolve in the evidence pool.
     3. A record, passage, evidence id or module ref was never returned by a
-       tool call in this run.
+       tool call in this run. A kept run (a simulation or a vessel design,
+       KEPT_RUNS) a read returned only as a row is cited by that row's ref,
+       and a claim citing it by evidence id is told so (OF-BLD-020 §3.4,
+       §4.2).
     4. A quote is longer than MAX_QUOTE_CHARS, or is not one whole sentence
        or table row of its passage, or a run of them, after `normalize_text`
        (§5.R: a fragment can lift a number out of its negation).
@@ -376,6 +401,12 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
         ghost = [r for r in record_ids if pool.record(r) is None]
         if ghost:
             reject(f"cites records that do not exist: {', '.join(ghost)}")
+            continue
+        by_row = [e for e in evidence_ids if e not in seen.evidence and e in seen.runs]
+        if by_row:
+            reject(f"cites {', '.join(by_row)} by evidence id, which a read returned only as a row: cite "
+                   f"{', '.join(seen.runs[e] for e in by_row)} in moduleRefs, or the evidence id the tool that keeps it "
+                   "returns")
             continue
         unseen = (
             [r for r in record_ids if r not in seen.records]

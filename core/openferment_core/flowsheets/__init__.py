@@ -33,6 +33,10 @@ its reference run (OF-BLD-019 §2.2, the worker's `reference` op) it exposes:
 
 and cornstover_benchmark keeps `run()`, the benchmark's own (§8.2).
 
+`vessel.py` is not a flowsheet on the shelf (it is not in KNOWN): it is
+fermOS's one vessel, designed afresh by the Proforma worker's `vessel_specs`
+and `vessel_design` ops (OF-BLD-020 §4.1), here because BioSTEAM is.
+
 A scenario flowsheet prices every case on BioSTEAM's own default utility
 prices and plant cost index, set at the start of the case
 (`bst.process_tools.default_utilities()` and `default_CEPCI()`), and reads
