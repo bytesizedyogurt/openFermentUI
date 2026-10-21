@@ -53,6 +53,12 @@ pass; a train run has no TEA, so its product is the chemical the run traced
 outlet (`productStream`). `trains()` and `train()` list and open train runs
 beside Proforma's: a train run is known by its train's id (its newest run
 read), or by its artifact id.
+
+A TRAIN PROPOSED BY RULES (OF-BLD-020 §7.2, D12). `pureos.proposer` reads a
+product's class and the properties its class's rule splits on (thermosteam's
+volatility, ProtParam on its sequence, where the products seed says it is)
+and proposes a `TrainSpec` with every parameter at its library default or
+waiting, each unit with its reason; `propose` is re-exported here.
 """
 from __future__ import annotations
 
@@ -455,3 +461,7 @@ from .train_spec import (  # noqa: E402, F401 (re-exported: pureos.run_train and
     validate,
     validation,
 )
+
+# OF-BLD-020 §7.2: a train proposed by written rules, re-exported as
+# pureos.propose (the module is `proposer`, so the function shadows no module).
+from .proposer import ProposeRefused, ProposeUnknown, propose  # noqa: E402, F401

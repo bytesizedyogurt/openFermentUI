@@ -158,6 +158,8 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   /** thermosteam's answers the browser asked for and got (OF-BLD-019 §4.2), by question. */
   const thermoKept = new Map();
   const thermoCalls = [];
+  /** pureOS's proposals the browser asked for (OF-BLD-020 §7.2): each POST /api/pureos/propose body, as sent. */
+  const pureosProposals = [];
   /**
    * The parameter panel (OF-BLD-020 §2.2): each scope the browser asked for
    * (GET /api/params/{scope}, with its query) and each resolve it posted
@@ -517,6 +519,24 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(train));
+    }
+    // OF-BLD-020 §7.2 — pureOS proposes a train: the answer the real proposer
+    // gave the same ask (product, host, inlet, switch) over the exported seed,
+    // with a stand-in for thermosteam's volatility (pureos-propose.json); an ask
+    // the fixture never made is a 404 that says so.
+    if (url === '/api/pureos/propose' && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const asked = JSON.parse(body || '{}');
+      pureosProposals.push(asked);
+      const keyOf = (q) => [q.product ?? '', q.host ?? '', q.inletRef ?? '', q.includeArchived ? 'on' : 'off'].join('|');
+      const entry = (await prototype('pureos-propose.json')).entries.find((e) => keyOf(e.request) === keyOf(asked));
+      if (!entry) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: `the browser tests recorded no proposal for ${asked.product ?? 'no product'} in ${asked.host ?? 'no host'}` }));
+      }
+      res.writeHead(entry.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(entry.body));
     }
     // OF-BLD-019 §2.2 — a reference biorefinery: its shelf entry, a run made
     // through the real code with the stand-in in place of BioSTEAM, and the
@@ -1057,5 +1077,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, pureosProposals, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, flags } };
 }

@@ -277,6 +277,11 @@ const PAIRS = [
   // OF-BLD-020 §5.4 — a train a model built, kept on the service.
   ['KeptTrain', 'KeptTrain'],
   ['KeptTrains', 'KeptTrains'],
+  // OF-BLD-020 §7.2 — a train proposed by rules that each name the property they read.
+  ['ProposeRequest', 'ProposeRequest'],
+  ['ProposalReason', 'ProposalReason'],
+  ['ProposalMissing', 'ProposalMissing'],
+  ['TrainProposal', 'TrainProposal'],
 ];
 
 let compared = 0;

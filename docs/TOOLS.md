@@ -9,10 +9,10 @@ outside `k` and `limit` refuses the call, and every refusal is a result with
 `data` is emptied with it; a tool whose whole output is longer
 (`stream_table`) cuts its own summary, says how much it left out, and carries
 the whole in `ToolResult.data`, which the endpoint and the MCP server return
-and no model reads. The registry holds thirty-five names (OF-BLD-020 §3.4
-added `fermos_simulate`, §4.2 `fermos_vessel` and §5.4 `pureos_build`);
-`test_tools.NAMES` is the one literal list of them in the tests, and every
-other count there is derived from `WHITELIST`.
+and no model reads. The registry holds thirty-six names (OF-BLD-020 §3.4
+added `fermos_simulate`, §4.2 `fermos_vessel`, §5.4 `pureos_build` and §7.2
+`pureos_propose`); `test_tools.NAMES` is the one literal list of them in the
+tests, and every other count there is derived from `WHITELIST`.
 
 The names below are the registry's. The build document writes `dominion.read`;
 the Messages API refuses a dot in a tool name, so the registry uses an
@@ -202,7 +202,8 @@ does not name is refused. A unit a model adds takes the catalogue's own
 routing (its onward port on, every other outlet to waste) and an id of its
 type's first letter and the smallest free count (`C1`, `D2`). D13 names seven
 inputs; the tree adds `unitId`, the unit `remove_unit` and `set_from_record`
-act on, since `afterUnitId` names where a unit goes. A field the action does
+act on, since `afterUnitId` names where a unit goes, and `host` for `propose`
+(the proposer reads where the product is made). A field the action does
 not take is refused in words.
 
 `set_from_record` binds a parameter of a unit to exactly the records named
@@ -221,8 +222,9 @@ worker, with no person's value: the service holds none, so a value nothing
 binds (a flash's two settings, a column's keys, a broth flow) waits, and the
 call returns the run's refusal (the 422's words) naming each one; a person
 types it in pureOS → Builder. `propose` keeps the train OF-BLD-020 §7.2's
-rules propose (`pureos.propose.propose`), under an id of its own, with the
-proposer's reasons; until §7.2 has landed it refuses in words naming it.
+rules propose (`pureos.propose`, for `product` made in `host`, a geneOS host
+id) under an id of its own, with the proposer's reasons; a proposal that
+proposes nothing is refused in the words naming each missing property.
 
 **Where a model's train lives.** A person's trains stay in their browser
 (D9). A model builds across tool calls, and an outside assistant over MCP has
@@ -259,6 +261,37 @@ conversation is dropped. A train run is a kept run (`validate.KEPT_RUNS` maps
 is cited by its ref in `moduleRefs`, and a claim citing it by evidence id is
 dropped with words that say so. Postdoc's prompt (rule 17) says a train's
 numbers are read from its run's artifact and never stated.
+
+## pureOS proposes a train (OF-BLD-020 §7.2)
+
+| Tool | In | Out |
+|---|---|---|
+| `pureos_propose` | a product's id (`product`: a products seed entry, or a product thermosteam's library is asked about by name, ethanol); a host strain's id on geneOS's shelf (`host`); and optionally the train's inlet (`inletRef`: a kept fermOS simulation's artifact id, or a kept run's artifact id and one of its streams as `<artifact id>/<stream id>`; empty for none) | a train proposed by written rules (`pureos/proposer.py`): its units in order, catalogue types, each with the rule, the property it read and the artifact that holds it, in words with no number; every parameter left at its library default or waiting for a person; or nothing proposed and each missing property named. Each property read is its own evidence id (`<artifact id>:<property>`); the whole proposal is in `data` |
+
+Offered loose, as the module tools are; every field is a string, and E.4‴
+holds the schema to no numeric field. It is a read: it keeps nothing but the
+property artifacts it reads (`volatility` from thermosteam in the Proforma
+worker, `protparam` from Biopython's ProtParam on the sequence a products
+seed entry carries, OF-BLD-020 §7.1), writes no audit line and starts no run;
+the proposal goes to a person, who fills what waits in pureOS's Builder. The
+rules, each with its basis, are in `proposer.py`'s docstring: a small
+molecule lighter than water by thermosteam's boiling points is distilled
+(`distillation`), then dried on a `molecular-sieve` where thermosteam finds a
+minimum-boiling azeotrope with water; one heavier than water is extracted
+(`lle`); a secreted protein is clarified (`centrifugation`), concentrated
+(`uf-df`), captured and polished (`chromatography` twice, keyed on ProtParam's
+isoelectric point and molecular weight, the mode waiting while the inlet
+carries no pH) and spray-dried (`spray-dry`); an intracellular protein is
+harvested, disrupted and clarified first; an intracellular polymer is
+harvested, digested, washed and dried (`drying-drum`). The class is the
+products seed's `category`, or, for a product the seed holds no entry for,
+thermosteam's normal boiling point; whether a product is secreted is the
+entry's `location`, which no entry carries yet, so a protein says it is
+missing, as it says a sequence is. With the switch off a product or host of
+an archived program is refused like any archived target. `POST
+/api/pureos/propose` answers the same, and pureOS's **Propose a train** shows
+it with each unit's reason beside it and keeps it under a new train id, which
+the Builder opens.
 
 ## A person's value (OF-BLD-020 Phase 2)
 
@@ -380,8 +413,9 @@ modules it holds for.
 The thirtieth name, added by the build document's authority (OF-BLD-019
 Part C.8 and §4.2), before Proforma's two (§6.1), which brought the registry
 to thirty-two (OF-BLD-020 §3.4's `fermos_simulate` is the thirty-third,
-§4.2's `fermos_vessel` the thirty-fourth and §5.4's `pureos_build` the
-thirty-fifth);
+§4.2's `fermos_vessel` the thirty-fourth, §5.4's `pureos_build` the
+thirty-fifth and §7.2's `pureos_propose` the
+thirty-sixth);
 `check:tools` (rule 5) fails when a name in `WHITELIST` has no tool registered
 or no mention here.
 
@@ -578,6 +612,6 @@ The rules a proposal holds to (OF-BLD-016 §1.R, as `proposals.propose`, `_held_
 `core/openferment_core/mcp_server.py` lists `tools.infos()` and calls
 `tools.run`, so every tool above, with its marks, refusals and gates, is what
 Claude Desktop or Claude Code sees, plus `ask_postdoc` and `get_artifact`:
-thirty-seven in all. `test_mcp` counts them from `WHITELIST`, and holds
-`run_flowsheet`, `stream_table` and `fermos_simulate` to the registry's own
-descriptions and schemas.
+thirty-eight in all. `test_mcp` counts them from `WHITELIST`, and holds
+`run_flowsheet`, `stream_table`, `fermos_simulate` and `pureos_propose` to the
+registry's own descriptions and schemas.

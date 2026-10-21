@@ -98,7 +98,7 @@ def test_the_server_counts_every_module_tool_with_its_marks_and_gates():
     # and test_tools.NAMES is the one literal list (OF-BLD-019 §6.1).
     assert len(names) == len(tools.WHITELIST) + len(mcp_server.EXTRA)
     assert {"thermo_props", "run_flowsheet", "stream_table", "fermos_simulate", "fermos_vessel",
-            "pureos_build"} <= set(names)
+            "pureos_build", "pureos_propose"} <= set(names)
     assert set(reads) | set(writes) <= set(names)
     by_name = {t.name: t for t in listed}
     # A read says what state it computes; a write says which actions a gate stops.
@@ -164,4 +164,17 @@ def test_the_server_offers_pureos_build_as_the_registry_does(store):
                  {"action": "run", "trainId": "tr-nowhere"}):
         through = _text(asyncio.run(server.call_tool("pureos_build", args)))
         assert through == json.loads(tools.run("pureos_build", args).model_dump_json(exclude_none=True))
+
+
+# ── OF-BLD-020 §7.2: pureos_propose, with no change here ───────────────────
+
+
+def test_the_server_offers_pureos_propose_as_the_registry_does(store):
+    listed = {t.name: t for t in asyncio.run(mcp_server.build().list_tools())}
+    assert listed["pureos_propose"].description == tools.REGISTRY["pureos_propose"].description
+    assert listed["pureos_propose"].input_schema == tools.REGISTRY["pureos_propose"].info().inputSchema
+    server = mcp_server.build()
+    for args in ({"product": "ethanol", "host": "s-cerevisiae-s288c", "inletRef": 7}, {"product": "nonesuch", "host": "x"}):
+        through = _text(asyncio.run(server.call_tool("pureos_propose", args)))
+        assert through == json.loads(tools.run("pureos_propose", args).model_dump_json(exclude_none=True))
         assert through["error"]

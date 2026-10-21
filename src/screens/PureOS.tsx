@@ -25,7 +25,14 @@
 // names the BioSTEAM classes that perform it, so a unit in a run's train links
 // to its step (`?op=` highlights it below). Every operation listed is one a
 // molecule in the catalogue declares or a train BioSTEAM ships runs; none is
-// invented, and choosing a train is still not built.
+// invented.
+//
+// A TRAIN IS PROPOSED BY RULES (OF-BLD-020 §7.2, D12). **Propose a train**
+// (PureOSPropose.tsx) sends a product, a host and optionally an inlet, and
+// shows the service's proposal: catalogue unit types in order, each with the
+// rule, the property it read and the artifact that holds it, or what is
+// missing. The rules are the service's (`pureos/proposer.py`); the page
+// decides nothing, and the Builder opens the proposal by its train id.
 import { useEffect, useMemo, useState } from 'react';
 import { STORAGE_FORMATS, UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER } from '@/data/vocabulary';
 import { PRODUCTS } from '@/data/products';
@@ -40,13 +47,11 @@ import { ComponentTag } from '@/components/ComponentTag';
 import { HiddenByArchive } from '@/components/HiddenByArchive';
 import { UnbuiltList } from '@/components/Unbuilt';
 import { SubsystemShelf } from '@/components/ReferenceView';
+import { ProposeTrain } from '@/screens/PureOSPropose';
 
 // Recovery per unit is no longer here: the trains above read it from a run.
+// Train selection left this list with OF-BLD-020 §7.2: Propose a train, below.
 const PLANNED = [
-  {
-    what: 'Train selection',
-    why: 'Propose a train for a molecule and a host, rather than reading back one a flowsheet already ran.',
-  },
   {
     what: 'Formulation and storage',
     why: 'Which format a product survives in, and what that costs in stability rather than in dollars.',
@@ -242,11 +247,14 @@ export default function PureOS() {
 
       <TrainsOnFile />
 
+      <ProposeTrain />
+
       <div className="mt-5">
         <Callout kind="info" title="The vocabulary is names, not a process model">
           Everything below is a name for a step and the stage it belongs to, with the BioSTEAM classes
-          that perform it. A train above is read from a run somebody made; nothing here chooses an
-          operation or knows whether a train is a good one — those are the pieces that are not built.
+          that perform it. A train above is read from a run somebody made, and a proposed one is the
+          service's rules, each naming the property it read; nothing here knows whether a train is a good
+          one — that is the piece that is not built.
           What exists is the shared language the rest of the platform describes a train in.
         </Callout>
       </div>

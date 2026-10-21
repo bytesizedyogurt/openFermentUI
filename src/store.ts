@@ -32,6 +32,7 @@ import type {
   Runbook,
   SeriesRole,
   FermosFitResponse,
+  TrainProposal,
   RunbookStage,
   RunOutput,
   RunState,
@@ -621,6 +622,17 @@ export interface OFState {
    */
   fermosFits: Record<string, FermosFitResponse>;
   keepFermosFit: (fit: FermosFitResponse) => void;
+  /**
+   * OF-BLD-020 §7.2 — the trains pureOS's proposer proposed in this session,
+   * by the train id this browser gave each (time-based, `tr-…`): the service's
+   * proposal whole, its train carrying that id, its reasons and what is
+   * missing. pureOS's Builder opens one at /pureos/build/<id>. Ephemeral: the
+   * proposal is the service's, and a person keeps a train by saving it from
+   * the Builder.
+   */
+  proposedTrains: Record<string, TrainProposal>;
+  /** Keep a proposal that proposed a train under a new train id, and return the id; null when it proposed none. */
+  keepProposedTrain: (proposal: TrainProposal) => string | null;
   /** Whether the Durable tier's copy of the ledger has been read this session. */
   guildHydrated: boolean;
   /**
@@ -897,6 +909,16 @@ export const useStore = create<OFState>()((set, get) => ({
       const key = model === 'logistic_v0' ? fit.depositionId : `${fit.depositionId} · ${model}`;
       return { fermosFits: { ...s.fermosFits, [key]: fit } };
     }),
+  proposedTrains: {} as Record<string, TrainProposal>,
+  // OF-BLD-020 §7.2: a new id (as a made scenario's, `nextId` restarting on a
+  // reload); the service's train, reasons and missing list kept as it sent them.
+  keepProposedTrain: (proposal: TrainProposal) => {
+    if (!proposal.train) return null;
+    const id = timeId('tr');
+    const train = { ...proposal.train, id };
+    set((s) => ({ proposedTrains: { ...s.proposedTrains, [id]: { ...proposal, train } } }));
+    return id;
+  },
   guildHydrated: false,
   practice: null as Practice | null,
   checks: null as Checks | null,

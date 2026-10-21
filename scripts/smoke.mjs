@@ -2170,6 +2170,74 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-020 §7.2 — pureOS proposes a train by rules that each name the
+  // property they read.
+  //
+  // Propose a train opens the chooser on pureOS's index: ethanol, the yeast
+  // program's product, made in S288C, no inlet. The double answers with what
+  // the real proposer gave the same ask (pureos-propose.json, thermosteam's
+  // volatility a stand-in there): a column then a molecular sieve, each unit's
+  // reason beside it naming its rule, the property it read (the boiling point,
+  // the azeotrope) and the volatility artifact that holds it, words with no
+  // number, and the train kept under a new id for the Builder. A protein the
+  // seed gives no sequence and no location proposes nothing and names both.
+  let proposeFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const recorded = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/pureos-propose.json'), 'utf8')).response.entries;
+    try {
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="pureos-propose-open"]').click();
+      await page.locator('[data-testid="pureos-propose-chooser"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const chosen = await page.locator('[data-testid="propose-product"]').inputValue().catch(() => '');
+      if (chosen !== 'ethanol') problems.push(`the chooser does not start on the program's product, ethanol (${chosen})`);
+      const hostIds = await page.locator('[data-testid="propose-host"] option').evaluateAll((els) => els.map((e) => e.getAttribute('value')));
+      if (!hostIds.includes('s-cerevisiae-s288c') || hostIds.includes('c-necator-h16')) problems.push(`the hosts are not the shown programs' strains: ${hostIds.join()}`);
+      await page.locator('[data-testid="propose-host"]').selectOption('s-cerevisiae-s288c');
+      const before = doubleState.pureosProposals.length;
+      await page.locator('[data-testid="propose-submit"]').click();
+      await page.locator('[data-testid="pureos-proposal"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const sent = doubleState.pureosProposals.slice(before);
+      if (sent.length !== 1 || JSON.stringify(sent[0]) !== JSON.stringify({ product: 'ethanol', host: 's-cerevisiae-s288c', inletRef: null, includeArchived: false }))
+        problems.push(`the chooser posted ${JSON.stringify(sent)}, not ids and words alone`);
+      const answer = recorded.find((e) => e.request.product === 'ethanol' && e.request.host === 's-cerevisiae-s288c').body;
+      const units = await page.locator('[data-testid="proposal-unit"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-unit')}:${e.getAttribute('data-type')}`).join());
+      if (units !== 'D1:distillation,MS1:molecular-sieve') problems.push(`the proposed units are ${units}`);
+      const reasons = await page.locator('[data-testid="proposal-reason"]').evaluateAll((els) =>
+        els.map((e) => [e.getAttribute('data-unit'), e.getAttribute('data-rule'), e.getAttribute('data-property'), e.getAttribute('data-artifact')].join(':')).join());
+      const expected = answer.reasons.map((r) => [r.unitId, r.rule, r.property, r.artifactId].join(':')).join();
+      if (reasons !== expected) problems.push(`the reasons beside the units are ${reasons}, not the service's ${expected}`);
+      const [vol] = answer.artifacts;
+      if (!vol || answer.reasons.map((r) => r.property).join() !== 'boilingPoint,azeotrope') problems.push('the recorded proposal does not read the boiling point, then the azeotrope');
+      if ((await page.locator(`[data-testid="proposal-artifact"][href="#/biorepo/artifacts/${vol}"]`).count()) !== 2) problems.push('each reason does not link the volatility artifact it read');
+      const words = await page.locator('[data-testid="proposal-words"]').allInnerTexts();
+      if (words.length !== 2 || words.some((w) => /\d/.test(w))) problems.push(`a reason's words carry a number, or are missing: ${JSON.stringify(words)}`);
+      if (!/minimum-boiling azeotrope of Ethanol and Water/.test(words[1] ?? '')) problems.push("the sieve's reason does not say thermosteam finds the azeotrope");
+      if (await page.locator('[data-testid="proposal-missing"]').count()) problems.push('ethanol names a missing property');
+      const link = await page.locator('[data-testid="proposal-open-builder"]').getAttribute('href').catch(() => null);
+      const trainId = await page.locator('[data-testid="pureos-proposal"]').getAttribute('data-train').catch(() => null);
+      if (!trainId || !/^tr-/.test(trainId) || link !== `#/pureos/build/${encodeURIComponent(trainId)}`) problems.push(`the proposal does not open in the Builder under its new train id (${link}, ${trainId})`);
+      // A protein the seed gives neither a sequence nor a location proposes nothing, and names both.
+      await page.locator('[data-testid="propose-product"]').selectOption('taq-dna-polymerase');
+      await page.locator('[data-testid="propose-submit"]').click();
+      await page.locator('[data-testid="proposal-none"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const missing = await page.locator('[data-testid="proposal-missing"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-property')).join());
+      if (missing !== 'location,sequence') problems.push(`a protein with no sequence names ${missing} missing`);
+      if (await page.locator('[data-testid="proposal-unit"], [data-testid="proposal-open-builder"]').count()) problems.push('a proposal of nothing shows units or a Builder link');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      proposeFails++;
+      console.log(`✗ propose      ${problems.join('; ')}`);
+    } else {
+      console.log('✓ propose      Propose a train for ethanol in S288C posts ids and words; a column then a molecular sieve, each reason beside its unit naming the rule, the property (boiling point, azeotrope) and the volatility artifact, words with no number; kept under a new train id for the Builder; a protein with no sequence or location proposes nothing and names both');
+    }
+    await page.close();
+  }
+
   // ── OF-BLD-019 §4.R — the fermOS Properties card answers the record it names.
   //
   // Two ethanol titre candidates on a thread Q paper join the overlay (TEST
@@ -2626,10 +2694,11 @@ async function main() {
   console.log(`${1 - guildFails}/1 Guild ledger flow — empty ledger, My path, practice on nobody's record, first person, reload`);
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
+  console.log(`${1 - proposeFails}/1 pureOS propose — a train proposed by rules, each reason naming the property it read`);
   console.log(`${1 - brothFails}/1 fermOS Properties — the card answers the record it names, and asks again after a 503`);
   console.log(`${1 - vesselFails}/1 fermOS Vessel — every design parameter in the panel, a scale a named assumption, the design and its oxygen balance read from the service`);
   console.log(`${1 - simulateFails}/1 fermOS Simulate — a family simulated from its sources, what waits typed under a name, the result read from the artifact`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails || ceilingFails || vesselFails || simulateFails) process.exit(1);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || proposeFails || brothFails || ceilingFails || vesselFails || simulateFails) process.exit(1);
 }
 
 main();

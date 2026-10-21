@@ -1,4 +1,4 @@
-"""pureOS's tools.
+"""pureOS's tools: `pureos_build` and `pureos_propose`.
 
 `pureos_build` (OF-BLD-020 §5.4, D9, D13): Postdoc, or an outside assistant
 over MCP, builds and runs a train from unit type names and record ids. One
@@ -23,14 +23,15 @@ action a call:
                      it: one `pureos.train_run` artifact, returned as one
                      Evidence whose id is the artifact's
     propose          a train proposed by OF-BLD-020 §7.2's rules
-                     (`pureos.propose`), kept as the model's; refused in words
-                     until §7.2 has landed
+                     (`pureos.propose`, for the product made in `host`, a
+                     geneOS host id), kept as the model's
 
 Ids and words only: every field is a string, a list of strings or a word, and
 a number anywhere refuses the call, as the registry does for every tool (E.4‴
 holds the schema to no numeric field, `check:tools` rule 6). D13 lists seven
 inputs; the tree adds `unitId`, the unit `remove_unit` and `set_from_record`
-act on, because `afterUnitId` names where a unit goes and not which one.
+act on, because `afterUnitId` names where a unit goes and not which one, and
+`host`, which §7.2's proposer needs (the cells the product is made in).
 
 Every action is a free write through `tools/writes.py` (the same function as
 `pureos_write`'s `new_train`, `add_unit`, `remove_unit`, `set_from_record` and
@@ -39,6 +40,27 @@ kept on the service (`pureos.kept`, `core/data/pureos-trains.json`), marked as
 the model's; a person's trains stay in their browser. The service holds no
 person's value, so a value nothing binds waits at the run, and the call returns
 the refusal's words: a person types it in pureOS → Builder.
+
+`pureos_propose`: a train proposed by written rules, a read. Ids and words in
+(a product's id, a host strain's id, an inlet's artifact id or
+`<run artifact id>/<stream id>`, each a string, an empty one meaning none);
+no field of its schema is numeric (E.4‴, `check:tools` rule 6), and a number
+anywhere refuses the call as the registry does for every tool. The service
+reads the product's class and the properties its class's rule splits on
+(`pureos.proposer`: thermosteam's volatility, ProtParam on the entry's
+sequence, where the products seed says the product is) and proposes a
+`TrainSpec` whose units are catalogue types in order, every parameter at its
+library default or waiting for a person, each unit with one reason naming the
+rule, the property it read and the artifact that holds it; or none, naming
+each missing property.
+
+It keeps nothing but the property artifacts §7.1's functions keep, and it is
+no write: the proposal goes to a person (pureOS → Builder), and no run starts
+from it. The summary names each unit's rule and property and the artifact
+ids, in words and ids alone; each property read comes back as its own
+`Evidence` (`<artifact id>:<property>`), so a claim cites the property and its
+value is read from the artifact, never stated; the whole proposal is in
+`data`, which no model reads. Offered loose, the module tools' way.
 """
 from __future__ import annotations
 
@@ -46,7 +68,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .. import pureos
 from ..models import ToolResult
+from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 from . import Tool, ToolContext, register
 
 BUILD = "pureos_build"
@@ -59,7 +83,7 @@ TAKES = {
     "remove_unit": ("trainId", "unitId"),
     "set_from_record": ("trainId", "unitId", "recordsByParam"),
     "run": ("trainId",),
-    "propose": ("product", "inletRef"),
+    "propose": ("product", "host", "inletRef"),
 }
 
 
@@ -80,6 +104,8 @@ class PureosBuildInput(BaseModel):
     unitId: str = Field("", description="remove_unit and set_from_record: the unit acted on, by its id in the train.")
     product: str = Field("", description="new and propose: the product the train recovers, by its id (ethanol); empty "
                                          "takes a simulation inlet's own product.")
+    host: str = Field("", description="propose: the host strain's id on geneOS's shelf of hosts, the cells the product "
+                                      "is made in (the proposer's rules read where the product is made).")
     inletRef: str = Field("", description=(
         "new and propose: the artifact the inlet is read from: a kept simulation's artifact id (its broth at harvest; "
         "its broth flow then waits for a person), a kept vessel design's artifact id (the harvest of the simulation it "
@@ -93,7 +119,7 @@ class PureosBuildInput(BaseModel):
 def _build(inp: PureosBuildInput, ctx: ToolContext) -> ToolResult:
     from . import writes
 
-    given = {k for k in ("trainId", "unitType", "afterUnitId", "unitId", "product", "inletRef")
+    given = {k for k in ("trainId", "unitType", "afterUnitId", "unitId", "product", "host", "inletRef")
              if (getattr(inp, k) or "").strip()} | ({"recordsByParam"} if inp.recordsByParam else set())
     extra = sorted(given - set(TAKES[inp.action]))
     if extra:
@@ -110,7 +136,7 @@ def _build(inp: PureosBuildInput, ctx: ToolContext) -> ToolResult:
                                       {k: list(v) for k, v in inp.recordsByParam.items()}, "", ctx)
     if inp.action == "run":
         return writes.run_train(BUILD, inp.trainId, "", ctx)
-    return writes.propose_train(BUILD, inp.product, inp.inletRef, "", ctx)
+    return writes.propose_train(BUILD, inp.product, inp.host, inp.inletRef, "", ctx)
 
 
 BUILD_TOOL = register(
@@ -125,7 +151,7 @@ BUILD_TOOL = register(
             "out; set_from_record binds a parameter of unitId to exactly the record ids recordsByParam names for it "
             "(each must be a record of the field the parameter binds from, kept by the aggregate gate; one that cannot "
             "bind is refused naming the record and why); run runs the train in the Proforma worker as the service "
-            "binds it; propose keeps the train the proposer's rules propose for the product. You never type a "
+            "binds it; propose keeps the train the proposer's rules propose for the product made in host (a host strain id). You never type a "
             "number: every value binds from the records, the class's own default or a named person. A value nothing "
             "binds waits: the run then refuses naming each one, and nothing is kept; say in gaps that a person types "
             "it in pureOS → Builder. A run comes back as one evidence id (its artifact id) with each unit's recovery, "
@@ -135,6 +161,79 @@ BUILD_TOOL = register(
         ),
         input_model=PureosBuildInput,
         run=_build,
+        strict=False,
+    )
+)
+
+
+# ── pureos_propose (OF-BLD-020 §7.2) ──────────────────────────────────────
+
+NAME = "pureos_propose"
+
+
+class PureosProposeInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product: str = Field(description=(
+        "The product's id: a products seed entry (Dominion's molecules), or a product thermosteam's library is asked "
+        "about by name (ethanol)."))
+    host: str = Field(description="The host strain's id on geneOS's shelf of hosts: the cells the product is made in.")
+    inletRef: str = Field(default="", description=(
+        "The train's inlet: a kept fermOS simulation's artifact id (its broth at harvest), or a kept run's artifact id "
+        "and one of its streams as <artifact id>/<stream id>; an empty string for none (a person types the inlet)."))
+
+
+def _run(inp: PureosProposeInput, ctx: ToolContext) -> ToolResult:
+    from .. import artifacts
+
+    try:
+        p = pureos.propose(inp.product, inp.host, inp.inletRef or None, include_archived=ctx.include_archived)
+        evidence = pureos.proposer.evidence(p)
+    except (pureos.ProposeUnknown, pureos.ProposeRefused) as e:
+        return ToolResult(error=f"{NAME} refused: {e}")
+    except artifacts.ArtifactDamaged as e:
+        return ToolResult(error=f"{NAME} refused: {e}")
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        return ToolResult(error=f"{NAME} could not ask thermosteam: {e}")
+    types = {u.id: u.type for u in (p.train.units if p.train else [])}
+    return ToolResult(
+        summary={
+            "product": p.product,
+            "host": p.host,
+            "program": p.program,
+            "productClass": p.productClass,
+            "proposed": p.train is not None,
+            "inlet": p.train.inlet.kind if p.train else None,
+            "units": [{"unitId": r.unitId, "type": types.get(r.unitId), "rule": r.rule, "property": r.property,
+                       "artifactId": r.artifactId, "why": r.words} for r in p.reasons],
+            "missing": [m.model_dump() for m in p.missing],
+            "propertyEvidence": [e.id for e in evidence],
+            "notes": p.notes,
+            "meaning": ("a train proposed by written rules, each naming the property it read; every parameter stays at "
+                        "its library default or waits for a person in pureOS's Builder, and nothing runs until a person "
+                        "fills what waits; each property is cited by its evidence id and its value read from it"),
+        },
+        evidence=evidence,
+        data=p.model_dump(mode="json"),
+    )
+
+
+TOOL = register(
+    Tool(
+        name=NAME,
+        description=(
+            "Propose a downstream train for a product made in a host, by written rules that each name the property "
+            "they read: a small molecule lighter than water by thermosteam's boiling points is distilled, then dried "
+            "on a molecular sieve where thermosteam finds an azeotrope with water; a secreted protein is clarified, "
+            "concentrated by ultrafiltration, captured and polished by chromatography (keyed on ProtParam's "
+            "isoelectric point and molecular weight) and spray-dried; an intracellular one is harvested and disrupted "
+            "first. Ids and words in: a product id, a host strain id, and optionally an inlet (a kept simulation's "
+            "artifact id, or <run artifact id>/<stream id>). Returns the units in order, each with its rule, property "
+            "and artifact, every parameter left at its library default or waiting for a person; or what property is "
+            "missing. Each property read is one evidence id to cite. Proposes only: nothing runs."
+        ),
+        input_model=PureosProposeInput,
+        run=_run,
         strict=False,
     )
 )

@@ -3308,6 +3308,73 @@ class KeptTrains(BaseModel):
     trains: list[KeptTrain] = Field(default_factory=list)
 
 
+# ── pureOS proposes a train (OF-BLD-020 §7.2, D12) ──────────────────────
+#
+# pureos/proposer.py reads a product's class and the properties its class's
+# rule splits on (thermosteam's volatility, ProtParam on its sequence, where
+# the seed says it is), and proposes a TrainSpec whose units are catalogue
+# types in order, every parameter at its library default or waiting, each
+# unit with one reason naming the rule, the property and its artifact.
+
+
+class ProposeRequest(BaseModel):
+    """POST /api/pureos/propose: ids and words, never a number."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # A products seed id, or a product thermosteam's library is asked about by
+    # name (thermo.CHEMICALS: ethanol).
+    product: str
+    # A geneOS host (strain) id: the cells the product is made in.
+    host: str
+    # A kept fermOS simulation's artifact id, or a kept run's id and one of its
+    # streams as `<artifact id>/<stream id>`; none, and the inlet is typed.
+    inletRef: str | None = None
+    includeArchived: bool = False
+
+
+class ProposalReason(BaseModel):
+    """Why one unit of a proposal is there: the rule, the property it read,
+    the artifact that holds that property (None when the products seed
+    states it), and the words, which carry no number."""
+
+    unitId: str
+    rule: str
+    # A property name: `boilingPoint`, `azeotrope`, `molecularWeight`,
+    # `isoelectricPoint` (each an evidence key of its artifact), or `class`,
+    # `location` (the products seed's).
+    property: str
+    artifactId: str | None = None
+    words: str
+
+
+class ProposalMissing(BaseModel):
+    """A property the rules needed and nothing holds, and why."""
+
+    property: str
+    why: str
+
+
+class TrainProposal(BaseModel):
+    """POST /api/pureos/propose: a train proposed by the written rules, or
+    none, with what is missing. (Named apart from `Proposal`, a write a
+    model proposed at a gate, OF-BLD-015 §7.4.)"""
+
+    product: str
+    host: str
+    program: str | None = None
+    # protein, small molecule, polymer; None when nothing states it.
+    productClass: str | None = None
+    # Null when nothing is proposed. Every unit's params and records are empty.
+    train: TrainSpec | None = None
+    # One a unit, in the train's order.
+    reasons: list[ProposalReason] = Field(default_factory=list)
+    missing: list[ProposalMissing] = Field(default_factory=list)
+    # The property artifacts read (`volatility`, `protparam`), by id.
+    artifacts: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()

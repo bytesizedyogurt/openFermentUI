@@ -1446,6 +1446,43 @@ def pureos_train(key: str) -> dict:
         raise HTTPException(status_code=404, detail=str(e)) from None
 
 
+# ── pureOS proposes a train (OF-BLD-020 §7.2, D12) ──────────────────────
+
+from .models import ProposeRequest  # noqa: E402
+
+
+@app.post("/api/pureos/propose")
+def pureos_propose(req: ProposeRequest) -> dict:
+    """A train proposed by written rules (`TrainProposal`): the product's
+    class and the properties its rule splits on (thermosteam's volatility,
+    ProtParam on the entry's sequence, where the seed says the product is),
+    each unit at its library defaults or waiting, with one reason naming the
+    rule, the property and its artifact; or none, naming what is missing.
+    Keeps nothing but the property artifacts it reads. 404 for a product
+    neither the products seed nor thermo.CHEMICALS holds; 422 in words for a
+    refusal (an unknown host, an archived program with the switch off, an
+    inlet that is not one, a sequence ProtParam cannot read, a chemical the
+    library lacks); 409 for a property answer damaged on disk; 503 when the
+    worker cannot answer a volatility question, or the corpus is not
+    exported."""
+    from . import artifacts, pureos
+
+    try:
+        return pureos.propose(req.product, req.host, req.inletRef,
+                              include_archived=req.includeArchived).model_dump(mode="json")
+    except pureos.ProposeUnknown as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    except pureos.ProposeRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where thermosteam runs, could not answer "
+                                                    f"the volatility question: {e}") from e
+    except FileNotFoundError as e:  # corpus.json or modules.json not exported
+        raise HTTPException(status_code=503, detail=str(e)) from None
+
+
 # ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────
 
 

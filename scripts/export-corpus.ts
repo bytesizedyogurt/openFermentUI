@@ -327,6 +327,9 @@ const modulesProjection = {
       provenance: p.provenance,
       note: p.note,
       program: programOf('product', p.id),
+      // OF-BLD-020 §7.2 — secreted or intracellular, when the entry says so:
+      // pureOS's proposer splits a protein's and a polymer's train on it.
+      ...(p.location !== undefined ? { location: p.location } : {}),
     })),
     findings: CLEARANCE_FINDINGS.map((f) => ({
       productId: f.productId,

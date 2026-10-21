@@ -460,6 +460,7 @@ def _rebuild_prototype(out: Path, real_worker: bool | None = None) -> list[Path]
         *prototype_ceiling_check().items(),
         *prototype_pureos().items(),
         *prototype_thermo().items(),
+        *prototype_propose().items(),
         *prototype_proposals().items(),
         *prototype_vessel(real_worker).items(),
     ):
@@ -1692,8 +1693,10 @@ def _standin_thermo_call(op: str, args: dict[str, Any]) -> Any:
     from .workers import WorkerError
 
     table = _THERMO_STANDIN_CHEMICALS
+    if op == "volatility":  # OF-BLD-020 §7.2: the proposer's question, in the worker's shape
+        return _standin_volatility(args)
     if op != "thermo_props":
-        raise WorkerError(f"KeyError: the {THERMO_STANDIN} answers thermo_props alone, not {op!r}")
+        raise WorkerError(f"KeyError: the {THERMO_STANDIN} answers thermo_props and volatility alone, not {op!r}")
     solve = args.get("solve") or None
     if solve and solve["kind"] == "titre":
         w = solve["kgPerM3"] / table[solve["solvent"]][0]
@@ -1720,6 +1723,72 @@ def _standin_thermo_call(op: str, args: dict[str, Any]) -> Any:
                                        "vapourAtBubble": "mol/mol"},
         "solved": {"kind": solve["kind"], "how": THERMO_STANDIN} if solve else None, "notes": [THERMO_STANDIN],
     }
+
+
+def _standin_volatility(args: dict[str, Any]) -> dict[str, Any]:
+    """The worker's `volatility` answer from the STAND-IN's table: the two
+    invented boiling points decide which boils first, and the azeotrope is
+    said found with invented fractions, as thermosteam finds one for ethanol."""
+    from .workers import WorkerError
+
+    table = _THERMO_STANDIN_CHEMICALS
+    chem, partner = args["chemical"], args["partner"]
+    lacking = sorted(n for n in (chem, partner) if n not in table)
+    if lacking:
+        raise WorkerError(f"Refused: the {THERMO_STANDIN} holds {', '.join(sorted(table))} alone; it has no "
+                          f"{', '.join(lacking)}")
+    tb, tbp = table[chem][3], table[partner][3]
+    return {
+        "library": THERMO_STANDIN, "chemical": chem, "partner": partner, "P": args.get("P") or 101325.0,
+        "PSource": "given" if args.get("P") is not None else "thermosteam's Stream default", "boilingPoint": tb,
+        "partnerBoilingPoint": tbp, "lighter": chem if tb < tbp else partner, "azeotrope": True,
+        "azeotropeMoleFraction": 0.9, "azeotropeMassFraction": 0.95, "azeotropeT": min(tb, tbp) - 1.0,
+        "searched": {"of": chem if tb < tbp else partner, "from": 0.1, "to": 0.9, "points": 9, "halvings": 3},
+        "units": {"boilingPoint": "K", "partnerBoilingPoint": "K", "azeotropeT": "K", "P": "Pa",
+                  "azeotropeMoleFraction": "mol/mol", "azeotropeMassFraction": "kg/kg"},
+        "how": THERMO_STANDIN, "notes": [THERMO_STANDIN],
+    }
+
+
+# OF-BLD-020 §7.2: pureOS's proposals for the double, made by the real
+# proposer (pureos/proposer.py) over the exported products seed and hosts, in
+# a scratch store, with the STAND-IN above answering thermosteam's volatility
+# question: each ask the browser tests make, with the service's answer (200,
+# or the 404 or 422 in its words). The volatility artifact a proposal names
+# is the STAND-IN's, and its `library` says so.
+PROPOSE_ASKS = (
+    {"product": "ethanol", "host": "s-cerevisiae-s288c", "inletRef": None, "includeArchived": False},
+    {"product": "ethanol", "host": "s-cerevisiae-cenpk113-7d", "inletRef": None, "includeArchived": False},
+    {"product": "taq-dna-polymerase", "host": "s-cerevisiae-s288c", "inletRef": None, "includeArchived": False},
+    {"product": "nonesuch", "host": "s-cerevisiae-s288c", "inletRef": None, "includeArchived": False},
+    {"product": "phb", "host": "c-necator-h16", "inletRef": None, "includeArchived": False},
+)
+
+
+def prototype_propose() -> dict[str, Any]:
+    import tempfile
+
+    from . import proforma, pureos
+    from . import intake as _intake
+
+    entries: list[dict[str, Any]] = []
+    saved = (_intake.DATA_DIR, proforma.call)
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            proforma.call = _standin_thermo_call
+            for ask in PROPOSE_ASKS:
+                try:
+                    body = pureos.propose(ask["product"], ask["host"], ask["inletRef"],
+                                          include_archived=ask["includeArchived"]).model_dump(mode="json")
+                    entries.append({"request": ask, "status": 200, "body": body})
+                except pureos.ProposeUnknown as e:
+                    entries.append({"request": ask, "status": 404, "body": {"detail": str(e)}})
+                except pureos.ProposeRefused as e:
+                    entries.append({"request": ask, "status": 422, "body": {"detail": str(e)}})
+        finally:
+            _intake.DATA_DIR, proforma.call = saved
+    return {"pureos-propose.json": {"entries": entries}}
 
 
 def prototype_thermo() -> dict[str, Any]:

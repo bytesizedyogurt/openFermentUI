@@ -799,20 +799,32 @@ def _proposal(got: Any) -> tuple[Any, list[Any]]:
     return TrainSpec.model_validate(spec.model_dump() if hasattr(spec, "model_dump") else spec), list(reasons or [])
 
 
-def propose_train(tool: str, product: str, inlet_ref: str, note: str, ctx: ToolContext) -> ToolResult:
-    """A train proposed by OF-BLD-020 §7.2's rules (`pureos.propose.propose`),
-    kept as the model's under an id of its own (pureos_build propose). Until
-    §7.2 has landed on this service, refused in words naming it."""
+def propose_train(tool: str, product: str, host: str, inlet_ref: str, note: str, ctx: ToolContext) -> ToolResult:
+    """A train proposed by OF-BLD-020 §7.2's rules (`pureos.propose`) for a
+    product made in a host, kept as the model's under an id of its own
+    (pureos_build propose). A proposal that proposes nothing is refused in
+    the words naming each missing property; the proposer's own refusals
+    (an unknown product or host, an archived program with the switch off, a
+    bad inlet) come back in its words."""
+    from .. import artifacts
     from ..pureos import build, kept
+    from ..pureos import propose as proposer
+    from ..pureos.proposer import ProposeRefused, ProposeUnknown
+    from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 
     try:
-        from ..pureos.propose import propose as proposer  # OF-BLD-020 §7.2
-    except ImportError:
-        return ToolResult(error=f"{tool} refused propose: the train proposer is OF-BLD-020 §7.2's "
-                                "(pureos.propose) and has not landed on this service; build the train with new and "
-                                "add_unit instead. Say so in gaps.")
+        got = proposer((product or "").strip(), (host or "").strip(), (inlet_ref or "").strip() or None,
+                       include_archived=ctx.include_archived)
+    except (ProposeUnknown, ProposeRefused, artifacts.ArtifactDamaged) as e:
+        return _train_refused(tool, e)
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        return ToolResult(error=f"{tool} could not ask thermosteam for the properties the proposer reads: {e}")
+    if getattr(got, "train", None) is None:
+        missing = "; ".join(f"{m.property}: {m.why}" for m in getattr(got, "missing", []) or []) or "no rule applies"
+        return ToolResult(error=f"{tool} refused propose: the rules propose no train for {product} made in {host}, "
+                                f"because {missing}. Nothing was kept. Say so in gaps.")
     try:
-        spec, reasons = _proposal(proposer((product or "").strip(), None, (inlet_ref or "").strip() or None))
+        spec, reasons = _proposal(got)
     except (ValueError, LookupError) as e:
         return _train_refused(tool, e)
     spec = spec.model_copy(update={"id": build.new_id()})

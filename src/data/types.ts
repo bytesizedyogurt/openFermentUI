@@ -1117,6 +1117,13 @@ export interface Product {
   sequence?: string;
   /** Where `sequence` was read, e.g. a UniProt accession and the chain's residues. Required beside a sequence. */
   sequenceSource?: string;
+  /**
+   * Where the product is when the fermentation ends (OF-BLD-020 §7.2): secreted
+   * into the broth, or held in the cells. pureOS's proposer splits a protein's
+   * and a polymer's train on it. Present only where a named source says so;
+   * no entry carries one yet, so the proposer names it missing.
+   */
+  location?: 'secreted' | 'intracellular';
 }
 
 /**
@@ -4146,4 +4153,55 @@ export interface KeptTrain {
 /** `core/data/pureos-trains.json`. */
 export interface KeptTrains {
   trains: KeptTrain[];
+}
+
+// ── pureOS proposes a train (OF-BLD-020 §7.2, D12) ──────────────────────
+
+/** `POST /api/pureos/propose`: ids and words, never a number. */
+export interface ProposeRequest {
+  /** A products seed id, or a product thermosteam's library is asked about by name (ethanol). */
+  product: string;
+  /** A geneOS host (strain) id: the cells the product is made in. */
+  host: string;
+  /** A kept fermOS simulation's id, or `<run artifact id>/<stream id>`; none, and the inlet is typed. */
+  inletRef?: string | null;
+  includeArchived?: boolean;
+}
+
+/** Why one unit of a proposal is there: its rule, the property it read and the artifact that holds it. */
+export interface ProposalReason {
+  unitId: string;
+  rule: string;
+  /** boilingPoint, azeotrope, molecularWeight, isoelectricPoint (an artifact's), or class, location (the products seed's). */
+  property: string;
+  /** Null when the products seed states the property. */
+  artifactId: string | null;
+  /** Words, with no number in them. */
+  words: string;
+}
+
+/** A property the rules needed and nothing holds, and why. */
+export interface ProposalMissing {
+  property: string;
+  why: string;
+}
+
+/**
+ * A train proposed by written rules, or none with what is missing. Named apart
+ * from `Proposal`, a write a model proposed at a gate (OF-BLD-015 §7.4).
+ */
+export interface TrainProposal {
+  product: string;
+  host: string;
+  program: string | null;
+  /** protein, small molecule, polymer; null when nothing states it. */
+  productClass: string | null;
+  /** Null when nothing is proposed; every unit's params and records are empty. */
+  train: TrainSpec | null;
+  /** One a unit, in the train's order. */
+  reasons: ProposalReason[];
+  missing: ProposalMissing[];
+  /** The property artifacts read (volatility, protparam), by id. */
+  artifacts: string[];
+  notes: string[];
 }

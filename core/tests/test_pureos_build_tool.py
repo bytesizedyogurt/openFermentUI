@@ -115,8 +115,8 @@ def test_pureos_build_is_registered_loose_with_ids_and_words_only():
     t = tools.REGISTRY["pureos_build"]
     assert "pureos_build" in tools.WHITELIST and not t.strict
     schema = t.info().inputSchema
-    assert set(schema["properties"]) == {"action", "trainId", "unitType", "afterUnitId", "unitId", "product", "inletRef",
-                                         "recordsByParam"}
+    assert set(schema["properties"]) == {"action", "trainId", "unitType", "afterUnitId", "unitId", "product", "host",
+                                         "inletRef", "recordsByParam"}
     text = json.dumps(schema)
     assert '"number"' not in text and '"integer"' not in text
     assert schema["properties"]["action"]["enum"] == ["new", "add_unit", "remove_unit", "set_from_record", "run",
@@ -369,30 +369,54 @@ def test_pureos_write_builds_the_same_train_through_the_same_functions(store, in
 # ── propose (OF-BLD-020 §7.2's proposer) ───────────────────────────────
 
 
-def test_propose_refuses_in_words_until_the_proposer_has_landed(store, monkeypatch):
-    monkeypatch.setitem(sys.modules, "openferment_core.pureos.propose", None)
-    r = b(action="propose", product="ethanol", inletRef="")
-    assert r.error.startswith("pureos_build refused propose: the train proposer is OF-BLD-020 §7.2's")
+def test_propose_refuses_in_words_naming_what_is_missing_when_nothing_is_proposed(store, monkeypatch):
+    """A STAND-IN proposal with no train (§7.2's `TrainProposal`: `train`
+    None and each missing property with why): nothing is kept, and the
+    refusal names the missing property."""
+    from openferment_core import pureos
+    from openferment_core.models import ProposalMissing
+
+    def propose(product, host, inlet_ref, *, include_archived=False):
+        return SimpleNamespace(train=None, reasons=[], missing=[
+            ProposalMissing(property="sequence", why="STAND-IN: the product's entry carries no sequence")])
+
+    monkeypatch.setattr(pureos, "propose", propose)
+    r = b(action="propose", product="insulin", host="s-cerevisiae-s288c", inletRef="")
+    assert r.error.startswith("pureos_build refused propose: the rules propose no train for insulin made in "
+                              "s-cerevisiae-s288c, because sequence: STAND-IN")
+    assert kept.read().trains == [] and audit.read() == []
+
+
+def test_propose_passes_the_host_and_refuses_in_the_proposers_words(store, monkeypatch):
+    from openferment_core import pureos
+
+    def propose(product, host, inlet_ref, *, include_archived=False):
+        raise pureos.ProposeRefused(f"there is no host {host!r} among geneOS's hosts")
+
+    monkeypatch.setattr(pureos, "propose", propose)
+    r = b(action="propose", product="ethanol", host="nowhere", inletRef="")
+    assert r.error == "pureos_build refused: there is no host 'nowhere' among geneOS's hosts."
     assert kept.read().trains == [] and audit.read() == []
 
 
 def test_propose_keeps_the_proposers_train_under_an_id_of_its_own(store, inlet, monkeypatch):
-    """A STAND-IN proposer (§7.2's shape: `propose(product, host, inlet_ref)`
-    returns a train and its reasons); its train is kept as the model's."""
+    """A STAND-IN proposer (§7.2's shape: `pureos.propose(product, host,
+    inlet_ref, include_archived=...)` returns a `TrainProposal`); its train
+    is kept as the model's."""
+    from openferment_core import pureos
+
     asked = []
 
-    def propose(product, host, inlet_ref):
-        asked.append((product, host, inlet_ref))
+    def propose(product, host, inlet_ref, *, include_archived=False):
+        asked.append((product, host, inlet_ref, include_archived))
         spec = spec_of(id="proposed", units=[{"id": "D1", "type": "distillation"}],
                        inlet={"kind": "run-stream", "ref": inlet.split("/")[0], "streamId": "F1_liquid"})
-        return SimpleNamespace(train=spec, reasons=["STAND-IN reason: the product is volatile"])
+        return SimpleNamespace(train=spec, reasons=["STAND-IN reason: the product is volatile"], missing=[])
 
-    stand_in = ModuleType("openferment_core.pureos.propose")
-    stand_in.propose = propose  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "openferment_core.pureos.propose", stand_in)
-    r = b(action="propose", product="ethanol", inletRef=inlet)
+    monkeypatch.setattr(pureos, "propose", propose)
+    r = b(action="propose", product="ethanol", host="s-cerevisiae-s288c", inletRef=inlet)
     assert r.error is None, r.error
-    assert asked == [("ethanol", None, inlet)]
+    assert asked == [("ethanol", "s-cerevisiae-s288c", inlet, False)]
     assert r.summary["trainId"].startswith(build.ID_PREFIX) and r.summary["trainId"] != "proposed"
     assert r.summary["reasons"] == ["STAND-IN reason: the product is volatile"]
     [k] = kept.read().trains

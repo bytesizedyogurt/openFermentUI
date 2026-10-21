@@ -16,9 +16,10 @@ Messages API refuses a dot in a tool name, and its write pair (§7.3); then
 `fermos_vessel` (§4.2), a free write through `fermos_write`'s `design_vessel`;
 then pureOS's `pureos_build` (OF-BLD-020 §5.4), a free write through
 `pureos_write`'s train actions that builds and runs a train from unit type
-names and record ids. Thirty-five names. A tool outside it is a new document.
-`test_tools.NAMES` is the one literal list the tests hold the registry to;
-every other count is derived from `WHITELIST`.
+names and record ids; then `pureos_propose` (§7.2), a read: a train proposed
+by written rules, each naming the property it read. Thirty-six names. A tool
+outside it is a new document. `test_tools.NAMES` is the one literal list the
+tests hold the registry to; every other count is derived from `WHITELIST`.
 
 TOOL INPUTS CARRY IDS AND WORDS. A model names a record, an artifact, a model
 file, a field or a scenario, and the service looks the quantity up. A JSON
@@ -97,6 +98,9 @@ WHITELIST = (
     # OF-BLD-020 §5.4 — a train built and run from unit type names and record
     # ids: a free write through pureos_write's train actions, loose.
     "pureos_build",
+    # OF-BLD-020 §7.2 — a train proposed by written rules that each name the
+    # property they read: a read, loose, ids and words in.
+    "pureos_propose",
 )
 # The only fields a number may stand in: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})
