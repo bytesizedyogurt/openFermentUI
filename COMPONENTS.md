@@ -117,9 +117,12 @@ fields on its program's papers that pass the aggregate gate and name a feed the 
 takes as their carbon source, converted by `units.py`. Glucose to ethanol binds
 its feed concentration, titre and yield to thread Q's records today; its
 productivity waits, because no thread Q productivity record names a carbon
-source. What no record binds waits for a named person's assumption (or, for
-titre, yield and productivity, a fermOS fit a person chooses, below), and the
-run's basis names every record, assumption and fit it used.
+source. What no record binds waits for a named person's assumption, typed into
+the parameter panel. A fermOS fit a person chooses (below) replaces the records
+for titre, yield and productivity, and a person's value replaces the records
+and any fit for its input, not only where no record binds (OF-BLD-020 D3). The
+run's basis names every record, assumption and fit it used, each assumption
+with the person who typed it.
 
 Two more carry the reactor and the organism into the price, and both are built
 (OF-BLD-019 Phase 5).
@@ -254,11 +257,11 @@ Techno-economics on BioSTEAM: published reference biorefineries run whole, and s
 
 Views: [Corn ethanol reference](#) `/proforma/reference/corn_drygrind` · [Corn stover benchmark](#) `/proforma/reference/cornstover_benchmark`
 
-**Proforma runs flowsheets from a shelf** (OF-BLD-019 Phase 2). The shelf is data (`core/openferment_core/flowsheets/shelf.py`, `GET /api/proforma/shelf`): two published reference biorefineries from the `biorefineries` package, the NREL corn stover design (`cornstover_benchmark`) and the dry-grind corn ethanol plant (`corn_drygrind`, the yeast program's reference), each run whole on its package's own defaults and held to its package's own test values, read from the installed test file; and two flowsheets of this repository that a scenario runs, glucose to ethanol (`ethanol_glucose_v0`, run by `sc-yeast-1`, yeast ethanol) and PHA from sugar (`pha_sugar_v0`, run by `sc-pha-1`, archived). BioSTEAM runs in the Proforma worker, where every plant builds as it would in a worker that had built nothing before. Each run is one artifact holding the price, the sensitivity and the base case's TEA breakdown, stream table, unit table, utility duties and diagram (`proforma.run` for a scenario, `proforma.reference` for a reference biorefinery), and every reader reads that artifact; nothing is computed again on read. A scenario flowsheet's file holds no input value: an input the shelf ties to ontology fields binds to records of its program's papers, and one no record binds takes a fermOS fit a person chose or waits for a named person's assumption. `model` is a kind of basis source (a value the package, BioSTEAM or thermosteam sets as its own default, named with its version), not a provenance: a reference run, whose inputs are all `model` or stated conventions, is `computed`, and a scenario's run is the weakest of `computed` and its records', `demo` while an assumption remains. Postdoc and the MCP server run a seed scenario (`run_flowsheet`), read a run's streams (`stream_table`) and its price (`selling_price`), and ask thermosteam (`thermo_props`), through the same functions the screens call.
+**Proforma runs flowsheets from a shelf** (OF-BLD-019 Phase 2). The shelf is data (`core/openferment_core/flowsheets/shelf.py`, `GET /api/proforma/shelf`): two published reference biorefineries from the `biorefineries` package, the NREL corn stover design (`cornstover_benchmark`) and the dry-grind corn ethanol plant (`corn_drygrind`, the yeast program's reference), each run whole on its package's own defaults and held to its package's own test values, read from the installed test file; and two flowsheets of this repository that a scenario runs, glucose to ethanol (`ethanol_glucose_v0`, run by `sc-yeast-1`, yeast ethanol) and PHA from sugar (`pha_sugar_v0`, run by `sc-pha-1`, archived). BioSTEAM runs in the Proforma worker, where every plant builds as it would in a worker that had built nothing before. Each run is one artifact holding the price, the sensitivity and the base case's TEA breakdown, stream table, unit table, utility duties and diagram (`proforma.run` for a scenario, `proforma.reference` for a reference biorefinery), and every reader reads that artifact; nothing is computed again on read. A scenario flowsheet's file holds no input value: an input the shelf ties to ontology fields binds to records of its program's papers; a fermOS fit a person chose replaces them for titre, yield and productivity; a named person's value, typed into the parameter panel, wins over both (OF-BLD-020 D3); and an input with none of these waits. `model` is a kind of basis source (a value the package, BioSTEAM or thermosteam sets as its own default, named with its version), not a provenance: a reference run, whose inputs are all `model` or stated conventions, is `computed`, and a scenario's run is the weakest of `computed` and its records', `demo` while an assumption remains. Postdoc and the MCP server run a seed scenario (`run_flowsheet`), read a run's streams (`stream_table`) and its price (`selling_price`), and ask thermosteam (`thermo_props`), through the same functions the screens call.
 
 **A reference biorefinery has a page** (OF-BLD-019 §3.3): `/proforma/reference/:id` (`src/screens/ProformaReference.tsx`) shows a published biorefinery from the `biorefineries` package run whole on its own defaults, its price as the shelf names it, and each value of the package's own regression test beside what the run measured, read from the run's `proforma.reference` artifact, then the same tables a scenario page shows. BioRepo → Compare (`/biorepo/compare`) sets two or more pinned BioSTEAM scenarios side by side from each one's newest run.
 
-**Proforma's screens read the run and price nothing** (OF-BLD-019 Phase 3). The index (`src/screens/Proforma.tsx`) has three rows: the reference runs, each with its newest stored price, when it ran, its provenance and how many of its package test's values it holds; the other flowsheets on the shelf, each with **New scenario from this**; and the scenarios of the programs the switch shows, with the newest run's price or *Not run yet*. **New scenario** (`src/components/NewScenarioDialog.tsx`) makes a `biosteam` scenario on a non-reference flowsheet, in that flowsheet's own program, and nothing is disabled because a list is empty. The scenario page (`/proforma/scenario/:id`, `src/screens/ProformaScenario.tsx`) is one page for a seed scenario and one made here: its inputs with their sources, Run with the worker's status, and every section of the newest run (`src/screens/ProformaBiosteam.tsx`): price, the TEA's cost breakdown as a waterfall closing on the run's own price, the tornado, the distribution, streams, equipment, utilities, diagram, the values read back and who set each, and the flowsheet's own questions; the newest run is the service's (`GET /api/proforma/runs`), else this browser's. Scenarios made here, the pins, the assumptions and the fermOS fits chosen are kept in this browser's Durable tier; the runs are kept by the service. The authored branch and the authored compare open the archived casein examples alone, and recharts stays there.
+**Proforma's screens read the run and price nothing** (OF-BLD-019 Phase 3). The index (`src/screens/Proforma.tsx`) has three rows: the reference runs, each with its newest stored price, when it ran, its provenance and how many of its package test's values it holds; the other flowsheets on the shelf, each with **New scenario from this**; and the scenarios of the programs the switch shows, with the newest run's price or *Not run yet*. **New scenario** (`src/components/NewScenarioDialog.tsx`) makes a `biosteam` scenario on a non-reference flowsheet, in that flowsheet's own program, and nothing is disabled because a list is empty. The scenario page (`/proforma/scenario/:id`, `src/screens/ProformaScenario.tsx`) is one page for a seed scenario and one made here: its inputs with their sources in the parameter panel (`src/components/ParameterPanel.tsx`, over the scope `proforma:<id>`; *One panel for every parameter*, below), **Use a fermOS fit** beside it, Run with the worker's status (held, in the service's words, while the service refuses the values as they stand), and every section of the newest run (`src/screens/ProformaBiosteam.tsx`): price, the TEA's cost breakdown as a waterfall closing on the run's own price, the tornado, the distribution, streams, equipment, utilities, diagram, the values read back and who set each, and the flowsheet's own questions; the newest run is the service's (`GET /api/proforma/runs`), else this browser's. Scenarios made here, the pins, a person's values typed into the panel (`parameterOverrides`, by scope) and the fermOS fits chosen are kept in this browser's Durable tier; the values and the fits go with each run, and the runs are kept by the service, which keeps no person's value. The authored branch and the authored compare open the archived casein examples alone, and recharts stays there.
 
 | Component | Implemented in |
 |---|---|
@@ -378,6 +381,27 @@ hosts in geneOS, its scenarios in Proforma, its runbooks and protocols in
 Runbooks. So it is a filter every destination applies through one selector in
 the store, not a twelfth entry, and the one switch that shows archived programs
 lives in Settings → Programs.
+
+**One panel for every parameter, and no destination owns it** (OF-BLD-020
+Phase 2). A number a person may set for a model is declared once,
+in Python (`core/openferment_core/params.py`): what it means, its unit, bounds
+with a written reason, and the order of the places its value comes from (a fit,
+records, a kept artifact, a named person, a stated convention, the library's own
+default). `GET /api/params/{scope}` serves a scope's parameters with their values
+and sources: a Proforma scenario (`proforma:<scenario id>`), a vessel design
+(`fermos:vessel:<id>`) or a kinetics family (`fermos:family:<id>`); pureOS's
+units come later. One component, `src/components/ParameterPanel.tsx`, draws every
+scope the same way, each value with its source chip, **Reset to source** and
+**Why**, and it is live on Proforma's scenario page and fermOS → Vessel. A
+person's change is an `Override` under their reviewer name, kept in this
+browser's Durable tier (`parameterOverrides`) and sent with the run; the service
+keeps none, and the run's basis names each one as an `assumption` by that person,
+so the run is `demo`. It wins over the records and any fit. A model never sets
+one. `check:seed` holds the rest: every parameter has a bounds reason (D4), and
+Proforma's and pureOS's screens render no number box or slider of their own
+outside the panel (E.1‴), apart from three named views over a computed grid.
+The panel's code has no row in the map, because no one destination owns it;
+each destination that uses it says so.
 
 **The Assay layer is where the arrow reverses.** Everything above Runbook is
 software reasoning about the world. Deposition is the world reporting back.

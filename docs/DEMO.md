@@ -252,12 +252,15 @@ branch, over this checkout's data.
 1. **New scenario.** Proforma → *New scenario* (or *New scenario from this* on the Glucose to ethanol card in the
    Flowsheets row) → pick the flowsheet, name it, keep the program (Yeast ethanol) → it opens on its page. It is kept
    in this browser and survives a reload. The seed's own yeast scenario is `sc-yeast-1` (`/proforma/scenario/sc-yeast-1`).
-2. **Inputs.** The Inputs table says where each value comes from: *N records, low–high* (thread Q, through the
-   aggregate gate), an *assumption by* a named person, a fermOS fit, or *waiting*. On thread Q today three bind and
-   three wait: feed glucose 4 records (20–100 g/L), titre 9 records (57–139 g/L), yield 18 records (0.22–0.518 g/g);
-   productivity waits (its 14 records name no carbon source), and so do plant scale and glucose price. Type each
-   waiting value under your reviewer name with what it rests on (*Keep assumption*). A run with an assumption is
-   marked *Modeled · not measured*.
+2. **Inputs.** The parameter panel says where each value comes from: *record ×N low–high* (thread Q, through the
+   aggregate gate), *assumption by* a named person, *fitted* (a fermOS fit), *convention*, or *waiting*. On thread Q
+   today three bind and three wait: feed glucose 4 records (20–100 g/L), titre 9 records (57–139 g/L), yield 18
+   records (0.22–0.518 g/g); productivity waits (its 14 records name no carbon source), and so do plant scale and
+   glucose price. Type each waiting value into its row under your reviewer name, with its low, its high and what it
+   rests on below it; *Why* says what the input means and where its bounds come from, and *Reset to source* takes a
+   value away. A value you type wins over the records too. A run with an assumption is marked *Modeled · not
+   measured*. (OF-BLD-020 §2.2 replaced the old *Keep assumption* form with this panel; the counts above are
+   2026-10-20's.)
 3. **Run.** *Run the scenario* sends it to the warm BioSTEAM worker; the status line says cold, starting or ready.
    The first run after a restart takes about half a minute; a repeat of the same inputs returns the kept run at once.
 4. **Read.** The price with its basis and its 5th to 95th percentile over the samples; the base case (or why it could

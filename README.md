@@ -557,14 +557,17 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   imported from src/sim, and no string a user sees says demo, sample run,
                          #   stand-in, placeholder or scripted (three named exceptions); a BioSTEAM class names
                          #   one unit-operation step; no scenario takes a reserved id (scenario, reference), and
-                         #   a BioSTEAM seed scenario's description names no binding outcome
+                         #   a BioSTEAM seed scenario's description names no binding outcome; since OF-BLD-020
+                         #   Phase 2, every declared parameter has a written bounds reason (D4), and Proforma's
+                         #   and pureOS's screens render no number box or slider outside the panel (E.1‴)
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
   pnpm test:export       #   the decision merge, exercised on core/tests/fixtures/export/; a bent one fails
   pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
   pnpm check:store       #   the store's contracts (141 checks): the overlay is authoritative, a record remembers
                          #   its original, the program switch survives a reload, archived and example
                          #   entities hide by default and the switch brings them back; scenarios made here,
-                         #   pins, assumptions and fermOS fits survive a reload and Clear drops them, New
+                         #   pins, a person's parameter overrides (the older assumptions read into them once)
+                         #   and fermOS fits survive a reload and Clear drops them, New
                          #   scenario is never disabled, and Proforma's pages read prices from the run
   pnpm check:guild       #   Guild's ladder on a ledger built in memory (no team in the store), the gate in both
                          #   modes, what runs, lessons, practice and checks write to the ledger, and who may see
@@ -747,9 +750,9 @@ JSON contract. In one account, with the detail phase by phase below:
   diagram where it is drawn. Proforma's pages, Compare, pureOS → Train, Postdoc's tools and the
   MCP server read that artifact and compute nothing again.
 - **The screens.** `/proforma` (the reference runs, the flowsheets, the scenarios, and **New
-  scenario**), `/proforma/scenario/:id` (inputs and their sources, Run, every table of the
-  newest run), `/proforma/reference/:id` (a reference run beside its package's test),
-  `/biorepo/compare`, and pureOS's `/pureos/train/:scenarioId`.
+  scenario**), `/proforma/scenario/:id` (inputs and their sources in the parameter panel, Run,
+  every table of the newest run), `/proforma/reference/:id` (a reference run beside its
+  package's test), `/biorepo/compare`, and pureOS's `/pureos/train/:scenarioId`.
 - **The bridges.** A fermOS fit a person chooses feeds a scenario's titre, yield and
   productivity; geneOS's ceiling flags a fermenter yield above it and clamps nothing; pureOS
   reads the train, unit by unit, from the run; thermosteam answers density, heat capacity and
@@ -760,9 +763,9 @@ JSON contract. In one account, with the detail phase by phase below:
   change (*Postdoc reaches every module*, above).
 - **What waits for Sean.** On this checkout's data `sc-yeast-1` binds its feed glucose (4
   records), titre (9) and yield (18) to thread Q; its productivity (all 14 of its records name no
-  carbon source), plant scale and glucose price wait for a named person's assumption, typed on
-  the scenario page under a reviewer name, so no yeast run is kept yet (STATE.md §7.1). On the
-  Mini, `brew install graphviz` lets the diagram draw.
+  carbon source), plant scale and glucose price wait for a named person's assumption, typed into
+  the scenario page's parameter panel under a reviewer name, so no yeast run is kept yet
+  (STATE.md §7.1). On the Mini, `brew install graphviz` lets the diagram draw.
 
 #### Proforma's shelf, run in the worker (OF-BLD-019 Phase 2)
 
@@ -868,6 +871,16 @@ a finite number and a negative seed are each refused in words (422), and an inpu
 records nor a named person's assumption refuses the run, naming it. Every run's basis names the
 scenario it belongs to, so a scenario's newest run is found by its id.
 
+**A person's value wins** (OF-BLD-020 D3). A run carries the values this browser holds for its
+scope, `proforma:<scenario id>`, as `overrides`. Each is a named person's assumption, and it
+replaces the records and any fermOS fit for its input, not only on an input no record binds; the
+input says it was chosen in place of the records it bound. The run's basis names each one as an
+`assumption` by that person, and says it read overrides, so the run is `demo`. `GET
+/api/proforma/bind` and the ceiling check take the same values (`?overrides=`). The older field,
+`assumptions`, is still read for one release, the same way. Refused in words: an input named in
+both fields, a value in words, an override of another scenario's scope, one that does not say
+when it was typed, and a value for a convention or for an input the flowsheet does not take.
+
 #### Proforma's screens (OF-BLD-019 Phase 3)
 
 Every screen reads the service and the runs it kept; none prices anything in the browser.
@@ -889,13 +902,17 @@ Every screen reads the service and the runs it kept; none prices anything in the
   the switch on). It makes a BioSTEAM scenario, the only kind it makes, and opens its page.
 - **The scenario page** (`/proforma/scenario/:id`) is one page for a seed scenario and one made
   here. The header names the flowsheet and its source, the program and the newest run's
-  provenance, with Pin, Compare and, once a run exists, pureOS → Train. **Inputs** gives each
-  input's dimension, unit, value and source: *N records, low–high* with the records under a
-  disclosure, an artifact (a fermOS fit) linked, *assumption by <name>* with its value, range and
-  what it rests on, a convention, or *waiting*, where **Keep assumption** takes a value, a range
-  and what it rests on under the reviewer name. **Run** shows the worker's status (cold,
-  starting, ready, failed) and waits while the simulator starts. Then every section of the newest
-  run, read from its one artifact: the price (median, 5th–95th, its basis and provenance, the
+  provenance, with Pin, Compare and, once a run exists, pureOS → Train. **Inputs** is the
+  parameter panel over the scenario's scope, `proforma:<id>` (OF-BLD-020 Phase 2; *One parameter
+  panel*, under Architecture), in three groups: Process, Economics and Conventions. Each row
+  gives the input's value, unit and interval, and its source as a chip: *record ×N low–high*,
+  which opens the records, *fitted* with the fermOS fit linked, *assumption by <name>*,
+  *convention*, or *waiting*. A person types a value into the row, or moves its slider, under the
+  reviewer name, with a low, a high and what it rests on below it, and **Reset to source** takes
+  the value away again. **Use a fermOS fit** stays beside the panel. When the service refuses the
+  values as they stand, Run waits and shows the service's words. **Run** shows the worker's
+  status (cold, starting, ready, failed) and waits while the simulator starts. Then every
+  section of the newest run, read from its one artifact: the price (median, 5th–95th, its basis and provenance, the
   base case or why it could not run), the cost breakdown as a waterfall of the TEA's lines that
   closes on the run's own price, the sensitivity tornado, the price distribution, the streams,
   the equipment with installed and purchase cost per unit, the utilities, the diagram or the
@@ -922,10 +939,11 @@ Every screen reads the service and the runs it kept; none prices anything in the
   and each cell names its own input. A pinned scenario with no run says so.
 - **What this browser keeps, and what the service keeps.** The Durable tier keeps the scenarios
   made here (whole, by a time-based id), the newest run id of a seed scenario, the pins, the
-  assumptions typed under a reviewer name and the fermOS fits chosen, by scenario and input;
-  *Clear this browser's data* drops them all. The service keeps the runs, each one artifact, and
-  holds no scenario made here: such a scenario runs by the flowsheet it names, and the run's
-  basis carries the scenario's id.
+  values a person typed into the parameter panel (`parameterOverrides`, by scope and input) and
+  the fermOS fits chosen, by scenario and input; *Clear this browser's data* drops them all. The
+  service keeps the runs, each one artifact, and holds no scenario made here and no person's
+  value: such a scenario runs by the flowsheet it names, the browser sends the values with each
+  run, and the run's basis carries the scenario's id.
 
 #### fermOS and geneOS reach Proforma (OF-BLD-019 Phase 5)
 
@@ -1117,6 +1135,67 @@ surface alone.
 package's defaults and held to their package's own test, and two flowsheets of our own,
 glucose to ethanol for the active program (`sc-yeast-1`) and PHA from sugar for the archived one
 (`sc-pha-1`), each pricing from inputs that name a source.
+
+### One parameter panel (OF-BLD-020 Phase 2)
+
+Every number a person may set for a model is a declared parameter, and one panel shows them all.
+A screen never builds a form of its own for one.
+
+- **A parameter is declared once, in Python.** `core/openferment_core/params.py` holds the shapes
+  (`ParameterSpec`, `ParameterValue`, `Override`, `ParamScope`; mirrored in `src/data/types.ts`
+  and listed in `PAIRS`). A spec has a key, a label, a symbol, a sentence on what it means, a
+  dimension and a unit, bounds with a written reason, a group, and an ordered rule for where its
+  value comes from: a fit a person chose, the records of named fields, a kept artifact or
+  simulation, a named person, a stated convention, or the library's own default. The first
+  source in the rule that has a value gives it, and the value names that source.
+- **The service serves a scope.** `GET /api/params/{scope}` answers with every spec of the scope
+  and its value as the service binds it now. `POST /api/params/{scope}/resolve` lays a person's
+  values on and says what a run would add to its basis; it runs nothing and keeps nothing.
+  Three kinds of scope are served. `proforma:<scenario id>` is a scenario's inputs, bound as a
+  run binds them, and starts no worker. `fermos:vessel:<simulation or fit id>` is a vessel
+  design's parameters, with BioSTEAM's own defaults read in the Proforma worker, so a read can
+  start it. `fermos:family:<family id>` is a kinetics family's parameters. `pureos:unit:…` answers
+  404 until pureOS has a provider. A malformed scope or a refused value is a 422 in words.
+- **One panel draws every scope.** `src/components/ParameterPanel.tsx` renders one row per
+  parameter (`ParameterRow.tsx`), in its group. A row shows the value, the unit and the interval,
+  and its source as a chip: *fitted* or *artifact* or *simulation* with a link to the artifact,
+  *record ×N low–high*, which opens the records, *assumption by <name>*, *convention*,
+  *library default*, or *waiting*. Where the parameter's rule takes a person's value, below them
+  are a number box, a slider when the parameter has both bounds, or a list when it is a choice of
+  words, then the low, the high and what the value rests on. **Reset to source** shows while a
+  person's value stands, and every row has **Why**: what the symbol means, the source rule in
+  order with the one that answered, the bounds and their reason, and the library's default. The panel computes nothing: every value and warning on it came from the service or
+  from the person. It is live on Proforma's scenario page and on fermOS → Vessel. Its controls
+  are 44 px touch targets and nothing on it needs a hover, because it may be used at the bench.
+- **A person's change is a named assumption** (D3). Typing needs a reviewer name, set in
+  Settings; without one every edit control is off and the row says where to set it. Each change
+  is an `Override`: the scope, the key, the value, its low and high, who typed it, when, and
+  what it rests on. It is kept in this browser's Durable tier (`parameterOverrides`, by scope).
+  A browser that kept Proforma's older `proformaAssumptions` has them read once into
+  `proforma:<id>`, and *Clear this browser's data* drops both. The service keeps no override: the
+  browser sends a scope's overrides with each run, and the service checks each one. It needs a
+  real name, the time it was typed, a number (or one of the offered words), a parameter the scope
+  has whose rule takes a person's value, and a value inside its own low and high. With one end
+  typed, the empty end is the value itself. The run's basis names each one as an `assumption` by
+  that person, so the run is `demo`. A person's value wins over the records and any fit for its
+  parameter.
+- **Bounds are conventions** (D4). A slider's ends are a choice, and each spec says why in
+  `boundsReason`: the ontology's plausibility range for its field, converted into its unit, or a
+  physical limit (nothing negative, a share between none and the whole), or a sentence saying why
+  it has no bounds (a choice of words). A value typed outside the bounds is kept as typed; the
+  row shows the service's warning, and the basis records the value. `check:seed` asks
+  `python -m openferment_core.params --check` and fails on a spec with no reason: 156 parameters
+  are declared at this commit, across Proforma's flowsheets, fermOS's five model families and the
+  vessel, and every one has one.
+- **A number box lives only in the panel** (E.1‴). `check:seed` reads Proforma's and pureOS's
+  screens (`ProformaScenario.tsx`, `ProformaBiosteam.tsx`, `PureOS*.tsx`) as syntax trees. It
+  fails on any `<input>` of type number or range there, and on one whose type it cannot read.
+  Three are allowed by name, each with its reason: the authored surfaces' number box and slider
+  (S1–S3, the archived casein examples) and the run's grid sliders (*Move three inputs over the
+  run's grid*). All three move a view over a computed grid and set no parameter. fermOS's screens
+  join the guard once fermOS → Forecast's typed start values and duration move into the panel.
+- **A model never sets one.** Postdoc's tools carry ids and words. `proforma_write`'s `bind` is
+  refused, and `run_flowsheet` runs a scenario as the service binds it, with no person's value.
 
 ### No simulated agent
 

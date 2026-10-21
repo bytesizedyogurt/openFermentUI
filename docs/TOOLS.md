@@ -41,9 +41,10 @@ it spends no model money, and **it is at no gate** (`gates.py` is unchanged:
 a run keeps one artifact in the open lane, as a ceiling does). It is audited
 like every module write, `agent: model` with the model id, the effort and the
 ask id, `module: proforma`, `action: run`, and the tool's name in `detail`.
-The service holds no person's assumption (they are typed in Proforma and kept
-in the browser's Durable tier), so the model never supplies one: an input no
-record binds waits, and the call refuses naming it. A scenario made with New
+The service holds no person's assumption (they are typed into Proforma's
+parameter panel and kept in the browser's Durable tier; *A person's value*,
+below), so the model never supplies one: an input no record binds waits, and
+the call refuses naming it. A scenario made with New
 scenario lives in the browser that made it and is refused in words, as is an
 authored cost surface and, with the switch off, an archived scenario. The run
 is `tools/writes.py`'s `run_scenario`, the same function `proforma_write`'s
@@ -108,6 +109,36 @@ design no tool returned in this conversation is dropped. `fermos_read`'s kind
 `vessel` lists the kept designs (`fermos/vessel/<artifact id>`, read by the
 design's id or the simulation's). Postdoc's prompt (rule 15) says a vessel's
 numbers are read from its artifact, never stated.
+
+## A person's value (OF-BLD-020 Phase 2)
+
+A number a person sets for a model reaches a run one way, and no tool is on it.
+
+1. The service declares the parameter (`params.py`) and serves it in a scope:
+   `GET /api/params/{scope}` gives its value and where the value came from.
+2. A person types a value into the parameter panel, under their reviewer
+   name. It is an `Override` (scope, key, value, low, high, by, at, note),
+   kept in that browser's Durable tier (`parameterOverrides`). The service
+   keeps none. `POST /api/params/{scope}/resolve` shows what it would change
+   and keeps nothing.
+3. The browser sends the scope's overrides with the run, as `overrides` in the
+   body of `POST /api/proforma/run`, `POST /api/fermos/vessel` or
+   `POST /api/fermos/simulate`. `GET /api/proforma/bind` and the ceiling
+   check take them as `?overrides=`. Proforma still reads the older field,
+   `assumptions`, the same way for one release.
+4. The service checks each one (a real name, when it was typed, a number or
+   one of the offered words, a parameter whose rule takes a person's value, a
+   value inside its own low and high) and refuses one that fails, in words. A
+   person's value wins over the records and any fit for its parameter. The
+   run's basis names it as an `assumption` by that person, so the run is
+   `demo`.
+
+No tool takes a person's value, and no tool input carries an override: tool
+inputs carry ids and words. `run_flowsheet`, `proforma_write`'s `run`,
+`fermos_vessel` and `fermos_write`'s `design_vessel` run as the service binds
+the scenario or the design, with no person's value, so an input that waits for
+one refuses the call, naming it. `proforma_write`'s `bind` is refused (the
+table below).
 
 ## The read tools (OF-BLD-015 §7.2)
 
@@ -280,7 +311,7 @@ audited as `finding`.
 | `fermos_write` | `fit` | refused: a deposition's series lives in the browser | — |
 | `fermos_write` | `design_vessel` | designs the vessel a kept simulation (or, anaerobic, a kept fit) needs on BioSTEAM, the same design as `fermos_vessel` (`design_vessel`); fields `simulationArtifact` or `fitArtifact`, `vesselType`, `klaMethod`; refuses in words while the plant scale waits for a person | `vessel.design` |
 | `proforma_write` | `run` | runs the BioSTEAM scenario named in `target` as the service binds it, the same run as `run_flowsheet` (`run_scenario`); refuses naming what waits, an empty target, or a scenario the service does not hold | `proforma.run` |
-| `proforma_write` | `bind` | refused: an assumption is a named person's, in the Durable tier | — |
+| `proforma_write` | `bind` | refused: an assumption is a named person's, typed into the parameter panel and kept in the browser's Durable tier (*A person's value*, above) | — |
 | `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…`, kept in `candidates/hand/` apart from the extractor's file, so it never counts as an extraction; fields the action lists only, `negativeResult` and `isPrimary` as the word true or false | `extract.add_candidate` (§2.4's rules) |
 | `biorepo_write` | `decide` | refused: a decision is a person's | — |
 | `intake_write` | `fetch` | fetches and prepares a corpus paper's full text | `intake.fetch_paper` |
