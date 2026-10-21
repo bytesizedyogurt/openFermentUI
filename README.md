@@ -530,8 +530,8 @@ export set together.
 
 ### The gate
 
-The counts below were measured at `1555f0d` (OF-BLD-019 §3.R), in the integration gate run of
-2026-10-20 that ended green at 19:55 UTC.
+The counts below were measured at OF-BLD-020 §8.R (`8c81df4`, the code of night one's last
+commit), in the gate run of 2026-10-21 that ended green at 09:18 UTC.
 
 ```bash
 pnpm verify              # offline — no key, no service, no network — twenty-four stages, in order:
@@ -540,10 +540,10 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field, and the
                          #   provenance ranking is one list on both sides
   pnpm check:reference   #   reference content is domain knowledge, never a result
-  pnpm test:core         #   the Python service, 1,742 tests (1 skipped) at 1555f0d: retrieval, units,
+  pnpm test:core         #   the Python service, 1,930 tests (1 skipped): retrieval, units,
                          #   anchoring, match_run, biorepo.write, the computed-value basis, the artifact store
                          #   and replay, llm.py's roles, cached tokens, tool turns and daily cap, the registry's
-                         #   thirty-two tools, its gates and the proposals they make, the coverage sweep, the
+                         #   thirty-four tools, its gates and the proposals they make, the coverage sweep, the
                          #   program switch on the pool, the passages, the module rows and the coverage map,
                          #   the worker runner, the geneOS worker on a toy network worked by hand and Appendix
                          #   2's bundled-model ceilings, fermOS's fits and forecast band on synthetic runs,
@@ -560,17 +560,26 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   pureOS's trains read from a run's stream table, recovery by pass, and thermosteam's
                          #   questions, refusals and status codes against a stand-in worker; a scenario's newest
                          #   run on the service; a fermOS fit feeding a scenario, its run-out found between grid
-                         #   points and every refusal; the ceiling check, flagged and never clamped
+                         #   points and every refusal; the ceiling check, flagged and never clamped; the
+                         #   parameter panel's resolution, its providers and a person's override winning and named;
+                         #   fermOS's model families on scipy against rtol 1e-12 references (mass balance, washout
+                         #   and the Haldane culture, storage after the nutrient, the light socket refusing),
+                         #   batch fits recovering their parameters, the X0 gauge, binding from records, fits and
+                         #   kept simulations, fermos_simulate and every program rule; the vessel's request rules
+                         #   and its basis
   pnpm test:sim          #   the real BioSTEAM worker answers: the corn plant run whole and read back, glucose to
                          #   ethanol converging on stand-in inputs, one result whatever the warm worker built
-                         #   before, thermosteam's answers and the ethanol train read by pass among them
-                         #   (pytest marker sim; 20 tests)
+                         #   before, thermosteam's answers and the ethanol train read by pass among them, and
+                         #   fermOS's vessels designed on BioSTEAM (aerated by Riet and Dewes, NREL's anaerobic
+                         #   batch, the peak sizing at every scale, the heat cross-check, the class's own refusals)
+                         #   (pytest marker sim; 34 tests)
   pnpm check:licences    #   every dependency's licence against core/licences.toml; THIRD_PARTY.md current
-  pnpm check:tools       #   11 modules with a read and a write tool; writes.py calls only the 10 module write
+  pnpm check:tools       #   11 modules with a read and a write tool; writes.py calls only the 12 module write
                          #   functions it names, followed through every import and alias; no other tool file
-                         #   reaches any of the 24 functions it finds keeping a Proforma run or writing an
-                         #   audit line (rule 2b); 12 gated actions need a person's name; the 7 gates in
-                         #   gates.py and docs/TOOLS.md alike; each of the 32 names in WHITELIST registered
+                         #   reaches any of the 34 functions it finds keeping a run or writing an audit line,
+                         #   sys.modules, vars() and globals() included (rule 2b); 12 gated actions need a
+                         #   person's name; the 7 gates in gates.py and docs/TOOLS.md alike; each of the 34
+                         #   names in WHITELIST registered
                          #   and written down in docs/TOOLS.md; since OF-BLD-020 Phase 3, rule 2b also finds
                          #   what keeps a simulation, a vessel design or a train, and rule 6 (E.4‴) fails a
                          #   fermOS or pureOS tool whose input schema admits a number
@@ -587,7 +596,7 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
   pnpm test:export       #   the decision merge, exercised on core/tests/fixtures/export/; a bent one fails
   pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
-  pnpm check:store       #   the store's contracts (141 checks): the overlay is authoritative, a record remembers
+  pnpm check:store       #   the store's contracts (208 checks): the overlay is authoritative, a record remembers
                          #   its original, the program switch survives a reload, archived and example
                          #   entities hide by default and the switch brings them back; scenarios made here,
                          #   pins, a person's parameter overrides (the older assumptions read into them once)
@@ -602,13 +611,15 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:figures     #   the figure grammar: one mark per provenance, the non-evidence classes dashed, a table
                          #   row per mark, recharts only where it was; recovery by unit draws no bar where no
                          #   product enters, and says so; the cost waterfall closes on the run's own price,
-                         #   never a sum, and it and the tornado stand on the grammar
+                         #   never a sum, and it and the tornado stand on the grammar; fermOS's time course (one
+                         #   row per mark, the ceiling a rule, never a clamp) and oxygen balance (rendered, its
+                         #   shaded hours counted) stand on it too
   pnpm build
   pnpm test:durable      #   the Durable tier survives a reload, finished lessons and series times included
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
-  pnpm test:smoke        #   72 routes headless with archived programs hidden, 30 redirects, the 6 reference
-                         #   shelves and 3 seeded subsystems, 4 requests outside dist/ refused, and twelve flows:
+  pnpm test:smoke        #   74 routes headless with archived programs hidden, 30 redirects, the 6 reference
+                         #   shelves and 6 seeded subsystems, 4 requests outside dist/ refused, and fifteen flows:
                          #   programs (Settings lists them, every list says what it hides, a deep link opens
                          #   under its banner, the switch brings them back); Proforma's index, a scenario's page
                          #   (a seed and a made scenario run, every section read from the run), the reference
@@ -619,8 +630,12 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   empty state); the Guild ledger from empty to its first person; the empty states of
                          #   Witness, fermOS and Guild with the service down; pureOS's train (a run's units in
                          #   order, a click cuts the streams, Properties on its broth and product stream, a
-                         #   chemical the library lacks refused in words); and fermOS's Properties card (a late
-                         #   answer dropped for the record it left, a 503 asked again)
+                         #   chemical the library lacks refused in words); fermOS's Properties card (a late
+                         #   answer dropped for the record it left, a 503 asked again); the parameter panel
+                         #   (every input with its source, a change a named assumption the run carries, Reset
+                         #   to source); fermOS → Vessel (every design parameter in the panel, a scale a named
+                         #   assumption, the design and its oxygen balance); and fermOS → Simulate (a family
+                         #   from its sources, what waits typed under a name, the result read from the artifact)
   pnpm test:golden       #   34 checks, the switch turned on first: Postdoc down and back, its eleven questions
                          #   and no scripted mode, a live answer's steps, a replay labelled, the reader, the
                          #   review queue, Witness, scaling, Deposition, an authored cost surface's sweep
