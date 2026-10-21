@@ -125,6 +125,8 @@ def test_a_design_is_kept_cited_by_its_artifact_id_and_marked_as_the_models(mark
     assert ev.unit == "vessels" and ev.figure == "oxygen-balance" and ev.basis.artifactId == art.id
     assert s["state"] == "open" and s["vesselType"] == "bubble-column" and s["assumedBy"] == [STANDIN_PERSON]
     assert s["design"] and s["cost"]["costIndex"] and len(json.dumps(s, ensure_ascii=False)) <= tools.MAX_SUMMARY_CHARS
+    # How BioSTEAM found its duty, and what the cross-check rests on, in the service's words (§4.R).
+    assert s["heat"]["dutyNote"] and "heats of formation" in s["heat"]["dutyNote"] and s["heat"]["conventionNote"]
     # The kLa correlation and the vessel type the call named are its conventions, in the basis.
     named = {i.name: i for i in art.inputs}
     assert named["method"].value == "Dewes" and named["method"].source.kind == "convention"
@@ -217,3 +219,26 @@ def test_fermos_read_lists_kept_designs_by_their_id_or_their_simulations(marked,
     assert row.detail["unitClass"] == "NRELAnaerobicBatchBioreactor" and row.detail["source"] == ANAEROBIC_ID
     assert "NRELAnaerobicBatchBioreactor" in row.label and ANAEROBIC_ID in row.label
     assert [r.id for r in read("fermos", c, words="fermenter").rows] == [aid]
+
+
+def test_a_refusal_reads_in_the_trace_with_its_prefix_once(marked):
+    """Seen live (2026-10-21 05:50): the trace line of a refused fermos_vessel
+    read "fermos_vessel refused: fermos_vessel refused: …". The line is
+    written by code from the tool's own error, which already names the tool."""
+    from openferment_core import postdoc_agent
+
+    asked = ask(simulationArtifact=AEROBIC_ID)
+    r = tools.run("fermos_vessel", asked, ctx())
+    assert r.error.startswith("fermos_vessel refused: ")
+    line = postdoc_agent._summary_line("fermos_vessel", asked, r)
+    assert line.startswith("fermos_vessel refused: ") and line.count("fermos_vessel refused") == 1, line
+    assert "plant_scale" in line
+    # A tool whose error does not name it still reads as refused, named once.
+    other = postdoc_agent._summary_line("search_records", {}, tools.ToolResult(error="the field is unknown"))
+    assert other == "search_records refused: the field is unknown"
+    # The number refusal tools.run writes names the tool too, and reads once.
+    numbered = tools.run("fermos_vessel", ask(simulationArtifact=AEROBIC_ID, klaMethod=3), ctx())
+    assert postdoc_agent._summary_line("fermos_vessel", {}, numbered).count("fermos_vessel refused") == 1
+    # An error that names the tool another way is the line itself, the tool named once.
+    down = tools.ToolResult(error="fermos_vessel could not design the vessel: the simulator is starting")
+    assert postdoc_agent._summary_line("fermos_vessel", {}, down) == down.error

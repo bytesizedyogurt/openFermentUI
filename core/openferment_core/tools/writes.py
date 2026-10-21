@@ -322,7 +322,9 @@ def _vessel_summary(d: Any) -> dict[str, Any]:
             "method": ox.method, "kLa": ox.kLa, "kLaNeededAtPeak": ox.kLaNeededAtPeak, "kLaUnit": ox.kLaUnit,
             "otr": ox.otr, "unit": ox.unit, "short": ox.short, "oxygenBasis": ox.oxygenBasis, "aerated": ox.aerated},
         "oxygenNote": d.oxygenNote,
-        "heat": {"bst": d.heat.bst, "convention": d.heat.convention, "unit": d.heat.unit},
+        # How BioSTEAM found its duty and what the cross-check rests on, in the service's words (§4.R).
+        "heat": {"bst": d.heat.bst, "method": d.heat.method, "dutyNote": d.heat.dutyNote,
+                 "convention": d.heat.convention, "conventionNote": d.heat.conventionNote, "unit": d.heat.unit},
         "cost": {"purchase": d.cost.purchase, "installed": d.cost.installed, "unit": "USD",
                  "costIndex": d.cost.costIndex, "costIndexYear": d.cost.costIndexYear},
         "assumedBy": sorted({p.overriddenBy for p in d.parameters if p.overriddenBy}),

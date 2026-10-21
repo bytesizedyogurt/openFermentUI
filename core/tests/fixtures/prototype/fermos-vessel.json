@@ -131,7 +131,7 @@
                 "assumption",
                 "library-default"
               ],
-              "note": "Give N or V_max, not both. The NREL vessel has no default of its own: BioSTEAM's anaerobic bioreactor's, as the ethanol flowsheet passes it.",
+              "note": "Give N or V_max, not both. The NREL vessel has no default of its own: BioSTEAM's anaerobic bioreactor's, as the ethanol flowsheet passes it. A batch volume designs one vessel, which V_max does not bound: its basis names no V_max, and a V_max typed beside one is refused.",
               "boundsReason": "a physical limit: a vessel's volume is above none",
               "choices": null,
               "convention": null
@@ -152,8 +152,8 @@
                 "assumption",
                 "library-default"
               ],
-              "note": "None by default: BioSTEAM finds the number from V_max. Give N or V_max, not both.",
-              "boundsReason": "a physical limit: a design has at least one vessel (BioSTEAM's NREL vessel refuses fewer than two, in its own words)",
+              "note": "None by default: BioSTEAM finds the number from V_max. Give N or V_max, not both. A whole number; one aerated vessel at a plant scale needs a loading time.",
+              "boundsReason": "a physical limit: a design has at least one vessel, a whole number of them (a class that refuses more, as the NREL vessel does, raises the bound in its own scope, with its own words)",
               "choices": null,
               "convention": null
             },
@@ -641,7 +641,7 @@
                 "assumption",
                 "library-default"
               ],
-              "note": "None by default: the duty from the reaction's heats of formation. Not an oxygen demand: BioSTEAM sizes the air from the reaction's oxygen.",
+              "note": "None by default: the duty from the reaction's heats of formation. Not an oxygen demand: BioSTEAM sizes the air from the reaction's oxygen. Set, BioSTEAM's duty is it times the oxygen the vessel consumes, which is the reaction's scaled to the uptake the air is sized for; the heat line says so.",
               "boundsReason": "no bound: a heat released is negative and BioSTEAM takes any value",
               "choices": null,
               "convention": null
@@ -887,13 +887,13 @@
             },
             {
               "key": "our_peak",
-              "value": 1.6793730841704166,
+              "value": 1.6798948063406645,
               "low": null,
               "high": null,
               "source": {
                 "kind": "artifact",
                 "id": "d0415fc497aca19f",
-                "note": "the highest simulated oxygen uptake",
+                "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                 "by": null
               },
               "origin": "simulation",
@@ -901,7 +901,7 @@
               "overriddenBy": null,
               "libraryDefault": null,
               "recordIds": [],
-              "detail": "the highest simulated oxygen uptake",
+              "detail": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
               "outOfBounds": null
             },
             {
@@ -1254,7 +1254,7 @@
                 "assumption",
                 "library-default"
               ],
-              "note": "Give N or V_max, not both. The NREL vessel has no default of its own: BioSTEAM's anaerobic bioreactor's, as the ethanol flowsheet passes it.",
+              "note": "Give N or V_max, not both. The NREL vessel has no default of its own: BioSTEAM's anaerobic bioreactor's, as the ethanol flowsheet passes it. A batch volume designs one vessel, which V_max does not bound: its basis names no V_max, and a V_max typed beside one is refused.",
               "boundsReason": "a physical limit: a vessel's volume is above none",
               "choices": null,
               "convention": null
@@ -1275,8 +1275,8 @@
                 "assumption",
                 "library-default"
               ],
-              "note": "None by default: BioSTEAM finds the number from V_max. Give N or V_max, not both.",
-              "boundsReason": "a physical limit: a design has at least one vessel (BioSTEAM's NREL vessel refuses fewer than two, in its own words)",
+              "note": "None by default: BioSTEAM finds the number from V_max. Give N or V_max, not both. A whole number; one aerated vessel at a plant scale needs a loading time.",
+              "boundsReason": "a physical limit: a design has at least one vessel, a whole number of them (a class that refuses more, as the NREL vessel does, raises the bound in its own scope, with its own words)",
               "choices": null,
               "convention": null
             },
@@ -1763,7 +1763,7 @@
                 "assumption",
                 "library-default"
               ],
-              "note": "None by default: the duty from the reaction's heats of formation. Not an oxygen demand: BioSTEAM sizes the air from the reaction's oxygen.",
+              "note": "None by default: the duty from the reaction's heats of formation. Not an oxygen demand: BioSTEAM sizes the air from the reaction's oxygen. Set, BioSTEAM's duty is it times the oxygen the vessel consumes, which is the reaction's scaled to the uptake the air is sized for; the heat line says so.",
               "boundsReason": "no bound: a heat released is negative and BioSTEAM takes any value",
               "choices": null,
               "convention": null
@@ -2009,13 +2009,13 @@
             },
             {
               "key": "our_peak",
-              "value": 1.6793730841704166,
+              "value": 1.6798948063406645,
               "low": null,
               "high": null,
               "source": {
                 "kind": "artifact",
                 "id": "d0415fc497aca19f",
-                "note": "the highest simulated oxygen uptake",
+                "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                 "by": null
               },
               "origin": "simulation",
@@ -2023,7 +2023,7 @@
               "overriddenBy": null,
               "libraryDefault": null,
               "recordIds": [],
-              "detail": "the highest simulated oxygen uptake",
+              "detail": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
               "outOfBounds": null
             },
             {
@@ -2322,7 +2322,7 @@
               "gloss": "the largest single vessel BioSTEAM may use; it adds vessels rather than exceed it",
               "dimension": "volume",
               "unit": "m³",
-              "min": 0.0,
+              "min": 1.0,
               "max": null,
               "step": null,
               "scale": "linear",
@@ -2331,8 +2331,8 @@
                 "assumption",
                 "library-default"
               ],
-              "note": "Give N or V_max, not both. The NREL vessel has no default of its own: BioSTEAM's anaerobic bioreactor's, as the ethanol flowsheet passes it.",
-              "boundsReason": "a physical limit: a vessel's volume is above none",
+              "note": "Give N or V_max, not both. The NREL vessel has no default of its own: BioSTEAM's anaerobic bioreactor's, as the ethanol flowsheet passes it. A batch volume designs one vessel, which V_max does not bound: its basis names no V_max, and a V_max typed beside one is refused.",
+              "boundsReason": "BioSTEAM's NRELAnaerobicBatchBioreactor refuses V_max at or below 1 m³ (NRELAnaerobicBatchBioreactor.V_max's setter raises ValueError at or below it (read from its code)): a V_max above it",
               "choices": null,
               "convention": null
             },
@@ -2343,7 +2343,7 @@
               "gloss": "how many vessels share the broth; unset, BioSTEAM finds it from the largest vessel",
               "dimension": "count",
               "unit": "",
-              "min": 1.0,
+              "min": 2.0,
               "max": null,
               "step": 1.0,
               "scale": "linear",
@@ -2352,8 +2352,8 @@
                 "assumption",
                 "library-default"
               ],
-              "note": "None by default: BioSTEAM finds the number from V_max. Give N or V_max, not both.",
-              "boundsReason": "a physical limit: a design has at least one vessel (BioSTEAM's NREL vessel refuses fewer than two, in its own words)",
+              "note": "None by default: BioSTEAM finds the number from V_max. Give N or V_max, not both. A whole number; one aerated vessel at a plant scale needs a loading time.",
+              "boundsReason": "a whole number of vessels: BioSTEAM's NRELAnaerobicBatchBioreactor refuses N at or below 1 (NRELAnaerobicBatchBioreactor.N's setter raises ValueError at or below it (read from its code))",
               "choices": null,
               "convention": null
             },
@@ -2662,6 +2662,392 @@
             "Not offered: reactions, built from what the simulation made; Nmin, stored by the NREL vessel and never used (measured: a large flow gave more vessels); Nmax, stored by the NREL vessel and never used (measured: a large flow gave more vessels)."
           ]
         }
+      },
+      {
+        "fit": "a9074acb4eeb57d9",
+        "vesselType": null,
+        "status": 422,
+        "body": {
+          "detail": "fit a9074acb4eeb57d9 gives no batch time: productivity is titre over batch time, and the forecast's median sugar does not run out within its 32.5 h, so it gives no batch time; a forecast on fermOS → Forecast run until the sugar is spent does"
+        }
+      },
+      {
+        "fit": "9493894dbc27ffad",
+        "vesselType": null,
+        "status": 200,
+        "body": {
+          "scope": "fermos:vessel:9493894dbc27ffad",
+          "kind": "fermos-vessel",
+          "title": "Vessel for a growth_forecast 9493894dbc27ffad: NRELAnaerobicBatchBioreactor",
+          "specs": [
+            {
+              "key": "plant_scale",
+              "label": "Plant scale",
+              "symbol": "",
+              "gloss": "the product the plant makes in a year, which with the titre at harvest sets how much broth the vessels take",
+              "dimension": "mass",
+              "unit": "t yr⁻¹",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Scale",
+              "sourceRule": [
+                "assumption"
+              ],
+              "note": "One of plant_scale and batch_volume is needed. A plant scale runs the year on the corn plant's TEA operating hours, read from biorefineries.corn.",
+              "boundsReason": "a physical limit: a plant's yearly output is above none",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "V_max",
+              "label": "Largest vessel",
+              "symbol": "Vmax",
+              "gloss": "the largest single vessel BioSTEAM may use; it adds vessels rather than exceed it",
+              "dimension": "volume",
+              "unit": "m³",
+              "min": 1.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Vessel",
+              "sourceRule": [
+                "assumption",
+                "library-default"
+              ],
+              "note": "Give N or V_max, not both. The NREL vessel has no default of its own: BioSTEAM's anaerobic bioreactor's, as the ethanol flowsheet passes it. A batch volume designs one vessel, which V_max does not bound: its basis names no V_max, and a V_max typed beside one is refused.",
+              "boundsReason": "BioSTEAM's NRELAnaerobicBatchBioreactor refuses V_max at or below 1 m³ (NRELAnaerobicBatchBioreactor.V_max's setter raises ValueError at or below it (read from its code)): a V_max above it",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "N",
+              "label": "Number of vessels",
+              "symbol": "N",
+              "gloss": "how many vessels share the broth; unset, BioSTEAM finds it from the largest vessel",
+              "dimension": "count",
+              "unit": "",
+              "min": 2.0,
+              "max": null,
+              "step": 1.0,
+              "scale": "linear",
+              "group": "Vessel",
+              "sourceRule": [
+                "assumption",
+                "library-default"
+              ],
+              "note": "None by default: BioSTEAM finds the number from V_max. Give N or V_max, not both. A whole number; one aerated vessel at a plant scale needs a loading time.",
+              "boundsReason": "a whole number of vessels: BioSTEAM's NRELAnaerobicBatchBioreactor refuses N at or below 1 (NRELAnaerobicBatchBioreactor.N's setter raises ValueError at or below it (read from its code))",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "V_wf",
+              "label": "Working volume fraction",
+              "symbol": "V_wf",
+              "gloss": "the share of each vessel the broth fills",
+              "dimension": "fraction",
+              "unit": "",
+              "min": 0.0,
+              "max": 1.0,
+              "step": null,
+              "scale": "linear",
+              "group": "Vessel",
+              "sourceRule": [
+                "assumption",
+                "library-default"
+              ],
+              "note": null,
+              "boundsReason": "a physical limit: a share lies between none and the whole",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "tau",
+              "label": "Reacting time",
+              "symbol": "τ",
+              "gloss": "the hours each batch reacts: the simulation's harvest hour",
+              "dimension": "time",
+              "unit": "h",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Schedule",
+              "sourceRule": [
+                "simulation",
+                "artifact",
+                "assumption"
+              ],
+              "note": null,
+              "boundsReason": "a physical limit: a batch's time is above none",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "tau_0",
+              "label": "Cleaning and unloading time",
+              "symbol": "τ₀",
+              "gloss": "the hours between batches to empty and clean a vessel",
+              "dimension": "time",
+              "unit": "h",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Schedule",
+              "sourceRule": [
+                "assumption",
+                "library-default"
+              ],
+              "note": null,
+              "boundsReason": "a physical limit: no negative time",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "loading_time",
+              "label": "Loading time",
+              "symbol": "",
+              "gloss": "the hours to fill a vessel; unset, BioSTEAM takes each vessel to be filled all the time it is not reacting or being cleaned",
+              "dimension": "time",
+              "unit": "h",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Schedule",
+              "sourceRule": [
+                "assumption",
+                "library-default"
+              ],
+              "note": "None by default: BioSTEAM assumes each vessel is constantly being filled.",
+              "boundsReason": "a physical limit: no negative time",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "T",
+              "label": "Temperature",
+              "symbol": "T",
+              "gloss": "the broth's temperature",
+              "dimension": "temperature",
+              "unit": "K",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Heat",
+              "sourceRule": [
+                "assumption",
+                "library-default"
+              ],
+              "note": null,
+              "boundsReason": "a physical limit: a temperature in kelvin is above none",
+              "choices": null,
+              "convention": null
+            },
+            {
+              "key": "P",
+              "label": "Pressure",
+              "symbol": "P",
+              "gloss": "the vessel's operating pressure",
+              "dimension": "pressure",
+              "unit": "Pa",
+              "min": 0.0,
+              "max": null,
+              "step": null,
+              "scale": "linear",
+              "group": "Heat",
+              "sourceRule": [
+                "assumption",
+                "library-default"
+              ],
+              "note": null,
+              "boundsReason": "a physical limit: an absolute pressure is above none",
+              "choices": null,
+              "convention": null
+            }
+          ],
+          "values": [
+            {
+              "key": "plant_scale",
+              "value": null,
+              "low": null,
+              "high": null,
+              "source": null,
+              "origin": "waiting",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "waits for a source: a named person's assumption",
+              "outOfBounds": null
+            },
+            {
+              "key": "V_max",
+              "value": 3785.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "NRELAnaerobicBatchBioreactor's own default for V_max, read from bst.AnaerobicBioreactor.V_max_default: the NREL vessel has no default of its own, and the ethanol flowsheet passes BioSTEAM's anaerobic bioreactor's",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 3785.0,
+              "recordIds": [],
+              "detail": "NRELAnaerobicBatchBioreactor's default, from bst.AnaerobicBioreactor.V_max_default: the NREL vessel has no default of its own, and the ethanol flowsheet passes BioSTEAM's anaerobic bioreactor's",
+              "outOfBounds": null
+            },
+            {
+              "key": "N",
+              "value": null,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "NRELAnaerobicBatchBioreactor's own default for N, read from NRELAnaerobicBatchBioreactor._init's signature: None, which the class reads at run time",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "NRELAnaerobicBatchBioreactor's default, from NRELAnaerobicBatchBioreactor._init's signature: None, which the class reads at run time",
+              "outOfBounds": null
+            },
+            {
+              "key": "V_wf",
+              "value": 0.9,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "NRELAnaerobicBatchBioreactor's own default for V_wf, read from NRELAnaerobicBatchBioreactor.V_wf",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 0.9,
+              "recordIds": [],
+              "detail": "NRELAnaerobicBatchBioreactor's default, from NRELAnaerobicBatchBioreactor.V_wf",
+              "outOfBounds": null
+            },
+            {
+              "key": "tau",
+              "value": 82.9164214090859,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "artifact",
+                "id": "9493894dbc27ffad",
+                "note": "the fit's batch time: the hour its forecast's median sugar runs out",
+                "by": null
+              },
+              "origin": "artifact",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "the fit's batch time: the hour its forecast's median sugar runs out",
+              "outOfBounds": null
+            },
+            {
+              "key": "tau_0",
+              "value": 3.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "NRELAnaerobicBatchBioreactor's own default for tau_0, read from NRELAnaerobicBatchBioreactor.tau_0",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 3.0,
+              "recordIds": [],
+              "detail": "NRELAnaerobicBatchBioreactor's default, from NRELAnaerobicBatchBioreactor.tau_0",
+              "outOfBounds": null
+            },
+            {
+              "key": "loading_time",
+              "value": null,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "NRELAnaerobicBatchBioreactor's own default for loading_time, read from NRELAnaerobicBatchBioreactor._init's signature: None, which the class reads at run time",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "NRELAnaerobicBatchBioreactor's default, from NRELAnaerobicBatchBioreactor._init's signature: None, which the class reads at run time",
+              "outOfBounds": null
+            },
+            {
+              "key": "T",
+              "value": 305.15,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "NRELAnaerobicBatchBioreactor's own default for T, read from NRELAnaerobicBatchBioreactor._init's signature",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 305.15,
+              "recordIds": [],
+              "detail": "NRELAnaerobicBatchBioreactor's default, from NRELAnaerobicBatchBioreactor._init's signature",
+              "outOfBounds": null
+            },
+            {
+              "key": "P",
+              "value": 101325.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "NRELAnaerobicBatchBioreactor's own default for P, read from NRELAnaerobicBatchBioreactor._init's signature",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 101325.0,
+              "recordIds": [],
+              "detail": "NRELAnaerobicBatchBioreactor's default, from NRELAnaerobicBatchBioreactor._init's signature",
+              "outOfBounds": null
+            }
+          ],
+          "waiting": [
+            "plant_scale"
+          ],
+          "notes": [
+            "A plant scale is needed: it sizes the vessels for a year's product over the corn TEA's operating hours. BioSTEAM's NREL batch fermenter sizes two vessels or more, so a batch volume of one vessel is not offered.",
+            "Each default is NRELAnaerobicBatchBioreactor's own in BioSTEAM 2.54.0, read from its code at import in the worker; a value a person types is a named assumption, and the design's basis names it.",
+            "Not offered: reactions, built from what the simulation made; Nmin, stored by the NREL vessel and never used (measured: a large flow gave more vessels); Nmax, stored by the NREL vessel and never used (measured: a large flow gave more vessels).",
+            "from growth_forecast 9493894dbc27ffad: the titre (12.4 g L⁻¹) and the yield (0.2052 g g⁻¹) its forecast gives, and the hour its median sugar runs out as the batch time; a fit gives no cells, so none are in the broth, and the glucose fed is what the titre over the yield used"
+          ]
+        }
       }
     ],
     "designs": [
@@ -2701,7 +3087,7 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "54b1e23cc817621c",
+          "artifactId": "d8295a1a3a60d221",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
           "source": "d0415fc497aca19f",
@@ -2797,19 +3183,19 @@
             },
             {
               "label": "Agitator power, each vessel",
-              "value": 142.26654628093408,
+              "value": 142.29736317395256,
               "unit": "kW",
               "readFrom": "the agitator auxiliary's power utility (none when kW_per_m3 is zero)"
             },
             {
               "label": "Agitation power per working volume",
-              "value": 0.5202813838196628,
+              "value": 0.5203940839319788,
               "unit": "kW/m3",
               "readFrom": "the unit's kW_per_m3 after the run (solved when optimize_power is on)"
             },
             {
               "label": "Compressor power",
-              "value": 5127.772693839579,
+              "value": 5128.88448642793,
               "unit": "kW",
               "readFrom": "the compressor auxiliary's power utility"
             },
@@ -2821,67 +3207,67 @@
             },
             {
               "label": "Air cooler duty",
-              "value": -14767985.35825798,
+              "value": -14771187.32091243,
               "unit": "kJ/hr",
               "readFrom": "the air cooler auxiliary's heat utility"
             },
             {
               "label": "Air fed",
-              "value": 116060.21323465646,
+              "value": 116085.37715914744,
               "unit": "m3/hr",
               "readFrom": "the air stream, at its own conditions"
             },
             {
               "label": "Air fed",
-              "value": 4636.194666945971,
+              "value": 4637.199876649392,
               "unit": "kmol/hr",
               "readFrom": "the air stream"
             },
             {
               "label": "Recirculation pump power, each vessel",
-              "value": 36.53530905154626,
+              "value": 36.53514643738963,
               "unit": "kW",
               "readFrom": "the recirculation pump auxiliary's power utility"
             },
             {
               "label": "kLa achieved",
-              "value": 302.5941028977288,
+              "value": 302.68592074638,
               "unit": "1/hr",
               "readFrom": "get_kLa(), by Riet"
             },
             {
               "label": "Superficial gas velocity",
-              "value": 0.039792575512683497,
+              "value": 0.039801203252867616,
               "unit": "m/s",
               "readFrom": "the unit's superficial_gas_flow"
             },
             {
               "label": "Aeration, vvm",
-              "value": 0.1893306645650562,
+              "value": 0.18937171483038107,
               "unit": "1/min",
               "readFrom": "the sparged gas per vessel while it reacts over its working volume, as BioSTEAM reckons the gas velocity"
             },
             {
               "label": "Reactor duty",
-              "value": -449459496.905777,
+              "value": -449457417.45535564,
               "unit": "kJ/hr",
-              "readFrom": "the unit's _get_duty(): the enthalpy and heats of formation out less in, or Q_O2_consumption times the oxygen consumed"
+              "readFrom": "the unit's _get_duty(): the enthalpy and heats of formation out less in"
             },
             {
               "label": "Cooling duty, every heat utility",
-              "value": -464227482.2640197,
+              "value": -464228604.7762576,
               "unit": "kJ/hr",
               "readFrom": "the unit's heat utilities, auxiliaries included"
             },
             {
               "label": "Electricity, the whole unit",
-              "value": 9061.413511154147,
+              "value": 9063.199697877459,
               "unit": "kW",
               "readFrom": "the unit's power utility"
             },
             {
               "label": "Utility cost",
-              "value": 3029.7399478923517,
+              "value": 3029.885240255305,
               "unit": "USD/hr",
               "readFrom": "the unit's utility_cost"
             }
@@ -3297,34 +3683,41 @@
               31.165350723239285,
               9.900899137190736
             ],
-            "otr": 52.48237696946187,
+            "otr": 52.49868139869822,
             "unit": "mmol L⁻¹ h⁻¹",
             "short": [],
-            "kLa": 302.5941028977288,
-            "kLaNeededAtPeak": 302.5941028977289,
+            "kLa": 302.68592074638,
+            "kLaNeededAtPeak": 302.68592074638,
             "kLaUnit": "h⁻¹",
             "method": "Riet",
             "aerated": true,
             "oxygenBasis": "peak",
-            "targetUptake": 52.482376969461875,
-            "sized": 52.482376969461875,
-            "balancedUptake": 217.36968813155505,
-            "scale": 0.24144294184062515,
+            "targetUptake": 52.49868139869822,
+            "sized": 52.4986813986982,
+            "balancedUptake": 217.3696881315551,
+            "scale": 0.24151794967348575,
             "cStar": 0.6298616529355925,
             "cL": 0.31493082646779624,
-            "drivingForce": 0.17344150618559787,
-            "reactionO2KmolPerH": 950.5702856629331
+            "drivingForce": 0.17344275964089775,
+            "reactionO2KmolPerH": 950.5702856629334,
+            "scaledO2KmolPerH": 229.57978641385125,
+            "simulatedO2KmolPerH": 98.61231952279888,
+            "floorKmolPerH": 0.036000000000000004
           },
           "oxygenNote": null,
           "heat": {
-            "bst": -449459496.905777,
-            "convention": -437490468.2735083,
-            "conventionNote": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention beside BioSTEAM's own duty from the heats of formation; applied to the oxygen the reaction consumes as its yields balance it, 950.6 kmol/hr, before any scale to the peak",
-            "unit": "kJ/hr"
+            "bst": -449457417.45535564,
+            "convention": -45385333.93717296,
+            "conventionNote": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention set beside BioSTEAM's own duty as a cross-check; applied to the oxygen the simulation took up: the trapezoid integral of its uptake over the batch to harvest, 216.1 mmol L⁻¹, times each vessel's working volume, 273.4 m³, and the vessels, 22, over the 13.18 h cycle: 98.61 kmol/hr",
+            "unit": "kJ/hr",
+            "method": "heats-of-formation",
+            "consumedKmolPerH": 229.57978641385125,
+            "oxygenKmolPerH": 98.61231952279888,
+            "dutyNote": "from the reaction's enthalpy and heats of formation, out less in (AeratedBioreactor._get_duty, with no heat per oxygen forced)"
           },
           "cost": {
-            "purchase": 16698298.562980352,
-            "installed": 37941172.37984018,
+            "purchase": 16699042.20488151,
+            "installed": 37942507.267473966,
             "byItem": {
               "Vertical pressure vessel": {
                 "purchase": 6784969.892481726,
@@ -3335,31 +3728,31 @@
                 "installed": 1206062.2594276203
               },
               "Compressor - Compressor(s)": {
-                "purchase": 3376989.844170864,
-                "installed": 7260528.164967358
+                "purchase": 3377520.1547239744,
+                "installed": 7261668.332656545
               },
               "Air cooler - Floating head": {
-                "purchase": 35669.12487121164,
-                "installed": 114181.52379135278
+                "purchase": 35672.629341154054,
+                "installed": 114192.74205699709
               },
               "Heat exchanger - Floating head": {
-                "purchase": 2829950.091836587,
-                "installed": 9086124.117316274
+                "purchase": 2829939.3833646933,
+                "installed": 9086089.73561286
               },
               "Recirculation pump - Pump": {
-                "purchase": 614473.3348358505,
-                "installed": 1321117.6698970785
+                "purchase": 614471.4696988793,
+                "installed": 1321113.6598525902
               },
               "Recirculation pump - Motor": {
-                "purchase": 47061.094538821424,
-                "installed": 155301.61197811068
+                "purchase": 47060.87407790898,
+                "installed": 155300.88445709963
               },
               "Agitator - Agitator": {
-                "purchase": 1803122.920817674,
-                "installed": 1803122.920817674
+                "purchase": 1803345.5417655534,
+                "installed": 1803345.5417655534
               }
             },
-            "utility": 3029.7399478923517,
+            "utility": 3029.885240255305,
             "costIndex": 567.5,
             "costIndexYear": 2017,
             "note": "BioSTEAM's own cost correlations for this class and its auxiliaries, at the plant cost index it holds (its default, of 2017); installed is purchase times BioSTEAM's bare-module factors. The NREL vessel's correlations are scaled from their own base index to it."
@@ -3595,13 +3988,13 @@
             },
             {
               "key": "our_peak",
-              "value": 1.6793730841704166,
+              "value": 1.6798948063406645,
               "low": null,
               "high": null,
               "source": {
                 "kind": "artifact",
                 "id": "d0415fc497aca19f",
-                "note": "the highest simulated oxygen uptake",
+                "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                 "by": null
               },
               "origin": "simulation",
@@ -3609,7 +4002,7 @@
               "overriddenBy": null,
               "libraryDefault": null,
               "recordIds": [],
-              "detail": "the highest simulated oxygen uptake",
+              "detail": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
               "outOfBounds": null
             },
             {
@@ -3645,7 +4038,7 @@
               "origin": "library-default",
               "identified": null,
               "overriddenBy": null,
-              "libraryDefault": null,
+              "libraryDefault": "Riet",
               "recordIds": [],
               "detail": "AeratedBioreactor's own default for method, read from a AeratedBioreactor built as a stirred tank with nothing else set",
               "outOfBounds": null
@@ -3721,7 +4114,7 @@
               "origin": "library-default",
               "identified": null,
               "overriddenBy": null,
-              "libraryDefault": 1.0,
+              "libraryDefault": "true",
               "recordIds": [],
               "detail": "AeratedBioreactor's own default for optimize_power, read from a AeratedBioreactor built as a stirred tank with nothing else set",
               "outOfBounds": null
@@ -3870,7 +4263,7 @@
             "N": null,
             "loading_time": null,
             "length_to_diameter": 3.0,
-            "kW_per_m3": 0.5202813838196628,
+            "kW_per_m3": 0.5203940839319788,
             "vessel_material": "Stainless steel 316",
             "vessel_type": "Vertical",
             "heat_exchanger_configuration": "recirculation loop",
@@ -3893,19 +4286,20 @@
             "equation": "Reaction('Glucose + 3.76 O2 -> 3.93 Water + 0.541 Ethanol + 4.37 CO2 + 0.552 Yeast', reactant='Glucose', X=0.999, basis='mol')",
             "stoichiometry": {
               "Glucose": -1.0,
-              "O2": -3.755925815312546,
+              "O2": -3.7559258153125463,
               "Yeast": 0.5520404011459751,
               "Ethanol": 0.5414696114670323,
               "CO2": 4.36502037591996,
-              "Water": 3.9311986426763927
+              "Water": 3.931198642676393
             },
             "glucoseUsedShare": 0.9989999999999999,
-            "impliedYxo": 0.10377599373199475
+            "impliedYxo": 0.10377599373199474
           },
           "flags": [
-            "the reaction consumes 0.2414 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
+            "the reaction consumes 0.2415 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
+            "the reaction's yields balance 950.6 kmol/hr of oxygen and the simulation took up 98.61 kmol/hr over the batch (0.104 times as much), apart by more than 0.1 of the reaction's, the stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up",
             "BioSTEAM warned: CostWarning: <AeratedBioreactor: R1> Vertical vessel length (51.72 ft) is out of bounds (12 to 40 ft) for cost correlation",
-            "BioSTEAM warned: CostWarning: <IsentropicCompressor: compressor> power (6876 hp) is out of bounds (10 to 750 hp) for cost correlation",
+            "BioSTEAM warned: CostWarning: <IsentropicCompressor: compressor> power (6878 hp) is out of bounds (10 to 750 hp) for cost correlation",
             "BioSTEAM warned: OptimizeWarning: Unknown solver options: xtol"
           ],
           "versions": {
@@ -3914,7 +4308,7 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "54b1e23cc817621c",
+            "id": "d8295a1a3a60d221",
             "label": "Vessel design for fermos.simulation d0415fc497aca19f: BioSTEAM's AeratedBioreactor, stirred tank, the number of vessels it sized (every other number is in the artifact)",
             "value": 22.0,
             "unit": "vessels",
@@ -3922,7 +4316,7 @@
             "provenance": "demo",
             "basis": {
               "tool": "fermos.vessel",
-              "toolVersion": "vessel 1 · biosteam 2.54.0 · thermosteam 0.54.2",
+              "toolVersion": "vessel 2 · biosteam 2.54.0 · thermosteam 0.54.2",
               "inputs": [
                 {
                   "name": "simulation",
@@ -4008,7 +4402,18 @@
                   "source": {
                     "kind": "model",
                     "id": "biorefineries@2.35.1",
-                    "note": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention beside BioSTEAM's own duty from the heats of formation (the cross-check, labelled a convention)",
+                    "note": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention set beside BioSTEAM's own duty as a cross-check (the cross-check, labelled a convention)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "oxygen agreement tolerance",
+                  "value": 0.1,
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "the share of the reaction's balanced oxygen within which the oxygen the simulation took up agrees with it; beyond it the design flags both (the heat cross-check's tolerance, a convention: a heat-per-oxygen rule is a rule of thumb)",
                     "by": null
                   }
                 },
@@ -4124,12 +4529,12 @@
                 },
                 {
                   "name": "our_peak",
-                  "value": 1.6793730841704166,
+                  "value": 1.6798948063406645,
                   "unit": "g O₂ L⁻¹ h⁻¹",
                   "source": {
                     "kind": "artifact",
                     "id": "d0415fc497aca19f",
-                    "note": "the highest simulated oxygen uptake",
+                    "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                     "by": null
                   }
                 },
@@ -4266,7 +4671,7 @@
                   }
                 }
               ],
-              "artifactId": "54b1e23cc817621c",
+              "artifactId": "d8295a1a3a60d221",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },
@@ -4306,7 +4711,7 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "f6bc04d73ee338de",
+          "artifactId": "8729d09ddf237999",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
           "source": "d0415fc497aca19f",
@@ -4414,7 +4819,7 @@
             },
             {
               "label": "Compressor power",
-              "value": 4419.186376246457,
+              "value": 4420.574609505827,
               "unit": "kW",
               "readFrom": "the compressor auxiliary's power utility"
             },
@@ -4426,67 +4831,67 @@
             },
             {
               "label": "Air cooler duty",
-              "value": -12727256.76358981,
+              "value": -12731254.875376776,
               "unit": "kJ/hr",
               "readFrom": "the air cooler auxiliary's heat utility"
             },
             {
               "label": "Air fed",
-              "value": 100022.3184165379,
+              "value": 100053.73920246575,
               "unit": "m3/hr",
               "readFrom": "the air stream, at its own conditions"
             },
             {
               "label": "Air fed",
-              "value": 3995.5375429196065,
+              "value": 3996.7926920882137,
               "unit": "kmol/hr",
               "readFrom": "the air stream"
             },
             {
               "label": "Recirculation pump power, each vessel",
-              "value": 36.64772452899757,
+              "value": 36.64751773188407,
               "unit": "kW",
               "readFrom": "the recirculation pump auxiliary's power utility"
             },
             {
               "label": "kLa achieved",
-              "value": 311.6513742765154,
+              "value": 311.73948420770733,
               "unit": "1/hr",
               "readFrom": "get_kLa(), by Dewes"
             },
             {
               "label": "Superficial gas velocity",
-              "value": 0.034293799292755875,
+              "value": 0.03430457226966032,
               "unit": "m/s",
               "readFrom": "the unit's superficial_gas_flow"
             },
             {
               "label": "Aeration, vvm",
-              "value": 0.16316782030076402,
+              "value": 0.16321907747249478,
               "unit": "1/min",
               "readFrom": "the sparged gas per vessel while it reacts over its working volume, as BioSTEAM reckons the gas velocity"
             },
             {
               "label": "Reactor duty",
-              "value": -450896790.71820354,
+              "value": -450894148.08706,
               "unit": "kJ/hr",
-              "readFrom": "the unit's _get_duty(): the enthalpy and heats of formation out less in, or Q_O2_consumption times the oxygen consumed"
+              "readFrom": "the unit's _get_duty(): the enthalpy and heats of formation out less in"
             },
             {
               "label": "Cooling duty, every heat utility",
-              "value": -463624047.4818134,
+              "value": -463625402.9624358,
               "unit": "kJ/hr",
               "readFrom": "the unit's heat utilities, auxiliaries included"
             },
             {
               "label": "Electricity, the whole unit",
-              "value": 5225.4363158844035,
+              "value": 5226.819999607276,
               "unit": "kW",
               "readFrom": "the unit's power utility"
             },
             {
               "label": "Utility cost",
-              "value": 2726.749357311228,
+              "value": 2726.864338781469,
               "unit": "USD/hr",
               "readFrom": "the unit's utility_cost"
             }
@@ -4902,34 +5307,41 @@
               31.165350723239285,
               9.900899137190736
             ],
-            "otr": 52.48238379855377,
+            "otr": 52.49868823371537,
             "unit": "mmol L⁻¹ h⁻¹",
             "short": [],
-            "kLa": 311.6513742765154,
-            "kLaNeededAtPeak": 311.6513337239391,
+            "kLa": 311.73948420770733,
+            "kLaNeededAtPeak": 311.7394436210795,
             "kLaUnit": "h⁻¹",
             "method": "Dewes",
             "aerated": true,
             "oxygenBasis": "peak",
-            "targetUptake": 52.482376969461875,
-            "sized": 52.482376969461875,
-            "balancedUptake": 217.36968813155505,
-            "scale": 0.24144294184062515,
+            "targetUptake": 52.49868139869822,
+            "sized": 52.4986813986982,
+            "balancedUptake": 217.3696881315551,
+            "scale": 0.24151794967348575,
             "cStar": 0.6298616529355925,
             "cL": 0.31493082646779624,
-            "drivingForce": 0.16840093813283916,
-            "reactionO2KmolPerH": 950.5702856629331
+            "drivingForce": 0.16840564283071785,
+            "reactionO2KmolPerH": 950.5702856629334,
+            "scaledO2KmolPerH": 229.57978641385125,
+            "simulatedO2KmolPerH": 98.61231952279888,
+            "floorKmolPerH": 0.036000000000000004
           },
           "oxygenNote": null,
           "heat": {
-            "bst": -450896790.71820354,
-            "convention": -437490468.2735083,
-            "conventionNote": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention beside BioSTEAM's own duty from the heats of formation; applied to the oxygen the reaction consumes as its yields balance it, 950.6 kmol/hr, before any scale to the peak",
-            "unit": "kJ/hr"
+            "bst": -450894148.08706,
+            "convention": -45385333.93717296,
+            "conventionNote": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention set beside BioSTEAM's own duty as a cross-check; applied to the oxygen the simulation took up: the trapezoid integral of its uptake over the batch to harvest, 216.1 mmol L⁻¹, times each vessel's working volume, 273.4 m³, and the vessels, 22, over the 13.18 h cycle: 98.61 kmol/hr",
+            "unit": "kJ/hr",
+            "method": "heats-of-formation",
+            "consumedKmolPerH": 229.57978641385125,
+            "oxygenKmolPerH": 98.61231952279888,
+            "dutyNote": "from the reaction's enthalpy and heats of formation, out less in (AeratedBioreactor._get_duty, with no heat per oxygen forced)"
           },
           "cost": {
-            "purchase": 14325713.892166715,
-            "installed": 34919359.85805944,
+            "purchase": 14326339.375431268,
+            "installed": 34920694.59154556,
             "byItem": {
               "Vertical pressure vessel": {
                 "purchase": 6784969.892481726,
@@ -4940,27 +5352,27 @@
                 "installed": 1206062.2594276203
               },
               "Compressor - Compressor(s)": {
-                "purchase": 2800942.420785873,
-                "installed": 6022026.2046896275
+                "purchase": 2801579.6915409365,
+                "installed": 6023396.336813013
               },
               "Air cooler - Floating head": {
-                "purchase": 33411.043752522324,
-                "installed": 106953.11143452134
+                "purchase": 33415.51864529067,
+                "installed": 106967.43615027868
               },
               "Heat exchanger - Floating head": {
-                "purchase": 2837352.125254961,
-                "installed": 9109889.83479443
+                "purchase": 2837338.514927552,
+                "installed": 9109846.13610007
               },
               "Recirculation pump - Pump": {
-                "purchase": 615762.5743153873,
-                "installed": 1323889.5347780825
+                "purchase": 615760.202901737,
+                "installed": 1323884.4362387345
               },
               "Recirculation pump - Motor": {
-                "purchase": 47213.57614862344,
-                "installed": 155804.80129045734
+                "purchase": 47213.29550640597,
+                "installed": 155803.8751711397
               }
             },
-            "utility": 2726.749357311228,
+            "utility": 2726.864338781469,
             "costIndex": 567.5,
             "costIndexYear": 2017,
             "note": "BioSTEAM's own cost correlations for this class and its auxiliaries, at the plant cost index it holds (its default, of 2017); installed is purchase times BioSTEAM's bare-module factors. The NREL vessel's correlations are scaled from their own base index to it."
@@ -5196,13 +5608,13 @@
             },
             {
               "key": "our_peak",
-              "value": 1.6793730841704166,
+              "value": 1.6798948063406645,
               "low": null,
               "high": null,
               "source": {
                 "kind": "artifact",
                 "id": "d0415fc497aca19f",
-                "note": "the highest simulated oxygen uptake",
+                "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                 "by": null
               },
               "origin": "simulation",
@@ -5210,7 +5622,7 @@
               "overriddenBy": null,
               "libraryDefault": null,
               "recordIds": [],
-              "detail": "the highest simulated oxygen uptake",
+              "detail": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
               "outOfBounds": null
             },
             {
@@ -5246,7 +5658,7 @@
               "origin": "library-default",
               "identified": null,
               "overriddenBy": null,
-              "libraryDefault": null,
+              "libraryDefault": "Dewes",
               "recordIds": [],
               "detail": "AeratedBioreactor's own default for method, read from a AeratedBioreactor built as a bubble column with nothing else set",
               "outOfBounds": null
@@ -5322,7 +5734,7 @@
               "origin": "library-default",
               "identified": null,
               "overriddenBy": null,
-              "libraryDefault": 1.0,
+              "libraryDefault": "false",
               "recordIds": [],
               "detail": "AeratedBioreactor's own default for optimize_power, read from a AeratedBioreactor built as a bubble column with nothing else set",
               "outOfBounds": null
@@ -5494,19 +5906,20 @@
             "equation": "Reaction('Glucose + 3.76 O2 -> 3.93 Water + 0.541 Ethanol + 4.37 CO2 + 0.552 Yeast', reactant='Glucose', X=0.999, basis='mol')",
             "stoichiometry": {
               "Glucose": -1.0,
-              "O2": -3.755925815312546,
+              "O2": -3.7559258153125463,
               "Yeast": 0.5520404011459751,
               "Ethanol": 0.5414696114670323,
               "CO2": 4.36502037591996,
-              "Water": 3.9311986426763927
+              "Water": 3.931198642676393
             },
             "glucoseUsedShare": 0.9989999999999999,
-            "impliedYxo": 0.10377599373199475
+            "impliedYxo": 0.10377599373199474
           },
           "flags": [
-            "the reaction consumes 0.2414 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
+            "the reaction consumes 0.2415 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
+            "the reaction's yields balance 950.6 kmol/hr of oxygen and the simulation took up 98.61 kmol/hr over the batch (0.104 times as much), apart by more than 0.1 of the reaction's, the stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up",
             "BioSTEAM warned: CostWarning: <AeratedBioreactor: R1> Vertical vessel length (51.72 ft) is out of bounds (12 to 40 ft) for cost correlation",
-            "BioSTEAM warned: CostWarning: <IsentropicCompressor: compressor> power (5926 hp) is out of bounds (10 to 750 hp) for cost correlation"
+            "BioSTEAM warned: CostWarning: <IsentropicCompressor: compressor> power (5928 hp) is out of bounds (10 to 750 hp) for cost correlation"
           ],
           "versions": {
             "biosteam": "2.54.0",
@@ -5514,7 +5927,7 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "f6bc04d73ee338de",
+            "id": "8729d09ddf237999",
             "label": "Vessel design for fermos.simulation d0415fc497aca19f: BioSTEAM's AeratedBioreactor, bubble column, the number of vessels it sized (every other number is in the artifact)",
             "value": 22.0,
             "unit": "vessels",
@@ -5522,7 +5935,7 @@
             "provenance": "demo",
             "basis": {
               "tool": "fermos.vessel",
-              "toolVersion": "vessel 1 · biosteam 2.54.0 · thermosteam 0.54.2",
+              "toolVersion": "vessel 2 · biosteam 2.54.0 · thermosteam 0.54.2",
               "inputs": [
                 {
                   "name": "simulation",
@@ -5608,7 +6021,18 @@
                   "source": {
                     "kind": "model",
                     "id": "biorefineries@2.35.1",
-                    "note": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention beside BioSTEAM's own duty from the heats of formation (the cross-check, labelled a convention)",
+                    "note": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention set beside BioSTEAM's own duty as a cross-check (the cross-check, labelled a convention)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "oxygen agreement tolerance",
+                  "value": 0.1,
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "the share of the reaction's balanced oxygen within which the oxygen the simulation took up agrees with it; beyond it the design flags both (the heat cross-check's tolerance, a convention: a heat-per-oxygen rule is a rule of thumb)",
                     "by": null
                   }
                 },
@@ -5724,12 +6148,12 @@
                 },
                 {
                   "name": "our_peak",
-                  "value": 1.6793730841704166,
+                  "value": 1.6798948063406645,
                   "unit": "g O₂ L⁻¹ h⁻¹",
                   "source": {
                     "kind": "artifact",
                     "id": "d0415fc497aca19f",
-                    "note": "the highest simulated oxygen uptake",
+                    "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                     "by": null
                   }
                 },
@@ -5866,7 +6290,7 @@
                   }
                 }
               ],
-              "artifactId": "f6bc04d73ee338de",
+              "artifactId": "8729d09ddf237999",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },
@@ -5896,7 +6320,7 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "a16fa81502bbb49c",
+          "artifactId": "760e4449a856ea16",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
           "source": "0a131e039e37b30d",
@@ -5996,8 +6420,12 @@
           "heat": {
             "bst": -14417648.305932999,
             "convention": null,
-            "conventionNote": "the cross-check rests on oxygen consumed, and an anaerobic vessel consumes none: BioSTEAM's duty from the reaction's heats of formation stands alone",
-            "unit": "kJ/hr"
+            "conventionNote": "the cross-check rests on oxygen consumed, and an anaerobic vessel consumes none: BioSTEAM's duty stands alone",
+            "unit": "kJ/hr",
+            "method": "heats-of-formation",
+            "consumedKmolPerH": null,
+            "oxygenKmolPerH": null,
+            "dutyNote": "from the reaction's enthalpy and heats of formation, out less in (the NREL fermenter's design result 'Reactor duty', its Hnet)"
           },
           "cost": {
             "purchase": 3464619.237523058,
@@ -6233,7 +6661,7 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "a16fa81502bbb49c",
+            "id": "760e4449a856ea16",
             "label": "Vessel design for fermos.simulation 0a131e039e37b30d: BioSTEAM's NRELAnaerobicBatchBioreactor, the number of vessels it sized (every other number is in the artifact)",
             "value": 3.0,
             "unit": "vessels",
@@ -6241,7 +6669,7 @@
             "provenance": "demo",
             "basis": {
               "tool": "fermos.vessel",
-              "toolVersion": "vessel 1 · biosteam 2.54.0 · thermosteam 0.54.2",
+              "toolVersion": "vessel 2 · biosteam 2.54.0 · thermosteam 0.54.2",
               "inputs": [
                 {
                   "name": "simulation",
@@ -6387,11 +6815,1646 @@
                   }
                 }
               ],
-              "artifactId": "a16fa81502bbb49c",
+              "artifactId": "760e4449a856ea16",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },
             "figure": null
+          }
+        }
+      },
+      {
+        "request": {
+          "simulation": "d0415fc497aca19f",
+          "fit": null,
+          "vesselType": null,
+          "klaMethod": null,
+          "overrides": [
+            {
+              "scope": "fermos:vessel:d0415fc497aca19f",
+              "key": "Q_O2_consumption",
+              "value": -400000.0,
+              "low": null,
+              "high": null,
+              "by": "openFerment test fixture",
+              "at": "2026-10-21",
+              "note": "STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result"
+            },
+            {
+              "scope": "fermos:vessel:d0415fc497aca19f",
+              "key": "plant_scale",
+              "value": 50000.0,
+              "low": null,
+              "high": null,
+              "by": "openFerment test fixture",
+              "at": "2026-10-21",
+              "note": "STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result"
+            }
+          ],
+          "includeArchived": false
+        },
+        "status": 200,
+        "body": {
+          "artifactId": "8f0f32642dcd9e11",
+          "provenance": "demo",
+          "createdAt": "2026-09-15T09:00:00Z",
+          "source": "d0415fc497aca19f",
+          "sourceTool": "fermos.simulation",
+          "aerobic": true,
+          "unitClass": "AeratedBioreactor",
+          "unitId": "R1",
+          "vesselType": "stirred-tank",
+          "design": [
+            {
+              "label": "Vessels",
+              "value": 22.0,
+              "unit": "",
+              "readFrom": "design_results 'Number of reactors'"
+            },
+            {
+              "label": "Volume of each vessel",
+              "value": 341.8019333030897,
+              "unit": "m3",
+              "readFrom": "design_results 'Reactor volume'"
+            },
+            {
+              "label": "Working volume of each vessel",
+              "value": 273.4415466424718,
+              "unit": "m3",
+              "readFrom": "design_results 'Reactor volume' times the unit's V_wf"
+            },
+            {
+              "label": "Working volume fraction",
+              "value": 0.8,
+              "unit": "",
+              "readFrom": "the unit's V_wf"
+            },
+            {
+              "label": "Batch time (reacting)",
+              "value": 9.581534558641376,
+              "unit": "hr",
+              "readFrom": "the unit's tau"
+            },
+            {
+              "label": "Cycle time",
+              "value": 13.180655251910013,
+              "unit": "hr",
+              "readFrom": "design_results 'Batch time' (tau + tau_0 + loading)"
+            },
+            {
+              "label": "Loading time",
+              "value": 0.599120693268637,
+              "unit": "hr",
+              "readFrom": "design_results 'Loading time'"
+            },
+            {
+              "label": "Cleaning and unloading time",
+              "value": 3.0,
+              "unit": "hr",
+              "readFrom": "the unit's tau_0"
+            },
+            {
+              "label": "Dead time",
+              "value": 3.5991206932686364,
+              "unit": "hr",
+              "readFrom": "design_results 'Batch time' less the unit's tau"
+            },
+            {
+              "label": "Length",
+              "value": 15.763127736407037,
+              "unit": "m",
+              "readFrom": "design_results 'Length', in m"
+            },
+            {
+              "label": "Diameter",
+              "value": 5.2543759121356794,
+              "unit": "m",
+              "readFrom": "design_results 'Diameter', in m"
+            },
+            {
+              "label": "Vessel orientation",
+              "value": "Vertical",
+              "unit": "",
+              "readFrom": "design_results 'Vessel type'"
+            },
+            {
+              "label": "Vessel material",
+              "value": "Stainless steel 316",
+              "unit": "",
+              "readFrom": "the unit's vessel_material"
+            },
+            {
+              "label": "Design",
+              "value": "Stirred tank",
+              "unit": "",
+              "readFrom": "the unit's design"
+            },
+            {
+              "label": "Agitator power, each vessel",
+              "value": 142.29736317395256,
+              "unit": "kW",
+              "readFrom": "the agitator auxiliary's power utility (none when kW_per_m3 is zero)"
+            },
+            {
+              "label": "Agitation power per working volume",
+              "value": 0.5203940839319788,
+              "unit": "kW/m3",
+              "readFrom": "the unit's kW_per_m3 after the run (solved when optimize_power is on)"
+            },
+            {
+              "label": "Compressor power",
+              "value": 5128.88448642793,
+              "unit": "kW",
+              "readFrom": "the compressor auxiliary's power utility"
+            },
+            {
+              "label": "Compressor outlet pressure",
+              "value": 257328.86654420794,
+              "unit": "Pa",
+              "readFrom": "the compressor auxiliary's P"
+            },
+            {
+              "label": "Air cooler duty",
+              "value": -14771187.32091243,
+              "unit": "kJ/hr",
+              "readFrom": "the air cooler auxiliary's heat utility"
+            },
+            {
+              "label": "Air fed",
+              "value": 116085.37715914744,
+              "unit": "m3/hr",
+              "readFrom": "the air stream, at its own conditions"
+            },
+            {
+              "label": "Air fed",
+              "value": 4637.199876649392,
+              "unit": "kmol/hr",
+              "readFrom": "the air stream"
+            },
+            {
+              "label": "Recirculation pump power, each vessel",
+              "value": 8.667008650470098,
+              "unit": "kW",
+              "readFrom": "the recirculation pump auxiliary's power utility"
+            },
+            {
+              "label": "kLa achieved",
+              "value": 302.68592074638,
+              "unit": "1/hr",
+              "readFrom": "get_kLa(), by Riet"
+            },
+            {
+              "label": "Superficial gas velocity",
+              "value": 0.039801203252867616,
+              "unit": "m/s",
+              "readFrom": "the unit's superficial_gas_flow"
+            },
+            {
+              "label": "Aeration, vvm",
+              "value": 0.18937171483038107,
+              "unit": "1/min",
+              "readFrom": "the sparged gas per vessel while it reacts over its working volume, as BioSTEAM reckons the gas velocity"
+            },
+            {
+              "label": "Reactor duty",
+              "value": -91831914.5655405,
+              "unit": "kJ/hr",
+              "readFrom": "the unit's _get_duty(): Q_O2_consumption times the oxygen in less the oxygen out"
+            },
+            {
+              "label": "Cooling duty, every heat utility",
+              "value": -106603101.88645275,
+              "unit": "kJ/hr",
+              "readFrom": "the unit's heat utilities, auxiliaries included"
+            },
+            {
+              "label": "Electricity, the whole unit",
+              "value": 8450.100666565228,
+              "unit": "kW",
+              "readFrom": "the unit's power utility"
+            },
+            {
+              "label": "Utility cost",
+              "value": 1193.8133815576643,
+              "unit": "USD/hr",
+              "readFrom": "the unit's utility_cost"
+            }
+          ],
+          "oxygen": {
+            "t": [
+              0.0,
+              0.04790767279320688,
+              0.09581534558641376,
+              0.14372301837962065,
+              0.19163069117282752,
+              0.2395383639660344,
+              0.2874460367592413,
+              0.33535370955244814,
+              0.38326138234565504,
+              0.43116905513886195,
+              0.4790767279320688,
+              0.5269844007252756,
+              0.5748920735184826,
+              0.6227997463116894,
+              0.6707074191048963,
+              0.7186150918981032,
+              0.7665227646913101,
+              0.8144304374845169,
+              0.8623381102777239,
+              0.9102457830709307,
+              0.9581534558641376,
+              1.0060611286573444,
+              1.0539688014505513,
+              1.1018764742437583,
+              1.1497841470369652,
+              1.197691819830172,
+              1.2455994926233789,
+              1.2935071654165857,
+              1.3414148382097926,
+              1.3893225110029996,
+              1.4372301837962065,
+              1.4851378565894133,
+              1.5330455293826202,
+              1.580953202175827,
+              1.6288608749690339,
+              1.6767685477622407,
+              1.7246762205554478,
+              1.7725838933486546,
+              1.8204915661418615,
+              1.8683992389350683,
+              1.9163069117282752,
+              1.964214584521482,
+              2.012122257314689,
+              2.0600299301078957,
+              2.1079376029011025,
+              2.15584527569431,
+              2.2037529484875167,
+              2.2516606212807235,
+              2.2995682940739304,
+              2.347475966867137,
+              2.395383639660344,
+              2.443291312453551,
+              2.4911989852467578,
+              2.5391066580399646,
+              2.5870143308331714,
+              2.6349220036263783,
+              2.682829676419585,
+              2.730737349212792,
+              2.7786450220059993,
+              2.826552694799206,
+              2.874460367592413,
+              2.92236804038562,
+              2.9702757131788267,
+              3.0181833859720335,
+              3.0660910587652404,
+              3.113998731558447,
+              3.161906404351654,
+              3.209814077144861,
+              3.2577217499380677,
+              3.3056294227312746,
+              3.3333333333333335,
+              3.3535370955244814,
+              3.4014447683176887,
+              3.4493524411108956,
+              3.4972601139041024,
+              3.5451677866973093,
+              3.593075459490516,
+              3.640983132283723,
+              3.68889080507693,
+              3.7367984778701366,
+              3.7847061506633435,
+              3.8326138234565503,
+              3.880521496249757,
+              3.928429169042964,
+              3.976336841836171,
+              4.024244514629378,
+              4.072152187422585,
+              4.120059860215791,
+              4.167967533008999,
+              4.215875205802205,
+              4.263782878595412,
+              4.31169055138862,
+              4.359598224181826,
+              4.407505896975033,
+              4.45541356976824,
+              4.503321242561447,
+              4.5512289153546535,
+              4.599136588147861,
+              4.647044260941067,
+              4.694951933734274,
+              4.742859606527481,
+              4.790767279320688,
+              4.8386749521138945,
+              4.886582624907102,
+              4.934490297700309,
+              4.9823979704935155,
+              5.030305643286723,
+              5.078213316079929,
+              5.1261209888731365,
+              5.174028661666343,
+              5.22193633445955,
+              5.269844007252757,
+              5.317751680045964,
+              5.36565935283917,
+              5.413567025632378,
+              5.461474698425584,
+              5.509382371218791,
+              5.5572900440119986,
+              5.605197716805205,
+              5.653105389598412,
+              5.701013062391619,
+              5.748920735184826,
+              5.796828407978032,
+              5.84473608077124,
+              5.892643753564446,
+              5.940551426357653,
+              5.98845909915086,
+              6.036366771944067,
+              6.084274444737273,
+              6.132182117530481,
+              6.180089790323688,
+              6.227997463116894,
+              6.275905135910102,
+              6.323812808703308,
+              6.371720481496515,
+              6.419628154289722,
+              6.467535827082929,
+              6.5154434998761355,
+              6.563351172669343,
+              6.611258845462549,
+              6.6591665182557565,
+              6.666666666666667,
+              6.707074191048963,
+              6.75498186384217,
+              6.802889536635377,
+              6.850797209428584,
+              6.898704882221791,
+              6.9466125550149975,
+              6.994520227808205,
+              7.042427900601411,
+              7.0903355733946185,
+              7.138243246187825,
+              7.186150918981032,
+              7.234058591774239,
+              7.281966264567446,
+              7.329873937360652,
+              7.37778161015386,
+              7.425689282947067,
+              7.473596955740273,
+              7.521504628533481,
+              7.569412301326687,
+              7.617319974119894,
+              7.665227646913101,
+              7.713135319706308,
+              7.761042992499514,
+              7.808950665292722,
+              7.856858338085928,
+              7.904766010879135,
+              7.952673683672342,
+              8.000581356465549,
+              8.048489029258755,
+              8.096396702051964,
+              8.14430437484517,
+              8.192212047638376,
+              8.240119720431583,
+              8.288027393224791,
+              8.335935066017997,
+              8.383842738811204,
+              8.43175041160441,
+              8.479658084397618,
+              8.527565757190825,
+              8.575473429984031,
+              8.62338110277724,
+              8.671288775570446,
+              8.719196448363652,
+              8.767104121156859,
+              8.815011793950067,
+              8.862919466743273,
+              8.91082713953648,
+              8.958734812329686,
+              9.006642485122894,
+              9.0545501579161,
+              9.102457830709307,
+              9.150365503502513,
+              9.198273176295721,
+              9.246180849088928,
+              9.294088521882134,
+              9.341996194675342,
+              9.389903867468549,
+              9.437811540261755,
+              9.485719213054962,
+              9.53362688584817,
+              9.581534558641376
+            ],
+            "our": [
+              4.6643540177532765,
+              4.7307901092875975,
+              4.798150777031359,
+              4.866448238883707,
+              4.93569488835082,
+              5.005903238320204,
+              5.077085938384965,
+              5.149255798631437,
+              5.222425788238868,
+              5.29660903744105,
+              5.371818817791378,
+              5.448068529826851,
+              5.52537173277303,
+              5.6037421409913035,
+              5.683193634557571,
+              5.763740235265951,
+              5.845396120942091,
+              5.928175640306943,
+              6.012093286679071,
+              6.097163715932342,
+              6.183401771838658,
+              6.270822430357287,
+              6.359440821666077,
+              6.449272233683339,
+              6.540332113176045,
+              6.63263606682594,
+              6.726199862947738,
+              6.821039467070673,
+              6.917171011329678,
+              7.014610783155733,
+              7.113375240355292,
+              7.2134810123210285,
+              7.314944901190577,
+              7.41778388295203,
+              7.522015091824376,
+              7.627655784043177,
+              7.734723418593278,
+              7.843235627545079,
+              7.953210212839659,
+              8.064665146442882,
+              8.177618570439096,
+              8.292088796958916,
+              8.408094302892737,
+              8.525653734570206,
+              8.644785909472422,
+              8.765509813829418,
+              8.887844602255674,
+              9.01180959731442,
+              9.137424289008873,
+              9.264708334787201,
+              9.393681560205591,
+              9.524363955358337,
+              9.656775675139537,
+              9.790937038484756,
+              9.926868527405453,
+              10.064590785936467,
+              10.204124618906892,
+              10.345490986219872,
+              10.488711005592807,
+              10.633805952755951,
+              10.780797258069855,
+              10.92970650485,
+              11.080555427588159,
+              11.233365910067928,
+              11.388159980958141,
+              11.544959805733232,
+              11.703787695771473,
+              11.864666101887272,
+              12.027617611234337,
+              12.19266494457875,
+              12.289073406396268,
+              12.359835684099147,
+              12.529145873980253,
+              12.700620863857209,
+              12.874282903785195,
+              13.050150911671286,
+              13.228253497302124,
+              13.408617791207043,
+              13.591264779426597,
+              13.776217429260448,
+              13.96349946712727,
+              14.153135206295891,
+              14.345148234818945,
+              14.539562848301934,
+              14.736403345198362,
+              14.935693519144497,
+              15.137457924911564,
+              15.341720863373608,
+              15.548506622649958,
+              15.757839632943753,
+              15.96974445794603,
+              16.184245507464432,
+              16.40136707020475,
+              16.621133710091726,
+              16.84357003942827,
+              17.068700709180703,
+              17.296550322988203,
+              17.527143032193266,
+              17.76050315214276,
+              17.99665500139847,
+              18.235622835629652,
+              18.47743083677879,
+              18.722103082362707,
+              18.969663545205247,
+              19.220136098062795,
+              19.473544490831134,
+              19.729912338070957,
+              19.98926309124528,
+              20.25161997819662,
+              20.51700607707173,
+              20.78544427475864,
+              21.056957247314333,
+              21.33156744225037,
+              21.609296921993867,
+              21.8901674900378,
+              22.17420072256236,
+              22.461417886427256,
+              22.751839918975733,
+              23.045487407137855,
+              23.342380565784346,
+              23.64253921527801,
+              23.945982758164355,
+              24.252730038925854,
+              24.562799119880626,
+              24.876207777801298,
+              25.192973257131754,
+              25.51311221988629,
+              25.836640713955173,
+              26.16357413997556,
+              26.493927216639275,
+              26.827713944293542,
+              27.164947552737598,
+              27.50564007630649,
+              27.849802760485147,
+              28.197446069320392,
+              28.548579497010387,
+              28.903211515276347,
+              29.261349517468428,
+              29.622999759046607,
+              29.988167294028912,
+              30.356855906945366,
+              30.4148946129232,
+              30.72908839849269,
+              31.10482858237749,
+              31.484091535800122,
+              31.86687442277653,
+              32.25316205253137,
+              32.64295528560361,
+              33.03625343474459,
+              33.433047557920304,
+              33.83331881007342,
+              34.237051811055686,
+              34.644228464417026,
+              35.05482697435575,
+              35.468823067842365,
+              35.886189265558066,
+              36.30689317102458,
+              36.73089893659137,
+              37.15816695119932,
+              37.58865149068063,
+              38.02230112443,
+              38.459059413654714,
+              38.89886343982949,
+              39.34164314424603,
+              39.78732016691729,
+              40.23580464214135,
+              40.68699776086161,
+              41.140789749450555,
+              41.597058064614515,
+              42.05566567594658,
+              42.51645600636564,
+              42.97925007347308,
+              43.44384937976402,
+              43.91002941654582,
+              44.377535259407786,
+              44.84607562778988,
+              45.31530786758418,
+              45.784837984619436,
+              46.25421088550131,
+              46.722894287084635,
+              47.190253743623565,
+              47.65554059710089,
+              48.11786170216069,
+              48.57613651662356,
+              49.029030497055494,
+              49.47490090320025,
+              49.91168708076029,
+              50.33676856391234,
+              50.7467714868625,
+              51.137239647985076,
+              51.50218895574295,
+              51.8333815641873,
+              52.119166118596844,
+              52.342480476975155,
+              52.477366413822054,
+              52.482376969461875,
+              52.287290573309114,
+              51.76386290960086,
+              50.654037860329076,
+              48.368756297829144,
+              43.341845439684626,
+              31.165350723239285,
+              9.900899137190736
+            ],
+            "otr": 52.49868139869822,
+            "unit": "mmol L⁻¹ h⁻¹",
+            "short": [],
+            "kLa": 302.68592074638,
+            "kLaNeededAtPeak": 302.68592074638,
+            "kLaUnit": "h⁻¹",
+            "method": "Riet",
+            "aerated": true,
+            "oxygenBasis": "peak",
+            "targetUptake": 52.49868139869822,
+            "sized": 52.4986813986982,
+            "balancedUptake": 217.3696881315551,
+            "scale": 0.24151794967348575,
+            "cStar": 0.6298616529355925,
+            "cL": 0.31493082646779624,
+            "drivingForce": 0.17344275964089775,
+            "reactionO2KmolPerH": 950.5702856629334,
+            "scaledO2KmolPerH": 229.57978641385125,
+            "simulatedO2KmolPerH": 98.61231952279888,
+            "floorKmolPerH": 0.036000000000000004
+          },
+          "oxygenNote": null,
+          "heat": {
+            "bst": -91831914.5655405,
+            "convention": -45385333.93717296,
+            "conventionNote": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention set beside BioSTEAM's own duty as a cross-check; applied to the oxygen the simulation took up: the trapezoid integral of its uptake over the batch to harvest, 216.1 mmol L⁻¹, times each vessel's working volume, 273.4 m³, and the vessels, 22, over the 13.18 h cycle: 98.61 kmol/hr",
+            "unit": "kJ/hr",
+            "method": "forced-per-oxygen",
+            "consumedKmolPerH": 229.57978641385125,
+            "oxygenKmolPerH": 98.61231952279888,
+            "dutyNote": "forced: Q_O2_consumption, -4e+05 kJ/kmol, typed by openFerment test fixture, times the oxygen the vessel consumed, 229.6 kmol/hr (AeratedBioreactor._get_duty with a heat per oxygen set); that oxygen is the reaction's scaled ×0.2415 to size the air for the simulation's peak uptake, so this duty is the heat at that uptake, not the batch's on average"
+          },
+          "cost": {
+            "purchase": 14330919.003549062,
+            "installed": 31000523.42042183,
+            "byItem": {
+              "Vertical pressure vessel": {
+                "purchase": 6784969.892481726,
+                "installed": 16994734.111644704
+              },
+              "Platform and ladders": {
+                "purchase": 1206062.2594276203,
+                "installed": 1206062.2594276203
+              },
+              "Compressor - Compressor(s)": {
+                "purchase": 3377520.1547239744,
+                "installed": 7261668.332656545
+              },
+              "Air cooler - Floating head": {
+                "purchase": 35672.629341154054,
+                "installed": 114192.74205699709
+              },
+              "Heat exchanger - Floating head": {
+                "purchase": 968990.5029228533,
+                "installed": 3111138.957346023
+              },
+              "Recirculation pump - Pump": {
+                "purchase": 139611.07128694752,
+                "installed": 460716.5352469268
+              },
+              "Recirculation pump - Motor": {
+                "purchase": 14746.951599232274,
+                "installed": 48664.9402774665
+              },
+              "Agitator - Agitator": {
+                "purchase": 1803345.5417655534,
+                "installed": 1803345.5417655534
+              }
+            },
+            "utility": 1193.8133815576643,
+            "costIndex": 567.5,
+            "costIndexYear": 2017,
+            "note": "BioSTEAM's own cost correlations for this class and its auxiliaries, at the plant cost index it holds (its default, of 2017); installed is purchase times BioSTEAM's bare-module factors. The NREL vessel's correlations are scaled from their own base index to it."
+          },
+          "parameters": [
+            {
+              "key": "plant_scale",
+              "value": 50000.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "assumption",
+                "id": null,
+                "note": "typed on 2026-10-21: STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result",
+                "by": "openFerment test fixture"
+              },
+              "origin": "assumption",
+              "identified": null,
+              "overriddenBy": "openFerment test fixture",
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "typed on 2026-10-21: STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result",
+              "outOfBounds": null
+            },
+            {
+              "key": "design",
+              "value": "Stirred tank",
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for design, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": "Stirred tank",
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for design, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+              "outOfBounds": null
+            },
+            {
+              "key": "V_max",
+              "value": 355.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for V_max, read from AeratedBioreactor.V_max_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 355.0,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for V_max, read from AeratedBioreactor.V_max_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "N",
+              "value": null,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for N, read from AeratedBioreactor._init's signature: None, which the class reads at run time",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's default is None: the class decides at run time",
+              "outOfBounds": null
+            },
+            {
+              "key": "V_wf",
+              "value": 0.8,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for V_wf, read from AeratedBioreactor.V_wf_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 0.8,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for V_wf, read from AeratedBioreactor.V_wf_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "length_to_diameter",
+              "value": 3.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for length_to_diameter, read from AeratedBioreactor.length_to_diameter_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 3.0,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for length_to_diameter, read from AeratedBioreactor.length_to_diameter_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "vessel_material",
+              "value": "Stainless steel 316",
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for vessel_material, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": "Stainless steel 316",
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for vessel_material, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+              "outOfBounds": null
+            },
+            {
+              "key": "vessel_type",
+              "value": "Vertical",
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for vessel_type, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": "Vertical",
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for vessel_type, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+              "outOfBounds": null
+            },
+            {
+              "key": "tau",
+              "value": 9.581534558641376,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "artifact",
+                "id": "d0415fc497aca19f",
+                "note": "the simulation's harvest hour",
+                "by": null
+              },
+              "origin": "simulation",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "the simulation's harvest hour",
+              "outOfBounds": null
+            },
+            {
+              "key": "tau_0",
+              "value": 3.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for tau_0, read from AeratedBioreactor.tau_0_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 3.0,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for tau_0, read from AeratedBioreactor.tau_0_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "loading_time",
+              "value": null,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for loading_time, read from AeratedBioreactor._init's signature: None, which the class reads at run time",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's default is None: the class decides at run time",
+              "outOfBounds": null
+            },
+            {
+              "key": "oxygen_basis",
+              "value": "peak",
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "D7: the vessel must meet the culture's peak demand, so peak is the convention; batch-average is what BioSTEAM's class sizes for of itself, and the oxygen balance then shows where the peak falls short.",
+                "by": null
+              },
+              "origin": "convention",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "D7: the vessel must meet the culture's peak demand, so peak is the convention; batch-average is what BioSTEAM's class sizes for of itself, and the oxygen balance then shows where the peak falls short.",
+              "outOfBounds": null
+            },
+            {
+              "key": "our_peak",
+              "value": 1.6798948063406645,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "artifact",
+                "id": "d0415fc497aca19f",
+                "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
+                "by": null
+              },
+              "origin": "simulation",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
+              "outOfBounds": null
+            },
+            {
+              "key": "our_mean",
+              "value": 0.7215719031506217,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "artifact",
+                "id": "d0415fc497aca19f",
+                "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
+                "by": null
+              },
+              "origin": "simulation",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
+              "outOfBounds": null
+            },
+            {
+              "key": "method",
+              "value": "Riet",
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for method, read from a AeratedBioreactor built as a stirred tank with nothing else set",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": "Riet",
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for method, read from a AeratedBioreactor built as a stirred tank with nothing else set",
+              "outOfBounds": null
+            },
+            {
+              "key": "theta_O2",
+              "value": 0.5,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for theta_O2, read from AeratedBioreactor._init's signature",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 0.5,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for theta_O2, read from AeratedBioreactor._init's signature",
+              "outOfBounds": null
+            },
+            {
+              "key": "compressor_isentropic_efficiency",
+              "value": 0.85,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for compressor_isentropic_efficiency, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 0.85,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for compressor_isentropic_efficiency, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+              "outOfBounds": null
+            },
+            {
+              "key": "kW_per_m3",
+              "value": 0.2955,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for kW_per_m3, read from AeratedBioreactor.kW_per_m3_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 0.2955,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for kW_per_m3, read from AeratedBioreactor.kW_per_m3_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "optimize_power",
+              "value": "true",
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for optimize_power, read from a AeratedBioreactor built as a stirred tank with nothing else set",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": "true",
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for optimize_power, read from a AeratedBioreactor built as a stirred tank with nothing else set",
+              "outOfBounds": null
+            },
+            {
+              "key": "T",
+              "value": 305.15,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for T, read from AeratedBioreactor.T_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 305.15,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for T, read from AeratedBioreactor.T_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "P",
+              "value": 101325.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for P, read from AeratedBioreactor.P_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 101325.0,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for P, read from AeratedBioreactor.P_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "heat_exchanger_configuration",
+              "value": "recirculation loop",
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for heat_exchanger_configuration, read from AeratedBioreactor.heat_exchanger_configuration_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": "recirculation loop",
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for heat_exchanger_configuration, read from AeratedBioreactor.heat_exchanger_configuration_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "dT_hx_loop",
+              "value": 5.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for dT_hx_loop, read from AeratedBioreactor.dT_hx_loop_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 5.0,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for dT_hx_loop, read from AeratedBioreactor.dT_hx_loop_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "jacket_annular_diameter",
+              "value": 0.05,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for jacket_annular_diameter, read from AeratedBioreactor.jacket_annular_diameter_default",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 0.05,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for jacket_annular_diameter, read from AeratedBioreactor.jacket_annular_diameter_default",
+              "outOfBounds": null
+            },
+            {
+              "key": "cooler_pressure_drop",
+              "value": 20684.28,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "model",
+                "id": "biosteam@2.54.0",
+                "note": "AeratedBioreactor's own default for cooler_pressure_drop, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                "by": null
+              },
+              "origin": "library-default",
+              "identified": null,
+              "overriddenBy": null,
+              "libraryDefault": 20684.28,
+              "recordIds": [],
+              "detail": "AeratedBioreactor's own default for cooler_pressure_drop, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+              "outOfBounds": null
+            },
+            {
+              "key": "Q_O2_consumption",
+              "value": -400000.0,
+              "low": null,
+              "high": null,
+              "source": {
+                "kind": "assumption",
+                "id": null,
+                "note": "typed on 2026-10-21: STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result",
+                "by": "openFerment test fixture"
+              },
+              "origin": "assumption",
+              "identified": null,
+              "overriddenBy": "openFerment test fixture",
+              "libraryDefault": null,
+              "recordIds": [],
+              "detail": "typed on 2026-10-21: STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result",
+              "outOfBounds": null
+            }
+          ],
+          "used": {
+            "T": 305.15,
+            "P": 101325.0,
+            "tau": 9.581534558641376,
+            "tau_0": 3.0,
+            "V_wf": 0.8,
+            "V_max": 355.0,
+            "N": null,
+            "loading_time": null,
+            "length_to_diameter": 3.0,
+            "kW_per_m3": 0.5203940839319788,
+            "vessel_material": "Stainless steel 316",
+            "vessel_type": "Vertical",
+            "heat_exchanger_configuration": "recirculation loop",
+            "dT_hx_loop": 5.0,
+            "jacket_annular_diameter": 0.05,
+            "theta_O2": 0.5,
+            "Q_O2_consumption": -400000.0,
+            "optimize_power": true,
+            "design": "Stirred tank",
+            "cooler_pressure_drop": 20684.28,
+            "compressor_isentropic_efficiency": 0.85
+          },
+          "scale": {
+            "operatingHours": 7920.0,
+            "operatingHoursFrom": "biorefineries.corn's default_tea_parameters operating_days (330 days a year), in hours: the TEA the ethanol flowsheet prices with",
+            "productKgPerH": 6313.131313131313,
+            "how": "the product a year over the corn TEA's operating hours, over the titre at harvest (kg m⁻³)"
+          },
+          "reaction": {
+            "equation": "Reaction('Glucose + 3.76 O2 -> 3.93 Water + 0.541 Ethanol + 4.37 CO2 + 0.552 Yeast', reactant='Glucose', X=0.999, basis='mol')",
+            "stoichiometry": {
+              "Glucose": -1.0,
+              "O2": -3.7559258153125463,
+              "Yeast": 0.5520404011459751,
+              "Ethanol": 0.5414696114670323,
+              "CO2": 4.36502037591996,
+              "Water": 3.931198642676393
+            },
+            "glucoseUsedShare": 0.9989999999999999,
+            "impliedYxo": 0.10377599373199474
+          },
+          "flags": [
+            "the reaction consumes 0.2415 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
+            "the reaction's yields balance 950.6 kmol/hr of oxygen and the simulation took up 98.61 kmol/hr over the batch (0.104 times as much), apart by more than 0.1 of the reaction's, the stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up",
+            "BioSTEAM warned: CostWarning: <AeratedBioreactor: R1> Vertical vessel length (51.72 ft) is out of bounds (12 to 40 ft) for cost correlation",
+            "BioSTEAM warned: CostWarning: <IsentropicCompressor: compressor> power (6878 hp) is out of bounds (10 to 750 hp) for cost correlation",
+            "BioSTEAM warned: OptimizeWarning: Unknown solver options: xtol"
+          ],
+          "versions": {
+            "biosteam": "2.54.0",
+            "thermosteam": "0.54.2",
+            "biorefineries": "2.35.1"
+          },
+          "evidence": {
+            "id": "8f0f32642dcd9e11",
+            "label": "Vessel design for fermos.simulation d0415fc497aca19f: BioSTEAM's AeratedBioreactor, stirred tank, the number of vessels it sized (every other number is in the artifact)",
+            "value": 22.0,
+            "unit": "vessels",
+            "interval": null,
+            "provenance": "demo",
+            "basis": {
+              "tool": "fermos.vessel",
+              "toolVersion": "vessel 2 · biosteam 2.54.0 · thermosteam 0.54.2",
+              "inputs": [
+                {
+                  "name": "simulation",
+                  "value": "d0415fc497aca19f",
+                  "unit": "",
+                  "source": {
+                    "kind": "artifact",
+                    "id": "d0415fc497aca19f",
+                    "note": "the fermos.simulation the vessel is designed for",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "vessel class",
+                  "value": "AeratedBioreactor",
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "BioSTEAM's AeratedBioreactor, sized and costed by BioSTEAM",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "chemicals",
+                  "value": "biorefineries.corn.create_chemicals",
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biorefineries@2.35.1",
+                    "note": "the yeast program's chemicals, as the ethanol flowsheet makes them",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "utility prices and cost index",
+                  "value": "biosteam.process_tools.default_utilities() and default_CEPCI()",
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "BioSTEAM's own default prices of electricity and of each heating and cooling agent, and its default plant cost index, set at the start of every case and read back after it, each value the case used (cepci, electricityPrice, and each agent's price and temperature)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "unit id",
+                  "value": "R1",
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "the BioSTEAM unit id the design is built under",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "vessel type",
+                  "value": "Stirred tank",
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "BioSTEAM's own default design for AeratedBioreactor",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "operating hours",
+                  "value": 7920.0,
+                  "unit": "h yr⁻¹",
+                  "source": {
+                    "kind": "model",
+                    "id": "biorefineries@2.35.1",
+                    "note": "biorefineries.corn's default_tea_parameters operating_days (330 days a year), in hours: the TEA the ethanol flowsheet prices with",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "heat per oxygen consumed",
+                  "value": -460240.0,
+                  "unit": "kJ kmol⁻¹",
+                  "source": {
+                    "kind": "model",
+                    "id": "biorefineries@2.35.1",
+                    "note": "biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed (its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and Mateles, Biotechnol. Bioeng. 1969), a convention set beside BioSTEAM's own duty as a cross-check (the cross-check, labelled a convention)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "oxygen agreement tolerance",
+                  "value": 0.1,
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "the share of the reaction's balanced oxygen within which the oxygen the simulation took up agrees with it; beyond it the design flags both (the heat cross-check's tolerance, a convention: a heat-per-oxygen rule is a rule of thumb)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "plant_scale",
+                  "value": 50000.0,
+                  "unit": "t yr⁻¹",
+                  "source": {
+                    "kind": "assumption",
+                    "id": null,
+                    "note": "typed on 2026-10-21: STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result",
+                    "by": "openFerment test fixture"
+                  }
+                },
+                {
+                  "name": "design",
+                  "value": "Stirred tank",
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for design, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "V_max",
+                  "value": 355.0,
+                  "unit": "m³",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for V_max, read from AeratedBioreactor.V_max_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "V_wf",
+                  "value": 0.8,
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for V_wf, read from AeratedBioreactor.V_wf_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "length_to_diameter",
+                  "value": 3.0,
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for length_to_diameter, read from AeratedBioreactor.length_to_diameter_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "vessel_material",
+                  "value": "Stainless steel 316",
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for vessel_material, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "vessel_type",
+                  "value": "Vertical",
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for vessel_type, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "tau",
+                  "value": 9.581534558641376,
+                  "unit": "h",
+                  "source": {
+                    "kind": "artifact",
+                    "id": "d0415fc497aca19f",
+                    "note": "the simulation's harvest hour",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "tau_0",
+                  "value": 3.0,
+                  "unit": "h",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for tau_0, read from AeratedBioreactor.tau_0_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "oxygen_basis",
+                  "value": "peak",
+                  "unit": "",
+                  "source": {
+                    "kind": "convention",
+                    "id": null,
+                    "note": "D7: the vessel must meet the culture's peak demand, so peak is the convention; batch-average is what BioSTEAM's class sizes for of itself, and the oxygen balance then shows where the peak falls short.",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "our_peak",
+                  "value": 1.6798948063406645,
+                  "unit": "g O₂ L⁻¹ h⁻¹",
+                  "source": {
+                    "kind": "artifact",
+                    "id": "d0415fc497aca19f",
+                    "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "our_mean",
+                  "value": 0.7215719031506217,
+                  "unit": "g O₂ L⁻¹ h⁻¹",
+                  "source": {
+                    "kind": "artifact",
+                    "id": "d0415fc497aca19f",
+                    "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "method",
+                  "value": "Riet",
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for method, read from a AeratedBioreactor built as a stirred tank with nothing else set",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "theta_O2",
+                  "value": 0.5,
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for theta_O2, read from AeratedBioreactor._init's signature",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "compressor_isentropic_efficiency",
+                  "value": 0.85,
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for compressor_isentropic_efficiency, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "kW_per_m3",
+                  "value": 0.2955,
+                  "unit": "kW m⁻³",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for kW_per_m3, read from AeratedBioreactor.kW_per_m3_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "optimize_power",
+                  "value": "true",
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for optimize_power, read from a AeratedBioreactor built as a stirred tank with nothing else set",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "T",
+                  "value": 305.15,
+                  "unit": "K",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for T, read from AeratedBioreactor.T_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "P",
+                  "value": 101325.0,
+                  "unit": "Pa",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for P, read from AeratedBioreactor.P_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "heat_exchanger_configuration",
+                  "value": "recirculation loop",
+                  "unit": "",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for heat_exchanger_configuration, read from AeratedBioreactor.heat_exchanger_configuration_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "dT_hx_loop",
+                  "value": 5.0,
+                  "unit": "K",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for dT_hx_loop, read from AeratedBioreactor.dT_hx_loop_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "jacket_annular_diameter",
+                  "value": 0.05,
+                  "unit": "m",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for jacket_annular_diameter, read from AeratedBioreactor.jacket_annular_diameter_default",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "cooler_pressure_drop",
+                  "value": 20684.28,
+                  "unit": "Pa",
+                  "source": {
+                    "kind": "model",
+                    "id": "biosteam@2.54.0",
+                    "note": "AeratedBioreactor's own default for cooler_pressure_drop, read from a AeratedBioreactor built with nothing set (its _init sets it)",
+                    "by": null
+                  }
+                },
+                {
+                  "name": "Q_O2_consumption",
+                  "value": -400000.0,
+                  "unit": "kJ kmol⁻¹",
+                  "source": {
+                    "kind": "assumption",
+                    "id": null,
+                    "note": "typed on 2026-10-21: STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result",
+                    "by": "openFerment test fixture"
+                  }
+                }
+              ],
+              "artifactId": "8f0f32642dcd9e11",
+              "at": "2026-09-15T09:00:00Z",
+              "seed": null
+            },
+            "figure": "oxygen-balance"
           }
         }
       }

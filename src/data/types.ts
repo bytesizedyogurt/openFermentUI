@@ -3486,14 +3486,25 @@ export interface VesselOxygen {
   cL: number | null;
   drivingForce: number | null;
   reactionO2KmolPerH: number | null;
+  /** OF-BLD-020 §4.R: the oxygen the vessel's reaction consumes as designed, the oxygen the simulation took up per hour of the plant, and BioSTEAM's aeration floor, each kmol h⁻¹. */
+  scaledO2KmolPerH: number | null;
+  simulatedO2KmolPerH: number | null;
+  floorKmolPerH: number | null;
 }
 
-/** BioSTEAM's duty beside a cross-check from the oxygen consumed at a stated convention. */
+/** BioSTEAM's duty as it found it, beside a cross-check from the oxygen the simulation took up at a stated convention (D7, §4.R). */
 export interface VesselHeat {
   bst: number;
   convention: number | null;
   conventionNote: string;
   unit: string;
+  /** 'heats-of-formation' or 'forced-per-oxygen' (a person's Q_O2_consumption times the oxygen consumed); null on a design kept before §4.R. */
+  method: string | null;
+  consumedKmolPerH: number | null;
+  /** The oxygen the convention's estimate rests on (the simulation's), kmol h⁻¹. */
+  oxygenKmolPerH: number | null;
+  /** BioSTEAM's duty in words: how it was found, and whose heat per oxygen when a person forced one. */
+  dutyNote: string | null;
 }
 
 export interface VesselCostItem {

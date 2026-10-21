@@ -184,9 +184,13 @@ def _same_vessel_asks(written: dict, committed: dict) -> None:
     answered alike in status and in every parameter's key and origin."""
     for key in ("aerobic", "anaerobic", "plantScale", "by", "simulations"):
         assert written[key] == committed[key], f"{VESSEL_FIXTURE}'s {key} no longer matches the code"
-    assert [(s["simulation"], s["vesselType"], s["status"]) for s in written["scopes"]] == \
-        [(s["simulation"], s["vesselType"], s["status"]) for s in committed["scopes"]]
+    # A scope is a simulation's or (§4.R) a fit's.
+    assert [(s.get("simulation"), s.get("fit"), s["vesselType"], s["status"]) for s in written["scopes"]] == \
+        [(s.get("simulation"), s.get("fit"), s["vesselType"], s["status"]) for s in committed["scopes"]]
     for w, c in zip(written["scopes"], committed["scopes"]):
+        if w["status"] != 200:
+            assert w["body"] == c["body"]
+            continue
         assert [(v["key"], v["origin"]) for v in w["body"]["values"]] == [(v["key"], v["origin"]) for v in c["body"]["values"]]
     assert [(d["request"], d["status"]) for d in written["designs"]] == [(d["request"], d["status"]) for d in committed["designs"]]
     refused = [d["body"] for d in committed["designs"] if d["status"] == 422]

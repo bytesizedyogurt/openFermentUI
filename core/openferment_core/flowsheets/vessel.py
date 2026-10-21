@@ -20,10 +20,25 @@ glucose and oxygen to cells, ethanol, carbon dioxide and water, closed on
 thermosteam's formulas — and its oxygen is scaled so that the uptake
 BioSTEAM sizes for is the simulation's peak or its batch average, as the
 request's `oxygenBasis` says (D7 asks for the peak). The scale is found by
-designing once as balanced, reading the uptake per working volume the class
-sized for, and designing again (a fresh unit each time). With the scale
-above one the vessel's outlets carry that oxygen as consumed; the broth the
-simulation ends with is its own end state, not this unit's outlet.
+designing once as balanced, reading the uptake per working volume the
+reaction asks of the vessel (`get_OUR` over the vessels' working volume
+while they react, whether or not BioSTEAM aerated it: the class sizes no air
+at or below a floor its `_run` names, which a balanced reaction in a small
+vessel can fall under), and designing again (a fresh unit each time); only a
+scaled reaction still under that floor is designed with no air (OF-BLD-020
+§4.R). With the scale above one the vessel's outlets carry that oxygen as
+consumed; the broth the simulation ends with is its own end state, not this
+unit's outlet.
+
+THE HEAT. BioSTEAM's duty is its `_get_duty`: the enthalpy and heats of
+formation out less in, or, when a person forces a heat per oxygen
+(`Q_O2_consumption`), that heat times the oxygen the vessel consumed, which
+is the scaled reaction's (`heat.method` says which). Beside it, D7's
+cross-check after Cooney: the heat per oxygen of `biorefineries.cane` times
+the oxygen the SIMULATION took up, the trapezoid integral of its uptake over
+the batch to harvest, times each vessel's working volume and the vessels,
+over the cycle (§4.R: never the reaction's own oxygen, which would agree with
+BioSTEAM by construction).
 
 THE OXYGEN BALANCE IS COMPUTED AFTER, against the simulated uptake over
 time: OTR = kLa · ΔC, with kLa the class's own (`get_kLa`, by its
@@ -65,6 +80,7 @@ from importlib.metadata import version
 from typing import Any
 
 import biosteam as bst
+import numpy as np
 import thermosteam as tmo
 from biosteam.units.design_tools import aeration
 from thermosteam.units_of_measure import convert
@@ -152,8 +168,33 @@ def heat_per_oxygen() -> tuple[float, str]:
     return float(q), ("biorefineries.cane's AeratedFermentation passes BioSTEAM this forced duty per oxygen consumed "
                       "(its Q_O2_consumption default, kJ/kmol; its comment cites Benz, Bioreactor Design for Chemical "
                       "Engineers, Chem. Eng. Progress 2011): the rule that heat follows oxygen uptake (Cooney, Wang and "
-                      "Mateles, Biotechnol. Bioeng. 1969), a convention beside BioSTEAM's own duty from the heats of "
-                      "formation")
+                      "Mateles, Biotechnol. Bioeng. 1969), a convention set beside BioSTEAM's own duty as a cross-check")
+
+
+def aeration_floor() -> tuple[float | None, str]:
+    """The oxygen uptake, mol/s, at or below which `AeratedBioreactor` sizes
+    no air, read from its `_run` (None when this BioSTEAM words it
+    otherwise)."""
+    m = re.search(r"if\s+OUR\s*<=\s*([0-9.eE+-]+)\s*:", inspect.getsource(bst.AeratedBioreactor._run))
+    return (float(m.group(1)) if m else None), (
+        "AeratedBioreactor._run sizes no air for an oxygen uptake at or below it (read from its code)")
+
+
+def refusals(cls: Any) -> dict[str, dict[str, Any]]:
+    """What the class's own setters refuse, read from their code: for N and
+    V_max, the value a property's setter raises at or below. The NREL vessel
+    refuses N and V_max at or below one; the aerated class's are plain
+    attributes, and refuse nothing."""
+    out: dict[str, dict[str, Any]] = {}
+    for name in ("N", "V_max"):
+        attr = inspect.getattr_static(cls, name, None)
+        if not isinstance(attr, property) or attr.fset is None:
+            continue
+        m = re.search(rf"if\s+{name}\s*<=\s*([0-9.eE+-]+)\s*:\s*raise\s+ValueError", inspect.getsource(attr.fset))
+        if m:
+            out[name] = {"atOrBelow": float(m.group(1)),
+                         "from": f"{cls.__name__}.{name}'s setter raises ValueError at or below it (read from its code)"}
+    return out
 
 
 def cost_index() -> tuple[float, int | None]:
@@ -225,6 +266,8 @@ def specs(kind: str) -> dict[str, Any]:
             }
             q, why = heat_per_oxygen()
             out["heatPerO2"], out["heatPerO2From"] = q, why
+            out["aerationFloorMolPerS"], out["aerationFloorFrom"] = aeration_floor()
+        out["refuses"] = refusals(cls)
         hours, hours_from = operating_hours()
         ce, year = cost_index()
     out.update(parameters=params, biosteam=version("biosteam"), thermosteam=version("thermosteam"),
@@ -452,15 +495,28 @@ def _scale(spec: dict[str, Any], cls: Any, params: dict[str, Any]) -> tuple[floa
                                                    "loading_time)"}
 
 
-def _uptake_sized(R: Any) -> float | None:
-    """The oxygen uptake BioSTEAM sized the air for, per working volume while
-    the vessel reacts, mmol L⁻¹ h⁻¹ (its reaction's, over the cycle)."""
-    if R.air.isempty():
-        return None
+def _uptake_sized(R: Any) -> float:
+    """The oxygen uptake the vessel's reaction asks of it, per working volume
+    while it reacts, mmol L⁻¹ h⁻¹ (its reaction's, over the cycle): what
+    BioSTEAM sizes the air for, read whether or not it aerated (the vessel's
+    size is the liquid's, designed either way; §4.R)."""
     d = R.design_results
     op = R.tau / d["Batch time"]
     V_work = d["Reactor volume"] * R.V_wf
     return float(R.get_OUR() * convert(1, "hr", "s") / (d["Number of reactors"] * V_work * op))
+
+
+def _made(cls: Any, spec: dict[str, Any], chems: Any, rxn: Any, F_vol: float) -> tuple[Any, list[str]]:
+    """Build the unit and simulate it, a class that refuses its construction
+    (the NREL vessel's N or V_max at or below one, say) refused in BioSTEAM's
+    own words like any failure of its design (OF-BLD-020 §4.R)."""
+    try:
+        R = _build(cls, spec, chems, rxn, F_vol)
+    except Refused:
+        raise
+    except Exception as e:  # BioSTEAM's own words
+        raise Refused(f"BioSTEAM could not build this vessel: {type(e).__name__}: {e}") from None
+    return R, _simulate(R)
 
 
 def _simulate(R: Any) -> list[str]:
@@ -500,28 +556,61 @@ def design(spec: dict[str, Any]) -> dict[str, Any]:
         params = dict(spec.get("params") or {})
         F_vol, scale_info = _scale(spec, cls, params)
         rxn, rinfo = _reactions(chems, kind, spec["start"], spec["made"], spec["used"])
-        R = _build(cls, spec, chems, rxn, F_vol)
-        said = _simulate(R)
+        R, said = _made(cls, spec, chems, rxn, F_vol)
         oxygen = None
         if kind == AEROBIC:
             balanced = _uptake_sized(R)
-            consumed_kmol_h = float(R.get_OUR() * convert(1, "hr", "s") / convert(1, "kmol", "mol"))
+            consumed_kmol_h = _kmol_h(R.get_OUR())
             target = spec.get("ourTarget")
             factor = 1.0
-            if balanced is not None and target is not None:
+            if target is not None and balanced > 0:
                 # The class sizes for its reaction's uptake: scale the
-                # reaction's oxygen to the simulation's, and design again.
+                # reaction's oxygen to the simulation's, and design again,
+                # whether or not the balanced reaction was aerated (§4.R).
                 mmol_g = float(convert(1, "mol", "mmol")) / float(chems[O2].MW)
                 factor = target * mmol_g / balanced
                 rxn.istoichiometry[O2] *= factor
-                R = _build(cls, spec, chems, rxn, F_vol)
-                said = _simulate(R)
+                R, said = _made(cls, spec, chems, rxn, F_vol)
             oxygen = _oxygen(R, spec, chems, balanced, factor, consumed_kmol_h)
         out = _read(R, cls, spec, chems)
         out.update(scale=scale_info, reaction=rinfo, oxygen=oxygen, warnings=said,
-                   utilitySettings=utility_settings([R]))
+                   utilitySettings=utility_settings([R]), designNotes=_design_notes(R, cls, spec))
         out["heat"] = _heat(R, kind, out, oxygen)
     return out
+
+
+def _kmol_h(mol_s: float) -> float:
+    """mol s⁻¹ in kmol h⁻¹, by thermosteam's units."""
+    return float(mol_s * convert(1, "hr", "s") * convert(1, "mol", "kmol"))
+
+
+def _design_notes(R: Any, cls: Any, spec: dict[str, Any]) -> list[str]:
+    """What the design does that its basis alone does not say: a batch
+    volume's one vessel is not bounded by V_max (OF-BLD-020 §4.R)."""
+    if spec["scale"].get("batchVolume") is None:
+        return []
+    V = float(R.design_results["Reactor volume"])
+    vmax = getattr(cls, "V_max_default", None)
+    over = vmax is not None and V > float(vmax)
+    return [f"a batch volume designs one vessel of that working volume, so V_max does not apply: BioSTEAM's vessel "
+            f"holds the batch volume over V_wf, {V:.4g} m³"
+            + (f", larger than the {float(vmax):.4g} m³ its {cls.__name__} holds a vessel to by default "
+               "(V_max_default)" if over else "")]
+
+
+def _batch_oxygen(R: Any, ts: list[float], ys: list[float]) -> dict[str, float] | None:
+    """The oxygen the simulation took up, per hour of the plant: the
+    trapezoid integral of its uptake over the batch to harvest (mmol L⁻¹,
+    which is mol m⁻³), times each vessel's working volume and the vessels,
+    over the cycle (D7's Cooney basis, OF-BLD-020 §4.R). None without an
+    interval of uptake (two hours or more)."""
+    if len(ts) <= 1:
+        return None
+    area = float(np.trapezoid(ys, ts))
+    d = R.design_results
+    V_work, N, cycle = float(d["Reactor volume"]) * float(R.V_wf), float(d["Number of reactors"]), float(d["Batch time"])
+    return {"area": area, "workingVolume": V_work, "vessels": N, "cycle": cycle,
+            "kmolPerH": float(area * V_work * N / cycle * convert(1, "mol", "kmol"))}
 
 
 def _oxygen(R: Any, spec: dict[str, Any], chems: Any, balanced: float | None, factor: float,
@@ -530,9 +619,14 @@ def _oxygen(R: Any, spec: dict[str, Any], chems: Any, balanced: float | None, fa
     our = spec.get("our") or {}
     ts = [float(t) for t in our.get("t") or []]
     ys = [float(v) * mmol_g for v in our.get("value") or []]
+    floor, _ = aeration_floor()
+    batch = _batch_oxygen(R, ts, ys)
     base = {"t": ts, "our": ys, "unit": "mmol L⁻¹ h⁻¹", "oxygenBasis": spec.get("oxygenBasis"),
             "balancedUptake": balanced, "scale": factor, "reactionO2KmolPerH": consumed_kmol_h,
-            "targetUptake": spec["ourTarget"] * mmol_g if spec.get("ourTarget") is not None else None}
+            "targetUptake": spec["ourTarget"] * mmol_g if spec.get("ourTarget") is not None else None,
+            "scaledO2KmolPerH": _kmol_h(R.get_OUR()),
+            "simulatedO2KmolPerH": batch["kmolPerH"] if batch else None,
+            "floorKmolPerH": _kmol_h(floor) if floor is not None else None}
     if R.air.isempty():
         return {**base, "aerated": False, "otr": 0.0, "kLa": None, "kLaUnit": "h⁻¹",
                 "kLaNeededAtPeak": None, "method": None, "short": _short(ts, ys, 0.0) if ts else [],
@@ -547,7 +641,10 @@ def _oxygen(R: Any, spec: dict[str, Any], chems: Any, balanced: float | None, fa
     to_mmol_L = float(convert(1, "mol", "mmol")) * rho / float(convert(1, "m3", "L"))  # mol kg⁻¹ → mmol L⁻¹
     otr = kLa * lmdf * to_mmol_L
     method = next((m for (d, m), fn in aeration.kLa_methods.items() if fn is R.kLa), getattr(R.kLa, "__name__", None))
-    peak = max(ys) if ys else None
+    # The peak the simulation states (on its solver's steps), when it states
+    # one above its display grid's (§4.R).
+    stated = [spec["ourPeak"] * mmol_g] if spec.get("ourPeak") is not None else []
+    peak = max(ys + stated) if ys or stated else None
     return {**base, "aerated": True, "otr": otr, "kLa": kLa, "kLaUnit": "h⁻¹",
             "kLaNeededAtPeak": peak / (lmdf * to_mmol_L) if peak is not None else None, "method": method,
             "short": _short(ts, ys, otr) if ts else [], "sized": _uptake_sized(R),
@@ -609,8 +706,9 @@ def _read(R: Any, cls: Any, spec: dict[str, Any], chems: Any) -> dict[str, Any]:
                      "velocity"),
             ]
         duty = R._get_duty()
-        rows.append(_row("Reactor duty", duty, "kJ/hr", "the unit's _get_duty(): the enthalpy and heats of formation "
-                                                        "out less in, or Q_O2_consumption times the oxygen consumed"))
+        rows.append(_row("Reactor duty", duty, "kJ/hr", (
+            "the unit's _get_duty(): the enthalpy and heats of formation out less in" if R.Q_O2_consumption is None else
+            "the unit's _get_duty(): Q_O2_consumption times the oxygen in less the oxygen out")))
     else:
         duty = d["Reactor duty"]
         rows += [
@@ -654,13 +752,27 @@ def _read(R: Any, cls: Any, spec: dict[str, Any], chems: Any) -> dict[str, Any]:
 
 
 def _heat(R: Any, kind: str, out: dict[str, Any], oxygen: dict[str, Any] | None) -> dict[str, Any]:
+    """BioSTEAM's duty and how it was found (`method`: the heats of formation,
+    or a forced heat per oxygen times the oxygen the vessel consumed, which
+    `consumedKmolPerH` is), beside D7's cross-check on the oxygen the
+    simulation took up (OF-BLD-020 §4.R)."""
     if kind != AEROBIC or oxygen is None:
-        return {"bst": out["dutyRead"], "convention": None, "conventionNote": (
-            "the cross-check rests on oxygen consumed, and an anaerobic vessel consumes none: BioSTEAM's duty from the "
-            "reaction's heats of formation stands alone")}
+        return {"bst": out["dutyRead"], "method": "heats-of-formation", "consumedKmolPerH": None, "convention": None,
+                "oxygenKmolPerH": None, "conventionNote": (
+                    "the cross-check rests on oxygen consumed, and an anaerobic vessel consumes none: BioSTEAM's duty "
+                    "stands alone")}
+    # What _get_duty multiplies a forced heat per oxygen by: the oxygen in less the oxygen out.
+    consumed = float(sum(i.imol[O2] for i in R.ins) - sum(i.imol[O2] for i in R.outs))
+    method = "heats-of-formation" if R.Q_O2_consumption is None else "forced-per-oxygen"
     q, why = heat_per_oxygen()
-    # The reaction's oxygen as its yields balance it, before any scale: the
-    # oxygen the batch consumes on average.
-    return {"bst": out["dutyRead"], "convention": q * oxygen["reactionO2KmolPerH"], "conventionNote": (
-        f"{why}; applied to the oxygen the reaction consumes as its yields balance it, "
-        f"{oxygen['reactionO2KmolPerH']:.4g} kmol/hr, before any scale to the peak")}
+    batch = _batch_oxygen(R, oxygen["t"], oxygen["our"])
+    if batch is None:
+        return {"bst": out["dutyRead"], "method": method, "consumedKmolPerH": consumed, "convention": None,
+                "oxygenKmolPerH": None, "conventionNote": (
+                    f"{why}; the simulation keeps no uptake over its hours, so there is no oxygen to apply it to")}
+    return {"bst": out["dutyRead"], "method": method, "consumedKmolPerH": consumed,
+            "convention": q * batch["kmolPerH"], "oxygenKmolPerH": batch["kmolPerH"], "conventionNote": (
+                f"{why}; applied to the oxygen the simulation took up: the trapezoid integral of its uptake over the "
+                f"batch to harvest, {batch['area']:.4g} mmol L⁻¹, times each vessel's working volume, "
+                f"{batch['workingVolume']:.4g} m³, and the vessels, {batch['vessels']:.4g}, over the {batch['cycle']:.4g} h "
+                f"cycle: {batch['kmolPerH']:.4g} kmol/hr")}

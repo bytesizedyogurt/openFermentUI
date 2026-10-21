@@ -113,13 +113,16 @@ class StandInWorker:
                 out["designs"] = {
                     "Stirred tank": {"method": "Riet", "optimize_power": True, "kW_per_m3": 0.5, "runs": ["Riet"],
                                      "solvesPower": ["Riet"], "registered": ["Riet", "Labik", "Galaction"]},
-                    "Bubble column": {"method": "Dewes", "optimize_power": False, "kW_per_m3": 0.5, "runs": ["Dewes"],
+                    "Bubble column": {"method": "Dewes", "optimize_power": False, "kW_per_m3": 0.25, "runs": ["Dewes"],
                                       "solvesPower": [], "registered": ["Deshpande", "Dewes", "Shah"]},
                 }
                 out["defaultDesign"] = "Stirred tank"
                 out["choices"] = {"vessel_material": ["Carbon steel", "Titanium"], "vessel_type": ["Horizontal", "Vertical"],
                                   "heat_exchanger_configuration": ["jacketed", "recirculation loop"]}
                 out["heatPerO2"], out["heatPerO2From"] = -1.0, STANDIN
+            else:
+                # What the NREL class's setters refuse, as the worker reads them from its code.
+                out["refuses"] = {k: {"atOrBelow": 1.0, "from": STANDIN} for k in ("N", "V_max")}
             return out
         if op == "vessel_design":
             aerobic = args["kind"] == vessel.AEROBIC
@@ -382,7 +385,8 @@ def test_a_real_simulation_is_read_as_kept(store):
         assert src["finalTitre"] == sim.finalTitre and src["used"] == pytest.approx(SIM_STANDIN["s0"] - sim.end["S"])
         assert src["our"]["t"] == sim.our.t and src["readNotes"] == []
         peak, _ = vessel.oxygen_uptake(src)
-        assert (peak == pytest.approx(max(sim.our.value)) and peak > 0) if aerobic else peak == 0
+        # The peak the simulation states, read on its solver's steps (§4.R, finding 11).
+        assert (peak == sim.our.peak and peak > 0) if aerobic else peak == 0
 
 
 def test_a_run_past_its_harvest_is_read_at_harvest_with_the_uptake_up_to_it(store, worker):
@@ -397,6 +401,89 @@ def test_a_run_past_its_harvest_is_read_at_harvest_with_the_uptake_up_to_it(stor
     assert max(src["our"]["t"]) <= sim.harvestH and len(src["our"]["t"]) < len(sim.our.t)
     assert "reads its broth at harvest" in src["readNotes"][0]
     assert any("reads its broth at harvest" in n for n in vessel.scope(sim.artifactId).notes)
+
+
+# ── §4.R: the Phase 4 review's findings, each held ─────────────────────
+
+
+def test_our_peak_is_the_peak_the_simulation_states(store, worker):
+    """Finding 11: the vessel is sized for the peak the simulation states
+    (`our.peak`, read on its solver's own steps), not the display grid's
+    maximum, which lies under it."""
+    sim = real_simulation(True)
+    assert sim.our.peak > max(sim.our.value)  # the grid misses the solver's peak, as measured
+    v = by_key(vessel.scope(sim.artifactId).values)["our_peak"]
+    assert v.value == sim.our.peak and v.origin == "simulation" and "solver" in v.detail
+    # A run past its harvest whose stated peak lies before harvest keeps it too.
+    late = real_simulation(True, kd=0.02, t_end=20.0)
+    assert late.our.peakH <= late.harvestH
+    assert by_key(vessel.scope(late.artifactId).values)["our_peak"].value == late.our.peak
+
+
+def test_a_vessel_count_is_whole_and_at_least_the_classes_own_minimum(store, worker, client):
+    """Findings 3, 8, 4, 9: N is a whole number, at least the class's own
+    minimum (the NREL class refuses N at or below one, read from its code);
+    the spec says so, and the service refuses in words before the worker is
+    asked, as it does a V_max the class cannot use: never a 503 for a
+    person's value."""
+    aer = lambda *more: VesselRequest(simulation=AEROBIC_ID, overrides=[  # noqa: E731
+        override(AEROBIC_ID, "plant_scale", 2000.0), *(override(AEROBIC_ID, k, v) for k, v in more)])
+    with pytest.raises(vessel.VesselRefused, match=r"N is a number of vessels, a whole number; 2\.5 is not"):
+        vessel.design(aer(("N", 2.5)))
+    # The panel's resolve says the same, before any design.
+    with pytest.raises(params.ParamRefused, match="whole number"):
+        params.resolve_scope(f"fermos:vessel:{AEROBIC_ID}", ParamResolveRequest(overrides=[override(AEROBIC_ID, "N", 2.5)]))
+    # One aerated vessel at a plant scale needs a loading time, said before BioSTEAM divides by zero.
+    with pytest.raises(vessel.VesselRefused, match="loading time"):
+        vessel.design(aer(("N", 1.0)))
+    one = vessel.design(aer(("N", 1.0), ("loading_time", 2.0)))
+    assert one.artifactId
+    # The NREL class's minimum is the anaerobic spec's bound, step one, its reason read from the class.
+    specs = {sp.key: sp for sp in vessel.scope(ANAEROBIC_ID).specs}
+    assert specs["N"].step == 1 and specs["N"].min == 2 and "NRELAnaerobicBatchBioreactor refuses N at or below 1" in specs["N"].boundsReason
+    assert specs["V_max"].min == 1 and "refuses V_max at or below 1" in specs["V_max"].boundsReason
+    assert {sp.key: sp for sp in vessel.scope(AEROBIC_ID).specs}["N"].min == 1
+    before = len([c for c in worker.calls if c[0] == "vessel_design"])
+    for key, value in (("N", 1.0), ("N", 2.5), ("V_max", 0.5)):
+        r = client.post("/api/fermos/vessel", json={"simulation": ANAEROBIC_ID, "overrides": [
+            override(ANAEROBIC_ID, "plant_scale", 50000.0).model_dump(), override(ANAEROBIC_ID, key, value).model_dump()]})
+        assert r.status_code == 422 and r.json()["detail"].startswith(key), (key, value, r.json())
+    assert len([c for c in worker.calls if c[0] == "vessel_design"]) == before  # the worker was never asked
+    ok = client.post("/api/fermos/vessel", json={"simulation": ANAEROBIC_ID, "overrides": [
+        override(ANAEROBIC_ID, "plant_scale", 50000.0).model_dump(), override(ANAEROBIC_ID, "N", 2.0).model_dump()]})
+    assert ok.status_code == 200
+
+
+def test_a_batch_volume_design_names_no_v_max_it_did_not_use(store, worker):
+    """Finding 5: a batch volume designs one vessel of that working volume,
+    and V_max does not bound it; a person's V_max beside a batch volume is
+    refused in words, and the basis never names a V_max the design did not
+    use."""
+    bv = [override(AEROBIC_ID, "batch_volume", 400.0), override(AEROBIC_ID, "loading_time", 2.0)]
+    with pytest.raises(vessel.VesselRefused, match="V_max does not apply"):
+        vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[*bv, override(AEROBIC_ID, "V_max", 100.0)]))
+    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=bv))
+    named = {i.name for i in artifacts.get(d.artifactId).inputs}
+    assert "V_max" not in named and "batch_volume" in named
+    p = by_key(d.parameters)["V_max"]
+    assert p.value is None and p.source is None and "does not apply" in p.detail
+    # A plant scale still designs under V_max, and its basis names it.
+    scaled = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)]))
+    assert "V_max" in {i.name for i in artifacts.get(scaled.artifactId).inputs}
+
+
+def test_the_kept_parameters_carry_the_built_designs_library_defaults(store, worker):
+    """Finding 10: a kept design's parameters carry BioSTEAM's defaults for
+    the class and design it built, as the scope serves them."""
+    for vtype, method, power in (("bubble-column", "Dewes", "false"), ("stirred-tank", "Riet", "true")):
+        d = vessel.design(VesselRequest(simulation=AEROBIC_ID, vesselType=vtype,
+                                        overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)]))
+        p, served = by_key(d.parameters), by_key(vessel.scope(AEROBIC_ID, vtype).values)
+        assert p["method"].libraryDefault == method == served["method"].libraryDefault
+        assert p["optimize_power"].libraryDefault == power == served["optimize_power"].libraryDefault
+        assert p["design"].libraryDefault == served["design"].libraryDefault == "Stirred tank"
+        design = vessel.VESSEL_TYPES[vtype]
+        assert p["kW_per_m3"].libraryDefault == vessel.worker_specs(vessel.AEROBIC)["designs"][design]["kW_per_m3"]
 
 
 # ── the endpoints ──────────────────────────────────────────────────────
@@ -544,13 +631,110 @@ def test_a_vessel_is_designed_for_each_real_simulation(real):
     d = vessel.design(VesselRequest(simulation=aer.artifactId, overrides=[override(aer.artifactId, "plant_scale", 2000.0)]))
     assert d.unitClass == "AeratedBioreactor" and d.oxygen.method == "Riet" and d.oxygen.kLa > 0
     assert _row(d, "Vessels") >= 1 and _row(d, "Batch time (reacting)") == pytest.approx(aer.harvestH)
-    assert d.oxygen.otr == pytest.approx(max(d.oxygen.our), rel=1e-6) and d.oxygen.short == []
+    # Sized for the peak the simulation states (§4.R, finding 11), which the display grid lies under.
+    assert d.oxygen.otr == pytest.approx(d.oxygen.targetUptake, rel=1e-6) and d.oxygen.short == []
+    assert d.oxygen.otr >= max(d.oxygen.our)
     bubble = vessel.design(VesselRequest(simulation=aer.artifactId, overrides=[
         override(aer.artifactId, "plant_scale", 2000.0), override(aer.artifactId, "design", "Bubble column")]))
     assert bubble.vesselType == "bubble-column" and bubble.oxygen.method == "Dewes" and bubble.oxygen.kLa > 0
     n = vessel.design(VesselRequest(simulation=ana.artifactId, overrides=[override(ana.artifactId, "plant_scale", 50000.0)]))
     assert n.unitClass == "NRELAnaerobicBatchBioreactor" and n.oxygen is None and _row(n, "Vessels") >= 2
     assert not any("Compressor" in k for k in n.cost.byItem) and n.evidence.id == n.artifactId
+
+
+YXO_ID = "a0a0a0a0a0a0a0a4"
+WHO = "Stand-In Person"
+
+
+@pytest.mark.sim
+def test_the_heat_cross_check_rests_on_the_simulated_uptake_and_flags_a_gap(real):
+    """Finding 0 (D7): Cooney's estimate is the heat per oxygen times the
+    oxygen the simulation took up (the trapezoid integral of its uptake to
+    harvest, times each vessel's working volume and the vessels, over the
+    cycle), beside BioSTEAM's duty; when the reaction's balanced oxygen and
+    the simulation's differ beyond the stated tolerance, a flag names both."""
+    keep(YXO_ID, standin_simulation(True, yxo=12.0))
+    d = vessel.design(VesselRequest(simulation=YXO_ID, overrides=[override(YXO_ID, "plant_scale", 2000.0)]))
+    ox, q = d.oxygen, vessel.worker_specs(vessel.AEROBIC)["heatPerO2"]
+    area = sum((ox.t[i + 1] - ox.t[i]) * (ox.our[i] + ox.our[i + 1]) / 2 for i in range(len(ox.t) - 1))  # mol m⁻³
+    flow = _row(d, "Working volume of each vessel") * _row(d, "Vessels") / _row(d, "Cycle time")  # m³ h⁻¹
+    simulated = area * flow / 1000  # kmol h⁻¹
+    assert ox.simulatedO2KmolPerH == pytest.approx(simulated, rel=1e-9)
+    assert d.heat.convention == pytest.approx(q * simulated, rel=1e-9) and d.heat.oxygenKmolPerH == ox.simulatedO2KmolPerH
+    assert "trapezoid" in d.heat.conventionNote and "before any scale" not in d.heat.conventionNote
+    assert abs(ox.reactionO2KmolPerH - simulated) > vessel.OXYGEN_AGREE_RTOL * ox.reactionO2KmolPerH
+    gap = [f for f in d.flags if "the simulation took up" in f]
+    assert len(gap) == 1 and f"{ox.reactionO2KmolPerH:.4g}" in gap[0] and f"{simulated:.4g}" in gap[0]
+    named = {i.name: i for i in artifacts.get(d.artifactId).inputs}
+    assert named["oxygen agreement tolerance"].source.kind == "convention"
+
+
+@pytest.mark.sim
+def test_a_small_aerated_vessel_is_sized_for_the_peak_whatever_the_floor(real):
+    """Findings 1, 6: the reaction is scaled to the simulated uptake whether
+    or not its balanced oxygen is above the floor BioSTEAM aerates from; no
+    aeration is reported only when the scaled reaction is still under it,
+    in terms of the target uptake."""
+    small = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+        override(AEROBIC_ID, "batch_volume", 5.0), override(AEROBIC_ID, "loading_time", 2.0)]))
+    ox = small.oxygen
+    assert ox.aerated and ox.scale != pytest.approx(1.0) and ox.balancedUptake is not None
+    assert ox.otr == pytest.approx(max(ox.our), rel=1e-6) and ox.short == []
+    assert ox.scaledO2KmolPerH > ox.floorKmolPerH > ox.reactionO2KmolPerH  # the balanced reaction alone was under it
+    tiny = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+        override(AEROBIC_ID, "batch_volume", 1.0), override(AEROBIC_ID, "loading_time", 2.0)]))
+    t = tiny.oxygen
+    assert not t.aerated and t.scale != pytest.approx(1.0) and t.scaledO2KmolPerH <= t.floorKmolPerH
+    words = next(f for f in tiny.flags if f.startswith("BioSTEAM designed no aeration"))
+    assert f"{t.targetUptake:.4g}" in words and f"{t.floorKmolPerH:.4g}" in words and "peak" in words
+
+
+@pytest.mark.sim
+def test_a_persons_heat_per_oxygen_is_what_the_duty_says_it_is(real):
+    """Findings 2, 7, 13: with a person's Q_O2_consumption BioSTEAM's duty is
+    Q times the oxygen its vessel consumed (scaled to the sized uptake), and
+    the words say so, naming the person; without one, the heats of
+    formation."""
+    q = vessel.worker_specs(vessel.AEROBIC)["heatPerO2"]
+    base = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 2000.0)]))
+    assert base.heat.method == "heats-of-formation" and "heats of formation" in base.heat.dutyNote
+    forced = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+        override(AEROBIC_ID, "plant_scale", 2000.0), override(AEROBIC_ID, "Q_O2_consumption", q, by=WHO)]))
+    h, ox = forced.heat, forced.oxygen
+    assert h.method == "forced-per-oxygen" and "heats of formation" not in h.dutyNote
+    assert "Q_O2_consumption" in h.dutyNote and WHO in h.dutyNote and f"{ox.scale:.4g}" in h.dutyNote
+    assert h.bst == pytest.approx(q * h.consumedKmolPerH, rel=1e-6)
+    assert h.consumedKmolPerH == pytest.approx(ox.scaledO2KmolPerH, rel=1e-6)
+
+
+@pytest.mark.sim
+def test_a_batch_volume_vessel_says_what_it_does_with_v_max(real):
+    """Finding 5: one vessel holds the batch volume over V_wf whatever V_max,
+    and the design says so (here larger than the class's own V_max)."""
+    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+        override(AEROBIC_ID, "batch_volume", 400.0), override(AEROBIC_ID, "loading_time", 2.0)]))
+    V = _row(d, "Volume of each vessel")
+    default = vessel.worker_specs(vessel.AEROBIC)["parameters"]["V_max"]["default"]
+    assert _row(d, "Vessels") == 1 and V > default
+    said = next(f for f in d.flags if "V_max does not apply" in f)
+    assert f"{V:.4g}" in said and f"{default:.4g}" in said
+    assert "V_max" not in {i.name for i in artifacts.get(d.artifactId).inputs}
+
+
+@pytest.mark.sim
+def test_a_class_that_refuses_its_construction_is_refused_in_words(real):
+    """Findings 4, 9 at the root: a unit BioSTEAM refuses to build is the
+    worker's refusal in words (a 422), never an error the service reads as a
+    simulator that cannot answer (a 503); the worker answers after."""
+    from openferment_core.workers import WorkerError
+
+    spec = _requests(real)["anaerobic"]
+    with pytest.raises(WorkerError, match=r"^Refused: BioSTEAM could not build this vessel: ValueError: number of reactors"):
+        proforma.call("vessel_design", {**spec, "params": {**spec["params"], "N": 1.0}})
+    assert proforma.worker().ping()["worker"] == "proforma"
+    # The real class's own minimum and floor, read from its code, bound the anaerobic scope.
+    specs = {sp.key: sp for sp in vessel.scope(ANAEROBIC_ID).specs}
+    assert specs["N"].min == 2 and specs["V_max"].min == 1
 
 
 ETHANOL_STANDIN = {"feed_glucose_conc": 100.0, "titre": 45.0, "yield": 0.45, "productivity": 2.0,

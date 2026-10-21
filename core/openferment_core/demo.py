@@ -1784,6 +1784,9 @@ VESSEL_SIM = {"mu_max": 0.3, "ks": 0.5, "yxs": 0.1, "alpha": 2.0, "yps": 0.45, "
               "s0": 100.0, "p0": 0.0}
 VESSEL_AEROBIC = {"yxo": 1.0}
 VESSEL_PLANT_SCALE = 50000.0
+# §4.R: a STAND-IN person's heat per oxygen consumed (kJ kmol⁻¹), typed so the
+# browser tests see a duty BioSTEAM forces from it, said so on the screen.
+VESSEL_Q_STANDIN = -400000.0
 VESSEL_FIXTURE_RTOL = 1e-6
 
 
@@ -1822,6 +1825,11 @@ def _standin_vessel_call(op: str, args: dict[str, Any]) -> Any:
                               "vessel_type": ["Horizontal", "Vertical"],
                               "heat_exchanger_configuration": ["jacketed", "recirculation loop"]}
             out["heatPerO2"], out["heatPerO2From"] = -1.0, VESSEL_STANDIN
+            out["aerationFloorMolPerS"], out["aerationFloorFrom"] = 0.0, VESSEL_STANDIN
+            out["refuses"] = {}
+        else:
+            # What the NREL class's setters refuse, as the worker reads them from its code (§4.R).
+            out["refuses"] = {k: {"atOrBelow": 1.0, "from": VESSEL_STANDIN} for k in ("N", "V_max")}
         return out
     if op == "vessel_design":
         aerobic = args["kind"] == vessel.AEROBIC
@@ -1833,7 +1841,7 @@ def _standin_vessel_call(op: str, args: dict[str, Any]) -> Any:
                   "method": (args["params"].get("method") or ("Dewes" if args["design"] == "Bubble column" else "Riet")),
                   "aerated": True, "oxygenBasis": args["oxygenBasis"], "targetUptake": max(ys), "sized": max(ys),
                   "balancedUptake": max(ys), "scale": 1.0, "cStar": 1.0, "cL": 0.5, "drivingForce": 0.5,
-                  "reactionO2KmolPerH": 1.0}
+                  "reactionO2KmolPerH": 1.0, "scaledO2KmolPerH": 1.0, "simulatedO2KmolPerH": 1.0, "floorKmolPerH": 0.0}
         row = lambda label, value, unit: {"label": label, "value": value, "unit": unit, "readFrom": VESSEL_STANDIN}  # noqa: E731
         return {"unitClass": "AeratedBioreactor" if aerobic else "NRELAnaerobicBatchBioreactor", "unitId": "R1",
                 "aerobic": aerobic, "design": [row("Vessels", 2.0, ""), row("Volume of each vessel", 10.0, "m3"),
@@ -1844,8 +1852,10 @@ def _standin_vessel_call(op: str, args: dict[str, Any]) -> Any:
                     "utility": 1.0, "costIndex": 500.0, "costIndexYear": None, "note": VESSEL_STANDIN},
                 "versions": {"biosteam": "stand-in"}, "chemicals": VESSEL_STANDIN, "dutyRead": -1.0,
                 "scale": {"how": VESSEL_STANDIN}, "reaction": {"equation": VESSEL_STANDIN, "notes": []}, "oxygen": ox,
-                "warnings": [], "utilitySettings": {},
-                "heat": {"bst": -1.0, "convention": -1.0 if aerobic else None, "conventionNote": VESSEL_STANDIN}}
+                "warnings": [], "utilitySettings": {}, "designNotes": [],
+                "heat": {"bst": -1.0, "method": "heats-of-formation", "consumedKmolPerH": 1.0 if aerobic else None,
+                         "convention": -1.0 if aerobic else None, "oxygenKmolPerH": 1.0 if aerobic else None,
+                         "conventionNote": VESSEL_STANDIN}}
     raise ValueError(f"the stand-in vessel worker has no op {op}")
 
 
@@ -1855,6 +1865,7 @@ VESSEL_ASKS = (
     ("aerobic", None, ()),
     ("aerobic", "bubble-column", (("design", "Bubble column"),)),
     ("anaerobic", None, ()),
+    ("aerobic", None, (("Q_O2_consumption", VESSEL_Q_STANDIN),)),
 )
 
 
@@ -1864,7 +1875,7 @@ _NO_RECORDS = SimpleNamespace(records=[], records_by_id={}, hidden={})
 
 
 def prototype_vessel(real_worker: bool | None = None) -> dict[str, Any]:
-    from . import fermos, proforma, vessel
+    from . import fermos, params, proforma, vessel
     from . import intake as _intake
     from .models import Override, SimulationRequest, VesselRequest
 
@@ -1882,7 +1893,7 @@ def prototype_vessel(real_worker: bool | None = None) -> dict[str, Any]:
 
     def typed(aid: str, key: str, value: Any) -> Override:
         return Override(scope=f"fermos:vessel:{aid}", key=key, value=value, by=VESSEL_BY, at=VESSEL_AT,
-                        note=VESSEL_STANDIN if key == "plant_scale" else None)
+                        note=VESSEL_STANDIN if key in ("plant_scale", "Q_O2_consumption") else None)
 
     def stamped(body: dict[str, Any]) -> dict[str, Any]:
         out = {**body, "createdAt": AT}
@@ -1905,6 +1916,14 @@ def prototype_vessel(real_worker: bool | None = None) -> dict[str, Any]:
             for which, kind in (("aerobic", None), ("aerobic", "bubble-column"), ("anaerobic", None)):
                 body = vessel.scope(ids[which], kind).model_dump(mode="json")
                 scopes.append({"simulation": ids[which], "vesselType": kind, "status": 200, "body": body})
+            # §4.R: the bridge's STAND-IN fit and forecast (fermos-fits.json lists them), each one's vessel scope
+            # as the service serves or refuses it, so the browser can choose a fit when no simulation is kept.
+            for fid in _bridge_fits():
+                try:
+                    scopes.append({"fit": fid, "vesselType": None, "status": 200,
+                                   "body": vessel.scope(fid).model_dump(mode="json")})
+                except params.ParamRefused as e:
+                    scopes.append({"fit": fid, "vesselType": None, "status": 422, "body": {"detail": str(e)}})
             designs = []
             refused = VesselRequest(simulation=ids["aerobic"])
             try:

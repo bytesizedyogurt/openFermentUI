@@ -281,7 +281,12 @@ def _count(n: int, noun: str) -> str:
 def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
     """One line in plain words, written by code."""
     if result.error:
-        return f"{name} refused: {result.error[:160]}"
+        # A tool's own error names it already ("fermos_vessel refused: …");
+        # the line names it once (OF-BLD-020 §4.R, seen live).
+        words = result.error.removeprefix(f"{name} refused: ")
+        if words.startswith(f"{name} "):  # "fermos_vessel could not design the vessel: …"
+            return words[: len(name) + 1 + 160]
+        return f"{name} refused: {words[:160]}"
     if name == "search_passages":
         return f'Searched the papers for "{inp.get("query", "")}" · {_count(len(result.passages), "passage")}'
     if name == "search_records":

@@ -2513,16 +2513,37 @@ class VesselOxygen(BaseModel):
     drivingForce: float | None = None
     # The reaction's oxygen as its yields balance it, kmol h⁻¹.
     reactionO2KmolPerH: float | None = None
+    # OF-BLD-020 §4.R. The oxygen the vessel's reaction consumes as designed
+    # (after the scale), kmol h⁻¹; the oxygen the simulation took up, per
+    # hour of the plant (the trapezoid integral of its uptake over the batch
+    # to harvest, times each vessel's working volume and the vessels, over
+    # the cycle), kmol h⁻¹; and the floor at or below which BioSTEAM's
+    # AeratedBioreactor sizes no air, read from its code, kmol h⁻¹.
+    scaledO2KmolPerH: float | None = None
+    simulatedO2KmolPerH: float | None = None
+    floorKmolPerH: float | None = None
 
 
 class VesselHeat(BaseModel):
-    """The vessel's duty, BioSTEAM's from the heats of formation, beside a
-    cross-check from the oxygen consumed at a stated convention."""
+    """The vessel's duty as BioSTEAM found it, beside a cross-check from the
+    oxygen the simulation took up at a stated convention (D7, §4.R)."""
 
     bst: float
     convention: float | None = None
     conventionNote: str
     unit: str = "kJ/hr"
+    # OF-BLD-020 §4.R. How BioSTEAM found `bst`: 'heats-of-formation' (the
+    # enthalpy and heats of formation out less in) or 'forced-per-oxygen'
+    # (a person's Q_O2_consumption times the oxygen the vessel consumed,
+    # `consumedKmolPerH`, kmol h⁻¹); None on a design kept before §4.R.
+    method: str | None = None
+    consumedKmolPerH: float | None = None
+    # The oxygen the convention's estimate rests on, kmol h⁻¹: the
+    # simulation's (VesselOxygen.simulatedO2KmolPerH).
+    oxygenKmolPerH: float | None = None
+    # BioSTEAM's duty in words: which way it was found, and whose heat per
+    # oxygen when a person forced one.
+    dutyNote: str | None = None
 
 
 class VesselCostItem(BaseModel):

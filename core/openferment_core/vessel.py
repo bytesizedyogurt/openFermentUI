@@ -63,6 +63,22 @@ fermos_vessel returns and the screen reads the basis from. And the real
 simulation is read as §3.1 keeps it: `end` is the run's last hour, so a run
 that goes on past the hour its sugar runs out is read at `harvestH`
 (`fermos.harvest`), its oxygen uptake up to that hour (`_past_harvest`).
+
+OF-BLD-020 §4.R (the Phase 4 review). The peak uptake is the one the
+simulation states (`our.peak`, on its solver's steps), not its display
+grid's maximum. The reaction is scaled to the sized uptake at every scale,
+and "no aeration" is said only of a scaled reaction still under BioSTEAM's
+floor, in terms of the target uptake. The heat cross-check rests on the
+oxygen the simulation took up, beside BioSTEAM's duty in the words of how it
+was found (the heats of formation, or a person's heat per oxygen times the
+oxygen the vessel consumed); a gap between the reaction's balanced oxygen
+and the simulation's beyond `OXYGEN_AGREE_RTOL` is flagged with both
+numbers. `N` is a whole number at or above the class's own minimum (the NREL
+vessel refuses one, read from its code), and a V_max the class cannot use is
+refused in words before the worker is asked (`_held`), as is a person's
+V_max beside a batch volume, whose one vessel V_max does not bound: its
+basis names no V_max. A kept design's parameters carry the library defaults
+of the class and design built.
 """
 from __future__ import annotations
 
@@ -86,7 +102,9 @@ from .models import (
 )
 
 TOOL = "fermos.vessel"
-VERSION_WORDS = "vessel 1"
+# 2 since §4.R: the cross-check's oxygen, the scale at every size, the
+# duty's words and the stated peak changed what a design computes.
+VERSION_WORDS = "vessel 2"
 SIMULATION = "fermos.simulation"
 FIT_TOOLS = ("kinetic_fit", "growth_forecast")
 # The families whose simulation is one batch on glucose making ethanol and
@@ -110,6 +128,13 @@ UNSCALED = 1e-12
 HARVEST_EPS = 1e-9
 # BioSTEAM's word for each vessel type, and the request's word for each.
 TYPE_OF_DESIGN = {v: k for k, v in VESSEL_TYPES.items()}
+# The heat cross-check's tolerance (§4.R, D7): the reaction's balanced
+# oxygen and the oxygen the simulation took up agree within this share of
+# the reaction's; beyond it a flag names both. A convention of this
+# cross-check, named in every aerobic design's basis: a heat-per-oxygen rule
+# is a rule of thumb, and a gap it could hide is not flagged.
+OXYGEN_AGREE_RTOL = 0.1
+TOLERANCE_INPUT = "oxygen agreement tolerance"
 
 
 class VesselRefused(ValueError):
@@ -206,12 +231,20 @@ def simulation_inputs(art: Artifact) -> dict[str, Any]:
                      f"{harvest:.4g} h, the hour its sugar runs out, and its oxygen uptake up to that hour")
     else:
         X, S, P = (_number(end.get(k), f"{k} at harvest") for k in ("X", "S", "P"))
+    # The peak the simulation states, read on its solver's own steps (§3.1),
+    # kept when it falls at or before harvest (§4.R, finding 11).
+    stated, stated_h = our.get("peak"), our.get("peakH")
+    our_peak = None
+    if isinstance(stated, (int, float)) and not isinstance(stated, bool) and math.isfinite(float(stated)) and stated > 0:
+        if not (isinstance(stated_h, (int, float)) and _past_harvest(stated_h, harvest)):
+            our_peak = {"value": float(stated), "h": float(stated_h) if isinstance(stated_h, (int, float)) else None}
     return {
         "id": art.id, "tool": art.tool, "family": family, "aerobic": bool(o.get("aerobic")),
         "start": {"x0": x0, "s0": s0, "p0": p0}, "end": {"X": X, "S": S, "P": P},
         "used": s0 - S, "made": {"cells": X - x0, "ethanol": P - p0},
         "harvestH": harvest, "finalTitre": float(o.get("finalTitre", P)),
         "our": {"t": [float(x) for x in t], "value": [float(x) for x in value]},
+        "ourPeak": our_peak,
         "readNotes": notes,
     }
 
@@ -289,13 +322,18 @@ def _source_of(aid: str, include_archived: bool = True) -> tuple[Artifact, dict[
 def oxygen_uptake(src: dict[str, Any]) -> tuple[float | None, float | None]:
     """The simulation's peak uptake and its average over the batch (the
     trapezoid integral over the hours it was kept, over their span), in
-    the simulation's unit; None without a series."""
+    the simulation's unit; None without a series. The peak is the one the
+    simulation states on its solver's steps (`our.peak`) when it states one
+    at or before harvest, else, or when its display grid holds a higher
+    one, the grid's (§4.R, finding 11)."""
     t, y = src["our"]["t"], src["our"]["value"]
     if len(t) < 2:
         return None, None
     area = sum((t[i + 1] - t[i]) * (y[i] + y[i + 1]) / 2 for i in range(len(t) - 1))
     span = t[-1] - t[0]
-    return max(y), (area / span if span > 0 else None)
+    stated = (src.get("ourPeak") or {}).get("value")
+    peak = max(y) if stated is None else max(stated, max(y))
+    return peak, (area / span if span > 0 else None)
 
 
 # ── the worker's answer, read once ─────────────────────────────────────
@@ -356,12 +394,14 @@ DECLARED: tuple[Decl, ...] = (
     Decl("V_max", "Largest vessel", "Vmax", "the largest single vessel BioSTEAM may use; it adds vessels rather than "
          "exceed it", "volume", "m³", "Vessel", DEFAULT, (0, None, _POSITIVE.format(what="a vessel's volume")),
          note="Give N or V_max, not both. The NREL vessel has no default of its own: BioSTEAM's anaerobic bioreactor's, "
-              "as the ethanol flowsheet passes it."),
+              "as the ethanol flowsheet passes it. A batch volume designs one vessel, which V_max does not bound: its "
+              "basis names no V_max, and a V_max typed beside one is refused."),
     Decl("N", "Number of vessels", "N", "how many vessels share the broth; unset, BioSTEAM finds it from the largest "
          "vessel", "count", "", "Vessel", DEFAULT,
-         (1, None, "a physical limit: a design has at least one vessel (BioSTEAM's NREL vessel refuses fewer than two, "
-                   "in its own words)"), step=1,
-         note="None by default: BioSTEAM finds the number from V_max. Give N or V_max, not both."),
+         (1, None, "a physical limit: a design has at least one vessel, a whole number of them (a class that refuses "
+                   "more, as the NREL vessel does, raises the bound in its own scope, with its own words)"), step=1,
+         note="None by default: BioSTEAM finds the number from V_max. Give N or V_max, not both. A whole number; one "
+              "aerated vessel at a plant scale needs a loading time."),
     Decl("V_wf", "Working volume fraction", "V_wf", "the share of each vessel the broth fills", "fraction", "",
          "Vessel", DEFAULT, (0, 1, _SHARE)),
     Decl("length_to_diameter", "Length to diameter", "L/D", "the vessel's height over its width", "ratio", "",
@@ -426,7 +466,8 @@ DECLARED: tuple[Decl, ...] = (
          "computes the duty from the heats of formation in and out", "molarEnergy", "kJ kmol⁻¹", "Heat", DEFAULT,
          (None, None, "no bound: a heat released is negative and BioSTEAM takes any value"), kinds=AER,
          note="None by default: the duty from the reaction's heats of formation. Not an oxygen demand: BioSTEAM "
-              "sizes the air from the reaction's oxygen."),
+              "sizes the air from the reaction's oxygen. Set, BioSTEAM's duty is it times the oxygen the vessel "
+              "consumes, which is the reaction's scaled to the uptake the air is sized for; the heat line says so."),
 )
 # What each class takes that the panel does not offer, and why.
 NOT_OFFERED = {
@@ -451,12 +492,73 @@ def _decls(kind: str) -> list[Decl]:
 
 
 def _spec(d: Decl, choices: list[str] | None = None, *, rule: list[str] | None = None, convention: Any = None,
-          note: str | None = None) -> ParameterSpec:
+          note: str | None = None, bounds: tuple[float | None, str] | None = None) -> ParameterSpec:
+    low, reason = bounds if bounds is not None else (d.min, d.reason)
     return ParameterSpec(
         key=d.key, label=d.label, symbol=d.symbol, gloss=d.gloss, dimension=d.dimension, unit=d.unit,
-        min=d.min, max=d.max, step=d.step, group=d.group, sourceRule=rule or d.rule, note=note or d.note,
-        boundsReason=d.reason, choices=choices if d.choice else None,
+        min=low, max=d.max, step=d.step, group=d.group, sourceRule=rule or d.rule, note=note or d.note,
+        boundsReason=reason, choices=choices if d.choice else None,
         convention=convention if convention is not None else d.convention)
+
+
+def _class_bounds(d: Decl, ws: dict[str, Any]) -> tuple[float | None, str] | None:
+    """A lower bound the vessel class sets itself, read from its code by the
+    worker (`refuses`: the value its setter raises at or below), with its
+    reason (§4.R): N's least whole number above it, V_max's value itself
+    (which the class refuses, said in the reason). None keeps the
+    declaration's."""
+    got = (ws.get("refuses") or {}).get(d.key)
+    if got is None:
+        return None
+    x = float(got["atOrBelow"])
+    if d.key == "N":
+        return float(math.floor(x)) + 1, (f"a whole number of vessels: BioSTEAM's {ws['unitClass']} refuses N at or "
+                                          f"below {x:g} ({got['from']})")
+    return x, (f"BioSTEAM's {ws['unitClass']} refuses V_max at or below {x:g} {d.unit} ({got['from']}): a V_max "
+               "above it")
+
+
+def _held(kind: str, ws: dict[str, Any], overrides: Iterable[Override]) -> None:
+    """What a person typed that the class cannot design, refused in words
+    before the worker is asked (§4.R, findings 3, 4, 5, 8, 9): an N that is
+    not a whole number or lies under the class's own minimum, a V_max at or
+    under what the class refuses, one aerated vessel at a plant scale with
+    no loading time, and a V_max beside a batch volume, which designs one
+    vessel V_max does not bound."""
+    typed = {o.key: o.value for o in overrides}
+    num = {k: float(v) for k, v in typed.items()
+           if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v))}
+    refuses = ws.get("refuses") or {}
+    if "N" in num and "batch_volume" in num:
+        raise VesselRefused("N does not apply to a batch volume: a batch volume names one vessel's working volume; leave "
+                            "N to it, or give a plant scale")
+    if "N" in num:
+        n = num["N"]
+        if not n.is_integer():
+            raise VesselRefused(f"N is a number of vessels, a whole number; {n:g} is not: BioSTEAM would size and cost "
+                                "that many vessels' worth (the aerated class) or round it up unsaid (the NREL vessel)")
+        if "N" in refuses and n <= refuses["N"]["atOrBelow"]:
+            x = refuses["N"]["atOrBelow"]
+            raise VesselRefused(f"N {n:g}: BioSTEAM's {ws['unitClass']} refuses N at or below {x:g} ({refuses['N']['from']}); "
+                                f"give {math.floor(x) + 1:g} or more, or leave N to it")
+        if n < 1:
+            raise VesselRefused(f"N {n:g}: a design has at least one vessel; give one or more, or leave N to BioSTEAM")
+        if n == 1 and kind == AEROBIC and "loading_time" not in num and "batch_volume" not in num:
+            raise VesselRefused("N 1: one aerated vessel at a plant scale needs a loading time: BioSTEAM sizes a single "
+                                "vessel's schedule with it (without one it divides by zero); type one under Schedule")
+    if "V_max" in num:
+        v = num["V_max"]
+        if "V_max" in refuses and v <= refuses["V_max"]["atOrBelow"]:
+            x = refuses["V_max"]["atOrBelow"]
+            raise VesselRefused(f"V_max {v:g} m³: BioSTEAM's {ws['unitClass']} refuses V_max at or below {x:g} m³ "
+                                f"({refuses['V_max']['from']}); give a larger one, or leave V_max to it")
+        if not v > 0:
+            raise VesselRefused(f"V_max {v:g} m³: a vessel's volume is above none; give a larger one, or leave V_max to "
+                                "BioSTEAM")
+        if "batch_volume" in num:
+            raise VesselRefused("V_max does not apply to a batch volume: a batch volume designs one vessel of that "
+                                "working volume, which V_max does not bound; leave V_max to the class, or give a "
+                                "plant scale")
 
 
 def _static() -> Iterable[tuple[str, list[ParameterSpec]]]:
@@ -560,6 +662,7 @@ def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True
     vessel_type, design_from = _chosen_type(vessel_type, overrides)
     design = _design_of(kind, vessel_type, ws)
     named_method = _kla_method(kind, design, ws, kla_method, overrides)
+    _held(kind, ws, overrides)
     defaults = ws["parameters"]
     specs: list[ParameterSpec] = []
     sources: dict[str, dict[str, ParameterValue | None]] = {}
@@ -575,7 +678,12 @@ def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True
         elif d.key in ("our_peak", "our_mean"):
             v = peak if d.key == "our_peak" else mean
             if v is not None:
-                what = ("the highest simulated oxygen uptake" if d.key == "our_peak" else
+                stated = src.get("ourPeak")
+                at = f", at {stated['h']:.4g} h" if stated and stated.get("h") is not None else ""
+                what = (("the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak"
+                         f"{at}), which its display grid lies under" if stated and v == stated["value"] else
+                         "the highest oxygen uptake on the simulation's time course (it states no peak of its own at or "
+                         "before harvest above it)") if d.key == "our_peak" else
                         "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)")
                 cands["simulation"] = ParameterValue(key=d.key, value=v, origin="simulation", detail=what,
                                                      source=BasisSource(kind="artifact", id=art.id, note=what))
@@ -615,7 +723,8 @@ def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True
             cands["library-default"] = ParameterValue(key=d.key, value=v, origin="library-default", libraryDefault=v,
                                                       source=_model_source(ws, d.key, got["from"]),
                                                       detail=f"{ws['unitClass']}'s default, from {got['from']}")
-        specs.append(_spec(d, _choices(d, ws, design), rule=rule, convention=convention, note=note))
+        specs.append(_spec(d, _choices(d, ws, design), rule=rule, convention=convention, note=note,
+                           bounds=_class_bounds(d, ws)))
         sources[d.key] = cands
     words = "a simulation" if art.tool == SIMULATION else f"a {art.tool}"
     title = f"Vessel for {words} {art.id}: {ws['unitClass']}" + (f", {design.lower()}" if design else "")
@@ -730,7 +839,16 @@ def basis_inputs(req: VesselRequest) -> tuple[list[BasisInput], list[ParameterSp
         inputs.append(BasisInput(name="heat per oxygen consumed", value=ws["heatPerO2"], unit="kJ kmol⁻¹",
                                  source=BasisSource(kind="model", id=f"biorefineries@{ws['biorefineries']}",
                                                     note=ws["heatPerO2From"] + " (the cross-check, labelled a convention)")))
-    inputs += params.basis_inputs(got.specs, values)
+        inputs.append(BasisInput(name=TOLERANCE_INPUT, value=OXYGEN_AGREE_RTOL, unit="", source=BasisSource(
+            kind="convention", note=("the share of the reaction's balanced oxygen within which the oxygen the simulation "
+                                     "took up agrees with it; beyond it the design flags both (the heat cross-check's "
+                                     "tolerance, a convention: a heat-per-oxygen rule is a rule of thumb)"))))
+    drop = set()
+    if "batch_volume" in has:
+        # One vessel of the batch volume: V_max does not bound it, so the
+        # basis names none (§4.R, finding 5); the design's flags say so.
+        drop = {"V_max", "V_max low", "V_max high"}
+    inputs += [i for i in params.basis_inputs(got.specs, values) if i.name not in drop]
     return inputs, got.specs, values, read
 
 
@@ -766,7 +884,8 @@ def worker_request(inputs: list[BasisInput]) -> tuple[dict[str, Any], Artifact, 
         target = given.get("our_peak" if oxygen_basis == "peak" else "our_mean")
         if target is None or not float(target.value) > 0:
             raise VesselRefused("the simulation takes up no oxygen to size the air for, though it is aerobic")
-        spec.update(our=src["our"], ourTarget=float(target.value), oxygenBasis=oxygen_basis)
+        spec.update(our=src["our"], ourTarget=float(target.value), oxygenBasis=oxygen_basis,
+                    ourPeak=(src.get("ourPeak") or {}).get("value"))
     return spec, art, src, kind
 
 
@@ -788,12 +907,11 @@ def _compute(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
             raise VesselRefused(text.removeprefix("Refused: ")) from None
         raise
     flags = (list(said["reaction"].get("notes") or []) + list(src.get("fitNotes") or [])
-             + list(src.get("readNotes") or []))
+             + list(src.get("readNotes") or []) + list(said.get("designNotes") or []))
     ox = said.get("oxygen")
     if ox is not None:
         if not ox["aerated"]:
-            flags.append("BioSTEAM designed no aeration: the reaction's oxygen uptake is below the floor its "
-                         "AeratedBioreactor sizes air from, so every hour the simulation takes up oxygen is short")
+            flags.append(_no_air_words(ox, oxygen_basis))
         if abs(ox["scale"] - 1) > UNSCALED and ox["aerated"]:
             flags.append(f"the reaction consumes {ox['scale']:.4g} times the oxygen its yields balance, so BioSTEAM sizes "
                          f"the air for the simulation's {oxygen_basis} uptake; the vessel's outlets carry that oxygen as "
@@ -801,7 +919,12 @@ def _compute(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
         if ox["short"]:
             spans = ", ".join(f"{a:.3g} to {b:.3g} h" for a, b in ox["short"])
             flags.append(f"the simulated oxygen uptake rises above what the vessel transfers from {spans}")
+        tol = _named(inputs, TOLERANCE_INPUT)
+        gap = _oxygen_gap(ox, float(tol.value) if tol is not None else None)
+        if gap:
+            flags.append(gap)
     flags += [f"BioSTEAM warned: {w}" for w in said.get("warnings") or []]
+    heat = {**said["heat"], "unit": "kJ/hr", "dutyNote": _duty_words(said["heat"], ox, oxygen_basis, inputs, kind)}
     return {
         "parameters": [v.model_dump(mode="json") for v in _parameters(inputs, kind, art.id, art.tool)],
         "aerobic": kind == AEROBIC, "unitClass": said["unitClass"], "unitId": said["unitId"],
@@ -811,12 +934,61 @@ def _compute(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
         "oxygenNote": None if ox is not None else (
             "an anaerobic vessel takes no air: BioSTEAM's NREL batch fermenter has no gas inlet and no compressor, so "
             "there is no oxygen balance"),
-        "heat": {**said["heat"], "unit": "kJ/hr"}, "cost": said["cost"], "used": said["used"],
+        "heat": heat, "cost": said["cost"], "used": said["used"],
         "scale": said["scale"], "reaction": {k: v for k, v in said["reaction"].items() if k != "notes"},
         "designResults": said["designResults"], "auxiliaries": said["auxiliaries"],
         "coolingAgents": said["coolingAgents"], "utilitySettings": said["utilitySettings"],
         "flags": flags, "versions": said["versions"],
     }
+
+
+def _no_air_words(ox: dict[str, Any], oxygen_basis: str | None) -> str:
+    """Why a design has no air, in terms of the uptake it was sized for: the
+    reaction scaled to the target is still at or under BioSTEAM's floor."""
+    target, scaled, floor = ox.get("targetUptake"), ox.get("scaledO2KmolPerH"), ox.get("floorKmolPerH")
+    if target is None or scaled is None:
+        return ("BioSTEAM designed no aeration: the reaction's oxygen uptake is at or below the floor its "
+                "AeratedBioreactor aerates from, so every hour the simulation takes up oxygen is short")
+    return (f"BioSTEAM designed no aeration: scaled to the simulation's {oxygen_basis} uptake, {target:.4g} mmol L⁻¹ h⁻¹ "
+            f"per working volume, the reaction consumes {scaled:.4g} kmol/hr of oxygen over the plant"
+            + (f", at or below the floor of {floor:.4g} kmol/hr its AeratedBioreactor aerates from (read from its code)"
+               if floor is not None else ", at or below the floor its AeratedBioreactor aerates from")
+            + "; so every hour the simulation takes up oxygen is short: a larger batch or plant scale is aerated")
+
+
+def _oxygen_gap(ox: dict[str, Any], tol: float | None) -> str | None:
+    """The flag when the reaction's balanced oxygen and the oxygen the
+    simulation took up differ by more than the stated tolerance (§4.R, D7),
+    naming both."""
+    rxn, sim = ox.get("reactionO2KmolPerH"), ox.get("simulatedO2KmolPerH")
+    if tol is None or rxn is None or sim is None or not rxn > 0 or abs(sim - rxn) <= tol * rxn:
+        return None
+    return (f"the reaction's yields balance {rxn:.4g} kmol/hr of oxygen and the simulation took up {sim:.4g} kmol/hr "
+            f"over the batch ({sim / rxn:.3g} times as much), apart by more than {tol:g} of the reaction's, the "
+            "stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per "
+            "oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up")
+
+
+def _duty_words(heat: dict[str, Any], ox: dict[str, Any] | None, oxygen_basis: str | None,
+                inputs: list[BasisInput], kind: str) -> str:
+    """BioSTEAM's duty in words: how it was found (findings 2, 7, 13)."""
+    if heat.get("method") == "forced-per-oxygen":
+        q = _named(inputs, "Q_O2_consumption")
+        who = (f"typed by {q.source.by}" if q is not None and q.source.by else "set") if q is not None else "set"
+        value = f", {float(q.value):.4g} kJ/kmol," if q is not None else ""
+        consumed = heat.get("consumedKmolPerH")
+        scale = (ox or {}).get("scale", 1.0)
+        scaled = (f"; that oxygen is the reaction's scaled ×{scale:.4g} to size the air for the simulation's "
+                  f"{oxygen_basis} uptake, so this duty is the heat at that uptake, not the batch's on average"
+                  if abs(scale - 1) > UNSCALED else "")
+        return (f"forced: Q_O2_consumption{value} {who}, times the oxygen the vessel consumed"
+                + (f", {consumed:.4g} kmol/hr" if consumed is not None else "")
+                + f" (AeratedBioreactor._get_duty with a heat per oxygen set){scaled}")
+    if kind == AEROBIC:
+        return ("from the reaction's enthalpy and heats of formation, out less in (AeratedBioreactor._get_duty, with no "
+                "heat per oxygen forced)")
+    return ("from the reaction's enthalpy and heats of formation, out less in (the NREL fermenter's design result "
+            "'Reactor duty', its Hnet)")
 
 
 def _register() -> None:
@@ -844,12 +1016,19 @@ def _parameters(inputs: list[BasisInput], kind: str, source_id: str, source_tool
     origin = {"assumption": "assumption", "model": "library-default", "convention": "convention"}
     ws = worker_specs(kind)
     given = {i.name: i for i in inputs}
+    design = _named(inputs, "vessel type")
     out = []
     for d in _decls(kind):
-        lib = (ws["parameters"].get(d.key) or {}).get("default")
+        lib = _library_default(ws, d.key, design.value if design is not None else None)
         i = given.get(d.key)
         if i is None:
             if d.key in ("plant_scale", "batch_volume"):
+                continue
+            if d.key == "V_max" and "batch_volume" in given:
+                out.append(ParameterValue(key=d.key, value=None, source=None, origin="library-default",
+                                          libraryDefault=lib, detail=(
+                                              "not used: a batch volume designs one vessel of that working volume, "
+                                              "and V_max does not apply to it")))
                 continue
             got = ws["parameters"].get(d.key) or {}
             out.append(ParameterValue(key=d.key, value=None, source=_model_source(ws, d.key, got.get("from", "its code")),
@@ -863,9 +1042,25 @@ def _parameters(inputs: list[BasisInput], kind: str, source_id: str, source_tool
                            high=float(high.value) if high else None, source=i.source, origin=o,
                            overriddenBy=i.source.by if o == "assumption" else None,
                            libraryDefault=lib, detail=i.source.note)
-        v.outOfBounds = params.bounds_check(_spec(d, [] if d.choice else None), v.value, v.low, v.high)
+        v.outOfBounds = params.bounds_check(_spec(d, [] if d.choice else None, bounds=_class_bounds(d, ws)), v.value,
+                                            v.low, v.high)
         out.append(v)
     return out
+
+
+def _library_default(ws: dict[str, Any], key: str, design: str | None) -> Any:
+    """BioSTEAM's own default for a parameter of the class and design built,
+    as the scope serves it (§4.R, finding 10): the design's for the kLa
+    method, optimize_power and kW_per_m3, the class's default design for
+    `design`, else the class's."""
+    each = (ws.get("designs") or {}).get(design) if design else None
+    if each is not None and key in ("method", "kW_per_m3"):
+        return each[key]
+    if each is not None and key == "optimize_power":
+        return "true" if each["optimize_power"] else "false"
+    if key == "design":
+        return ws.get("defaultDesign")
+    return (ws["parameters"].get(key) or {}).get("default")
 
 
 def output_of(art: Artifact) -> VesselDesign:

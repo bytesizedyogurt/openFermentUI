@@ -136,9 +136,12 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * `vesselSimulationsOnFile` (OF-BLD-020 §4.2, stacked on §3.3) adds
    * fermos-vessel.json's two simulations to GET /api/fermos/simulations,
    * which the vessel flow chooses from; off, the list holds only what
-   * Simulate's recorded run kept, empty as a fresh install starts.
+   * Simulate's recorded run kept, empty as a fresh install starts, so
+   * fermOS → Vessel can also be driven with fits alone (§4.R).
+   * `vesselDelayMs` (§4.R) holds each POST /api/fermos/vessel answer that
+   * long, so a test can change the source while a design is in flight.
    */
-  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true, vesselSimulationsOnFile: false };
+  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true, vesselSimulationsOnFile: false, vesselDelayMs: 0 };
   /** The ceiling checks the browser asked for (OF-BLD-019 §5.2): each query, as sent. */
   const ceilingChecks = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
@@ -594,9 +597,12 @@ export function createServiceDouble({ dist, seedOnly = false }) {
           paramScopes.push({ scope: `fermos:vessel:${id}`, ...Object.fromEntries(q) });
         }
         const fx = await vesselFixture();
-        const entry = fx.scopes.find((sc) => sc.simulation === id && (sc.vesselType ?? null) === (ask.vesselType ?? null));
+        // A scope is a kept simulation's or (§4.R) a kept fit's, served or refused as the real code answered.
+        const sourceOf = (sc) => sc.simulation ?? sc.fit;
+        const entry = fx.scopes.find((sc) => sourceOf(sc) === id && (sc.vesselType ?? null) === (ask.vesselType ?? null));
+        if (entry && entry.status !== 200) return sendJson(entry.status, entry.body);
         if (!entry) {
-          const known = fx.scopes.some((sc) => sc.simulation === id);
+          const known = fx.scopes.some((sc) => sourceOf(sc) === id);
           return known
             ? sendJson(422, { detail: `the double holds no ${ask.vesselType} scope of ${id}` })
             : sendJson(404, { detail: `no artifact '${id}' is on file here: a vessel is designed for a fermOS simulation (fermOS → Simulate keeps one) or, anaerobic, a kinetic fit or forecast` });
@@ -635,6 +641,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         for await (const chunk of req) raw += chunk;
         const asked = JSON.parse(raw || '{}');
         vesselPosts.push(asked);
+        if (flags.vesselDelayMs > 0) await new Promise((r) => setTimeout(r, flags.vesselDelayMs));
         const fx = await vesselFixture();
         const keyed = (os) => JSON.stringify((os ?? []).map((o) => [o.key, o.value]).sort());
         const source = asked.simulation ?? asked.fit ?? null;
@@ -652,7 +659,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
             evidence: { ...body.evidence, basis: { ...body.evidence.basis, inputs: body.evidence.basis.inputs.map((i) => ({ ...i, source: named(i.source, i.name) })) } },
           });
         }
-        if (!fx.scopes.some((sc) => sc.simulation === source)) return sendJson(422, { detail: `no artifact '${source}' is on file here` });
+        if (!fx.scopes.some((sc) => (sc.simulation ?? sc.fit) === source)) return sendJson(422, { detail: `no artifact '${source}' is on file here` });
         const refusal = fx.designs.find((d) => d.status === 422);
         if (!scaled && refusal) return sendJson(422, refusal.body);
         return sendJson(422, { detail: 'the double holds no design for this request: it holds the designs the browser tests ask for' });

@@ -27,7 +27,16 @@
 // **Price this in Proforma** waits for night two's Phase 6, which adds
 // `custom_train_v1` to the shelf; until then the button says so and makes no
 // scenario.
-import { useEffect, useMemo, useState } from 'react';
+//
+// OF-BLD-020 §4.R (the Phase 4 review). The chooser opens on a choice that
+// is no source when none is chosen, so a kept fit can be chosen when no
+// simulation is kept; the line above Design names only the scales the panel
+// offers (an anaerobic vessel takes a plant scale alone); a design in flight
+// is dropped, and a shown one cleared, when the source or the vessel type
+// changes; and the heat line says how BioSTEAM found its duty (the heats of
+// formation, or a person's heat per oxygen times the oxygen the vessel
+// consumed) and what the cross-check rests on, in the service's words.
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Gauge } from 'lucide-react';
 import type { FermosFitInfo, ParamScope, SimulationSummary, VesselDesign } from '@/data/types';
 import { overridesFor, useStore } from '@/store';
@@ -91,6 +100,12 @@ function Chooser({
           navigate(`/fermos/vessel?${kind}=${encodeURIComponent(id)}`, { replace: true });
         }}
       >
+        {/* Nothing chosen: a first choice that is no source, so choosing the first listed one is a change (§4.R). */}
+        {!chosen && (
+          <option value="" disabled data-testid="vessel-source-none">
+            Choose a kept simulation or fit
+          </option>
+        )}
         {!known && chosen && <option value={value}>{`${chosen.kind} ${chosen.id}`}</option>}
         {simulations.length > 0 && (
           <optgroup label="Kept simulations">
@@ -206,15 +221,16 @@ function Result({ design }: { design: VesselDesign }) {
         </Callout>
       )}
 
-      <section aria-label="Heat" className="text-body" data-testid="vessel-heat">
+      <section aria-label="Heat" className="text-body" data-testid="vessel-heat" data-method={design.heat.method ?? ''}>
         <SectionTitle>Heat</SectionTitle>
         <p>
-          BioSTEAM&rsquo;s duty: <span className="font-num">{fmt(design.heat.bst, 4)} {design.heat.unit}</span>, from the reaction&rsquo;s heats of
-          formation in and out.
+          BioSTEAM&rsquo;s duty: <span className="font-num">{fmt(design.heat.bst, 4)} {design.heat.unit}</span>
+          {design.heat.dutyNote ? `, ${design.heat.dutyNote}.` : '.'}
           {design.heat.convention != null ? (
             <>
               {' '}
-              Beside it, a convention&rsquo;s estimate from the oxygen consumed:{' '}
+              Beside it, a convention&rsquo;s estimate from the oxygen{' '}
+              {design.heat.oxygenKmolPerH != null ? 'the simulation took up' : 'consumed'}:{' '}
               <span className="font-num">
                 {fmt(design.heat.convention, 4)} {design.heat.unit}
               </span>{' '}
@@ -316,9 +332,12 @@ export default function FermOSVessel() {
   const ask = useMemo(() => ({ vesselType }), [vesselType]);
   const [panel, setPanel] = useState<ParamScope | null>(null);
   const [panelProblem, setPanelProblem] = useState<string | null>(null);
-  const [design, setDesign] = useState<VesselDesign | null>(null);
-  const [refused, setRefused] = useState<string | null>(null);
+  // A design, or a refusal, belongs to the source and the vessel type it was asked for (§4.R).
+  const asked = `${scope}|${vesselType ?? ''}`;
+  const [design, setDesign] = useState<{ asked: string; design: VesselDesign } | null>(null);
+  const [refused, setRefused] = useState<{ asked: string; words: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setPanel(null);
@@ -331,25 +350,46 @@ export default function FermOSVessel() {
     return () => ctrl.abort();
   }, [scope, ask]);
 
-  // A design belongs to the source it was made for.
+  // A design belongs to the source and the vessel type it was made for: a
+  // change of either drops the one in flight and clears the one shown (§4.R).
   useEffect(() => {
+    inFlight.current?.abort();
+    inFlight.current = null;
+    setBusy(false);
     setDesign(null);
     setRefused(null);
-  }, [scope]);
+  }, [asked]);
+  useEffect(() => () => inFlight.current?.abort(), []);
 
   const scale = scaleOf(overrides);
+  // The scales the panel offers: an anaerobic vessel takes a plant scale alone (§4.R).
+  const offersBatch = panel ? panel.specs.some((sp) => sp.key === 'batch_volume') : null;
   const run = () => {
     if (!chosen) return;
+    inFlight.current?.abort();
+    const ctrl = new AbortController();
+    inFlight.current = ctrl;
+    const mine = asked;
     setBusy(true);
     setRefused(null);
-    designVessel(vesselRequest(chosen.kind === 'simulation' ? { simulation: chosen.id } : { fit: chosen.id }, overrides, showArchived))
-      .then((d) => setDesign(d))
-      .catch((e: unknown) => {
-        setDesign(null);
-        setRefused(problemOf(e));
+    designVessel(vesselRequest(chosen.kind === 'simulation' ? { simulation: chosen.id } : { fit: chosen.id }, overrides, showArchived), ctrl.signal)
+      .then((d) => {
+        if (ctrl.signal.aborted) return;
+        setDesign({ asked: mine, design: d });
       })
-      .finally(() => setBusy(false));
+      .catch((e: unknown) => {
+        if (ctrl.signal.aborted) return;
+        setDesign(null);
+        setRefused({ asked: mine, words: problemOf(e) });
+      })
+      .finally(() => {
+        if (inFlight.current !== ctrl) return;
+        inFlight.current = null;
+        setBusy(false);
+      });
   };
+  const shownDesign = design && design.asked === asked ? design.design : null;
+  const shownRefusal = refused && refused.asked === asked ? refused.words : null;
 
   return (
     <div className="space-y-4" data-testid="fermos-vessel">
@@ -368,7 +408,16 @@ export default function FermOSVessel() {
       )}
       {listProblem && <Callout kind="warn">{listProblem}</Callout>}
 
-      {simulations !== null && !chosen && !listProblem && (
+      {simulations !== null && !chosen && !listProblem && fits.length > 0 && (
+        <p className="text-body text-ink-soft" data-testid="vessel-choose">
+          No simulation is kept yet. Choose a kept fit above to design the anaerobic vessel it needs, or simulate a batch in{' '}
+          <a href={href('/fermos/simulate')} className="text-accent hover:underline">
+            fermOS → Simulate
+          </a>
+          .
+        </p>
+      )}
+      {simulations !== null && !chosen && !listProblem && fits.length === 0 && (
         <div data-testid="vessel-empty">
           <EmptyState
             icon={<Gauge size={28} />}
@@ -404,7 +453,11 @@ export default function FermOSVessel() {
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-body" data-testid="vessel-scale" data-scale={scale}>
               {scale === 'none'
-                ? 'One of plant scale and batch volume is needed, and neither is set: type one under Scale, as your named assumption.'
+                ? offersBatch === null
+                  ? 'A scale is needed, and none is set: type one under Scale, as your named assumption.'
+                  : offersBatch
+                    ? 'One of plant scale and batch volume is needed, and neither is set: type one under Scale, as your named assumption.'
+                    : 'A plant scale is needed, and none is set: type one under Scale, as your named assumption.'
                 : scale === 'both'
                   ? 'Give plant scale or batch volume, not both: one sets how much broth the vessels take.'
                   : 'The scale is set, as your named assumption.'}
@@ -413,12 +466,12 @@ export default function FermOSVessel() {
               {busy ? 'Designing…' : 'Design'}
             </Button>
           </div>
-          {refused && (
+          {shownRefusal && (
             <Callout kind="warn">
-              <p data-testid="vessel-refused">{refused}</p>
+              <p data-testid="vessel-refused">{shownRefusal}</p>
             </Callout>
           )}
-          {design && <Result design={design} />}
+          {shownDesign && <Result design={shownDesign} />}
         </>
       )}
 

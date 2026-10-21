@@ -2262,6 +2262,14 @@ async function main() {
   // vessel type refetches the scope (Dewes) and designs it; the anaerobic
   // simulation designs the NREL fermenter, with no compressor and no
   // oxygen balance, said so.
+  //
+  // §4.R (the Phase 4 review): the heat line says how BioSTEAM found its
+  // duty, and a person's heat per oxygen is said as forced, never as the
+  // heats of formation; a vessel type changed clears the design shown; a
+  // design in flight when the source changes never lands under the new
+  // one; the anaerobic line above Design names no batch volume; and with
+  // no simulation kept the chooser opens on no source, so a kept fit can be
+  // chosen and its panel loads.
   let vesselFails = 0;
   {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -2326,6 +2334,8 @@ async function main() {
         problems.push('the oxygen balance is not drawn, its transfer as a rule and its uptake as a curve');
       const heat = await page.locator('[data-testid="vessel-heat"]').innerText().catch(() => '');
       if (!/BioSTEAM.s duty/.test(heat) || !/a convention/.test(heat)) problems.push(`the heat line does not set BioSTEAM's duty beside the convention, labelled (${heat.slice(0, 120)})`);
+      if (!heat.includes(stirred.heat.dutyNote) || !/the simulation took up/.test(heat) || !heat.includes(stirred.heat.conventionNote.slice(-60)))
+        problems.push(`the heat line does not say how BioSTEAM found its duty and what the cross-check rests on (${heat.slice(0, 160)})`);
       const cost = await page.locator('[data-testid="vessel-cost"]').innerText().catch(() => '');
       if (!/plant cost index/.test(cost)) problems.push("the cost line does not name BioSTEAM's cost index");
       await page.locator('[data-testid="vessel-basis"] summary').click();
@@ -2337,8 +2347,24 @@ async function main() {
       if (!/custom_train_v1/.test(words) || !/no scenario is created/.test(words)) problems.push(`Price this in Proforma does not say what Phase 6 adds (${words.slice(0, 120)})`);
       if (!page.url().includes('/fermos/vessel')) problems.push('Price this in Proforma left the page');
 
-      // A bubble column, chosen as the panel's vessel type.
+      // §4.R (findings 2, 7, 13): a person's heat per oxygen forces BioSTEAM's duty, and the heat line says so.
+      const forcedAsk = fx.designs.find((d) => d.status === 200 && (d.request.overrides ?? []).some((o) => o.key === 'Q_O2_consumption'));
+      const q = forcedAsk.request.overrides.find((o) => o.key === 'Q_O2_consumption').value;
+      await typeParam(page, 'Q_O2_consumption', q);
+      await page.waitForTimeout(400);
+      const forcedPost = await design();
+      await page.waitForFunction(() => document.querySelector('[data-testid="vessel-heat"]')?.getAttribute('data-method') === 'forced-per-oxygen', null, { timeout: 8000 }).catch(() => {});
+      const forcedHeat = await page.locator('[data-testid="vessel-heat"]').innerText().catch(() => '');
+      if (!(forcedPost?.overrides ?? []).some((o) => o.key === 'Q_O2_consumption' && o.value === q && o.by === REVIEWER)) problems.push("the heat per oxygen was not posted as the person's");
+      if ((await page.locator('[data-testid="vessel-heat"]').getAttribute('data-method').catch(() => null)) !== 'forced-per-oxygen' || /heats of formation/.test(forcedHeat) || !/forced: Q_O2_consumption/.test(forcedHeat))
+        problems.push(`with a person's heat per oxygen the heat line still claims the heats of formation (${forcedHeat.slice(0, 160)})`);
+      await row('Q_O2_consumption').locator('[data-testid="param-reset"]').click();
+      await page.waitForTimeout(400);
+
+      // A bubble column, chosen as the panel's vessel type: the stirred tank's design is cleared (§4.R, finding 15).
       await row('design').locator('[data-testid="param-choice"]').selectOption('Bubble column');
+      await page.waitForTimeout(300);
+      if (await page.locator('[data-testid="vessel-result"]').count()) problems.push("the stirred tank's design stays on screen after the vessel type changed");
       await page.waitForFunction(() => document.querySelector('[data-testid="param-row"][data-key="method"] [data-testid="param-value"]')?.textContent?.includes('Dewes'), null, { timeout: 8000 }).catch(() => {});
       if (!doubleState.paramScopes.some((q) => q.scope === `fermos:vessel:${fx.aerobic}` && q.vesselType === 'bubble-column')) problems.push("choosing a bubble column does not ask for the bubble column's scope");
       if (!(await row('method').locator('[data-testid="param-value"]').innerText().catch(() => '')).includes('Dewes')) problems.push("the bubble column's kLa correlation is not Dewes");
@@ -2348,10 +2374,25 @@ async function main() {
         problems.push(`the bubble column was not posted as the person's choice: ${JSON.stringify(bubblePost).slice(0, 200)}`);
       if (!/bubble column/.test(await page.locator('[data-testid="vessel-result"]').innerText().catch(() => ''))) problems.push('the bubble column is not designed');
 
+      // §4.R (finding 15): a design in flight when the source changes never lands under the new source.
+      doubleState.flags.vesselDelayMs = 1500;
+      const inFlight = doubleState.vesselPosts.length;
+      await page.locator('[data-testid="vessel-design"]').click();
+      for (let i = 0; i < 40 && doubleState.vesselPosts.length === inFlight; i++) await page.waitForTimeout(50);
+      await page.locator('[data-testid="vessel-source"]').selectOption(`simulation:${fx.anaerobic}`);
+      await page.waitForTimeout(2200);
+      doubleState.flags.vesselDelayMs = 0;
+      if (doubleState.vesselPosts.length === inFlight) problems.push('the design in flight was never posted');
+      if (await page.locator('[data-testid="vessel-result"]').count()) problems.push("a design in flight for the aerobic simulation landed under the anaerobic one");
+      if (/Designing/.test(await page.locator('[data-testid="vessel-design"]').innerText().catch(() => ''))) problems.push('Design still says it is designing after the source changed');
+
       // The anaerobic simulation: the NREL fermenter, no compressor, no oxygen balance.
       await page.locator('[data-testid="vessel-source"]').selectOption(`simulation:${fx.anaerobic}`);
       await row('plant_scale').waitFor({ timeout: 8000 }).catch(() => {});
       if (await row('batch_volume').count()) problems.push('an anaerobic vessel offers a batch volume');
+      // §4.R (finding 14): the line above Design names only the scale the panel offers.
+      const anaerobicScale = await page.locator('[data-testid="vessel-scale"]').innerText().catch(() => '');
+      if (/batch volume/i.test(anaerobicScale) || !/A plant scale is needed/.test(anaerobicScale)) problems.push(`the anaerobic line above Design asks for a scale the panel does not offer (${anaerobicScale})`);
       await typeParam(page, 'plant_scale', fx.plantScale);
       await page.waitForTimeout(500);
       await design();
@@ -2360,6 +2401,35 @@ async function main() {
       if (!result.includes('Anaerobic: no compressor, no oxygen balance') || (await page.locator('[data-testid="oxygen-balance"]').count()))
         problems.push('the anaerobic design does not say it has no compressor and no oxygen balance');
       if ((await page.locator('[data-testid="vessel-result"]').getAttribute('data-unit-class')) !== 'NRELAnaerobicBatchBioreactor') problems.push('the anaerobic simulation is not designed as the NREL fermenter');
+
+      // §4.R (finding 12): no simulation kept, a fit on file. The chooser opens on no source, so the fit can be
+      // chosen; its panel loads, the anaerobic NREL fermenter's.
+      const fitScope = fx.scopes.find((sc) => sc.fit && sc.status === 200);
+      doubleState.flags.vesselSimulationsOnFile = false;
+      doubleState.flags.fermosFitsOnFile = true;
+      const fresh = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      fresh.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+      try {
+        await fresh.goto(`http://localhost:${PORT}/#/fermos/vessel`, { waitUntil: 'networkidle' });
+        await fresh.locator(`[data-testid="vessel-source"] option[value="fit:${fitScope.fit}"]`).waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+        const first = await fresh.locator('[data-testid="vessel-source"] option').first().evaluate((o) => ({ value: o.value, disabled: o.disabled })).catch(() => null);
+        const value = await fresh.locator('[data-testid="vessel-source"]').inputValue().catch(() => null);
+        if (first?.value !== '' || !first?.disabled || value !== '') problems.push(`with no simulation kept the chooser does not open on no source (${JSON.stringify(first)}, ${value})`);
+        if (await fresh.locator('[data-testid="vessel-empty"]').count()) problems.push('with a fit kept the page says nothing is kept');
+        if (!(await fresh.locator('[data-testid="vessel-choose"]').count())) problems.push('with no simulation kept the page does not say a fit can be chosen');
+        const asked = doubleState.paramScopes.length;
+        await fresh.locator('[data-testid="vessel-source"]').selectOption(`fit:${fitScope.fit}`);
+        await fresh.locator('[data-testid="param-row"][data-key="plant_scale"]').waitFor({ timeout: 8000 }).catch(() => {});
+        if (!fresh.url().includes(`fit=${fitScope.fit}`)) problems.push(`choosing the fit did not open it (${fresh.url()})`);
+        if (!doubleState.paramScopes.slice(asked).some((q2) => q2.scope === `fermos:vessel:${fitScope.fit}`)) problems.push("choosing the fit did not ask for the fit's vessel scope");
+        if (!/NRELAnaerobicBatchBioreactor/.test(await fresh.locator('#vessel-panel-title').innerText().catch(() => ''))) problems.push("the fit's panel is not the NREL fermenter's");
+        const fitScale = await fresh.locator('[data-testid="vessel-scale"]').innerText().catch(() => '');
+        if (/batch volume/i.test(fitScale)) problems.push(`a fit's line above Design asks for a batch volume (${fitScale})`);
+      } finally {
+        doubleState.flags.vesselSimulationsOnFile = true;
+        doubleState.flags.fermosFitsOnFile = false;
+        await fresh.close();
+      }
     } catch (e) {
       problems.push(String(e).slice(0, 200));
     }
@@ -2368,7 +2438,7 @@ async function main() {
       vesselFails++;
       console.log(`✗ vessel       ${problems.join('; ')}`);
     } else {
-      console.log(`✓ vessel       fermOS → Vessel (${fx.worker.kind}): the kept simulations chosen; every design parameter in six groups with its source; the scale waits and Design says the service's words; a plant scale typed is the reviewer's assumption, posted signed; the design table, the oxygen balance as a rule and a curve, heat with its convention, cost with BioSTEAM's index, the basis naming the person; Price this in Proforma says what Phase 6 adds; a bubble column chosen in the panel designs by Dewes; the anaerobic batch is the NREL fermenter with no compressor`);
+      console.log(`✓ vessel       fermOS → Vessel (${fx.worker.kind}): the kept simulations chosen; every design parameter in six groups with its source; the scale waits and Design says the service's words; a plant scale typed is the reviewer's assumption, posted signed; the design table, the oxygen balance as a rule and a curve, heat with how BioSTEAM found it and its convention on the simulated uptake, cost with BioSTEAM's index, the basis naming the person; Price this in Proforma says what Phase 6 adds; a person's heat per oxygen said as forced; a vessel type changed clears the design; a bubble column chosen in the panel designs by Dewes; a design in flight dropped when the source changes; the anaerobic batch is the NREL fermenter with no compressor and asks for a plant scale alone; with no simulation kept a fit is chosen from a chooser that opens on no source`);
     }
     await page.close();
   }
