@@ -523,8 +523,11 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         # A scope names its scenario by id, so its records bind whatever the
         # program switch says, as a run's do (OF-BLD-016).
         pool = evidence_pool.load(include_archived=True)
+        # An input a person's override names takes no fit (D3), as a run
+        # binds it: the override is laid on by `resolve`, over the records.
+        fits = {k: v for k, v in req.fits.items() if k not in {o.key for o in req.overrides}}
         bound = proforma.bound(flowsheet, scenario_id=scenario_id, name=seeds.get(scenario_id, {}).get("name") or "",
-                               host=req.host, pool=pool, fits=req.fits)
+                               host=req.host, pool=pool, fits=fits)
     except proforma.ScenarioRefused as e:
         raise ParamRefused(str(e)) from None
     feed = " or ".join(sorted(proforma.FEED_CARBON.get(flowsheet, ()))) or "a fermentable sugar"
@@ -535,8 +538,8 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         f"Bound as a run of {flowsheet} binds it: each process input to the records of its fields on its program's "
         "papers that pass the aggregate gate" + (f" and name {feed} as their carbon source" if flowsheet in proforma.FEED_CARBON else "")
         + ", converted into the input's unit; a fermOS fit a person chose replaces them for titre, yield and productivity.",
-        "A run made today lays a person's assumption only on an input no record binds; an override of a bound input "
-        "is resolved here as the panel will run it (OF-BLD-020 §2.2 moves the run onto overrides).",
+        "A person's override wins over the records and any fit for its input, here and in the run, which carries the "
+        "overrides and names the person in its basis (OF-BLD-020 D3).",
     ]
     return Provided(title=title, specs=flowsheet_specs(info), sources=sources, notes=notes)
 

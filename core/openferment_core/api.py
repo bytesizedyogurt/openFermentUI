@@ -397,6 +397,23 @@ def _assumptions_param(raw: str | None) -> list:
                                                     "low, high, by and at, as a run takes them") from None
 
 
+def _overrides_param(raw: str | None) -> list:
+    """`?overrides=` on GET /api/proforma/bind and the ceiling check: a JSON
+    list of a person's overrides from the parameter panel (OF-BLD-020 D3),
+    as ProformaRunRequest.overrides carries them."""
+    from pydantic import TypeAdapter, ValidationError
+
+    from .models import Override
+
+    if not raw:
+        return []
+    try:
+        return TypeAdapter(list[Override]).validate_json(raw)
+    except (ValidationError, RecursionError):
+        raise HTTPException(status_code=422, detail="overrides is a JSON list of overrides, each with scope, key, value, "
+                                                    "by and at, as a run takes them") from None
+
+
 @app.get("/api/proforma/status")
 def proforma_status() -> dict:
     """Where the BioSTEAM worker is (§8.1): cold, starting, ready or failed."""
@@ -482,19 +499,25 @@ def proforma_scenarios(host: str | None = None, includeArchived: bool = False) -
 
 @app.get("/api/proforma/bind")
 def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool = False,  # noqa: N803
-                  fits: str | None = None) -> dict:
+                  fits: str | None = None, overrides: str | None = None) -> dict:
     """A shelf flowsheet's inputs bound, as a scenario a person made in the
     browser shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
     lays on the fermOS fits a person chose (§5.1), a JSON object of input
-    key to artifact id. A reference biorefinery, the toy, an unknown id, a
-    flowsheet of a program the switch hides, or a fit that cannot feed its
-    input is a 422 in words. A read: it starts no simulator."""
+    key to artifact id, and `?overrides=` a person's overrides of one
+    scenario's scope over both (OF-BLD-020 D3), a JSON list. A reference
+    biorefinery, the toy, an unknown id, a flowsheet of a program the switch
+    hides, a fit that cannot feed its input, or an override that cannot
+    stand is a 422 in words. A read: it starts no simulator."""
     from . import proforma
 
     chosen = _fits_param(fits)
+    typed = _overrides_param(overrides)
     try:
+        values, _ = proforma.named_values(None, typed)
+        if values:
+            proforma._check_keys(proforma.runnable(flowsheet), values)
         return proforma.bind_flowsheet(flowsheet, include_archived=includeArchived, host=host,
-                                       fits=chosen).model_dump(mode="json")
+                                       assumptions=values, fits=chosen).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -502,22 +525,24 @@ def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool
 @app.get("/api/proforma/ceiling-check")
 def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: str | None = None,  # noqa: N803
                            includeArchived: bool = False, fits: str | None = None,  # noqa: N803
-                           assumptions: str | None = None) -> dict:
+                           assumptions: str | None = None, overrides: str | None = None) -> dict:
     """A scenario's fermenter yield read against the newest stored geneOS
     ceiling of each shelf model of its organism, on its flowsheet's sugar
     (OF-BLD-019 §5.2, D11): `CeilingCheck`. A seed scenario by its id, one
     made in the browser by the flowsheet it names; `?fits=` and
-    `?assumptions=` (JSON) bind its yield as its page binds it. A yield above
-    a ceiling is flagged, never clamped. A read: it keeps nothing, starts no
-    worker and changes no binding or run. Refused in words (422) as the
-    binding is."""
+    `?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,
+    and `?assumptions=`, the older field, is read as overrides for one
+    release. A yield above a ceiling is flagged, never clamped. A read: it
+    keeps nothing, starts no worker and changes no binding or run. Refused
+    in words (422) as the binding is."""
     from . import proforma
 
     chosen = _fits_param(fits)
     typed = _assumptions_param(assumptions)
+    over = _overrides_param(overrides)
     try:
         return proforma.ceiling_check(scenarioId, flowsheet, include_archived=includeArchived, host=host,
-                                      assumptions=typed, fits=chosen).model_dump(mode="json")
+                                      assumptions=typed, fits=chosen, overrides=over).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

@@ -1574,7 +1574,16 @@ class ProformaScenarioInfo(BaseModel):
 
 class ProformaRunRequest(BaseModel):
     scenarioId: str
+    # The older field (OF-BLD-014 §8.4): a named person's values by input
+    # key. Accepted for one release as a shim (OF-BLD-020 §2.2): each is read
+    # as an Override of `proforma:<scenarioId>`, and the run's basis says
+    # which field it read.
     assumptions: list[InputAssumption] = Field(default_factory=list)
+    # A person's changes in the parameter panel (OF-BLD-020 D3), each an
+    # Override of scope `proforma:<scenarioId>`: a named assumption that wins
+    # over the records and any fermOS fit for its input, and that the run's
+    # basis names with the person. The service keeps none.
+    overrides: list[Override] = Field(default_factory=list)
     host: str | None = None
     seed: int = 0
     # How many Latin hypercube samples the run draws (OF-BLD-019 D7). The
@@ -2546,5 +2555,7 @@ class VesselSummary(BaseModel):
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()
+# ProformaRunRequest names Override, which is defined further down (OF-BLD-020 §2.2).
+ProformaRunRequest.model_rebuild()
 AnswerPlan.model_rebuild()
 ToolResult.model_rebuild()

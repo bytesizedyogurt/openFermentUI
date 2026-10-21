@@ -12,7 +12,7 @@ import type {
   FermosFitInfo,
   FlowsheetInfo,
   HistogramBin,
-  InputAssumption,
+  Override,
   InputSensitivity,
   PackageRegression,
   ProformaGrid,
@@ -257,16 +257,17 @@ export function inputCounts(
   scenario: Scenario,
   info: ProformaScenarioInfo | null,
   shelf: FlowsheetInfo[],
-  assumptions: InputAssumption[],
+  /** The scenario's overrides (OF-BLD-020 D3): each wins over the records and any fit for its input. */
+  typedValues: { key: string }[],
   fits: Record<string, string> = {},
 ): InputCounts | null {
-  const typed = new Set(assumptions.map((a) => a.key));
+  const typed = new Set(typedValues.map((a) => a.key));
   if (info) {
     const c = { total: info.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: true };
     for (const i of info.inputs) {
-      if (i.binding === 'artifact' || fits[i.key]) c.computed++;
+      if (typed.has(i.key) || i.binding === 'assumption') c.assumed++;
+      else if (i.binding === 'artifact' || fits[i.key]) c.computed++;
       else if (i.binding === 'records') c.records++;
-      else if (i.binding === 'assumption' || typed.has(i.key)) c.assumed++;
       else c.waiting++;
     }
     return c;
@@ -275,10 +276,10 @@ export function inputCounts(
   if (!flowsheet) return null;
   const c = { total: flowsheet.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: false };
   for (const i of flowsheet.inputs) {
-    if (fits[i.key]) c.computed++;
-    else if (i.fields.length > 0) c.records++;
-    else if (i.kind === 'convention') c.conventions++;
+    if (i.kind === 'convention') c.conventions++;
     else if (typed.has(i.key)) c.assumed++;
+    else if (fits[i.key]) c.computed++;
+    else if (i.fields.length > 0) c.records++;
     else c.waiting++;
   }
   return c;
@@ -387,26 +388,48 @@ export interface RunAsk {
   scenarioId: string;
   /** Sent for a scenario made here alone: the service runs a seed scenario by its id. */
   flowsheet?: string | null;
-  assumptions: InputAssumption[];
+  /**
+   * A person's changes in the parameter panel (OF-BLD-020 D3): the scope
+   * `proforma:<scenarioId>`'s overrides, each a named assumption that wins
+   * over the records and any fit for its input (`runOverrides`).
+   */
+  overrides: Override[];
   host: string | null;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1). */
   fits?: Record<string, string>;
 }
 
-/** (d) Run a scenario; the service keeps the run as one `proforma.run` artifact (D1). */
-export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
+/**
+ * The overrides a run carries (OF-BLD-020 §2.2): the scenario's scope's
+ * own, of the inputs its flowsheet takes; an override of an input the
+ * flowsheet no longer takes stays in this browser and is not sent.
+ */
+export function runOverrides(scoped: Override[], keys: string[]): Override[] {
+  const takes = new Set(keys);
+  return scoped.filter((o) => takes.has(o.key));
+}
+
+/** The body `runProformaScenario` posts, as the service reads it (`ProformaRunRequest`). */
+export function runBody(ask: RunAsk): ProformaRunRequest {
   // `flowsheet` joins ProformaRunRequest in the service with OF-BLD-019 §2.3;
   // a service that predates it ignores the field and refuses a scenario it
   // does not hold, in words. It is sent only for a scenario made here, and
-  // `fits` only when a person chose one (§5.1).
-  const body: ProformaRunRequest = {
+  // `fits` only when a person chose one (§5.1). A person's values go as
+  // `overrides` (OF-BLD-020 §2.2); the older `assumptions` field, which the
+  // service still reads for one release, is no longer sent.
+  return {
     scenarioId: ask.scenarioId,
-    assumptions: ask.assumptions,
+    overrides: ask.overrides,
     host: ask.host,
     seed: 0,
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
     ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
   };
+}
+
+/** (d) Run a scenario; the service keeps the run as one `proforma.run` artifact (D1). */
+export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
+  const body = runBody(ask);
   return call<ProformaRunResult>('/api/proforma/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -459,8 +482,8 @@ export interface CeilingAsk {
   includeArchived: boolean;
   /** The fermOS fits a person chose, by input key (§5.1). */
   fits?: Record<string, string>;
-  /** The yield's assumption, when a person typed one; the rest do not bear on the check. */
-  assumptions?: InputAssumption[];
+  /** The yield's override, when a person typed one (OF-BLD-020 D3); the rest do not bear on the check. */
+  overrides?: Override[];
 }
 
 /** `GET /api/proforma/ceiling-check`: a service that predates it says so in words. */
@@ -469,7 +492,7 @@ export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promi
   if (ask.flowsheet) q.set('flowsheet', ask.flowsheet);
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
-  if (ask.assumptions && ask.assumptions.length > 0) q.set('assumptions', JSON.stringify(ask.assumptions));
+  if (ask.overrides && ask.overrides.length > 0) q.set('overrides', JSON.stringify(ask.overrides));
   try {
     return await call<CeilingCheck>(`/api/proforma/ceiling-check?${q.toString()}`, { signal });
   } catch (e) {

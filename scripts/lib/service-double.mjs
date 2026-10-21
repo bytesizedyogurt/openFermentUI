@@ -149,6 +149,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   /** thermosteam's answers the browser asked for and got (OF-BLD-019 §4.2), by question. */
   const thermoKept = new Map();
   const thermoCalls = [];
+  /**
+   * The parameter panel (OF-BLD-020 §2.2): each scope the browser asked for
+   * (GET /api/params/{scope}, with its query) and each resolve it posted
+   * (POST /api/params/{scope}/resolve, with its body), as sent.
+   */
+  const paramScopes = [];
+  const paramResolves = [];
 
   const server = createServer(async (req, res) => {
     try {
@@ -423,6 +430,121 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(entry.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(entry.body));
     }
+    // OF-BLD-020 §2.2 — the parameter panel. GET /api/params/{scope}: a seed
+    // scenario's scope, or a scenario made here by the flowsheet it names
+    // (answered under the id asked), each as demo.py --prototype recorded the
+    // real code's answer over the stand-in records; with fermOS fits chosen,
+    // the yeast scope as the real code bound it with that choice (the choices
+    // the browser tests make), any other a 422 in words. A scope no provider
+    // serves yet is the service's 404; a malformed one its 422.
+    // POST .../resolve lays each override on as the service does, an
+    // assumption by the person it names, and returns the words the real code
+    // returned for the recorded override outside its bounds; a key the scope
+    // does not have, an override of another scope or one naming nobody is
+    // refused in the service's words.
+    {
+      const m = /^\/api\/params\/(.+?)(\/resolve)?$/.exec(url);
+      if (m) {
+        const scope = m[1];
+        const resolving = Boolean(m[2]);
+        const send = (status, body) => {
+          res.writeHead(status, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify(body));
+        };
+        if (resolving !== (req.method === 'POST')) return send(405, { detail: 'Method Not Allowed' });
+        let ask;
+        if (resolving) {
+          let raw = '';
+          for await (const chunk of req) raw += chunk;
+          ask = JSON.parse(raw || '{}');
+          paramResolves.push({ scope, ...ask });
+        } else {
+          const q = new URL(req.url ?? '/', 'http://double').searchParams;
+          ask = { flowsheet: q.get('flowsheet'), host: q.get('host'), fits: q.get('fits') ? JSON.parse(q.get('fits')) : {} };
+          paramScopes.push({ scope, ...Object.fromEntries(q) });
+        }
+        const kinds = {
+          'fermos:family': "fermOS's model families",
+          'fermos:vessel': "fermOS's vessel designs",
+          'pureos:unit': "pureOS's train units",
+        };
+        const other = Object.keys(kinds).find((k) => scope.startsWith(`${k}:`));
+        if (other) return send(404, { detail: `this service serves no parameters for ${kinds[other]} yet` });
+        const id = /^proforma:([A-Za-z0-9][A-Za-z0-9._-]{0,127})$/.exec(scope)?.[1];
+        if (!id)
+          return send(422, {
+            detail: `a parameter scope is fermos:family:<family id>, fermos:vessel:<simulation artifact id>, pureos:unit:<train id>:<unit id> or proforma:<scenario id>, each id letters, digits, dots, dashes and underscores; '${scope}' is none of them`,
+          });
+        const recorded = await prototype('params-proforma.json');
+        const fits = ask.fits ?? {};
+        const typed = new Set((ask.overrides ?? []).map((o) => o.key));
+        const kept = Object.fromEntries(Object.entries(fits).filter(([k]) => !typed.has(k)));
+        let answer;
+        if (Object.keys(kept).length > 0) {
+          const withFits = await prototype('params-proforma-fits.json');
+          answer = (scope === withFits.scope || ask.flowsheet === 'ethanol_glucose_v0') && fitsAnswer(JSON.stringify(kept), withFits.answers);
+          if (!answer) return send(422, { detail: `the double holds no binding of ${scope} with these fits` });
+        } else if (recorded.scopes[scope]) answer = recorded.scopes[scope];
+        else if (ask.flowsheet && recorded.flowsheets[ask.flowsheet]) answer = recorded.flowsheets[ask.flowsheet];
+        else if (ask.flowsheet)
+          answer = { status: 422, body: { detail: `there is no flowsheet ${ask.flowsheet} on the shelf; it holds ${Object.keys(recorded.flowsheets).filter((k) => k !== 'toy').join(', ')}` } };
+        else
+          answer = {
+            status: 404,
+            body: {
+              detail: `there is no scenario ${id}: the seed's BioSTEAM scenarios are ${Object.keys(recorded.scopes).map((k) => k.slice('proforma:'.length)).join(', ')}, and a scenario made in a browser names the shelf flowsheet it runs (?flowsheet=)`,
+            },
+          };
+        if (answer.status !== 200) return send(answer.status, answer.body);
+        const served = { ...answer.body, scope };
+        if (!resolving) return send(200, served);
+        // The resolve: each override laid on as the service lays it on.
+        const specs = new Map(served.specs.map((sp) => [sp.key, sp]));
+        const overrides = ask.overrides ?? [];
+        const stray = [...new Set(overrides.map((o) => o.scope).filter((sc) => sc !== scope))].sort();
+        if (stray.length) return send(422, { detail: `an override names the scope it changes, and these were sent to ${scope}: ${stray.join(', ')}` });
+        const seen = new Set();
+        for (const o of overrides) {
+          if (!specs.has(o.key)) return send(422, { detail: `there is no parameter ${o.key} here; the parameters are ${[...specs.keys()].join(', ')}` });
+          if (seen.has(o.key)) return send(422, { detail: `two overrides of ${o.key}: one person's value a parameter` });
+          seen.add(o.key);
+          if (!String(o.by ?? '').trim()) return send(422, { detail: `the override of ${o.key} needs a person's name: a decision needs a reviewer name` });
+        }
+        const out = recorded.resolve.body.values;
+        // The recorded override outside its bounds, on the flowsheet it was recorded on, gets the real code's words.
+        const flowsheet = ask.flowsheet ?? recorded.flowsheetOf[scope] ?? null;
+        const flagged = (o) => {
+          const r = recorded.resolve.request.overrides.find((x) => x.key === o.key && x.value === o.value && (x.low ?? null) === (o.low ?? null) && (x.high ?? null) === (o.high ?? null));
+          return r && flowsheet === recorded.resolve.flowsheet ? (out.find((v) => v.key === o.key)?.outOfBounds ?? null) : null;
+        };
+        const byKey = new Map(overrides.map((o) => [o.key, o]));
+        const values = served.values.map((v) => {
+          const o = byKey.get(v.key);
+          if (!o) return v;
+          return {
+            key: v.key, value: o.value, low: o.low ?? null, high: o.high ?? null,
+            source: { kind: 'assumption', id: null, note: `typed on ${o.at}${o.note ? `: ${o.note}` : ''}`, by: String(o.by).trim() },
+            origin: 'assumption', identified: null, overriddenBy: String(o.by).trim(), libraryDefault: v.libraryDefault ?? null,
+            recordIds: [], detail: `typed by ${String(o.by).trim()} on ${o.at}${o.note ? `: ${o.note}` : ''}`, outOfBounds: flagged(o),
+          };
+        });
+        const basisInputs = values
+          .filter((v) => v.overriddenBy)
+          .flatMap((v) => [
+            { name: v.key, value: v.value, unit: specs.get(v.key).unit, source: v.source },
+            ...(v.low != null ? [{ name: `${v.key} low`, value: v.low, unit: specs.get(v.key).unit, source: v.source }] : []),
+            ...(v.high != null ? [{ name: `${v.key} high`, value: v.high, unit: specs.get(v.key).unit, source: v.source }] : []),
+          ]);
+        return send(200, {
+          scope,
+          values,
+          waiting: values.filter((v) => v.origin === 'waiting').map((v) => v.key),
+          basisInputs,
+          warnings: values.map((v) => v.outOfBounds).filter(Boolean),
+          notes: served.notes,
+        });
+      }
+    }
     // OF-BLD-014 §8.4 — the BioSTEAM scenarios, bound over stand-in records,
     // and runs made through the real code with a stand-in evaluator.
     // OF-BLD-019 §2.3 (b): the seed's scenarios with the program switch off
@@ -524,7 +646,8 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       // Inputs that still wait are refused as the service refuses them (§3.2).
       const seed = seeds.find((sc) => sc.id === asked.scenarioId);
       const bound = seed ?? seeds.find((sc) => sc.flowsheet === asked.flowsheet);
-      const typed = new Set([...(asked.assumptions ?? []).map((a) => a.key), ...Object.keys(asked.fits ?? {})]);
+      // OF-BLD-020 §2.2: the panel's overrides, and the older assumptions field the service still reads.
+      const typed = new Set([...(asked.overrides ?? []).map((o) => o.key), ...(asked.assumptions ?? []).map((a) => a.key), ...Object.keys(asked.fits ?? {})]);
       const waiting = (bound?.inputs ?? []).filter((i) => i.binding === 'waiting' && !typed.has(i.key)).map((i) => i.key);
       if (waiting.length) return refuse(`these inputs wait for a source, a record or a named person's assumption: ${waiting.join(', ')}`);
       const run = await prototype(name);
@@ -638,5 +761,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, paramScopes, paramResolves, flags } };
 }

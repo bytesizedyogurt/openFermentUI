@@ -332,9 +332,10 @@ export interface OFState {
    * Proforma's typed assumptions, by scenario id (§8.4). Durable. Since
    * OF-BLD-020 §2.1 it is DERIVED from `parameterOverrides`: each
    * `proforma:<id>` scope's numeric overrides, as `assumptionsFromOverrides`
-   * reads them, kept in step by every action that writes an override, so the
-   * scenario page, the index and geneOS keep reading it unchanged until §2.2
-   * moves the page onto the panel.
+   * reads them, kept in step by every action that writes an override. Since
+   * OF-BLD-020 §2.2 no screen reads it: the scenario page, the index and
+   * geneOS read the overrides, and the field is kept, derived, for the
+   * snapshot an older build reads and the one-time migration.
    */
   proformaAssumptions: Record<string, InputAssumption[]>;
   /** Writes the override `proforma:<scenarioId>` holds for the input, through `setOverride`. */
@@ -3431,8 +3432,8 @@ export function mergeAssumptions(
 // this browser and sent with the run; the service keeps none. Proforma's
 // older `proformaAssumptions` is the same thing for one kind of scope: a
 // scenario's assumptions are the overrides of `proforma:<scenario id>`, and
-// the old field is read from them until OF-BLD-020 §2.2 moves the scenario
-// page onto the panel.
+// the old field is derived from them. Since OF-BLD-020 §2.2 the scenario page
+// is the panel and nothing on a screen reads the old field.
 
 const PROFORMA_SCOPE = 'proforma:';
 const NO_OVERRIDES: Override[] = [];

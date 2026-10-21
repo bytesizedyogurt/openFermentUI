@@ -1345,6 +1345,116 @@ let parametersLine = '';
   parametersLine = (run.stdout ?? '').trim().split('\n').pop()?.trim() ?? '';
 }
 
+// ── E.1‴ a parameter is declared or it does not exist (OF-BLD-020 §2.2) ─
+//
+// No module screen renders a numeric control that is not a ParameterSpec the
+// service serves: a number box or a slider lives in
+// src/components/ParameterPanel.tsx and ParameterRow.tsx, which render every
+// scope's specs, and nowhere in the screens named below. Each screen is read
+// as a syntax tree: every `<input>` element, opening or self-closing, whose
+// `type` is number or range in any spelling JSX allows (type="number",
+// type={'range'}, type={`number`}, a conditional either way, a spread object
+// literal naming it) fails the build; so does a `type` the tree cannot read
+// (a variable, a call, a spread of anything but an object literal), since it
+// may be either. Comments never count.
+//
+// ALLOWED names the controls that are not parameters, by the function that
+// renders them, each with why, as E.3′ does: views over a computed grid that
+// set no parameter. They stay where they are; moving one to dodge this guard
+// is the thing it forbids. An ALLOWED entry that matches nothing fails too.
+// §3.3 adds fermOS's screens by one line, `/^FermOS.*\.tsx$/`, once
+// FermOSForecast.tsx's typed start values and duration are in the panel.
+let numericLine = '';
+{
+  const SCREENS: RegExp[] = [/^ProformaScenario\.tsx$/, /^ProformaBiosteam\.tsx$/, /^PureOS.*\.tsx$/];
+  const NUMERIC = /^(number|range)$/i;
+  const ALLOWED: { file: string; within: string; type: 'number' | 'range'; why: string }[] = [
+    { file: 'src/screens/ProformaScenario.tsx', within: 'AuthoredScenario', type: 'number',
+      why: "the authored surfaces' exact value of a sweep dimension (S1–S3, the archived casein examples, OF-BLD-019 D5): it moves a point over a precomputed grid and sets no parameter" },
+    { file: 'src/screens/ProformaScenario.tsx', within: 'AuthoredScenario', type: 'range',
+      why: "the authored surfaces' dimension slider (S1–S3, archived examples): a view over a precomputed grid that sets no parameter" },
+    { file: 'src/screens/ProformaBiosteam.tsx', within: 'Sliders', type: 'range',
+      why: "Move three inputs over the run's grid: it interpolates a kept run's grid and sets no parameter" },
+  ];
+  const used = new Set<number>();
+  let found = 0;
+  const files = readdirSync('src/screens').filter((name) => SCREENS.some((re) => re.test(name))).map((name) => `src/screens/${name}`);
+  // The string literals an expression could give (a conditional, a template
+  // with no substitution); null when it is not read from literals alone.
+  const literals = (e: ts.Expression): string[] | null => {
+    if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e)) return [e.text];
+    if (ts.isParenthesizedExpression(e) || ts.isAsExpression(e) || ts.isSatisfiesExpression(e)) return literals(e.expression);
+    if (ts.isConditionalExpression(e)) {
+      const a = literals(e.whenTrue);
+      const b = literals(e.whenFalse);
+      return a && b ? [...a, ...b] : null;
+    }
+    if (ts.isBinaryExpression(e) && [ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.AmpersandAmpersandToken].includes(e.operatorToken.kind)) {
+      const a = literals(e.left);
+      const b = literals(e.right);
+      return a && b ? [...a, ...b] : null;
+    }
+    return null;
+  };
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8');
+    const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const within = (node: ts.Node): string => {
+      for (let p: ts.Node | undefined = node.parent; p; p = p.parent) {
+        if (ts.isFunctionDeclaration(p) && p.name) return p.name.text;
+        if ((ts.isArrowFunction(p) || ts.isFunctionExpression(p)) && ts.isVariableDeclaration(p.parent) && ts.isIdentifier(p.parent.name)) return p.parent.name.text;
+      }
+      return '(top level)';
+    };
+    const visit = (node: ts.Node): void => {
+      if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(sf) === 'input') {
+        const types: string[] = [];
+        let unread: string | null = null;
+        for (const attr of node.attributes.properties) {
+          if (ts.isJsxAttribute(attr) && attr.name.getText(sf) === 'type') {
+            const init = attr.initializer;
+            if (!init) continue;
+            if (ts.isStringLiteral(init)) types.push(init.text);
+            else if (ts.isJsxExpression(init) && init.expression) {
+              const got = literals(init.expression);
+              if (got) types.push(...got);
+              else unread = `type={${init.expression.getText(sf)}}`;
+            }
+          } else if (ts.isJsxSpreadAttribute(attr)) {
+            const e = attr.expression;
+            if (ts.isObjectLiteralExpression(e)) {
+              for (const prop of e.properties) {
+                if (ts.isPropertyAssignment(prop) && prop.name.getText(sf).replace(/['"`]/g, '') === 'type') {
+                  const got = literals(prop.initializer);
+                  if (got) types.push(...got);
+                  else unread = `{...{ type: ${prop.initializer.getText(sf)} }}`;
+                } else if (!ts.isPropertyAssignment(prop)) unread = `{...${e.getText(sf).slice(0, 40)}}`;
+              }
+            } else unread = `{...${e.getText(sf).slice(0, 40)}}`;
+          }
+        }
+        const numeric = types.map((t) => t.trim().toLowerCase()).filter((t) => NUMERIC.test(t));
+        const { line } = sf.getLineAndCharacterOfPosition(node.getStart());
+        const fn = within(node);
+        if (unread) fail(`${file}:${line + 1} renders an <input> whose type the guard cannot read (${unread}) in ${fn}: a numeric control lives in the parameter panel (OF-BLD-020 E.1‴)`);
+        for (const t of new Set(numeric)) {
+          found++;
+          const i = ALLOWED.findIndex((a) => a.file === file.replace(/\\/g, '/') && a.within === fn && a.type === t);
+          if (i >= 0) used.add(i);
+          else
+            fail(`${file}:${line + 1} renders <input type="${t}"> in ${fn}: a parameter is declared in Python and rendered by src/components/ParameterPanel.tsx, never typed into a screen of its own (OF-BLD-020 E.1‴)`);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+  }
+  ALLOWED.forEach((a, i) => {
+    if (!used.has(i)) fail(`E.1‴: ALLOWED names an <input type="${a.type}"> in ${a.within} (${a.file}) that is not there any more; take the allowance out with it`);
+  });
+  numericLine = `numeric controls  ${found} in ${files.length} Proforma and pureOS screens, each a view over a computed grid that sets no parameter (ALLOWED); every parameter is the panel's (E.1‴)`;
+}
+
 // ── report ─────────────────────────────────────────────────────────────
 console.log('\nopenFerment seed check');
 console.log('──────────────────────');
@@ -1378,6 +1488,7 @@ console.log(`  postdoc prompts   ${LIVE_PROMPTS.length} (${YEAST_PROMPT_COUNT} y
 console.log(`  learn modules     ${MODULES.length} (${MODULES.reduce((n, m) => n + m.lessons.length, 0)} lessons, ${MODULES.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.checkpoint.length, 0), 0)} checkpoint questions)`);
 console.log(`  skills            ${SKILLS.length} in ${FAMILIES.length} families, tagged on ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.filter((st) => (st.skills ?? []).length > 0).length, 0), 0)} protocol steps across ${PROTOCOLS.filter((p) => p.versions.some((v) => v.steps.some((st) => (st.skills ?? []).length > 0))).length} protocols`);
 console.log(`  ${parametersLine || 'parameters        not read'}`);
+console.log(`  ${numericLine}`);
 console.log(`  bench lessons     ${MODULES.reduce((n, m) => n + m.lessons.filter((l) => (l.skills ?? []).length > 0).length, 0)} counting toward ${new Set(MODULES.flatMap((m) => m.lessons.flatMap((l) => l.skills ?? []))).size} skills`);
 
 

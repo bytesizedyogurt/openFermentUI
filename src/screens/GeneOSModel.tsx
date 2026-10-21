@@ -29,9 +29,9 @@
 // and clamps nothing.
 import { useEffect, useMemo, useState } from 'react';
 import { Calculator } from 'lucide-react';
-import type { CeilingCheck, ExtractionRecord, GeneosModelInfo, GeneosResult, InputAssumption, Scenario } from '@/data/types';
+import type { CeilingCheck, ExtractionRecord, GeneosModelInfo, GeneosResult, Scenario } from '@/data/types';
 import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, useProgramFilter, useProgramLookup, useStore, type ProgramEntityKind, useProgramScope } from '@/store';
+import { archivedProgramOf, proformaScope, useProgramFilter, useProgramLookup, useStore, type ProgramEntityKind, useProgramScope } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState, LinkButton } from '@/components/ui';
 import { ArchivedBanner } from '@/components/ArchivedBanner';
@@ -85,7 +85,8 @@ export default function GeneOSModel() {
   const [busy, setBusy] = useState(false);
   const scenarios = useStore((s) => s.scenarios);
   const createdScenarioIds = useStore((s) => s.createdScenarioIds);
-  const proformaAssumptions = useStore((s) => s.proformaAssumptions);
+  // OF-BLD-020 §2.2: a person's changes to a scenario's inputs are its scope's overrides.
+  const parameterOverrides = useStore((s) => s.parameterOverrides);
   const proformaFits = useStore((s) => s.proformaFits);
   const showArchived = useStore((s) => s.showArchived);
   const lookup = useProgramLookup();
@@ -180,7 +181,7 @@ export default function GeneOSModel() {
   // OF-BLD-019 §5.2 — the Proforma scenarios in view, each asked of the
   // service once the ceilings above are computed and kept: the yield as the
   // scenario binds it (its flowsheet when made here, its fermOS fits, the
-  // yield's assumption when typed), against the newest stored ceilings.
+  // yield's override when typed), against the newest stored ceilings.
   const scenarioAsks = useMemo(
     () =>
       scenarios
@@ -193,10 +194,10 @@ export default function GeneOSModel() {
             host: null,
             includeArchived: showArchived || archivedProgramOf('scenario', s.id, lookup) !== null,
             fits: proformaFits[s.id] ?? {},
-            assumptions: (proformaAssumptions[s.id] ?? []).filter((a: InputAssumption) => a.key === 'yield'),
+            overrides: (parameterOverrides[proformaScope(s.id)] ?? []).filter((o) => o.key === 'yield'),
           },
         })),
-    [scenarios, inView, createdScenarioIds, showArchived, lookup, proformaFits, proformaAssumptions],
+    [scenarios, inView, createdScenarioIds, showArchived, lookup, proformaFits, parameterOverrides],
   );
   const asksKey = JSON.stringify(scenarioAsks.map((x) => x.ask));
   useEffect(() => {

@@ -472,6 +472,13 @@ def bind(records: list[dict], host: str | None = None, assumptions: list | None 
                 _assume(inp, given[key])
             out.append(inp)
             continue
+        if key in given:
+            # OF-BLD-020 D3: a named person's value wins over the records,
+            # and the input says how many it stands in place of.
+            _in_place_of(inp, bound)
+            _assume(inp, given[key])
+            out.append(inp)
+            continue
         if key == "yield" and cap is not None:
             clipped = [b for b in bound if b.value > cap[0]]
             for b in clipped:
@@ -480,8 +487,6 @@ def bind(records: list[dict], host: str | None = None, assumptions: list | None 
                 inp.flags.append(f"{len(clipped)} above the highest glucose ceiling on the geneOS shelf, clipped to it")
         if bound:
             _settle(inp, bound, field_id)
-        elif key in given:
-            _assume(inp, given[key])
         out.append(inp)
     for key, (label, unit) in ASSUMED.items():
         inp = ScenarioInput(key=key, label=label, unit=unit, binding="waiting")
@@ -511,6 +516,13 @@ def _settle(inp, bound: list, field_id: str) -> None:
         inp.value = inp.low = inp.high = vals[0]
         inp.sampling = "fixed"
         inp.flags.append(SINGLE if len(vals) == 1 else "every bound record gives the same value: held fixed in sampling")
+
+
+def _in_place_of(inp, bound: list) -> None:
+    """Say how many bound records a person's value stands in place of
+    (OF-BLD-020 D3), as a fermOS fit chosen in their place says it."""
+    if bound:
+        inp.flags.append(f"chosen in place of the {len(bound)} record{'s' if len(bound) != 1 else ''} it bound")
 
 
 def _assume(inp, a) -> None:
@@ -546,6 +558,110 @@ def scenario(host: str | None = None, assumptions: list | None = None, pool=None
         id=SCENARIO_ID, name="PHA from cellulosic sugar — draft flowsheet", product="phb", flowsheet=FLOWSHEET,
         host=host, hosts=hosts, inputs=inputs, waiting=[i.key for i in inputs if i.binding == "waiting"],
         leavesOut=LEAVES_OUT, priceBasis=PRICE_BASIS)
+
+
+# ── A person's overrides (OF-BLD-020 §2.2, D3) ─────────────────────────
+#
+# The parameter panel keeps a person's change to a scenario's input as an
+# Override of scope `proforma:<scenario id>`, in the browser that typed it,
+# and a run, a binding or a ceiling check carries it. Each is laid on as the
+# named assumption it is: it wins over the records and over a fermOS fit
+# for its input, the input says how many records it stands in place of, and
+# the basis names the person (basis.assumption_source), so the run is
+# `demo`. The older `assumptions` field is read the same way for one
+# release. The basis says which field it read: a run that read overrides
+# carries `assumptions read from`; one that read the older field alone
+# carries nothing new, so its basis, and its artifact id, are what they were
+# before the panel. The service keeps none.
+
+ASSUMPTIONS_READ = "assumptions read from"
+READ_WORDS = {
+    (True, False): "overrides",
+    (True, True): "overrides, and assumptions, the older field, read as overrides for one release",
+}
+
+
+def proforma_scope(scenario_id: str) -> str:
+    """The parameter scope of a scenario (params.parse_scope's proforma form)."""
+    return f"proforma:{scenario_id}"
+
+
+def named_values(scenario_id: str | None, overrides: list | None = None,
+                 assumptions: list | None = None) -> tuple[list, str | None]:
+    """A person's values for a scenario's inputs, as the binding lays them on:
+    each Override of the scenario's scope, and the older `assumptions` field,
+    as `InputAssumption`s; and the words the basis says it read (None when
+    it read no override: the older field alone, or nothing, is what every
+    run before the panel read). With no scenario id (GET /api/proforma/bind) every
+    override names one proforma scope. Refused in words: an override of
+    another scope, a value in words, and an input named twice."""
+    from .models import InputAssumption
+
+    over = list(overrides or [])
+    old = list(assumptions or [])
+    scopes = sorted({o.scope for o in over})
+    if scenario_id is not None:
+        stray = [sc for sc in scopes if sc != proforma_scope(scenario_id)]
+        if stray:
+            raise ScenarioRefused(f"an override names the scope it changes, and these were sent for "
+                                  f"{proforma_scope(scenario_id)}: {', '.join(stray)}")
+    elif len(scopes) > 1 or (scopes and not scopes[0].startswith("proforma:")):
+        raise ScenarioRefused(f"the overrides of one binding name one scenario's scope, proforma:<scenario id>; "
+                              f"these name {', '.join(scopes)}")
+    out: dict[str, InputAssumption] = {}
+    for o in over:
+        if isinstance(o.value, bool) or not isinstance(o.value, (int, float)):
+            raise ScenarioRefused(f"the override of {o.key} takes a number, not words")
+        if o.key in out:
+            raise ScenarioRefused(f"two overrides of {o.key}: one person's value an input")
+        value = float(o.value)
+        out[o.key] = InputAssumption(key=o.key, value=value, low=value if o.low is None else o.low,
+                                     high=value if o.high is None else o.high, by=o.by, at=o.at, note=o.note)
+    from_overrides = set(out)
+    for a in old:
+        if a.key in from_overrides:
+            raise ScenarioRefused(f"{a.key} is named in both overrides and assumptions, the older field: send it once, "
+                                  "as an override")
+        out[a.key] = a  # as before the panel, the last of the older field's values for a key stands
+    words = READ_WORDS.get((bool(over), bool(old)))
+    return list(out.values()), words
+
+
+def fits_beside(fits: dict[str, str] | None, typed: list) -> dict[str, str]:
+    """The fermOS fits a person chose, less any input a person's value
+    overrides: an override wins over a fit (D3), so the fit is not laid on
+    there, and a fit's productivity then stands beside titre as the binding
+    has it."""
+    named = {a.key for a in typed}
+    return {k: v for k, v in (fits or {}).items() if k not in named}
+
+
+def _check_keys(info, typed: list) -> None:
+    """Every input a person's value names is one the flowsheet takes a value
+    for; a convention is stated in the basis and takes none."""
+    takes = {i.key for i in info.inputs if i.kind != "convention"}
+    stated = sorted({a.key for a in typed} & {i.key for i in info.inputs if i.kind == "convention"})
+    if stated:
+        raise ScenarioRefused(f"{', '.join(stated)} {'is a convention' if len(stated) == 1 else 'are conventions'} every "
+                              f"run of {info.id} states in its basis, and takes no value")
+    unknown = sorted({a.key for a in typed} - takes)
+    if unknown:
+        raise ScenarioRefused(f"{info.id} takes no input {', '.join(unknown)}")
+
+
+def assumptions_read(words: str | None) -> list:
+    """The basis input that says a run's named values were read from the
+    panel's overrides (OF-BLD-020 §2.2): none for a run that carries no
+    override, so a run with none keeps the basis, and the artifact id, it
+    had before the panel."""
+    from .models import BasisInput, BasisSource
+
+    if not words:
+        return []
+    return [BasisInput(name=ASSUMPTIONS_READ, value=words, unit="", source=BasisSource(
+        kind="convention", note="where the named persons' values in this basis came from: the parameter panel's "
+                                "overrides, and any the older assumptions field gave, which the service reads as overrides "
+                                "for one release; a basis without this input read the older field alone"))]
 
 
 def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = FLOWSHEET,
@@ -854,21 +970,27 @@ def run(req, pool=None):
     _check_seed(req.seed)
     # A run is a caller a person started by id: its records bind whatever the
     # program switch says (OF-BLD-016, "what keeps everything").
+    # OF-BLD-020 §2.2 (D3): a person's overrides, and the older assumptions
+    # field read the same way for one release, each a named assumption that
+    # wins over the records and any fit for its input.
+    typed, read = named_values(req.scenarioId, req.overrides, req.assumptions)
+    _check_keys(info, typed)
     pool = pool or evidence_pool.load(include_archived=True)
     if flowsheet == FLOWSHEET:
         cap = yield_cap()
-        inputs = bind(pool.records, req.host, req.assumptions, cap)
+        inputs = bind(pool.records, req.host, typed, cap)
     else:
         cap = None
-        inputs = bind_inputs(flowsheet, pool.records, req.host, req.assumptions)
+        inputs = bind_inputs(flowsheet, pool.records, req.host, typed)
     # OF-BLD-019 §5.1 (D10): the fermOS fits a person chose, each computed
     # from its artifact; one that cannot feed its input is refused in words.
-    fitted = apply_fits(inputs, req.fits, flowsheet)
+    # An input a person's value overrides takes no fit (D3).
+    fitted = apply_fits(inputs, fits_beside(req.fits, typed), flowsheet)
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
         raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
     art = artifacts.compute(RUN, basis_inputs(inputs, cap, flowsheet, req.samples, scenario_id=req.scenarioId,
-                                              fitted=fitted),
+                                              fitted=fitted) + assumptions_read(read),
                             records_by_id=pool.records_by_id, seed=req.seed)
     o = art.output
     q = o["quantiles"]
@@ -1096,8 +1218,9 @@ def bind_inputs(flowsheet: str, records: list[dict], host: str | None = None, as
     entry: a process input to the records of its fields (the first field
     with a bound record wins) on its program's papers that pass the
     aggregate gate and name the flowsheet's feed as their carbon source, each
-    converted by units.py into the input's unit; with none, or with the
-    binding stopped, a named person's assumption; else it waits. A
+    converted by units.py into the input's unit; else it waits. A named
+    person's assumption (an Override from the parameter panel, OF-BLD-020
+    D3) wins over the records and says how many it stands in place of. A
     convention takes no value: the run's basis states it."""
     from . import units, validate
     from .models import BoundRecord, ScenarioInput
@@ -1144,10 +1267,12 @@ def bind_inputs(flowsheet: str, records: list[dict], host: str | None = None, as
             inp.flags.append(f"the binding stopped: {refused}")
             if fi.key in given:
                 _assume(inp, given[fi.key])
+        elif fi.key in given:
+            # OF-BLD-020 D3: a named person's value wins over the records.
+            _in_place_of(inp, bound)
+            _assume(inp, given[fi.key])
         elif bound:
             _settle(inp, bound, used)
-        elif fi.key in given:
-            _assume(inp, given[fi.key])
         out.append(inp)
     return out
 
@@ -1200,7 +1325,8 @@ def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | 
     """A flowsheet's inputs bound, in the shape GET /api/proforma/scenarios
     serves: a seed scenario's with its id and name, a flowsheet's alone with
     both empty (§2.3, c); with the fermOS fits a person chose laid on
-    (OF-BLD-019 §5.1)."""
+    (OF-BLD-019 §5.1), and a person's named values over both (OF-BLD-020
+    D3: an input a value overrides takes no fit)."""
     from . import evidence_pool
     from .models import ProformaScenarioInfo
 
@@ -1214,7 +1340,7 @@ def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | 
             id=scenario_id, name=name, product=PRODUCTS.get(flowsheet, flowsheet), flowsheet=flowsheet, host=host,
             hosts=_hosts(pool.records, flowsheet), inputs=inputs, waiting=[], leavesOut=info.leavesOut,
             priceBasis=info.priceBasis or "")
-    apply_fits(out.inputs, fits or {}, flowsheet)
+    apply_fits(out.inputs, fits_beside(fits, assumptions or []), flowsheet)
     out.waiting = [i.key for i in out.inputs if i.binding == "waiting"]
     return out
 
@@ -1606,13 +1732,13 @@ def _row_words(flag: str, binding: str, value_above: bool) -> str:
 
 def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_archived: bool = False,
                   host: str | None = None, assumptions: list | None = None, fits: dict[str, str] | None = None,
-                  pool=None):
+                  pool=None, overrides: list | None = None):
     """GET /api/proforma/ceiling-check: a scenario's fermenter yield beside
     the newest stored geneOS ceiling of each shelf model of its organism, on
     its flowsheet's sugar (D11). The scenario is a seed's by its id, or one
     made here by the flowsheet it names (flowsheet_of); its yield is bound as
-    its page binds it, with the person's assumptions and the fermOS fits
-    chosen. Refused in words as the binding is; a scenario of a program the
+    its page binds it, with the person's overrides (and the older
+    assumptions field, read the same way) and the fermOS fits chosen. Refused in words as the binding is; a scenario of a program the
     switch hides, as GET /api/proforma/bind refuses it. A read: it keeps
     nothing, starts no worker, and changes no binding or run."""
     from . import artifacts, evidence_pool, geneos, geneos_models, module_stores, programs, units
@@ -1629,12 +1755,14 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_arc
     product = PRODUCTS.get(fid, fid)
     if sugar is None or product not in geneos_models.PRODUCTS:
         raise ScenarioRefused(f"{fid} names no product and sugar a geneOS ceiling is computed for")
+    typed, _ = named_values(scenario_id, overrides, assumptions)
+    _check_keys(info, typed)
     pool = pool or evidence_pool.load(include_archived=True)
     # The yield as the scenario binds it: the PHA draft's records unclipped
     # (cap=None), so the check reads each record as it is (D11).
-    inputs = bind(pool.records, host, assumptions, cap=None) if fid == FLOWSHEET else bind_inputs(
-        fid, pool.records, host, assumptions)
-    apply_fits(inputs, fits or {}, fid)
+    inputs = bind(pool.records, host, typed, cap=None) if fid == FLOWSHEET else bind_inputs(
+        fid, pool.records, host, typed)
+    apply_fits(inputs, fits_beside(fits, typed), fid)
     inp = next((i for i in inputs if i.key == "yield"), None)
     if inp is None:
         raise ScenarioRefused(f"{fid} takes no yield, so no ceiling bounds it")

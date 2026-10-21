@@ -327,6 +327,22 @@ input[type='range']::-moz-range-thumb {
   border-color: rgb(var(--surface-1));
 }
 
+/* The parameter panel's slider (OF-BLD-020 §2.2): a 44 px touch target for
+   a gloved hand at the bench (Deposition.tsx's constraints), the 4 px track
+   drawn inside it, and a thumb large enough to take with a finger. */
+input[type='range'].touch-range {
+  height: 44px;
+  background: linear-gradient(rgb(var(--line)), rgb(var(--line))) center / 100% 4px no-repeat;
+}
+input[type='range'].touch-range::-webkit-slider-thumb {
+  width: 24px;
+  height: 24px;
+}
+input[type='range'].touch-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+}
+
 /* ── Utility compositions ────────────────────────────────────────────── */
 .card {
   background: rgb(var(--surface-1));

@@ -55,7 +55,7 @@ def test_a_scenario_with_no_run_on_the_service_reads_as_none(client):
     assert proforma.status()["status"] in ("cold", "failed")
 
 
-def test_the_newest_run_of_each_scenario_is_found_by_the_scenario_its_basis_names(client, standin):
+def test_the_newest_run_of_each_scenario_is_found_by_the_scenario_its_basis_names(client, standin, monkeypatch):
     seeded = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=ASSUMED, samples=8), pool=standin)
     made = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, samples=8),
                         pool=standin)
@@ -67,7 +67,15 @@ def test_the_newest_run_of_each_scenario_is_found_by_the_scenario_its_basis_name
     # The answer is the artifact as the store keeps it, the one pureOS and selling_price read.
     assert got["artifact"] == artifacts.get(seeded.artifactId).model_dump(mode="json")
     assert proforma.latest_run("sc-yeast-1").id == seeded.artifactId
-    # A newer run of the same scenario is the one answered.
+    # A newer run of the same scenario is the one answered. Its time is set a
+    # second on: a run's time is kept to the second, and two runs in one
+    # second are ordered by their ids (OF-BLD-020 §2.2 found the tie when the
+    # basis, and so the ids, changed).
+    from datetime import datetime, timedelta
+
+    then = datetime.fromisoformat(proforma.latest_run("sc-yeast-1").createdAt.replace("Z", "+00:00"))
+    later = (then + timedelta(seconds=1)).isoformat(timespec="seconds").replace("+00:00", "Z")
+    monkeypatch.setattr(artifacts, "_now", lambda: later)
     newer = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=[assume("plant_scale", 200000.0),
                                                                                     ASSUMED[1]], samples=8), pool=standin)
     assert newer.artifactId != seeded.artifactId

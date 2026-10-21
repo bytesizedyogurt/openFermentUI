@@ -2787,7 +2787,19 @@ export interface ProformaScenarioInfo {
 
 export interface ProformaRunRequest {
   scenarioId: string;
-  assumptions: InputAssumption[];
+  /**
+   * The older field (OF-BLD-014 §8.4): a named person's values by input key.
+   * The service reads it as overrides for one release (OF-BLD-020 §2.2); this
+   * browser sends `overrides` instead.
+   */
+  assumptions?: InputAssumption[];
+  /**
+   * A person's changes in the parameter panel (OF-BLD-020 D3), each an
+   * Override of scope `proforma:<scenarioId>`: a named assumption that wins
+   * over the records and any fermOS fit for its input, named in the run's
+   * basis. The service keeps none.
+   */
+  overrides?: Override[];
   host: string | null;
   seed: number;
   /** Latin hypercube samples to draw (OF-BLD-019 D7); the service defaults it and caps it. */

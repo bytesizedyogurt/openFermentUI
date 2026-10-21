@@ -635,7 +635,7 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
 
     from . import artifacts, fermos, geneos, postdoc_agent, proforma, tools
     from . import intake as _intake
-    from .models import FermosSeries, InputAssumption, ProformaRunRequest
+    from .models import FermosSeries, ProformaRunRequest
 
     pool = _stream_pool(overlay)
     # The ceiling is the toy network's, a STAND-IN the tool refuses outside
@@ -653,9 +653,8 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
             fit = fermos.fit(DRAFT_DEPOSITION, [FermosSeries.model_validate(x) for x in fermos_sample_series()])
             fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId)
             rs = _standin_records()
-            a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-                 for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
-            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a),
+            a = _standin_overrides(proforma.SCENARIO_ID, PHA_STANDIN_ASSUMED)
+            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, overrides=a),
                                pool=SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
             draft = {"title": "The stand-in run, forecast and priced", "productId": "taq-dna-polymerase",
                      "strainId": "c-necator-h16",
@@ -821,6 +820,7 @@ def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
     from . import artifacts, proforma
     from . import intake as _intake
     from .flowsheets import shelf as _shelf
+    from .models import ParamResolveRequest
 
     rs = _standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
@@ -856,11 +856,18 @@ def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
                         proforma.ETHANOL, pool=pool, fits=chosen).model_dump(mode="json")})
                 except proforma.ScenarioRefused as e:
                     others.append({"fits": chosen, "status": 422, "body": {"detail": str(e)}})
+            # OF-BLD-020 §2.2: the parameter panel's scope of sc-yeast-1 with
+            # each of those choices, as GET /api/params/{scope}?fits= answers.
+            scope = f"proforma:{proforma.YEAST_SCENARIO_ID}"
+            with _PoolLoaded(pool):
+                panel = [{"fits": chosen, **_param_answer(scope, ParamResolveRequest(fits=chosen))}
+                         for chosen in (fits, *_bridge_choices(fit_id, fc_id))]
             kept = [artifacts.get(i).model_copy(update={"createdAt": AT, "durationMs": 0}) for i in (fit_id, fc_id)]
         finally:
             _intake.DATA_DIR = saved
     return ({"fermos-fits.json": {"none": none, "onFile": on_file},
-             "proforma-bind-fits.json": {"flowsheet": proforma.ETHANOL, "fits": fits, "body": body, "others": others}}, kept)
+             "proforma-bind-fits.json": {"flowsheet": proforma.ETHANOL, "fits": fits, "body": body, "others": others},
+             "params-proforma-fits.json": {"scope": scope, "answers": panel}}, kept)
 
 
 # §8.4: Proforma's BioSTEAM scenario for the smoke double. The binding and
@@ -869,6 +876,18 @@ def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
 # corpus holds, and BioSTEAM is replaced by a closed-form STAND-IN evaluator,
 # so test:core needs no simulator. Not a price of anything.
 PROFORMA_STANDIN = "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+# The economic inputs the PHA draft's stand-in runs take as a person's
+# values (a STAND-IN, not a price of anything).
+PHA_STANDIN_ASSUMED = (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))
+
+
+def _standin_overrides(scenario_id: str, rows) -> list[Any]:
+    """The stand-in runs' values as the parameter panel sends them
+    (OF-BLD-020 §2.2): each an Override of the scenario's scope, named."""
+    from .models import Override
+
+    return [Override(scope=f"proforma:{scenario_id}", key=k, value=v, low=lo, high=hi, by="openFerment test fixture",
+                     at="2026-10-15", note=PROFORMA_STANDIN) for k, v, lo, hi in rows]
 
 
 def _standin_records() -> list[dict[str, Any]]:
@@ -1216,6 +1235,73 @@ def _standin_ethanol_tables(v: dict[str, float], out: dict[str, Any]) -> dict[st
 # artifacts artifacts.json carries beside the others: not a file of its own.
 PROFORMA_RUN_ARTIFACTS = "(run artifacts for artifacts.json)"
 
+# OF-BLD-020 §2.2: the parameter panel's scopes for the double. A scenario
+# made in a browser takes a time-based id; its scope is recorded under this
+# one and the double answers it under the id asked.
+PARAMS_MADE_HERE = "sc-made-here"
+# A STAND-IN override the browser tests type, above the yield's bounds (the
+# ontology's plausibility range for ethanol_yield_substrate): the resolve is
+# recorded as the real code answers it, warning and all. Not a yield of
+# anything.
+PARAMS_OUT_OF_BOUNDS = ("yield", 0.7)
+
+
+class _PoolLoaded:
+    """evidence_pool.load answers the stand-in pool while the panel's
+    provider binds, as the tests' client fixture has it."""
+
+    def __init__(self, pool) -> None:
+        self.pool = pool
+
+    def __enter__(self):
+        from . import evidence_pool
+
+        self.saved = evidence_pool.load
+        evidence_pool.load = lambda include_archived=False: self.pool
+        return self
+
+    def __exit__(self, *exc) -> None:
+        from . import evidence_pool
+
+        evidence_pool.load = self.saved
+
+
+def _param_answer(scope: str, req=None) -> dict[str, Any]:
+    """GET /api/params/{scope} as the service answers it: the scope, or the
+    refusal in its words with its status."""
+    from . import params
+
+    try:
+        return {"status": 200, "body": params.scope(scope, req).model_dump(mode="json")}
+    except params.ScopeUnknown as e:
+        return {"status": 404, "body": {"detail": str(e)}}
+    except params.ParamRefused as e:
+        return {"status": 422, "body": {"detail": str(e)}}
+
+
+def prototype_params(pool) -> dict[str, Any]:
+    """The parameter panel's Proforma scopes over the stand-in records: each
+    seed BioSTEAM scenario by its id, each shelf flowsheet as a scenario made
+    here names it (or the service's refusal), and one resolve with a yield
+    outside its bounds, each as the real code answers it."""
+    from . import params, proforma
+    from .flowsheets import shelf as _shelf
+    from .models import Override, ParamResolveRequest
+
+    with _PoolLoaded(pool):
+        scopes = {f"proforma:{sc['id']}": _param_answer(f"proforma:{sc['id']}") for sc in proforma.seed_scenarios()}
+        made = f"proforma:{PARAMS_MADE_HERE}"
+        flowsheets = {fid: _param_answer(made, ParamResolveRequest(flowsheet=fid)) for fid in (*_shelf.SHELF, *_shelf.TEST_ONLY)}
+        key, value = PARAMS_OUT_OF_BOUNDS
+        o = Override(scope=f"proforma:{proforma.YEAST_SCENARIO_ID}", key=key, value=value, by="openFerment test fixture",
+                     at="2026-10-15", note=PROFORMA_STANDIN)
+        req = ParamResolveRequest(overrides=[o])
+        resolved = params.resolve_scope(o.scope, req).model_dump(mode="json")
+    return {"params-proforma.json": {"scopes": scopes, "madeHere": PARAMS_MADE_HERE, "flowsheets": flowsheets,
+                                     "flowsheetOf": {f"proforma:{sc['id']}": sc["modelId"] for sc in proforma.seed_scenarios()},
+                                     "resolve": {"flowsheet": proforma.ETHANOL, "request": req.model_dump(mode="json"),
+                                                 "body": resolved}}}
+
 
 def prototype_proforma() -> dict[str, Any]:
     import tempfile
@@ -1225,22 +1311,20 @@ def prototype_proforma() -> dict[str, Any]:
     from . import intake as _intake
     from . import proforma
     from .flowsheets import shelf as _shelf
-    from .models import InputAssumption, ProformaRunRequest
+    from .models import ProformaRunRequest
 
     rs = _standin_records() + _standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
-    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
-    ay = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-          for k, v, lo, hi in YEAST_STANDIN_ASSUMED]
+    a = _standin_overrides(proforma.SCENARIO_ID, PHA_STANDIN_ASSUMED)
+    ay = _standin_overrides(proforma.YEAST_SCENARIO_ID, YEAST_STANDIN_ASSUMED)
     saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
     with tempfile.TemporaryDirectory() as tmp:
         try:
             _intake.DATA_DIR = Path(tmp)
             proforma.call = _standin_call
             proforma.yield_cap = lambda: None
-            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool)
-            yeast = proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, assumptions=ay), pool=pool)
+            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, overrides=a), pool=pool)
+            yeast = proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, overrides=ay), pool=pool)
             yeast_art = _artifacts.get(yeast.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0})
             # OF-BLD-019 §2.3 (b, c): the seed's scenarios bound with the
             # switch off and on, and every flowsheet a scenario made here
@@ -1255,6 +1339,7 @@ def prototype_proforma() -> dict[str, Any]:
                         bind[switch][fid] = {"status": 200, "body": body}
                     except proforma.ScenarioRefused as e:
                         bind[switch][fid] = {"status": 422, "body": {"detail": str(e)}}
+            panel = prototype_params(pool)
         finally:
             _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
     run.evidence.basis.at = AT
@@ -1284,7 +1369,7 @@ def prototype_proforma() -> dict[str, Any]:
     return {"proforma-scenarios.json": scenarios[False], "proforma-scenarios-archived.json": scenarios[True],
             "proforma-bind.json": bind, "proforma-run.json": run.model_dump(mode="json"),
             "proforma-run-yeast.json": yeast.model_dump(mode="json"),
-            "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True), **references,
+            "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True), **references, **panel,
             PROFORMA_RUN_ARTIFACTS: [yeast_art.model_dump(mode="json")]}
 
 
@@ -1389,24 +1474,22 @@ def _kept_standin_runs(then=None) -> list:
 
     from . import artifacts, proforma
     from . import intake as _intake
-    from .models import InputAssumption, ProformaRunRequest
+    from .models import ProformaRunRequest
 
     rs = _standin_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     ry = _standin_records() + _standin_yeast_records()
     pool_y = SimpleNamespace(records=ry, records_by_id={r["id"]: r for r in ry})
-    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
-    ay = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-          for k, v, lo, hi in YEAST_STANDIN_ASSUMED]
+    a = _standin_overrides(proforma.SCENARIO_ID, PHA_STANDIN_ASSUMED)
+    ay = _standin_overrides(proforma.YEAST_SCENARIO_ID, YEAST_STANDIN_ASSUMED)
     saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
     with tempfile.TemporaryDirectory() as tmp:
         try:
             _intake.DATA_DIR = Path(tmp)
             proforma.call = _standin_call
             proforma.yield_cap = lambda: None
-            runs = [proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool),
-                    proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, assumptions=ay), pool=pool_y)]
+            runs = [proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, overrides=a), pool=pool),
+                    proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, overrides=ay), pool=pool_y)]
             arts = [artifacts.get(r.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0}) for r in runs]
             if then is not None:
                 then(arts)
