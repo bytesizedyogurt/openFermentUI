@@ -3596,6 +3596,13 @@ export interface SimulationRequest {
   startFrom?: string;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length';
   includeArchived?: boolean;
+  /**
+   * A parameter bound to exactly these records of the evidence pool, by spec
+   * key (OF-BLD-020 §3.4, D13): each must be in the pool, carry a field the
+   * parameter binds from, pass the aggregate gate and convert into its unit,
+   * or the request is refused in words. Ids, never values.
+   */
+  recordsByParam?: Record<string, string[]>;
 }
 
 /**

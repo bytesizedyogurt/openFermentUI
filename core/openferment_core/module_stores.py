@@ -259,6 +259,10 @@ ARTIFACT_MODULE = {
 }
 
 
+# A kept simulation (OF-BLD-020 §3.4): fermOS reads it as its own kind,
+# `simulation`, never as a bare artifact row.
+SIMULATION = "fermos.simulation"
+
 # A Proforma run: a scenario's (`proforma.run`) or a reference biorefinery's
 # (`proforma.reference`). Its program is decided by one rule (OF-BLD-019 §6.R).
 RUN_TOOLS = ("proforma.run", "proforma.reference")
@@ -540,11 +544,45 @@ class Stores:
 
     def _fermos(self) -> Iterable[Row]:
         yield from self._artifacts("fermos")
+        yield from self._simulations()
         # OF-BLD-020 §4.2 — a kept vessel design, kind `vessel`: what BioSTEAM
         # sized for which simulation, read from the artifact (vessel.summary).
         for a in self._get("artifacts"):
             if a.tool == VESSEL_TOOL:
                 yield _vessel_row(a, self._artifact_mark(a), self._artifact_program(a))
+
+    def _simulations(self) -> Iterable[Row]:
+        """One row a kept simulation (OF-BLD-020 §3.4), `fermos/simulation/<id>`:
+        its family and strain in the label, the mark worked out from its
+        inputs as they stand (`_artifact_mark`), and a detail of words, ids
+        and flags alone. Its numbers stay in the artifact: a claim cites the
+        row by its ref, or the simulation by the evidence id fermos_simulate
+        returns."""
+        hosts = {h["id"]: h["name"] for h in self._get("projection")["geneos"]["hosts"] if h.get("id")}
+        for a in self._get("artifacts"):
+            if a.tool != SIMULATION:
+                continue
+            o = a.output if isinstance(a.output, dict) else {}
+            family, title = str(o.get("family") or ""), str(o.get("title") or o.get("family") or "")
+            strain, product, sugar = o.get("strain"), o.get("product"), o.get("sugar")
+            who = hosts.get(str(strain), str(strain)) if strain else "every strain of the program's organism"
+            bound: dict[str, list[str]] = {}
+            for v in [*(o.get("parameters") or []), *(o.get("start") or [])]:
+                if isinstance(v, dict) and v.get("key"):
+                    bound.setdefault(str(v.get("origin") or "waiting"), []).append(str(v["key"]))
+            ceiling = o.get("ceiling") if isinstance(o.get("ceiling"), dict) else {}
+            program = self._artifact_program(a)
+            yield Row("fermos", "simulation", a.id, f"{title} ({family}) simulation of {who}", "open", "computed",
+                      provenance=self._artifact_mark(a),
+                      words=" ".join(str(x) for x in ("simulation", family, title, strain or "", product or "",
+                                                      sugar or "", who) if x),
+                      detail={"artifactId": a.id, "family": family, "title": title, "strain": strain,
+                              "product": product, "sugar": sugar, "boundBy": bound,
+                              "aerobic": bool(o.get("aerobic")), "aboveCeiling": bool(ceiling.get("flagged")),
+                              "flagged": bool(o.get("flags")),
+                              "cite": "cite the row by its ref; its numbers are in the artifact, and fermos_simulate "
+                                      "returns a simulation's evidence id"},
+                      program=program, species=self._species_of([strain], program))
 
     def _pureos(self) -> Iterable[Row]:
         ops = self._get("projection")["pureos"]["unitOperations"]
@@ -683,7 +721,7 @@ KINDS = {
     "dominion": ("molecule", "finding"),
     "runbooks": ("runbook", "protocol"),
     "geneos": ("host", "pathway", "model", "artifact"),
-    "fermos": ("artifact", "vessel"),
+    "fermos": ("artifact", "simulation", "vessel"),
     "pureos": ("unit-operation", "train", "train-unit"),
     "proforma": ("scenario", "artifact"),
     "biorepo": ("record", "candidate", "artifact", "witness-run"),

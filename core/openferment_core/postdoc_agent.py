@@ -146,13 +146,23 @@ draft is the answer the person asked for, and nothing else stands in for it.
 rest). What it writes lands marked as yours for a person to promote; an \
 action at a gate comes back `state: proposed` and waits for a person on Home. \
 Say in gaps what you wrote or proposed, and what a tool refused to write.
-15. A vessel is BioSTEAM's design for a kept simulation: fermos_vessel takes \
+15. A simulation comes from fermos_simulate: name the model family, the strain, \
+the product and the sugar by their ids, and, to bind a parameter to particular \
+records, their record ids for it in recordsByParam; never a value. A \
+simulation's numbers (a titre, a yield, a productivity, the hour the sugar runs \
+out) are read from its artifact and never stated by you: cite the simulation by \
+the evidence id fermos_simulate returns, which is its artifact id, or a \
+simulation row fermos_read returned by its ref in moduleRefs. When it refuses \
+because parameters wait, say in gaps which wait; never supply one yourself: an \
+assumption is a named person's, typed in fermOS → Simulate.
+16. A vessel is BioSTEAM's design for a kept simulation: fermos_vessel takes \
 the simulation's artifact id, a vessel type and a kLa correlation by name. A \
 vessel's numbers (vessels, volumes, times, powers, kLa, the oxygen balance, \
-heat, cost) are read from its artifact and cited by its evidence id, which is \
-the artifact id; never state them yourself. When fermos_vessel refuses because \
-the plant scale waits, say in gaps that a named person types it in fermOS → \
-Vessel; never supply one."""
+heat, cost) are read from its artifact and cited by the evidence id \
+fermos_vessel returns, which is the artifact id, or a vessel row fermos_read \
+returned by its ref in moduleRefs; never state them yourself. When \
+fermos_vessel refuses because the plant scale waits, say in gaps that a named \
+person types it in fermOS → Vessel; never supply one."""
 )
 
 
@@ -282,6 +292,8 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         return f"Converted {inp.get('recordId')} to {inp.get('toUnit')}"
     if name == "run_flowsheet":
         return f"Ran the flowsheet of {inp.get('scenarioId')} · kept run {result.summary.get('artifactId')}"
+    if name == "fermos_simulate":
+        return f"Simulated {inp.get('family')} · kept simulation {result.summary.get('artifactId')}"
     if name == "fermos_vessel":
         what = inp.get("simulationArtifact") or inp.get("fitArtifact")
         return f"Designed the vessel for {what} · kept design {result.summary.get('artifactId')}"

@@ -406,3 +406,89 @@ def test_the_bind_endpoint_and_the_family_scope_bind_alike(client):
     # A binding keeps nothing.
     kept = intake.DATA_DIR / "artifacts"
     assert not kept.exists() or not list(kept.glob("*.json"))
+
+
+# ── records named for a parameter (OF-BLD-020 §3.4, D13) ───────────────
+
+
+def test_a_parameter_named_records_binds_exactly_them_and_the_rest_bind_by_the_rule(store):
+    pool = pool_of(*STANDIN, rec("mu-s288c", "growth_rate_mu", 0.9, "h-1", strain=S288C, carbon="xylose"))
+    v, waiting = fermos.bind_parameters(BATCH, CENPK, "ethanol", "glucose", pool, [], None,
+                                        records_by_param={"mu_max": ["mu1", "mu-s288c"]})
+    mu = by_key(v)["mu_max"]
+    # Named by id: no strain or sugar filter chose them, and the detail says they were named.
+    assert mu.origin == "record" and mu.recordIds == ["mu1", "mu-s288c"] and (mu.low, mu.high) == (0.30, 0.9)
+    assert mu.detail.startswith("2 records of growth_rate_mu, named for it: ") and mu.source.kind == "record"
+    # Every other parameter binds as before: CEN.PK113-7D's own records, none here.
+    assert by_key(v)["ks"].origin == "waiting" and "ks" in waiting
+    same, _ = fermos.bind_parameters(BATCH, None, "ethanol", "glucose", pool_of(*STANDIN), [], None)
+    named, _ = fermos.bind_parameters(BATCH, None, "ethanol", "glucose", pool_of(*STANDIN), [], None,
+                                      records_by_param={"yps": ["yp2"]})
+    assert by_key(named)["yps"].recordIds == ["yp2"] and by_key(named)["yps"].value == 0.46
+    assert {k: x for k, x in by_key(named).items() if k != "yps"} == {k: x for k, x in by_key(same).items() if k != "yps"}
+
+
+def test_named_records_bind_ahead_of_a_fit_and_a_persons_override_still_wins(store, monkeypatch):
+    fit_id = _batch_fit(monkeypatch)
+    pool = pool_of(*STANDIN, rec("pmax1", "ethanol_max_conc", 90.0))
+    got = fermos.bind(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", fitArtifact=fit_id,
+                                        recordsByParam={"yps": ["yp1"]}), pool=pool)
+    v = by_key(got.values)
+    assert v["yps"].origin == "record" and v["yps"].recordIds == ["yp1"] and v["mu_max"].origin == "fit"
+    assert any(n.startswith("yps is bound to the records named for it (yp1); the fit would have bound it, and is set "
+                            "aside for it") for n in got.notes), got.notes
+    over, _ = fermos.bind_parameters(BATCH, None, "ethanol", "glucose", pool, typed(yps=0.4), fit_id,
+                                     records_by_param={"yps": ["yp1"]})
+    assert by_key(over)["yps"].origin == "assumption" and by_key(over)["yps"].overriddenBy == BY
+
+
+def test_a_simulation_on_named_records_names_them_in_its_basis_and_says_they_were_named(store):
+    pool = pool_of(*STANDIN)
+    rest = {k: x for k, x in dict(ks=0.2, yxs=0.12, yps=0.45, s0=50.0, **TYPED).items()}
+    r = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", overrides=typed(**rest),
+                                          recordsByParam={"mu_max": ["mu1", "mu2"]}), by_pool=pool)
+    art = artifacts.get(r.artifactId)
+    named = {i.name: i for i in art.inputs}
+    assert [i.value for i in art.inputs if i.name == "mu_max record"] == ["mu1", "mu2"]
+    assert all(i.source.kind == "record" for i in art.inputs if i.name == "mu_max record")
+    assert named["mu_max origin"].value == fermos.NAMED and "named for it by id" in named["mu_max origin"].source.note
+    # Only named records bound, so `records of` (whose records the rule found) is not said.
+    assert "records of" not in named
+    p = by_key(r.parameters)
+    assert p["mu_max"].origin == "record" and p["mu_max"].recordIds == ["mu1", "mu2"] and p["mu_max"].identified is None
+    assert artifacts.replay(r.artifactId).identical
+    # A request naming no records keeps the id it had before §3.4: nothing is added to its basis.
+    plain = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
+                                              overrides=typed(mu_max=0.3, **rest)), by_pool=pool)
+    assert not [i for i in artifacts.get(plain.artifactId).inputs if i.name.endswith(" origin")]
+
+
+@pytest.mark.parametrize("named, words", [
+    ({"mu_max": ["nowhere"]}, "record nowhere, named for mu_max, is not in the evidence pool the program switch shows"),
+    ({"mu_max": ["ks1"]}, "record ks1 is a record of monod_ks"),
+    ({"mu_max": ["mu-rej"]}, "is kept out by the aggregate gate: rejected"),
+    ({"mu_max": ["mu-est"]}, "is kept out by the aggregate gate: industry-estimate"),
+    ({"mu_max": ["mu-bad"]}, "record mu-bad, named for mu_max, is in 'g/L', which units.py does not convert into h⁻¹"),
+    ({"yps": ["yp1"]}, "yps (product yield on substrate) binds from no record field here"),
+    ({"p0": ["s01"]}, "p0 (product at the start) binds from no record field here"),
+    ({"nope": ["mu1"]}, "recordsByParam names nope, which is no parameter of batch_v1"),
+])
+def test_a_named_record_that_cannot_bind_refuses_the_request_naming_it(store, named, words):
+    pool = pool_of(*STANDIN, rec("mu-rej", "growth_rate_mu", 0.9, "h-1", status="rejected"),
+                   rec("mu-est", "growth_rate_mu", 0.9, "h-1", provenance="industry-estimate"),
+                   rec("mu-bad", "growth_rate_mu", 0.3, "g/L"))
+    product = None if "yps" in named else "ethanol"
+    with pytest.raises(fermos.SimulationRefused) as e:
+        fermos.bind_parameters(BATCH, None, product, "glucose", pool, [], None, records_by_param=named)
+    assert words in str(e.value), str(e.value)
+
+
+def test_the_simulate_endpoint_takes_named_records_and_refuses_one_that_cannot_bind(client):
+    body = {"family": BATCH, "product": "ethanol", "sugar": "glucose", "recordsByParam": {"mu_max": ["mu2"]},
+            "overrides": [o.model_dump() for o in typed(**TYPED)]}
+    ok = client.post("/api/fermos/simulate", json=body)
+    assert ok.status_code == 200, ok.json()
+    mu = {x["key"]: x for x in ok.json()["parameters"]}["mu_max"]
+    assert mu["recordIds"] == ["mu2"] and mu["origin"] == "record"
+    bad = client.post("/api/fermos/simulate", json={**body, "recordsByParam": {"mu_max": ["ks1"]}})
+    assert bad.status_code == 422 and "record ks1 is a record of monod_ks" in bad.json()["detail"]

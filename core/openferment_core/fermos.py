@@ -70,6 +70,17 @@ would bind it. Every record that is left out is counted and said: another
 strain or organism, no carbon source or another one, a unit units.py cannot
 convert.
 
+NAMED RECORDS (OF-BLD-020 §3.4, D13). A request may bind a parameter to
+exactly the records it names (`recordsByParam`, spec key to record ids):
+what Postdoc's `fermos_simulate` sends, ids and never values. Each must be
+in the evidence pool the switch shows, a record of a field the spec binds
+from, through the aggregate gate, and convert into the spec's unit; one
+that is not refuses the request, naming it and why. They bind ahead of a fit
+or a kept simulation (a person's override still wins), their value is the
+same statistic, the basis names each as a `record` input, and `<key> origin`
+says they were named (`NAMED`); `records of` speaks only of the records the
+rule found.
+
 SIMULATION. `simulate(SimulationRequest)` binds a family's specs
 (bind_parameters), refuses in words naming every parameter that waits and
 what would bind it, integrates (kinetics.py), and keeps one
@@ -1139,6 +1150,13 @@ ORIGIN_WORDS = {"fit": True, "fit, not identified": False, "fit, identification 
 ORIGIN_NOTE = ("where the value came from, as the binding chose it (OF-BLD-020 D6): a fit a person chose, and whether "
                "the run it was fitted to identified it (its interval excludes zero), or a kept simulation")
 RECORDS_OF = "records of"
+# The `<key> origin` word beside a value bound to the records a request named
+# for it (recordsByParam, OF-BLD-020 §3.4): those records alone bind it, and
+# `records of` says nothing of them.
+NAMED = "records named"
+NAMED_NOTE = ("where the value came from (OF-BLD-020 §3.4): the records the request named for it by id, each in the "
+              "evidence pool, of a field it binds from, through the aggregate gate and units.py; no strain, sugar or "
+              "program filter chose them")
 
 
 def _load_pool(include_archived: bool) -> Any:
@@ -1181,6 +1199,7 @@ class _Context:
 
         self.labels, species_of_program = proforma._strain_labels()
         self.strain, self.sugar, self.product = req.strain, req.sugar, req.product
+        self.include_archived = req.includeArchived
         hosts: dict[str, str | None] = {}
         try:
             hosts = {h["id"]: h.get("program") for h in module_stores._projection()["geneos"]["hosts"] if h.get("id")}
@@ -1347,6 +1366,89 @@ def _record_candidate(spec: ParameterSpec, entry: str, ctx: _Context, pool: Any)
                           origin="record", recordIds=[str(r["id"]) for r, _ in got.kept], detail=detail), ""
 
 
+def _record_fields(spec: ParameterSpec, ctx: _Context) -> tuple[list[str], list[str]]:
+    """The record fields a spec binds from for this product (a field one
+    product owns gives way to the product's own, kinetics.PRODUCT_FIELDS),
+    and why each field that cannot bind here does not, in words."""
+    fields, why = [], []
+    for entry in spec.sourceRule:
+        if not entry.startswith("record:"):
+            continue
+        field = entry.split(":", 1)[1]
+        own = kinetics.PRODUCT_OWN.get(field)
+        if own and own != ctx.product:
+            swap = kinetics.PRODUCT_FIELDS.get(ctx.product or "", {}).get(field)
+            if not swap:
+                why.append(f"{field} is {own}'s own field, and "
+                           + (f"the product is {ctx.product}" if ctx.product else "no product is named"))
+                continue
+            field = swap
+        if field not in fields:
+            fields.append(field)
+    return fields, why
+
+
+def _named_records(spec: ParameterSpec, ids: list[str], ctx: _Context, pool: Any) -> ParameterValue:
+    """A parameter bound to exactly the records a request named for it
+    (`recordsByParam`, OF-BLD-020 §3.4, D13): each must be in the evidence
+    pool the switch shows, be a record of a field the spec binds from, pass
+    the aggregate gate and convert into the spec's unit; any one that does
+    not refuses the request, naming the record and why. Their value is
+    Proforma's statistic over them, as the records the rule finds bind; no
+    strain, sugar or program filter is applied, since the records were
+    chosen by id, and the detail says they were named."""
+    if not ids:
+        raise SimulationRefused(f"recordsByParam names no record for {spec.key}: name the records that bind it, or "
+                                "leave it out and the records the rule finds bind it")
+    fields, why = _record_fields(spec, ctx)
+    if not fields:
+        said = "; ".join(why) if why else f"its sources are {', '.join(spec.sourceRule) or 'none'}"
+        raise SimulationRefused(f"{spec.key} ({spec.label}) binds from no record field here, so no record can be named "
+                                f"for it: {said}")
+    by_id = getattr(pool, "records_by_id", None) or {str(r.get("id")): r for r in getattr(pool, "records", [])}
+    seen: set[str] = set()
+    kept: list[tuple[str, float, str]] = []
+    for rid in ids:
+        if not isinstance(rid, str) or not re.fullmatch(params._ID, rid):
+            raise SimulationRefused(f"a record is named by its id (letters, digits, dots, dashes, underscores); "
+                                    f"{rid!r}, named for {spec.key}, is not one")
+        if rid in seen:
+            raise SimulationRefused(f"record {rid} is named twice for {spec.key}: name each record once")
+        seen.add(rid)
+        r = by_id.get(rid)
+        if r is None:
+            raise SimulationRefused(f"record {rid}, named for {spec.key}, is not in the evidence pool"
+                                    + ("" if ctx.include_archived else " the program switch shows")
+                                    + ": search_records finds the records that are")
+        field = str(r.get("field") or "")
+        if field not in fields:
+            raise SimulationRefused(f"record {rid} is a record of {field or 'no field'}, and {spec.key} ({spec.label}) "
+                                    f"binds from {' or '.join(fields)}")
+        gate = binding.exclusion(r)
+        if gate:
+            raise SimulationRefused(f"record {rid}, named for {spec.key}, is kept out by the aggregate gate: {gate}")
+        try:
+            v = units.convert(float(r["value"]), r.get("unit") or spec.unit, spec.unit)
+        except (TypeError, ValueError, KeyError) as e:
+            said = units.explain_refusal(str(r.get("unit") or ""), spec.unit) or str(e)
+            raise SimulationRefused(f"record {rid}, named for {spec.key}, is in {r.get('unit')!r}, which units.py does "
+                                    f"not convert into {spec.unit or 'a number'}: {said}") from None
+        kept.append((rid, v, field))
+    st = binding.statistic([v for _, v, _ in kept])
+    n = len(kept)
+    named_fields = sorted({f for _, _, f in kept})
+    unit = f" {spec.unit}" if spec.unit else ""
+    span = f"{_g(st.low)}{unit}" if st.low == st.high else f"{_g(st.low)}–{_g(st.high)}{unit}"
+    stat = {"triangular": f", the median {_g(st.value)}", "uniform": f", the middle {_g(st.value)}"}.get(st.sampling, "")
+    what = f"{_plural(n, 'record')} of {' and '.join(named_fields)}, named for it"
+    detail = f"{what}: {span}{stat}"
+    if st.flag and n > 1:
+        detail += "; every one gives the same value"
+    return ParameterValue(key=spec.key, value=st.value, low=st.low, high=st.high,
+                          source=BasisSource(kind="record", note=what), origin="record",
+                          recordIds=[rid for rid, _, _ in kept], detail=detail)
+
+
 def _identified(p: FitParam) -> bool | None:
     """Whether the run a fit was made on identified a parameter: its own
     word, else its interval excluding zero for a coefficient, else unjudged."""
@@ -1481,11 +1583,13 @@ def _simulation_candidates(sim_id: str, specs: dict[str, ParameterSpec]) -> tupl
 
 
 class _Binding:
-    def __init__(self, specs, sources, notes, ctx) -> None:
+    def __init__(self, specs, sources, notes, ctx, named=()) -> None:
         self.specs: list[ParameterSpec] = specs
         self.sources: dict[str, dict[str, ParameterValue | None]] = sources
         self.notes: list[str] = notes
         self.ctx: _Context = ctx
+        # The keys bound to the records the request named for them (§3.4).
+        self.named: frozenset[str] = frozenset(named)
 
 
 def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any) -> _Binding:
@@ -1506,8 +1610,27 @@ def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any) -> _Binding:
     if start.startswith(SIM_PREFIX):
         kept, said = _simulation_candidates(start[len(SIM_PREFIX):], by_key)
         notes += said
+    named = dict(req.recordsByParam or {})
+    stray = [k for k in named if k not in by_key]
+    if stray:
+        raise SimulationRefused(f"recordsByParam names {', '.join(stray)}, which {'is' if len(stray) == 1 else 'are'} "
+                                f"no parameter of {fam.id}; its parameters are {', '.join(by_key)}")
     sources: dict[str, dict[str, ParameterValue | None]] = {}
     for spec in specs:
+        if spec.key in named:
+            # Exactly these records bind it (§3.4): the first record entry of
+            # its sourceRule holds them, and nothing else is offered, so a
+            # fit or a kept simulation does not stand in their place; a
+            # person's override still wins (params.resolve).
+            value = _named_records(spec, list(named[spec.key]), ctx, pool)
+            entry = next(e for e in spec.sourceRule if e.startswith("record:"))
+            set_aside = [w for w, there in (("the fit", spec.key in fits), ("the kept simulation", spec.key in kept))
+                         if there]
+            notes.append(f"{spec.key} is bound to the records named for it ({', '.join(value.recordIds)})"
+                         + (f"; {' and '.join(set_aside)} would have bound it, and {'is' if len(set_aside) == 1 else 'are'} "
+                            "set aside for it" if set_aside else "") + ".")
+            sources[spec.key] = {entry: value}
+            continue
         cands: dict[str, ParameterValue | None] = {}
         why: list[str] = []
         for entry in spec.sourceRule:
@@ -1537,25 +1660,30 @@ def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any) -> _Binding:
     if hidden and ctx.program in hidden:
         notes.append(f"{_plural(hidden[ctx.program], 'record')} of the archived {ctx.program_name} program "
                      "are hidden: Settings → Programs has the switch that shows archived programs.")
-    return _Binding(specs, sources, notes, ctx)
+    return _Binding(specs, sources, notes, ctx, named)
 
 
 def bind_parameters(family: str, strain: str | None, product: str | None, sugar: str | None, pool: Any,
                     overrides: list[Override] | None, fit: str | None, by: str | None = None, *,
                     simulation: str | None = None,
-                    duration_preset: str = UNTIL_RUN_OUT_PRESET) -> tuple[list[ParameterValue], list[str]]:
+                    duration_preset: str = UNTIL_RUN_OUT_PRESET,
+                    records_by_param: dict[str, list[str]] | None = None) -> tuple[list[ParameterValue], list[str]]:
     """Each parameter of a family's specs with its value and source (D6): a
     fit a person chose, the records through the aggregate gate, a kept
     simulation (`simulation`, its artifact id), then a named person's
     override (which wins over all of them), then the spec's convention; and
     the keys that wait, as a run would refuse them (a key the request does
-    not read waits for nothing). Starts no integration and keeps nothing.
-    Refused in words (SimulationRefused): a fit or simulation not on file, a
-    fit of another family, an id that is not one, an unknown family."""
+    not read waits for nothing). A key in `records_by_param` is bound to
+    exactly the records named for it (§3.4), ahead of a fit or a kept
+    simulation. Starts no integration and keeps nothing. Refused in words
+    (SimulationRefused): a fit or simulation not on file, a fit of another
+    family, an id that is not one, an unknown family, a named record that is
+    not in the pool, of another field, kept out by the aggregate gate or in a
+    unit units.py does not convert."""
     fam = kinetics.family(family)
     req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar, overrides=list(overrides or []),
                             fitArtifact=fit, startFrom=f"{SIM_PREFIX}{simulation}" if simulation else "records",
-                            durationPreset=duration_preset)
+                            durationPreset=duration_preset, recordsByParam=dict(records_by_param or {}))
     _check_request(req)
     got = _bound(fam, req, pool)
     return _resolved(fam, got, req.overrides, by)
@@ -1599,7 +1727,7 @@ def _binding_inputs(got: _Binding, values: list[ParameterValue]) -> list[BasisIn
     whose records bound (when any did), and, beside each value bound to a fit
     or a kept simulation, which it was (`<key> origin`)."""
     out: list[BasisInput] = []
-    if any(v.origin == "record" for v in values):
+    if any(v.origin == "record" and v.key not in got.named for v in values):
         ctx = got.ctx
         whose = (f"{ctx.strain} by its aliases, and the medium's records of {ctx.organism_words}" if ctx.strain
                  else ctx.organism_words)
@@ -1611,10 +1739,12 @@ def _binding_inputs(got: _Binding, values: list[ParameterValue]) -> list[BasisIn
             word = next(w for w, i in ORIGIN_WORDS.items() if i is v.identified)
         elif v.origin == "simulation":
             word = "simulation"
+        elif v.origin == "record" and v.key in got.named:
+            word = NAMED
         else:
             continue
         out.append(BasisInput(name=f"{v.key} {ORIGIN}", value=word, unit="",
-                              source=BasisSource(kind="convention", note=ORIGIN_NOTE)))
+                              source=BasisSource(kind="convention", note=NAMED_NOTE if word == NAMED else ORIGIN_NOTE)))
     return out
 
 

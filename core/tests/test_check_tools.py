@@ -1,4 +1,5 @@
-"""`pnpm check:tools` rule 2b, negative-tested (OF-BLD-019 §6.R, review finding 17).
+"""`pnpm check:tools` rule 2b and rule 6 (E.4‴), negative-tested (OF-BLD-019
+§6.R, review finding 17; OF-BLD-020 §3.4).
 
 Rule 2b holds every tool file other than `tools/writes.py` away from what
 keeps a Proforma run or writes an audit line: those writes go through
@@ -38,6 +39,16 @@ PLANTED = {
     # A function outside tools/ that keeps a run, reached from a tool file:
     # what keeps a run is followed through every function that calls it.
     "plant_wrapper.py": "from .. import plant_keeper\n\n\ndef f(req):\n    return plant_keeper.keep(req)\n",
+    # OF-BLD-020 §3.4: a simulation, a vessel and a train are kept runs too.
+    # fermos.simulate itself, past writes.run_simulation.
+    "plant_simulate.py": "from .. import fermos\n\n\ndef f(req):\n    return fermos.simulate(req)\n",
+    # The artifact store asked for a simulation by the module's own constant.
+    "plant_compute_simulation.py": "from .. import artifacts, fermos\n\n\ndef f():\n    return artifacts.compute(fermos.SIMULATION, [])\n",
+    # A vessel design, reached through the function that keeps one.
+    "plant_vessel.py": "from .. import vessel\n\n\ndef f(req):\n    return vessel.design(req)\n",
+    # A vessel and a train, the tool spelled out and the store's function aliased.
+    "plant_compute_vessel.py": 'from ..artifacts import compute as keep\n\n\ndef f():\n    return keep("fermos.vessel", [])\n',
+    "plant_compute_train.py": 'from .. import artifacts\n\n\ndef f():\n    return artifacts.compute("pureos.train_run", [])\n',
 }
 # The function the last planted tool file reaches, outside tools/.
 KEEPER = "from . import proforma\n\n\ndef keep(req):\n    return proforma.run(req)\n"
@@ -80,3 +91,26 @@ def test_the_copy_the_negative_test_plants_in_passes_as_the_tree_does(tmp_path):
     out = _check(_copy(tmp_path))
     assert out.returncode == 0, out.stdout + out.stderr
     assert out.stdout.startswith("✓ check:tools")
+
+
+# Rule 6 (E.4‴): a number field planted in fermos_simulate's input, at the
+# top and nested; each must be named, and nothing else.
+SIM_CLASS = 'class FermosSimulateInput(BaseModel):\n    model_config = ConfigDict(extra="forbid")\n'
+PLANTED_FIELDS = ('    hours: float = Field(0.0, description="a STAND-IN numeric field, planted")\n'
+                  '    byKey: dict[str, list[int]] = Field(default_factory=dict, description="a STAND-IN, planted")\n'
+                  '    limit: dict[str, int] = Field(default_factory=dict, description="a count name, planted nested")\n')
+
+
+def test_rule_6_names_a_numeric_field_in_a_fermos_tools_input_and_lets_the_top_level_counts_stand(tmp_path):
+    root = _copy(tmp_path)
+    source = root / "core" / "openferment_core" / "tools" / "fermos.py"
+    text = source.read_text(encoding="utf-8")
+    assert text.count(SIM_CLASS) == 1, "fermos_simulate's input class moved; plant the fields where it is"
+    source.write_text(text.replace(SIM_CLASS, SIM_CLASS + PLANTED_FIELDS), encoding="utf-8")
+    out = _check(root)
+    assert out.returncode == 1, out.stdout + out.stderr
+    errors = [line.strip()[2:] for line in out.stdout.splitlines() if line.strip().startswith("- ")]
+    where = sorted(e.split(" at ", 1)[1].split(":", 1)[0] for e in errors)
+    assert where == ["byKey.additionalProperties.items", "hours", "limit.additionalProperties"], out.stdout
+    assert all(e.startswith("fermos_simulate's input schema holds a numeric field at ") and "(E.4‴)" in e
+               for e in errors), out.stdout

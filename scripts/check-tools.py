@@ -12,17 +12,20 @@ Fails when:
    constant may be named, a store module handed around bare or a dynamic
    import may not;
 2b. a tool file other than `tools/writes.py` reaches what keeps a Proforma
-   run or writes an audit line itself (OF-BLD-019 §6.1, §6.R): `run_flowsheet`
-   is a free, audited write, and runs through `writes.run_scenario`, so rule 2
-   reads its one call to `proforma.run`. What keeps a run is found, not
-   listed: every function of the service that calls `artifacts.compute` for a
-   `proforma.run`, `proforma.reference` or `proforma_benchmark` artifact (or
-   for a tool it cannot name) or `audit.append`, and every function that
-   reaches one of those, to a fixed point, each name followed through its
-   import as rule 2 follows it. A tool file may reach none of them but
-   through writes.py, may not call `artifacts.compute` for a run, and, as in
-   rule 2, may not hand a store module around bare or import by name at run
-   time;
+   run, a simulation, a vessel or a train, or writes an audit line itself
+   (OF-BLD-019 §6.1, §6.R; OF-BLD-020 §3.4): `run_flowsheet` and
+   `fermos_simulate` are free, audited writes, and run through
+   `writes.run_scenario` and `writes.run_simulation`, so rule 2 reads their
+   one call to `proforma.run` and to `fermos.simulate`. What keeps a run is
+   found, not listed: every function of the service that calls
+   `artifacts.compute` for a `proforma.run`, `proforma.reference`,
+   `proforma_benchmark`, `fermos.simulation`, `fermos.vessel` or
+   `pureos.train_run` artifact (or for a tool it cannot name) or
+   `audit.append`, and every function that reaches one of those, to a fixed
+   point, each name followed through its import as rule 2 follows it. A tool
+   file may reach none of them but through writes.py, may not call
+   `artifacts.compute` for a run, and, as in rule 2, may not hand a store
+   module around bare or import by name at run time;
 3. a gated action can complete without a person's id on it: every (module,
    action) in `gates.GATES` comes back `proposed` with nothing written but
    the proposal, and carrying it out with no name, a placeholder or one
@@ -32,10 +35,16 @@ Fails when:
    is a gate the other still promises;
 5. the registry is not the closed list: a name in `WHITELIST` with no tool
    registered under it, or one `docs/TOOLS.md` never names in backticks
-   (OF-BLD-019 §4.2 added the thirtieth, `thermo_props`, and §6.1
-   `run_flowsheet` and `stream_table`, and OF-BLD-020 §4.2 `fermos_vessel`,
-   by the build documents' authority; a name added to the code alone is a
-   tool nobody wrote down).
+   (OF-BLD-019 §4.2 added the thirtieth, `thermo_props`, §6.1
+   `run_flowsheet` and `stream_table`, and OF-BLD-020 §3.4 `fermos_simulate`
+   and §4.2 `fermos_vessel`, by the build documents' authority; a name added
+   to the code alone is a tool nobody wrote down);
+6. a fermOS or pureOS tool's input schema holds a numeric field (E.4‴: a
+   model's parameter is a source, never a value): `number` or `integer`
+   anywhere in the schema of a tool named `fermos_*` or `pureos_*`, a
+   numeric `enum` or `const` included. The registry's two count fields, `k`
+   and `limit`, at the top of an input are not parameters and stand aside, as
+   `tools.numbers_in` lets them (the module reads take `limit`).
 
 Runs on a throwaway data directory with no key and no network, in a few
 seconds. Negative-tested on 2026-10-20: a module added with no tools,
@@ -87,6 +96,9 @@ except Exception as e:  # a module with no tool, or a tool outside WHITELIST, fa
 ALLOWED_WRITES = (
     "geneos.ceiling", "geneos.frontier", "geneos.mix",
     "fermos.forecast_run",
+    # fermos_write's simulate and the registry's fermos_simulate alike, both
+    # through writes.run_simulation (OF-BLD-020 §3.4; rule 2b).
+    "fermos.simulate",
     # fermos_write's design_vessel and the registry's fermos_vessel alike, both
     # through writes.design_vessel (OF-BLD-020 §4.2).
     "vessel.design",
@@ -267,12 +279,18 @@ for fn in ALLOWED_WRITES:
 #     name followed through its import as rule 2 follows it. writes.py is the
 #     way through and passes nothing on. The worker side (workers/,
 #     flowsheets/) runs in the worker's own process and holds no store.
+from openferment_core import fermos as _fermos_mod  # noqa: E402
 from openferment_core import proforma as _proforma_mod  # noqa: E402
+from openferment_core import vessel as _vessel_mod  # noqa: E402
 
 PACKAGE_DIR = Path(writes.__file__).resolve().parent.parent
 TOOLS_DIR = Path(writes.__file__).resolve().parent
 WORKER_SIDE = ("workers", "flowsheets")
-RUN_KINDS = frozenset({_proforma_mod.RUN, _proforma_mod.REFERENCE, _proforma_mod.BENCHMARK})
+# What a kept run is (OF-BLD-020 §3.4): a Proforma run, a simulation, a vessel
+# design, and pureOS's train run (night two names it; `pureos.train_run`).
+TRAIN_RUN = "pureos.train_run"
+RUN_KINDS = frozenset({_proforma_mod.RUN, _proforma_mod.REFERENCE, _proforma_mod.BENCHMARK, _fermos_mod.SIMULATION,
+                       _vessel_mod.TOOL, TRAIN_RUN})
 COMPUTE = "openferment_core.artifacts.compute"
 APPEND = "openferment_core.audit.append"
 WRITES = f"{writes.__name__}."
@@ -471,9 +489,10 @@ while grew:
         if key not in WRITERS and reached & WRITERS:
             WRITERS.add(key)
             grew = True
-if not {f"{_proforma_mod.__name__}.run", f"{_proforma_mod.__name__}.run_flowsheet", APPEND} <= WRITERS:
-    fail("rule 2b no longer finds proforma.run, proforma.run_flowsheet and audit.append among the writers: it has "
-         "stopped reading the service")
+if not {f"{_proforma_mod.__name__}.run", f"{_proforma_mod.__name__}.run_flowsheet", APPEND,
+        f"{_fermos_mod.__name__}.simulate", f"{_vessel_mod.__name__}.design"} <= WRITERS:
+    fail("rule 2b no longer finds proforma.run, proforma.run_flowsheet, fermos.simulate, vessel.design and "
+         "audit.append among the writers: it has stopped reading the service")
 
 for mod in service:
     if mod.path.parent != TOOLS_DIR or mod.path.name == "writes.py":
@@ -492,8 +511,9 @@ for mod in service:
             fail(f"{where} line {line} hands the store module {_STORE_NAMES[obj.__name__]} around bare ({spelled}): "
                  "a tool file names what it reads of a store")
         elif key in WRITERS and key not in own and not key.startswith(WRITES):
-            fail(f"{where} line {line} reaches {key} (as {spelled}), which keeps a Proforma run or writes an audit "
-                 "line: a tool that does goes through tools/writes.py, where rule 2 reads it")
+            fail(f"{where} line {line} reaches {key} (as {spelled}), which keeps a Proforma run, a simulation, a "
+                 "vessel or a train, or writes an audit line: a tool that does goes through tools/writes.py, where "
+                 "rule 2 reads it")
     for line, kept in mod.run_computes(mod.tree, tool_refs):
         fail(f"{where} line {line} keeps {kept} through artifacts.compute itself: a tool that keeps a run goes "
              "through tools/writes.py, where rule 2 reads it")
@@ -541,6 +561,49 @@ for name in tools.WHITELIST:
         fail(f"{name} is in WHITELIST and no tool is registered under it")
     if f"`{name}`" not in doc:
         fail(f"{name} is in WHITELIST and docs/TOOLS.md never names it")
+# 6. E.4‴: a fermOS or pureOS tool takes ids and words; a model's parameter
+#    is a source, never a value. Its schema holds no numeric field but the
+#    registry's two count fields at the top of the input.
+NUMERIC = frozenset({"number", "integer"})
+
+
+def _numeric(node: object, path: str, top: bool) -> list[str]:
+    """Where a JSON schema admits a number: a `type` of number or integer
+    (alone or in a list), or a numeric `enum` or `const`, anywhere below,
+    `$defs` and `anyOf` included. A top-level count field stands aside only
+    as a whole number, as `tools.numbers_in` lets one through: a `limit`
+    that holds numbers inside it is checked like any field."""
+    found: list[str] = []
+    if isinstance(node, list):
+        for n, child in enumerate(node):
+            found += _numeric(child, f"{path}[{n}]", False)
+        return found
+    if not isinstance(node, dict):
+        return found
+    kinds = node.get("type")
+    kinds = set(kinds) if isinstance(kinds, list) else {kinds}
+    values = list(node.get("enum") or []) + ([node["const"]] if "const" in node else [])
+    if kinds & NUMERIC or any(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
+        found.append(path or "input")
+    for key, child in node.items():
+        if key == "properties" and isinstance(child, dict):
+            for name, prop in child.items():
+                if top and name in tools.COUNT_FIELDS and isinstance(prop, dict) and prop.get("type") == "integer":
+                    continue
+                found += _numeric(prop, f"{path}.{name}" if path else name, False)
+        elif key not in ("enum", "const", "default", "examples", "description", "title"):
+            found += _numeric(child, f"{path}.{key}" if path else key, False)
+    return found
+
+
+for name in tools.WHITELIST:
+    tool = tools.REGISTRY.get(name)
+    if tool is None or not name.startswith(("fermos_", "pureos_")):
+        continue
+    for where in _numeric(tool.info().inputSchema, "", True):
+        fail(f"{name}'s input schema holds a numeric field at {where}: a fermOS or pureOS tool takes ids and words, "
+             "a model's parameter is a source and never a value (E.4‴)")
+
 lines = audit.read()
 if any(a.agent == "person" for a in lines):
     fail("a person's line entered the audit log with no person's name")
@@ -553,6 +616,6 @@ if errors:
         print(f"  - {e}")
     sys.exit(1)
 print(f"✓ check:tools  {len(module_stores.MODULES)} modules with a read and a write tool; writes.py calls only "
-      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a Proforma run or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
+      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a run (Proforma's, a simulation, a vessel or a train) or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
       f"{len(coded)} gates in gates.py and docs/TOOLS.md alike; {len(tools.WHITELIST)} tools, each registered and "
-      f"written down")
+      f"written down; no fermOS or pureOS tool takes a number")

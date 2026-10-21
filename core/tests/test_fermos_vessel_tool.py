@@ -171,13 +171,47 @@ def test_a_claim_cites_a_design_its_run_returned_and_no_other(marked, a_person_t
     assert c.provenance == "demo"
 
 
+def test_a_design_read_as_a_row_is_cited_by_its_ref_and_one_cited_by_evidence_id_is_told_so(
+        marked, a_person_typed_a_scale, pool):  # noqa: F811
+    """A vessel design is a kept run, as a simulation is (validate.KEPT_RUNS
+    maps `fermos.vessel` to the `vessel` row, OF-BLD-020 §3.4 and §4.2):
+    SeenSet learns it from the Evidence fermos_vessel returns and from
+    fermos_read's row, and a design a read returned only as a row is cited by
+    its ref, never by an evidence id no tool returned."""
+    made = tools.run("fermos_vessel", ask(simulationArtifact=ANAEROBIC_ID), ctx())
+    assert made.error is None, made.error
+    aid = made.evidence[0].id
+    ref = f"fermos/vessel/{aid}"
+    from_tool = SeenSet()
+    from_tool.add(made)
+    assert from_tool.runs == {aid: ref}, "SeenSet learns the design from the evidence fermos_vessel returns"
+    seen = SeenSet()
+    seen.add(read("fermos", ctx_for(pool, artifacts=artifacts.all_artifacts), kind="vessel"))
+    assert seen.runs == {aid: ref}, "and from fermos_read's row"
+    by_ref = {"id": "c1", "text": "The batch needs several vessels of the size the design names.", "recordIds": [],
+              "support": "direct", "passages": [], "evidenceIds": [], "moduleRefs": [ref]}
+    by_id = dict(by_ref, id="c2", moduleRefs=[], evidenceIds=[aid])
+    ghost = dict(by_ref, id="c3", moduleRefs=["fermos/vessel/0123456789abcdef"])
+    out = validate_plan([by_ref, by_id, ghost], seen, pool)
+    assert [c.id for c in out.claims] == ["c1"] and out.claims[0].provenance == "demo"
+    assert out.rejected == 2
+    assert out.reasons[0].startswith(f"c2: cites {aid} by evidence id, which a read returned only as a row: cite {ref}")
+    assert out.reasons[1].startswith("c3: cites what no tool returned in this run")
+    # The tool's own Evidence stays citable by its id.
+    [kept] = validate_plan([dict(by_id, id="c4")], from_tool, pool).claims
+    assert kept.id == "c4" and kept.evidenceIds == [aid]
+
+
 def test_fermos_read_lists_kept_designs_by_their_id_or_their_simulations(marked, a_person_typed_a_scale, pool):  # noqa: F811
     made = tools.run("fermos_vessel", ask(simulationArtifact=ANAEROBIC_ID), ctx())
     aid = made.evidence[0].id
     c = ctx_for(pool, artifacts=artifacts.all_artifacts)
     assert "vessel" in module_stores.KINDS["fermos"]
     by_id, by_sim = read("fermos", c, ids=[aid]), read("fermos", c, ids=[ANAEROBIC_ID])
-    assert [r.id for r in by_id.rows] == [r.id for r in by_sim.rows] == [aid]
+    assert [r.id for r in by_id.rows] == [aid]
+    # By the simulation's id: the simulation itself (kind simulation, §3.4) and the design made for it.
+    assert [(r.kind, r.id) for r in by_sim.rows] == [("simulation", ANAEROBIC_ID), ("vessel", aid)]
+    assert [r.id for r in read("fermos", c, ids=[ANAEROBIC_ID], kind="vessel").rows] == [aid]
     row = by_id.rows[0]
     assert row.kind == "vessel" and row.state == "open" and row.provenance == "demo"
     assert row.detail["unitClass"] == "NRELAnaerobicBatchBioreactor" and row.detail["source"] == ANAEROBIC_ID

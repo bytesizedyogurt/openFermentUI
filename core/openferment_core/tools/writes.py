@@ -29,9 +29,13 @@ ONE RUN, TWO NAMES (OF-BLD-019 §6.1). `proforma_write`'s `run` and the
 registry's `run_flowsheet` (tools/proforma.py) both run a scenario through
 `run_scenario` below, so the one call to `proforma.run` stays in this file,
 where `check:tools` reads it, and both are refused, run and audited alike.
-So with a vessel (OF-BLD-020 §4.2): `fermos_write`'s `design_vessel` and the
-registry's `fermos_vessel` (tools/fermos.py) both design through
-`design_vessel` below, the one call to `vessel.design`.
+So with a simulation (OF-BLD-020 §3.4): `fermos_write`'s `simulate` and the
+registry's `fermos_simulate` (tools/fermos.py) both run `run_simulation`
+below, the one call to `fermos.simulate`, free (compute, no model money) and
+at no gate, audited with the model as agent. So with a vessel (OF-BLD-020
+§4.2): `fermos_write`'s `design_vessel` and the registry's `fermos_vessel`
+(tools/fermos.py) both design through `design_vessel` below, the one call to
+`vessel.design`.
 
 Inputs carry ids and words, as every tool's do: `action`, `target` (an id or
 ref), `fields` (names to words, what the action needs), `note` (the model's
@@ -73,6 +77,11 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
     "fermos": {
         "forecast": ("forecast a run from a kept kinetic fit and keep it", ("fitArtifactId",)),
         "fit": ("fit a deposited run's series", ("depositionId",)),
+        "simulate": ("simulate the model family named in target (batch_v1 and the rest) and keep the simulation, as "
+                     "fermos_simulate does: each parameter binds from a fit, the records, a kept simulation or a stated "
+                     "convention, and the call refuses naming each parameter nothing binds; records.<parameter key> "
+                     "names the record ids, comma-separated, that bind that parameter",
+                     ("strain", "product", "sugar", "fitArtifact", "startFrom", "durationPreset", "records.<key>")),
         "design_vessel": ("design on BioSTEAM the vessel a kept simulation (or, anaerobic, a kept kinetic fit) needs and "
                           "keep it, as fermos_vessel does; refused in words while its plant scale waits for a person",
                           ("simulationArtifact", "fitArtifact", "vesselType", "klaMethod")),
@@ -322,6 +331,8 @@ def _vessel_summary(d: Any) -> dict[str, Any]:
 
 
 def _fermos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
+    if action == "simulate":
+        return _fermos_simulate(inp, ctx)
     if action == "design_vessel":
         f = inp.fields
         return design_vessel("fermos_write", f.get("simulationArtifact", ""), f.get("fitArtifact", ""),
@@ -403,6 +414,170 @@ def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> To
 
 def _proforma_run(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     return run_scenario("proforma_write", inp.target, inp.note, ctx)
+
+
+# ── a simulation (OF-BLD-020 §3.4) ────────────────────────────────────────
+
+SIM_WAITS = ("A named person types each waiting parameter in fermOS → Simulate under their reviewer name; a model "
+             "never supplies one. Where a waiting parameter names a record field, records of that field can be named "
+             "for it in recordsByParam. Say in gaps which parameters wait.")
+# How each origin is said, in words: what bound the parameter, never its value.
+BOUND_BY = {"fit": "a fit", "record": "records", "simulation": "a kept simulation", "assumption": "a named person",
+            "convention": "a stated convention", "library-default": "the library's own default", "artifact": "an artifact"}
+MAX_FLAG_CHARS = 300
+
+
+def _bound_by(v: Any, named: set[str], fields_of: dict[str, str]) -> dict[str, Any]:
+    """What bound one parameter, in words and counts: the records by how many
+    and of which field, and whether they were named for it; a fit or a kept
+    simulation by its artifact id; a convention by its word when it is one.
+    Never a number of the parameter's, which the artifact holds."""
+    line: dict[str, Any] = {"key": v.key, "origin": v.origin}
+    src = v.source
+    if v.origin == "record":
+        n = len(v.recordIds)
+        fields = sorted({fields_of[r] for r in v.recordIds if r in fields_of})
+        line["records"] = n
+        line["boundBy"] = (f"{n} record{'' if n == 1 else 's'}" + (f" of {' and '.join(fields)}" if fields else "")
+                           + (", named for it" if v.key in named else ", found by the rule for the strain and sugar"))
+    elif v.origin in ("fit", "simulation", "artifact"):
+        line["boundBy"] = f"{BOUND_BY[v.origin]}, {src.id}" if src and src.id else BOUND_BY[v.origin]
+        if v.origin == "fit" and v.identified is False:
+            line["identified"] = False
+    elif v.origin == "assumption":
+        line["boundBy"] = f"{BOUND_BY['assumption']}, {v.overriddenBy}"
+    elif v.origin == "waiting":
+        line["boundBy"] = "nothing: this setting of the family does not read it"
+    else:
+        line["boundBy"] = BOUND_BY.get(v.origin, v.origin) + (f": {v.value}" if isinstance(v.value, str) else "")
+    return line
+
+
+def _simulation_evidence(r: Any) -> Any:
+    """A kept simulation as the one `Evidence` a claim cites it by: its id is
+    the artifact's, its value the product's titre at harvest as the artifact
+    holds it, its provenance and basis the artifact's."""
+    from .. import kinetics
+    from ..models import Evidence
+
+    state = kinetics.FAMILIES[r.family].product_state() if r.family in kinetics.FAMILIES else None
+    who = r.strain or "every strain of the program's organism"
+    on = f" on {r.sugar}" if r.sugar else ""
+    made = r.product or "product"
+    value: float | str = r.finalTitre if r.finalTitre is not None else "no product state"
+    return Evidence(id=r.artifactId, label=f"{r.title} simulation ({r.family}) of {who}{on}: the {made} titre at harvest",
+                    value=value, unit=(r.units.get(state, "") if state else ""), provenance=r.provenance,
+                    basis=r.basis, figure="trajectory")
+
+
+def _sig(x: Any) -> Any:
+    """A number of the end state to four significant digits, for the summary
+    alone; the artifact holds every number whole."""
+    return float(f"{x:.4g}") if isinstance(x, float) else x
+
+
+def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResult:
+    """Simulate one model family as the service binds it, keep it and mark it
+    as the model's (OF-BLD-020 §3.4). The request carries ids and words: a
+    family, a strain, a product, a sugar, the records named for a parameter,
+    a fit, a start and a run-length preset; the service holds no person's
+    assumption (they live in the browser's Durable tier), so none is passed:
+    a parameter nothing binds waits, and the refusal is fermos.simulate's own
+    words (what `POST /api/fermos/simulate` answers with a 422)."""
+    from .. import fermos, kinetics, programs
+
+    family = (req.family or "").strip()
+    if not family:
+        return ToolResult(error=f"{tool} refused: name the model family to simulate by its id ({', '.join(kinetics.FAMILIES)})")
+    fam = kinetics.FAMILIES.get(family)
+    if fam is not None and not ctx.include_archived:
+        try:
+            hidden = programs.hides(fam.program, False)
+        except FileNotFoundError:  # no projection here: nothing is known to be archived
+            hidden = False
+        if hidden:
+            p = programs.program_by_id(fam.program)
+            return ToolResult(error=f"{tool} refused: {family} belongs to {p.name if p else fam.program}, archived "
+                                    f"(hidden). {programs.SWITCH}")
+    try:
+        refused = programs.archived_refusal(tool, [("strain", req.strain or ""), ("product", req.product or "")],
+                                            ctx.include_archived)
+    except FileNotFoundError:
+        refused = None
+    if refused:
+        return ToolResult(error=refused)
+    req = req.model_copy(update={"family": family, "includeArchived": ctx.include_archived, "overrides": []})
+    try:
+        r = fermos.simulate(req, by_pool=ctx.pool)
+    except fermos.SimulationRefused as e:
+        waits = f" {SIM_WAITS}" if "cannot run yet" in str(e) else ""
+        return ToolResult(error=f"{tool} refused: {e}.{waits}")
+    ev = _simulation_evidence(r)
+    _audit(ctx, "fermos", "simulate", "open", family, {"artifactId": r.artifactId, "evidenceId": ev.id, "tool": tool,
+                                                       "strain": r.strain, "product": r.product, "sugar": r.sugar,
+                                                       "note": note})
+    ceiling = r.ceiling
+    # Which keys the request named records for, as the basis says (`<key>
+    # origin`), and each bound record's field, from the pool it was bound on.
+    named = {i.name.rsplit(" ", 1)[0] for i in r.basis.inputs
+             if i.name.endswith(f" {fermos.ORIGIN}") and i.value == fermos.NAMED}
+    by_id = getattr(ctx.pool, "records_by_id", None) or {}
+    fields_of = {rid: str(by_id[rid].get("field") or "") for v in [*r.parameters, *r.start] for rid in v.recordIds
+                 if rid in by_id}
+    return ToolResult(
+        summary={
+            "state": "open",
+            "artifactId": r.artifactId,
+            "evidenceId": ev.id,
+            "family": r.family,
+            "title": r.title,
+            "strain": r.strain,
+            "product": r.product,
+            "sugar": r.sugar,
+            "provenance": r.provenance,
+            "parameters": [_bound_by(v, named, fields_of) for v in r.parameters],
+            "start": [_bound_by(v, named, fields_of) for v in r.start],
+            "end": {"finalTitre": _sig(r.finalTitre), "yieldAchieved": _sig(r.yieldAchieved),
+                    "productivity": _sig(r.productivity), "harvestH": _sig(r.harvestH),
+                    "sugarRunsOutH": _sig(r.sugarRunsOutH), "aerobic": r.aerobic, "units": r.units,
+                    "read": "from the artifact, to four significant digits; cite the evidence id, never the number"},
+            "ceiling": ({"rows": [{"modelId": c.modelId, "above": c.above, "words": c.words} for c in ceiling.rows],
+                         "flagged": ceiling.flagged, "empty": ceiling.empty} if ceiling else None),
+            "massBalanceCloses": r.massBalance.ok,
+            "flags": [f[:MAX_FLAG_CHARS] for f in r.flags],
+            "meaning": "the family ran as the service binds it and is kept as one simulation artifact in the open lane, "
+                       "marked as the model's in the audit log; each parameter says what bound it, and its value is in "
+                       "the artifact. Its numbers are read from the artifact, never stated: cite the simulation by the "
+                       "evidence id, which is its artifact id; fermos_read reads it again as kind simulation",
+        },
+        evidence=[ev],
+    )
+
+
+def _fermos_simulate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
+    """`fermos_write`'s `simulate`: the family in `target`, the rest in
+    `fields` as words, a parameter's records as `records.<key>`, their ids
+    separated by commas or spaces; any other field is refused, never passed
+    on and never guessed at."""
+    from ..models import SimulationRequest
+
+    words = ("strain", "product", "sugar", "fitArtifact", "startFrom", "durationPreset")
+    unknown = [k for k in inp.fields if k not in words and not (k.startswith("records.") and k[len("records."):])]
+    if unknown:
+        return ToolResult(error=f"fermos_write refused simulate: {', '.join(unknown)} "
+                                f"{'is' if len(unknown) == 1 else 'are'} not a field of it; the fields are "
+                                f"{', '.join(words)} and records.<parameter key>")
+    f = {k: (v or "").strip() for k, v in inp.fields.items()}
+    preset = f.get("durationPreset") or "until-sugar-runs-out"
+    if preset not in ("until-sugar-runs-out", "fit-length"):
+        return ToolResult(error=f"fermos_write refused simulate: durationPreset is until-sugar-runs-out or fit-length; "
+                                f"{preset!r} is neither")
+    named = {k[len("records."):]: [x for x in v.replace(",", " ").split() if x] for k, v in f.items()
+             if k.startswith("records.")}
+    req = SimulationRequest(family=inp.target, strain=f.get("strain") or None, product=f.get("product") or None,
+                            sugar=f.get("sugar") or None, fitArtifact=f.get("fitArtifact") or None,
+                            startFrom=f.get("startFrom") or "records", durationPreset=preset, recordsByParam=named)
+    return run_simulation("fermos_write", req, inp.note, ctx)
 
 
 def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:

@@ -2643,6 +2643,11 @@ class SimulationRequest(BaseModel):
     startFrom: str = "records"
     durationPreset: Literal["until-sugar-runs-out", "fit-length"] = "until-sugar-runs-out"
     includeArchived: bool = False
+    # A parameter bound to exactly these records of the evidence pool, by
+    # spec key (OF-BLD-020 §3.4, D13): each must be in the pool, carry a
+    # field the parameter binds from, pass the aggregate gate and convert
+    # into its unit, or the request is refused in words. Ids, never values.
+    recordsByParam: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class FermosBinding(BaseModel):
