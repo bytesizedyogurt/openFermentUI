@@ -239,10 +239,15 @@ KINETICS = {
     "ethanol_lp_alpha": "g g⁻¹",
     "ethanol_lp_beta": "g g⁻¹ h⁻¹",
     "ethanol_mesp": "USD gal⁻¹",
+    # OF-BLD-020 §3.2: the oxygen and maintenance fields fermOS's simulations read.
+    "maintenance_coefficient": "g g⁻¹ h⁻¹",
+    "biomass_yield_oxygen": "g g⁻¹",
+    "specific_oxygen_uptake": "mmol g⁻¹ h⁻¹",
+    "kla_measured": "h⁻¹",
 }
 
 
-def test_the_ontology_carries_the_eleven_kinetics_fields_in_units_the_engine_knows():
+def test_the_ontology_carries_the_fifteen_kinetics_fields_in_units_the_engine_knows():
     ontology = tables()["ontology"]
     kinetics = {k: d for k, d in ontology.items() if d["family"] == "kinetics"}
     assert {k: d["canonicalUnit"] for k, d in kinetics.items()} == KINETICS

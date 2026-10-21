@@ -21,11 +21,14 @@ export interface UnitDef {
 // Family base units: rate=h⁻¹, time=h, massConc=g L⁻¹, mass=g, volume=L,
 // percent=%, yield=g g⁻¹, volProd=g L⁻¹ h⁻¹, specProd=mg g⁻¹ h⁻¹,
 // odDcw=g L⁻¹ OD⁻¹, temp=°C, light=µmol m⁻² s⁻¹, ph=(none), molar=mol L⁻¹,
-// percentCdw=% CDW, molarMass=g mol⁻¹, costUSDVolume=USD gal⁻¹
+// percentCdw=% CDW, molarMass=g mol⁻¹, costUSDVolume=USD gal⁻¹,
+// specMolarRate=mmol g⁻¹ h⁻¹
 export const U: Record<string, UnitDef> = {
   'h⁻¹': { family: 'rate', factor: 1, label: 'h⁻¹' },
   'd⁻¹': { family: 'rate', factor: 1 / 24, label: 'd⁻¹' },
   'min⁻¹': { family: 'rate', factor: 60, label: 'min⁻¹' },
+  // OF-BLD-020 §3.2: a kLa is as often written per second as per hour.
+  's⁻¹': { family: 'rate', factor: 3600, label: 's⁻¹' },
   h: { family: 'time', factor: 1, label: 'h' },
   min: { family: 'time', factor: 1 / 60, label: 'min' },
   d: { family: 'time', factor: 24, label: 'd' },
@@ -116,6 +119,14 @@ export const U: Record<string, UnitDef> = {
   // mass, and between them stands the product's density, which a unit
   // engine has no business assuming. `gal` is read as the US gallon.
   'USD gal⁻¹': { family: 'costUSDVolume', factor: 1, label: 'USD gal⁻¹' },
+
+  // ── OF-BLD-020 §3.2 — an oxygen uptake per gram of cells ─────────────
+  // Moles per gram per hour. Its OWN family, not `specProd`: between a
+  // mole and a gram stands the molar mass of what is taken up, which a unit
+  // engine has no business assuming.
+  'mmol g⁻¹ h⁻¹': { family: 'specMolarRate', factor: 1, label: 'mmol g⁻¹ h⁻¹' },
+  'µmol g⁻¹ h⁻¹': { family: 'specMolarRate', factor: 0.001, label: 'µmol g⁻¹ h⁻¹' },
+  'mol g⁻¹ h⁻¹': { family: 'specMolarRate', factor: 1000, label: 'mol g⁻¹ h⁻¹' },
 };
 
 /**
@@ -149,6 +160,13 @@ export const REFUSALS: { a: string; b: string; because: string }[] = [
     b: 'massConc',
     because:
       'A share of dry cell mass and a concentration are not interconvertible without the biomass density of that culture. Record the dry cell weight per litre the paper reports for it and the conversion becomes possible; guessing it would fabricate a titre.',
+  },
+  {
+    // OF-BLD-020 §3.2: a specific oxygen uptake and a specific rate in grams.
+    a: 'specMolarRate',
+    b: 'specProd',
+    because:
+      'A rate in moles per gram per hour and one in grams per gram per hour differ by the molar mass of what is taken up or made. Record which substance it is and convert by its molar mass as a stated step; the engine will not assume it.',
   },
   {
     // Thread Q: a minimum ethanol selling price and minimum_selling_price.
@@ -211,6 +229,7 @@ export const SI_UNIT: Record<string, string> = {
   // The kDa is numerically the SI kg mol⁻¹.
   molarMass: 'kDa',
   costUSDVolume: 'USD gal⁻¹',
+  specMolarRate: 'mmol g⁻¹ h⁻¹',
 };
 
 // Alias normalization: accept human/ASCII notations.
@@ -251,6 +270,12 @@ export const ALIASES: Record<string, string> = {
   'mg/g/h': 'mg g⁻¹ h⁻¹',
   'g/g/h': 'g g⁻¹ h⁻¹',
   'mg/g/d': 'mg g⁻¹ d⁻¹',
+  // OF-BLD-020 §3.2: an oxygen uptake per gram of cells, and a kLa per second.
+  'mmol/g/h': 'mmol g⁻¹ h⁻¹',
+  'mmol/gdw/h': 'mmol g⁻¹ h⁻¹',
+  'mmol gdw-1 h-1': 'mmol g⁻¹ h⁻¹',
+  '1/s': 's⁻¹',
+  '/s': 's⁻¹',
   'g/l/od': 'g L⁻¹ OD⁻¹',
   'g/L/OD': 'g L⁻¹ OD⁻¹',
   c: '°C',

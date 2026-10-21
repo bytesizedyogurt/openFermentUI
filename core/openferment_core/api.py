@@ -387,6 +387,35 @@ def fermos_simulate(req: SimulationRequest) -> dict:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+@app.get("/api/fermos/bind")
+def fermos_bind(family: str, strain: str | None = None, product: str | None = None, sugar: str | None = None,
+                fit: str | None = None, startFrom: str = "records",  # noqa: N803 (the wire name)
+                durationPreset: str = "until-sugar-runs-out", includeArchived: bool = False) -> dict:  # noqa: N803
+    """A family's parameters bound for a strain, product and sugar
+    (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
+    (`?fit=`), the records of the evidence pool the switch shows through the
+    aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
+    spec's convention, with its source; what waits, each named with the field
+    that would bind it; and notes saying what bound from where. Starts no
+    integration and keeps nothing. 404 for a family no one declared; 422 in
+    words for a fit or simulation not on file, a fit of another family, a
+    sugar or id that is not one."""
+    from . import kinetics
+
+    if family not in kinetics.FAMILIES:
+        raise HTTPException(status_code=404, detail=f"there is no model family {family!r}: the families are "
+                                                    f"{', '.join(kinetics.FAMILIES)}")
+    if durationPreset not in ("until-sugar-runs-out", "fit-length"):
+        raise HTTPException(status_code=422, detail=f"a run-length preset is until-sugar-runs-out or fit-length; "
+                                                    f"{durationPreset!r} is neither")
+    req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar, fitArtifact=fit,
+                            startFrom=startFrom, durationPreset=durationPreset, includeArchived=includeArchived)
+    try:
+        return fermos.bind(req).model_dump(mode="json")
+    except fermos.SimulationRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
 @app.get("/api/fermos/simulations")
 def fermos_simulations(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
     """The kept simulations, newest first (`SimulationSummary`); one of an
@@ -628,7 +657,9 @@ def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
 
 @app.get("/api/params/{scope:path}")
 def params_scope(scope: str, flowsheet: str | None = None, host: str | None = None, fits: str | None = None,
-                 vesselType: str | None = None) -> dict:  # noqa: N803 (the wire name)
+                 vesselType: str | None = None, strain: str | None = None, product: str | None = None,  # noqa: N803
+                 sugar: str | None = None, fit: str | None = None, startFrom: str | None = None,  # noqa: N803
+                 durationPreset: str | None = None, includeArchived: bool = False) -> dict:  # noqa: N803 (the wire name)
     """A scope's parameters (`ParamScope`): every spec with its bounds and
     their reason, and its value as the service binds it now, with its
     source. `proforma:<scenario id>` is a seed scenario, or with
@@ -636,14 +667,22 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     bind as `/api/proforma/bind` does. Binding only: it starts no worker,
     integrates nothing and keeps nothing. `fermos:vessel:<id>` (with
     `?vesselType=`) reads its class's defaults through the Proforma worker,
-    which a read starts when it is cold (OF-BLD-020 §4.1). 404 for a scope no
-    provider here knows; 422 in words for a malformed one or a refused
-    binding; 503 when the worker cannot answer."""
+    which a read starts when it is cold (OF-BLD-020 §4.1). `fermos:family:<id>`
+    binds as GET /api/fermos/bind does, from `?strain=`, `?product=`,
+    `?sugar=`, `?fit=`, `?startFrom=`, `?durationPreset=` and
+    `?includeArchived=` (OF-BLD-020 §3.2). 404 for a scope no provider here
+    knows; 422 in words for a malformed one or a refused binding; 503 when the
+    worker cannot answer."""
     from . import params
 
     if vesselType not in (None, "stirred-tank", "bubble-column"):
         raise HTTPException(status_code=422, detail=f"a vessel type is stirred-tank or bubble-column; {vesselType!r} is neither")
-    req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits), vesselType=vesselType)
+    if durationPreset not in (None, "until-sugar-runs-out", "fit-length"):
+        raise HTTPException(status_code=422, detail=f"a run-length preset is until-sugar-runs-out or fit-length; "
+                                                    f"{durationPreset!r} is neither")
+    req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits), vesselType=vesselType,
+                              strain=strain, product=product, sugar=sugar, fit=fit, startFrom=startFrom,
+                              durationPreset=durationPreset, includeArchived=includeArchived)
     try:
         return params.scope(scope, req).model_dump(mode="json")
     except params.ScopeUnknown as e:

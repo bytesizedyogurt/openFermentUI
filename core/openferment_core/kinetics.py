@@ -8,7 +8,10 @@ else. No process number lives in this file: every parameter value arrives in
 `p` and every start value in `y0` (`fermos.simulate` resolves them through
 `params.resolve`, each with its source). The numbers here are the solver's
 own settings, each a named constant in SETTINGS with its reason, which every
-simulation's basis states as a convention.
+simulation's basis states as a convention. Where a record binds a parameter
+(the sugar, the strain, the product a field belongs to) is declared beside
+the specs, in CARBON_RULE, STRAIN_FREE and PRODUCT_OWN (OF-BLD-020 §3.2), and
+`fermos.bind_parameters` reads it.
 
 THE FAMILIES, AS D5 WRITES THEM
 
@@ -419,10 +422,15 @@ def _ontology_bounds(field_id: str, unit: str) -> tuple[float | None, float | No
 
 def _spec(key: str, label: str, symbol: str, gloss: str, dimension: str, unit: str, group: str, rule: list[str], *,
           bounds: str = "nonnegative", reason: str = "", scale: str = "linear", choices: list[str] | None = None,
-          convention: float | str | None = None, note: str | None = None) -> ParameterSpec:
+          convention: float | str | None = None, note: str | None = None, kept: bool = True) -> ParameterSpec:
     """One ParameterSpec. `bounds`: 'ontology' (the first record field's
     plausibility range, else the physical limit), 'share' (0 to 1),
-    'nonnegative' (at least 0) or 'none' (a word)."""
+    'nonnegative' (at least 0) or 'none' (a word). `kept`: a kept
+    simulation's value is a source just before a person's (D6, §3.2), so
+    `simulation` enters the rule ahead of `assumption`; the run length and
+    the light socket's parameters take none."""
+    if kept and "assumption" in rule and "simulation" not in rule:
+        rule = [*rule[:rule.index("assumption")], "simulation", *rule[rule.index("assumption"):]]
     low: float | None = None
     high: float | None = None
     why = reason
@@ -461,6 +469,32 @@ WORDS = (OFF, ANAEROBIC, PER_LITRE, UNTIL_RUN_OUT, TO_THE_END)
 # culture, no feed end a feed to the end of the run.
 OPTIONAL = ("ki_substrate", "p_max", "yxo", "feed_end_h")
 
+# ── where a record binds (OF-BLD-020 §3.2, D6) ─────────────────────────
+# `fermos.bind_parameters` binds a spec's `record:<field>` entries over the
+# evidence pool: the program's papers, the aggregate gate, the strain chosen
+# (its aliases) or every strain of the program's organism, and the sugar.
+# What departs from that, field by field, is declared here, and each spec
+# whose field departs says so in its note.
+#
+# How a field's records are held to the sugar. The default, "sugar": a record
+# names the sugar as its carbon source, as Proforma holds a flowsheet's feed
+# (proforma.FEED_CARBON). "sugar or none": one naming the sugar or naming
+# none binds, one naming another is another substrate's and is left out.
+# "any": whatever carbon source it names, or none.
+CARBON_RULE: dict[str, str] = {"ethanol_max_conc": "any", "substrate_inhibition_ki": "sugar or none"}
+# Fields no strain sets: the medium is the experimenter's, so a record binds
+# over every strain of the program's organism whatever strain is chosen.
+STRAIN_FREE = ("medium_component_conc",)
+MEDIUM_NOTE = ("A record of medium_component_conc that names the sugar binds it, over every strain of the program's "
+               "organism whatever strain is chosen: the medium is the experimenter's, not the strain's (STRAIN_FREE).")
+# Record fields one product owns (Appendix 2 §A names ethanol's): a field in
+# PRODUCT_OWN binds only for its product; another product binds its own field
+# in its place where the ontology holds one (PRODUCT_FIELDS), else none, and
+# with no product named it binds none.
+PRODUCT_OWN: dict[str, str] = {"ethanol_yield_substrate": "ethanol", "ethanol_lp_alpha": "ethanol",
+                               "ethanol_lp_beta": "ethanol", "ethanol_max_conc": "ethanol"}
+PRODUCT_FIELDS: dict[str, dict[str, str]] = {"phb": {"ethanol_yield_substrate": "pha_yield_substrate"}}
+
 
 def _growth() -> list[ParameterSpec]:
     return [
@@ -492,16 +526,19 @@ def _product() -> list[ParameterSpec]:
                       "reaction's theoretical yield; neither is known to a family's declaration")),
         _spec("maintenance", "maintenance coefficient", "m",
               "substrate the cells burn just to stay alive per gram per hour", "specProd", "g g⁻¹ h⁻¹", "Product",
-              ["fit", "assumption", "convention"], convention=0,
-              note=(f"No maintenance: {ZERO_SAID}. Appendix 2 §A names maintenance_coefficient, a field the "
-                    "ontology does not hold yet; until it does a record cannot bind this.")),
+              ["fit", "record:maintenance_coefficient", "assumption", "convention"], convention=0,
+              note=(f"No maintenance: {ZERO_SAID}. A record of maintenance_coefficient (OF-BLD-020 §3.2 added the "
+                    "field) binds it when it names the sugar.")),
     ]
 
 
 def _inhibition() -> list[ParameterSpec]:
     return [
         _spec("p_max", "maximum product concentration", "Pmax", "the product concentration at which growth stops",
-              "massConc", G_L, "Inhibition", ["fit", "record:ethanol_max_conc", "assumption"], bounds="ontology"),
+              "massConc", G_L, "Inhibition", ["fit", "record:ethanol_max_conc", "assumption"], bounds="ontology",
+              note=("A record of ethanol_max_conc binds whatever carbon source it names, or none: the concentration "
+                    "at which the product stops growth is the product's, not the sugar's (CARBON_RULE). It is "
+                    "ethanol's own field, so another product binds none (PRODUCT_FIELDS).")),
         _spec("n_inhibition", "product inhibition exponent", "n",
               "how sharply growth falls as product builds toward Pmax", "exponent", "", "Inhibition",
               ["fit", "assumption", "convention"], convention=1,
@@ -513,16 +550,19 @@ def _inhibition() -> list[ParameterSpec]:
               "the substrate concentration above which it inhibits (Haldane)", "massConc", G_L, "Inhibition",
               ["fit", "record:substrate_inhibition_ki", "assumption", "convention"], bounds="ontology", scale="log",
               convention=OFF, note=("Off when absent, said so: Ki → ∞, the Haldane term 1, never Ki = 0, which "
-                                    "would stop growth (D5 as built, 4).")),
+                                    "would stop growth (D5 as built, 4). A record of substrate_inhibition_ki binds "
+                                    "when it names the sugar or no carbon source; one naming another is the constant "
+                                    "of another substrate and is left out (CARBON_RULE).")),
     ]
 
 
 def _oxygen() -> list[ParameterSpec]:
     return [
         _spec("yxo", "biomass yield on oxygen", "Yx/o", "grams of cells per gram of oxygen", "yield", "g g⁻¹",
-              "Oxygen", ["fit", "assumption", "convention"], convention=ANAEROBIC,
-              note=("Anaerobic when absent: the culture takes up no oxygen and its OUR is zero, said so (D5). "
-                    "Appendix 2 §A names biomass_yield_oxygen, a field the ontology does not hold yet.")),
+              "Oxygen", ["fit", "record:biomass_yield_oxygen", "assumption", "convention"], convention=ANAEROBIC,
+              note=("Absent: anaerobic, OUR is zero. With no value the culture takes up no oxygen and its OUR is "
+                    "zero, said so (D5). A record of biomass_yield_oxygen (OF-BLD-020 §3.2 added the field) binds "
+                    "it when it names the sugar, and the culture is then aerobic.")),
         _spec("mo", "oxygen maintenance coefficient", "mO", "oxygen for maintenance per gram of cells per hour",
               "specProd", "g g⁻¹ h⁻¹", "Oxygen", ["assumption", "convention"], convention=0,
               note=f"No oxygen for maintenance: {ZERO_SAID}."),
@@ -533,7 +573,7 @@ def _feed_conc(group: str) -> ParameterSpec:
     return _spec("feed_conc", "substrate in the feed", "Sf", "substrate concentration in the feed", "massConc", G_L,
                  group, ["record:medium_component_conc", "assumption"],
                  reason=("a physical limit: no negative concentration. The substrate's solubility bounds it above "
-                         "(Appendix 2 §A), and no solubility is on file here"))
+                         "(Appendix 2 §A), and no solubility is on file here"), note=MEDIUM_NOTE)
 
 
 def _start(*, volume: bool, product: bool = True) -> list[ParameterSpec]:
@@ -541,7 +581,7 @@ def _start(*, volume: bool, product: bool = True) -> list[ParameterSpec]:
         _spec("x0", "cells at the start", "X0", "cells at time zero", "massConc", G_L, "Start values",
               ["fit", "assumption"]),
         _spec("s0", "substrate at the start", "S0", "substrate at time zero", "massConc", G_L, "Start values",
-              ["fit", "record:medium_component_conc", "assumption"]),
+              ["fit", "record:medium_component_conc", "assumption"], note=MEDIUM_NOTE),
     ]
     if product:
         out.append(_spec("p0", "product at the start", "P0", "product at time zero", "massConc", G_L, "Start values",
@@ -561,12 +601,15 @@ def _start(*, volume: bool, product: bool = True) -> list[ParameterSpec]:
 def _run_length(*, until_run_out: bool) -> ParameterSpec:
     if until_run_out:
         return _spec("t_end", "run length", "", "how long to integrate", "time", "h", "Run length",
-                     ["convention", "assumption"], convention=UNTIL_RUN_OUT,
+                     ["fit", "convention", "assumption"], convention=UNTIL_RUN_OUT, kept=False,
                      note=("Until the sugar runs out (Appendix 2 §A): the first hour the sugar falls to a "
                            "thousandth of its start (kinetics.RUN_OUT_SHARE). A run whose sugar stops falling is "
-                           "refused in words, and then a person names the length."))
-    return _spec("t_end", "run length", "", "how long to integrate", "time", "h", "Run length", ["assumption"],
-                 note="A feed keeps bringing sugar, so the sugar need not run out: a person names the length.")
+                           "refused in words, and then a person names the length. With the fit-length preset, the "
+                           "length of the run the chosen fit was made on (its last reading)."))
+    return _spec("t_end", "run length", "", "how long to integrate", "time", "h", "Run length", ["fit", "assumption"],
+                 kept=False,
+                 note=("A feed keeps bringing sugar, so the sugar need not run out: a person names the length, or the "
+                       "fit-length preset takes the length of the run the chosen fit was made on."))
 
 
 def _feed_specs() -> list[ParameterSpec]:
@@ -594,7 +637,10 @@ def _feed_specs() -> list[ParameterSpec]:
 def _storage_specs() -> list[ParameterSpec]:
     return [
         _spec("n_initial", "second nutrient at the start", "N0", "the second nutrient at the start", "massConc", G_L,
-              "Storage", ["record:medium_component_conc", "assumption"]),
+              "Storage", ["assumption"],
+              note=("No record binds it. Appendix 2 §A names medium_component_conc, but a record of that field names a "
+                    "carbon source and never the second nutrient, so bound on the sugar it would put the sugar's "
+                    "concentration in N0's place (OF-BLD-020 §3.2). A named person gives it.")),
         _spec("k_n", "half-saturation constant of the second nutrient", "KN",
               "half-speed concentration of the second nutrient", "massConc", G_L, "Storage", ["fit", "assumption"]),
         _spec("yxn", "biomass yield on the second nutrient", "Yx/N", "cells per gram of the second nutrient",
@@ -614,13 +660,14 @@ def _storage_specs() -> list[ParameterSpec]:
 def _light_specs() -> list[ParameterSpec]:
     return [
         _spec("irradiance", "incident irradiance", "I0", "the light reaching the culture's surface", "light",
-              "µmol m⁻² s⁻¹", "Growth", ["assumption"]),
+              "µmol m⁻² s⁻¹", "Growth", ["assumption"], kept=False),
         _spec("path_length", "light path length", "L", "the light's path through the culture", "length", "m", "Growth",
-              ["assumption"]),
+              ["assumption"], kept=False),
         _spec("attenuation", "attenuation coefficient", "Ka", "how strongly the culture absorbs light per gram of cells",
-              "attenuation", "m² g⁻¹", "Growth", ["assumption"]),
+              "attenuation", "m² g⁻¹", "Growth", ["assumption"], kept=False),
         _spec("k_photoinhibition", "photoinhibition constant", "KI,light",
-              "the irradiance above which light inhibits growth", "light", "µmol m⁻² s⁻¹", "Growth", ["assumption"]),
+              "the irradiance above which light inhibits growth", "light", "µmol m⁻² s⁻¹", "Growth", ["assumption"],
+              kept=False),
     ]
 
 

@@ -9,9 +9,8 @@ cannot see, so it takes the readings as sent and says so in each fit's basis
 (§7.R). A *simulation* (kinetics.py's model families) may take its
 parameters from records through the aggregate gate, a fit or forecast, a
 kept simulation, a named person's assumption or a stated convention, each
-named in its basis, and its provenance is basis_provenance over them. This
-step binds a person's overrides and the families' stated conventions; the
-fits, records and kept simulations bind in OF-BLD-020 §3.2.
+named in its basis, and its provenance is basis_provenance over them
+(BINDING below, OF-BLD-020 §3.2).
 
 GROWTH FIT. For a biomass series of four or more readings: least squares of
 ln X on t over every contiguous window of four or more readings. Among the
@@ -52,8 +51,27 @@ conventions named in the basis (no death, no maintenance, Ki and Pmax off,
 anaerobic). It keeps a `kinetic_fit` whose `model` is the family; with no
 biomass series μmax is reported unidentified (OF-BLD-018 D4).
 
-SIMULATION. `simulate(SimulationRequest)` resolves a family's specs
-(params.resolve), refuses in words naming every parameter that waits and
+BINDING (OF-BLD-020 §3.2, D6). `bind_parameters` gives each spec its value
+by its `sourceRule`, in order: the parameter of the fit a person chose (a
+`kinetic_fit` of the same family, or a `logistic_v0` fit or its forecast for
+what it carries: μ, α, β, the start values, and Yp/s through its forecast as
+`proforma.fit_info` reads it), with its interval and whether its run
+identified it; the records of each `record:<field>` entry in the evidence
+pool, on the program's papers, through Proforma's aggregate gate and its
+statistic (binding.py, moved there from proforma.py) and units.py into the
+spec's unit, held to the strain chosen (its aliases) or to every strain of
+the program's organism, and to the sugar (kinetics.CARBON_RULE says which
+fields are held otherwise, kinetics.STRAIN_FREE which no strain sets, and
+kinetics.PRODUCT_OWN which are one product's own); a kept simulation's value
+when the request starts from one; then a named person's override, which wins
+over all of them (params.resolve); then the spec's stated convention. A
+parameter with none waits, and a run refuses naming it and the field that
+would bind it. Every record that is left out is counted and said: another
+strain or organism, no carbon source or another one, a unit units.py cannot
+convert.
+
+SIMULATION. `simulate(SimulationRequest)` binds a family's specs
+(bind_parameters), refuses in words naming every parameter that waits and
 what would bind it, integrates (kinetics.py), and keeps one
 `fermos.simulation` artifact (`SIMULATION`): the parameters and start values
 with their sources, the time course by state, OUR(t), the end state, the
@@ -72,18 +90,20 @@ import numpy as np
 from scipy.optimize import least_squares, lsq_linear
 from scipy.stats import t as student_t
 
-from . import artifacts, kinetics, params, units
+from . import artifacts, binding, kinetics, params, units
 from .models import (
     Band,
     BasisInput,
     BasisSource,
     Evidence,
     FamilyInfo,
+    FermosBinding,
     FermosFitResponse,
     FermosPoint,
     ForecastResult,
     Interval,
     MassBalance,
+    Override,
     OxygenUptake,
     ParameterSpec,
     ParameterValue,
@@ -982,17 +1002,24 @@ def families(include_archived: bool = False) -> list[FamilyInfo]:
 
 def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
     """The `fermos-family` scope (`fermos:family:<id>`): the family's specs,
-    bound from its stated conventions; a person's overrides lie on them."""
+    bound as a simulation binds them (bind_parameters) from the request's
+    strain, product, sugar, fit, kept simulation and run-length preset over
+    the evidence pool the program switch shows; a person's overrides lie on
+    them (params.resolve)."""
     (fid,) = ids
     fam = kinetics.FAMILIES.get(fid)
     if fam is None:
         raise params.ScopeUnknown(f"there is no model family {fid}: the families are {', '.join(kinetics.FAMILIES)}")
-    notes = ["A family's parameters bind here from a person's overrides and the family's stated conventions; binding "
-             "from a fit, the records and a kept simulation is not built yet, so every other parameter waits for a "
-             "named person's value."]
-    if fam.socket:
-        notes.insert(0, fam.refusal())
-    return params.Provided(title=f"{fam.title} ({fam.id})", specs=fam.specs(), sources={}, notes=notes)
+    sim = SimulationRequest(family=fid, strain=req.strain, product=req.product, sugar=req.sugar,
+                            fitArtifact=req.fit, startFrom=req.startFrom or "records",
+                            durationPreset=req.durationPreset or UNTIL_RUN_OUT_PRESET,
+                            includeArchived=req.includeArchived)
+    try:
+        _check_request(sim)
+        got = _bound(fam, sim, _load_pool(sim.includeArchived))
+    except SimulationRefused as e:
+        raise params.ParamRefused(str(e)) from None
+    return params.Provided(title=f"{fam.title} ({fam.id})", specs=got.specs, sources=got.sources, notes=got.notes)
 
 
 def _family_static():
@@ -1001,20 +1028,29 @@ def _family_static():
 
 
 def _check_request(req: SimulationRequest) -> None:
-    """What this step does not bind yet, refused in words, never ignored."""
+    """A request that cannot stand, refused in words, never ignored: a start
+    that is not records, a fit or simulation:<artifact id>; a start from a
+    fit, or a fit's run length, with no fit named; an id that is not one; a
+    sugar the carbon-source vocabulary does not hold."""
     start = req.startFrom or "records"
-    if start != "records" and start != "fit" and not start.startswith("simulation:"):
+    if start not in ("records", "fit") and not start.startswith(SIM_PREFIX):
         raise SimulationRefused(f"a simulation starts from records, a fit or simulation:<artifact id>; "
                                 f"{start!r} is none of them")
-    if req.fitArtifact or start != "records" or req.durationPreset == "fit-length":
-        raise SimulationRefused("a simulation does not yet start from a fit or a kept simulation, nor run a fit's "
-                                "length: this service binds a family's parameters from a person's overrides and the "
-                                "stated conventions, and the binding from fits, records and kept simulations is still "
-                                "to be built")
-    for word, value in (("strain", req.strain), ("product", req.product), ("sugar", req.sugar)):
+    if start == "fit" and not req.fitArtifact:
+        raise SimulationRefused("a simulation that starts from a fit names the fit: choose one (fitArtifact)")
+    if req.durationPreset == FIT_LENGTH and not req.fitArtifact:
+        raise SimulationRefused("the fit-length preset runs as long as the run a fit was made on, and no fit is named: "
+                                "choose one (fitArtifact)")
+    kept = start[len(SIM_PREFIX):] if start.startswith(SIM_PREFIX) else None
+    for word, value in (("strain", req.strain), ("product", req.product), ("sugar", req.sugar),
+                        ("fit", req.fitArtifact), ("kept simulation", kept)):
         if value is not None and not re.fullmatch(params._ID, value):
             raise SimulationRefused(f"a {word} is named by its id (letters, digits, dots, dashes, underscores); "
                                     f"{value!r} is not one")
+    sugars = _sugars()
+    if req.sugar and sugars and req.sugar not in sugars:
+        raise SimulationRefused(f"a sugar is named by its carbon-source id, one of {', '.join(sorted(sugars))}; "
+                                f"{req.sugar!r} is not one")
 
 
 def _numbers(fam: kinetics.Family, specs: list[ParameterSpec],
@@ -1083,13 +1119,514 @@ def _solver_inputs() -> list[BasisInput]:
     ]
 
 
+# ── binding: a fit, the records, a kept simulation, a person (§3.2, D6) ─
+
+SIM_PREFIX = "simulation:"
+UNTIL_RUN_OUT_PRESET = "until-sugar-runs-out"
+FIT_LENGTH = "fit-length"
+# What a logistic_v0 fit carries into a family's parameters, by spec key: its
+# μ read as μmax (a logistic's rate is the growth rate with nothing yet
+# limiting), its Luedeking–Piret coefficients, and its start values. Its Xmax
+# has no parameter: in a family growth stops where the sugar, Pmax or the
+# second nutrient stops it. Yp/s comes through its forecast (fit_info).
+FROM_LOGISTIC = {"mu_max": "mu", "alpha": "alpha", "beta": "beta", "x0": "X0", "s0": "S0", "p0": "P0"}
+# A value bound to a fit or a kept simulation names that artifact as its
+# source; the basis says which it was, and whether the fit's run identified
+# it, in one `<key> origin` input beside it, so a simulation reads its
+# parameters back from its own basis and nothing else.
+ORIGIN = "origin"
+ORIGIN_WORDS = {"fit": True, "fit, not identified": False, "fit, identification not judged": None}
+ORIGIN_NOTE = ("where the value came from, as the binding chose it (OF-BLD-020 D6): a fit a person chose, and whether "
+               "the run it was fitted to identified it (its interval excludes zero), or a kept simulation")
+RECORDS_OF = "records of"
+
+
+def _load_pool(include_archived: bool) -> Any:
+    """The evidence pool the switch shows, or an empty one when no corpus is
+    exported here (nothing is known, so nothing binds)."""
+    from types import SimpleNamespace
+
+    from . import evidence_pool
+
+    try:
+        return evidence_pool.load(include_archived=include_archived)
+    except FileNotFoundError:
+        return SimpleNamespace(records=[], records_by_id={}, hidden={})
+
+
+def _sugars() -> set[str]:
+    from . import validate
+
+    try:
+        return set(validate.vocabulary()["carbon"].values())
+    except (FileNotFoundError, ValueError):
+        return set()
+
+
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+def _g(x: float) -> str:
+    return f"{x:.4g}"
+
+
+class _Context:
+    """Who and what a binding is for: the program whose papers bind, its one
+    species, the strain chosen or none, the sugar, the product, and the
+    words that say each."""
+
+    def __init__(self, fam: kinetics.Family, req: SimulationRequest) -> None:
+        from . import module_stores, programs, proforma
+
+        self.labels, species_of_program = proforma._strain_labels()
+        self.strain, self.sugar, self.product = req.strain, req.sugar, req.product
+        hosts: dict[str, str | None] = {}
+        try:
+            hosts = {h["id"]: h.get("program") for h in module_stores._projection()["geneos"]["hosts"] if h.get("id")}
+        except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
+            pass
+        if self.strain and hosts and self.strain not in hosts:
+            raise SimulationRefused(f"there is no catalogued strain {self.strain}: a strain is named by its id in "
+                                    f"geneOS's hosts, such as {', '.join(sorted(k for k, v in hosts.items() if v)[:4])}")
+        flowsheet_programs: dict[str, str | None] = {}
+        from .flowsheets import shelf
+
+        for fid, made in proforma.PRODUCTS.items():
+            if fid in shelf.SHELF:
+                flowsheet_programs[made] = shelf.SHELF[fid].program
+        try:
+            active = [p.id for p in programs.active_programs()]
+        except FileNotFoundError:
+            active = []
+        if self.strain and hosts.get(self.strain):
+            self.program, why = hosts[self.strain], "the strain's program"
+        elif fam.program:
+            self.program, why = fam.program, "the family's program"
+        elif self.product and flowsheet_programs.get(self.product):
+            self.program, why = flowsheet_programs[self.product], f"the program whose flowsheet makes {self.product}"
+        elif len(active) == 1:
+            self.program, why = active[0], "the one active program"
+        else:
+            self.program, why = None, "no one program"
+        held = None
+        try:
+            held = programs.program_by_id(self.program) if self.program else None
+        except FileNotFoundError:
+            pass
+        self.program_name = held.name if held else (self.program or "")
+        self.program_words = (f"the {self.program_name} program's papers ({why})" if self.program
+                              else "every paper the evidence pool holds (no one program is named: no strain of one, "
+                                   "no family of one, and not one active program)")
+        self.species = species_of_program.get(self.program or "")
+        self.strain_label = self.labels.get(self.strain or "", self.strain or "")
+        self.organism_words = (
+            f"every strain of the {self.program_name} program's organism, {self.species[:1].upper() + self.species[1:]}"
+            if self.species else f"every strain on {self.program_words}")
+
+    def on_program(self, r: dict[str, Any]) -> bool:
+        return binding.in_program(str(r.get("paperId") or ""), self.program) if self.program else True
+
+    def species_of(self, r: dict[str, Any]) -> str | None:
+        """A record's species as the ceiling check reads it: its strain's,
+        else what its paper's words name; None when nothing can be read."""
+        from . import module_stores
+
+        if r.get("strainId"):
+            return module_stores.species_of(self.labels.get(str(r["strainId"]), "")) or None
+        return module_stores.species_of(r.get("organismText") or "")
+
+    def of_strain(self, r: dict[str, Any]) -> bool:
+        from . import validate
+
+        if r.get("strainId") == self.strain:
+            return True
+        try:
+            return bool(r.get("organismText")) and validate.strain_id(str(r["organismText"])) == self.strain
+        except (FileNotFoundError, ValueError):
+            return False
+
+
+class _Bound:
+    """One field's records as a binding takes them: the kept ones with their
+    value in the spec's unit, and every one left out, counted by why."""
+
+    def __init__(self) -> None:
+        self.kept: list[tuple[dict[str, Any], float]] = []
+        self.out: dict[str, int] = {}
+        self.unconverted: list[str] = []
+
+    def leave(self, why: str) -> None:
+        self.out[why] = self.out.get(why, 0) + 1
+
+    def words(self) -> str:
+        parts = [f"{n} {why}" for why, n in self.out.items()]
+        if self.unconverted:
+            parts.append(f"{len(self.unconverted)} in a unit units.py does not convert ("
+                         + "; ".join(self.unconverted[:3]) + ("; …" if len(self.unconverted) > 3 else "") + ")")
+        return ("left out: " + ", ".join(parts)) if parts else ""
+
+
+def _field_records(field: str, unit: str, ctx: _Context, pool: Any) -> _Bound:
+    """The records of one field that bind, in `unit`, and the rest counted."""
+    from . import validate
+
+    rule = kinetics.CARBON_RULE.get(field, "sugar")
+    by_strain = bool(ctx.strain) and field not in kinetics.STRAIN_FREE
+    out = _Bound()
+    for r in pool.records:
+        if r.get("field") != field or not ctx.on_program(r):
+            continue
+        if binding.exclusion(r):
+            out.leave("kept out by the aggregate gate")
+            continue
+        if by_strain:
+            if not ctx.of_strain(r):
+                out.leave("of another strain or of none")
+                continue
+        elif ctx.species:
+            sp = ctx.species_of(r)
+            if sp is not None and sp != ctx.species:
+                out.leave("of another organism")
+                continue
+        if rule != "any":
+            carbon = r.get("carbonSource")
+            if not carbon:
+                if rule == "sugar":
+                    out.leave("naming no carbon source")
+                    continue
+            else:
+                try:
+                    named = validate.carbon_source_id(str(carbon))
+                except (FileNotFoundError, ValueError):
+                    named = None
+                if named != ctx.sugar:
+                    out.leave("naming another carbon source")
+                    continue
+        try:
+            v = units.convert(float(r["value"]), r.get("unit") or unit, unit)
+        except (TypeError, ValueError, KeyError) as e:
+            why = units.explain_refusal(str(r.get("unit") or ""), unit) or str(e)
+            out.unconverted.append(f"{r.get('id')}: {r.get('unit')}, {why}")
+            continue
+        out.kept.append((r, v))
+    return out
+
+
+def _record_candidate(spec: ParameterSpec, entry: str, ctx: _Context, pool: Any) -> tuple[ParameterValue | None, str]:
+    """What one `record:<field>` entry binds for a spec, or why it binds
+    nothing, in words."""
+    field = entry.split(":", 1)[1]
+    own = kinetics.PRODUCT_OWN.get(field)
+    if own and own != ctx.product:
+        swap = kinetics.PRODUCT_FIELDS.get(ctx.product or "", {}).get(field)
+        if not swap:
+            return None, (f"{field} is {own}'s own field, and " + (f"the product is {ctx.product}" if ctx.product
+                                                                    else "no product is named"))
+        field = swap
+    rule = kinetics.CARBON_RULE.get(field, "sugar")
+    if rule != "any" and not ctx.sugar:
+        return None, f"a record of {field} binds on the sugar it names, and no sugar is named"
+    got = _field_records(field, spec.unit, ctx, pool)
+    on = {"sugar": f" on {ctx.sugar}", "sugar or none": f" on {ctx.sugar} or naming no carbon source",
+          "any": ""}[rule]
+    whose = (f", for {ctx.strain_label}" if ctx.strain and field not in kinetics.STRAIN_FREE else "")
+    left = got.words()
+    if not got.kept:
+        return None, f"no record of {field}{on}{whose} binds" + (f" ({left})" if left else "")
+    st = binding.statistic([v for _, v in got.kept])
+    n = len(got.kept)
+    unit = f" {spec.unit}" if spec.unit else ""
+    span = f"{_g(st.low)}{unit}" if st.low == st.high else f"{_g(st.low)}–{_g(st.high)}{unit}"
+    stat = {"triangular": f", the median {_g(st.value)}", "uniform": f", the middle {_g(st.value)}"}.get(st.sampling, "")
+    detail = f"{_plural(n, 'record')} of {field}{on}{whose}: {span}{stat}" + (f"; {left}" if left else "")
+    if st.flag and n > 1:
+        detail += "; every one gives the same value"
+    return ParameterValue(key=spec.key, value=st.value, low=st.low, high=st.high,
+                          source=BasisSource(kind="record", note=f"{_plural(n, 'record')} of {field}"),
+                          origin="record", recordIds=[str(r["id"]) for r, _ in got.kept], detail=detail), ""
+
+
+def _identified(p: FitParam) -> bool | None:
+    """Whether the run a fit was made on identified a parameter: its own
+    word, else its interval excluding zero for a coefficient, else unjudged."""
+    if p.identified is not None:
+        return p.identified
+    if p.indistinguishableFromZero is not None:
+        return not p.indistinguishableFromZero
+    return None
+
+
+def _fit_art(fit_id: str) -> Any:
+    try:
+        art = artifacts.get(fit_id)
+    except artifacts.ArtifactNotFound:
+        raise SimulationRefused(f"there is no kept fit {fit_id}: fermOS keeps a fit when it fits a deposited run, and "
+                                "a forecast when one is made from it") from None
+    except artifacts.ArtifactDamaged as e:
+        raise SimulationRefused(f"fit {fit_id} cannot be read: {e}") from None
+    if art.tool not in FEEDABLE:
+        raise SimulationRefused(f"{fit_id} is a {art.tool}, not a kinetic fit or a forecast fermOS keeps")
+    return art
+
+
+def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, ParameterSpec], ctx: _Context,
+                    preset: str) -> tuple[dict[str, ParameterValue], list[str]]:
+    """What a chosen fit gives each parameter it carries, in the spec's unit,
+    with its interval and whether its run identified it; and what it could
+    not give, in words. A fit of another family is refused."""
+    from . import proforma
+
+    art = _fit_art(fit_id)
+    try:
+        fit_ = fit_of(art)
+    except FitRefused as e:
+        raise SimulationRefused(str(e)) from None
+    if fit_.reason or not fit_.params:
+        raise SimulationRefused(f"fit {fit_id} holds no kinetic fit: {fit_.reason or 'no parameters'}")
+    model = fit_.model
+    if model == fam.id:
+        names = {k: k for k in specs}
+    elif model == LOGISTIC:
+        names = {k: n for k, n in FROM_LOGISTIC.items() if k in specs}
+    else:
+        raise SimulationRefused(f"fit {fit_id} is of {model}; a {fam.id} simulation takes a fit of its own family or "
+                                f"a {LOGISTIC} fit")
+    dep = deposition_of(art)
+    what = f"{model} {art.tool} {fit_id}" + (f", fitted to deposition {dep}" if dep else "")
+    roles = series_by_role(fit_)
+    notes: list[str] = []
+    out: dict[str, ParameterValue] = {}
+
+    def factor(key: str, unit: str) -> float:
+        """The number one of the fit's units is in the spec's unit."""
+        if model == LOGISTIC and key in ("alpha", "beta"):
+            pu, xu = (roles.get(r).unit if roles.get(r) else "" for r in ("product", "biomass"))
+            return units.convert(1.0, pu, G_L) / units.convert(1.0, xu, G_L)
+        return units.convert(1.0, unit, specs[key].unit)
+
+    for key, name in names.items():
+        p = param(fit_, name)
+        if p is None:
+            continue
+        try:
+            k = factor(key, p.unit)
+        except (TypeError, ValueError):
+            notes.append(f"Fit {fit_id} gives {specs[key].symbol or key} in {p.unit}, which does not convert into "
+                         f"{specs[key].unit or 'a number'}, so it does not bind {key}.")
+            continue
+        identified = _identified(p)
+        said = ("" if identified is not False else "; its run did not identify it: the interval reaches zero")
+        out[key] = ParameterValue(
+            key=key, value=p.value * k, low=p.low * k, high=p.high * k, identified=identified, origin="fit",
+            source=BasisSource(kind="artifact", id=fit_id,
+                               note=f"{specs[key].symbol or key} of {what}, with its 95 % interval{said}"),
+            detail=f"{specs[key].symbol or key} of {what}{said}")
+    if model == LOGISTIC and "yps" in specs:
+        flowsheet = next((f for f, made in proforma.PRODUCTS.items() if made == ctx.product), None)
+        if flowsheet is None:
+            notes.append(f"A {LOGISTIC} fit gives Yp/s through its forecast, read for the product a shelf flowsheet "
+                         f"makes ({', '.join(sorted(set(proforma.PRODUCTS.values())))}); "
+                         + (f"{ctx.product} is not one" if ctx.product else "no product is named")
+                         + f", so fit {fit_id} does not bind yps.")
+        else:
+            info = proforma.fit_info(art, flowsheet)
+            feed = next((f for f in info.feeds if f.key == "yield"), None)
+            why = info.refused or (feed.refused if feed else "it gives no yield")
+            if why or feed is None or feed.value is None:
+                notes.append(f"Fit {fit_id} gives no Yp/s: {why}.")
+            else:
+                k = units.convert(1.0, feed.unit, specs["yps"].unit)
+                out["yps"] = ParameterValue(
+                    key="yps", value=feed.value * k, low=feed.low * k if feed.low is not None else None,
+                    high=feed.high * k if feed.high is not None else None, identified=True, origin="fit",
+                    source=BasisSource(kind="artifact", id=fit_id, note=f"Yp/s of {what}: {feed.derivation}"),
+                    detail=f"Yp/s of {what}: {feed.derivation}")
+    if preset == FIT_LENGTH and "t_end" in specs:
+        hours = [pt.t for sr in fit_.series for pt in sr.points]
+        if hours and max(hours) > 0:
+            out["t_end"] = ParameterValue(
+                key="t_end", value=float(max(hours)), origin="fit",
+                source=BasisSource(kind="artifact", id=fit_id, note=f"the length of the run {what}: its last reading"),
+                detail=f"the length of the run {what}: its last reading")
+        else:
+            notes.append(f"Fit {fit_id} holds no reading after its start, so it gives no run length.")
+    if model == fam.id:
+        held = ", ".join(k for k, _, _ in FIT_HELD)
+        notes.append(f"Fit {fit_id} held what one batch's readings cannot pin as conventions ({held}); a simulation "
+                     "binds those as their specs say, from the records, a person or the spec's convention, not as the "
+                     "fit held them.")
+    return out, notes
+
+
+def _simulation_candidates(sim_id: str, specs: dict[str, ParameterSpec]) -> tuple[dict[str, ParameterValue], list[str]]:
+    """A kept simulation's values for the keys this family shares with it:
+    each one it took from a fit, the records, another simulation or a named
+    person (a convention binds here as its spec says)."""
+    art = kept_simulation(sim_id)
+    fid = _named(art.inputs, "family")
+    other = kinetics.family(str(fid.value)) if fid else None
+    if other is None:
+        raise SimulationRefused(f"kept simulation {sim_id} names no family")
+    out: dict[str, ParameterValue] = {}
+    for v in _values_of(other.specs(), art.inputs):
+        if v.key not in specs or v.origin in ("waiting", "convention") or v.value is None:
+            continue
+        how = f"{v.origin} by {v.overriddenBy}" if v.overriddenBy else v.origin
+        note = f"{v.key} of kept simulation {sim_id} ({other.id}), where it was bound to {how}"
+        out[v.key] = ParameterValue(key=v.key, value=v.value, low=v.low, high=v.high, origin="simulation",
+                                    source=BasisSource(kind="artifact", id=sim_id, note=note), detail=note)
+    return out, [f"Starting from kept simulation {sim_id} ({other.id}): its values bind where no fit or record "
+                 "does, before a person's (D6)."]
+
+
+class _Binding:
+    def __init__(self, specs, sources, notes, ctx) -> None:
+        self.specs: list[ParameterSpec] = specs
+        self.sources: dict[str, dict[str, ParameterValue | None]] = sources
+        self.notes: list[str] = notes
+        self.ctx: _Context = ctx
+
+
+def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any) -> _Binding:
+    """Each spec's candidates by sourceRule entry (params.Provided's
+    `sources`), and the notes that say what was bound from where."""
+    specs = fam.specs()
+    by_key = {s.key: s for s in specs}
+    ctx = _Context(fam, req)
+    notes: list[str] = []
+    if fam.socket:
+        notes.append(fam.refusal())
+    fits: dict[str, ParameterValue] = {}
+    if req.fitArtifact:
+        fits, said = _fit_candidates(req.fitArtifact, fam, by_key, ctx, req.durationPreset)
+        notes += said
+    start = req.startFrom or "records"
+    kept: dict[str, ParameterValue] = {}
+    if start.startswith(SIM_PREFIX):
+        kept, said = _simulation_candidates(start[len(SIM_PREFIX):], by_key)
+        notes += said
+    sources: dict[str, dict[str, ParameterValue | None]] = {}
+    for spec in specs:
+        cands: dict[str, ParameterValue | None] = {}
+        why: list[str] = []
+        for entry in spec.sourceRule:
+            if entry == "fit" and spec.key in fits:
+                cands["fit"] = fits[spec.key]
+            elif entry.startswith("record:"):
+                found, words = _record_candidate(spec, entry, ctx, pool)
+                if found is not None:
+                    cands[entry] = found
+                elif words:
+                    why.append(words)
+            elif entry == "simulation" and spec.key in kept:
+                cands["simulation"] = kept[spec.key]
+        if why:
+            said = "; ".join(why)
+            cands["waiting"] = ParameterValue(key=spec.key, value=None, source=None, origin="waiting",
+                                              detail=said[:1].upper() + said[1:])
+        sources[spec.key] = cands
+    sugar = f", naming {ctx.sugar} as their carbon source" if ctx.sugar else ", and no sugar is named"
+    notes.insert(0, f"Records bind from {ctx.program_words}, through the aggregate gate, of "
+                    + (f"{ctx.strain_label} (by its aliases; the medium's records of {ctx.organism_words})"
+                       if ctx.strain else ctx.organism_words)
+                    + f"{sugar}; each is converted into its parameter's unit, and the value is their median with their "
+                      "range (Proforma's statistic). A fit a person chose comes first; a person's override wins over "
+                      "all of them.")
+    hidden = getattr(pool, "hidden", None) or {}
+    if hidden and ctx.program in hidden:
+        notes.append(f"{_plural(hidden[ctx.program], 'record')} of the archived {ctx.program_name} program "
+                     "are hidden: Settings → Programs has the switch that shows archived programs.")
+    return _Binding(specs, sources, notes, ctx)
+
+
+def bind_parameters(family: str, strain: str | None, product: str | None, sugar: str | None, pool: Any,
+                    overrides: list[Override] | None, fit: str | None, by: str | None = None, *,
+                    simulation: str | None = None,
+                    duration_preset: str = UNTIL_RUN_OUT_PRESET) -> tuple[list[ParameterValue], list[str]]:
+    """Each parameter of a family's specs with its value and source (D6): a
+    fit a person chose, the records through the aggregate gate, a kept
+    simulation (`simulation`, its artifact id), then a named person's
+    override (which wins over all of them), then the spec's convention; and
+    the keys that wait, as a run would refuse them (a key the request does
+    not read waits for nothing). Starts no integration and keeps nothing.
+    Refused in words (SimulationRefused): a fit or simulation not on file, a
+    fit of another family, an id that is not one, an unknown family."""
+    fam = kinetics.family(family)
+    req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar, overrides=list(overrides or []),
+                            fitArtifact=fit, startFrom=f"{SIM_PREFIX}{simulation}" if simulation else "records",
+                            durationPreset=duration_preset)
+    _check_request(req)
+    got = _bound(fam, req, pool)
+    return _resolved(fam, got, req.overrides, by)
+
+
+def _resolved(fam: kinetics.Family, got: _Binding, overrides: list[Override],
+              by: str | None) -> tuple[list[ParameterValue], list[str]]:
+    try:
+        values = params.resolve(got.specs, got.sources, overrides, by)
+    except params.ParamRefused as e:
+        raise SimulationRefused(str(e)) from None
+    return values, _waiting(fam, got.specs, values)
+
+
+def _waiting(fam: kinetics.Family, specs: list[ParameterSpec], values: list[ParameterValue]) -> list[str]:
+    """The keys a run would refuse for: every value that waits, but a key
+    the request does not read (a feed's rate under an exponential profile)."""
+    spec_of = {s.key: s for s in specs}
+    p: dict[str, Any] = {}
+    for v in values:
+        x = v.value
+        p[v.key] = (x if spec_of[v.key].choices else None) if isinstance(x, str) else x
+    skip = fam.irrelevant(p)
+    return [v.key for v in values if v.origin == "waiting" and v.key not in skip]
+
+
+def bind(req: SimulationRequest, *, pool: Any = None) -> FermosBinding:
+    """GET /api/fermos/bind: a family's parameters bound for a strain,
+    product and sugar, from a fit or a kept simulation when one is named,
+    over the evidence pool the switch shows; what waits; and the notes that
+    say what bound from where. Starts no integration and keeps nothing."""
+    fam = kinetics.family(req.family)
+    _check_request(req)
+    got = _bound(fam, req, pool if pool is not None else _load_pool(req.includeArchived))
+    values, waiting = _resolved(fam, got, req.overrides, None)
+    return FermosBinding(values=values, waiting=waiting, notes=got.notes)
+
+
+def _binding_inputs(got: _Binding, values: list[ParameterValue]) -> list[BasisInput]:
+    """What the basis says of the binding beyond each value's own source:
+    whose records bound (when any did), and, beside each value bound to a fit
+    or a kept simulation, which it was (`<key> origin`)."""
+    out: list[BasisInput] = []
+    if any(v.origin == "record" for v in values):
+        ctx = got.ctx
+        whose = (f"{ctx.strain} by its aliases, and the medium's records of {ctx.organism_words}" if ctx.strain
+                 else ctx.organism_words)
+        out.append(BasisInput(name=RECORDS_OF, value=whose, unit="", source=BasisSource(
+            kind="convention", note=f"whose records bound the values bound to records: {ctx.program_words}, through "
+                                    "the aggregate gate (OF-BLD-020 §3.2)")))
+    for v in values:
+        if v.origin == "fit":
+            word = next(w for w, i in ORIGIN_WORDS.items() if i is v.identified)
+        elif v.origin == "simulation":
+            word = "simulation"
+        else:
+            continue
+        out.append(BasisInput(name=f"{v.key} {ORIGIN}", value=word, unit="",
+                              source=BasisSource(kind="convention", note=ORIGIN_NOTE)))
+    return out
+
+
 def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult:
     """One simulation, kept as a `fermos.simulation` artifact. The family's
-    specs resolve through params.resolve: a person's override (an
-    `assumption` by name) wins, else the spec's stated convention; anything
-    else waits, and a waiting parameter refuses the run naming it and the
-    record field that would bind it (SimulationRefused, a 422). `by_pool`
-    is for the binding from records (§3.2) and is not read yet."""
+    specs bind as `bind_parameters` binds them (D6): a fit a person chose,
+    the records of the evidence pool the switch shows (`by_pool`, else
+    evidence_pool.load), a kept simulation, a person's override (an
+    `assumption` by name, which wins), the spec's stated convention; a
+    parameter with none refuses the run naming it and the record field that
+    would bind it (SimulationRefused, a 422). The basis names every value's
+    source, the records each one rests on, and whose records they were."""
     fam = kinetics.family(req.family)
     if fam.socket:
         raise SimulationRefused(fam.refusal())
@@ -1099,11 +1636,10 @@ def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult
     if stray:
         raise SimulationRefused(f"an override names the scope it changes, and these were sent to {scope}: "
                                 f"{', '.join(stray)}")
-    specs = fam.specs()
-    try:
-        values = params.resolve(specs, {}, req.overrides)
-    except params.ParamRefused as e:
-        raise SimulationRefused(str(e)) from None
+    pool = by_pool if by_pool is not None else _load_pool(req.includeArchived)
+    got = _bound(fam, req, pool)
+    specs = got.specs
+    values, _ = _resolved(fam, got, req.overrides, None)
     _numbers(fam, specs, values)
     named = [BasisInput(name="family", value=fam.id, unit="",
                         source=BasisSource(kind="convention", note=f"the model family: {fam.title} (kinetics.py)"))]
@@ -1112,8 +1648,9 @@ def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult
             named.append(BasisInput(name=word, value=value, unit="",
                                     source=BasisSource(kind="convention", note=f"the {word} simulated, as named")))
     ceilings, _ = _ceiling_inputs(req)
-    inputs = named + params.basis_inputs(specs, values) + _solver_inputs() + ceilings
-    art = artifacts.compute(SIMULATION, inputs)
+    inputs = (named + params.basis_inputs(specs, values) + _binding_inputs(got, values) + _solver_inputs()
+              + ceilings)
+    art = artifacts.compute(SIMULATION, inputs, records_by_id=getattr(pool, "records_by_id", None))
     return result_of(art)
 
 
@@ -1124,7 +1661,9 @@ def result_of(art: Any) -> SimulationResult:
 def _values_of(specs: list[ParameterSpec], inputs: list[BasisInput]) -> list[ParameterValue]:
     """Each spec's value read back from a simulation's basis: its input,
     its low and high, the records behind it, and its origin from its
-    source (the inverse of params.basis_inputs)."""
+    source (the inverse of params.basis_inputs), a fit's or a kept
+    simulation's from the `<key> origin` input beside it, with whether the
+    fit's run identified it. Reads the basis alone."""
     by_name: dict[str, BasisInput] = {i.name: i for i in inputs}
     out = []
     for spec in specs:
@@ -1136,10 +1675,15 @@ def _values_of(specs: list[ParameterSpec], inputs: list[BasisInput]) -> list[Par
         records = [str(x.value) for x in inputs if x.name == f"{spec.key} record" and x.source.kind == "record"]
         low, high = by_name.get(f"{spec.key} low"), by_name.get(f"{spec.key} high")
         kind = i.source.kind
-        origin = ("record" if records else "assumption" if kind == "assumption" else "artifact" if kind == "artifact"
-                  else "fit" if kind == "deposition" else "convention")
+        said = by_name.get(f"{spec.key} {ORIGIN}")
+        word = str(said.value) if said is not None and said.source.kind == "convention" else None
+        identified = ORIGIN_WORDS.get(word) if word in ORIGIN_WORDS else None
+        origin = ("record" if records else "assumption" if kind == "assumption"
+                  else "fit" if word in ORIGIN_WORDS or kind == "deposition"
+                  else "simulation" if word == "simulation" else "artifact" if kind == "artifact" else "convention")
         v = ParameterValue(key=spec.key, value=i.value, low=float(low.value) if low else None,
                            high=float(high.value) if high else None, source=i.source, origin=origin,
+                           identified=identified if origin == "fit" else None,
                            overriddenBy=i.source.by if kind == "assumption" else None, recordIds=records,
                            detail=i.source.note)
         v.outOfBounds = params.bounds_check(spec, v.value, v.low, v.high)
@@ -1232,6 +1776,8 @@ def _run_simulation(inputs, seed):
                                "parameters do not hold together")
               + ". The check catches a wrong rate law, not the integrator's error, which the tests hold."))
     flags = [v.outOfBounds for v in values if v.outOfBounds]
+    flags += [f"{v.key} is bound to fit {v.source.id if v.source else ''}, whose run did not identify it: its interval "
+              "reaches zero" for v in values if v.origin == "fit" and v.identified is False]
     if not ok:
         flags.append(f"The mass balance does not close: {mb['closure']:.2g} against {kinetics.BALANCE_TOL:.0%}.")
     if traj.runout_h is None and fam.id in ("batch_v1", "storage_v1"):

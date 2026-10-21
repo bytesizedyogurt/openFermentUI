@@ -15,6 +15,8 @@ import shutil
 import threading
 from typing import Any, Literal
 
+from . import binding as _binding
+from .binding import exclusion as _exclusion, in_program as _in_program
 from .flowsheets import shelf as _shelf
 from .workers import SimWorker, WorkerCrashed, WorkerError, WorkerTimeout
 
@@ -390,7 +392,7 @@ ASSUMED = {
 }
 KEYS = (*BOUND, *ASSUMED)
 SUGARS = frozenset({"glucose", "xylose", "fructose", "mixed-sugars", "hydrolysate"})
-SINGLE = "single source: held fixed in sampling"
+SINGLE = _binding.SINGLE
 
 
 class ScenarioRefused(ValueError):
@@ -403,17 +405,7 @@ def _thread_p(paper_id: str) -> bool:
     return re.fullmatch(r"P\d+\w*", paper_id or "") is not None
 
 
-def _exclusion(r: dict) -> str | None:
-    """`aggregateExclusion` in Python, over a pool record."""
-    if r.get("status") == "rejected":
-        return "rejected"
-    if r.get("provenance") == "industry-estimate":
-        return "industry-estimate"
-    if r.get("provenance") == "computed":
-        return "computed"
-    if r.get("primary") is False:
-        return "not-primary"
-    return None
+# `_exclusion`, the aggregate gate, lives in binding.py (OF-BLD-020 §3.2), imported above.
 
 
 def yield_cap() -> tuple[float, str] | None:
@@ -500,22 +492,17 @@ def _settle(inp, bound: list, field_id: str) -> None:
     """An input bound to records: their median with their range and a
     triangular draw from three on, a pair drawn uniform, one held fixed and
     flagged (§8.3)."""
-    import statistics
-
     from .models import BasisSource
 
-    vals = sorted(b.value for b in bound)
     inp.binding = "records"
     inp.records, inp.recordIds = bound, [b.id for b in bound]
     inp.source = BasisSource(kind="record", note=f"{len(bound)} record{'s' if len(bound) != 1 else ''} of {field_id}")
-    if len(vals) >= 3 and vals[0] != vals[-1]:
-        inp.value, inp.low, inp.high, inp.sampling = statistics.median(vals), vals[0], vals[-1], "triangular"
-    elif len(vals) == 2 and vals[0] != vals[1]:
-        inp.value, inp.low, inp.high, inp.sampling = (vals[0] + vals[1]) / 2, vals[0], vals[1], "uniform"
-    else:
-        inp.value = inp.low = inp.high = vals[0]
-        inp.sampling = "fixed"
-        inp.flags.append(SINGLE if len(vals) == 1 else "every bound record gives the same value: held fixed in sampling")
+    # The statistic lives in binding.py (OF-BLD-020 §3.2), which fermOS's
+    # simulation binds through too.
+    st = _binding.statistic([b.value for b in bound])
+    inp.value, inp.low, inp.high, inp.sampling = st.value, st.low, st.high, st.sampling
+    if st.flag:
+        inp.flags.append(st.flag)
 
 
 def _in_place_of(inp, bound: list) -> None:
@@ -1204,13 +1191,7 @@ def _unrunnable_seed(scenario_id: str) -> str | None:
     return str(row.get("kind") or "authored")
 
 
-def _in_program(paper_id: str, program: str | None) -> bool:
-    from . import programs
-
-    try:
-        return program is not None and programs.program_of_paper(paper_id or "") == program
-    except FileNotFoundError:  # no corpus exported here: no paper is known to be the program's
-        return False
+# `_in_program` lives in binding.py (OF-BLD-020 §3.2), imported at the top.
 
 
 def bind_inputs(flowsheet: str, records: list[dict], host: str | None = None, assumptions: list | None = None) -> list:

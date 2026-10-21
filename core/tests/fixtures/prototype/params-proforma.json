@@ -1260,7 +1260,14 @@
         "flowsheet": null,
         "host": null,
         "fits": {},
-        "vesselType": null
+        "vesselType": null,
+        "strain": null,
+        "product": null,
+        "sugar": null,
+        "fit": null,
+        "startFrom": null,
+        "durationPreset": null,
+        "includeArchived": false
       },
       "body": {
         "scope": "proforma:sc-yeast-1",

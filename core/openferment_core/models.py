@@ -2396,6 +2396,19 @@ class ParamResolveRequest(BaseModel):
     # fermOS's vessel scope (OF-BLD-020 §4.1): the aerated design a scope is
     # for; None is BioSTEAM's own default design. An anaerobic design takes none.
     vesselType: Literal["stirred-tank", "bubble-column"] | None = None
+    # fermOS's family scope (OF-BLD-020 §3.2), bound as a simulation binds:
+    # the strain whose records bind (None: every strain of the program's
+    # organism), the product, the sugar the records must name, the fit a
+    # person chose, where the simulation starts (`records`, `fit` or
+    # `simulation:<artifact id>`), the run-length preset, and the program
+    # switch, which decides what the evidence pool shows.
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    fit: str | None = None
+    startFrom: str | None = None
+    durationPreset: Literal["until-sugar-runs-out", "fit-length"] | None = None
+    includeArchived: bool = False
 
 
 class ParamResolveResult(BaseModel):
@@ -2609,6 +2622,20 @@ class SimulationRequest(BaseModel):
     startFrom: str = "records"
     durationPreset: Literal["until-sugar-runs-out", "fit-length"] = "until-sugar-runs-out"
     includeArchived: bool = False
+
+
+class FermosBinding(BaseModel):
+    """GET /api/fermos/bind (OF-BLD-020 §3.2): a family's parameters bound
+    for a strain, product and sugar from a fit, the records, a kept
+    simulation and the conventions, starting no integration."""
+
+    values: list[ParameterValue]
+    # The keys a simulation would refuse for, each named with the field that
+    # would bind it in its value's detail.
+    waiting: list[str]
+    # What bound from where: the program's papers, whose records, the sugar,
+    # the fit and the kept simulation, and what they could not give.
+    notes: list[str] = Field(default_factory=list)
 
 
 class OxygenUptake(BaseModel):

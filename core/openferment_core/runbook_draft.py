@@ -44,9 +44,9 @@ def _no_number(what: str, text: str) -> None:
 
 
 def _gate(record: dict[str, Any]) -> bool:
-    from .proforma import _exclusion
+    from .binding import exclusion
 
-    return _exclusion(record) is None
+    return exclusion(record) is None
 
 
 def _from_evidence(item: DraftItem, ev: Any, n: int) -> Prediction:

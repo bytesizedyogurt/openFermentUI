@@ -244,6 +244,8 @@ const PAIRS = [
   ['SteadyState', 'SteadyState'],
   ['SimulationResult', 'SimulationResult'],
   ['SimulationSummary', 'SimulationSummary'],
+  // OF-BLD-020 §3.2 — a family's parameters bound from a fit, the records, a kept simulation.
+  ['FermosBinding', 'FermosBinding'],
 ];
 
 let compared = 0;

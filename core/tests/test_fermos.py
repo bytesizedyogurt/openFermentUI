@@ -114,7 +114,15 @@ def test_units_are_built_from_the_measures_own():
 
 @pytest.fixture()
 def store(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from openferment_core import evidence_pool
+
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    # No record binds here: a simulation's parameters come from what each
+    # test types (test_fermos_bind holds the binding from records).
+    empty = SimpleNamespace(records=[], records_by_id={}, hidden={})
+    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: empty)
     return tmp_path
 
 
@@ -355,7 +363,11 @@ def test_a_waiting_parameter_refuses_the_simulation_naming_it_and_its_field(stor
     for req, words in (
         (SimulationRequest(family="light_v1"), "light_v1 is declared and not built"),
         (SimulationRequest(family="nowhere_v1"), "there is no model family 'nowhere_v1'"),
-        (SimulationRequest(family=BATCH, fitArtifact="0123456789abcdef"), "does not yet start from a fit"),
+        (SimulationRequest(family=BATCH, fitArtifact="0123456789abcdef"), "there is no kept fit 0123456789abcdef"),
+        (SimulationRequest(family=BATCH, startFrom="fit"), "names the fit"),
+        (SimulationRequest(family=BATCH, durationPreset="fit-length"), "no fit is named"),
+        (SimulationRequest(family=BATCH, startFrom="simulation:0123456789abcdef"), "no kept simulation"),
+        (SimulationRequest(family=BATCH, startFrom="yesterday"), "starts from records, a fit"),
         (SimulationRequest(family=BATCH, overrides=typed(nothing=1.0)), "there is no parameter nothing"),
         (SimulationRequest(family=BATCH, overrides=[Override(scope="fermos:family:chemostat_v1", key="ks", value=1.0,
                                                              by=BY, at="2026-10-21")]), "an override names the scope"),

@@ -58,7 +58,8 @@ export type ParameterFamily =
 /**
  * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — the
  * polymer family OF-BLD-014 §2.1 adds, and the kinetics family the
- * yeast-ethanol program (thread Q) adds: forty fields in seven.
+ * yeast-ethanol program (thread Q) adds, with the oxygen and maintenance fields
+ * fermOS's simulations read (OF-BLD-020 §3.2): forty-four fields in seven.
  */
 export type FieldId =
   // Family 1 — expression performance
@@ -107,7 +108,12 @@ export type FieldId =
   | 'substrate_inhibition_ki'
   | 'ethanol_lp_alpha'
   | 'ethanol_lp_beta'
-  | 'ethanol_mesp';
+  | 'ethanol_mesp'
+  // The oxygen and maintenance fields fermOS's simulations and vessels read (OF-BLD-020 §3.2)
+  | 'maintenance_coefficient'
+  | 'biomass_yield_oxygen'
+  | 'specific_oxygen_uptake'
+  | 'kla_measured';
 
 /**
  * Analytical method behind a PTM or functional measurement (OF-COR-001 §17
@@ -3403,6 +3409,20 @@ export interface ParamResolveRequest {
   fits?: Record<string, string>;
   /** fermOS's vessel scope (OF-BLD-020 §4.1): the aerated design; null is BioSTEAM's own default. */
   vesselType?: 'stirred-tank' | 'bubble-column' | null;
+  /**
+   * fermOS's family scope (OF-BLD-020 §3.2), bound as a simulation binds: the
+   * strain whose records bind (null: every strain of the program's organism),
+   * the product, the sugar the records must name, the fit a person chose, where
+   * the simulation starts ('records', 'fit', 'simulation:<artifact id>'), the
+   * run-length preset, and the program switch.
+   */
+  strain?: string | null;
+  product?: string | null;
+  sugar?: string | null;
+  fit?: string | null;
+  startFrom?: string | null;
+  durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
+  includeArchived?: boolean;
 }
 
 export interface ParamResolveResult {
@@ -3572,6 +3592,19 @@ export interface SimulationRequest {
   startFrom?: string;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length';
   includeArchived?: boolean;
+}
+
+/**
+ * `GET /api/fermos/bind` (OF-BLD-020 §3.2): a family's parameters bound for a
+ * strain, product and sugar from a fit, the records, a kept simulation and the
+ * conventions, starting no integration.
+ */
+export interface FermosBinding {
+  values: ParameterValue[];
+  /** The keys a simulation would refuse for; each value's detail names the field that would bind it. */
+  waiting: string[];
+  /** What bound from where: the program's papers, whose records, the sugar, the fit, the kept simulation. */
+  notes: string[];
 }
 
 /** OUR(t) = qO2·X on the time course's hours; its peak read on the solver's own steps. */

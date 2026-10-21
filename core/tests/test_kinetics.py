@@ -136,12 +136,17 @@ def test_every_family_declares_the_appendix_parameters_with_bounds_and_groups():
     assert b["kd"].convention == 0 and b["beta"].convention == 0 and b["maintenance"].convention == 0
     assert b["ki_substrate"].convention == "off" and b["n_inhibition"].convention == 1
     assert b["yxo"].convention == "anaerobic" and b["t_end"].convention == "until the sugar runs out"
-    assert b["mu_max"].sourceRule == ["fit", "record:growth_rate_mu", "assumption"]
-    assert b["s0"].sourceRule == ["fit", "record:medium_component_conc", "assumption"]
+    # D6's order: a fit, the records, a kept simulation, a person, a convention.
+    assert b["mu_max"].sourceRule == ["fit", "record:growth_rate_mu", "simulation", "assumption"]
+    assert b["s0"].sourceRule == ["fit", "record:medium_component_conc", "simulation", "assumption"]
     assert "convention" not in b["p_max"].sourceRule and "convention" not in b["alpha"].sourceRule
-    # A field the appendix calls new waits for §3.2's ontology entry.
-    assert b["maintenance"].sourceRule == ["fit", "assumption", "convention"]
-    assert b["yxo"].sourceRule == ["fit", "assumption", "convention"]
+    # The fields the appendix calls new, which §3.2 added to the ontology.
+    assert b["maintenance"].sourceRule == ["fit", "record:maintenance_coefficient", "simulation", "assumption",
+                                           "convention"]
+    assert b["yxo"].sourceRule == ["fit", "record:biomass_yield_oxygen", "simulation", "assumption", "convention"]
+    # The run length is a fit's only under the fit-length preset, and never a kept simulation's.
+    assert b["t_end"].sourceRule == ["fit", "convention", "assumption"]
+    assert all("simulation" not in s.sourceRule for s in FAMILIES["light_v1"].specs())
 
 
 def test_the_light_socket_refuses_in_words():
