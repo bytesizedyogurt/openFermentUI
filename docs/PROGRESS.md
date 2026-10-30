@@ -440,3 +440,9 @@ Blockers).
   `test_runs_sim.py` (`sim`: the flowsheet on library defaults with a valid SFF file, a scenario
   with a person's assumption and a model's estimate `assumed`, a replay within tolerance, AFEX's
   receipt).
+- 4.4 (gate) `test_boundaries.py` holds the package rules of §7.2, read from the code by `ast`:
+  each package imports what its row allows of openFerment's modules and none of the libraries it
+  forbids; six exceptions are written down with their reasons (literature → projects and
+  migrations; engine → artifacts, basis, the shelf's package-test reader and projects), and an
+  exception no longer used fails the test. studies/ and postdoc/ are held to their rows from the
+  commit that makes them.
