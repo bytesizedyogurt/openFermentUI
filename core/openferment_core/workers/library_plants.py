@@ -45,6 +45,7 @@ import ast
 import importlib
 import inspect
 import io
+import math
 import pkgutil
 import re
 from collections.abc import Callable, Iterator
@@ -326,19 +327,37 @@ def _module(plant: str) -> Any:
         raise Refused(f"{PACKAGE} {version(PACKAGE)} has no plant {plant}") from None
 
 
+def _process_models() -> list[Any]:
+    """Every ProcessModel class BioSTEAM knows, its subclasses' subclasses
+    included."""
+    out, stack = [], list(bst.ProcessModel.__subclasses__())
+    while stack:
+        cls = stack.pop()
+        if cls not in out:
+            out.append(cls)
+            stack += cls.__subclasses__()
+    return out
+
+
 @contextmanager
-def _empty_class_cache(cls: Any) -> Iterator[None]:
-    """A ProcessModel class's own cache, emptied while `load()` builds and
-    put back after: a build never returns a plant an earlier build left."""
-    held = vars(cls).get("cache") if cls is not None else None
-    if not isinstance(held, dict):
-        yield
-        return
-    cls.cache = {}
+def _empty_class_caches() -> Iterator[None]:
+    """Every ProcessModel class's own cache, emptied while a package's
+    `load()` builds and put back after: a build never returns a plant an
+    earlier build left. A `load()` that takes no arguments names no class
+    (cornstover's builds `cellulosic.Biorefinery('corn stover ethanol')`),
+    and a cached plant skips the `create_system` that sets the package's
+    process settings, so it would keep BioSTEAM's defaults (measured: the
+    second cornstover build in a worker costed at CEPCI 567.5 and
+    electricity at 0.0782 USD/kWh, the first at the package's 525.4 and
+    0.0572)."""
+    held = {cls: vars(cls)["cache"] for cls in _process_models() if isinstance(vars(cls).get("cache"), dict)}
+    for cls in held:
+        cls.cache = {}
     try:
         yield
     finally:
-        cls.cache = held
+        for cls, cache in held.items():
+            cls.cache = cache
 
 
 def _largest_priced_system() -> tuple[Any, str]:
@@ -396,8 +415,7 @@ def build(plant: str, configuration: str | None = None) -> Plant:
     try:
         with redirect_stdout(io.StringIO()):
             if entry == "load":
-                with _empty_class_cache(forwarded if forwarded is not None and issubclass(forwarded, bst.ProcessModel)
-                                        else None):
+                with _empty_class_caches():
                     made = obj(*args, **kwargs)
             elif entry == "Biorefinery":
                 made = obj(*args, **kwargs)
@@ -734,6 +752,21 @@ def priced(p: Plant) -> dict[str, Any]:
         out["feedstock"] = p.feedstock.ID
         out["feedstockKgPerH"] = _number(p.feedstock.F_mass)
     return out
+
+
+def npv_to_capital(price: dict[str, Any], digits: int) -> dict[str, Any]:
+    """The price block with its NPV kept to one unit in the last of `digits`
+    significant digits of the plant's total capital investment, the money it
+    is reckoned from. An NPV is a difference of discounted cash flows a
+    hundred million dollars large; at a price the TEA solved its last digits
+    are the arithmetic's (measured: -1.16e-7 and -5.63e-8 USD on two builds
+    of cornstover), and they are no part of the run."""
+    npv, tci = price.get("NPV"), price.get("TCI")
+    if not isinstance(npv, (int, float)) or not isinstance(tci, (int, float)) or not tci:
+        return price
+    step = 10.0 ** (math.floor(math.log10(abs(tci))) - (digits - 1))
+    kept = float(f"{round(npv / step) * step:.{digits}g}")
+    return {**price, "NPV": kept if kept else 0.0}
 
 
 def run(plant: str, configuration: str | None, overrides: dict[str, Any], *,

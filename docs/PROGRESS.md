@@ -190,6 +190,8 @@ precision, the package rules of §7.2 as a test, the worker op reference, and tw
 - Stage 2: a role `openferment` (password `openferment`, may create databases) and a database
   `openferment_dev` on the local cluster, for the development address and the tests' default.
   Container state, gone with the container.
+- CI went green again on `1393b1c` (the stage 4 gate's last commit), the whole verify passing on
+  the runner.
 - CI (`.github/workflows/verify.yml`, read through the GitHub tools, 2026-10-30): verify runs on
   the runner's Python 3.12 with a `pgvector/pgvector:pg17` service. Green on 3.1 and 4.1; red on
   3.2 and 3.3 (fixed by 4.1), on 4.2 (`test_proforma_worker.py`'s toy fixture compared floats

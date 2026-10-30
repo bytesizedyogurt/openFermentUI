@@ -144,6 +144,31 @@ determinism after `empty_recycles()` and `tea._sales = 0`.
   build, which moved rows of the stream and unit tables (measured: three builds in one process,
   three orders) while every number agreed. Every other unit keeps the place BioSTEAM ran it.
 
+### 5.1 (2026-10-30): every build fresh
+
+- A package's `load()` built a cached plant on every build after the first. BioSTEAM's
+  `ProcessModel` keeps the plants it made per scenario in its class (`cls.cache`); the runner
+  emptied the cache of the class a `load(*args, **kwargs)` hands its arguments to, and
+  cornstover's `load()` takes none and builds `cellulosic.Biorefinery('corn stover ethanol')`.
+  A cached plant skips `create_system`, where the package sets its process settings, so the
+  second cornstover build in a worker costed at BioSTEAM's defaults (CEPCI 567.5, electricity
+  0.0782 USD/kWh) where the first used the package's (525.4, 0.0572). Measured by building
+  cornstover, oilcane O1, cornstover and cornstover in one process. The runner now empties every
+  `ProcessModel` class's cache while a `load()` builds and puts each back after; every build reads
+  the package's settings (`test_library_sim.py` holds the cost index). The full `test:sim` order
+  had hidden it: a replay test passed because both its runs were cached builds.
+- A `Mixer`'s inlets are listed in the order of their IDs in the unit table and the stream order
+  (`inlets_in_order`): the package builds M601 and slurry_mixer from a set, and their two inlets
+  came in either order build to build. A mixer's inlets are alike; every other unit keeps its
+  ports' order.
+- With every build fresh, the NPV was the one number a replay moved: at a price the TEA solved
+  (cornstover's package prices its ethanol so) the NPV is a difference of discounted cash flows a
+  hundred million dollars large, and its last digits are the arithmetic's (-1.16e-7, -6.4e-8 and
+  -5.6e-8 USD on three builds). A library run keeps its NPV to one unit in the last kept digit of
+  the plant's total capital investment, the money it is reckoned from (`npv_to_capital`, in both
+  `library_run` and `library_cases`), which reads 0 for each of those. The A→B→A replay test holds
+  a run to its precision (`withinTolerance`).
+
 ## Revisit condition
 
 A second engine; NSKinetics once a kinetic model exists.

@@ -325,14 +325,25 @@ def units_in_order(system: Any) -> list[Any]:
     return out
 
 
+def inlets_in_order(u: Any) -> list[Any]:
+    """A unit's inlets in port order. A Mixer's inlets are alike, and a
+    package may build one from a set, so its inlets are put in the order of
+    their IDs (two builds of cornstover gave M601 and slurry_mixer their two
+    inlets in either order); every other unit keeps its ports' order."""
+    if isinstance(u, bst.Mixer):
+        return sorted((s for s in u._ins if s), key=_sid) + [s for s in u._ins if not s]
+    return list(u._ins)
+
+
 def streams_in_order(system: Any) -> list[Any]:
     """The system's streams in the order BioSTEAM lists them (each where its
     first unit, in run order, takes it in or sends it out), over the units
-    in the order `units_in_order` gives."""
+    in the order `units_in_order` gives and their inlets in the order
+    `inlets_in_order` gives."""
     at = {u: n for n, u in enumerate(units_in_order(system))}
 
     def first(s: Any) -> tuple[int, int]:
-        seen = [(at[u], next((i for i, x in enumerate([*u._ins, *u._outs]) if x is s), 0))
+        seen = [(at[u], next((i for i, x in enumerate([*inlets_in_order(u), *u._outs]) if x is s), 0))
                 for u in (s.sink, s.source) if u is not None and u in at]
         return min(seen) if seen else (len(at), 0)
 
@@ -375,7 +386,7 @@ def unit_table(system: Any) -> list[dict[str, Any]]:
         power = _num(u.power_utility.rate)
         rows.append({
             "id": u.ID, "unitClass": type(u).__name__, "line": getattr(u, "line", None) or None, "order": n,
-            "ins": [_sid(s) for s in u.ins if s], "outs": [_sid(s) for s in u.outs if s],
+            "ins": [_sid(s) for s in inlets_in_order(u) if s], "outs": [_sid(s) for s in u.outs if s],
             "installedCost": float(u.installed_cost), "purchaseCost": float(u.purchase_cost),
             "heatingDuty": heating, "coolingDuty": cooling, "power": power or None,
         })
@@ -1241,9 +1252,12 @@ def _op_library_run(args):
     digits = int(args.get("digits", 10))
     if not 1 <= digits <= 17:
         raise Refused("a library run keeps between 1 and 17 significant digits")
-    out = library_plants.run(str(args["plant"]), args.get("configuration"), dict(args.get("overrides") or {}),
-                             defaults=package_defaults, read_tables=tables, test_quantities=package_test_quantities)
-    return rounded(out, digits)
+    out = rounded(library_plants.run(str(args["plant"]), args.get("configuration"), dict(args.get("overrides") or {}),
+                                     defaults=package_defaults, read_tables=tables,
+                                     test_quantities=package_test_quantities), digits)
+    if isinstance(out.get("price"), dict):
+        out["price"] = library_plants.npv_to_capital(out["price"], digits)
+    return out
 
 
 @_library
@@ -1251,8 +1265,10 @@ def _op_library_cases(args):
     digits = int(args.get("digits", 10))
     if not 1 <= digits <= 17:
         raise Refused("library cases keep between 1 and 17 significant digits")
-    return rounded(library_plants.cases(str(args["plant"]), args.get("configuration"),
-                                        [dict(c) for c in args.get("cases") or []], defaults=package_defaults), digits)
+    out = rounded(library_plants.cases(str(args["plant"]), args.get("configuration"),
+                                       [dict(c) for c in args.get("cases") or []], defaults=package_defaults), digits)
+    return [{**c, "price": library_plants.npv_to_capital(c["price"], digits)} if isinstance(c.get("price"), dict) else c
+            for c in out]
 
 
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,

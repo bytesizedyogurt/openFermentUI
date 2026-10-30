@@ -5,8 +5,8 @@ exposes is what the committed shelf says; library plants run and are held to
 their package's own test as it holds on these versions (the corn stover plant
 misses two of its eleven values, measured); an agile configuration runs and
 says why it has no TEA breakdown; a person's value changes the solved price
-and makes the run assumed; a run replays identically after another plant ran
-between (A→B→A); a library run's SFF file validates and scores; a plant the
+and makes the run assumed; a run replays within its precision after another
+plant ran between (A→B→A); a library run's SFF file validates and scores; a plant the
 pinned BioSTEAM cannot build is refused with the package's own error.
 """
 from __future__ import annotations
@@ -83,11 +83,15 @@ def test_a_persons_value_changes_the_solved_price_and_makes_the_run_assumed(warm
     assert p["value"] == 0.05 and art.output["libraryDefaults"]["stream.sugarcane.price"] == pytest.approx(0.03455)
 
 
-def test_a_run_replays_identically_after_another_plant_ran_between(warm):
+def test_a_run_replays_within_its_precision_after_another_plant_ran_between(warm):
+    # Every build is fresh: a later one sets the package's own settings
+    # again, so what differs is the solver's last digits, an NPV at the
+    # solved price lying within the package test's atol of zero.
     a = library.run("cornstover")
     library.run("oilcane", "O1")
     replayed = artifacts.replay(a.id)
-    assert replayed.identical, replayed.differences[:5]
+    assert replayed.withinTolerance, replayed.differences[:5]
+    assert a.output["libraryDefaults"]["utility.CEPCI"] == pytest.approx(525.4), "the package's own cost index"
 
 
 def test_the_parameters_read_back_are_the_library_defaults_a_run_starts_from(warm):
