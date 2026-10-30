@@ -161,7 +161,9 @@ def check_state(state: str) -> str:
 
 
 def intake_state(ingest: str) -> str:
-    if ingest == "complete":
+    """A document's state: held by the project (collected, or linked from
+    another project's), refused, or waiting."""
+    if ingest in ("complete", "ingested", "linked", "held"):
         return "approved"
     if ingest.startswith("failed"):
         return "fenced"
@@ -232,7 +234,7 @@ def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
         artifacts=artifacts.all_artifacts,
         guild=guild.read,
         checks=checks.read,
-        intake=intake.all_statuses,
+        intake=intake.held,
         shelf=geneos.models,
         strain_aliases=_strain_aliases,
         witness=witness.runs,
@@ -648,14 +650,12 @@ class Stores:
                       detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", []), **_example(lesson)})
 
     def _intake(self) -> Iterable[Row]:
-        fetched = self._get("intake")
-        for paper in self.pool().corpus.papers:
-            status = fetched.get(paper["id"])
-            ingest = status.ingest if status is not None else str(paper.get("ingest") or "queued")
-            yield Row("intake", "source", paper["id"], paper.get("title") or paper["id"], intake_state(ingest), ingest,
-                      words=str(paper.get("year") or ""),
-                      detail={"textSource": status.textSource if status is not None else paper.get("textSource"),
-                              "reason": status.reason if status is not None else None}, id_names=False,
+        for document_id, held in self._get("intake").items():
+            title = str(held.get("title") or document_id)
+            yield Row("intake", "source", document_id, title, "approved", "held",
+                      words=str(held.get("year") or ""),
+                      detail={"collector": held.get("collector"), "licenceClass": held.get("licenceClass"),
+                              "passages": held.get("passages")}, id_names=False,
                       species=self._species_of([]))
 
     def _home(self) -> Iterable[Row]:

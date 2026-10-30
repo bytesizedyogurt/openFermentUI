@@ -169,6 +169,37 @@ def test_database():
 
 
 @pytest.fixture
+def held_documents(monkeypatch):
+    """Documents the test's project holds, id → passages, served to
+    extraction and to BioRepo through `extract.passages` in place of Sci RAG
+    Kit, so a rule can be pinned on text a human reads in one screen. The
+    kit's own passages are tested in test_literature_kit.py."""
+    from openferment_core import extract
+
+    held: dict[str, list[dict]] = {}
+
+    def passages(document_id: str) -> list[dict]:
+        if document_id not in held:
+            raise extract.NothingToAnchor(
+                f"this project holds no document {document_id}. Collect it first — there is nothing to anchor to."
+            )
+        if not held[document_id]:
+            raise extract.NothingToAnchor(f"{document_id} holds no text — there is nothing to anchor to.")
+        return held[document_id]
+
+    monkeypatch.setattr(extract, "passages", passages)
+    return held
+
+
+def structural_passages() -> list[dict]:
+    """The structural JATS fixture's sections, as a held document's passages."""
+    from openferment_core.literature.collectors import FIXTURE_ROOT, split_jats
+
+    xml = (FIXTURE_ROOT / "jats" / "structural.xml").read_text(encoding="utf-8")
+    return [section.model_dump() for section in split_jats(xml).sections]
+
+
+@pytest.fixture
 def kit_database(test_database):
     """The session's database, made now: Sci RAG Kit is pointed at it when it
     is made, and a test that reaches the kit before anything else touched the

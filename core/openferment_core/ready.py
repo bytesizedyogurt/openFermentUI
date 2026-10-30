@@ -126,29 +126,26 @@ def check_data() -> Check:
 
 
 def check_intake() -> Check:
-    complete = missed = 0
-    damaged: list[str] = []
-    for path in sorted(intake.FULLTEXT_DIR.glob("*.json")):
-        try:
-            hit = intake.cached(path.stem)
-        except ValueError:
-            damaged.append(path.name)
-            continue
-        if hit is not None and hit.status == "complete":
-            complete += 1
-        else:
-            missed += 1
+    """What the projects hold in their literature (ADR-002), and how much of
+    it has been extracted, across every project on this machine."""
     try:
+        links = _count(t.documents_link)
+        documents = db.run(_distinct_documents())
         extracted: int | str = _count(t.candidates, t.candidates.c.source == extract.MODEL)
-    except Exception:  # the data row says why the database cannot be read
-        extracted = "an unknown number"
-    summary = f"{complete} papers fetched with full text, {missed} misses cached, {extracted} extracted"
-    if damaged:
-        return Check("intake", "warn", f"{summary}; {len(damaged)} damaged ({', '.join(damaged[:5])}). "
-                     "Delete them from core/data/fulltext/ and they are fetched again tonight")
-    if complete == 0:
-        return Check("intake", "warn", f"{summary}. Fetch now: scripts/host/nightly.sh (or pnpm intake:fetch --all)")
+    except Exception as e:  # the data row says why the database cannot be read
+        return Check("intake", "warn", f"could not be read ({type(e).__name__})")
+    summary = (f"{documents} document{'s' if documents != 1 else ''} held "
+               f"({links} link{'s' if links != 1 else ''} to projects), {extracted} extracted")
+    if documents == 0:
+        return Check("intake", "warn", f"{summary}. Collect a paper on Intake (Add to this project)")
     return Check("intake", "ok", summary)
+
+
+async def _distinct_documents() -> int:
+    from sqlalchemy import distinct
+
+    async with db.session() as s:
+        return (await s.execute(select(func.count(distinct(t.documents_link.c.document_id))))).scalar_one()
 
 
 # ── the literature layer (ADR-002) ─────────────────────────────────────

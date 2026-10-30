@@ -16,18 +16,19 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 3, step 3.2** — extraction and anchoring over the kit's text: `extract.py`
-   reads a document's passages from the kit (`kit.document`), candidates anchor to the kit's
-   text, decisions and records stay in PostgreSQL, `Witness.tsx` scores them; the full-text cache
-   (`core/data/fulltext/`, `intake.fetch_paper` and the corpus-paper routes) goes. Then 3.3:
-   BioRepo → Search and PaperReader over the kit, the retrieval report, the stage 3 gate
-   (`pnpm test:lit` over the demo corpus `core/tests/fixtures/kit-demo/`).
+4. **Next step: stage 3, step 3.3** — BioRepo → Search over the kit (`kit.retrieve`, cited
+   answers through `ProjectService.answer_stream`), PaperReader over a held document's passages
+   (it reads the overlay's papers today), the retrieval report from the kit's evaluation
+   harness, and the stage 3 gate: `pnpm test:lit` over the demo corpus
+   (`core/tests/fixtures/kit-demo/`): ingest, search with citations, answer with citations,
+   extraction anchored, decision accepted, the project scope filtering results.
 5. Files in flight: none.
 
 ## Current stage
 
 Stage 3 — Sci RAG Kit — is under way: 3.1 (the kit wired in, the collectors, Intake, `/rag`, the
-kit's MCP server) is done; 3.2 is next. Stage 2 is complete: 2.1 to 2.4 put every store on
+kit's MCP server) and 3.2 (extraction, anchoring, BioRepo and Witness over the kit's text) are
+done; 3.3 is next. Stage 2 is complete: 2.1 to 2.4 put every store on
 PostgreSQL, scope every request to a project, move the browser's scientific state to the service,
 and passed the gate in a clean worktree. Stages 0 and 1 are complete (the tag push waits on the
 owner; see Blockers).
@@ -79,7 +80,10 @@ owner; see Blockers).
 | §8.2, ADR-002 | The kit's migrations live in `core/openferment_core/literature/kit_alembic/` (with its licence), where ADR-002's consequences said `core/vendor/sci_rag_migrations/`; `pnpm db:migrate` runs them through `python -m openferment_core.migrations`, which replaces `python -m openferment_core.db` | In the package beside `kit.py`, the deployed tree finds them where the code is; `db` may import nothing of the service (§7.2), so the command that runs both histories lives outside it |
 | §8.2 | `/rag` serves the kit's REST routes without its `/mcp` endpoint; the kit's MCP server runs over stdio from `.mcp.json` (`sci-rag`) | Starlette does not run a mounted app's lifespan, which the kit's streamable HTTP endpoint needs; stdio is how `.mcp.json` starts a server |
 | §8.2 | `/rag` asks for `OPENFERMENT_RAG_KEY` (`core/.env`), and with none set refuses every request | The kit runs open when given no keys; a key the owner sets is how a program outside the app reaches it |
-| §8.2, stage 3.1 | Intake keeps the corpus-paper fetch (`intake.fetch_paper`, `/api/intake/{paperId}/fetch`) and the full-text cache beside collection into the kit for one step | Extraction reads the cache until 3.2 moves it onto the kit's text, and every commit stays green |
+| §8.2, stage 3.1 | Intake kept the corpus-paper fetch (`intake.fetch_paper`, `/api/intake/{paperId}/fetch`) and the full-text cache beside collection into the kit for one step; 3.2 removed both | Extraction read the cache until 3.2 moved it onto the kit's text, and every commit stays green |
+| §8.2, stage 3.2 | Extraction anchors to the kit's chunks as passages (`p<index>`), a candidate's `sectionId` naming one; neighbouring passages of a section share the kit's overlap, so a sentence may stand in two and either anchors | The kit's chunks are its text; rebuilding sections from them would undo the overlap by guesswork, since the overlap's whitespace is the kit's own |
+| §6.2, stage 3.2 | Witness scores a run against the values reviewers typed (a gold value or a correction on a decision), where alpha 1.0 scored it against the seed's curated records | The seed is gone (ADR-010); a value a person typed is independent of the extractor, and one accepted as the extractor wrote it is not |
+| stage 3.2 | The overlay carries every held document's passages on every load, as the fetched papers' sections were | The reader, the review card and Witness read a paper's sections from the store today; reading them on demand is stage 7's |
 | §10 stage 1.1 | Section 5 runs in the order 5.4 + 5.3 (one commit), 5.1, 5.2, 5.5, 5.6, 5.7 | `demo.py`, `retrieve.py` and `rageval.py` were the heaviest users of the program machinery and build their fixtures through each other; deleting them first spares edits to files deleted one step later, and a commit between 5.4 and 5.3 could not be green |
 | §5.3 | `demo.py`'s stand-in evaluator and stand-in records moved to `core/tests/standins.py` (test-only) | Thirteen kept test files (Proforma, fermOS, params, pureOS, tools) test binding, override, ceiling and run-contract rules on them. Stage 4 replaces them with fixtures read from library plants (debt recorded below) |
 | §5.4 | `search_passages` stays registered, with one seam (`tools/passages.py: search`) that answers "no literature index exists yet" | Postdoc's quote validation and its tests keep the passage contract; stage 3 fills the seam with Sci RAG Kit. The whole-sentence rule moved to `quotes.py` |
@@ -291,4 +295,18 @@ owner; see Blockers).
   and factories; `/rag` with and without its key and project), `test_fastembed.py` (`lit`: the
   kit's embedding contract), the Intake API tests. CI: a `pgvector/pgvector:pg17` service and the
   FastEmbed model cache.
+- 3.2 Extraction and anchoring over the kit's text. `kit.passages` (a document's chunks in order,
+  `p<index>`, the breadcrumb taken off) and `kit.held` (every held document with its passages, in
+  three reads); `extract.passages` serves extraction and BioRepo, refusing a document the project
+  does not hold (`NothingToAnchor`, 422 at the endpoint); `extract_all` runs over the project's
+  documents. BioRepo's `fulltext` rule reads the kit's passages and its `paper` rule accepts a
+  document the project holds. Witness scores against `reference_records`: what reviewers typed,
+  and a corpus file's curated records where a test holds one. The full-text cache, `fetch_paper`,
+  the corpus fetch and status routes, the nightly fetch batch, `pnpm intake:fetch`, `IntakeStatus`
+  and the store's timed ingest go; the overlay's papers are the project's documents with their
+  citations, from which the store makes its papers (`Paper.held`); Intake's screen is the
+  collection card beside the project's documents with Extract. The Intake tool's `fetch` collects
+  by identifier (`intake.collect`); Intake's module rows are the project's documents. Tests: the
+  `held_documents` fixture serves passages to rule tests; `test_literature_kit.py` extracts over
+  the kit's own passages, takes a gold decision and has Witness score the run.
 

@@ -76,7 +76,6 @@ from .models import (
     GuildPerson,
     GuildPolicy,
     GuildWithdrawal,
-    IntakeStatus,
     LiteratureDocument,
     Overlay,
     PasteRequest,
@@ -1067,58 +1066,19 @@ _warm_proforma()
 # ── Intake (OF-BLD-012 §5.2) ────────────────────────────────────────────
 
 
-@app.post("/api/intake/{paper_id}/fetch", response_model=FetchResult)
-def intake_fetch(paper_id: str, force: bool = False) -> FetchResult:
-    """Fetch one paper's full text from Europe PMC, or from OSTI or the
-    Saccharomyces Genome Database when its `sourceUrl` names one, split it,
-    cache it.
-
-    A fetch that fails returns HTTP 200 with `status: failed:fetch` or
-    `failed:parse` and a reason — the ingest board renders both, and a 5xx
-    would render as nothing. The only errors here are a paper the corpus has
-    never heard of, and a corpus that has not been generated.
-    """
-    try:
-        corpus = load_corpus()
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    paper = corpus.paper(paper_id)
-    if paper is None:
-        raise HTTPException(status_code=404, detail=f"{paper_id} is not in the corpus")
-    result = intake.fetch_paper(paper, force=force)
-    log.info("intake: %s → %s%s", paper_id, result.status, f" ({result.reason})" if result.reason else "")
-    return result
-
-
-@app.get("/api/intake/status")
-def intake_status() -> dict[str, IntakeStatus]:
-    """Every paper with a cached fetch, success or failure, summarised."""
-    return intake.all_statuses()
-
-
 @app.post("/api/intake/{paper_id}/extract", response_model=ExtractResponse)
 def intake_extract(paper_id: str, force: bool = False) -> ExtractResponse:
-    """One structured model response over the paper's cached full text (§6.1, §6.3).
+    """One structured model response over a document's passages in the kit
+    (§6.1, §6.3; ADR-002). `paper_id` is the kit's document id.
 
-    422 when the paper has no cached full text — there is nothing to anchor
-    to, and an extraction over a curation note would be an extraction over
-    the curator. 503 when there is no key or the API cannot be reached; the
-    detail says which.
+    422 when the project holds no such document — there is nothing to anchor
+    to. 503 when there is no key or the API cannot be reached; the detail says
+    which.
     """
     try:
-        corpus = load_corpus()
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    if corpus.paper(paper_id) is None:
-        raise HTTPException(status_code=404, detail=f"{paper_id} is not in the corpus")
-    fetched = intake.cached(paper_id)
-    if fetched is None or fetched.status != "complete":
-        raise HTTPException(
-            status_code=422,
-            detail=f"{paper_id} has no cached full text. POST /api/intake/{paper_id}/fetch first.",
-        )
-    try:
         result = extract.extract_paper(paper_id, force=force)
+    except extract.NothingToAnchor as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except extract.ExtractTruncated as e:
         # Not cached, so the next attempt is a real one; 502 because the
         # upstream answered and the answer was unusable.
@@ -1233,21 +1193,22 @@ app.mount("/rag", _KitREST(), name="rag")
 
 @app.get("/api/biorepo/overlay", response_model=Overlay)
 def biorepo_overlay() -> Overlay:
-    """What the service knows that the seed does not.
+    """What the service knows of the project's literature.
 
-    Papers from fulltext/ (§5); the run and the new candidates recomputed
-    from the project's candidates against the seed (§6.2); the reviewers'
-    decisions from the project's decision rows (§7.2). The store applies whatever is here in one action at
+    Papers are the documents the project holds in the kit, with their
+    passages (ADR-002); the run and the new candidates are recomputed from
+    the project's candidates against the values its reviewers typed (§6.2,
+    `witness.reference_records`); the decisions come from the project's
+    decision rows (§7.2). The store applies whatever is here in one action at
     load, and nothing here changes a record's status — that path goes
-    through `biorepo.write` alone. A missing corpus.json costs the run, not
-    the overlay.
+    through `biorepo.write` alone.
     """
     runs, candidates, decisions = witness.overlay_bundle()
     # Always the FULL lists, never None (OF-BLD-012.1 F3): an empty list here
     # means the extractor has produced nothing, and the store drops what it
     # was holding. None is reserved for a caller that supplies neither, and
     # nothing in this service is such a caller.
-    return Overlay(papers=intake.overlay_papers(), records=decisions, candidates=candidates, runs=runs)
+    return Overlay(papers=intake.overlay_papers(projects.current()), records=decisions, candidates=candidates, runs=runs)
 
 
 @app.post("/api/biorepo/decisions", response_model=ReviewDecision)

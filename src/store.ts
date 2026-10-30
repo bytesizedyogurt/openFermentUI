@@ -23,6 +23,7 @@ import type {
   Job,
   MeasuredEvidence,
   LearnModule,
+  OverlayPaper,
   Paper,
   Product,
   Protocol,
@@ -73,7 +74,7 @@ import {
   type DurableSnapshot,
   type TrainMade,
 } from '@/lib/durable';
-import { DecisionRefused, IntakeDown, extractPaper, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
+import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
 import { blocks, carryOverSpan, isNewCandidate, spanChangesNumber, writeRefusal, type ReviewAction } from '@/lib/review';
 import { postdocHealth } from '@/lib/postdoc';
 import { call } from '@/lib/http';
@@ -418,8 +419,6 @@ export interface OFState {
   clearJobs: () => void;
 
   // ingest
-  ingestPaper: (paperId: string, opts?: { force?: boolean }) => void;
-  setPaperIngest: (paperId: string, status: Paper['ingest']) => void;
 
   // protocols / runs
   startRun: (protocolId: string, version: string, scale: number) => string;
@@ -623,8 +622,6 @@ export interface OFState {
   applyOverlay: (overlay: Overlay) => void;
   /** Ask the service for its overlay and apply it. Silent when there is no service. */
   hydrateOverlay: () => Promise<void>;
-  /** Live fetch through the service. Called by `ingestPaper` when the service is up. */
-  ingestPaperLive: (paperId: string, force?: boolean) => Promise<void>;
   /** One structured model response over a fetched paper, through the service (§6.3); then the overlay again. */
   extractPaperLive: (paperId: string) => Promise<void>;
   completeJob: (id: string) => void;
@@ -822,6 +819,43 @@ function initialTheme(): Theme {
   if (stamped === 'dark') return 'night';
   if (stamped === 'light') return 'bench';
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'bench';
+}
+
+/** What kind of source a collector serves, for a paper made from the overlay. */
+const SOURCE_TYPES: Partial<Record<NonNullable<OverlayPaper['source']>, Paper['sourceType']>> = {
+  europepmc: 'journal-article',
+  osti: 'industry-report',
+  sgd: 'database-entry',
+};
+
+/**
+ * A document the project holds, as a paper (ADR-002): the citation the kit
+ * holds, its passages as its sections, its licence. Nothing is filled in
+ * that the kit does not hold; a year it does not know stays unset.
+ */
+function paperOf(id: string, o: OverlayPaper): Paper {
+  return {
+    id,
+    title: o.title ?? id,
+    authors: o.authors ?? [],
+    year: o.year ?? undefined,
+    venue: o.journal ?? '',
+    organisms: [],
+    topics: [],
+    abstract: '',
+    sections: o.sections,
+    ingest: o.ingest,
+    textSource: o.textSource,
+    openAccess: o.licenceClass === 'public' || o.licenceClass === 'open_commercial' || o.licenceClass === 'open_noncommercial',
+    doi: o.doi ?? undefined,
+    pmcid: o.pmcid ?? undefined,
+    sourceUrl: o.url ?? undefined,
+    sourceType: o.source ? SOURCE_TYPES[o.source] : undefined,
+    license: o.license ?? undefined,
+    licenceClass: o.licenceClass ?? undefined,
+    fetchedFrom: o.source,
+    held: true,
+  };
 }
 
 export const useStore = create<OFState>()((set, get) => ({
@@ -1285,27 +1319,6 @@ export const useStore = create<OFState>()((set, get) => ({
   // from Europe PMC and its own text replaces the curation note (OF-BLD-012
   // §5.4). When it does not, nothing is fetched, and the toast names the
   // missing service and the command that starts it.
-  ingestPaper: (paperId, opts) => {
-    if (!get().papers.some((p) => p.id === paperId)) return;
-    void (async () => {
-      let up = get().serviceUp;
-      if (up === null) {
-        try {
-          up = (await postdocHealth()).ok;
-        } catch {
-          up = false;
-        }
-        set({ serviceUp: up });
-      }
-      if (up) await get().ingestPaperLive(paperId, opts?.force);
-      else
-        get().toast({
-          text: `${paperId} was not fetched: the Intake service is not running. Start it with \`uv run uvicorn openferment_core.api:app\` from \`core/\`.`,
-          kind: 'error',
-        });
-    })();
-  },
-
   extractPaperLive: async (paperId) => {
     const id = get().startJob({
       title: `Extract ${paperId}`,
@@ -1345,103 +1358,6 @@ export const useStore = create<OFState>()((set, get) => ({
     // ask for them again so Witness and Guild move.
     await get().hydrateOverlay();
   },
-
-  ingestPaperLive: async (paperId, force = false) => {
-    get().setPaperIngest(paperId, 'stage:fetch');
-    // Two real stages. Chunk, Embed and Extract are not run by a fetch — the
-    // board shows them as not built rather than ticking them off.
-    const id = get().startJob({
-      title: `Fetch ${paperId}`,
-      kind: 'ingest',
-      stages: [
-        { label: 'Fetch', ms: 20000 },
-        { label: 'Parse', ms: 2000 },
-      ],
-      href: `#/biorepo/paper/${paperId}`,
-    });
-    get().logActivity({
-      at: stamp(),
-      icon: 'download',
-      text: `Fetching ${paperId} from Europe PMC`,
-      href: `#/intake/ingest`,
-      provenance: 'user',
-    });
-
-    let result: FetchResult;
-    try {
-      // Retry forces: the service caches a miss so the same paper is not
-      // asked twice by accident, and a retry is on purpose.
-      result = await fetchPaper(paperId, { force });
-    } catch (e) {
-      const message =
-        e instanceof IntakeDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
-      get().failJob(id, message);
-      get().setPaperIngest(paperId, 'failed:fetch');
-      if (e instanceof IntakeDown) set({ serviceUp: false });
-      get().toast({ text: `Fetch ${paperId} failed — ${message}`, kind: 'error' });
-      return;
-    }
-
-    if (result.status === 'complete') {
-      get().applyOverlay({
-        papers: {
-          [paperId]: {
-            ingest: 'complete',
-            textSource: 'full-text',
-            sections: result.sections,
-            license: result.license?.href ?? result.license?.text ?? null,
-            fetchedAt: result.fetchedAt,
-            reason: null,
-            source: result.source,
-          },
-        },
-        records: {},
-        // A fetch brings a paper, not an extractor run. `[]` here would say
-        // "the extractor produced nothing" (F3) and drop every undecided
-        // candidate in the store; `null` says nothing about them.
-        candidates: null,
-        runs: null,
-      });
-      get().completeJob(id);
-      get().toast({
-        text: `${paperId} fetched — ${result.sections.length} sections, the paper's own words`,
-        kind: 'success',
-        href: `#/biorepo/paper/${paperId}`,
-        hrefLabel: 'Open',
-      });
-      return;
-    }
-
-    // A real failure, with the service's reason. Persisted server-side, so
-    // the same paper is not asked again until somebody forces it.
-    get().applyOverlay({
-      papers: {
-        [paperId]: {
-          ingest: result.status,
-          textSource: 'curation-note',
-          sections: [],
-          license: null,
-          fetchedAt: result.fetchedAt,
-          reason: result.reason,
-        },
-      },
-      records: {},
-      candidates: null,
-      runs: null,
-    });
-    get().failJob(id, result.reason ?? 'The service reported a failure without a reason.');
-    get().toast({
-      text: `${paperId} halted at ${result.status === 'failed:parse' ? 'Parse' : 'Fetch'}`,
-      kind: 'error',
-      href: '#/intake/ingest',
-      hrefLabel: 'Open the board',
-    });
-  },
-
-  setPaperIngest: (paperId, status) =>
-    set((s) => ({
-      papers: s.papers.map((p) => (p.id === paperId ? { ...p, ingest: status } : p)),
-    })),
 
   // ── runs ─────────────────────────────────────────────────────────────
   startRun: (protocolId, version, scale) => {
@@ -2505,7 +2421,15 @@ export const useStore = create<OFState>()((set, get) => ({
       // Papers, runs, decisions and new records. A decision here came through
       // `biorepo.write` on the service (§2.3); this is the only other place a
       // record's status moves, and only to what the service already stored.
-      const papers = s.papers.map((p) => {
+      // The documents the project holds (ADR-002) are papers made from the
+      // overlay, all of them every time: the service sends the project's
+      // whole set, so a paper the last project held and this one does not
+      // leaves with it.
+      const notHeld = s.papers.filter((p) => !p.held);
+      const held = Object.entries(overlay.papers)
+        .filter(([id, o]) => o.title != null && !notHeld.some((p) => p.id === id))
+        .map(([id, o]) => paperOf(id, o));
+      const papers = [...notHeld.map((p) => {
         const o = overlay.papers[p.id];
         if (!o) return p;
         const fetched = o.textSource === 'full-text' && o.sections.length > 0;
@@ -2520,7 +2444,7 @@ export const useStore = create<OFState>()((set, get) => ({
           fetchedFrom: fetched ? (o.source ?? 'europepmc') : p.fetchedFrom,
           ingestReason: o.reason ?? undefined,
         } as Paper;
-      });
+      }), ...held];
       // §6.4 — Witness reads runs from the store: the overlay's when present,
       // the seed's RUN_OUTPUTS otherwise. An overlay run replaces a seed run
       // of the same id; the seed keeps any run the overlay does not carry.

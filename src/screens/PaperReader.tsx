@@ -121,7 +121,6 @@ export default function PaperReader({
   const unitMode = useStore((s) => s.ui.unitMode);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
   const setUI = useStore((s) => s.setUI);
-  const ingestPaper = useStore((s) => s.ingestPaper);
   const toast = useStore((s) => s.toast);
 
   const [activeId, setActiveId] = useState<string | null>(spanId ?? null);
@@ -439,20 +438,6 @@ export default function PaperReader({
               the searchable corpus and carries no extractions.
             </p>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => {
-                  ingestPaper(paper.id);
-                  toast({
-                    text: `Ingest started for ${paper.id}`,
-                    kind: 'info',
-                    href: '#/intake/ingest',
-                    hrefLabel: 'Board',
-                  });
-                }}
-              >
-                Ingest this paper
-              </Button>
               <LinkButton to="/intake/ingest" size="sm">
                 Open ingest board
               </LinkButton>
@@ -481,20 +466,6 @@ export default function PaperReader({
               The abstract below is the raw-text fallback.
             </p>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => {
-                  ingestPaper(paper.id);
-                  toast({
-                    text: `Retrying ingest for ${paper.id}`,
-                    kind: 'info',
-                    href: '#/intake/ingest',
-                    hrefLabel: 'Board',
-                  });
-                }}
-              >
-                <RefreshCw size={12} /> Retry ingest
-              </Button>
               <LinkButton to="/intake/ingest" size="sm">
                 Open ingest board
               </LinkButton>

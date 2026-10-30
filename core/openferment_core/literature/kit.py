@@ -588,6 +588,43 @@ def document(document_id: str, *, project_id: str, preview_chunks: int = 10_000)
     return db.run(go())
 
 
+@dataclass(frozen=True)
+class Passages:
+    """A document's text as the kit holds it: one section a chunk, in order,
+    each `p<index>` with the section it sits in. Neighbouring passages of one
+    section share a sentence or two (the kit's overlap); a quote anchors in
+    the passage it cites."""
+
+    document: Document
+    sections: list[dict[str, Any]]
+
+
+def body_of(chunk: Chunk) -> str:
+    """A chunk's own words: its content without the breadcrumb (the title and
+    the section) the kit puts first for embedding."""
+    head, sep, rest = chunk.content.partition("\n\n")
+    return rest if sep else chunk.content
+
+
+def passage_id(chunk_index: int) -> str:
+    return f"p{chunk_index}"
+
+
+def passages(document_id: str, *, project_id: str) -> Passages:
+    """The document's passages, for extraction and anchoring and for reading.
+    ApiError 404 for a document the project does not hold."""
+    found, chunks = document(document_id, project_id=project_id)
+    return Passages(found, [
+        {
+            "id": passage_id(c.chunk_index),
+            "heading": c.section_path or found.title,
+            "text": body_of(c),
+            "isTable": bool(c.is_table),
+        }
+        for c in chunks
+    ])
+
+
 def documents(project_id: str) -> list[tuple[Document, dict[str, Any]]]:
     """Every document the project holds, newest link first, each with its link."""
 
@@ -606,6 +643,35 @@ def documents(project_id: str) -> list[tuple[Document, dict[str, Any]]]:
         return [(found[x["document_id"]], x) for x in links if x["document_id"] in found]
 
     return db.run(go())
+
+
+def held(project_id: str) -> list[tuple[Document, dict[str, Any], list[dict[str, Any]]]]:
+    """Every document the project holds, newest link first, each with its
+    link and its passages (`passages`), in three reads however many there are."""
+    found = documents(project_id)
+    if not found:
+        return []
+
+    async def go() -> dict[str, list[Chunk]]:
+        async with async_sessionmaker(_engine("loop"), expire_on_commit=False)() as session:
+            rows = (await session.execute(
+                select(Chunk).where(Chunk.document_id.in_([d.id for d, _ in found]))
+                .order_by(Chunk.document_id, Chunk.chunk_index)
+            )).scalars().all()
+        out: dict[str, list[Chunk]] = {}
+        for c in rows:
+            out.setdefault(c.document_id, []).append(c)
+        return out
+
+    chunks = db.run(go())
+    return [
+        (d, link, [
+            {"id": passage_id(c.chunk_index), "heading": c.section_path or d.title, "text": body_of(c),
+             "isTable": bool(c.is_table)}
+            for c in chunks.get(d.id, [])
+        ])
+        for d, link in found
+    ]
 
 
 def stats(project_id: str) -> dict[str, Any]:

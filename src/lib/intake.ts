@@ -1,8 +1,8 @@
 // The browser's side of Intake (OF-BLD-012 §5.4).
 //
-// Three calls, no key. The service fetches from Europe PMC, splits the JATS,
-// and caches the result; this asks for one paper, asks what has been fetched,
-// and asks for the overlay the store applies at load.
+// Calls with no key: extract one of the project's documents, post a review
+// decision, and ask for the overlay the store applies at load. Collecting a
+// document into the project is lib/literature.ts's.
 //
 // SAME DISCIPLINE AS lib/postdoc.ts. When the service is unreachable this says
 // so and says how to start it, and it never quietly substitutes the timer
@@ -12,7 +12,6 @@
 import type {
   DecisionCheck,
   ExtractResponse,
-  FetchResult,
   FetchSource,
   Overlay,
   ReviewDecision,
@@ -25,6 +24,8 @@ const SOURCE_NAMES: Record<FetchSource, string> = {
   europepmc: 'Europe PMC',
   osti: 'OSTI',
   sgd: 'Saccharomyces Genome Database',
+  upload: 'an uploaded file',
+  paste: 'pasted text',
 };
 
 /** The name of a fetched text's source; absent is Europe PMC, the one source an older service knew. */
@@ -143,31 +144,6 @@ export async function checkDecision(decision: ReviewDecision, signal?: AbortSign
   }
   if (!response.ok) await explain(response, signal);
   return (await response.json()) as DecisionCheck;
-}
-
-/**
- * Fetch one paper's full text through the service.
- *
- * A FAILED FETCH IS A SUCCESS OF THIS CALL: the result carries `failed:fetch`
- * or `failed:parse` and a reason, and the board renders it. Only the service
- * being unreachable throws.
- */
-export async function fetchPaper(
-  paperId: string,
-  opts: { force?: boolean; signal?: AbortSignal } = {},
-): Promise<FetchResult> {
-  let response: Response;
-  try {
-    response = await apiFetch(
-      `/api/intake/${encodeURIComponent(paperId)}/fetch${opts.force ? '?force=true' : ''}`,
-      { method: 'POST', signal: opts.signal },
-    );
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') throw e;
-    throw new IntakeDown('Intake service not running.');
-  }
-  if (!response.ok) await explain(response, opts.signal);
-  return (await response.json()) as FetchResult;
 }
 
 /**

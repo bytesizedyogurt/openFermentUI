@@ -20,9 +20,8 @@ import pytest
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
-from openferment_core import intake
 from openferment_core.literature import collectors
-from openferment_core.intake import NetworkRefused, cached, fetch_paper, split_pdf, split_sgd, status_of
+from openferment_core.literature.collectors import NetworkRefused, NotCollected, split_pdf, split_sgd
 
 FIXTURES = Path(__file__).parent / "fixtures"
 SGD_ENTRY = FIXTURES / "sgd" / "S000203483.json"
@@ -31,10 +30,8 @@ SGD_URL = "https://www.yeastgenome.org/backend/strain/S000203483"
 
 
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path):
+def _offline(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    # Persist under a temp directory so a test never writes into core/data/.
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
 
 
 def pdf(*pages: list[str]) -> bytes:
@@ -156,7 +153,7 @@ def test_an_entry_with_nothing_to_read_is_a_parse_failure(text):
     assert r.status == "failed:parse" and r.reason and r.source == "sgd"
 
 
-# ── fetch: dispatch, cache, and the network guard ──────────────────────
+# ── fetch: dispatch and the network guard ──────────────────────────────
 
 
 @pytest.fixture
@@ -171,89 +168,73 @@ def fixture_root(monkeypatch, tmp_path):
 
 
 def test_source_of_reads_the_host():
-    assert intake.source_of({"sourceUrl": OSTI_URL}) == "osti"
-    assert intake.source_of({"sourceUrl": SGD_URL}) == "sgd"
-    assert intake.source_of({"pmcid": "PMC1"}) == "europepmc"
-    assert intake.source_of({"sourceUrl": "https://example.org/osti.gov/1"}) == "europepmc"
+    assert collectors.source_of({"sourceUrl": OSTI_URL}) == "osti"
+    assert collectors.source_of({"sourceUrl": SGD_URL}) == "sgd"
+    assert collectors.source_of({"pmcid": "PMC1"}) == "europepmc"
+    assert collectors.source_of({"sourceUrl": "https://example.org/osti.gov/1"}) == "europepmc"
 
 
-def test_a_paper_with_a_source_address_is_fetched_there_and_cached(fixture_root):
-    # It carries a DOI too, and is still not asked of Europe PMC: in fixture
-    # mode that lookup would have been refused and cached as a miss.
-    report = fetch_paper({"id": "Q1", "doi": "10.2172/1013269", "sourceUrl": OSTI_URL})
-    assert report.status == "complete" and report.source == "osti"
-    assert cached("Q1").source == "osti" and len(cached("Q1").sections) == 2
-    s = status_of("Q1")
-    assert s.source == "osti" and s.tables == 0 and s.license == "https://www.osti.gov/biblio/1013269"
-    strain = fetch_paper({"id": "Q3", "sourceUrl": SGD_URL})
-    assert strain.status == "complete" and strain.source == "sgd"
-    overlay = intake.overlay_papers()
-    assert overlay["Q1"].source == "osti" and overlay["Q3"].source == "sgd"
-    assert overlay["Q3"].license == "http://creativecommons.org/licenses/by/4.0/"
-    again = fetch_paper({"id": "Q3", "sourceUrl": SGD_URL})
-    assert again.fetchedAt == strain.fetchedAt, "a cached result is returned, not re-fetched"
-
-
-def test_the_batch_reaches_an_entry_with_no_identifier_but_its_address(fixture_root):
-    results = intake.fetch_all([{"id": "Q3", "sourceUrl": SGD_URL}, {"id": "O4"}])
-    assert [r.paperId for r in results] == ["Q3"]
+def test_an_address_is_collected_where_it_points(fixture_root):
+    report = collectors.by_identifier(OSTI_URL)
+    assert report.collector == "osti" and report.sections == 2
+    assert report.licence and report.licence.href == "https://www.osti.gov/biblio/1013269"
+    strain = collectors.by_identifier(SGD_URL)
+    assert strain.collector == "sgd" and strain.licence == collectors.SGD_LICENCE
 
 
 def test_fixture_mode_refuses_the_network_for_both_sources(fixture_root):
     with pytest.raises(NetworkRefused):
-        intake.fetch_pdf("https://www.osti.gov/servlets/purl/1")
+        collectors.fetch_pdf("https://www.osti.gov/servlets/purl/1")
     with pytest.raises(NetworkRefused):
-        intake.fetch_sgd("https://www.yeastgenome.org/backend/strain/S000000001")
+        collectors.fetch_sgd("https://www.yeastgenome.org/backend/strain/S000000001")
     with pytest.raises(NetworkRefused):
-        intake._get(OSTI_URL, follow_redirects=True)
-    # Through fetch_paper the refusal is a miss, cached as one.
-    r = fetch_paper({"id": "Q9", "sourceUrl": "https://www.osti.gov/servlets/purl/1"})
-    assert r.status == "failed:fetch" and "no fixture" in (r.reason or "") and cached("Q9") is not None
+        collectors._get(OSTI_URL, follow_redirects=True)
+    # Through a collector the refusal is a reason, and not an outage.
+    with pytest.raises(NotCollected) as refused:
+        collectors.osti("https://www.osti.gov/servlets/purl/1")
+    assert "no fixture" in str(refused.value) and not refused.value.transient
 
 
-def test_an_outage_is_not_cached_and_a_page_in_place_of_a_pdf_is(monkeypatch):
+def test_an_outage_is_transient_and_a_page_in_place_of_a_pdf_is_not(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "0")
     request = httpx.Request("GET", OSTI_URL)
     asked: list[dict] = []
 
     def answer(response):
         def get(url, params=None, **kw):
+            if "/api/v1/records/" in url:
+                return httpx.Response(404, request=request)  # no record: the citation is the id alone
             asked.append(kw)
             if isinstance(response, Exception):
                 raise response
             return response
         return get
 
-    paper = {"id": "Q1", "sourceUrl": OSTI_URL}
+    def refused() -> NotCollected:
+        with pytest.raises(NotCollected) as e:
+            collectors.osti(OSTI_URL)
+        return e.value
+
     monkeypatch.setattr(collectors, "_get", answer(httpx.Response(503, request=request)))
-    r = fetch_paper(paper)
-    assert r.status == "failed:fetch" and "503" in (r.reason or "") and cached("Q1") is None
+    e = refused()
+    assert e.transient and "503" in str(e)
     assert asked[-1].get("follow_redirects") is True, "the purl's redirects are followed"
 
     monkeypatch.setattr(collectors, "_get", answer(httpx.ConnectError("down", request=request)))
-    assert fetch_paper(paper).status == "failed:fetch" and cached("Q1") is None
+    assert refused().transient
 
     page = httpx.Response(200, headers={"content-type": "text/html"}, content=b"<html>sign in</html>", request=request)
     monkeypatch.setattr(collectors, "_get", answer(page))
-    r = fetch_paper(paper, force=True)
-    assert r.status == "failed:fetch" and "not a PDF" in (r.reason or "") and cached("Q1") is not None
+    e = refused()
+    assert not e.transient and "not a PDF" in str(e)
 
     monkeypatch.setattr(collectors, "_get", answer(httpx.Response(404, request=request)))
-    assert fetch_paper(paper, force=True).status == "failed:fetch" and "404" in cached("Q1").reason
+    e = refused()
+    assert not e.transient and "404" in str(e)
 
     # Served as octet-stream, a PDF is still a PDF by its first bytes.
     data = pdf(*REPORT)
     stream = httpx.Response(200, headers={"content-type": "application/octet-stream"}, content=data, request=request)
     monkeypatch.setattr(collectors, "_get", answer(stream))
-    assert fetch_paper(paper, force=True).status == "complete"
-
-
-def test_a_file_cached_before_the_source_field_reads_as_europe_pmc():
-    intake.FULLTEXT_DIR.mkdir(parents=True)
-    (intake.FULLTEXT_DIR / "B5.json").write_text(json.dumps({
-        "paperId": "B5", "pmcid": "PMC8471596", "status": "complete", "fetchedAt": "2026-10-14T00:00:00+00:00",
-        "sections": [{"id": "abstract", "heading": "Abstract", "text": "Words."}], "bytes": 10,
-    }), encoding="utf-8")
-    assert cached("B5").source == "europepmc"
-    assert intake.overlay_papers()["B5"].source == "europepmc"
-    assert status_of("B5").source == "europepmc"
+    found = collectors.osti(OSTI_URL)
+    assert found.sections == 2 and found.citation.title == "OSTI report 1013269"

@@ -8,23 +8,16 @@ a file or pastes text; `collect` hands it to the collector that serves it
 held the same text already), held (so did the project), or not collected and
 why. A failure is a result, never an exception: the Intake board renders it.
 
-THE FULL-TEXT CACHE, UNTIL EXTRACTION READS THE KIT. Extraction (extract.py)
-still reads a paper's sections from `core/data/fulltext/{paperId}.json`,
-which `fetch_paper` writes for a paper of the corpus. That cache and the
-functions below `collect` stay until extraction reads the kit's text (stage
-3, step 2); the fetching and the splitting are the collectors'.
+What the project holds is the kit's (`overlay_papers`): its passages, which
+extraction reads and every quote anchors to (extract.py), its citation and
+its licence. Nothing is cached beside it.
 """
 from __future__ import annotations
 
-import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import get_args
 
-import httpx
-
-from . import atomic
-from .literature import collectors
+from .literature import collectors, kit
 from .literature.collectors import (
     EUROPE_PMC,
     FIXTURE_DIR,
@@ -46,7 +39,7 @@ from .literature.collectors import (
     split_pdf,
     split_sgd,
 )
-from .models import CollectOutcome, FetchResult, FetchSource, IntakeStatus, OverlayPaper
+from .models import CollectOutcome, FetchedSection, FetchSource, OverlayPaper
 
 __all__ = [
     "EUROPE_PMC", "FIXTURE_DIR", "FIXTURE_ROOT", "NetworkRefused", "NotCollected", "NotFetched", "Transient",
@@ -55,8 +48,9 @@ __all__ = [
 ]
 
 _CORE = Path(__file__).parent.parent
+# Where the service keeps what it fetches that is not literature: the
+# genome-scale models geneOS reads (geneos_models.py).
 DATA_DIR = _env_path("OPENFERMENT_DATA_DIR", _CORE / "data")
-FULLTEXT_DIR = DATA_DIR / "fulltext"
 
 
 # ── collection into a project ──────────────────────────────────────────
@@ -74,8 +68,6 @@ def _outcome(collected: Collected, status: str, *, document_id: str | None = Non
 def store(collected: Collected, *, project_id: str, by: str, reason: str = "") -> CollectOutcome:
     """Store a collected document in the kit and link it to the project."""
     from sci_rag.ingest.manifest import CorpusEntry
-
-    from .literature import kit
 
     citation = collected.citation
     selection = collected.selection(reason)
@@ -136,228 +128,50 @@ def paste(title: str, text: str, *, project_id: str, by: str, url: str = "", lic
     return store(collected, project_id=project_id, by=by, reason=reason)
 
 
-# ── the full-text cache, until extraction reads the kit (stage 3, step 2) ──
+# ── what the project holds ─────────────────────────────────────────────
 
 
-def _fetch_elsewhere(paper: dict[str, Any], source: FetchSource) -> FetchResult:
-    """A paper whose text is held outside Europe PMC, fetched at its
-    `sourceUrl` and split by its source's rule. Cached as `fetch_paper`
-    caches: a miss as a miss, an outage not at all."""
-    paper_id = str(paper["id"])
-    url = str(paper.get("sourceUrl") or "").strip()
-    now = datetime.now(timezone.utc).isoformat()
-    try:
-        if source == "osti":
-            result = split_pdf(fetch_pdf(url), paper_id=paper_id, source_url=url)
-        else:
-            result = split_sgd(fetch_sgd(url), paper_id=paper_id)
-    except (httpx.TransportError, Transient) as e:
-        return FetchResult(
-            paperId=paper_id, status="failed:fetch", fetchedAt=now, source=source,
-            reason=f"not cached — try again: {e}",
-        )
-    except (httpx.HTTPError, NetworkRefused, NotFetched) as e:
-        return _persist(FetchResult(
-            paperId=paper_id, status="failed:fetch", reason=str(e), fetchedAt=now, source=source,
-        ))
-    return _persist(result)
-
-
-# ── persistence ────────────────────────────────────────────────────────
-
-
-def _path(paper_id: str) -> Path:
-    return FULLTEXT_DIR / f"{paper_id}.json"
-
-
-def cached(paper_id: str) -> FetchResult | None:
-    path = _path(paper_id)
-    if not path.exists():
-        return None
-    return FetchResult.model_validate_json(path.read_text(encoding="utf-8"))
-
-
-def _persist(result: FetchResult) -> FetchResult:
-    atomic.write_text(_path(result.paperId), result.model_dump_json(indent=2) + "\n")
-    return result
-
-
-def fetch_paper(paper: dict[str, Any], *, force: bool = False) -> FetchResult:
-    """Resolve, fetch, split, persist. Returns the cached result when one
-    exists unless `force`, so the batch is idempotent and a miss is not
-    re-asked.
-
-    A MISS is cached: no open-access text, a 404, a document with nothing in
-    it. An OUTAGE is not — a timeout, a connection that dropped, a 5xx that
-    survived the retry — because that is the network's condition and not the
-    paper's, and a batch that cached it would show every paper a brief outage
-    touched as halted until somebody forced each one by hand.
-
-    A paper whose `sourceUrl` is on OSTI or the Saccharomyces Genome
-    Database is fetched there, under the same rules (`_fetch_elsewhere`)."""
-    paper_id = str(paper["id"])
-    if not force:
-        hit = cached(paper_id)
-        if hit is not None:
-            return hit
-    source = source_of(paper)
-    if source != "europepmc":
-        return _fetch_elsewhere(paper, source)
-
-    now = datetime.now(timezone.utc).isoformat()
-    try:
-        pmcid = resolve_pmcid(paper)
-    except (httpx.TransportError, Transient) as e:
-        return FetchResult(
-            paperId=paper_id, status="failed:fetch", fetchedAt=now,
-            reason=f"PMCID lookup failed, not cached — try again: {e}",
-        )
-    except (httpx.HTTPError, NetworkRefused, ValueError) as e:
-        return _persist(FetchResult(
-            paperId=paper_id, status="failed:fetch", reason=f"PMCID lookup failed: {e}", fetchedAt=now,
-        ))
-    if not pmcid:
-        what = paper.get("doi") or paper.get("pmid") or "no identifier"
-        return _persist(FetchResult(
-            paperId=paper_id, status="failed:fetch", fetchedAt=now,
-            reason=f"no open-access full text on Europe PMC for {what}",
-        ))
-    try:
-        xml = fetch_fulltext(pmcid)
-    except (httpx.TransportError, Transient) as e:
-        return FetchResult(
-            paperId=paper_id, pmcid=pmcid, status="failed:fetch", fetchedAt=now,
-            reason=f"not cached — try again: {e}",
-        )
-    except (httpx.HTTPError, NetworkRefused) as e:
-        return _persist(FetchResult(
-            paperId=paper_id, pmcid=pmcid, status="failed:fetch", reason=str(e), fetchedAt=now,
-        ))
-    return _persist(split_jats(xml, paper_id=paper_id, pmcid=pmcid))
-
-
-def status_of(paper_id: str) -> IntakeStatus | None:
-    """A paper's fetch state, summarised for `GET /api/intake/status`."""
-    result = cached(paper_id)
-    if result is None:
-        return None
-    return IntakeStatus(
-        paperId=paper_id,
-        pmcid=result.pmcid,
-        ingest=result.status,
-        textSource="full-text" if result.status == "complete" else "curation-note",
-        sections=len(result.sections),
-        tables=sum(1 for s in result.sections if s.id.startswith("t")),
-        license=(result.license.href or result.license.text) if result.license else None,
-        fetchedAt=result.fetchedAt,
-        reason=result.reason,
-        source=result.source,
-    )
-
-
-def all_statuses() -> dict[str, IntakeStatus]:
-    if not FULLTEXT_DIR.exists():
-        return {}
-    out: dict[str, IntakeStatus] = {}
-    for path in sorted(FULLTEXT_DIR.glob("*.json")):
-        status = status_of(path.stem)
-        if status is not None:
-            out[path.stem] = status
-    return out
-
-
-def overlay_papers() -> dict[str, OverlayPaper]:
-    """Every cached fetch as the overlay's `papers` map (§2.1).
-
-    A success carries the paper's own sections and the licence string; a
-    failure carries its status and reason and no sections, so the store keeps
-    the seed's curation note for it and the board can say why it halted.
-    """
+def overlay_papers(project_id: str) -> dict[str, OverlayPaper]:
+    """Every document the project holds, as the overlay's `papers` (§2.1):
+    its passages as its sections, its citation, its licence as the source
+    stated it and its class, and who served it."""
+    sources = set(get_args(FetchSource))
     out: dict[str, OverlayPaper] = {}
-    if not FULLTEXT_DIR.exists():
-        return out
-    for path in sorted(FULLTEXT_DIR.glob("*.json")):
-        result = cached(path.stem)
-        if result is None:
-            continue
-        ok = result.status == "complete"
-        out[path.stem] = OverlayPaper(
-            ingest=result.status,
-            textSource="full-text" if ok else "curation-note",
-            sections=result.sections if ok else [],
-            license=(result.license.href or result.license.text) if result.license else None,
-            fetchedAt=result.fetchedAt,
-            reason=result.reason,
-            source=result.source,
+    for document, link, passages in kit.held(project_id):
+        selection = link["selection"] or {}
+        stated = selection.get("licence") or {}
+        collector = selection.get("collector")
+        out[document.id] = OverlayPaper(
+            ingest="complete",
+            textSource="full-text",
+            sections=[FetchedSection(id=p["id"], heading=p["heading"], text=p["text"]) for p in passages],
+            license=stated.get("href") or stated.get("text") or document.license_source,
+            fetchedAt=link["created_at"].isoformat(),
+            source=collector if collector in sources else "upload",
+            title=document.title,
+            authors=list(document.authors or []),
+            year=document.publication_year,
+            journal=document.journal,
+            doi=document.doi,
+            pmcid=selection.get("pmcid"),
+            url=selection.get("url") or document.source_ref,
+            licenceClass=document.license_class,
         )
     return out
 
 
-# ── batch ──────────────────────────────────────────────────────────────
+def held(project_id: str | None = None) -> dict[str, dict[str, object]]:
+    """What the project holds, a line a document: its title, year, collector,
+    licence class and how many passages, for Intake's module rows."""
+    from . import projects
 
-
-def _papers() -> list[dict[str, Any]]:
-    from .corpus import load_corpus
-
-    return load_corpus().papers
-
-
-def fetch_all(papers: list[dict[str, Any]], *, force: bool = False) -> list[FetchResult]:
-    """Every paper with a PMCID first, then the DOI-only and PMID-only ones
-    through `resolve_pmcid`, and those with a source address of their own
-    among them. Papers with no identifier and no address are skipped without
-    a request — there is nothing to ask."""
-    ordered = sorted(
-        (p for p in papers if p.get("pmcid") or p.get("doi") or p.get("pmid") or p.get("sourceUrl")),
-        key=lambda p: (0 if p.get("pmcid") else 1, str(p["id"])),
-    )
-    return [fetch_paper(p, force=force) for p in ordered]
-
-
-def _print_table(results: list[FetchResult]) -> None:
-    print(f"{'id':<6} {'pmcid':<13} {'sections':>8} {'tables':>6}  {'licence':<44} {'bytes':>8}  status")
-    for r in results:
-        tables = sum(1 for s in r.sections if s.id.startswith("t"))
-        lic = ((r.license.href or r.license.text or "") if r.license else "")[:44]
-        where = r.pmcid or (r.source if r.source != "europepmc" else "-")
-        print(
-            f"{r.paperId:<6} {where:<13} {len(r.sections):>8} {tables:>6}  {lic:<44} "
-            f"{r.bytes:>8}  {r.status}{' — ' + r.reason if r.reason else ''}"
-        )
-    ok = sum(1 for r in results if r.status == "complete")
-    print(f"\n{ok} of {results and len(results)} fetched with full text")
-
-
-def main(argv: list[str]) -> int:
-    from dotenv import load_dotenv
-
-    load_dotenv(Path(__file__).parent.parent / ".env", override=False)
-    force = "--force" in argv
-    if "--all" in argv:
-        results = fetch_all(_papers(), force=force)
-        _print_table(results)
-        # A miss is an answer and is cached; an outage is not (fetch_paper).
-        # A result the cache does not hold is one this run could not get, and
-        # the batch exits 1 for it so the nightly log shows a failed night
-        # as one (OF-BLD-012 §B.8).
-        unreached = [r.paperId for r in results if cached(r.paperId) != r]
-        if unreached:
-            print(f"{len(unreached)} not reached, will be asked again: {', '.join(unreached)}")
-        return 1 if unreached else 0
-    ids = [a for a in argv if not a.startswith("--")]
-    if not ids:
-        print("usage: python -m openferment_core.intake --all [--force] | <paperId> [...]")
-        return 2
-    by_id = {p["id"]: p for p in _papers()}
-    results = []
-    for paper_id in ids:
-        if paper_id not in by_id:
-            print(f"{paper_id}: not in the corpus")
-            return 1
-        results.append(fetch_paper(by_id[paper_id], force=force))
-    _print_table(results)
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    return {
+        document.id: {
+            "title": document.title,
+            "year": document.publication_year,
+            "collector": (link["selection"] or {}).get("collector"),
+            "licenceClass": document.license_class,
+            "passages": document.chunk_count,
+        }
+        for document, link in kit.documents(project_id or projects.current())
+    }

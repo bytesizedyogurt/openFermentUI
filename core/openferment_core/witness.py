@@ -1,8 +1,12 @@
 """Witness — scoring the run that actually ran (OF-BLD-012 §6.2).
 
-`match_run` builds one RunOutput for 'claude-1' by holding every seed record
-on an extracted paper against the candidates the extractor produced for that
-paper and field. The outcome vocabulary is the browser's, from
+`match_run` builds one RunOutput for 'claude-1' by holding every reference
+record on an extracted paper against the candidates the extractor produced
+for that paper and field. A reference record is a value a reviewer typed, a
+gold value or a correction (`reviewed_records`), or a corpus file's curated
+record where one is held; alpha 2.0 ships no corpus (ADR-010), so in a
+project the references are what its reviewers typed. The outcome vocabulary
+is the browser's, from
 `computeRunMetrics` in src/engine/metrics.ts, so Witness scores a real run
 with the same code it was written to score seeded ones:
 
@@ -325,11 +329,42 @@ def new_records(
 
 
 def seed_records() -> list[dict[str, Any]]:
-    """The curated records, and only those. Accepted candidates join the
-    corpus (§7.4) with `source: 'biorepo'`; a run scored against them would
-    match the extractor against itself, and a field they cover would stop
-    looking new. The curated records are what is scored."""
+    """The curated records of a corpus file, and only those (the tests'; alpha
+    2.0 ships none, ADR-010). Accepted candidates join the corpus (§7.4) with
+    `source: 'biorepo'`; a run scored against them would match the extractor
+    against itself, and a field they cover would stop looking new."""
     return [r for r in load_corpus().records if r.get("source", "seed") == "seed"]
+
+
+def reviewed_records(repo: Any | None = None) -> list[dict[str, Any]]:
+    """Every record a reviewer gave a value of their own, a gold value or a
+    correction, in the project's decisions: the reviewer's value on the
+    candidate's paper and field. What a person typed is independent of the
+    extractor, so a run is scored against it; a record accepted as the
+    extractor wrote it is not, since it would score the extractor against
+    itself."""
+    repo = repo if repo is not None else biorepo.read()
+    copies = {c.id: c for c in repo.records}
+    out: list[dict[str, Any]] = []
+    for record_id, decision in repo.decisions.items():
+        typed = decision.gold or decision.corrected
+        candidate = copies.get(record_id)
+        if typed is None or candidate is None:
+            continue
+        out.append({
+            "id": record_id, "paperId": candidate.paperId, "field": candidate.field,
+            "value": typed.value, "unit": typed.unit, "source": "biorepo",
+        })
+    return out
+
+
+def reference_records(repo: Any | None = None) -> list[dict[str, Any]]:
+    """What a run is scored against: the records reviewers typed a value for
+    (`reviewed_records`), and a corpus file's curated records where one is
+    held, a reviewed record first where both name one id."""
+    reviewed = reviewed_records(repo)
+    named = {r["id"] for r in reviewed}
+    return reviewed + [r for r in seed_records() if r["id"] not in named]
 
 
 @dataclass
@@ -413,7 +448,7 @@ def runs() -> list[ExtractRun]:
     g = _gather()
     if not g.papers:
         return []
-    return [_run(g, seed_records())]
+    return [_run(g, reference_records())]
 
 
 def new_candidates() -> list[Candidate]:
@@ -423,7 +458,7 @@ def new_candidates() -> list[Candidate]:
     is gone."""
     g = _gather()
     decided = {c.id for c in biorepo.records()}
-    fresh = new_records(g.candidates, seed_records(), papers=g.papers) if g.papers else []
+    fresh = new_records(g.candidates, reference_records(), papers=g.papers) if g.papers else []
     return [c for c in fresh if c.id not in decided] + biorepo.records()
 
 
@@ -444,7 +479,7 @@ def overlay_bundle() -> tuple[list[ExtractRun], list[Candidate], dict[str, Revie
     every extraction. A missing corpus.json costs the run, not the rest."""
     g = _gather()
     try:
-        runs_ = [_run(g, seed_records())] if g.papers else []
+        runs_ = [_run(g, reference_records())] if g.papers else []
     except FileNotFoundError as e:
         log.warning("overlay without runs — %s", e)
         runs_ = []

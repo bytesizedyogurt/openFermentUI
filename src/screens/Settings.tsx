@@ -1139,7 +1139,7 @@ function AboutSection() {
       if (!p.doi && !p.pmcid && !p.pmid) noId++;
       if (p.authors.length === 0) noAuthors++;
       if (p.verifyNeeded) verify++;
-      threads.add(p.thread);
+      if (p.thread) threads.add(p.thread);
     }
     return { doi, noId, noAuthors, verify, threads: threads.size };
   }, [papers]);

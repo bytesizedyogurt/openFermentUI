@@ -18,21 +18,21 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, func, select
 
-from openferment_core import biorepo, db, extract, intake, projects, witness
+from openferment_core import biorepo, db, extract, projects, witness
 from openferment_core.db import models as t
 from openferment_core.api import app
 from openferment_core.corpus import load_corpus
+
+from conftest import structural_passages
 from openferment_core.models import (
     BioRepo,
     FetchedSection,
-    FetchResult,
     Overlay,
     Quantity,
     ReviewDecision,
 )
 
 REPO_ROOT = Path(__file__).parent.parent.parent
-STRUCTURAL = "structural"
 
 # The extractor found a titre in T5's table — a field the corpus has no T5
 # record for, so it is a new candidate.
@@ -46,11 +46,15 @@ NEW_TITRE = {
 }
 
 
+HELD: dict[str, list[dict]] = {}
+
+
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path, test_corpus):
+def _offline(monkeypatch, tmp_path, test_corpus, held_documents):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
+    global HELD
+    HELD = held_documents
 
 
 def decision_rows() -> list[dict]:
@@ -80,7 +84,7 @@ def drop_candidates() -> None:
 
 
 def fetch_t5():
-    return intake.fetch_paper({"id": "T5", "pmcid": STRUCTURAL})
+    HELD["T5"] = structural_passages()
 
 
 def extract_t5(monkeypatch):
@@ -102,22 +106,12 @@ def decision(record_id: str, status: str = "verified", **overrides) -> ReviewDec
 
 
 def fetch_saying(paper_id: str, record_id: str, sentence: str) -> None:
-    """A fetched paper whose section says this, under the section id the
-    record cites — written where a real fetch would leave it, so `cached`
-    reads it the way it reads any other. Used where the test is about the
-    anchoring rules and not about the fetch."""
+    """A held document whose passage says this, under the passage id the
+    record cites. Used where the test is about the anchoring rules and not
+    about the kit."""
     rec = load_corpus().record(record_id)
     assert rec is not None, record_id
-    result = FetchResult(
-        paperId=paper_id,
-        status="complete",
-        fetchedAt="2026-09-15T00:00:00Z",
-        sections=[FetchedSection(id=rec["sectionId"], heading="Results", text=sentence)],
-    )
-    intake.FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
-    (intake.FULLTEXT_DIR / f"{paper_id}.json").write_text(
-        result.model_dump_json(), encoding="utf-8"
-    )
+    HELD[paper_id] = [FetchedSection(id=rec["sectionId"], heading="Results", text=sentence).model_dump()]
 
 
 def identified(paper_id: str) -> bool:
@@ -446,7 +440,7 @@ def test_the_check_endpoint_answers_ok_or_the_rule(client):
     )
     assert bad.status_code == 200, "a refusal is an answer, not an error"
     assert bad.json()["ok"] is False and bad.json()["rule"] == "fulltext"
-    assert "full text" in bad.json()["why"]
+    assert "does not hold" in bad.json()["why"]
     assert biorepo.decisions() == {}, "asking must never write"
 
 

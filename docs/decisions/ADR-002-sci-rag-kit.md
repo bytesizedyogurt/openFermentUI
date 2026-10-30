@@ -108,6 +108,12 @@ Two adaptations, both offered upstream:
 - **Tests.** Outside the `lit` marker the kit embeds with its deterministic local embedder, so
   test:core needs no model file; `pnpm test:lit` runs the tests marked `lit` with FastEmbed. CI's
   verify gets a `pgvector/pgvector:pg17` service and the model file from a cache.
+- **Extraction over the kit's text (3.2).** A document's passages are its chunks in order,
+  `p<index>`, each under its section path with the kit's breadcrumb taken off (`kit.passages`);
+  extraction cites them, anchoring checks a quote verbatim in the passage cited, BioRepo's
+  promotion rule reads them, and Witness scores a run against the values reviewers typed. The
+  overlay carries the project's documents with their citations and passages, from which the
+  browser makes its papers.
 - **`pnpm ready`** adds three rows: `literature` (the vector extension, the kit's revision, the
   column's dimension, the domain profile, chunks embedded by another model), `embedder` (the
   model file cached) and `rag` (whether a key is set).

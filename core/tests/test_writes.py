@@ -17,15 +17,23 @@ from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 WRITES = [f"{m}_write" for m in module_stores.MODULES]
 
 
+class _Store(type(Path())):
+    """tmp_path, with the documents the project holds (`held`)."""
+
+    held: dict[str, list[dict]]
+
+
 @pytest.fixture()
-def store(tmp_path, monkeypatch, pool):  # noqa: F811
+def store(tmp_path, monkeypatch, pool, held_documents):  # noqa: F811
     """Every file store the writes reach, under tmp_path; the audit log is
-    the test's rolled-back database."""
+    the test's rolled-back database; the documents the project holds in
+    `store.held`."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
-    return tmp_path
+    held = _Store(tmp_path)
+    held.held = held_documents
+    return held
 
 
 def ctx(pool_, ask="ask-test"):  # noqa: F811
@@ -165,11 +173,8 @@ def test_a_check_proposal_is_asked_for_in_the_persons_name(pool, store, monkeypa
 
 
 def _fetched(store, paper_id="X1", text="The culture reached a titre of 7 g/L of PHB on day three. Growth was slow."):
-    f = FetchResult(paperId=paper_id, status="complete", sections=[FetchedSection(id="s1", heading="Results", text=text)],
-                    fetchedAt="2026-10-20T00:00:00Z", pmcid="PMC1")
-    (store / "fulltext").mkdir(parents=True, exist_ok=True)
-    (store / "fulltext" / f"{paper_id}.json").write_text(f.model_dump_json())
-    return f
+    """A document the project holds whose one passage says `text`."""
+    store.held[paper_id] = [FetchedSection(id="s1", heading="Results", text=text).model_dump()]
 
 
 def test_a_candidate_written_by_hand_is_anchored_and_marked(pool, store):  # noqa: F811
@@ -198,7 +203,7 @@ def test_a_candidate_whose_value_is_not_in_the_sentence_is_refused_on_the_rule(p
 def test_a_candidate_on_an_unfetched_paper_is_refused(pool, store):  # noqa: F811
     r = write("biorepo", ctx(pool), "candidate", fields={"paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "value": "7",
                                                        "unit": "g/L", "quote": "q"})
-    assert "no cached full text" in r.error
+    assert "holds no document X1" in r.error
 
 
 HAND = {"paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "value": "7", "unit": "g/L",

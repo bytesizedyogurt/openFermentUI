@@ -198,7 +198,8 @@ export interface Paper {
   id: string;
   title: string;
   authors: string[];
-  year: number;
+  /** Unset when the source does not say. */
+  year?: number;
   venue: string;
   organisms: string[];
   topics: string[];
@@ -211,8 +212,9 @@ export interface Paper {
   ingest: IngestStatus;
 
   // ── real-corpus identity (OF-COR-001) ──────────────────────────────
-  thread: CorpusThread;
-  sourceType: SourceType;
+  /** The seed corpus's thread; a document a project collected has none. */
+  thread?: CorpusThread;
+  sourceType?: SourceType;
   /** The authoritative record key — never the author string (OF-COR-001 header). */
   doi?: string;
   pmcid?: string;
@@ -229,13 +231,17 @@ export interface Paper {
   /** Openly retrievable vs. needs institutional access (OF-COR-001 §19). */
   openAccess: boolean;
   /** Ingestion tranche: 1 = open-access core, 2 = remainder, 3 = v1.1. */
-  tranche: 1 | 2 | 3;
+  tranche?: 1 | 2 | 3;
   /** Author string not fully resolved — must be checked at ingest ([verify]). */
   verifyNeeded?: boolean;
   /** Why this entry earns its place, from the corpus document. */
   corpusRole?: string;
 
   // ── set by the service overlay (OF-BLD-012 §2.1), never by the seed ──
+  /** A document the open project holds in its literature (ADR-002), made from the overlay. */
+  held?: boolean;
+  /** Its licence class in the kit's taxonomy. */
+  licenceClass?: string;
   /** The licence the fetched full text carried, when `textSource` is 'full-text'. */
   license?: string;
   /** Who served the fetched full text, when `textSource` is 'full-text'. */
@@ -1500,7 +1506,7 @@ export type FetchStatus = Extract<IngestStatus, 'complete' | 'failed:fetch' | 'f
  * Saccharomyces Genome Database strain entry. Absent from what an older
  * service sent, which was always Europe PMC.
  */
-export type FetchSource = 'europepmc' | 'osti' | 'sgd';
+export type FetchSource = 'europepmc' | 'osti' | 'sgd' | 'upload' | 'paste';
 
 /**
  * What one fetch produced. A failure is a result with a reason rather than an
@@ -1579,20 +1585,6 @@ export interface LiteratureDocument {
   linkedAt: string;
 }
 
-/** One row of GET /api/intake/status. */
-export interface IntakeStatus {
-  paperId: string;
-  pmcid: string | null;
-  ingest: IngestStatus;
-  textSource: 'full-text' | 'curation-note';
-  sections: number;
-  tables: number;
-  license: string | null;
-  fetchedAt: string | null;
-  reason: string | null;
-  source?: FetchSource;
-}
-
 /**
  * What the overlay says about one paper (§2.1). A failed fetch is here too,
  * with its reason and no sections — the store keeps the seed's curation note
@@ -1607,6 +1599,16 @@ export interface OverlayPaper {
   reason: string | null;
   /** Who served the text, so the reader names it rather than assuming Europe PMC. */
   source?: FetchSource;
+  // The citation the kit holds for a document the project holds (ADR-002),
+  // from which the store makes its paper, and its licence class.
+  title?: string | null;
+  authors?: string[];
+  year?: number | null;
+  journal?: string | null;
+  doi?: string | null;
+  pmcid?: string | null;
+  url?: string | null;
+  licenceClass?: string | null;
 }
 
 /**

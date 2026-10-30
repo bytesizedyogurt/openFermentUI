@@ -256,7 +256,7 @@ export default function BioRepo() {
       numeric: true,
       priority: 2,
       render: (r) => <span className="font-num">{r.paper.year}</span>,
-      value: (r) => r.paper.year,
+      value: (r) => r.paper.year ?? '',
     },
     {
       key: 'organisms',

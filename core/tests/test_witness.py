@@ -12,10 +12,12 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import biorepo, db, extract, intake, projects, witness
+from openferment_core import biorepo, db, extract, projects, witness
 from openferment_core.api import app
 from openferment_core.models import Candidate, DroppedCandidate, ExtractRun, Overlay, Quantity, Range, ReviewDecision
 from openferment_core.units import to_si
+
+from conftest import structural_passages
 
 # ── a seed nobody curated ──────────────────────────────────────────────
 
@@ -238,11 +240,15 @@ GOOD = {
 }
 
 
+HELD: dict[str, list[dict]] = {}
+
+
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path, test_corpus):
+def _offline(monkeypatch, tmp_path, test_corpus, held_documents):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
+    global HELD
+    HELD = held_documents
 
 
 @pytest.fixture
@@ -257,8 +263,7 @@ def test_runs_are_empty_until_something_is_extracted(client):
 
 
 def test_runs_recompute_from_the_cache_against_the_seed(client, monkeypatch):
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    assert client.post("/api/intake/T5/fetch").json()["status"] == "complete"
+    HELD["T5"] = structural_passages()
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
     assert client.post("/api/intake/T5/extract").status_code == 200
 
@@ -284,8 +289,7 @@ def test_a_decision_stays_with_its_content_across_a_re_extraction(client, monkey
     # The rejection stays with the sentence it was about (kept as the file's
     # copy, no longer a false positive the extractor produces), and the new
     # candidate arrives undecided under its own id.
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    client.post("/api/intake/T5/fetch")
+    HELD["T5"] = structural_passages()
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
     client.post("/api/intake/T5/extract")
     biorepo.write(ReviewDecision(status="rejected", provenance="unverified", reviewer="sean",
@@ -318,8 +322,7 @@ def test_a_candidate_written_by_hand_is_shown_and_never_scored(client, monkeypat
     not extracted until the extractor runs over it, the candidate is never
     the extractor's match, and a rejection of it is not the extractor's
     false positive."""
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    assert client.post("/api/intake/T5/fetch").json()["status"] == "complete"
+    HELD["T5"] = structural_passages()
     monkeypatch.setattr(witness, "seed_records", lambda: [
         {"id": "r-T5-9", "paperId": "T5", "field": "titer_secreted", "value": 9, "unit": "mg L-1"},
     ])
@@ -408,8 +411,7 @@ def test_a_dropped_candidate_whose_value_is_a_numeric_string_is_still_a_span_err
 def test_a_run_names_the_models_that_answered(client, monkeypatch):
     # Witness shows which model a run used, read from each paper's
     # usage.models, never typed into the screen (live test, 2026-10-16).
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    client.post("/api/intake/T5/fetch")
+    HELD["T5"] = structural_passages()
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage(models=["claude-haiku-5-5"])))
     client.post("/api/intake/T5/extract")
     runs = [ExtractRun.model_validate(r) for r in client.get("/api/witness/runs").json()]
@@ -417,8 +419,7 @@ def test_a_run_names_the_models_that_answered(client, monkeypatch):
 
 
 def test_a_run_with_no_recorded_model_says_none(client, monkeypatch):
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    client.post("/api/intake/T5/fetch")
+    HELD["T5"] = structural_passages()
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
     client.post("/api/intake/T5/extract")
     assert witness.runs()[0].models == []

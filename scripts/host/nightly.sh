@@ -1,13 +1,14 @@
 #!/bin/bash
-# Nightly Intake (OF-BLD-012 §B.8), and the night's check proposals
+# Nightly extraction (OF-BLD-012 §B.8), and the night's check proposals
 # (OF-BLD-013 §5.2). The com.umutuzo.openferment.nightly LaunchDaemon runs
 # this at 03:00; running it by hand does the same thing.
 #
-# Fetches every paper Europe PMC can give, then extracts from whatever arrived.
-# Both batches skip what is already done, so a night with nothing new costs
-# nothing, and extraction prints its cost per paper. The running service reads
-# the new files on its next request; no restart. Exits non-zero when either
-# batch failed, so the log says so.
+# Extracts from every document the project holds in its literature (ADR-002;
+# documents arrive through Intake, collected by a person). The batch skips
+# what is already extracted, so a night with nothing new costs nothing, and
+# extraction prints its cost per document. The running service reads the new
+# rows on its next request; no restart. Exits non-zero when a batch failed,
+# so the log says so.
 set -uo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
@@ -22,31 +23,9 @@ for name in OPENFERMENT_DATABASE_URL OPENFERMENT_PROJECT; do
   [ -n "$value" ] && export "$name=$value"
 done
 
-echo "── $(date '+%Y-%m-%d %H:%M:%S') nightly intake"
-
-# Intake caches a miss (no open-access text yet, a 404) so a batch never asks
-# twice (intake.fetch_paper). Papers become open access later, and that is the
-# reason this job exists (§B.8), so a miss older than a week is forgotten here
-# and asked again. Complete fetches are kept: their text is what review
-# decisions are anchored to, and refetching them would buy nothing.
-"$PY" - <<'EOF'
-import json, time
-from openferment_core import intake
-WEEK = 7 * 24 * 3600
-expired = 0
-for path in intake.FULLTEXT_DIR.glob("*.json"):
-    try:
-        status = json.loads(path.read_text(encoding="utf-8")).get("status")
-    except (OSError, ValueError):
-        continue
-    if status == "failed:fetch" and time.time() - path.stat().st_mtime > WEEK:
-        path.unlink()
-        expired += 1
-print(f"{expired} cached misses older than a week will be asked again")
-EOF
+echo "── $(date '+%Y-%m-%d %H:%M:%S') nightly extraction"
 
 status=0
-"$PY" -m openferment_core.intake --all || status=$?
 # Candidates belong to a project: the one OPENFERMENT_PROJECT names.
 if [ -n "${OPENFERMENT_PROJECT:-}" ]; then
   "$PY" -m openferment_core.extract --all || status=$?

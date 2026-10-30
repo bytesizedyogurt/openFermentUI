@@ -2,9 +2,14 @@
 
 The model call is stubbed — `call_model` is replaced with a function that
 returns a hand-written tool input — so every rule around the call is pinned
-without spending a token: what the prompt and tool contain, how a section is
+without spending a token: what the prompt and tool contain, how a passage is
 cut, what happens to the candidates the stub returns, what is persisted, and
 what the endpoint answers when there is nothing to anchor to.
+
+A document's passages come from Sci RAG Kit (`extract.passages`); here they
+are the structural fixture's sections, served as a held document's passages
+(`HELD`), so each rule is pinned against text a human can read. Extraction
+over a document the kit itself stores is tested in test_literature_kit.py.
 
 The live test that actually calls the model is test_extract_live.py, marked live.
 """
@@ -16,13 +21,16 @@ from fastapi.testclient import TestClient
 
 from sqlalchemy import select
 
-from openferment_core import db, extract, intake, projects
+from openferment_core import db, extract, projects
 from openferment_core.api import app
 from openferment_core.db import models as t
 from openferment_core.models import ExtractResponse, Usage
 from openferment_core.units import tables
 
-STRUCTURAL_PMCID = "structural"
+from conftest import structural_passages
+
+# The documents this test's project holds: id → passages (conftest's held_documents).
+HELD: dict[str, list[dict]] = {}
 
 
 
@@ -41,15 +49,16 @@ def kept_row(paper_id: str) -> dict:
     return db.run(read())
 
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path, test_corpus):
+def _offline(monkeypatch, tmp_path, test_corpus, held_documents):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
+    global HELD
+    HELD = held_documents
 
 
-def fetch_structural_as(paper_id: str):
-    """Cache the structural document as this paper's full text."""
-    return intake.fetch_paper({"id": paper_id, "pmcid": STRUCTURAL_PMCID})
+def fetch_structural_as(paper_id: str) -> None:
+    """The structural document, held as this paper's passages."""
+    HELD[paper_id] = structural_passages()
 
 
 # The response a well-behaved model would give for the structural document:
@@ -174,15 +183,15 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
 def test_a_paper_with_no_full_text_is_refused_before_any_call(monkeypatch):
     call = stub_call({"candidates": []})
     monkeypatch.setattr(extract, "call_model", call)
-    with pytest.raises(extract.ExtractUnavailable) as caught:
+    with pytest.raises(extract.NothingToAnchor) as caught:
         extract.extract_paper("NOPE")
-    assert "no cached full text" in str(caught.value)
+    assert "holds no document NOPE" in str(caught.value)
     assert call.calls == []
 
 
-def test_a_failed_fetch_is_not_extractable(monkeypatch):
-    intake.fetch_paper({"id": "X2", "pmcid": "PMC0000000"})  # no fixture → failed:fetch
-    with pytest.raises(extract.ExtractUnavailable):
+def test_a_document_with_no_text_is_not_extractable(monkeypatch):
+    HELD["X2"] = []
+    with pytest.raises(extract.NothingToAnchor):
         extract.extract_paper("X2")
 
 
@@ -203,8 +212,7 @@ def test_a_truncated_response_is_refused_and_not_cached(monkeypatch):
 
 def test_extract_endpoint_answers_502_on_a_truncated_response(monkeypatch):
     client = TestClient(app)
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
-    client.post("/api/intake/T5/fetch")
+    fetch_structural_as("T5")
     monkeypatch.setattr(extract, "call_model", stub_call({"candidates": [], "truncated": True}))
     r = client.post("/api/intake/T5/extract")
     assert r.status_code == 502 and "token limit" in r.json()["detail"]
@@ -226,16 +234,14 @@ def client():
     return TestClient(app)
 
 
-def test_extract_endpoint_refuses_without_full_text(client):
+def test_extract_endpoint_refuses_a_document_the_project_does_not_hold(client):
     r = client.post("/api/intake/T5/extract")
     assert r.status_code == 422
-    assert "no cached full text" in r.json()["detail"]
-    assert client.post("/api/intake/NOPE/extract").status_code == 404
+    assert "holds no document T5" in r.json()["detail"]
 
 
 def test_extract_endpoint_returns_the_anchored_candidates(client, monkeypatch):
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
-    assert client.post("/api/intake/T5/fetch").json()["status"] == "complete"
+    fetch_structural_as("T5")
     monkeypatch.setattr(extract, "call_model", stub_call(GOOD_AND_BAD))
     r = client.post("/api/intake/T5/extract")
     assert r.status_code == 200, r.text
@@ -245,8 +251,7 @@ def test_extract_endpoint_returns_the_anchored_candidates(client, monkeypatch):
 
 
 def test_extract_endpoint_says_when_there_is_no_key(client, monkeypatch):
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
-    client.post("/api/intake/T5/fetch")
+    fetch_structural_as("T5")
     # Fixture mode with no saved response behaves like the no-key case: 503
     # with the reason, never a candidate list invented to fill the gap.
     r = client.post("/api/intake/T5/extract")
@@ -276,31 +281,17 @@ def test_the_system_prompt_says_what_a_range_and_an_absence_are_for():
 def fetch_sections(paper_id: str, sections: list[tuple[str, str]]) -> None:
     """A fetched paper whose sections say these things, written where a real
     fetch would leave it."""
-    from openferment_core.models import FetchedSection, FetchResult
+    from openferment_core.models import FetchedSection
 
-    result = FetchResult(
-        paperId=paper_id,
-        status="complete",
-        fetchedAt="2026-09-15T00:00:00Z",
-        sections=[FetchedSection(id=i, heading="Results", text=t) for i, t in sections],
-    )
-    intake.FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
-    (intake.FULLTEXT_DIR / f"{paper_id}.json").write_text(result.model_dump_json(), encoding="utf-8")
+    HELD[paper_id] = [FetchedSection(id=i, heading="Results", text=t).model_dump() for i, t in sections]
 
 
 def fetch_saying(paper_id: str, section_id: str, text: str) -> None:
     """A fetched paper whose one section says this, written where a real
     fetch would leave it."""
-    from openferment_core.models import FetchedSection, FetchResult
+    from openferment_core.models import FetchedSection
 
-    result = FetchResult(
-        paperId=paper_id,
-        status="complete",
-        fetchedAt="2026-09-15T00:00:00Z",
-        sections=[FetchedSection(id=section_id, heading="Results", text=text)],
-    )
-    intake.FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
-    (intake.FULLTEXT_DIR / f"{paper_id}.json").write_text(result.model_dump_json(), encoding="utf-8")
+    HELD[paper_id] = [FetchedSection(id=section_id, heading="Results", text=text).model_dump()]
 
 
 def test_a_range_the_model_states_reaches_the_anchored_candidate(monkeypatch):
@@ -463,7 +454,7 @@ def test_the_prompt_is_built_once_per_call(monkeypatch):
 
     monkeypatch.setattr(extract, "build_prompt", counting)
     extract.extract_paper("X1")
-    assert calls == [len(intake.cached("X1").sections)], calls
+    assert calls == [len(HELD["X1"])], calls
 
 
 # ── a polymer, a bacterium's growth rate, and what the cells were fed ──

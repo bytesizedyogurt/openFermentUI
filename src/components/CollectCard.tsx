@@ -45,6 +45,7 @@ export function CollectCard() {
   const reviewer = useStore((s) => s.reviewer).trim();
   const projectId = useStore((s) => s.projectId);
   const serviceUp = useStore((s) => s.serviceUp);
+  const hydrateOverlay = useStore((s) => s.hydrateOverlay);
   const [mode, setMode] = useState<Mode>('identifier');
   const [identifier, setIdentifier] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -98,7 +99,9 @@ export function CollectCard() {
         setText('');
         setUrl('');
         setReason('');
-        await refresh();
+        // The overlay brings the document as a paper: the board, BioRepo and
+        // the reader see it without a reload.
+        await Promise.all([refresh(), hydrateOverlay()]);
       }
     } catch (e) {
       setProblem(said(e));

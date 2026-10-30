@@ -14,7 +14,7 @@ import httpx
 
 import pytest
 
-from openferment_core import api, db, intake, llm, projects, ready
+from openferment_core import api, db, llm, projects, ready
 from openferment_core.db import migrate
 
 # Shaped like a key, so check_key accepts it; random, so no piece of it turns
@@ -58,7 +58,6 @@ class FakeClient:
 @pytest.fixture(autouse=True)
 def _scratch(monkeypatch, tmp_path, test_database):
     monkeypatch.delenv("OPENFERMENT_FIXTURES", raising=False)
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     # The data row reads the database at the address set: the session's own,
     # migrated to head.
     test_database.open()
@@ -264,22 +263,56 @@ def test_the_lane_is_the_last_line_of_every_report(monkeypatch):
 # ── what is on disk ────────────────────────────────────────────────────
 
 
-def test_intake_counts_what_was_fetched_and_extracted(monkeypatch):
-    assert ready.check_intake().mark == "warn", "nothing fetched is worth knowing"
-    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    intake.fetch_paper({"id": "B5", "pmcid": "structural"})
+def test_intake_counts_the_documents_held_and_extracted():
+    assert ready.check_intake().mark == "warn", "nothing held is worth knowing"
+
+    async def link() -> None:
+        from sqlalchemy import insert
+
+        from openferment_core.db import models as t
+
+        async with db.session() as s:
+            await s.execute(insert(t.documents_link).values(
+                project_id="test-project", document_id="0" * 32, selection={}, created_by="test"))
+
+    db.run(link())
     check = ready.check_intake()
-    assert check.mark == "ok" and check.detail.startswith("1 papers fetched with full text")
+    assert check.mark == "ok" and check.detail == "1 document held (1 link to projects), 0 extracted"
 
 
-def test_a_damaged_fetch_is_named_and_the_rest_still_run(monkeypatch):
-    intake.FULLTEXT_DIR.mkdir(parents=True)
-    (intake.FULLTEXT_DIR / "A1.json").write_text('{"paperId": "A1", "sta', encoding="utf-8")
-    check = ready.check_intake()
-    assert check.mark == "warn" and "1 damaged (A1.json)" in check.detail
+def test_a_row_that_cannot_be_checked_says_so_and_the_rest_still_run(monkeypatch):
+    def broken():
+        raise OSError("the cache directory is not readable")
+
+    monkeypatch.setattr(ready, "check_embedder", broken)
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    names = [c.name for c in ready.run(no_network=True, port=1)]
-    assert names[-1] == "service", "a damaged file must not stop the checks after it"
+    checks = ready.run(no_network=True, port=1)
+    [embedder] = [c for c in checks if c.name == "embedder"]
+    assert embedder.mark == "warn" and "could not be checked" in embedder.detail
+    assert checks[-1].name == "service", "a row that fails must not stop the checks after it"
+
+
+def test_the_literature_row_reads_the_kits_schema():
+    check = ready.check_literature()
+    assert check.mark in ("ok", "warn"), check.detail
+    assert check.detail.startswith("pgvector ") and "revision 0006" in check.detail
+
+
+def test_the_embedder_row_says_when_the_model_file_is_not_cached(monkeypatch, tmp_path):
+    import openferment_core.literature as literature
+
+    monkeypatch.setattr(literature, "EMBEDDING_CACHE", tmp_path / "empty")
+    check = ready.check_embedder()
+    assert check.mark == "warn" and "huggingface.co" in check.detail
+
+
+def test_the_rag_row_says_whether_a_key_is_set(monkeypatch):
+    from openferment_core.literature import kit
+
+    monkeypatch.delenv(kit.RAG_KEY, raising=False)
+    assert ready.check_rag().mark == "warn"
+    monkeypatch.setenv(kit.RAG_KEY, "a-key")
+    assert ready.check_rag().mark == "ok"
 
 
 def test_a_damaged_corpus_is_a_failure_with_the_fix(monkeypatch):

@@ -24,7 +24,6 @@
     "test:slow": "cd core && uv run --all-extras pytest tests/ -q -m slow",
     "test:live": "cd core && uv run --all-extras pytest tests/ -q -m live -s",
     "check:figures": "tsx scripts/check-figures.ts",
-    "intake:fetch": "cd core && uv run python -m openferment_core.intake",
     "ready": "cd core && uv run python -m openferment_core.ready",
     "session:start": "bash scripts/session-start.sh",
     "intake:extract": "cd core && uv run python -m openferment_core.extract",

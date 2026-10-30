@@ -57,7 +57,7 @@ WHAT = {
     "guild": "the people on the ledger (name, role, whether active) and the competence checks on skills; no level is stored "
              "and none is read",
     "primer": "the lessons, by module, and the skills each counts toward",
-    "intake": "the sources (papers) and how far each is prepared: fetched with full text, failed and why, or waiting",
+    "intake": "the documents the project holds in its literature: title, year, where each came from, its licence class and passages",
     "home": "what waits for a person: candidates awaiting review and open checks",
 }
 

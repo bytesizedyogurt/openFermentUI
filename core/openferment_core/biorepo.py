@@ -14,15 +14,17 @@ that stand.
   reviewer   reviewer is empty, shorter than two characters, or one of the
              placeholders nobody is called ('you', 'me', 'reviewer', 'user',
              'test') — the decisions record who decided what
-  fulltext   a verified or gold decision names a record whose paper has no
-             fetched full text — there is nothing for a promotion to anchor to
+  fulltext   a verified or gold decision names a record on a document whose
+             text the project does not hold in its literature (ADR-002) —
+             there is nothing for a promotion to anchor to
   quote      a verified or gold decision carries a quote that fails §2.4
              anchoring; or a gold decision has no quote that anchors at all,
              its own or the record's, because gold means "this sentence in
              this paper says this number" and a gold record without a
              sentence is a curated record wearing a badge
-  paper      the record's paper carries no PMCID, DOI or PMID — a decision
-             stands on a paper a reader can look up (§7.4)
+  paper      the record's paper is neither a document the project holds nor
+             a corpus paper carrying a PMCID, DOI or PMID — a decision stands
+             on a text a reader can look up (§7.4)
   unit       a typed value — corrected or gold — is not a number, or its unit
              does not convert into the field's canonical unit: §2.4 rule 4,
              applied to what a reviewer typed as well as to what the model
@@ -47,7 +49,8 @@ from typing import Any
 
 from sqlalchemy import insert, select
 
-from . import db, extract, intake, projects
+from . import db, extract, projects
+from .literature import kit
 from .corpus import load_corpus
 from .db import models as t
 from .models import BioRepo, Candidate, Quantity, ReviewDecision
@@ -162,6 +165,16 @@ _CANDIDATE_ID = re.compile(r"^[^-]+-(?P<paper>[A-Za-z0-9_]+)-[0-9a-f]{8}$")
 _HAND_ID = re.compile(rf"^{extract.MODEL_PREFIX}-(?P<paper>[A-Za-z0-9_]+)-[0-9]{{4}}$")
 
 
+def _held(paper_id: str) -> bool:
+    """Whether a reader can look the paper up: a document the project holds
+    in its literature (the kit keeps its text and its citation), or a corpus
+    paper with a PMCID, DOI or PMID."""
+    paper = load_corpus().paper(paper_id) or {}
+    if paper.get("pmcid") or paper.get("doi") or paper.get("pmid"):
+        return True
+    return db.run(kit.linked(projects.current(), paper_id)) is not None
+
+
 def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
     """What this id names: the extractor's current candidate under it first —
     a decision is about what the extractor says NOW, and the copy kept with a
@@ -236,12 +249,11 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
             "record", f"{decision.recordId} is not a seed record and not a candidate anyone extracted"
         )
     paper_id = _field(rec, "paperId")
-    paper = load_corpus().paper(paper_id) or {}
-    if not (paper.get("pmcid") or paper.get("doi") or paper.get("pmid")):
+    if not _held(paper_id):
         raise WriteRefused(
             "paper",
-            f"{decision.recordId} is on {paper_id}, which carries no PMCID, DOI or PMID; "
-            "a decision stands on a paper a reader can look up (§7.4)",
+            f"{decision.recordId} is on {paper_id}, which is neither a document this project holds nor a "
+            "paper carrying a PMCID, DOI or PMID; a decision stands on a text a reader can look up (§7.4)",
         )
     if _is_gold(decision) and decision.status != "verified":
         raise WriteRefused("status", f"a gold decision is a verified one; this one says {decision.status!r}")
@@ -274,15 +286,15 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
             log.info("biorepo: %s withdrawn by %s", decision.recordId, reviewer)
         return stored
     if _is_promotion(decision) or typed:
-        fetched = intake.cached(paper_id)
-        if fetched is None or fetched.status != "complete" or not fetched.sections:
+        try:
+            sections = extract.passages(paper_id)
+        except extract.ExtractUnavailable as e:
             raise WriteRefused(
                 "fulltext",
-                f"{decision.recordId} is on {paper_id}, which has no fetched full text — "
+                f"{decision.recordId} is on {paper_id}, whose text this project does not hold — "
                 + ("a promotion" if _is_promotion(decision) else "a typed value")
-                + " has to anchor in the paper's own words, and there are none here",
-            )
-        sections = [s.model_dump() for s in fetched.sections]
+                + " has to anchor in the document's own words, and there are none here",
+            ) from e
 
         # The quote a decision stands on: the decision's if it brought one,
         # else the record's own whenever there is a NUMBER to place — gold,

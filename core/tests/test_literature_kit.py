@@ -222,3 +222,51 @@ def test_rag_with_no_key_set_accepts_none(monkeypatch):
     client = TestClient(app)
     assert client.post("/rag/v1/query", json={"query": "anything"}).status_code == 401
     assert client.post("/rag/v1/query", json={"query": "anything"}, headers={"Authorization": "Bearer guess"}).status_code == 401
+
+
+# ── extraction over the kit's passages (stage 3, step 2) ────────────────
+
+
+def test_a_document_reads_as_its_passages_in_order(tmp_path):
+    stored = _store(tmp_path, HERE, "passages in order")
+    held = kit.passages(stored.document_id, project_id=HERE)
+    assert held.document.title == "passages in order"
+    assert [p["id"] for p in held.sections] == [f"p{i}" for i in range(len(held.sections))]
+    assert all(not p["text"].startswith("passages in order") for p in held.sections), "the breadcrumb is not the text"
+    assert {p["heading"] for p in held.sections} <= {"Methods", "Results", "passages in order"}
+    assert [(d.id, [p["id"] for p in passages]) for d, _, passages in kit.held(HERE) if d.id == stored.document_id] == [
+        (stored.document_id, [p["id"] for p in held.sections])
+    ]
+
+
+def test_extraction_anchors_in_the_kits_passages_and_witness_scores_the_reviewers_value(tmp_path, monkeypatch):
+    from openferment_core import biorepo, extract, witness
+    from openferment_core.models import Quantity, ReviewDecision
+
+    sentence = "The culture reached a titre of 7 g/L of protein on day three."
+    stored = _store(tmp_path, HERE, "a titre", text=f"# A titre\n\n## Results\n\n{sentence} Run {uuid.uuid4().hex}.\n")
+    [where] = [p["id"] for p in kit.passages(stored.document_id, project_id=HERE).sections if sentence in p["text"]]
+    raw = {"candidates": [
+        {"sectionId": where, "field": "titer_secreted", "value": 7, "unit": "g/L", "quote": sentence,
+         "isPrimary": True, "confidence": 0.9},
+        {"sectionId": where, "field": "titer_secreted", "value": 7, "unit": "g/L",
+         "quote": "a sentence the document does not hold, 7 g/L", "isPrimary": True, "confidence": 0.9},
+    ]}
+    monkeypatch.setattr(extract, "call_model", lambda *_: (raw, extract.Usage()))
+    result = extract.extract_paper(stored.document_id)
+    [candidate] = result.candidates
+    assert candidate.paperId == stored.document_id and candidate.sectionId == where and result.rejected == 1
+
+    with pytest.raises(extract.NothingToAnchor):
+        extract.extract_paper("0" * 32)
+
+    biorepo.write(ReviewDecision(
+        status="verified", provenance="curated", reviewer="A. Reader", recordId=candidate.id,
+        at="2026-10-30T12:00:00Z", gold=Quantity(value=7, unit="g/L"),
+    ))
+    assert witness.reference_records() == [{
+        "id": candidate.id, "paperId": stored.document_id, "field": "titer_secreted", "value": 7.0, "unit": "g/L",
+        "source": "biorepo",
+    }]
+    [run] = witness.runs()
+    assert [(r.goldRecordId, r.outcome) for r in run.results] == [(candidate.id, "match")]

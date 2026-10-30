@@ -488,8 +488,8 @@ audited as `finding`.
 | `proforma_write` | `bind` | refused: an assumption is a named person's, typed into the parameter panel and kept in the browser's Durable tier (*A person's value*, above) | — |
 | `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…`, kept in `candidates/hand/` apart from the extractor's file, so it never counts as an extraction; fields the action lists only, `negativeResult` and `isPrimary` as the word true or false | `extract.add_candidate` (§2.4's rules) |
 | `biorepo_write` | `decide` | refused: a decision is a person's | — |
-| `intake_write` | `fetch` | fetches and prepares a corpus paper's full text | `intake.fetch_paper` |
-| `intake_write` | `extract` | extracts a fetched paper; at the budget, a `spend` proposal | `extract.extract_paper` |
+| `intake_write` | `fetch` | collects the document an identifier names into the project's literature (Sci RAG Kit) | `intake.collect` |
+| `intake_write` | `extract` | extracts a document the project holds; at the budget, a `spend` proposal | `extract.extract_paper` |
 | `intake_write` | `add` | refused: a source enters through a person's approval | — |
 | `runbooks_write` | `draft` | refused: use `draft_runbook` | — |
 | `runbooks_write` | `revise_protocol` | refused: protocols are seed, revised in the browser | — |

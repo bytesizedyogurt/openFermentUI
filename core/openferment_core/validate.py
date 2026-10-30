@@ -1003,7 +1003,7 @@ def anchor_candidate(
 
     `raw` is what the extractor emitted — sectionId, field, value, unit, quote,
     and optionally method, organism, carbonSource, isPrimary, confidence.
-    `sections` are the paper's fetched sections. The ontology and unit tables
+    `sections` are the document's passages in the kit. The ontology and unit tables
     come from corpus.json through `units`, the same tables the browser ships.
 
     A candidate that anchors may still lose a field (OF-BLD-014 §2.1): a
@@ -1016,11 +1016,11 @@ def anchor_candidate(
     if spec is None:
         return None, "field", f"{field_id!r} is not an ontology field"
 
-    # 1. The section exists in the fetched text.
+    # 1. The passage exists in the document's text.
     section_id = str(raw.get("sectionId") or "").strip()
     section = next((s for s in sections if s.get("id") == section_id), None)
     if section is None:
-        return None, "section", f"sectionId {section_id!r} is not a fetched section of {paper_id}"
+        return None, "section", f"sectionId {section_id!r} is not a passage of {paper_id}"
 
     # 2. The quote is verbatim, and short enough to be a quote.
     quote = str(raw.get("quote") or "").strip()

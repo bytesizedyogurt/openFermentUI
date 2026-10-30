@@ -7,7 +7,7 @@
 THE RULE. A write tool never touches a store. Each action calls the
 module's own write function, where the module's rules already live:
 `geneos.ceiling` and its kin, `fermos.forecast_run`, `proforma.run`,
-`extract.add_candidate` (anchoring, §2.4), `intake.fetch_paper`,
+`extract.add_candidate` (anchoring, §2.4), `intake.collect`,
 `extract.extract_paper`, and `checks.request` in a person's name. A module
 with no write function on the service refuses in words with the reason
 (Primer is curated, as pureOS's vocabulary and unit catalogue are;
@@ -128,8 +128,9 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
         "lesson": ("write or change a lesson", ("lessonId",)),
     },
     "intake": {
-        "fetch": ("fetch the full text of the paper named in target from Europe PMC and prepare it", ()),
-        "extract": ("extract candidates from the fetched paper named in target (spends on the model)", ()),
+        "fetch": ("collect the document target names (a PMCID, a DOI, PMID:..., OSTI:..., an osti.gov or "
+                  "yeastgenome.org address) into the project's literature", ()),
+        "extract": ("extract candidates from the project's document whose documentId is target (spends on the model)", ()),
         "add": ("add a new source to the corpus", ("doi",)),
     },
     "home": {
@@ -158,8 +159,8 @@ NO_WRITE_ACTION = {
                           "store for one, and a model's number would be one from its weights",
     ("biorepo", "decide"): "a review decision is a person's (biorepo.write refuses any other reviewer); say in gaps what "
                            "you would decide and why",
-    ("intake", "add"): "a source enters the corpus through a person's approval (pnpm thread:propose, thread:apply); "
-                       "the service has no write function for a new paper",
+    ("intake", "add"): "a document enters the project's literature through intake_write fetch, by its identifier; "
+                       "a file or pasted text is added by a person on Intake",
     ("primer", "lesson"): "Primer's lessons are curated seed (src/data/learn.ts); the service has no write function for them",
     ("guild", "record_check"): "a check is run by an assessor at the bench (/guild/checks/:id/run), one criterion at a "
                                "time, and its entries are written in their name; a model may propose a check and never "
@@ -877,26 +878,23 @@ def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
 
 
 def _intake_fetch(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
-    from .. import intake
+    from .. import intake, projects
 
-    paper = ctx.pool.corpus.paper(inp.target)
-    if paper is None:
-        return ToolResult(error=f"intake_write refused: {inp.target!r} is not a paper in the corpus")
-    try:
-        r = intake.fetch_paper(paper)
-    except (intake.NetworkRefused, intake.Transient) as e:
-        return ToolResult(error=f"intake_write could not fetch {inp.target}: {e}")
-    _audit(ctx, "intake", "fetch", module_stores.intake_state(r.status), inp.target, {"status": r.status, "note": inp.note})
-    return ToolResult(summary={"state": module_stores.intake_state(r.status), "paperId": inp.target, "status": r.status,
-                               "sections": len(r.sections), "reason": getattr(r, "reason", None),
-                               "meaning": "the paper's full text is prepared on the service, marked as the model's fetch"})
+    model, _ = _who(ctx)
+    r = intake.collect(inp.target, project_id=projects.current(), by=model, reason=inp.note or "")
+    if r.status == "failed":
+        return ToolResult(error=f"intake_write could not collect {inp.target}: {r.reason}")
+    _audit(ctx, "intake", "fetch", module_stores.intake_state(r.status), inp.target,
+           {"status": r.status, "documentId": r.documentId, "note": inp.note})
+    return ToolResult(summary={"state": module_stores.intake_state(r.status), "documentId": r.documentId,
+                               "status": r.status, "passages": r.chunks, "licenceClass": r.licenceClass,
+                               "meaning": "the document is in the project's literature, collected under the model's "
+                                          "name; extract it next, by its documentId"})
 
 
 def _intake_extract(inp: ModuleWriteInput, ctx: ToolContext, gate: gates.Gate) -> ToolResult:
     from .. import extract
 
-    if ctx.pool.corpus.paper(inp.target) is None:
-        return ToolResult(error=f"intake_write refused: {inp.target!r} is not a paper in the corpus")
     try:
         r = extract.extract_paper(inp.target)
     except llm.BudgetExhausted as e:

@@ -364,13 +364,13 @@ FetchStatus = Literal["complete", "failed:fetch", "failed:parse"]
 # Who served a fetched text: Europe PMC's JATS, an OSTI report's PDF, or a
 # Saccharomyces Genome Database strain entry (thread Q). A file cached before
 # the field existed was fetched from Europe PMC, and reads as such.
-FetchSource = Literal["europepmc", "osti", "sgd"]
+FetchSource = Literal["europepmc", "osti", "sgd", "upload", "paste"]
 
 
 class FetchResult(BaseModel):
-    """What `intake.fetch_paper` produced, and what `fulltext/{paperId}.json`
-    holds. A failure is a result with a reason, not an exception — the UI
-    already renders `failed:fetch` and `failed:parse` (§5.2)."""
+    """What a collector's split produced (literature/collectors.py), before it
+    becomes Markdown for Sci RAG Kit. A failure is a result with a reason, and
+    the collector says it in words (`NotCollected`)."""
 
     paperId: str
     pmcid: str | None = None
@@ -383,21 +383,6 @@ class FetchResult(BaseModel):
     # figure for the batch table and the quickest tell that a "success" was
     # actually an error page.
     bytes: int = 0
-    source: FetchSource = "europepmc"
-
-
-class IntakeStatus(BaseModel):
-    """One row of `GET /api/intake/status` — a paper's fetch state, summarised."""
-
-    paperId: str
-    pmcid: str | None = None
-    ingest: str
-    textSource: Literal["full-text", "curation-note"]
-    sections: int = 0
-    tables: int = 0
-    license: str | None = None
-    fetchedAt: str | None = None
-    reason: str | None = None
     source: FetchSource = "europepmc"
 
 
@@ -469,11 +454,10 @@ class LiteratureDocument(BaseModel):
 
 
 class OverlayPaper(BaseModel):
-    """What the overlay says about one paper (§2.1): its fetch state and, when
-    the fetch succeeded, the paper's own sections in place of the seed's
-    curation note. A failed fetch is here too, with its reason — the ingest
-    board renders it, and a board that only showed successes would be lying by
-    omission about the twenty-six DOI-only papers."""
+    """One document the project holds, as the overlay carries it (§2.1;
+    ADR-002): its passages in the kit as its sections, its citation, its
+    licence and who served it. The browser makes a paper of it, which
+    BioRepo, the review card, the reader and Witness read."""
 
     ingest: str
     textSource: Literal["full-text", "curation-note"]
@@ -481,9 +465,17 @@ class OverlayPaper(BaseModel):
     license: str | None = None
     fetchedAt: str | None = None
     reason: str | None = None
-    # Who served the text, so the reader names its source rather than
-    # assuming Europe PMC.
+    # Who served the text, so the reader names its source.
     source: FetchSource = "europepmc"
+    # The citation the kit holds for it, and its licence class.
+    title: str | None = None
+    authors: list[str] = Field(default_factory=list)
+    year: int | None = None
+    journal: str | None = None
+    doi: str | None = None
+    pmcid: str | None = None
+    url: str | None = None
+    licenceClass: str | None = None
 
 
 class Overlay(BaseModel):

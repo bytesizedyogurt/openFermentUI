@@ -149,7 +149,7 @@ ALLOWED_WRITES = (
     "pureos.kept.keep_train",
     "pureos.train_spec.run_train",
     "extract.add_candidate",
-    "intake.fetch_paper",
+    "intake.collect",
     "extract.extract_paper",
     "proposals.propose",
     "audit.append",
