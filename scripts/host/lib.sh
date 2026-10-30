@@ -61,14 +61,6 @@ wait_for_health() {
   die "the service did not answer /api/health within 30 s. Its log: tail -50 \"$LOGS/server.log\""
 }
 
-# Teach this clone to merge core/data/biorepo.json by record (.gitattributes
-# names the driver; scripts/host/merge_biorepo.py is it). Idempotent.
-# The same registration `pnpm install` makes (scripts/register-merge-driver.mjs).
-register_merge_driver() {
-  git -C "$REPO" config merge.biorepo.name "BioRepo decisions, merged by record"
-  git -C "$REPO" config merge.biorepo.driver "sh scripts/host/merge-biorepo %O %A %B"
-}
-
 # Stop when a rebase or merge was left half-done: the decisions file may hold
 # conflict markers, and building on it would commit them.
 refuse_unfinished_git() {

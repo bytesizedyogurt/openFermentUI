@@ -3,16 +3,15 @@
 #
 #   bash scripts/prototype-up.sh        pnpm prototype:up
 #
-# Runs session-start.sh (dependencies, core/.env, the corpus, saved data,
-# pnpm ready), builds the app, starts openferment-core on 127.0.0.1:8000 over
-# the real data directories, and serves the build on 127.0.0.1:4173 with /api
-# passed through to the service, the way scripts/demo-offline.mjs does. Then
-# it prints the address. Ctrl-C stops both.
+# Runs session-start.sh (dependencies, core/.env, pnpm ready), builds the app,
+# starts openferment-core on 127.0.0.1:8000 over the real data directories,
+# and serves the build on 127.0.0.1:4173 with /api passed through to the
+# service. Then it prints the address. Ctrl-C stops both.
 #
 # This is the live app. The service reads and writes core/data/: what this
 # machine fetched, extracted and decided. With a key in core/.env, Extract
 # and Postdoc's Live mode spend money, and a Guild decision lands in the
-# committed core/data/biorepo.json, which `pnpm decisions:push` sends on.
+# committed core/data/biorepo.json.
 # Both servers listen on loopback alone.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -33,7 +32,7 @@ say "pnpm build"
 pnpm build || die "pnpm build failed"
 
 for port in "$API_PORT" "$PORT"; do
-  port_free "$port" || die "port $port is in use. An earlier pnpm prototype:up or pnpm demo:offline may still run; stop it first"
+  port_free "$port" || die "port $port is in use. An earlier pnpm prototype:up may still run; stop it first"
 done
 
 svc="" web=""

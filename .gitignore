@@ -95,9 +95,3 @@ core/data/spend.json.lock
 # machine like the proposals; not on the data branch.
 core/data/pureos-trains.json
 core/data/pureos-trains.json.lock
-# OF-BLD-014 §2.3 — thread P as proposed, a list a person approves; the data branch keeps it.
-core/data/thread-p-proposed.tsv
-# Thread Q as proposed, the same way.
-core/data/thread-q-proposed.tsv
-# OF-BLD-014 §1.3 — data-sync.sh's throwaway checkout of the openferment-data branch.
-.data-sync/

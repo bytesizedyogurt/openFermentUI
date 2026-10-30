@@ -4,47 +4,39 @@
 #
 #   scripts/host/deploy.sh                    pull, install, build, restart, check health
 #   scripts/host/deploy.sh --verify           the same, with the full offline gate first
-#   scripts/host/deploy.sh --keep-decisions   first commit and push the review decisions
-#                                             Guild wrote on this machine, then the same
 #
-# Guild writes review decisions into core/data/biorepo.json in this checkout.
-# That file is committed, so pushing it is the backup (§B.8). A pull over
-# uncommitted decisions could fail halfway, so deploy stops until they are
-# committed, and --keep-decisions is the one-word way to do that.
+# Guild writes review decisions into core/data/biorepo.json in this checkout,
+# a committed file until stage 2 of alpha 2.0 moves them into PostgreSQL. A
+# pull over uncommitted decisions could fail halfway, so deploy stops until a
+# person commits and pushes them.
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 cd "$REPO"
 
-VERIFY=0 KEEP=0 PULL=1 RESTART=1
+VERIFY=0 PULL=1 RESTART=1
 for arg in "$@"; do
   case "$arg" in
     --verify) VERIFY=1 ;;
-    --keep-decisions) KEEP=1 ;;
     --no-pull) PULL=0 ;;        # install.sh: build what is checked out
     --no-restart) RESTART=0 ;;  # install.sh: it starts the jobs itself
-    *) die "unknown option $arg. Usage: deploy.sh [--verify] [--keep-decisions]" ;;
+    *) die "unknown option $arg. Usage: deploy.sh [--verify]" ;;
   esac
 done
 
 refuse_unfinished_git
-register_merge_driver
 
 changed="$(git diff --name-only HEAD)"
 if [ -n "$changed" ] && [ "$changed" != "core/data/biorepo.json" ]; then
   die "uncommitted changes in: ${changed//$'\n'/ }. A deploy pulls main over them. Commit or stash them first."
 fi
-if [ -n "$changed" ] && [ "$KEEP" = 0 ]; then
-  die "core/data/biorepo.json holds review decisions made in Guild on this machine that are not committed yet. Run: scripts/host/deploy.sh --keep-decisions"
-fi
-
-if [ "$KEEP" = 1 ]; then
-  "$REPO/scripts/host/sync_decisions.sh"
+if [ -n "$changed" ]; then
+  die "core/data/biorepo.json holds review decisions made in Guild on this machine that are not committed yet. Commit and push it first: git add core/data/biorepo.json && git commit -m 'Guild decisions' && git push"
 fi
 
 if [ "$PULL" = 1 ]; then
   say "Pulling main"
-  git pull --ff-only || die "this checkout and GitHub have diverged, usually over decisions committed here and not yet pushed. Run: scripts/host/deploy.sh --keep-decisions"
+  git pull --ff-only || die "this checkout and GitHub have diverged, usually over decisions committed here and not yet pushed. Push them, or rebase onto main, then deploy again"
 fi
 
 say "Installing packages"

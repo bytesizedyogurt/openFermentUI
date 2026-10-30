@@ -177,8 +177,8 @@ YEAST9 = FetchedFile(
 # iMM904 as BiGG Models serves it. BiGG's terms (bigg.ucsd.edu/license) grant
 # educational, research and non-profit use without fee, require the notice to
 # travel with every copy, and leave commercial use to an agreement with UC San
-# Diego. The file stays on the machine that fetched it: data-sync carries no
-# model file, so no copy leaves it.
+# Diego. The file stays on the machine that fetched it and is never committed,
+# so no copy leaves it.
 BIGG_IMM904 = UrlFile(
     url="https://bigg.ucsd.edu/static/models/iMM904.xml",
     revision='ETag "017c86841952cc365f20a8b466292b31", Last-Modified 2019-11-01',

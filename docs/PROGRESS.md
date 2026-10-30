@@ -12,18 +12,17 @@ checkpoint. A fresh session continues from this file and `git log` alone.
    - `cd core && uv sync --all-extras`
    - From stage 2 on: `pnpm db:up` (or a local PostgreSQL with pgvector), then `pnpm db:migrate`.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: 1.3** — stage 1, section 5.5: the file stores and the browser's scientific state
-   (the merge driver, `data-sync.sh`, `data-prepare.sh`, `decisions-push.sh`,
-   `scripts/host/sync_decisions.sh`, the tracked `core/data/biorepo.json`). Then 1.4 (the rest of
-   5.6: `react-router-dom`, `recharts`, `src/engine/retrieval.ts`, unused exports and store
-   fields, the dead types listed under Known debts), 1.5 (5.7: instruction sprawl to
-   `docs/history/`), a minimal smoke over the real service, and the stage 1 gate.
+4. **Next step: 1.4** — the rest of section 5.6: `react-router-dom`, `recharts`,
+   `src/engine/retrieval.ts`, unused exports and unread store fields, the offline ingest timer,
+   the dead types listed under Known debts, and the stream replay the deleted service double sent
+   (`ReplayInfo`, `LiveTurn.replay`). Then 1.5 (5.7: instruction sprawl to `docs/history/`), a
+   minimal smoke over the real service, and the stage 1 gate.
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 1 — delete. 1.1 (5.3, 5.4) and 1.2 (5.1, 5.2, Dominion and the retired guards of 5.6)
-are committed; 1.3 to 1.5, the smoke and the gate remain. Stage 0 is complete except the tag push
+Stage 1 — delete. 1.1 (5.3, 5.4), 1.2 (5.1, 5.2, Dominion and the retired guards of 5.6) and
+1.3 (5.5's data movement) are committed; 1.4, 1.5, the smoke and the gate remain. Stage 0 is complete except the tag push
 (see Blockers).
 
 ## Last green runs
@@ -34,6 +33,9 @@ are committed; 1.3 to 1.5, the smoke and the gate remain. Stage 0 is complete ex
 | 2026-10-30 03:48 | `pnpm test:sim` | 105 passed, 2233 deselected | 4 min 11 s | `d19224f` (baseline) |
 | 2026-10-30 04:08 | `test:core` in a clean worktree | 2083 passed, 1 skipped, 170 deselected | 4 min 44 s | `20bd36d` (1.1) |
 | 2026-10-30 04:12 | `test:sim` in a clean worktree | 103 passed, 2151 deselected | 3 min 44 s | `20bd36d` (1.1) |
+| 2026-10-30 05:39 | `typecheck`, `build`, `test:core` in a clean worktree | 1929 passed, 2 skipped, 128 deselected | 4 min 28 s | `b24e997` (1.2) |
+| 2026-10-30 05:44 | `test:sim` in a clean worktree | 102 passed, 1957 deselected | 4 min 9 s | `b24e997` (1.2) |
+| 2026-10-30 05:43 | `test:core` with 1.3 | 1888 passed, 2 skipped, 128 deselected | 4 min 12 s | 1.3 |
 
 ## Decisions
 
@@ -66,6 +68,7 @@ are committed; 1.3 to 1.5, the smoke and the gate remain. Stage 0 is complete ex
 | §10 stage 1.1 | 5.1, 5.2, Dominion and the retired guards (from 5.6) are one commit, 1.2 | The program machinery, the seed and Dominion share the store, the types, `module_stores` and `models`, and the retired guards import the seed: no commit between them could be green |
 | §5.2 | Tests that held seeded content were deleted with it; rule tests that only used it as material now run on fictional fixtures: `core/tests/fixtures/test-corpus.json` (placeholder papers and records, the `test_corpus` fixture), placeholder Guild skills and protocols in the alpha 1.0 shape, small fictional projections inside tests, and a test-only categorical field | A4 forbids seeded values under `core/`; the rules (anchoring, review decisions, retrieval, coverage, Guild) stay tested |
 | §5.2 | Eval set O (`evalo.py`, `pnpm eval:o`) and the identifier tooling (`identifiers.py`, `scripts/resolve-identifiers.py`, `pnpm ids:*`) are deleted | Eval set O's ten questions named the seed; the identifier tooling patched DOIs into the TypeScript seed |
+| §5.5, §10 stage 1 | Stage 1 deletes the merge driver, the data-sync, data-prepare and decisions-push scripts, `sync_decisions.sh` and the `openferment-data` branch convention. The file stores (`core/data/*.json`, `audit.jsonl`, `artifacts/`, `candidates/`, `live/`) and the browser's Durable scientific state stay until stage 2 replaces each with its PostgreSQL store, as stage 2 step 2 says; `core/data/biorepo.json` stays tracked until then | Untracking `biorepo.json` would make the live Mini's next pull delete the review decisions people made there (§11.1); stage 2 imports them into PostgreSQL |
 | §4, §5.2 | The record fields, the vocabulary (carbon sources and unit operations) and the unit tables live in `core/openferment_core/schema/` (`fields.yaml`, `vocabulary.yaml`, `units.json`), with no range and no example value; `src/data/ontology.ts` and `vocabulary.ts` mirror them, held equal by `test_schema.py` through the fixture `pnpm export:unit-fixtures` writes. BioRepo's typed-value refusal is renamed `range` → `unit`; `pyyaml` is a direct dependency | The service needs the fields without the TypeScript seed; a range is a number about a field (ADR-010) |
 
 ## Blockers
@@ -150,3 +153,8 @@ are committed; 1.3 to 1.5, the smoke and the gate remain. Stage 0 is complete ex
   browser and held equal by `test_schema.py`. Tests of deleted content went with it; rule tests
   run on fictional fixtures; `test_no_seed.py` holds A4. Four helper agents fixed the screens
   (by group) and two the Proforma and geneOS test families in parallel, each on its own files.
+- 1.3 Section 5.5's git-borne data movement: the record-level merge driver (`merge_biorepo.py`,
+  `merge-biorepo`, `.gitattributes`, `register-merge-driver.mjs`, the `prepare` script), the
+  `openferment-data` branch and its `data-sync.sh`, `data-prepare.sh`, `decisions-push.sh` and
+  `scripts/host/sync_decisions.sh` (`deploy.sh --keep-decisions` with it), and their tests.
+  `session-start.sh` no longer pulls or prepares data. The stores stay for stage 2 (Departures).

@@ -12,9 +12,7 @@
 #      by git, and the value is never printed.
 #   2. pnpm install --frozen-lockfile
 #   3. uv sync --all-extras, in core/
-#   4. data-sync.sh pull: what earlier sessions kept on openferment-data
-#   5. data-prepare.sh: what this machine derives for itself
-#   6. pnpm ready, whatever it exits with
+#   4. pnpm ready, whatever it exits with
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -50,12 +48,6 @@ pnpm install --frozen-lockfile || die "pnpm install failed"
 
 say "uv sync --all-extras"
 (cd core && uv sync --all-extras) || die "uv sync failed"
-
-say "data that earlier sessions kept"
-bash scripts/data-sync.sh pull || echo "data-sync.sh pull did not finish; this session starts from what is here"
-
-say "what this machine derives for itself"
-bash scripts/data-prepare.sh || echo "data-prepare.sh exited non-zero; its lines above say which step"
 
 say "pnpm ready"
 pnpm --silent ready || true

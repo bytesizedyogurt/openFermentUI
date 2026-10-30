@@ -5,8 +5,8 @@
 
 One question a line; blank lines and lines starting with `#` are skipped.
 Each question runs through `postdoc_agent.ask`, exactly as `/api/ask` runs it,
-and its plan is saved under `core/data/live/ask-batch-<time>/` (gitignored;
-`pnpm data:push` carries it). One row a question is printed: claims kept,
+and its plan is saved under `core/data/live/ask-batch-<time>/` (gitignored,
+and kept on this machine). One row a question is printed: claims kept,
 claims dropped by rule, tool calls, rounds (the tool-choosing turns of the
 conversation that answered, the last one included), seconds, cost, why it
 stopped.

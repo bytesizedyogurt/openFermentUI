@@ -5,7 +5,6 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "prepare": "node scripts/register-merge-driver.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
@@ -27,10 +26,6 @@
     "intake:fetch": "cd core && uv run python -m openferment_core.intake",
     "ready": "cd core && uv run python -m openferment_core.ready",
     "session:start": "bash scripts/session-start.sh",
-    "data:push": "bash scripts/data-sync.sh push",
-    "data:pull": "bash scripts/data-sync.sh pull",
-    "data:prepare": "bash scripts/data-prepare.sh",
-    "decisions:push": "bash scripts/decisions-push.sh",
     "intake:extract": "cd core && uv run python -m openferment_core.extract",
     "geneos:fetch": "cd core && uv run --all-extras python -m openferment_core.geneos fetch",
     "ask:batch": "cd core && uv run --all-extras python ../scripts/ask-batch.py",
