@@ -86,7 +86,7 @@
 - C: Studies: scenarios, comparisons, runbooks and the export package (`docs/api/studies.md`).
 - C: Intake: the collectors, the `CorpusEntry` fields and the routes documents enter by (`docs/api/intake.md`).
 - C: The tool registry: `core/openferment_core/tools/__init__.py` is the one place a tool exists, and `docs/TOOLS.md` is generated from it (`pnpm gen:tools`).
-- C: MCP: the `openferment` server over the registry, acting in the project `--project` names, and the kit's `sci-rag` server, both listed in `.mcp.json` (`docs/TOOLS.md`).
+- C: MCP: the `openferment` server over the registry and the kit's `sci-rag` server (its graph tools left off), both in `.mcp.json`, each acting in the project `--project` names and refusing in words without one (`docs/TOOLS.md`; ADR-002).
 - C: The package map: `COMPONENTS.md`, generated from `core/tests/test_boundaries.py` (`pnpm gen:components`).
 
 ## Working assumptions

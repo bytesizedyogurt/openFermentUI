@@ -171,7 +171,8 @@ Implementation 8).
 | `core/tests/standins.py` (27 test files use it) and `test_proforma_slow.py` keep test values that A4's `rg` clause would find: stand-in records on real strain ids, a closed-form ethanol evaluator with the theoretical yield, and the benchmark price this build once measured (a departure above) | after alpha 2.0: fixtures read from the library plants |
 | A review decision's provenance is the label of the reviewer's action, kept as the decision carries it (alpha 1.0's shape); `biorepo.write` refuses `assumed`, any estimate and a gold value on an unverified decision, and otherwise keeps the label as sent. Computing it from the decision's kind (verified → curated, a gold value → gold) is owed to ADR-006 | the next change to `biorepo.write` |
 | A retrieval report over a project's own corpus with the lanes that call a model (the graph, HyDE, a judge grading the answers): alpha 1.0's paid lanes (Live owed, §4.5) | after alpha 2.0, with the key: `pnpm lit:report` extended to a project and a judge route |
-| The `openferment` MCP server did not connect at this session's start within the client's 30 s (no `core/.env` then, so no database named); `pnpm test:core`'s `test_mcp.py` holds its tools in process | the next session with `core/.env` written before it starts |
+| The `openferment` MCP server did not connect at this session's start within the client's 30 s (no `core/.env` then, so no database named); `pnpm test:core`'s `test_mcp.py` holds its tools in process | paid after the pull request: both servers connected at the next session's start, and both answered over stdio (stage 8 log) |
+| The kit's `search_entities` and `get_entity_relationships` read the concept graph whole (every project's entities, relationships and evidence quotes), so the kit's MCP server leaves them off; nothing in openFerment builds the graph yet | before a graph is built: scope both to the project's chunks, or serve them from openFerment's registry |
 | `core/tests/standins.py` carries invented stand-in records (on real strain ids) and a closed-form evaluator for rule tests | stage 4: fixtures from `biorefineries` library plants; still open at stage 8: after alpha 2.0 |
 | `program` survives as pureOS's chemical-set key (`TrainSpec.program`), and as a field of `FlowsheetInfo`, `VesselSummary`, `TrainSummary` and `TrainProposal`; the UI no longer shows or filters by it; projects (stage 2) took the scoping, so what remains is the chemical-set key | stage 4 (the adapter); still open at stage 8: after alpha 2.0 |
 | Proforma tool rules that need a successful run of a seed scenario (`run_flowsheet` keeps one run and audits it; `stream_table` on a scenario's run) lost their tests with the seed scenarios | stage 5, when scenarios live in projects; still open at stage 8: after alpha 2.0 |
@@ -692,3 +693,12 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
   the key, `pnpm prove --live` held 46 of 46 (steps 1 to 8) on the same tree. Acceptance A1 to A8
   hold, with the departures recorded above (A3: ADR-014 and the tracked `biorepo.json`; A4: the test
   stand-ins). The pull request carries the completion report (§12).
+- 8.4, after the pull request (#15): both MCP servers connected at the next session's start, with
+  `core/.env` written. Called over stdio as `.mcp.json` starts them, on a proof database holding the
+  kit's demo corpus: the `openferment` server with `--project` listed its 45 tools and answered
+  `engine_plants` and `literature_sources`; the kit's server answered `corpus_stats` (5 documents,
+  34 chunks) and `search_corpus`. With no project the kit's server answered only "Error executing
+  tool corpus_stats": the MCP SDK (2.3) hands a client that line alone for an exception other than
+  its `ToolError`, and the kit's service refuses with its REST `ApiError`. `literature_mcp.py` now
+  raises each refusal as a `ToolError` in its words, takes `--project`, and leaves off the kit's
+  two tools that read the concept graph whole (ADR-002, Implementation 8; `test_literature_mcp.py`).
