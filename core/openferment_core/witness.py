@@ -267,7 +267,7 @@ def match_run(
         if rec["id"] in outcome_for:
             continue
         key = (rec["paperId"], rec["field"])
-        rv, ru = rec["value"], rec["unit"]
+        ru = rec["unit"]
         cands = [c for c in by_key.get(key, []) if id(c) not in consumed]
         if not cands:
             outcome_for[rec["id"]] = ExtractRunResult(goldRecordId=rec["id"], outcome="miss")

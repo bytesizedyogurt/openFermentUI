@@ -80,7 +80,6 @@ class FakeClient:
     def stream(self, **kwargs):
         self.requests.append(kwargs)
         outcome = self.script[kwargs["model"]]
-        client = self
 
         class Stream:
             def __enter__(self_inner):

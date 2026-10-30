@@ -593,7 +593,7 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
     if got.truncatedSections:
         notes.append(
             "sections " + ", ".join(got.truncatedSections) + " still hit the token limit after "
-            f"splitting and were not extracted; the rest of the paper was"
+            "splitting and were not extracted; the rest of the paper was"
         )
     if SAVE_RESPONSES and not collectors.fixtures_only():
         # The candidates from every call, as one response: a fixture replays

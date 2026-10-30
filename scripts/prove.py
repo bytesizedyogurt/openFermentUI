@@ -53,7 +53,6 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import signal
@@ -480,7 +479,7 @@ def step_4(proof: Proof) -> None:
                 f"held to the package's own test: {len(within)} of {len(checks)} within its tolerance"
                 + (f"; {len(held)} outside it as the package's own test is on this installation (ADR-013): "
                    + ", ".join(f"{c['expression']} {c['measured']:.10g} against {c['package']:.10g}" for c in held) if held else "")
-                + (f"; outside and not the package's own measurement: "
+                + ("; outside and not the package's own measurement: "
                    + ", ".join(f"{c['expression']} {c['measured']} against {c['package']}" for c in stray) if stray else ""))
     o = art["output"]
     proof.check(bool(o.get("streams")) and bool(o.get("units")) and o.get("tea") is not None,

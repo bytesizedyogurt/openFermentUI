@@ -269,10 +269,10 @@ def test_concurrent_writes_all_land():
             errors.append(e)
 
     threads = [threading.Thread(target=post, args=(i,)) for i in range(24)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
     assert not errors
     ids = {e.id for e in guild.read().evidence}
     assert all(f"e-par-{i:04d}" in ids for i in range(24))

@@ -1007,7 +1007,7 @@ def _intake_extract(inp: ModuleWriteInput, ctx: ToolContext, gate: gates.Gate) -
 
     try:
         r = extract.extract_paper(inp.target)
-    except llm.BudgetExhausted as e:
+    except llm.BudgetExhausted:
         # The why is the code's words: the budget's message carries its
         # figures, and a proposal's words hold no number (§1.R finding 5).
         return _propose(ctx, "intake", "extract", gate, inp, f"Extract {inp.target} when the budget allows",

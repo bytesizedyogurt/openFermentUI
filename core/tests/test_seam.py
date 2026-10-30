@@ -246,7 +246,7 @@ def test_a_scenario_inlet_reads_its_newest_runs_broth_as_its_flowsheet_names_it(
     assert b["inlet"].source.id == newest.id and b["inlet stream"].value == "beer"
     assert b["inlet source"].value == "a scenario's newest run"
     assert ("the stream ethanol_glucose_v0 names as its broth, read from its shelf entry" in
-            b["inlet source"].source.note and f"the newest run of scenario sc-k3x9q-1" in b["inlet source"].source.note)
+            b["inlet source"].source.note and "the newest run of scenario sc-k3x9q-1" in b["inlet source"].source.note)
     assert train_spec.chemicals_of(spec) == sorted(c for c, m in beer["massFlows"].items() if m > 0)
     # A stream the train names is taken instead, from the same newest run.
     named = pureos.inlet_stream(spec_of(inlet={"kind": "run-stream", "ref": "sc-k3x9q-1", "streamId": "s1"}))

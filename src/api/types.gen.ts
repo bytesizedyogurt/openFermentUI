@@ -2908,6 +2908,11 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** CheckProposeRequest */
+        CheckProposeRequest: {
+            /** By */
+            by: string;
+        };
         /**
          * CheckReason
          * @description Why a check is proposed, written by fixed rules from the ledger.
@@ -4998,6 +5003,18 @@ export interface components {
             reason: string;
         };
         /**
+         * ProposeRequest
+         * @description POST /api/pureos/propose: ids and words, never a number.
+         */
+        ProposeRequest: {
+            /** Host */
+            host: string;
+            /** Inletref */
+            inletRef?: string | null;
+            /** Product */
+            product: string;
+        };
+        /**
          * Quantity
          * @description A value and its unit; a categorical field carries a string value. A
          *     number a model, a person or a library supplies carries its origin
@@ -6282,23 +6299,6 @@ export interface components {
             simulation?: string | null;
             /** Vesseltype */
             vesselType?: ("stirred-tank" | "bubble-column") | null;
-        };
-        /** ProposeRequest */
-        openferment_core__api__ProposeRequest: {
-            /** By */
-            by: string;
-        };
-        /**
-         * ProposeRequest
-         * @description POST /api/pureos/propose: ids and words, never a number.
-         */
-        openferment_core__models__ProposeRequest: {
-            /** Host */
-            host: string;
-            /** Inletref */
-            inletRef?: string | null;
-            /** Product */
-            product: string;
         };
     };
     responses: never;
@@ -7587,7 +7587,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["openferment_core__api__ProposeRequest"];
+                "application/json": components["schemas"]["CheckProposeRequest"];
             };
         };
         responses: {
@@ -9287,7 +9287,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["openferment_core__models__ProposeRequest"];
+                "application/json": components["schemas"]["ProposeRequest"];
             };
         };
         responses: {

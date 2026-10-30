@@ -15,9 +15,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, intake, proforma, pureos
+from openferment_core import artifacts, proforma, pureos
 from openferment_core.models import Artifact, BasisInput, BasisSource, InputAssumption, Override, TrainSpec
-from openferment_core.pureos import from_run as fr
 from test_train import (  # noqa: F401 (the fixtures, by name)
     AT,
     BY,

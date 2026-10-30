@@ -82,7 +82,7 @@ def test_a_paper_collected_by_its_pmcid_is_stored_once_and_listed(kit_client):
 
     [listed] = client.get("/api/literature/documents").json()
     assert listed["documentId"] == body["documentId"] and listed["collector"] == "europepmc"
-    assert listed["source"] == f"project:test-project:europepmc" and listed["linkedBy"] == "A. Reader"
+    assert listed["source"] == "project:test-project:europepmc" and listed["linkedBy"] == "A. Reader"
     assert listed["selection"]["reason"] == "feed rates" and listed["selection"]["pmcid"] == pmcid
     assert listed["sourceRef"] == f"https://europepmc.org/article/PMC/{pmcid}"
     stats = client.get("/api/literature/stats").json()

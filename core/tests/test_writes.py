@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import audit, extract, intake, module_stores, proposals, tools
-from openferment_core.models import FetchResult, FetchedSection
+from openferment_core.models import FetchedSection
 from openferment_core.tools import gates, writes
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 

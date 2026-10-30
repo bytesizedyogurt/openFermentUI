@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, intake, proforma, protparam, pureos, thermo, tools
 from openferment_core.models import Artifact, TrainProposal
-from openferment_core.pureos import proposer, train_spec
+from openferment_core.pureos import proposer
 from openferment_core.workers import WorkerError
 
 CORE = Path(__file__).resolve().parent.parent

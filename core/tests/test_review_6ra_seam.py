@@ -135,9 +135,9 @@ def test_an_older_simulation_with_no_point_at_its_harvest_hour_is_refused_there_
     near = fermos.harvest(old.id, sim.harvestH)
     assert not near.exact and "the nearest kept point" in near.read
     # pureOS's inlet and the vessel refuse it in the read's words.
-    with pytest.raises(pureos.TrainRefused, match=rf"simulation c{{16}} keeps no point at its own harvest hour"):
+    with pytest.raises(pureos.TrainRefused, match=r"simulation c{16} keeps no point at its own harvest hour"):
         pureos.inlet_stream(sim_inlet(old.id))
-    with pytest.raises(vessel.VesselRefused, match=rf"simulation c{{16}} keeps no point at its own harvest hour"):
+    with pytest.raises(vessel.VesselRefused, match=r"simulation c{16} keeps no point at its own harvest hour"):
         vessel.simulation_inputs(artifacts.get(old.id))
 
 

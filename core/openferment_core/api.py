@@ -59,10 +59,10 @@ from .models import (
     FermosFitResponse,
     CollectOutcome,
     CollectRequest,
-    FetchResult,
     ForecastRequest,
     ParamResolveRequest,
     ProformaRunRequest,
+    ProposeRequest,
     SimulationRequest,
     ThermoPropsRequest,
     TrainFromRunRequest,
@@ -113,9 +113,8 @@ from .models import (
     SFFLibraryImport,
     ToolInfo,
     ToolResult,
-    Usage,
 )
-from . import llm, spend
+from . import llm
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
 from .engine import runs as _runs
 from .studies import comparisons as _comparisons  # noqa: F401  (registers study.comparison for compute and replay)
@@ -1822,7 +1821,7 @@ def guild_withdraw(request: GuildWithdrawal) -> GuildEvidence:
 # guild.write_evidence. 422 carries the rule and the reason.
 
 
-class ProposeRequest(BaseModel):
+class CheckProposeRequest(BaseModel):
     by: str
 
 
@@ -1836,7 +1835,7 @@ def checks_read() -> Checks:
 
 
 @app.post("/api/guild/checks/propose", response_model=list[Check])
-def checks_propose(request: ProposeRequest) -> list[Check]:
+def checks_propose(request: CheckProposeRequest) -> list[Check]:
     try:
         return checks.propose(request.by)
     except checks.CheckRefused as e:
@@ -2127,9 +2126,6 @@ def pureos_train(key: str) -> dict:
 
 
 # ── pureOS proposes a train (OF-BLD-020 §7.2, D12) ──────────────────────
-
-from .models import ProposeRequest  # noqa: E402
-
 
 @app.post("/api/pureos/propose")
 def pureos_propose(req: ProposeRequest) -> dict:

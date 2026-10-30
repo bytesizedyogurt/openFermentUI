@@ -3,7 +3,6 @@ before its fix. STAND-IN text, not a paper's words."""
 from __future__ import annotations
 
 import importlib.util
-import json
 from pathlib import Path
 
 import pytest

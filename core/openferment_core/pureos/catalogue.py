@@ -1328,7 +1328,6 @@ def _choices_of(cls: Any, p: Param, chemicals: list[str], source: str) -> list[s
         items = list(obj.keys()) if hasattr(obj, "keys") else list(obj)
         return [str(i) for i in items if i]
     if c == "setter":
-        import inspect
 
         for k in cls.__mro__:
             prop = k.__dict__.get(p.bst)

@@ -1162,6 +1162,19 @@
         "title": "CheckNote",
         "type": "object"
       },
+      "CheckProposeRequest": {
+        "properties": {
+          "by": {
+            "title": "By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "by"
+        ],
+        "title": "CheckProposeRequest",
+        "type": "object"
+      },
       "CheckReason": {
         "description": "Why a check is proposed, written by fixed rules from the ledger.",
         "properties": {
@@ -6605,6 +6618,37 @@
         "title": "ProposalAction",
         "type": "object"
       },
+      "ProposeRequest": {
+        "additionalProperties": false,
+        "description": "POST /api/pureos/propose: ids and words, never a number.",
+        "properties": {
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "inletRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inletref"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product",
+          "host"
+        ],
+        "title": "ProposeRequest",
+        "type": "object"
+      },
       "Quantity-Input": {
         "description": "A value and its unit; a categorical field carries a string value. A\nnumber a model, a person or a library supplies carries its origin\n(ADR-006); a value code derives from another (the SI form of a record's\nvalue) carries none, the thing it was derived from being its source.",
         "properties": {
@@ -9950,50 +9994,6 @@
         },
         "title": "VesselRequest",
         "type": "object"
-      },
-      "openferment_core__api__ProposeRequest": {
-        "properties": {
-          "by": {
-            "title": "By",
-            "type": "string"
-          }
-        },
-        "required": [
-          "by"
-        ],
-        "title": "ProposeRequest",
-        "type": "object"
-      },
-      "openferment_core__models__ProposeRequest": {
-        "additionalProperties": false,
-        "description": "POST /api/pureos/propose: ids and words, never a number.",
-        "properties": {
-          "host": {
-            "title": "Host",
-            "type": "string"
-          },
-          "inletRef": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Inletref"
-          },
-          "product": {
-            "title": "Product",
-            "type": "string"
-          }
-        },
-        "required": [
-          "product",
-          "host"
-        ],
-        "title": "ProposeRequest",
-        "type": "object"
       }
     }
   },
@@ -12003,7 +12003,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/openferment_core__api__ProposeRequest"
+                "$ref": "#/components/schemas/CheckProposeRequest"
               }
             }
           },
@@ -14858,7 +14858,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/openferment_core__models__ProposeRequest"
+                "$ref": "#/components/schemas/ProposeRequest"
               }
             }
           },

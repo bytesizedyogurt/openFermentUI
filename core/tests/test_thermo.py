@@ -86,7 +86,7 @@ def store(monkeypatch, tmp_path):
 
 @pytest.fixture()
 def worker(monkeypatch):
-    w = StandIn(refuse={"PHB"})
+    w = StandIn(refuse={"Unobtainium"})
     monkeypatch.setattr(proforma, "call", w)
     return w
 
@@ -181,10 +181,10 @@ def test_an_artifact_that_is_no_run_has_no_stream_table(store, worker):
         thermo.props(ThermoPropsRequest(artifactId="bbbbbbbbbbbbbbb3", streamId="beer"))
 
 
-def test_a_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, worker):
+def test_a_stream_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, worker):
     _keep(Artifact.model_validate({**_run("bbbbbbbbbbbbbbb4").model_dump(), "output": {
-        "streams": [_stream("cells", {"Water": 1.0, "PHB": 1.0})], "units": [], "tableUnits": {}}}))
-    with pytest.raises(thermo.ThermoRefused, match="no chemical named PHB"):
+        "streams": [_stream("cells", {"Water": 1.0, "Unobtainium": 1.0})], "units": [], "tableUnits": {}}}))
+    with pytest.raises(thermo.ThermoRefused, match="no chemical named Unobtainium"):
         thermo.props(ThermoPropsRequest(artifactId="bbbbbbbbbbbbbbb4", streamId="cells"))
     assert [a.tool for a in artifacts.all_artifacts()].count("thermo_props") == 0
 
@@ -315,9 +315,9 @@ def test_the_endpoints_say_what_is_not_on_file_and_what_cannot_be_asked(store, w
 
 def test_a_chemical_the_library_lacks_is_a_422_and_a_dead_worker_a_503(store, worker, client, monkeypatch):
     _keep(Artifact.model_validate({**_run("bbbbbbbbbbbbbbb6").model_dump(), "output": {
-        "streams": [_stream("cells", {"PHB": 1.0}), _stream("odd", {"boom": 1.0})], "units": [], "tableUnits": {}}}))
+        "streams": [_stream("cells", {"Unobtainium": 1.0}), _stream("odd", {"boom": 1.0})], "units": [], "tableUnits": {}}}))
     r = client.post("/api/thermo/props", json={"artifactId": "bbbbbbbbbbbbbbb6", "streamId": "cells"})
-    assert r.status_code == 422 and "no chemical named PHB" in r.json()["detail"]
+    assert r.status_code == 422 and "no chemical named Unobtainium" in r.json()["detail"]
     r = client.post("/api/thermo/props", json={"artifactId": "bbbbbbbbbbbbbbb6", "streamId": "odd"})
     assert r.status_code == 503 and "where thermosteam runs" in r.json()["detail"]
 
@@ -481,7 +481,7 @@ def test_a_missing_volatility_is_a_not_found_and_a_refusal_is_not():
     assert not issubclass(thermo.VolatilityMissing, thermo.ThermoRefused)
 
 
-def test_a_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, vworker):
+def test_a_product_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, vworker):
     with pytest.raises(thermo.ThermoRefused, match="no chemical named Unobtainium"):
         thermo.volatility("unobtainium-product")
     assert [a.tool for a in artifacts.all_artifacts()].count("volatility") == 0

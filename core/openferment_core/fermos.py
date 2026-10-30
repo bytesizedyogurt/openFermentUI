@@ -116,7 +116,6 @@ from scipy.stats import t as student_t
 from . import artifacts, binding, kinetics, params, units
 from .basis import ASSUMED_KINDS
 from .models import (
-    Band,
     BasisInput,
     BasisSource,
     Evidence,
@@ -126,7 +125,6 @@ from .models import (
     FermosHarvest,
     FermosPoint,
     ForecastResult,
-    Interval,
     MassBalance,
     Override,
     OxygenUptake,
