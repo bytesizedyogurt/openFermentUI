@@ -254,3 +254,39 @@ def test_the_routes_serve_the_shelf_the_regression_and_refuse_what_cannot_run(wo
     assert params["values"][0]["origin"] == "library-default"
     ran = client.post("/api/library/sugarcane/run", json={"overrides": [over("stream.sugarcane.price", 0.05).model_dump()]})
     assert ran.status_code == 200 and ran.json()["tool"] == "library.run" and ran.json()["provenance"] == "demo"
+
+
+# ── openFerment's composed flowsheet, on the same shelf ─────────────────
+
+
+def test_the_composed_flowsheet_is_on_the_shelf_with_its_configurations_and_recipe():
+    entry = library.plant("cellulosic_ethanol_v0")
+    assert (entry.kind, entry.composedFrom, entry.defaultConfiguration) == (
+        "flowsheet", "biorefineries.cellulosic", "dilute acid, IB")
+    assert entry.recipe == "openferment_core/flowsheets/recipes/cellulosic_ethanol_v0"
+    assert len(entry.configurations) == 8 and entry.configurations[0] == "dilute acid, IB"
+    built = {b.configuration: b.ok for b in entry.builds}
+    assert built["dilute acid, IB"] and built["hot water, SCF"] and not built["AFEX, IB"] and not built["alkaline, SCF"]
+
+
+def test_a_flowsheet_run_names_the_configuration_it_ran_and_what_it_is_composed_from(worker):
+    named = {i.name: i for i in library.run_inputs("cellulosic_ethanol_v0", None, [])}
+    assert named["configuration"].value == "dilute acid, IB"
+    assert "(the package's own composition)" in named["configuration"].source.note
+    assert named["plant"].source.id == "biorefineries.cellulosic@2.35.1"
+    assert "composed by its recipe" in named["plant"].source.note
+
+
+def test_the_flowsheets_unnamed_scope_sets_its_default_configuration_alone(worker, monkeypatch):
+    monkeypatch.setattr(library, "parameters", lambda plant, configuration=None: SimpleParameters())
+    unnamed = over("feed.moisture", 0.25, scope="library:cellulosic_ethanol_v0")
+    inputs = library.run_inputs("cellulosic_ethanol_v0", None, [unnamed])
+    assert {i.name for i in inputs if i.source.kind == "assumption"} == {"feed.moisture"}
+    with pytest.raises(library.LibraryRefused, match="names the scope it changes"):
+        library.run_inputs("cellulosic_ethanol_v0", "hot water, IB", [unnamed])
+
+
+class SimpleParameters:
+    """What `parameters` answers for the scope test: one spec, the moisture."""
+
+    specs = [type("Spec", (), {"key": "feed.moisture", "unit": ""})()]

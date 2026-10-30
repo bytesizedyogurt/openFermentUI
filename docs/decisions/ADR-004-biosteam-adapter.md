@@ -82,6 +82,51 @@ determinism after `empty_recycles()` and `tea._sales = 0`.
   a ProcessModel (cellulosic's feedstock, gas_fermentation's carbon source) is not offered: a
   plant runs on its default scenario.
 
+### 4.3 (2026-10-30)
+
+- `flowsheets/recipes/cellulosic_ethanol_v0/` is the flowsheet's recipe in the SFF toolkit's
+  model-directory shape: `load.py` (imports nothing of openFerment; `create_system(pretreatment,
+  fermentation)` and the toolkit's `load()`), `extended_metadata.yaml` (the source's DOI, the
+  designers, the organism a system cannot name: Zymomonas mobilis, whose cell mass the package's
+  seed train and co-fermentation reactions grow) and `environment.yaml`, written from
+  `core/uv.lock` (`python -m openferment_core.flowsheets.recipes environment`; 77 distributions,
+  Python 3.13) and held to it by a test. The toolkit names the authored file
+  `extended_metadata.yaml`, where the execution prompt wrote `metadata.yaml`; its runner reads that
+  name.
+- The composition is the package's own: the body of `create_cellulosic_ethanol_system` (the
+  function its `SystemFactory` wraps) runs inside a `bst.System` with the registry's renaming on,
+  and while it runs its two factory names stand for the chosen pretreatment factory (given the
+  inlets it declares) and the fermentation factory with the chosen kind. The package's own system
+  declares dilute acid's acid and ammonia inlets and checks each is used, so another pretreatment
+  cannot be built through it; the body builds every unit, and every number is the package's. The
+  TEA's units outside the battery limits and the wastewater recycle's tolerance are read from the
+  package's `Biorefinery.create_model` by `ast`. With dilute acid and IB the plant prices ethanol at
+  0.6588136420 USD/kg, the package plant's own figure to ten digits (1.968 USD/gal).
+- `flowsheets/cellulosic_ethanol_v0.py` runs through the library adapter as a composed plant
+  (`library_plants.COMPOSED`, kind `flowsheet` on the shelf): eight configurations (four
+  pretreatments, IB and SCF). Dilute acid and hot water build with both kinds; AFEX stops on a
+  BioSTEAM `InfeasibleRegion` in its ammonia mixer (a receipt naming the unit) and alkaline on a
+  chemical alias the cellulosic chemicals lack (`Solids`), the package's own errors. SCF runs
+  saccharification and co-fermentation in two `BatchBioreactor` units; the package's SSCF raises
+  "not yet implemented" and is not offered. Its parameters: the feed's moisture and dry
+  composition, the solids loadings, every conversion of the package's process units' reaction sets
+  (a set that is a view of a larger one offered once), every residence time a unit answers to a
+  `tau` name (a computed one read back, never set), and every library parameter. No number is typed
+  in the module or its recipe (a test reads every literal).
+- Gates: the dry shares sum to one and the moisture lies in [0, 1); no reactant's conversions sum
+  past one; an infeasible case is refused with BioSTEAM's words; a warm plant set B and back to A
+  returns A's answer exactly (`library_cases`: every parameter reset to its default, the recycles
+  emptied and the TEA's sales guess cleared before each case). Measured on dilute acid and IB: a
+  fresh build prices ethanol at 0.6588136420 USD/kg; simulating the same plant again without
+  settling it gives 0.6588285541; a settled plant gives 0.6589116596 every time, defaults re-applied
+  or not. The spread (1.5e-4 relative) is where the wastewater recycle stops within the tolerance
+  the package sets on it (fixed point, 10 kmol/hr); settling makes every case start from the same
+  state, which is what A→B→A needs.
+- An integer parameter stays an integer (a vessel count, a TEA's finance years are used as
+  indices); a refusal carries BioSTEAM's words without its terminal colour codes.
+- Not yet: an organism's reaction set beyond the package's one (none other is in the package);
+  the flowsheet's runs on `Quantity` with origins (4.4).
+
 ## Revisit condition
 
 A second engine; NSKinetics once a kinetic model exists.

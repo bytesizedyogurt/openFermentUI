@@ -1,6 +1,9 @@
 """The library plant runner (ADR-004; execution prompt §4.4, §8.4).
 
-Every plant the installed `biorefineries` exposes is on the shelf: discovery
+Every plant the installed `biorefineries` exposes is on the shelf, and so is
+each of openFerment's own flowsheets composed from a package's factories
+(kind `flowsheet`: `cellulosic_ethanol_v0`, run through the same adapter with
+its configuration named in every basis). Discovery
 (the Proforma worker's `library_discover`, workers/library_plants.py) reads
 every subpackage without building it, then builds each plant in each
 configuration the package names, and `library_shelf.json` holds what it
@@ -102,7 +105,7 @@ def _runnable(plant_id: str, configuration: str | None) -> LibraryPlant:
     """The plant, refused in words when it is not one a run can build: not
     a plant, a configuration it does not name, or none where it needs one."""
     p = plant(plant_id)
-    if p.kind != "plant":
+    if p.kind not in ("plant", "flowsheet"):
         said = {"subsystems": f"offers subsystem factories alone ({', '.join(p.factories)})",
                 "none": "offers no plant", "unimportable": f"cannot be imported here: {p.error}"}[p.kind]
         raise LibraryRefused(f"{p.module} {said}")
@@ -240,7 +243,9 @@ def parameters(plant_id: str, configuration: str | None = None) -> LibraryParame
 
 
 def _model(entry: LibraryPlant, note: str) -> BasisSource:
-    return BasisSource(kind="model", id=f"{entry.module}@{_installed('biorefineries')}", note=note)
+    """A plant's own source: the package's module, or for a composed
+    flowsheet the package it is composed from, with the version installed."""
+    return BasisSource(kind="model", id=f"{entry.composedFrom or entry.module}@{_installed('biorefineries')}", note=note)
 
 
 def _override_input(o: Override, unit: str) -> BasisInput:
@@ -261,8 +266,14 @@ def run_inputs(plant_id: str, configuration: str | None, overrides: list[Overrid
     the settings it builds under, each change it needs to build here, each
     person's value, and the digits it keeps."""
     entry = _runnable(plant_id, configuration)
+    if configuration is None and entry.kind == "flowsheet":
+        configuration = entry.defaultConfiguration  # the basis names the configuration it ran
     want = scope(plant_id, configuration)
-    stray = sorted({o.scope for o in overrides if o.scope != want})
+    # A composed flowsheet's default configuration is also its unnamed one:
+    # the panel of `library:<flowsheet>` sets the plant a run of it builds.
+    allowed = {want} | ({scope(plant_id, None)} if entry.kind == "flowsheet"
+                        and configuration == entry.defaultConfiguration else set())
+    stray = sorted({o.scope for o in overrides if o.scope not in allowed})
     if stray:
         raise LibraryRefused(f"an override names the scope it changes, and these were sent for {want}: {', '.join(stray)}")
     keys = [o.key for o in overrides]
@@ -274,11 +285,14 @@ def run_inputs(plant_id: str, configuration: str | None, overrides: list[Overrid
     if unknown:
         raise LibraryRefused(f"{entry.module} has no parameter {', '.join(unknown)}")
     bst_v, tmo_v = _installed("biosteam"), _installed("thermosteam")
-    out = [BasisInput(name="plant", value=plant_id, unit="", source=_model(
-        entry, f"{entry.title or entry.module}, built afresh through {entry.entry} with every setting the package's own"))]
+    built_by = (f"openFerment's flowsheet {entry.module}, composed by its recipe ({entry.recipe}) from the package's "
+                "factories, every number the package's" if entry.kind == "flowsheet" else
+                f"{entry.title or entry.module}, built afresh through {entry.entry} with every setting the package's own")
+    out = [BasisInput(name="plant", value=plant_id, unit="", source=_model(entry, built_by))]
     if configuration is not None:
         out.append(BasisInput(name="configuration", value=configuration, unit="", source=_model(
-            entry, f"one of the configurations {entry.configurationsFrom} names")))
+            entry, f"one of the configurations {entry.configurationsFrom} names"
+                   + (" (the package's own composition)" if configuration == entry.defaultConfiguration else ""))))
     out += [
         BasisInput(name="simulator", value=f"biosteam {bst_v}", unit="", source=BasisSource(
             kind="model", id=f"biosteam@{bst_v}", note="the process simulator the package runs on")),
@@ -430,15 +444,16 @@ def main(argv: list[str]) -> int:
         simulator.start(background=False)
         found = discover(builds=True)
         write_shelf(found)
-        plants = [p for p in found.plants if p.kind == "plant"]
+        plants = [p for p in found.plants if p.kind in ("plant", "flowsheet")]
         built = sum(1 for p in plants for b in p.builds if b.ok)
         tried = sum(len(p.builds) for p in plants)
-        print(f"{SHELF_FILE.name}: {len(found.plants)} subpackages of {found.package}, {len(plants)} plants; "
-              f"{built} of {tried} builds succeed under {found.simulator}")
+        composed = sum(1 for p in plants if p.kind == "flowsheet")
+        print(f"{SHELF_FILE.name}: {len(found.plants) - composed} subpackages of {found.package}, "
+              f"{len(plants) - composed} plants, {composed} openFerment flowsheet(s); {built} of {tried} builds "
+              f"succeed under {found.simulator}")
         for p in plants:
-            failed = [b for b in p.builds if not b.ok]
-            if failed:
-                print(f"  {p.id}: {failed[0].error}")
+            for b in [b for b in p.builds if not b.ok]:
+                print(f"  {p.id}{f' {b.configuration}' if b.configuration else ''}: {b.error}")
         return 0
     if argv == ["regression"]:
         simulator.start(background=False)

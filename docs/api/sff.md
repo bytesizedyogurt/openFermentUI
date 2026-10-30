@@ -82,6 +82,15 @@ run's base values (with the price the run solved on its product), or a library p
 and set as its run set it. It does not write the grid or the samples. A file openFerment imports
 is kept as it came; nothing is added to it.
 
+A run of openFerment's own flowsheet (`cellulosic_ethanol_v0`) also carries its recipe, embedded
+as the toolkit's runner embeds a model's: `metadata.reproducibility` holds the recipe's `load.py`,
+its `environment.yaml` and its `extended_metadata.yaml`, each with its sha256, the simulator and
+flowsheet packages pinned in that environment, and what ran (Python, platform, package versions);
+the recipe's authored metadata (source DOI, designers, the organism) is written beside it. The
+toolkit's checks find the recipe present and its digests valid. `exported-from-simulator` is still
+not earned: one warning-severity check (UNIT-07, two of the package's facilities attached to no
+stream) blocks it, and the `reproducible` tag is never evaluated.
+
 One adaptation, for openFerment's exports alone: the toolkit's design-spec registry names design
 inputs whose values are thermosteam objects (`NRELEthanolFermentation`'s `fermentation_reaction`
 and `cell_growth_reaction`, `MassBalance`'s stream lists), and its JSON writer refuses them, so at

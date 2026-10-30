@@ -3701,11 +3701,18 @@ class LibraryBuild(BaseModel):
 class LibraryPlant(BaseModel):
     """One subpackage of the installed `biorefineries` (GET /api/library):
     a plant with an entry point, a package of subsystem factories alone, or
-    one that offers neither."""
+    one that offers neither; or one of openFerment's own flowsheets
+    (`flowsheet`), composed from a package's factories by its recipe and run
+    through the same adapter."""
 
     id: str
     module: str
-    kind: Literal["plant", "subsystems", "none", "unimportable"]
+    kind: Literal["plant", "subsystems", "none", "unimportable", "flowsheet"]
+    # A composed flowsheet: the package it is composed from, its recipe
+    # directory, and the configuration a run takes when it names none.
+    composedFrom: str | None = None
+    recipe: str | None = None
+    defaultConfiguration: str | None = None
     title: str | None = None
     readme: str | None = None
     entry: str | None = None

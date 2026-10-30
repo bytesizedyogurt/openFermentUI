@@ -78,7 +78,10 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 through each parameter's accessor, simulated, priced and
                 read back, its tables read; numbers rounded to the digits
                 the basis states. `sff_export` with `library` writes the
-                plant a library run built (ADR-004)
+                plant a library run built (ADR-004). openFerment's composed
+                flowsheets (flowsheets/cellulosic_ethanol_v0.py) run here too
+    library_cases  cases one after another on one warm build, each set to
+                the library defaults and then its own values (A→B→A)
 
 NO WORKER STOPS IN A DEBUGGER. BioSTEAM 2.54.0's AeratedBioreactor answers a
 failure of its bubble-column correlation with a bare `breakpoint()`, which
@@ -1207,6 +1210,15 @@ def _op_library_run(args):
     return rounded(out, digits)
 
 
+@_library
+def _op_library_cases(args):
+    digits = int(args.get("digits", 10))
+    if not 1 <= digits <= 17:
+        raise Refused("library cases keep between 1 and 17 significant digits")
+    return rounded(library_plants.cases(str(args["plant"]), args.get("configuration"),
+                                        [dict(c) for c in args.get("cases") or []], defaults=package_defaults), digits)
+
+
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
             "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
             "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design,
@@ -1216,7 +1228,7 @@ HANDLERS["volatility"] = _op_volatility  # OF-BLD-020 §7.1
 HANDLERS.update(sff_export=_op_sff_export, sff_validate=sff_toolkit.op_validate,
                 sff_score=sff_toolkit.op_score)  # alpha 2.0, ADR-003
 HANDLERS.update(library_discover=_op_library_discover, library_parameters=_op_library_parameters,
-                library_run=_op_library_run)  # alpha 2.0, ADR-004
+                library_run=_op_library_run, library_cases=_op_library_cases)  # alpha 2.0, ADR-004
 HANDLERS.update(train_specs=_op_train_specs, flowsheet_unit_values=_op_flowsheet_unit_values,
                 train_run=_op_train_run)  # OF-BLD-020 §5.2
 

@@ -151,15 +151,26 @@ def _writes_objects() -> Iterator[None]:
 
 
 def export_checked(system: Any, tea: Any, path: str | Path, *, metadata: dict[str, Any] | None = None,
-                   process_title: str | None = None) -> dict[str, Any]:
+                   process_title: str | None = None, recipe: Path | None = None,
+                   authored: dict[str, Any] | None = None) -> dict[str, Any]:
     """Write the system's present state as an SFF file at `path` (the
     toolkit's exporter for the schema it ships, its writer taught to write
     a reaction and a stream in words), add openFerment's block to the file's
-    `metadata` when one is given, and check the file as written."""
+    `metadata` when one is given, and check the file as written. A flowsheet
+    with a recipe directory has it embedded as the toolkit's runner embeds a
+    model's (`metadata.reproducibility`: the load script and the pinned
+    environment, each with its digest), with what the recipe declares
+    (`authored`: the source's DOI, the designers, the organism)."""
+    from pisces_sff.export import _runner
+
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
+    extra: dict[str, Any] = dict(authored or {})
+    if recipe is not None:
+        extra["reproducibility"] = _runner.build_reproducibility(recipe, _runner.load_model_module(recipe))
     with _writes_objects():
-        pisces_sff.export_biosteam_flowsheet(system, str(p), SCHEMA_VERSION, tea=tea, process_title=process_title)
+        pisces_sff.export_biosteam_flowsheet(system, str(p), SCHEMA_VERSION, tea=tea, process_title=process_title,
+                                             **extra)
     if metadata:
         doc = json.loads(p.read_text(encoding="utf-8"))
         doc["metadata"][OPENFERMENT_KEY] = metadata

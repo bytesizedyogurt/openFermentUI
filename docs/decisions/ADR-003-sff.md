@@ -90,6 +90,13 @@ openFerment's own replay check (re-run within tolerance) is the verification tha
 - A library run exports through `sff_export` with `library` (the plant rebuilt and set as its run
   set it).
 
+### 4.3 (2026-10-30)
+
+- The flowsheet module has the model-directory shape (`flowsheets/recipes/cellulosic_ethanol_v0/`:
+  `load.py`, `environment.yaml` pinned from `core/uv.lock`, `extended_metadata.yaml`), and a run's
+  SFF file embeds it through the toolkit's own `build_reproducibility`; the toolkit finds the
+  recipe present and its digests valid. Earning `reproducible` through the conda harness stays off.
+
 ## Revisit condition
 
 The toolkit ships an importer or packaging; the schema reaches 1.0.

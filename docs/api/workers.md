@@ -31,7 +31,7 @@ out  {"id": 1, "ok": false, "error": "Refused: there is no flowsheet x; there ar
 
 | Worker | Module | Imports | Ops |
 |---|---|---|---|
-| `proforma` | `workers/proforma_worker.py` (with `flowsheets/`, `workers/library_plants.py`, `workers/sff_toolkit.py`, `vendor/pisces_sff`) | biosteam, thermosteam, biorefineries, the SFF toolkit | `benchmark`, `evaluate`, `grid`, `montecarlo`, `run`, `reference`, `thermo_props`, `volatility`, `vessel_specs`, `vessel_design`, `catalogue_specs`, `catalogue_unit_check`, `train_specs`, `flowsheet_unit_values`, `train_run`, `sff_export`, `sff_validate`, `sff_score`, `library_discover`, `library_parameters`, `library_run` |
+| `proforma` | `workers/proforma_worker.py` (with `flowsheets/`, `workers/library_plants.py`, `workers/sff_toolkit.py`, `vendor/pisces_sff`) | biosteam, thermosteam, biorefineries, the SFF toolkit | `benchmark`, `evaluate`, `grid`, `montecarlo`, `run`, `reference`, `thermo_props`, `volatility`, `vessel_specs`, `vessel_design`, `catalogue_specs`, `catalogue_unit_check`, `train_specs`, `flowsheet_unit_values`, `train_run`, `sff_export`, `sff_validate`, `sff_score`, `library_discover`, `library_parameters`, `library_run`, `library_cases` |
 | `geneos` | `workers/geneos_worker.py` | cobra | `describe`, `ceiling`, `frontier`, `mix` |
 | `echo` | `workers/echo_worker.py` | nothing heavy | the protocol's own tests |
 
@@ -138,3 +138,21 @@ expressions}, "parameters" (read back after the values were set), "libraryDefaul
 value as built}, "overrides"}` and the run's tables (`tablesSource`, `tea`, `streams`, `units`,
 `utilities`, `diagramNote`, `unitOrder`, `tableUnits`). A plant whose TEA BioSTEAM cannot break
 down (an agile system) has `"tea": null` and a `teaNote` saying why.
+
+openFerment's composed flowsheets run through the same ops: `plant` is `cellulosic_ethanol_v0`,
+`configuration` one of its eight (`"dilute acid, IB"` when null), and its own parameters come first
+(`feed.moisture`, `feed.dry.<component>`, `unit.<id>.solids_loading`, `unit.<id>.tau…`,
+`rxn.<unit>.<set>.<index>`). A run of it adds `readBack` (each process unit's mode, temperature,
+residence times, vessel count and reaction sets; the organism the recipe declares; the TEA's
+settings; the utility prices and cost index; the versions) and `outputs` (`mespUsdPerKg`,
+`mespUsdPerGal`, `ethanolKgPerH`, `dryFeedKgPerH`, `ethanolKgPerKgDryFeed`). Its gates refuse in
+words before it runs: dry shares that do not sum to one, a moisture outside [0, 1), a reactant's
+conversions summing past one; a case BioSTEAM finds infeasible is refused with its
+`InfeasibleRegion` words. Its export embeds the recipe (`metadata.reproducibility`).
+
+### `library_cases`
+
+Request `{"plant", "configuration", "cases": [{key: number}, …], "digits"}`. One warm build; each
+case sets every settable parameter to its library default and then its own values, settles the plant
+(recycles emptied, the TEA's sales guess cleared) and runs. Result: one entry per case, `{"values",
+"price", "outputs"}` or `{"values", "refused"}`, rounded to `digits`. The A→B→A gate runs here.

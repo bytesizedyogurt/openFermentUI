@@ -62,12 +62,24 @@ from . import sff_toolkit
 PACKAGE = "biorefineries"
 TEST_FILE = "biorefineries/tests/test_biorefineries.py"
 ENTRIES = ("load", "Biorefinery", "create_system")
+# openFerment's own flowsheets, composed from a package's factories and run
+# through this same adapter (flowsheets/cellulosic_ethanol_v0.py): id → module.
+COMPOSED = {"cellulosic_ethanol_v0": "openferment_core.flowsheets.cellulosic_ethanol_v0"}
 # Subpackages that are not plants by their own description: the package's test suite.
 NOT_PLANTS = {"tests"}
 
 
+# BioSTEAM writes a unit's name in its own colours, as terminal escapes; a
+# refusal carries the words alone.
+_ESCAPES = re.compile(r"\x1b\[[0-9;]*m")
+
+
 class Refused(ValueError):
-    """The request cannot be computed, in words."""
+    """The request cannot be computed, in words (BioSTEAM's colour escapes
+    taken out)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(_ESCAPES.sub("", message))
 
 
 # ── compatibility changes (stated in every run's basis) ─────────────────
@@ -267,6 +279,16 @@ def discover() -> dict[str, Any]:
             "compat": [{"change": compat[0], "why": compat[1]}] if compat else [],
             "factories": factories,
         })
+    for plant_id, module_name in COMPOSED.items():
+        flowsheet = importlib.import_module(module_name)
+        found.append({
+            "id": plant_id, "module": module_name, "kind": "flowsheet", "title": flowsheet.TITLE,
+            "composedFrom": flowsheet.COMPOSED_FROM, "entry": "recipe", "recipe": str(flowsheet.RECIPE_DIR.relative_to(
+                Path(flowsheet.__file__).parents[2])),
+            "configurations": list(flowsheet.CONFIGURATIONS), "configurationsFrom": f"{module_name}.CONFIGURATIONS",
+            "defaultConfiguration": flowsheet.DEFAULT_CONFIGURATION, "requiresConfiguration": False,
+            "parameters": [], "scenario": [], "tests": [], "testNames": None, "compat": [], "factories": [],
+        })
     return {"package": f"{PACKAGE} {version(PACKAGE)}", "simulator": f"biosteam {version('biosteam')}",
             "thermosteam": f"thermosteam {version('thermosteam')}", "testFile": TEST_FILE,
             "testTables": {k: v for k, v in tests.items() if k != "tests"}, "plants": found}
@@ -288,6 +310,10 @@ class Plant:
     feedstock: Any
     product: Any
     how: dict[str, str] = field(default_factory=dict)
+    # A composed flowsheet's module (its parameters, gates and read-back), and
+    # what a person set that it lays on together (`finalize`).
+    flowsheet: Any = None
+    pending: dict[str, Any] = field(default_factory=dict)
 
 
 def _module(plant: str) -> Any:
@@ -335,9 +361,12 @@ def _stream(made: Any, system: Any, stream_id: str | None) -> Any:
 
 
 def build(plant: str, configuration: str | None = None) -> Plant:
-    """The plant built afresh through its entry point. Called inside the
-    worker's `package_defaults()`; a build the package itself cannot finish
-    is refused with the package's own error."""
+    """The plant built afresh through its entry point (an openFerment
+    flowsheet through its recipe). Called inside the worker's
+    `package_defaults()`; a build the package itself cannot finish is refused
+    with the package's own error."""
+    if plant in COMPOSED:
+        return importlib.import_module(COMPOSED[plant]).build(configuration)
     module = _module(plant)
     ns = vars(module)
     entry = next((e for e in ENTRIES if e in ns and callable(ns[e])), None)
@@ -499,6 +528,20 @@ def _set_path(obj: Any, path: str, value: Any) -> None:
         setattr(obj, last, value)
 
 
+def writable(obj: Any, path: str) -> bool:
+    """Whether the attribute at an accessor path can be set: a property of
+    the object's class without a setter is computed, read back alone."""
+    parts = path.split(".")
+    try:
+        for part in parts[:-1]:
+            obj = _step(obj, part)
+    except Exception:  # noqa: BLE001 — a path the object cannot answer is not set
+        return False
+    name = re.sub(r"\[\d+\]$", "", parts[-1])
+    found = inspect.getattr_static(type(obj), name, None)
+    return not (isinstance(found, property) and found.fset is None)
+
+
 def _step(obj: Any, part: str) -> Any:
     m = re.fullmatch(r"(\w+)\[(\d+)\]", part)
     return getattr(obj, m[1])[int(m[2])] if m else getattr(obj, part)
@@ -538,7 +581,9 @@ def _tea_params(p: Plant) -> list[Param]:
     if p.tea is None:
         return out
     for attr, label, unit in TEA_SETTINGS:
-        v = _number(getattr(p.tea, attr, None))
+        raw = getattr(p.tea, attr, None)
+        # An integer stays one: the TEA slices its cash flows with some (finance_years).
+        v = raw if isinstance(raw, int) and not isinstance(raw, bool) else _number(raw)
         if v is None:
             continue
         out.append(Param(f"tea.{attr}", label, "TEA", unit, v, lambda x, t=p.tea, a=attr: setattr(t, a, x),
@@ -582,16 +627,19 @@ def _unit_params(p: Plant) -> list[Param]:
                     raw = _step_path(unit, accessor)
                 except Exception:  # noqa: BLE001 — an accessor the unit cannot answer is the next one's turn
                     continue
-                v = _number(raw)
+                # An integer stays one (a vessel count is used as an index).
+                v = raw if isinstance(raw, int) and not isinstance(raw, bool) else _number(raw)
                 if v is None:
                     if isinstance(raw, str) and raw:
                         out.append(Param(f"unit.{unit.ID}.{name}", f"{unit.ID}: {name}", f"unit {unit.ID}", "", raw, None,
                                          f"{type(unit).__name__}.{accessor}, in words; read back, not set: BioSTEAM "
                                          "states no choices for it here", "text"))
                     break
+                setter = (lambda x, u=unit, a=accessor: _set_path(u, a, x)) if writable(unit, accessor) else None
                 out.append(Param(f"unit.{unit.ID}.{name}", f"{unit.ID}: {name}", f"unit {unit.ID}",
-                                 DESIGN_UNITS.get(name, ""), v, lambda x, u=unit, a=accessor: _set_path(u, a, x),
-                                 f"{type(unit).__name__}.{accessor}", "number"))
+                                 DESIGN_UNITS.get(name, ""), v, setter,
+                                 f"{type(unit).__name__}.{accessor}" + ("" if setter else ", computed by the unit: "
+                                                                         "read back, not set"), "number"))
                 break
     return out
 
@@ -603,8 +651,12 @@ def _step_path(obj: Any, path: str) -> Any:
 
 
 def parameters(p: Plant) -> list[Param]:
-    """Every parameter read back from the built plant, in panel order."""
-    return [*_stream_params(p), *_tea_params(p), *_utility_params(p), *_unit_params(p)]
+    """Every parameter read back from the built plant, in panel order; a
+    composed flowsheet's own first, and a key it offers is offered once."""
+    own = p.flowsheet.parameters(p) if p.flowsheet is not None else []
+    keys = {q.key for q in own}
+    return [*own, *(q for q in [*_stream_params(p), *_tea_params(p), *_utility_params(p), *_unit_params(p)]
+                    if q.key not in keys)]
 
 
 def is_share(name: str) -> bool:
@@ -619,9 +671,11 @@ def param_json(param: Param) -> dict[str, Any]:
 # ── a run ──────────────────────────────────────────────────────────────
 
 
-def apply(params: list[Param], overrides: dict[str, Any]) -> None:
+def apply(params: list[Param], overrides: dict[str, Any], plant: Plant | None = None) -> None:
     """A person's values set through each parameter's own accessor; a key
-    the plant does not read back, or a value of the wrong kind, is refused."""
+    the plant does not read back, or a value of the wrong kind, is refused.
+    A composed flowsheet then lays on what it holds together and checks it
+    (`finalize`: share sums, conversion sums)."""
     by_key = {p.key: p for p in params}
     unknown = sorted(set(overrides) - set(by_key))
     if unknown:
@@ -633,10 +687,31 @@ def apply(params: list[Param], overrides: dict[str, Any]) -> None:
         v = _number(value)
         if v is None:
             raise Refused(f"{key} takes a finite number")
+        if isinstance(param.value, int):
+            if not v.is_integer():
+                raise Refused(f"{key} takes a whole number, as the package holds it")
+            v = int(v)
         try:
             param.setter(v)
         except Exception as e:  # the package's own refusal of the value
             raise Refused(f"{key} could not be set to {value!r}: {type(e).__name__}: {e}") from e
+    if plant is not None and plant.flowsheet is not None:
+        plant.flowsheet.finalize(plant)
+
+
+def simulate(p: Plant) -> None:
+    """The plant simulated after a person's values were set: a composed
+    flowsheet settles first (A→B→A); a case BioSTEAM finds infeasible is
+    refused with its words, a receipt naming the unit."""
+    if p.flowsheet is not None:
+        p.flowsheet.settle(p)
+    try:
+        with redirect_stdout(io.StringIO()):
+            p.system.simulate()
+    except bst.exceptions.InfeasibleRegion as e:
+        raise Refused(f"infeasible here (BioSTEAM's InfeasibleRegion): {e}") from e
+    except Exception as e:
+        raise Refused(f"the plant could not be simulated with these values: {type(e).__name__}: {e}") from e
 
 
 def priced(p: Plant) -> dict[str, Any]:
@@ -677,12 +752,8 @@ def run(plant: str, configuration: str | None, overrides: dict[str, Any], *,
         before = parameters(p)
         library = {q.key: q.value for q in before}
         if overrides:
-            apply(before, overrides)
-            try:
-                with redirect_stdout(io.StringIO()):
-                    p.system.simulate()
-            except Exception as e:
-                raise Refused(f"the plant could not be simulated with these values: {type(e).__name__}: {e}") from e
+            apply(before, overrides, p)
+            simulate(p)
         after = parameters(p)
         parts = {"system": p.system, "tea": p.tea, "product": p.product, "feedstock": p.feedstock, "price": None}
         out = {
@@ -694,6 +765,9 @@ def run(plant: str, configuration: str | None, overrides: dict[str, Any], *,
             "libraryDefaults": library,
             "overrides": dict(overrides),
         }
+        if p.flowsheet is not None:
+            out["readBack"] = p.flowsheet.read_back(p)
+            out["outputs"] = p.flowsheet.outputs(p)
         try:
             out.update(read_tables(_Module(), p, draw))
         except Exception as e:  # noqa: BLE001 — the tables are read without the TEA's breakdown, and say why
@@ -723,10 +797,41 @@ def export(plant: str, configuration: str | None, overrides: dict[str, Any], pat
     with defaults():
         p = build(plant, configuration)
         if overrides:
-            apply(parameters(p), overrides)
-            with redirect_stdout(io.StringIO()):
-                p.system.simulate()
-        return sff_toolkit.export_checked(p.system, p.tea, path, metadata=metadata, process_title=title)
+            apply(parameters(p), overrides, p)
+            simulate(p)
+        if p.flowsheet is None:
+            return sff_toolkit.export_checked(p.system, p.tea, path, metadata=metadata, process_title=title)
+        authored = p.flowsheet.authored()
+        return sff_toolkit.export_checked(
+            p.system, p.tea, path, metadata=metadata,
+            process_title=title or f"{authored.get('process_title')}: {p.configuration}",
+            recipe=p.flowsheet.RECIPE_DIR,
+            authored={k: v for k, v in authored.items() if k != "process_title"})
+
+
+def cases(plant: str, configuration: str | None, values: list[dict[str, Any]], *,
+          defaults: Callable[[], AbstractContextManager[None]]) -> list[dict[str, Any]]:
+    """Cases run one after another on one warm build (`library_cases`): each
+    sets every parameter to its library default and then its own values, and
+    runs from a settled plant; a case the plant cannot hold is a receipt in
+    its place. The A→B→A gate runs here."""
+    out = []
+    with defaults():
+        p = build(plant, configuration)
+        params = parameters(p)
+        library = {q.key: q.value for q in params if q.setter is not None}
+        for case in values:
+            try:
+                apply(params, {**library, **case}, p)
+                simulate(p)
+            except Refused as e:
+                out.append({"values": case, "refused": str(e)})
+                continue
+            row = {"values": case, "price": priced(p)}
+            if p.flowsheet is not None:
+                row["outputs"] = p.flowsheet.outputs(p)
+            out.append(row)
+    return out
 
 
 def check_builds(found: dict[str, Any], *, defaults: Callable[[], AbstractContextManager[None]]) -> dict[str, Any]:
@@ -736,7 +841,7 @@ def check_builds(found: dict[str, Any], *, defaults: Callable[[], AbstractContex
     parameters a plant reads back is left out: the heating and cooling agents
     its units name can follow what the worker built before.)"""
     for entry in found["plants"]:
-        if entry.get("kind") != "plant":
+        if entry.get("kind") not in ("plant", "flowsheet"):
             continue
         builds = []
         for configuration in entry.get("configurations") or [None]:

@@ -16,18 +16,19 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 4, step 4.3** — `flowsheets/cellulosic_ethanol_v0.py` with its recipe
-   directory, composed from the `biorefineries.cellulosic` factories, and its gates (ADR-004;
-   execution prompt §8.4, §3.2). Steps 4.1 (SFF) and 4.2 (the library plant runner) are
-   committed; ADR-003's and ADR-004's Implementation sections say what each built.
+4. **Next step: stage 4, step 4.4** — runs, artifacts, parameter specs and panels on `Quantity`
+   with origins; `demo` renamed `assumed`; runs on the `runs` table writing their SFF file; then
+   the stage 4 gate (ADR-006, ADR-004; execution prompt §10 stage 4, §8.4). Steps 4.1 (SFF), 4.2
+   (the library plant runner) and 4.3 (the composed cellulosic ethanol flowsheet) are committed;
+   ADR-003's and ADR-004's Implementation sections say what each built.
 5. Files in flight: none.
 
 ## Current stage
 
 Stage 4 — the BioSTEAM adapter and SFF — is in progress: 4.1 (the vendored SFF toolkit, its
-worker ops, SFF records, the reference corpus fetched and hashed) and 4.2 (the library plant
-runner, the shelf regenerated from discovery) are done; 4.3 (the openFerment cellulosic ethanol
-flowsheet) and 4.4 (runs on `Quantity` with origins, the gate) remain. Stages 0 to 3 are complete (the tag push waits on the owner; see
+worker ops, SFF records, the reference corpus fetched and hashed), 4.2 (the library plant
+runner, the shelf regenerated from discovery) and 4.3 (the composed cellulosic ethanol flowsheet
+and its recipe) are done; 4.4 (runs on `Quantity` with origins, the gate) remains. Stages 0 to 3 are complete (the tag push waits on the owner; see
 Blockers).
 
 ## Last green runs
@@ -56,6 +57,8 @@ Blockers).
 | 2026-10-30 09:48 | `test:sim` with 4.1 | 107 passed, 2076 deselected | 4 min 31 s | 4.1 |
 | 2026-10-30 10:35 | `test:sim` with 4.2 (the library sim tests among them) | 119 passed, 2102 deselected | 4 min 46 s | 4.2 |
 | 2026-10-30 10:40 | `test:core` with 4.2 | 2064 passed, 2 skipped, 155 deselected | 5 min 10 s | 4.2 |
+| 2026-10-30 11:08 | `test:sim` with 4.3 (the composed flowsheet's sim tests among them) | 126 passed, 2112 deselected | 5 min 6 s | 4.3 |
+| 2026-10-30 11:14 | `test:core` with 4.3 | 2074 passed, 2 skipped, 162 deselected | 5 min 19 s | 4.3 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -97,6 +100,10 @@ Blockers).
 | §4.4, stage 4.2 | `ethanol` and `biodiesel`, which the prompt lists among the plants, are on the shelf as packages of subsystem factories: the installed package gives them no plant entry point. LAOs, fattyalcohols, lactic and gas_fermentation are on the shelf and refused at build with the package's own error | Measured under biosteam 2.54.0 and biorefineries 2.35.1 (ADR-004, Implementation 4.2) |
 | §9 step 4, stage 4.2 | The corn stover plant (the NREL cellulosic ethanol design) holds nine of its package test's eleven values on the pinned versions, not all; the run's checks say which | Measured, as its reference run has since 2026-10-20: installed equipment cost −7.9 %, electricity consumption −5.2 % (`docs/reports/library-regression.md`) |
 | §8.4, stage 4.2 | `engine/library.py` imports the shelf's package-test reader (`flowsheets/shelf.py`) and, where a run is kept, `artifacts` | Both belong to the engine by §7.2's table and still live outside `engine/`; the boundary test at the stage 4 gate decides their place |
+| §8.3, stage 4.3 | The recipe's authored file is `extended_metadata.yaml`, where the prompt wrote `metadata.yaml` | The SFF toolkit's runner reads that name (`load_extended_metadata`) |
+| §8.4, stage 4.3 | The composed flowsheet runs through the library adapter (kind `flowsheet` on the library shelf, `library.run` artifacts), and runs the package's own composition body (`SystemFactory.f`) with its pretreatment and fermentation factories chosen | One adapter for every plant (§2 item 3); the package's own system factory checks that dilute acid's inlets are used and cannot take another pretreatment, and its body keeps every number the package's (ADR-004, Implementation 4.3) |
+| §8.4, stage 4.3 | The organism is declared in the recipe (`extended_metadata.yaml`: Zymomonas mobilis) and is not a configuration | A BioSTEAM system names no host, as the toolkit's own recipes say; the package holds one organism's reaction sets, so a choice would have one entry |
+| §8.4, stage 4.3 | AFEX and alkaline pretreatment are on the shelf and refused: AFEX with BioSTEAM's `InfeasibleRegion` in its ammonia mixer, alkaline with a chemical alias the cellulosic chemicals lack | Measured: the package's factories, composed on its corn stover feed and chemicals |
 | §10 stage 1.1 | Section 5 runs in the order 5.4 + 5.3 (one commit), 5.1, 5.2, 5.5, 5.6, 5.7 | `demo.py`, `retrieve.py` and `rageval.py` were the heaviest users of the program machinery and build their fixtures through each other; deleting them first spares edits to files deleted one step later, and a commit between 5.4 and 5.3 could not be green |
 | §5.3 | `demo.py`'s stand-in evaluator and stand-in records moved to `core/tests/standins.py` (test-only) | Thirteen kept test files (Proforma, fermOS, params, pureOS, tools) test binding, override, ceiling and run-contract rules on them. Stage 4 replaces them with fixtures read from library plants (debt recorded below) |
 | §5.4 | `search_passages` stays registered, with one seam (`tools/passages.py: search`) that answers "no literature index exists yet" | Postdoc's quote validation and its tests keep the passage contract; stage 3 fills the seam with Sci RAG Kit. The whole-sentence rule moved to `quotes.py` |
@@ -144,7 +151,8 @@ Blockers).
 | `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7 |
 | Runs do not yet write their SFF file on their own: a run is exported through `POST /api/flowsheets/export` | stage 4.4, when runs move to the `runs` table |
 | The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | stage 7, when the UI reads the library shelf |
-| A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and not offered | 4.3 composes the cellulosic plant's choices; others after alpha 2.0 |
+| A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and not offered | after alpha 2.0 (4.3 composes the cellulosic plant's pretreatment and fermentation instead) |
+| A second organism's reaction set for the composed flowsheet: the package holds one | when a package or a record gives another |
 | `docs/api/workers.md` gives the SFF ops' requests and results in full and the other ops by name | the stage 4 gate |
 
 ## Owner questions (execution prompt §13) and the defaults taken
@@ -383,3 +391,23 @@ Blockers).
   committed shelf is what the package exposes; corn, sugarcane, lipidcane, cornstover and oilcane
   O2 held to their tests as they hold here; an agile configuration; a person's value; A→B→A by
   replay; a library run's SFF file; a refusal in the package's words).
+- 4.3 The composed cellulosic ethanol flowsheet (ADR-004, Implementation 4.3).
+  `flowsheets/recipes/cellulosic_ethanol_v0/` (the SFF toolkit's model directory: `load.py`
+  importing nothing of openFerment, `extended_metadata.yaml`, `environment.yaml` written from
+  `core/uv.lock` by `python -m openferment_core.flowsheets.recipes environment`). The recipe runs
+  the package's own composition body with the pretreatment and fermentation kind chosen, the
+  registry's renaming on, and reads the TEA's outside-the-battery-limits units and the wastewater
+  recycle's tolerance from the package's `Biorefinery` code by `ast`: dilute acid with IB is the
+  package's plant to ten digits (0.6588136420 USD/kg, 1.968 USD/gal). `flowsheets/cellulosic_ethanol_v0.py`
+  runs through the library adapter (kind `flowsheet`, eight configurations; AFEX infeasible and
+  alkaline refused, as measured): its feed moisture and dry composition, solids loadings, every
+  conversion of the package's process units, every residence time, and the library parameters;
+  its gates (share sums, conversion sums, infeasibility receipts) and read-back (each process
+  unit's mode, temperature, residence times, vessels, reaction sets; the organism; the TEA; the
+  utilities; the versions). `library_cases` runs cases on one warm build; A→B→A returns A exactly.
+  A run's SFF file embeds the recipe with valid digests. Integer parameters stay integers;
+  computed attributes are read back, never set; refusals carry no terminal colour codes. Tests:
+  `test_cellulosic.py` (offline: the recipe's shape and declarations, its imports, its environment
+  against the lock, its authored metadata against the exporter, no number typed in the flowsheet
+  or the recipe) and `test_cellulosic_sim.py` (`sim`: the package's plant reproduced, each
+  configuration, SCF's two batch reactors, the gates, a person's composition, A→B→A, the export).
