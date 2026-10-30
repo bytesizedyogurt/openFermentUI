@@ -377,10 +377,6 @@ class Stores:
             self._rows[module] = list(self.all_rows(module))
         return self._rows[module]
 
-    def _record_lookup(self, record_id: str) -> Any:
-        pool = self.pool()
-        return pool.record(record_id) or pool.corpus.record(record_id)
-
     def error(self, module: str) -> str | None:
         self.rows(module)
         return self._errors.get(module)
@@ -578,8 +574,7 @@ class Stores:
         for key, group in pureos._runs(runs, scenarios).items():
             a = group[0]
             mark = self._artifact_mark(a)
-            tr = pureos.train_of(a, scenarios=scenarios, provenance=mark, runs=len(group),
-                                 record_lookup=self._record_lookup)
+            tr = pureos.train_of(a, scenarios=scenarios, provenance=mark, runs=len(group))
             name = tr.scenarioName or tr.flowsheet or a.id
             ids = tuple(x for x in (tr.scenarioId, a.id) if x and x != key)
             yield Row("pureos", "train", key, f"Train of {name}", "open", "computed", provenance=mark,

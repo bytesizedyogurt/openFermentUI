@@ -10,8 +10,6 @@ adopts it and locks it.
 """
 from __future__ import annotations
 
-from functools import lru_cache
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from .. import runbook_draft
@@ -31,14 +29,11 @@ class DraftRunbookInput(BaseModel):
     measures: list[DraftMeasure] = Field(description="What the bench records, each naming the item label it tests.")
 
 
-@lru_cache(maxsize=1)
 def _ids() -> tuple[frozenset[str], frozenset[str]]:
-    """The product and strain ids a draft may name: those the corpus holds
-    (none until a project's records carry them, alpha 2.0 stage 2)."""
-    from ..corpus import load_corpus
-
-    c = load_corpus()
-    return frozenset(p["id"] for p in c.products), frozenset(s["id"] for s in c.strains)
+    """The product and strain ids a draft may name. No store holds a product
+    or strain catalogue yet (alpha 2.0 deleted the seed's, ADR-010), so a
+    draft names none; tests supply them here."""
+    return frozenset(), frozenset()
 
 
 def _run(inp: DraftRunbookInput, ctx: ToolContext) -> ToolResult:

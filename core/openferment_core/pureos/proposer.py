@@ -89,6 +89,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 from ..models import ProposalMissing, ProposalReason, TrainInlet, TrainProposal, TrainSpec, TrainUnitSpec
@@ -197,10 +198,10 @@ RULES: dict[str, Rule] = {r.id: r for r in (
 
 
 def _catalogue() -> Any:
-    """The products and strains on file: the corpus's catalogues."""
-    from ..corpus import load_corpus
-
-    return load_corpus()
+    """The products and strains on file. No store holds either catalogue yet,
+    so both are empty (alpha 2.0 deleted the seed's, ADR-010) and every
+    proposal is refused for want of a host on file; tests supply them here."""
+    return SimpleNamespace(products=(), strains=())
 
 
 def _molecules() -> dict[str, dict[str, Any]]:

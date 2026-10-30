@@ -1778,7 +1778,7 @@ def run_of(art: Artifact) -> TrainRun:
 # ── what is on file ────────────────────────────────────────────────────
 
 
-def program_of_run(art: Artifact, record_lookup: Any = None) -> str | None:
+def program_of_run(art: Artifact) -> str | None:
     """A train run's chemical set: the one its train names in its basis."""
     return next((str(i.value) for i in art.inputs if i.name == "program"), None)
 

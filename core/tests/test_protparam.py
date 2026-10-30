@@ -252,10 +252,10 @@ def test_both_tools_are_registered_when_the_service_starts_and_biopython_waits()
     assert lines[-2].startswith("protparam 1 · biopython ") and lines[-1].startswith("thermo volatility 1 · thermosteam ")
 
 
-def test_the_products_catalogue_is_the_corpus_and_a_product_it_lacks_is_missing_in_words(test_corpus):
-    """The fictional test corpus catalogues no product, as the corpus the
-    service ships catalogues none: a product's properties are missing, said
-    in words, and nothing is computed."""
-    assert protparam.products() == [dict(p) for p in test_corpus.products] == []
+def test_no_product_is_catalogued_and_a_product_it_lacks_is_missing_in_words():
+    """No store holds a product catalogue yet, so the service ships none: a
+    product's properties are missing, said in words, and nothing is
+    computed."""
+    assert protparam.products() == []
     with pytest.raises(protparam.ProtParamMissing, match="there is no product 'insulin-b-chain' in the products catalogue"):
         protparam.of_product("insulin-b-chain")

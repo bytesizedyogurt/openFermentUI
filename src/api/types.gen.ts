@@ -1879,15 +1879,15 @@ export interface paths {
          * Pureos Propose
          * @description A train proposed by written rules (`TrainProposal`): the product's
          *     class and the properties its rule splits on (thermosteam's volatility,
-         *     ProtParam on the entry's sequence, where the seed says the product is),
-         *     each unit at its library defaults or waiting, with one reason naming the
-         *     rule, the property and its artifact; or none, naming what is missing.
-         *     Keeps nothing but the property artifacts it reads. 404 for a product
-         *     neither the products catalogue nor thermo.CHEMICALS holds; 422 in words
-         *     for a refusal (an unknown host, an inlet that is not one, a sequence ProtParam cannot read, a chemical the
-         *     library lacks); 409 for a property answer damaged on disk; 503 when the
-         *     worker cannot answer a volatility question, or the corpus is not
-         *     exported.
+         *     ProtParam on the catalogue entry's sequence, where the product is a
+         *     protein), each unit at its library defaults or waiting, with one reason
+         *     naming the rule, the property and its artifact; or none, naming what is
+         *     missing. Keeps nothing but the property artifacts it reads. 404 for a
+         *     product neither the products catalogue nor thermo.CHEMICALS holds; 422 in
+         *     words for a refusal (an unknown host, an inlet that is not one, a sequence
+         *     ProtParam cannot read, a chemical the library lacks); 409 for a property
+         *     answer damaged on disk; 503 when the worker cannot answer a volatility
+         *     question.
          */
         post: operations["pureos_propose_api_pureos_propose_post"];
         delete?: never;

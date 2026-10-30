@@ -247,12 +247,10 @@ def protparam(sequence: str, *, source: BasisSource, product: str | None = None,
 
 
 def products() -> list[dict[str, Any]]:
-    """The products catalogue as the corpus carries it: each entry's id and
-    name, and its sequence and source when it has one. Empty while the
-    corpus holds none (alpha 2.0 deleted the seed, ADR-010)."""
-    from .corpus import load_corpus
-
-    return [dict(p) for p in load_corpus().products]
+    """The products catalogue: each entry's id and name, and its sequence and
+    source when it has one. No store holds a product catalogue yet, so it is
+    empty (alpha 2.0 deleted the seed's, ADR-010); tests supply one here."""
+    return []
 
 
 def sequence_of(product: str) -> tuple[str, BasisSource]:

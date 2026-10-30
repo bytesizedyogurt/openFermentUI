@@ -55,6 +55,7 @@ DELETED = [
     "core/openferment_core/rerank.py",
     "core/openferment_core/expand.py",
     "core/openferment_core/rageval.py",
+    "core/openferment_core/anchor_report.py",
     "core/tests/fixtures/demo",
     "core/tests/fixtures/overlay-smoke.json",
     # Dominion (5.6).

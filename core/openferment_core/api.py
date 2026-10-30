@@ -1447,8 +1447,6 @@ def _protparam_answer(fn, product: str):
         raise HTTPException(status_code=404, detail=str(e)) from None
     except protparam.ProtParamRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from None
-    except FileNotFoundError as e:  # corpus.json not exported
-        raise HTTPException(status_code=503, detail=str(e)) from None
     except artifacts.ArtifactDamaged as e:
         raise HTTPException(status_code=409, detail=str(e)) from None
 
@@ -1996,13 +1994,6 @@ def artifacts_replay(artifact_id: str) -> ReplayResult:
 # ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
 
 
-def _record_lookup():
-    try:
-        return load_corpus().record
-    except FileNotFoundError:
-        return None
-
-
 @app.get("/api/pureos/trains")
 def pureos_trains() -> list[dict]:  # noqa: N803 (the wire name)
     """The trains on file: the newest Proforma run of each scenario, read
@@ -2011,7 +2002,7 @@ def pureos_trains() -> list[dict]:  # noqa: N803 (the wire name)
     from . import pureos
 
     return [pureos.summary(t).model_dump(mode="json")
-            for t in pureos.trains(record_lookup=_record_lookup())]
+            for t in pureos.trains()]
 
 
 @app.get("/api/pureos/train-runs")
@@ -2120,7 +2111,7 @@ def pureos_train(key: str) -> dict:
     from . import pureos
 
     try:
-        return pureos.train(key, record_lookup=_record_lookup()).model_dump(mode="json")
+        return pureos.train(key).model_dump(mode="json")
     except pureos.TrainNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
 
@@ -2131,15 +2122,15 @@ def pureos_train(key: str) -> dict:
 def pureos_propose(req: ProposeRequest) -> dict:
     """A train proposed by written rules (`TrainProposal`): the product's
     class and the properties its rule splits on (thermosteam's volatility,
-    ProtParam on the entry's sequence, where the seed says the product is),
-    each unit at its library defaults or waiting, with one reason naming the
-    rule, the property and its artifact; or none, naming what is missing.
-    Keeps nothing but the property artifacts it reads. 404 for a product
-    neither the products catalogue nor thermo.CHEMICALS holds; 422 in words
-    for a refusal (an unknown host, an inlet that is not one, a sequence ProtParam cannot read, a chemical the
-    library lacks); 409 for a property answer damaged on disk; 503 when the
-    worker cannot answer a volatility question, or the corpus is not
-    exported."""
+    ProtParam on the catalogue entry's sequence, where the product is a
+    protein), each unit at its library defaults or waiting, with one reason
+    naming the rule, the property and its artifact; or none, naming what is
+    missing. Keeps nothing but the property artifacts it reads. 404 for a
+    product neither the products catalogue nor thermo.CHEMICALS holds; 422 in
+    words for a refusal (an unknown host, an inlet that is not one, a sequence
+    ProtParam cannot read, a chemical the library lacks); 409 for a property
+    answer damaged on disk; 503 when the worker cannot answer a volatility
+    question."""
     from . import artifacts, pureos
 
     try:
@@ -2153,8 +2144,6 @@ def pureos_propose(req: ProposeRequest) -> dict:
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator, where thermosteam runs, could not answer "
                                                     f"the volatility question: {e}") from e
-    except FileNotFoundError as e:  # corpus.json or modules.json not exported
-        raise HTTPException(status_code=503, detail=str(e)) from None
 
 
 # ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────

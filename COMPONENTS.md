@@ -178,7 +178,6 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 
 | Module | What it says it is |
 |---|---|
-| `anchor_report.py` | How many curated records the anchoring rules can promote (OF-BLD-012.1 F1). |
 | `api.py` | FastAPI app — openferment-core's first surface (OF-BLD-007 §4). |
 | `artifacts.py` | What was computed is kept and can be replayed (OF-BLD-014 §3.2, E.5). |
 | `atomic.py` | Whole-file writes that land whole or not at all (OF-BLD-012 §B.8). |

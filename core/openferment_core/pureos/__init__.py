@@ -120,8 +120,7 @@ def scenario_of(art: Artifact, scenarios: Iterable[dict[str, Any]]) -> tuple[str
     return None, None
 
 
-def program_of(art: Artifact, scenario_id: str | None, scenarios: Iterable[dict[str, Any]],
-               record_lookup: Any = None) -> str | None:
+def program_of(art: Artifact, scenario_id: str | None, scenarios: Iterable[dict[str, Any]]) -> str | None:
     """A train's chemical set: its scenario's, else its flowsheet's on the shelf."""
     from ..flowsheets import shelf as _shelf
 
@@ -222,7 +221,7 @@ def _train_product(art: Artifact, t: ProformaTables) -> tuple[str | None, str | 
 
 
 def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None, provenance: str | None = None,
-             runs: int = 1, record_lookup: Any = None) -> Train:
+             runs: int = 1) -> Train:
     """One run's train, read from its stream and unit tables alone: a
     Proforma run's, or a pureOS train run's (OF-BLD-020 §5.2)."""
     from .. import proforma
@@ -241,7 +240,7 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
         stream_id, product, how = _train_product(art, t)
         spec = (art.output or {}).get("train") or {}
         train_id, train_name = spec.get("id"), spec.get("name")
-        program = _train.program_of_run(art, record_lookup)
+        program = _train.program_of_run(art)
     else:
         scenarios = list(seed_scenarios() if scenarios is None else scenarios)
         sid, sname = scenario_of(art, scenarios)
@@ -252,7 +251,7 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
                   "this run was kept before runs carried their tables (OF-BLD-019 §2.1), so it names no product here "
                   "and reads no recovery")
         stream_id, product, how = product_of(t, no_tea=no_tea)
-        program = program_of(art, sid, scenarios, record_lookup)
+        program = program_of(art, sid, scenarios)
     by_id = {s.id: s for s in t.streams}
 
     def m(sid_: str) -> float:
@@ -374,8 +373,7 @@ def _runs(arts: Iterable[Artifact], scenarios: list[dict[str, Any]]) -> dict[str
 
 
 def trains(*, arts: Iterable[Artifact] | None = None,
-           scenarios: Iterable[dict[str, Any]] | None = None, record_lookup: Any = None,
-           records_by_id: Any = None) -> list[Train]:
+           scenarios: Iterable[dict[str, Any]] | None = None, records_by_id: Any = None) -> list[Train]:
     """The newest run of every scenario with a run on file (and every run no
     scenario claims), newest first. Each train's provenance is its run's
     worth now, as pureos_read gives it."""
@@ -386,8 +384,7 @@ def trains(*, arts: Iterable[Artifact] | None = None,
     mark = _Marks(kept, records_by_id)
     out = []
     for runs in _runs(kept, scenarios).values():
-        tr = train_of(runs[0], scenarios=scenarios, provenance=mark(runs[0]), runs=len(runs),
-                      record_lookup=record_lookup)
+        tr = train_of(runs[0], scenarios=scenarios, provenance=mark(runs[0]), runs=len(runs))
         out.append(tr)
     return sorted(out, key=lambda tr: tr.createdAt, reverse=True)
 
@@ -400,7 +397,7 @@ def summary(tr: Train) -> TrainSummary:
 
 
 def train(key: str, *, arts: Iterable[Artifact] | None = None, scenarios: Iterable[dict[str, Any]] | None = None,
-          record_lookup: Any = None, records_by_id: Any = None) -> Train:
+          records_by_id: Any = None) -> Train:
     """The train a scenario id or a run's artifact id names: the newest run
     of that scenario, or that run. Its provenance is the run's worth now, as
     pureos_read gives it."""
@@ -412,11 +409,11 @@ def train(key: str, *, arts: Iterable[Artifact] | None = None, scenarios: Iterab
     runs = _runs(kept, scenarios)
     if key in runs:
         a = runs[key][0]
-        return train_of(a, scenarios=scenarios, provenance=mark(a), runs=len(runs[key]), record_lookup=record_lookup)
+        return train_of(a, scenarios=scenarios, provenance=mark(a), runs=len(runs[key]))
     for group in runs.values():
         for a in group:
             if a.id == key:
-                return train_of(a, scenarios=scenarios, provenance=mark(a), runs=1, record_lookup=record_lookup)
+                return train_of(a, scenarios=scenarios, provenance=mark(a), runs=1)
     other = next((a for a in kept if a.id == key), None)
     if other is not None:
         raise TrainNotFound(f"artifact {key} is a {other.tool} artifact, not a Proforma run or a train run; a train is "
