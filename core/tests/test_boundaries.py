@@ -63,6 +63,9 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
     ("studies", "projects"): "a scenario, a comparison and a runbook belong to the current project (ADR-005)",
     ("studies", "artifacts"): "a comparison is computed as an artifact over the runs' artifacts, replayable (§7.4)",
     ("studies", "basis"): "a value's origin and a comparison's provenance are the basis rules' (ADR-006)",
+    ("studies", "project_state"): "a study's runbook is a row of the project's runbooks beside a person's, kept and "
+                                  "its lock audited by the store the runbook page writes to",
+    ("studies", "runbook_lock"): "a runbook is locked under the digest the browser writes (src/engine/lock.ts)",
 }
 
 

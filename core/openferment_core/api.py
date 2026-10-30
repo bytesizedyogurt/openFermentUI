@@ -98,6 +98,8 @@ from .models import (
     StudyScenario,
     ComparisonCreate,
     ComparisonReport,
+    Runbook,
+    RunbookCreate,
     StudyComparison,
     LibraryShelf,
     PackageRegression,
@@ -115,6 +117,7 @@ from . import llm, spend
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
 from .engine import runs as _runs
 from .studies import comparisons as _comparisons  # noqa: F401  (registers study.comparison for compute and replay)
+from .studies import runbooks as _runbooks
 from .studies import scenarios as _scenarios
 from .postdoc import PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
@@ -936,6 +939,52 @@ def study_comparison(comparison_id: str) -> ComparisonReport:
         return _comparisons.get(comparison_id)
     except _comparisons.ComparisonNotFound as e:
         raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+
+
+# A runbook is answered as it is kept (`exclude_unset`): the lock's digest
+# reads a prediction's absent field and a null one differently.
+
+
+@app.get("/api/studies/runbooks", response_model=list[Runbook], response_model_exclude_unset=True)
+def study_runbooks() -> list[Runbook]:
+    """The runbooks studies made, newest first."""
+    try:
+        return _runbooks.listed()
+    except _runbooks.RunbookRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/studies/runbooks", response_model=Runbook, response_model_exclude_unset=True)
+def study_runbook_make(asked: RunbookCreate) -> Runbook:
+    """A runbook whose predictions are outputs of an engine run, in the
+    run's units, with the measures the bench records at harvest; kept
+    among the project's runbooks as a draft."""
+    try:
+        return _runbooks.make(asked)
+    except _runbooks.RunbookRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/studies/runbooks/{runbook_id}", response_model=Runbook, response_model_exclude_unset=True)
+def study_runbook(runbook_id: str) -> Runbook:
+    try:
+        return _runbooks.get(runbook_id)
+    except _runbooks.RunbookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+    except _runbooks.RunbookRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/studies/runbooks/{runbook_id}/lock", response_model=Runbook, response_model_exclude_unset=True)
+def study_runbook_lock(runbook_id: str, asked: StudyRequest) -> Runbook:
+    """The runbook's predictions and measures frozen under the digest the
+    browser writes (src/engine/lock.ts), with the moment."""
+    try:
+        return _runbooks.lock(runbook_id, by=asked.by)
+    except _runbooks.RunbookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+    except _runbooks.RunbookRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @app.get("/api/proforma/scenarios")

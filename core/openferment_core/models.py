@@ -2420,6 +2420,49 @@ class RunbookDraft(BaseModel):
     measures: list[Measure]
 
 
+# ── Runbooks (OF-BLD-006 §3) ────────────────────────────────────────────
+
+RunbookKind = Literal["industrial", "research"]
+RunbookStatus = Literal["draft", "running", "complete", "awaiting_budget", "cache_hit", "needs_review",
+                        "blocked_unverified"]
+RunbookStageStatus = Literal["done", "running", "queued", "pending", "review", "blocked", "draft"]
+
+
+class RunbookStage(BaseModel):
+    """Mirrors `RunbookStage` in src/data/types.ts."""
+
+    name: str
+    status: RunbookStageStatus
+    detail: str | None = None
+    value: str | None = None
+
+
+class Runbook(BaseModel):
+    """Mirrors `Runbook` in src/data/types.ts: a row of the project's
+    `runbooks`, a person's or a study's (studies/runbooks.py). It is read
+    and written with `exclude_unset`, so a row comes back as it was kept:
+    the lock's digest reads a prediction's absent field and a null one
+    differently (runbook_lock.py)."""
+
+    id: str
+    kind: RunbookKind
+    title: str
+    status: RunbookStatus
+    stages: list[RunbookStage] = Field(default_factory=list)
+    note: str = ""
+    eta: str | None = None
+    outputs: list[str] = Field(default_factory=list)
+    productId: str | None = None
+    progressPct: float = 0
+    estCostUsd: float | None = None
+    strainId: str | None = None
+    predictions: list[Prediction] = Field(default_factory=list)
+    measurementSchema: list[Measure] = Field(default_factory=list)
+    # When the predictions and measures were frozen, and their digest.
+    lockedAt: str | None = None
+    lockHash: str | None = None
+
+
 # ── One parameter panel (OF-BLD-020 §2.1, D2–D4) ────────────────────────
 #
 # Every model family, vessel design, catalogue unit and shelf flowsheet
@@ -4018,3 +4061,24 @@ class ComparisonReport(BaseModel):
 
     comparison: StudyComparison
     artifact: Artifact
+
+
+class PredictedOutput(BaseModel):
+    """One output of an engine run a runbook predicts: its key in the run's
+    artifact (`outputs.<key>` of a flowsheet's outputs, `price.<key>` of the
+    price) and what the bench calls it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    output: str = Field(min_length=1, max_length=120)
+    label: str = Field(min_length=1, max_length=200)
+
+
+class RunbookCreate(BaseModel):
+    """POST /api/studies/runbooks: a runbook predicting outputs of one engine
+    run, each in the run's unit, measured at harvest."""
+
+    title: str = Field(min_length=1, max_length=200)
+    runId: str = Field(min_length=1, max_length=64)
+    predict: list[PredictedOutput] = Field(min_length=1, max_length=24)
+    by: str = Field(default="", max_length=200)

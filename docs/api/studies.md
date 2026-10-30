@@ -51,3 +51,37 @@ named twice, and a run the project does not hold.
 | `GET /api/studies/comparisons` | The project's comparisons, newest first |
 | `POST /api/studies/comparisons` | `{title, runIds, by}`: two to twelve runs compared, kept; `{comparison, artifact}` |
 | `GET /api/studies/comparisons/{id}` | One comparison with its artifact; 404 for one the project does not hold |
+
+## Runbooks
+
+A study's runbook is a row of the project's `runbooks` in the shape the runbook page keeps
+(`Runbook` in `src/data/types.ts` and `core/openferment_core/models.py`, paired by `check:plan`), so
+it lists and opens there beside a person's. Made from one engine run (`RunbookCreate`):
+
+| Field | What it is |
+|---|---|
+| `id` | `rb-study-` and the first twelve hex of the sha256 of the run and the outputs it predicts: the same run and outputs asked again are the runbook kept already, as it stands (a person may have revised a draft) |
+| `predictions` | One point per output asked (`outputs.<key>` of a flowsheet's outputs, `price.<key>` of the price), its value and unit the run's, `confidence` `low`, `basis` naming the run, its plant and configuration and its provenance, `artifactId` the run's artifact |
+| `measurementSchema` | One measure per prediction, in its unit, at `harvest` |
+| `status`, `kind` | `draft`, `research` |
+| `lockedAt`, `lockHash` | Null until locked |
+
+An output the run answers with no number and unit, an output asked twice, a run its plant refused
+and a run the project does not hold are refused in words.
+
+Locking freezes the predictions and measures under the digest the browser's own code writes
+(`core/openferment_core/runbook_lock.py`, a port of `src/engine/lock.ts`, held to the browser's
+digests by `tests/test_runbook_lock.py`), with the moment: the lock is kept in `runbook_locks` and
+audited, then carried by the row. From then on the store (`project_state.py`) refuses a runbook row
+whose predictions or measures are not the ones frozen, from the page or the service alike; its
+status and stages still move. A second lock, and a runbook with no prediction, are refused.
+
+A row is answered as it is kept (`response_model_exclude_unset`): a prediction's field the row
+leaves out stays out, because the digest reads an absent field and a null one differently.
+
+| Route | What it does |
+|---|---|
+| `GET /api/studies/runbooks` | The runbooks studies made, newest first |
+| `POST /api/studies/runbooks` | `{title, runId, predict: [{output, label}], by}`: made and kept as a draft |
+| `GET /api/studies/runbooks/{id}` | Any runbook of the project, a lock the row does not carry laid on; 404 for one it does not hold |
+| `POST /api/studies/runbooks/{id}/lock` | `{by}`: locked; 422 when locked already or empty, 404 for an unknown runbook |

@@ -153,6 +153,9 @@ const PAIRS = [
   ['DraftItem', 'DraftItem'],
   ['DraftMeasure', 'DraftMeasure'],
   ['RunbookDraft', 'RunbookDraft'],
+  // OF-BLD-006 §3 — a runbook, a person's or a study's (studies/runbooks.py).
+  ['RunbookStage', 'RunbookStage'],
+  ['Runbook', 'Runbook'],
   // OF-BLD-014 §4.1 — passages.
   ['Passage', 'Passage'],
   // OF-BLD-014 §5.1 — a plan cites sentences and computed values.

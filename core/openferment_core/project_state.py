@@ -14,7 +14,9 @@ A row holds what the page sent, in the shape the page's types give it
 (`src/data/types.ts`; stage 7 generates those types from Pydantic models).
 What is checked here is what makes a row a row: a known kind, an id of the
 right shape that the value repeats, a value of the kind's shape, a size a
-page can send. The rules that act on the content run where they always ran.
+page can send, and, once a runbook is locked, predictions and measures that
+are the ones its lock froze (runbook_lock.py computes the digest the page
+writes). The rules that act on the content run where they always ran.
 
 What a person made, locked or measured stays: a deposition, a measurement
 and a lock are never taken back through here. Making, locking and taking back
@@ -37,6 +39,7 @@ from . import audit, db, projects
 from .basis import EstimateRefused, refuse_estimates
 from .db import models as t
 from .db import rows
+from .runbook_lock import frozen_as
 
 # An id as the pages make them, and an override scope (`pureos:unit:tr-1:inlet`).
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:|-]{0,199}$")
@@ -172,10 +175,24 @@ async def _held(s: AsyncSession, kind: str, project_id: str, item_id: str) -> bo
     return (await s.execute(q.limit(1))).first() is not None
 
 
+async def _frozen(s: AsyncSession, project_id: str, runbook_id: str) -> str | None:
+    """The digest a runbook's lock froze, or None while it is unlocked."""
+    q = select(t.runbook_locks.c.lock_hash).where(t.runbook_locks.c.project_id == project_id,
+                                                  t.runbook_locks.c.runbook_id == runbook_id)
+    return (await s.execute(q.limit(1))).scalar()
+
+
 async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) -> None:
     async with db.session() as s:
-        await db.lock(s, "state", project_id, kind, item_id)
+        # A runbook and its lock are written one at a time, so a row cannot
+        # slip in between a lock and the content it froze.
+        await db.lock(s, "state", project_id, "runbooks" if kind == LOCKS else kind, item_id)
         existed = await _held(s, kind, project_id, item_id)
+        if kind == "runbooks":
+            frozen = await _frozen(s, project_id, item_id)
+            if frozen is not None and not frozen_as(value, frozen):
+                raise StateRefused(f"{item_id} is locked: its predictions and measures are kept as they were frozen "
+                                   f"under {frozen}, and a change is a new runbook")
         if kind == LOCKS:
             if existed:
                 raise StateRefused(f"{item_id} is locked already; a lock is kept as it was made")

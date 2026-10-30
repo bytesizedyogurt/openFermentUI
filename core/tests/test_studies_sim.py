@@ -5,7 +5,8 @@ own defaults, and a scenario on it with one person's assumption and one
 model's estimate, run as engine runs and compared: the comparison holds the
 price and the flowsheet's outputs in their units with the scenario's change
 from the base, each value the scenario set with its origin beside the
-library's default, and it is `assumed`.
+library's default, and it is `assumed`. A runbook made from the scenario's
+run predicts its selling price and locks under the browser's digest.
 """
 from __future__ import annotations
 
@@ -13,8 +14,10 @@ import pytest
 
 from openferment_core import proforma
 from openferment_core.engine import runs
-from openferment_core.models import ComparisonCreate, Origin, Quantity, ScenarioCreate, ScenarioValue
-from openferment_core.studies import comparisons, scenarios
+from openferment_core.models import (ComparisonCreate, Origin, PredictedOutput, Quantity, RunbookCreate, ScenarioCreate,
+                                     ScenarioValue)
+from openferment_core.runbook_lock import lock_hash
+from openferment_core.studies import comparisons, runbooks, scenarios
 
 pytestmark = pytest.mark.sim
 
@@ -57,3 +60,11 @@ def test_a_scenario_on_the_flowsheet_runs_assumed_and_compares_with_its_base(war
     defaults = runs.report(base.id).artifact.output["libraryDefaults"]
     assert stover[0]["value"] == defaults["stream.cornstover.price"] and stover[0]["unit"] == "USD/kg"
     assert [c["origin"] for c in values["unit.R303.tau_cofermentation"]] == ["library-default", "model-estimate"]
+    book = runbooks.make(RunbookCreate(title="Dearer stover at the bench", runId=rep.run.id, by="Ada Moreno", predict=[
+        PredictedOutput(output="outputs.mespUsdPerKg", label="Minimum ethanol selling price")]))
+    (mesp_at_bench,) = book.predictions
+    assert (mesp_at_bench.value, mesp_at_bench.unit) == (mesp["values"][1], "USD/kg") and "assumed" in mesp_at_bench.basis
+    locked = runbooks.lock(book.id, by="Ada Moreno")
+    assert locked.lockedAt and locked.lockHash == lock_hash(
+        [p.model_dump(exclude_unset=True) for p in locked.predictions],
+        [m.model_dump(exclude_unset=True) for m in locked.measurementSchema])

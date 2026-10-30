@@ -493,3 +493,12 @@ precision, the package rules of §7.2 as a test, the worker op reference, and tw
   price block and a flowsheet's outputs now carry their units (`library run 2`).
   `test_comparisons.py`, `test_studies_sim.py` (`sim`: the flowsheet against a scenario with a
   person's assumption and a model's estimate, compared and `assumed`).
+- 5.1 (runbooks) A study makes a runbook from an engine run: each output asked a point
+  prediction in the run's unit, its basis the run and its artifact the run's, measured at
+  harvest; kept as a row of the project's `runbooks` in the page's shape (`Runbook` now in
+  `models.py`, paired by `check:plan`). The service locks a runbook, a study's or a person's,
+  under the digest the browser writes: `runbook_lock.py` ports `src/engine/lock.ts` and is held to
+  ten digests the browser's own code writes (`pnpm export:lock-fixtures`, run by `test:core`).
+  Once a lock is kept the store refuses a runbook row whose predictions or measures differ, from
+  either side. `test_runbook_lock.py`, `test_runbooks.py`; the `sim` study locks a runbook on the
+  scenario's selling price.
