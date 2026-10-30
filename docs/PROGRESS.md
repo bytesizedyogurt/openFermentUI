@@ -17,7 +17,8 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
 4. **Next step: the owner's.** The alpha 2.0 foundation build is complete (stages 0 to 8), and its
-   pull request carries the completion report. What waits is the owner's: owner questions 1 to 10
+   pull request, [#15](https://github.com/bytesizedyogurt/openFermentUI/pull/15), carries the
+   completion report. What waits is the owner's: owner questions 1 to 10
    below, the tag push and the live Mini's first alpha 2.0 install (Blockers), then the review. A
    session that continues the work starts from the Known debts, each naming what pays it, and runs
    `pnpm verify` and `pnpm build && pnpm prove` first; `pnpm prove --live` needs the key in
