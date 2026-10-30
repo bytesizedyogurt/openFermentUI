@@ -378,6 +378,18 @@ def test_exit_code_follows_the_failures(monkeypatch, capsys):
     assert ready.main(["--bogus"]) == 2
 
 
+def test_an_offline_run_asks_for_no_key_and_no_network(monkeypatch, capsys):
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    monkeypatch.setenv("OPENFERMENT_PORT", "1")
+    monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert ready.main(["--offline"]) == 0
+    out = capsys.readouterr().out
+    assert "· key" in out and "makes no model call" in out and "✗" not in out
+    marks = {c.name: c.mark for c in ready.run(offline=True, port=1)}
+    assert marks["key"] == "skip" and all(marks[n] == "skip" for n in ("model", "roles", "europepmc", "huggingface", "backup"))
+
+
 def test_service_address_comes_from_the_installed_job(tmp_path, monkeypatch):
     launchd = ready._launchd()
     jobs = launchd.daemons(Path("/Users/sean/openferment"), "sean", Path("/Users/sean"), "/usr/bin", "0.0.0.0", 8123)

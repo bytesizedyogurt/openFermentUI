@@ -108,7 +108,7 @@ precision, the package rules of §7.2 as a test, the worker op reference, and tw
 | §7.2, stage 4.1 | The Proforma worker's manager moved from `proforma.py` to `engine/simulator.py` (re-exported by `proforma`); engine functions take the project id from their caller | The engine reaches the worker without importing `proforma`, and imports what §7.2 lists, `projects` not among them |
 | §8.3, stage 4.2 | For openFerment's exports, the SFF toolkit's JSON writer also writes a thermosteam reaction in its own words and a stream by its id (vendored files unchanged) | Its design-spec registry names design inputs that hold such objects and its writer refused them, so four of the nine buildable library plants could not be exported (ADR-003, Implementation 4.2) |
 | §4.4, stage 4.2 | `ethanol` and `biodiesel`, which the prompt lists among the plants, are on the shelf as packages of subsystem factories: the installed package gives them no plant entry point. LAOs, fattyalcohols, lactic and gas_fermentation are on the shelf and refused at build with the package's own error | Measured under biosteam 2.54.0 and biorefineries 2.35.1 (ADR-004, Implementation 4.2) |
-| §9 step 4, stage 4.2 | The corn stover plant (the NREL cellulosic ethanol design) holds nine of its package test's eleven values on the pinned versions, not all; the run's checks say which | Measured, as its reference run has since 2026-10-20: installed equipment cost −7.9 %, electricity consumption −5.2 % (`docs/reports/library-regression.md`) |
+| §9 step 4, stage 4.2 | The corn stover plant (the NREL cellulosic ethanol design) holds nine of its package test's eleven values on the pinned versions, not all; the run's checks say which. `scripts/prove.py` step 4 holds each of the two to what the package's own code measures on this installation, to the run's ten digits, and fails on any other value outside (ADR-013) | Measured, as its reference run has since 2026-10-20: installed equipment cost −7.9 %, electricity consumption −5.2 % (`docs/reports/library-regression.md`). The package's own `test_cornstover` fails the same way under biosteam 2.54.0 (run 2026-10-30) |
 | §8.4, stage 4.2 | `engine/library.py` imports the shelf's package-test reader (`flowsheets/shelf.py`) and, where a run is kept, `artifacts` | Both belong to the engine by §7.2's table and still live outside `engine/`; the boundary test at the stage 4 gate decides their place |
 | §8.3, stage 4.3 | The recipe's authored file is `extended_metadata.yaml`, where the prompt wrote `metadata.yaml` | The SFF toolkit's runner reads that name (`load_extended_metadata`) |
 | §8.4, stage 4.3 | The composed flowsheet runs through the library adapter (kind `flowsheet` on the library shelf, `library.run` artifacts), and runs the package's own composition body (`SystemFactory.f`) with its pretreatment and fermentation factories chosen | One adapter for every plant (§2 item 3); the package's own system factory checks that dilute acid's inlets are used and cannot take another pretreatment, and its body keeps every number the package's (ADR-004, Implementation 4.3) |
@@ -508,3 +508,22 @@ precision, the package rules of §7.2 as a test, the worker op reference, and tw
   alone (`python -I -S`). `GET /api/studies/export` and `python -m
   openferment_core.studies.exports`. The tests written in this build name the estimating model
   through `llm.DEFAULT_PRIMARY`. `test_exports.py`; the `sim` study exports its two runs.
+- 5.2 (screens) `#/proforma/studies` (the runs, compared from there; the scenarios, run again
+  from there; the comparisons; the study runbooks; the export package), `#/proforma/runs/{id}` (the
+  run's parameters in the parameter panel, read-only, the values it set first; its basis with each
+  origin; the package's own test; `RunReport`'s sections over its artifact as one case; its SFF
+  file; a runbook made from its numbers) and `#/proforma/comparisons/{id}` (each output's change
+  from the first run as a `Tornado` in `FigureFrame`; every number; every value the runs set). A
+  study's runbook links each prediction to its run, and the page's own lock writes the digest the
+  service recomputes (checked in the browser on a scenario run's runbook). A run's report carries
+  its parameters as the panel reads them (`parameters_of`, `ParamScope` kind `library`). The run,
+  SFF and study types are in `types.ts`, paired by `check:plan`; the smoke opens the studies screen.
+- 5.2 (stream prices) The proof's A→B→A found sugarcane's process water price (0.000254 USD/kg)
+  paid by the composed flowsheet built after it: `bst.process_tools.default()` leaves stream
+  prices as the last plant set them. Every build now starts from BioSTEAM's own (ADR-004,
+  Implementation 5.2); `test_library_sim.py` holds the flowsheet identical after sugarcane.
+- 5.2 (the gate) `scripts/prove.py` (`pnpm prove`) proves steps 1, 2, 4, 5, 7 and 8 against a real
+  service on loopback, a database and data directory of its own, no model key: 34 checks.
+  `pnpm ready --offline` asks for no key and no network, as an offline run needs. Step 4 holds
+  cornstover's two values outside its package test's tolerance to what the package's own code
+  measures here (ADR-013, a departure). Steps 3 and 6 arrive with stages 6 and 8.

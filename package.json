@@ -37,6 +37,7 @@
     "check:guild": "tsx scripts/check-guild.ts",
     "check:state": "tsx scripts/check-state.ts",
     "smoke": "tsx scripts/smoke.ts",
+    "prove": "cd core && uv run --all-extras python ../scripts/prove.py",
     "db:up": "docker compose up -d --wait db",
     "db:migrate": "cd core && uv run --all-extras python -m openferment_core.migrations migrate",
     "db:reset": "cd core && uv run --all-extras python -m openferment_core.migrations reset",

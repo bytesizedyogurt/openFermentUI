@@ -2,6 +2,8 @@
 
     pnpm ready                 every check
     pnpm ready --no-network    only what needs no network
+    pnpm ready --offline       what an offline run needs: no network, and no key,
+                               because it makes no model call (scripts/prove.py)
 
 One line per check: ✓ ready, ! works with a gap worth knowing, ✗ the live
 loop fails here, · skipped. Each ✗ and ! says what to do. Exits 1 when any
@@ -516,11 +518,12 @@ def check_backup() -> Check:
 # ── the report ─────────────────────────────────────────────────────────
 
 
-def run(no_network: bool = False, port: int | None = None, workers: bool = True) -> list[Check]:
+def run(no_network: bool = False, port: int | None = None, workers: bool = True, offline: bool = False) -> list[Check]:
     load_dotenv(CORE / ".env", override=False)
     host, found_port = service_address()
     port = port or found_port
-    key = check_key()
+    no_network = no_network or offline
+    key = Check("key", "skip", "--offline: this run makes no model call, so it asks for no key") if offline else check_key()
     have_key = key.mark in ("ok", "warn")
     checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
     # §10.R: one damaged file must not stop the report; a row that cannot be
@@ -567,10 +570,10 @@ def report(checks: list[Check]) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if any(a not in ("--no-network", "--no-workers") for a in argv):
-        print("usage: python -m openferment_core.ready [--no-network] [--no-workers]")
+    if any(a not in ("--no-network", "--no-workers", "--offline") for a in argv):
+        print("usage: python -m openferment_core.ready [--no-network] [--no-workers] [--offline]")
         return 2
-    checks = run(no_network="--no-network" in argv, workers="--no-workers" not in argv)
+    checks = run(no_network="--no-network" in argv, workers="--no-workers" not in argv, offline="--offline" in argv)
     print(report(checks))
     return 1 if any(c.mark == "fail" for c in checks) else 0
 
