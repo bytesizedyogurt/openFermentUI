@@ -12,19 +12,16 @@ checkpoint. A fresh session continues from this file and `git log` alone.
    - `cd core && uv sync --all-extras`
    - From stage 2 on: `pnpm db:up` (or a local PostgreSQL with pgvector), then `pnpm db:migrate`.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: 1.5** — section 5.7: `CLAUDE.md` (already at `docs/history/`), `STATE.md`,
-   `README.md`, `COMPONENTS.md`, `THIRD_PARTY.md`, `BUILD-SPEC.md`, `docs/build/`,
-   `docs/OF-COR-001.md` and `docs/DEMO.md` to `docs/history/` with 2026-10-21 in their names
-   (the licence check regenerates `THIRD_PARTY.md`). Then a minimal smoke over the real service
-   that opens every rail entry, and the stage 1 gate (typecheck, build, `test:core`, `test:sim`,
-   `test_no_seed.py`, the app starts).
+4. **Next step: the stage 1 gate** — a minimal smoke over the real service that starts it and
+   opens every rail entry (`scripts/smoke.mjs`, `pnpm smoke`), then typecheck, build,
+   `test:core`, `test:sim` and `test_no_seed.py` in a clean worktree, and push. Stage 2 follows.
 5. Files in flight: none.
 
 ## Current stage
 
 Stage 1 — delete. 1.1 (5.3, 5.4), 1.2 (5.1, 5.2, Dominion and the retired guards of 5.6),
-1.3 (5.5's data movement) and 1.4 (the rest of 5.6) are committed; 1.5, the smoke and the gate
-remain. Stage 0 is complete except the tag push
+1.3 (5.5's data movement), 1.4 (the rest of 5.6) and 1.5 (5.7) are committed; the smoke and the
+gate remain. Stage 0 is complete except the tag push
 (see Blockers).
 
 ## Last green runs
@@ -165,3 +162,8 @@ remain. Stage 0 is complete except the tag push
   (`ui.bannerDismissed`, `checkpointAnswers`, `collections` with BioRepo's collection filter),
   the stream replay the deleted service double sent, the clearance, collection and authored
   scenario types, and every client export nothing referenced.
+- 1.5 Section 5.7: `STATE.md`, `README.md`, `COMPONENTS.md`, `THIRD_PARTY.md` (its 2026-10-21
+  listing; the licence check regenerates the live one at the root), `BUILD-SPEC.md`,
+  `docs/build/`, `docs/OF-COR-001.md` and `docs/DEMO.md` moved to `docs/history/` with 2026-10-21
+  in their names, beside `CLAUDE-2026-10-21.md` from stage 0. An interim `README.md` points at
+  this file, the decisions and `CLAUDE.md` until stage 8 writes the replacements.

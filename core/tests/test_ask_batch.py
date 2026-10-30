@@ -51,5 +51,5 @@ def test_each_question_is_asked_saved_and_counted(pool, tmp_path, monkeypatch): 
 def test_no_key_asks_nothing(monkeypatch, capsys):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr(ask_batch, "CORE", Path("/nonexistent"))
-    assert ask_batch.main(["docs/build/questions-pha.txt"]) == 2
+    assert ask_batch.main(["questions.txt"]) == 2
     assert "Nothing was asked" in capsys.readouterr().err

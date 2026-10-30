@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Ask a file of questions through Postdoc's loop (OF-BLD-014 §5.5).
 
-    pnpm ask:batch docs/build/questions-pha.txt          # LIVE, needs the key
+    pnpm ask:batch questions.txt          # LIVE, needs the key
 
 One question a line; blank lines and lines starting with `#` are skipped.
 Each question runs through `postdoc_agent.ask`, exactly as `/api/ask` runs it,

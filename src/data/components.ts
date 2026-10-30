@@ -1,9 +1,9 @@
 // The component architecture (OF-BLD-006 §2, with §2.2 reversed).
 //
 // Eighteen named components in seven layers. This module is the source of
-// truth; COMPONENTS.md at the repo root carries the same content and
-// `check-seed` fails if the two disagree, so the map a reader opens and the map
-// the code uses cannot drift apart.
+// truth. COMPONENTS.md, which carried the same content at the repo root, is at
+// docs/history/COMPONENTS-2026-10-21.md since alpha 2.0, and stage 8 writes
+// its replacement.
 //
 // §2.2 SAID THE OPPOSITE AND WAS WRONG. It held that these names were for
 // building the system and that a user should see "Ask" rather than "Postdoc".

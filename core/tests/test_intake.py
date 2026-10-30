@@ -298,7 +298,7 @@ def test_a_linked_citation_is_dropped_and_an_unlinked_superscript_on_a_number_is
     assert "2 × 10^6 cells mL-1" in s1 and "10^-3 M" in s1, "a superscript on a ten is still a power"
 
 
-# ── what the first real fetch taught (OF-BLD-014 §1.5, docs/build/JATS-AUDIT.md) ──
+# ── what the first real fetch taught (OF-BLD-014 §1.5, docs/history/build-2026-10-21/JATS-AUDIT.md) ──
 
 
 def _doc(body: str, *, front: str = "", after_body: str = "") -> str:
