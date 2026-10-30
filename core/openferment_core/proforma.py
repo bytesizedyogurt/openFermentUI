@@ -362,7 +362,7 @@ def _assume(inp, a) -> None:
 # named assumption it is: it wins over the records and over a fermOS fit
 # for its input, the input says how many records it stands in place of, and
 # the basis names the person (basis.assumption_source), so the run is
-# `demo`. The older `assumptions` field is read the same way for one
+# `assumed`. The older `assumptions` field is read the same way for one
 # release, and so wins over the records too: before the panel an older-field
 # value of an input that bound records was ignored, so such a run now binds,
 # bases and is kept differently (§2.R, finding 4; a test holds it). The basis
@@ -1259,7 +1259,7 @@ def _composite(flowsheet: str, vessel: str | None, train_run: str | None,
 # productivity that titre over the harvest hour, which is the batch time it
 # gives; each a single value (a simulation draws no band), fixed. Its
 # provenance is the artifact's own, basis_provenance over every source its
-# parameters came from (a person's value makes it `demo`), and it enters a
+# parameters came from (a person's value makes it `assumed`), and it enters a
 # run through the `artifact` source as a fit's does. A simulation is never a
 # measurement, and its card says so. A chemostat runs continuously and gives
 # a batch flowsheet nothing; a simulation of another product is refused

@@ -5,7 +5,7 @@ A person's change on Proforma's scenario page is an Override of scope
 `proforma:<scenario id>`, kept in the browser that typed it and carried by
 the run, the binding and the ceiling check. Each is laid on as the named
 assumption it is: it wins over the records and over a fermOS fit for its
-input, the basis names the person, and the run is `demo`. The older
+input, the basis names the person, and the run is `assumed`. The older
 `assumptions` field is read the same way for one release; a run that read
 overrides says so in its basis, and a run that read none keeps the basis,
 and the artifact id, it had before the panel.
@@ -87,7 +87,7 @@ def test_a_runs_overrides_are_bound_as_named_assumptions_and_the_basis_says_so(s
     assert got["glucose_price"].source == basis.assumption_source(BY, "2026-10-21", "a STAND-IN for a test")
     assert [got[f"glucose_price {p}"].value for p in ("low", "high")] == [0.3, 0.5]
     assert got[proforma.ASSUMPTIONS_READ].value == "overrides" and got[proforma.ASSUMPTIONS_READ].source.kind == "convention"
-    assert art.provenance == "demo" and r.provenance == "demo"
+    assert art.provenance == "assumed" and r.provenance == "assumed"
 
 
 def test_an_override_replaces_the_records_for_its_input_and_reset_brings_them_back(standin):

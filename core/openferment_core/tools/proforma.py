@@ -8,7 +8,7 @@ Ids in: a scenario id, any of the BioSTEAM scenarios the service holds
 stage 2's store holds them). The most recent run artifact of that
 scenario (`proforma.latest_run`) comes back as one `Evidence` with the hint
 `distribution`: the median price and its 5th to 95th percentile, with the
-run's provenance, which is `demo` while any input rests on an assumption;
+run's provenance, which is `assumed` while any input rests on an assumption;
 what the flowsheet leaves out is read from the run's flowsheet on the shelf.
 With no run on file, the tool refuses, names the inputs still waiting for a
 source as the service binds them (`proforma.bound`), and says how a run is

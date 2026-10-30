@@ -3615,7 +3615,7 @@ export const PROVENANCE_RANK: Record<Provenance, number> = {
   unverified: 5,
   user: 6,
   'industry-estimate': 7,
-  demo: 8,
+  assumed: 8,
 };
 
 export const tickClass = (p: Provenance | 'rejected'): string =>
@@ -3628,6 +3628,6 @@ export const tickClass = (p: Provenance | 'rejected'): string =>
     unverified: 'tick tick-unverified',
     user: 'tick tick-user',
     'industry-estimate': 'tick tick-industry-estimate',
-    demo: 'tick tick-demo',
+    assumed: 'tick tick-assumed',
     rejected: 'tick tick-rejected',
   })[p];

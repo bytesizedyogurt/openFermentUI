@@ -832,7 +832,7 @@ def _forecast_inputs(fit_artifact: str | None, fit_inline: KineticFit | None, st
                                  source=BasisSource(kind="assumption", by=changed_by.strip(), note=f"{key} set on screen")))
     if duration_h is not None:
         # A length a person typed is that person's assumption, named, and
-        # makes the forecast demo (OF-BLD-020 §3.R, findings 7 and 11; D3,
+        # makes the forecast assumed (OF-BLD-020 §3.R, findings 7 and 11; D3,
         # E.2‴): the person who set it (`duration_by`), else the one who
         # changed a start value. A length nobody is named for is the caller's
         # convention, as asked (a test, a stand-in, a fixed check).
@@ -1150,7 +1150,7 @@ FORECAST_KEYS = (("x0", "X0", "biomass"), ("s0", "S0", "substrate"), ("p0", "P0"
 FORECAST_SCOPE_NOTES = [
     "A forecast starts from the fitted run's own values and runs its own length unless a person names others here: "
     "a changed start value or length is that person's assumption, named in the forecast's basis, and the forecast it "
-    "makes is demo.",
+    "makes is assumed.",
     "A low and a high typed here are not read: a forecast starts from one value, and its band comes from the fit.",
 ]
 

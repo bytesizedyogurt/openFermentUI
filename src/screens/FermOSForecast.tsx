@@ -4,7 +4,7 @@
 // A forecast is drawn from one kept fit's covariance by the service, under the
 // fitted run's own starting values and length unless a person changes them;
 // a changed value is that person's assumption, and the forecast becomes
-// `demo`. The band leaves out run-to-run variation, and says so.
+// `assumed`. The band leaves out run-to-run variation, and says so.
 //
 // THE CONDITIONS ARE THE PANEL'S (OF-BLD-020 §3.3, E.1‴). A logistic_v0 fit's
 // start values and length are the scope `fermos:forecast:<fit id>`, served

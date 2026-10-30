@@ -31,7 +31,7 @@ served; no screen writes a form for a parameter of its own.
                               one BasisInput per value with its source; an
                               override is an `assumption` naming the person
                               and what it rests on, so `basis_provenance`
-                              makes the artifact `demo` (E.2‴)
+                              makes the artifact `assumed` (E.2‴)
     register(kind, provider, static=None)
                               a scope kind's provider: given the scope's ids
                               and the resolve request it returns
@@ -461,7 +461,7 @@ def basis_inputs(specs: list[ParameterSpec], values: Iterable[ParameterValue]) -
     named by its key, in its spec's unit, with its source; `<key> low` and
     `<key> high` beside it when it has an interval. An override's source is
     an `assumption` naming the person and what it rests on, so
-    `basis_provenance` makes the artifact `demo`. A value bound to records
+    `basis_provenance` makes the artifact `assumed`. A value bound to records
     is the statistic of those records (a `convention`), with one
     `<key> record` input per record naming it as its `record` source, so the
     records' own provenance enters. A waiting value adds nothing."""

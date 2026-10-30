@@ -261,7 +261,7 @@ def test_the_corn_plant_runs_in_the_worker_and_reads_back_every_input(store):
 
 # ── glucose to ethanol through the real worker (OF-BLD-019 §2.3; `sim`) ──
 # Every input is a STAND-IN typed here as a fixture's assumption, so the run
-# is `demo`; none is a measurement and no price here is a result.
+# is `assumed`; none is a measurement and no price here is a result.
 
 ETHANOL_STANDIN = {"feed_glucose_conc": 100.0, "titre": 45.0, "yield": 0.45, "productivity": 2.0,
                    "plant_scale": 100000.0, "glucose_price": 0.4}
@@ -297,7 +297,7 @@ def test_the_ethanol_flowsheet_converges_on_stand_in_assumptions(warm, store):
     a = [assume(k, v, v, v, by="openFerment test fixture") for k, v in ETHANOL_STANDIN.items()]
     art = proforma.run_flowsheet("ethanol_glucose_v0", a, samples=8, seed=1, scenario_id="sc-k3x9q-1")
     o = art.output
-    assert art.provenance == "demo" and o["baseInfeasible"] is None and o["feasible"] == o["samples"] == 8
+    assert art.provenance == "assumed" and o["baseInfeasible"] is None and o["feasible"] == o["samples"] == 8
     assert o["basePrice"] > 0 and o["flowsheet"] == "ethanol_glucose_v0"
     assert [i.value for i in art.inputs if i.name == "scenario"] == ["sc-k3x9q-1"]
     t = proforma.tables_of(art)

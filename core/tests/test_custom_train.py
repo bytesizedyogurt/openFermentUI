@@ -322,7 +322,7 @@ def test_a_run_hands_the_worker_the_vessels_fermenter_the_trains_units_and_the_p
     assert asked["base"]["plant_scale"] == PLANT_STANDIN
     # Nothing carried of the parts is sampled.
     assert not [k for k in asked["specs"] if "." in k]
-    assert r.provenance == "demo" and r.basePrice is not None
+    assert r.provenance == "assumed" and r.basePrice is not None
 
 
 def test_the_basis_names_both_artifacts_and_every_finance_parameters_source(parts, worker):
@@ -419,7 +419,7 @@ def test_a_vessel_and_a_three_unit_train_price_and_converge_and_every_reader_rea
     y = 0.12 if aerobic else INPUTS_STANDIN["yield"]
     r = proforma.run(request(p, overrides=[*inputs_typed(**{"yield": y}), over("IRR", 0.1)], samples=4), pool=POOL)
     assert r.baseInfeasible is None and r.feasible == r.samples == 4 and r.basePrice > 0
-    assert r.provenance == "demo"
+    assert r.provenance == "assumed"
     # The stream table's units: the feed mixer, the vessel's class, the train's types.
     classes = [u.unitClass for u in r.units]
     assert classes == ["Mixer", p.design.unitClass, "SolidsCentrifuge", "Flash", "DrumDryer"]

@@ -86,7 +86,7 @@ export function stripPoints(props: EvidenceStripProps): { points: StripPoint[]; 
       value,
       provenance: prov,
       // A modeled value is never evidence (E.8), so it stays out of the median.
-      heldOut: excl ? EXCLUSION_WORDS[excl] ?? excl : prov === 'demo' ? 'modeled, never evidence' : null,
+      heldOut: excl ? EXCLUSION_WORDS[excl] ?? excl : prov === 'assumed' ? 'assumed, never evidence' : null,
       above: lowest !== null && overRule.length ? `above ${overRule.map((x) => x.label).join(', ')}` : null,
     });
   }

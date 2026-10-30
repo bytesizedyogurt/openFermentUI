@@ -279,7 +279,7 @@ def test_an_unknown_product_is_unknown_and_an_unknown_host_refused(store, seed, 
 
 def _kept(store: Path, aid: str, tool: str, output: dict) -> Artifact:
     art = Artifact(id=aid, tool=tool, toolVersion="a test's", inputs=[], output=output, outputHash="0",
-                   provenance="demo", createdAt="2026-10-21T00:00:00Z", durationMs=0)
+                   provenance="assumed", createdAt="2026-10-21T00:00:00Z", durationMs=0)
     from standins import plant_artifact
 
     return plant_artifact(art)

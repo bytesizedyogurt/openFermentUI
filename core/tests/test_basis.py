@@ -34,12 +34,12 @@ def _p(*inputs: BasisInput) -> str:
     return basis_provenance(_basis(*inputs), RECORDS, ARTIFACTS)
 
 
-def test_an_assumption_input_gives_demo():
-    assert _p(_input("record", "r-gold"), _input("assumption", note="a guess", by="Sean Creighton")) == "demo"
+def test_an_assumption_input_gives_assumed():
+    assert _p(_input("record", "r-gold"), _input("assumption", note="a guess", by="Sean Creighton")) == "assumed"
 
 
 def test_an_assumption_outweighs_every_other_input():
-    assert _p(_input("deposition", "d-1"), _input("model", "m"), _input("assumption", by="Sean Creighton")) == "demo"
+    assert _p(_input("deposition", "d-1"), _input("model", "m"), _input("assumption", by="Sean Creighton")) == "assumed"
 
 
 def test_an_unverified_record_input_gives_unverified():
@@ -81,8 +81,8 @@ def test_an_artifact_object_is_read_like_a_dict():
 
 
 def test_a_source_that_cannot_be_found_is_the_weakest_there_is():
-    assert _p(_input("record", "r-nowhere")) == "demo"
-    assert _p(_input("artifact", "a-nowhere")) == "demo"
+    assert _p(_input("record", "r-nowhere")) == "assumed"
+    assert _p(_input("artifact", "a-nowhere")) == "assumed"
 
 
 def test_computed_sits_after_every_experimental_class_and_before_unverified():

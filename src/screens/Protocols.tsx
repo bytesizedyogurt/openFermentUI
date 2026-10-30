@@ -154,7 +154,7 @@ export function capabilityReason(key: CapabilityKey, c: Capabilities): string {
 
 /**
  * The strongest provenance among a set of cited records and papers. Anything
- * citing nothing at all has no literature ancestry, so it falls to 'demo' —
+ * citing nothing at all has no literature ancestry, so it falls to 'assumed' —
  * modeled, not measured — and gets the dashed tick (§20).
  */
 export function provenanceFromRefs(
@@ -172,7 +172,7 @@ export function provenanceFromRefs(
   for (const _ of paperIds) cited++;
   if (resolved.some((r) => provenanceOf(r) === 'gold')) return 'gold';
   if (resolved.some((r) => provenanceOf(r) === 'verified')) return 'verified';
-  return cited > 0 ? 'unverified' : 'demo';
+  return cited > 0 ? 'unverified' : 'assumed';
 }
 
 /** A protocol version's provenance: everything its materials and steps cite. */

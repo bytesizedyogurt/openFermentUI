@@ -59,6 +59,7 @@ Blockers).
 | 2026-10-30 10:40 | `test:core` with 4.2 | 2064 passed, 2 skipped, 155 deselected | 5 min 10 s | 4.2 |
 | 2026-10-30 11:08 | `test:sim` with 4.3 (the composed flowsheet's sim tests among them) | 126 passed, 2112 deselected | 5 min 6 s | 4.3 |
 | 2026-10-30 11:14 | `test:core` with 4.3 | 2074 passed, 2 skipped, 162 deselected | 5 min 19 s | 4.3 |
+| 2026-10-30 11:31 | `test:core` with 4.4 (the rename); `typecheck`, `check:plan`, `check:figures`, `check:tools`, `check:state`, `check:guild`, `check:secrets` | 2076 passed, 2 skipped, 162 deselected; all passed | 5 min 16 s | 4.4 (rename) |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -411,3 +412,11 @@ Blockers).
   against the lock, its authored metadata against the exporter, no number typed in the flowsheet
   or the recipe) and `test_cellulosic_sim.py` (`sim`: the package's plant reproduced, each
   configuration, SCF's two batch reactors, the gates, a person's composition, A→B→A, the export).
+- 4.4 (the rename) `demo` is `assumed` (ADR-006, Implementation 4.4; owner question 5): the
+  service's vocabulary and ranking, `basis_provenance`, the browser's union, rank, tick, legend,
+  figure encoding, CSV disclosure and screens; the label reads *Assumed · not measured*.
+  Migration 0003 rewrites stored rows (text `provenance` columns and every `provenance` key in the
+  schema's JSON columns, an artifact's output hash recomputed when its output changed; ids and
+  lock hashes untouched) and renames back on downgrade; `import_alpha1` reads alpha 1.0's word
+  under the new name. Tests: `test_db.py` (0002 → 0003 → 0002 over a record, an artifact and
+  its output), `test_import_alpha1.py` (an alpha 1.0 artifact that says `demo`).

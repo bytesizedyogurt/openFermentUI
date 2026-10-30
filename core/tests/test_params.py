@@ -142,7 +142,7 @@ def test_an_override_wins_over_every_source_and_is_named_in_the_value_and_the_ba
     assert [i.name for i in inputs] == ["mu_max", "mu_max low", "mu_max high"]
     assert all(i.source.kind == "assumption" and i.source.by == BY and "lab notebook" in i.source.note for i in inputs)
     b = ComputedBasis(tool="t", toolVersion="1", inputs=inputs, artifactId="x", at="2026-10-21")
-    assert basis.basis_provenance(b, {}, {}) == "demo"
+    assert basis.basis_provenance(b, {}, {}) == "assumed"
     # The same source Proforma's assumptions carry, so a run's basis reads alike.
     assert v.source == basis.assumption_source(BY, "2026-10-21", "read from a lab notebook")
 

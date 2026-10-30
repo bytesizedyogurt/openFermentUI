@@ -207,7 +207,7 @@ def test_the_bind_endpoint_binds_a_flowsheet_and_refuses_in_words(client, held):
 def test_a_scenario_made_here_runs_its_flowsheet_bound_as_bind_binds_it(standin, held):
     r = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, samples=20),
                      pool=standin)
-    assert r.scenarioId == MADE_HERE and r.flowsheet == ETHANOL and r.provenance == "demo" and r.samples == 20
+    assert r.scenarioId == MADE_HERE and r.flowsheet == ETHANOL and r.provenance == "assumed" and r.samples == 20
     assert [i.binding for i in r.inputs] == [i.binding for i in proforma.bind_inputs(ETHANOL, standin.records, None, ASSUMED)]
     assert r.priceBasis == shelf.ETHANOL_PRICE_BASIS and r.leavesOut == shelf.ETHANOL_LEAVES_OUT
     assert r.tea is not None and sum(line.perUnit for line in r.tea.lines) == pytest.approx(r.basePrice, rel=1e-12)

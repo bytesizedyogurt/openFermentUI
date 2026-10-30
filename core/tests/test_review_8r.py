@@ -115,7 +115,7 @@ def test_the_vessel_tool_is_registered_when_the_service_starts():
 
 def _keep(aid: str, tool: str, output: dict, inputs: list[BasisInput]) -> Artifact:
     art = Artifact(id=aid, tool=tool, toolVersion=STANDIN, inputs=inputs, output=output,
-                   outputHash=artifacts.output_hash(output), provenance="demo", createdAt="2026-10-21T00:00:00Z",
+                   outputHash=artifacts.output_hash(output), provenance="assumed", createdAt="2026-10-21T00:00:00Z",
                    durationMs=0, seed=None)
     from standins import plant_artifact
 

@@ -28,7 +28,7 @@
 // person's assumption, or from a stated convention, each labelled with its
 // source in the parameter panel and in the artifact's basis; its provenance is
 // basis_provenance over all of them, so a simulation from unverified records
-// shows as unverified and one with any typed value as modeled (demo). A
+// shows as unverified and one with any typed value as assumed. A
 // simulation never pretends to be a measurement: its curves are computed
 // lines, and its card says what it was built from. With no deposition to fit,
 // the Fits tab names the readings to deposit and where (OF-BLD-016 §3.2: the

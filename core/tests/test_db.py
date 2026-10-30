@@ -53,9 +53,9 @@ def test_the_session_database_is_at_the_newest_revision_of_both_schemas(test_dat
     from openferment_core import migrations
 
     test_database.open()
-    assert migrate.head() == "0002"
+    assert migrate.head() == "0003"
     assert migrations.kit_head() == "0006"
-    assert migrations.at_head(test_database.url) == {"openferment": ("0002", "0002"), "sci_rag": ("0006", "0006")}
+    assert migrations.at_head(test_database.url) == {"openferment": ("0003", "0003"), "sci_rag": ("0006", "0006")}
 
 
 def test_rollback_1_a_row_a_test_writes_is_there_for_the_rest_of_that_test():
@@ -143,6 +143,60 @@ def test_the_advisory_lock_lets_one_writer_at_a_time_across_connections(test_dat
     finally:
         db.bind(previous_binding)
         db.use_engine(previous_engine)
+        db.run(engine.dispose())
+        migrate.drop(name, test_database.server)
+
+
+def test_migration_0003_names_the_old_demo_class_assumed_in_every_row_and_back(test_database):
+    """A database at 0002 holding the old word (ADR-006): a record's column,
+    an artifact's body and the output inside it. At 0003 each says `assumed`,
+    the artifact's output hash is the rewritten output's, and everything else
+    is as it was, its id and a note that holds the word in prose included; at
+    0002 again each says `demo`."""
+    from alembic import command
+
+    from openferment_core import artifacts
+
+    test_database.open()
+    name = f"{test_database.name}_0003"
+    url = migrate.create(name, test_database.server)
+    engine = make_engine(url)
+    output = {"evidence": {"provenance": "demo", "value": 1.5}, "note": "demo", "runs": [{"provenance": "demo"}]}
+    body = {"id": "00000000000000ee", "tool": "proforma.run", "toolVersion": "1", "provenance": "demo",
+            "inputs": [{"name": "price", "value": 0.5, "unit": "USD/kg",
+                        "source": {"kind": "assumption", "by": "Sean Creighton", "note": "typed on 2026-10-29"}}],
+            "output": output, "outputHash": artifacts.output_hash(output), "createdAt": "2026-10-29T00:00:00Z",
+            "durationMs": 1}
+
+    async def seed() -> None:
+        async with engine.begin() as c:
+            await c.execute(insert(t.projects).values(id="p", name="p", created_by="test"))
+            await c.execute(insert(t.artifacts).values(project_id="p", id=body["id"], tool=body["tool"], version="1",
+                                                       output_hash=body["outputHash"], body=body, created_by="test"))
+            await c.execute(insert(t.records).values(project_id="p", id="r-1", document_id="d", field="titer",
+                                                     quote="q", status="accepted", provenance="demo", body={"id": "r-1"},
+                                                     created_by="test"))
+
+    async def held() -> tuple[dict, str, str]:
+        async with engine.connect() as c:
+            art = (await c.execute(select(t.artifacts.c.body, t.artifacts.c.output_hash))).one()
+            rec = (await c.execute(select(t.records.c.provenance))).scalar_one()
+            return art.body, art.output_hash, rec
+
+    try:
+        migrate.upgrade(url, "0002")
+        db.run(seed())
+        migrate.upgrade(url, "0003")
+        now, hashed, record = db.run(held())
+        assert record == "assumed" and now["provenance"] == "assumed"
+        assert now["output"] == {"evidence": {"provenance": "assumed", "value": 1.5}, "note": "demo",
+                                 "runs": [{"provenance": "assumed"}]}
+        assert hashed == now["outputHash"] == artifacts.output_hash(now["output"]) != body["outputHash"]
+        assert now["id"] == body["id"] and now["inputs"] == body["inputs"]
+        command.downgrade(migrate.config(url), "0002")
+        back, hashed, record = db.run(held())
+        assert record == "demo" and back == body and hashed == body["outputHash"]
+    finally:
         db.run(engine.dispose())
         migrate.drop(name, test_database.server)
 

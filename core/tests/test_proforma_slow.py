@@ -166,7 +166,7 @@ def test_a_whole_yeast_run_through_the_worker(store, monkeypatch):
     out = proforma.run(ProformaRunRequest(scenarioId="sc-held-ethanol", assumptions=a, seed=3), pool=pool)
     assert out.samples == 500 and out.feasible + sum(out.infeasible.values()) == 500 and out.baseInfeasible is None
     assert set(out.infeasible) <= {"yield", "concentration", "convergence"}
-    assert out.provenance == "demo" and out.flowsheet == "ethanol_glucose_v0" and out.tea.teaClass == "ConventionalEthanolTEA"
+    assert out.provenance == "assumed" and out.flowsheet == "ethanol_glucose_v0" and out.tea.teaClass == "ConventionalEthanolTEA"
     q = out.quantiles
     assert q["p5"] <= q["p25"] <= q["p50"] <= q["p75"] <= q["p95"]
     assert {s.key for s in out.sensitivity} <= {"feed_glucose_conc", "titre", "yield", "productivity", "glucose_price"}

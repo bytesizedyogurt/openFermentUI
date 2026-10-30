@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from openferment_core import audit, biorepo, db, extract, guild, import_alpha1, projects, proposals
+from openferment_core import artifacts, audit, biorepo, db, extract, guild, import_alpha1, projects, proposals
 from openferment_core.models import (
     AuditEntry,
     BioRepo,
@@ -66,6 +66,27 @@ def test_every_store_lands_in_the_new_project_and_reads_back_through_it(alpha1):
     # The test project holds none of it, and the files are where they were.
     assert biorepo.read().decisions == {}
     assert sorted(p.name for p in alpha1.rglob("*")) == before
+
+
+def test_an_artifact_alpha_1_called_demo_lands_assumed_with_its_outputs_hash(alpha1):
+    """ADR-006: the class alpha 1.0 named `demo` is `assumed`. An artifact
+    that names it, in its own provenance and in its output, is carried under
+    the new name; its output hash is the renamed output's and its id stays."""
+    output = {"evidence": {"provenance": "demo", "value": 1.5}, "note": "demo"}
+    raw = {"id": "00000000000000ee", "tool": "proforma.run", "toolVersion": "1", "provenance": "demo",
+           "inputs": [{"name": "price", "value": 0.5, "unit": "USD/kg",
+                       "source": {"kind": "assumption", "by": "Ada Moreno", "note": "typed on 2026-10-02"}}],
+           "output": output, "outputHash": artifacts.output_hash(output), "createdAt": "2026-10-02T00:00:00Z",
+           "durationMs": 1}
+    (alpha1 / "artifacts").mkdir()
+    (alpha1 / "artifacts" / "00000000000000ee.json").write_text(json.dumps(raw))
+    pid, counts = import_alpha1.carry(alpha1, "Alpha 1.0 records", "Ada Moreno")
+    assert counts["artifacts"] == 1
+    with projects.using(pid):
+        art = artifacts.get("00000000000000ee")
+    assert art.provenance == "assumed" and art.output == {"evidence": {"provenance": "assumed", "value": 1.5},
+                                                          "note": "demo"}
+    assert art.outputHash == artifacts.output_hash(art.output) != raw["outputHash"]
 
 
 def test_a_file_that_cannot_be_read_refuses_the_whole_directory_and_writes_nothing(alpha1):

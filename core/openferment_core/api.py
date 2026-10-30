@@ -450,7 +450,7 @@ def fermos_family(family_id: str) -> dict:
 def fermos_simulate(req: SimulationRequest) -> dict:
     """Simulate a model family (`SimulationResult`) and keep it as one
     `fermos.simulation` artifact. Each parameter resolves with its source: a
-    person's override (an assumption by name, so the result is `demo`), else
+    person's override (an assumption by name, so the result is `assumed`), else
     the family's stated convention. 422 in words for a parameter that waits
     (named with what would bind it), the light socket, a bad override, or a
     run that cannot end."""

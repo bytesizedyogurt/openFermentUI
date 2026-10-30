@@ -45,7 +45,7 @@ the utility prices and cost index (`model`), the vessel type and the unit id
 (`convention`), every design parameter with its source (`params.basis_inputs`:
 an override an `assumption` by the person; a class default `model`; the
 simulation's values `artifact`), and what a plant scale reads (the corn
-TEA's operating hours). Its provenance is `basis_provenance`'s: `demo` with
+TEA's operating hours). Its provenance is `basis_provenance`'s: `assumed` with
 any assumption, which a plant scale or batch volume always is.
 
     GET  /api/fermos/vessel/specs?simulation=&vesselType=   the ParamScope

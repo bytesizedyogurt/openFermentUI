@@ -224,7 +224,7 @@ def test_the_workers_refusal_is_said_in_its_words(monkeypatch):
 def test_a_library_run_is_exported_from_its_basis_alone(worker):
     inputs = library.run_inputs("sugarcane", None, [over("stream.sugarcane.price", 0.05)])
     art = Artifact(id="0123456789abcdef", tool=library.LIBRARY_RUN, toolVersion="v", inputs=inputs, output={},
-                   outputHash="h", provenance="demo", createdAt="2026-10-30T00:00:00Z", durationMs=0)
+                   outputHash="h", provenance="assumed", createdAt="2026-10-30T00:00:00Z", durationMs=0)
     assert library.plant_of(art) == {"library": "sugarcane", "flowsheet": "library:sugarcane", "configuration": None,
                                      "overrides": {"stream.sugarcane.price": 0.05}}
     with pytest.raises(library.LibraryRefused):
@@ -233,7 +233,7 @@ def test_a_library_run_is_exported_from_its_basis_alone(worker):
 
 def test_a_run_is_kept_and_assumed_when_it_rests_on_a_persons_value(worker):
     art = library.run("sugarcane", None, [over("stream.sugarcane.price", 0.05)])
-    assert art.tool == library.LIBRARY_RUN and art.provenance == "demo"
+    assert art.tool == library.LIBRARY_RUN and art.provenance == "assumed"
     plain = library.run("sugarcane")
     assert plain.provenance == "computed" and plain.id != art.id
     assert library.run("sugarcane").id == plain.id and len([c for c in worker.calls if c[0] == "library_run"]) == 2
@@ -253,7 +253,7 @@ def test_the_routes_serve_the_shelf_the_regression_and_refuse_what_cannot_run(wo
     params = client.get("/api/library/sugarcane/parameters").json()
     assert params["values"][0]["origin"] == "library-default"
     ran = client.post("/api/library/sugarcane/run", json={"overrides": [over("stream.sugarcane.price", 0.05).model_dump()]})
-    assert ran.status_code == 200 and ran.json()["tool"] == "library.run" and ran.json()["provenance"] == "demo"
+    assert ran.status_code == 200 and ran.json()["tool"] == "library.run" and ran.json()["provenance"] == "assumed"
 
 
 # ── openFerment's composed flowsheet, on the same shelf ─────────────────

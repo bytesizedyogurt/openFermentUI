@@ -317,8 +317,8 @@ def test_a_ceiling_is_kept_with_its_basis_and_replays(store):
     art = artifacts.get(r.artifactId)
     kinds = {i.name: (i.source.kind, i.source.id) for i in art.inputs}
     # The toy is a stand-in: its model input is an assumption, so what is
-    # computed on it is modeled (demo), never computed evidence (§6.R).
-    assert kinds["model"] == ("assumption", "toy") and art.provenance == "demo"
+    # computed on it is assumed, never computed evidence (§6.R).
+    assert kinds["model"] == ("assumption", "toy") and art.provenance == "assumed"
     assert "add-on" not in kinds, "the toy carries its own route"
     assert kinds["uptake"][0] == "convention" and kinds["substrate"][0] == "convention"
     assert next(i for i in art.inputs if i.name == "uptake").value == shelf.UPTAKE
@@ -379,7 +379,7 @@ def test_yield_ceiling_takes_ids_and_words_and_returns_one_evidence(store, monke
     assert r.error is None and len(r.evidence) == 1 and r.evidence[0].figure == "ceiling"
     assert r.summary["evidenceId"] == r.evidence[0].id and r.summary["model"] == {"id": "toy"}
     assert r.summary["what"].startswith("most ethanol from glucose") and r.summary["molPerMol"] == pytest.approx(2.0)
-    assert r.summary["provenance"] == "demo", "a stand-in network's value is modeled"
+    assert r.summary["provenance"] == "assumed", "a stand-in network's value is modeled"
     product = next(i for i in r.evidence[0].basis.inputs if i.name == "product")
     assert product.value == "ethanol" and product.source.note.startswith("secreted through EX_etoh_e; ethanol C2H6O")
     finding = tools.run("yield_ceiling", {"modelId": "toy", "product": "ethanol", "substrate": "xylose"})

@@ -131,7 +131,7 @@ body {
   );
 }
 /* Demo/synthetic — now only simulation grids and scripted agent text (§20) */
-.tick-demo::before {
+.tick-assumed::before {
   background: repeating-linear-gradient(
     to bottom,
     rgb(var(--signal-warn)) 0 3px,

@@ -72,7 +72,7 @@ def test_the_artifact_carries_its_provenance_from_its_inputs():
     c = artifacts.compute("t_count", [_in("a", "artifact", b.id)])
     assert c.provenance == "computed"
     d = artifacts.compute("t_count", [_in("guess", "assumption")])
-    assert d.provenance == "demo"
+    assert d.provenance == "assumed"
 
 
 def test_keep_false_writes_nothing():

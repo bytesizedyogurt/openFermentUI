@@ -329,7 +329,7 @@ A number a person sets for a model reaches a run one way, and no tool is on it.
    value inside its own low and high) and refuses one that fails, in words. A
    person's value wins over the records and any fit for its parameter. The
    run's basis names it as an `assumption` by that person, so the run is
-   `demo`.
+   `assumed`.
 
 No tool takes a person's value, and no tool input carries an override: tool
 inputs carry ids and words. `run_flowsheet`, `proforma_write`'s `run`,
@@ -449,7 +449,7 @@ temperature or pressure nobody gave is the library's own Stream default,
 said so. The Proforma worker asks thermosteam (op `thermo_props`); the answer
 is one `thermo_props` artifact whose basis names the library and its version,
 with provenance from `basis_provenance`: `computed` for the azeotrope, the
-weakest of that and the record's or the run's otherwise (`demo` for a run
+weakest of that and the record's or the run's otherwise (`assumed` for a run
 resting on an assumption). Each property is its own `Evidence`, id
 `<artifact id>:<property>`, which `SeenSet` keeps and a claim cites like any
 computed value. `POST /api/thermo/props` asks and

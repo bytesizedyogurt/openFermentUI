@@ -39,7 +39,7 @@ const TICK_BG: Record<ProvKind, string> = {
   'industry-estimate': 'rgb(var(--ink-soft) / 0.6)',
   unverified: 'rgb(var(--ink-soft))',
   user: 'rgb(var(--signal-info))',
-  demo: 'rgb(var(--signal-warn))',
+  assumed: 'rgb(var(--signal-warn))',
   rejected: 'rgb(var(--signal-error))',
 };
 
@@ -450,8 +450,8 @@ export function DataTable<T>({
                             style={{
                               background: TICK_BG[tickOf(row)],
                               backgroundImage:
-                                tickOf(row) === 'demo'
-                                  ? `repeating-linear-gradient(to bottom, ${TICK_BG.demo} 0 3px, transparent 3px 6px)`
+                                tickOf(row) === 'assumed'
+                                  ? `repeating-linear-gradient(to bottom, ${TICK_BG.assumed} 0 3px, transparent 3px 6px)`
                                   : tickOf(row) === 'industry-estimate'
                                     ? `repeating-linear-gradient(to bottom, ${TICK_BG['industry-estimate']} 0 3px, transparent 3px 6px)`
                                     : undefined,

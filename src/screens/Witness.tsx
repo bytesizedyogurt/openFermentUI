@@ -536,10 +536,10 @@ export default function Witness() {
         <span className="font-num">{defined ? `${pct(value)} %` : '—'}</span>
       </div>
     ) : null;
-  // The seeded runs are demo data; claude-1's numbers rest on whichever gold
+  // A run other than claude-1 is marked assumed; claude-1's numbers rest on whichever gold
   // basis is in force, and the tick says which.
-  const headlineTick: 'demo' | 'curated' | 'gold' =
-    run.run === 'claude-1' ? (provisional ? 'curated' : 'gold') : 'demo';
+  const headlineTick: 'assumed' | 'curated' | 'gold' =
+    run.run === 'claude-1' ? (provisional ? 'curated' : 'gold') : 'assumed';
   const headlineTitle =
     run.run === 'claude-1'
       ? provisional
@@ -1207,7 +1207,7 @@ function ComparisonBody({
             <div className="text-caption uppercase tracking-wide text-ink-soft">
               {runLabel} extraction
             </div>
-            <ProvenanceBadge p="demo" compact />
+            <ProvenanceBadge p="assumed" compact />
           </div>
           {row.extracted ? (
             <>

@@ -94,7 +94,7 @@ def version() -> str:
 
 def _model_input(model_id: str) -> BasisInput:
     if model_id == TOY:
-        # An assumption, so whatever is computed on it is modeled (demo),
+        # An assumption, so whatever is computed on it is assumed,
         # never computed evidence (basis_provenance; §6.R).
         return BasisInput(name="model", value="toy", unit="", source=BasisSource(
             kind="assumption", id=TOY, by="openFerment test fixture",

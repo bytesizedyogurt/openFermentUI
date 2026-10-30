@@ -494,7 +494,7 @@ def test_a_stand_in_run_asks_for_a_simulation_cites_its_artifact_and_a_claim_sta
     out = postdoc_agent.ask("Simulate a glucose batch from the extracted kinetics.", converse=script,
                             ctx=tools.ToolContext(pool_factory=lambda: fermos_store))
     [kept] = out.claims
-    assert kept.id == "c1" and kept.evidenceIds == [aid] and kept.provenance == "demo"
+    assert kept.id == "c1" and kept.evidenceIds == [aid] and kept.provenance == "assumed"
     assert out.rejected == 2
     assert any(r.startswith("c2: claim text contains a number") for r in out.rejectionReasons), out.rejectionReasons
     assert any(r.startswith("c3: cites what no tool returned") and other in r for r in out.rejectionReasons)

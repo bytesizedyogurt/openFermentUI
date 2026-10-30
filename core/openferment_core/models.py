@@ -29,7 +29,7 @@ Provenance = Literal[
     "unverified",
     "user",
     "industry-estimate",
-    "demo",
+    "assumed",
 ]
 
 # The same order as PROVENANCE_RANK in src/store.ts, member for member;
@@ -46,8 +46,26 @@ PROVENANCE_ORDER: list[str] = [
     "unverified",
     "user",
     "industry-estimate",
-    "demo",
+    "assumed",
 ]
+
+# Alpha 1.0 named `assumed` `demo` (ADR-006). Where an older store's rows
+# enter (import_alpha1; migration 0003 for this schema's own rows), each
+# `provenance` holding an old name is read under the new one; nothing writes
+# an old name.
+RENAMED_PROVENANCE = {"demo": "assumed"}
+
+
+def renamed_provenance(value: Any) -> Any:
+    """A JSON value with every `provenance` key that holds an old name set to
+    its new one (RENAMED_PROVENANCE); every other value as it was."""
+    if isinstance(value, dict):
+        return {k: RENAMED_PROVENANCE.get(v, v) if k == "provenance" and isinstance(v, str)
+                else renamed_provenance(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [renamed_provenance(v) for v in value]
+    return value
+
 
 Support = Literal["direct", "inferred", "unsupported"]
 
@@ -305,7 +323,7 @@ def weakest_provenance(provenances: list[str]) -> str:
         for p in provenances
     ]
     worst = max(ranked)
-    return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else "demo"
+    return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else "assumed"
 
 
 class PriorTurn(BaseModel):
@@ -2333,7 +2351,7 @@ class RunbookDraft(BaseModel):
 # resolves each to a `ParameterValue` naming where its value came from, in
 # the order its `sourceRule` gives. A person's change is an `Override`: a
 # named assumption the browser keeps (D3) and a run carries, which the
-# basis names as an `assumption`, so the result's provenance is `demo`.
+# basis names as an `assumption`, so the result's provenance is `assumed`.
 # Bounds are conventions with a written reason (D4): a value outside them
 # is kept and flagged in words, never clamped. `params.py` holds the rules.
 
@@ -2717,7 +2735,7 @@ class VesselSummary(BaseModel):
 # with their sources (params.resolve), integrates on scipy, and keeps one
 # `fermos.simulation` artifact whose basis names every parameter, start
 # value and override, and whose provenance is basis_provenance over them
-# (a person's override makes it `demo`).
+# (a person's override makes it `assumed`).
 
 
 class FamilyInfo(BaseModel):

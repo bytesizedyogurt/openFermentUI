@@ -88,7 +88,7 @@ def test_a_persons_composition_changes_the_price_and_makes_the_run_assumed(warm)
     shift = [over("feed.dry.Glucan", params["feed.dry.Glucan"] + 0.02),
              over("feed.dry.Xylan", params["feed.dry.Xylan"] - 0.02)]
     art = library.run(FLOWSHEET, None, shift)
-    assert art.provenance == "demo" and art.output["outputs"]["mespUsdPerKg"] != base
+    assert art.provenance == "assumed" and art.output["outputs"]["mespUsdPerKg"] != base
     assert {i.name for i in art.inputs if i.source.kind == "assumption"} == {"feed.dry.Glucan", "feed.dry.Xylan"}
 
 

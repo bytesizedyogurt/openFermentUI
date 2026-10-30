@@ -250,7 +250,7 @@ def test_an_override_replaces_a_record_and_the_basis_names_the_person(store):
     assert not any(i.name == "mu_max record" for i in art.inputs), "the person's value stands in the records' place"
     assert {i.value for i in art.inputs if i.name == "ks record"} == {"ks1", "ks2"}
     assert all(i.source.kind == "record" for i in art.inputs if i.name.endswith(" record"))
-    assert r.provenance == "demo", "a named person's value makes the simulation demo (D1)"
+    assert r.provenance == "assumed", "a named person's value makes the simulation assumed (D1)"
     p = by_key(r.parameters)
     assert p["mu_max"].origin == "assumption" and p["ks"].origin == "record" and p["ks"].recordIds == ["ks1", "ks2"]
     assert p["ks"].low == 0.10 and p["ks"].high == 0.30
@@ -298,7 +298,7 @@ def test_yps_binds_from_a_fit_with_its_interval_and_identified_and_the_fit_comes
     assert v["p_max"].origin == "fit" and v["p_max"].value == kinetics.OFF and v["p_max"].source.id == fit_id
     assert waiting == []
     # With nothing typed the simulation rests on the fit alone, its held terms included (§3.R): computed, not
-    # demo (D1); a value bound to records would make it unverified, as the records-only case above is.
+    # assumed (D1); a value bound to records would make it unverified, as the records-only case above is.
     r = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", fitArtifact=fit_id),
                         by_pool=pool)
     assert r.provenance == "computed" and not [v for v in r.parameters + r.start if v.origin == "record"]
@@ -355,7 +355,7 @@ def test_a_kept_simulation_binds_where_no_fit_or_record_does(store):
     named = {i.name: i for i in artifacts.get(r.artifactId).inputs}
     assert named["ks origin"].value == "simulation" and named["ks"].source.kind == "artifact"
     assert by_key(r.parameters)["ks"].origin == "simulation"
-    assert r.provenance == "demo", "the kept simulation rested on a named person's values"
+    assert r.provenance == "assumed", "the kept simulation rested on a named person's values"
 
 
 # ── the endpoints ──────────────────────────────────────────────────────

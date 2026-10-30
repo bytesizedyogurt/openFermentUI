@@ -77,7 +77,7 @@ def test_a_persons_value_changes_the_solved_price_and_makes_the_run_assumed(warm
     o = Override(scope="library:sugarcane", key="stream.sugarcane.price", value=0.05, by="openFerment test",
                  at="2026-10-30", note="a higher cane price")
     art = library.run("sugarcane", None, [o])
-    assert art.provenance == "demo" and art.output["regression"] is None
+    assert art.provenance == "assumed" and art.output["regression"] is None
     assert art.output["price"]["solvedPrice"] > base
     [p] = [p for p in art.output["parameters"] if p["key"] == "stream.sugarcane.price"]
     assert p["value"] == 0.05 and art.output["libraryDefaults"]["stream.sugarcane.price"] == pytest.approx(0.03455)

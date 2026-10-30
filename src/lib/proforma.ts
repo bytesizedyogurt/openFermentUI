@@ -947,7 +947,7 @@ export function pinnedCard(pinned: Scenario[]): { prov: Provenance | null; words
   const authored = pinned.filter((s) => s.kind !== 'biosteam').length;
   const biosteam = pinned.length - authored;
   const head = `${pinned.length} pinned — open the comparison.`;
-  if (!biosteam) return { prov: 'demo', words: `${head} Cost model v0 — illustrative economics, not validated.` };
+  if (!biosteam) return { prov: 'assumed', words: `${head} Cost model v0 — illustrative economics, not validated.` };
   if (!authored) return { prov: null, words: `${head} Each is compared from its newest run, with the provenance that run computes.` };
   return {
     prov: null,

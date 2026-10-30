@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import insert, update
 
-from . import db, projects
+from . import artifacts, db, projects
 from .db import models as t
 from .db import rows
 from .models import (
@@ -45,6 +45,7 @@ from .models import (
     Practice,
     ProjectCreate,
     Proposals,
+    renamed_provenance,
 )
 
 CORE = Path(__file__).parent.parent
@@ -86,11 +87,32 @@ class Found:
         }
 
 
-def _model(path: Path, model: type[BaseModel]) -> Any:
+def _json(path: Path) -> Any:
     try:
-        return model.model_validate_json(path.read_text(encoding="utf-8"))
-    except (OSError, ValidationError, ValueError) as e:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise ImportRefused(f"{path} cannot be read: {str(e).splitlines()[0]}") from None
+
+
+def _model(path: Path, model: type[BaseModel], held: Any = None) -> Any:
+    # A provenance alpha 1.0 named `demo` is read as `assumed` (ADR-006).
+    try:
+        return model.model_validate(renamed_provenance(_json(path) if held is None else held))
+    except (ValidationError, ValueError) as e:
         raise ImportRefused(f"{path} cannot be read as {model.__name__}: {str(e).splitlines()[0]}") from None
+
+
+def _artifact(path: Path) -> Artifact:
+    """An alpha 1.0 artifact. One whose output named the old class carries
+    the hash of its output as renamed, as migration 0003 rewrites a stored
+    one, so a replay compares like with like; its id hashes the inputs and
+    stays as it was."""
+    held = _json(path)
+    a = _model(path, Artifact, held)
+    output = held.get("output") if isinstance(held, dict) else None
+    if renamed_provenance(output) != output:
+        a = a.model_copy(update={"outputHash": artifacts.output_hash(a.output)})
+    return a
 
 
 def read(data: Path) -> Found:
@@ -116,10 +138,10 @@ def read(data: Path) -> Found:
             if not line.strip():
                 continue
             try:
-                found.audit.append(AuditEntry.model_validate(json.loads(line)))
+                found.audit.append(AuditEntry.model_validate(renamed_provenance(json.loads(line))))
             except (ValidationError, ValueError) as e:
                 raise ImportRefused(f"{data / 'audit.jsonl'} line {n} cannot be read: {str(e).splitlines()[0]}") from None
-    found.artifacts = [_model(p, Artifact) for p in sorted((data / "artifacts").glob("*.json"))]
+    found.artifacts = [_artifact(p) for p in sorted((data / "artifacts").glob("*.json"))]
     found.extracted = [_model(p, ExtractResponse) for p in sorted((data / "candidates").glob("*.json"))]
     found.hand = [_model(p, ExtractResponse) for p in sorted((data / "candidates" / "hand").glob("*.json"))]
     return found

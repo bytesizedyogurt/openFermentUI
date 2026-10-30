@@ -218,7 +218,7 @@ def test_an_artifact_row_is_worth_what_its_inputs_are_worth_now(pool):  # noqa: 
     ctx = ctx_for(pool, artifacts=lambda: [undecided, rejected, curated, forecast])
     r = read("biorepo", ctx, kind="artifact")
     marks = {row.id: row.provenance for row in r.rows}
-    assert marks == {"00000000000000aa": "unverified", "00000000000000bb": "demo", "00000000000000cc": "computed",
+    assert marks == {"00000000000000aa": "unverified", "00000000000000bb": "assumed", "00000000000000cc": "computed",
                      "00000000000000dd": "computed"}  # an artifact input is read as stored, as compute reads it
     seen = SeenSet()
     seen.add(r)
@@ -281,7 +281,7 @@ def test_fermos_reads_a_kept_simulation_as_its_own_kind_with_no_number_in_its_de
     [row] = r.rows
     assert row.ref == f"fermos/simulation/{art.id}" and row.kind == "simulation" and row.id == art.id
     assert row.label == "Batch (batch_v1) simulation of Saccharomyces cerevisiae CEN.PK113-7D"
-    assert (row.state, row.status, row.provenance) == ("open", "computed", "demo")
+    assert (row.state, row.status, row.provenance) == ("open", "computed", "assumed")
     assert row.detail["family"] == "batch_v1" and row.detail["strain"] == "s-cerevisiae-cenpk113-7d"
     assert set(row.detail["boundBy"]["assumption"]) >= {"mu_max", "ks", "x0"} and "convention" in row.detail["boundBy"]
     assert _numbers_in(row.detail) == [], "a simulation's numbers stay in its artifact"
@@ -303,7 +303,7 @@ def test_a_simulation_read_as_a_row_is_cited_by_its_ref_and_one_cited_by_evidenc
     by_id = dict(by_ref, id="c2", moduleRefs=[], evidenceIds=[art.id])
     ghost = dict(by_ref, id="c3", moduleRefs=["fermos/simulation/0123456789abcdef"])
     out = validate_plan([by_ref, by_id, ghost], seen, pool)
-    assert [c.id for c in out.claims] == ["c1"] and out.claims[0].provenance == "demo"
+    assert [c.id for c in out.claims] == ["c1"] and out.claims[0].provenance == "assumed"
     assert out.rejected == 2
     assert out.reasons[0].startswith(f"c2: cites {art.id} by evidence id, which a read returned only as a row: cite {ref}")
     assert out.reasons[1].startswith("c3: cites what no tool returned in this run")

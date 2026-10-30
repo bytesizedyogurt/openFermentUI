@@ -13,7 +13,7 @@ CORE = Path(__file__).resolve().parents[1]
 
 
 # R1 — the toy network is a stand-in: refused through the API and the tool,
-# and modeled (demo) wherever a fixture uses it.
+# and assumed wherever a fixture uses it.
 def test_the_public_paths_refuse_the_toy():
     with pytest.raises(geneos.GeneosUnavailable, match="no model toy"):
         geneos.ceiling("toy", "ethanol", "glucose", keep=False)
@@ -23,7 +23,7 @@ def test_the_public_paths_refuse_the_toy():
 
 def test_the_toy_in_a_fixture_is_modeled_never_computed():
     r = geneos.ceiling("toy", "ethanol", "glucose", keep=False, allow_toy=True)
-    assert r.evidence.provenance == "demo"
+    assert r.evidence.provenance == "assumed"
     assert next(i for i in r.evidence.basis.inputs if i.name == "model").source.kind == "assumption"
 
 

@@ -16,7 +16,7 @@
 // D1, AMENDED. A fit takes only a deposition's measurements. A simulation
 // may take records, fits, artifacts, a person's assumptions and stated
 // conventions, each labelled; its provenance is basis_provenance over all of
-// them, so one with any typed value is `demo`. A simulation never pretends
+// them, so one with any typed value is `assumed`. A simulation never pretends
 // to be a measurement: its curves are computed lines (TimeCourse), and the
 // card above the figure says what it was built from.
 //
@@ -149,7 +149,7 @@ function BuiltFrom({ r }: { r: SimulationResult }) {
       </div>
       <p className="text-caption text-ink-soft mt-1">
         Every value below was computed from the sources its parameters name, and its provenance follows the weakest of them
-        {r.provenance === 'demo' ? ': a value a person typed makes it modeled' : ''}. Kept as{' '}
+        {r.provenance === 'assumed' ? ': a value a person typed makes it assumed' : ''}. Kept as{' '}
         <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${r.artifactId}`)}>
           {r.artifactId}
         </a>

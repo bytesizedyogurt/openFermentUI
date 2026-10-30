@@ -689,7 +689,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
             </div>
             <div className="font-num text-section-title">{runbook.eta ?? '—'}</div>
           </div>
-          <Tick p="demo">
+          <Tick p="assumed">
             <div className="text-caption uppercase tracking-wide text-ink-soft inline-flex items-center gap-1.5">
               <CircleDollarSign size={12} aria-hidden /> Compute
             </div>
@@ -708,7 +708,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
       </div>
 
       <Card className="p-4 mb-6">
-        <Tick p="demo" title="Curator framing — modeled, not measured">
+        <Tick p="assumed" title="Curator framing — modeled, not measured">
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
             Why this runbook is here
           </div>

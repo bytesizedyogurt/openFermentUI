@@ -277,7 +277,7 @@ def test_weakest_provenance_ranks_measured_above_gold():
 
 def test_an_unknown_provenance_class_is_treated_as_the_weakest():
     # An unrecognised provenance is not a reason for confidence.
-    assert weakest_provenance(["gold", "something-new"]) == "demo"
+    assert weakest_provenance(["gold", "something-new"]) == "assumed"
 
 
 def test_papers_are_derived_from_the_cited_records():
@@ -661,7 +661,7 @@ def test_plan_provenance_across_mixed_citations():
     assert passages_only.claims[0].provenance == "unverified"
     candidate = _one({"text": "A claim.", "recordIds": ["r-X1-1", "cl1-X3-aaaaaaaa"]})
     assert candidate.claims[0].provenance == "unverified"
-    modeled = _one({"text": "A claim.", "recordIds": ["r-X1-1"], "evidenceIds": ["ev-1"]}, _seen(evidence=_evidence("demo")))
-    assert modeled.claims[0].provenance == "demo"
+    modeled = _one({"text": "A claim.", "recordIds": ["r-X1-1"], "evidenceIds": ["ev-1"]}, _seen(evidence=_evidence("assumed")))
+    assert modeled.claims[0].provenance == "assumed"
     curated = _one({"text": "A claim.", "recordIds": ["r-X1-1", "r-X2-1"]})
     assert curated.claims[0].provenance == "curated"

@@ -424,7 +424,7 @@ function MaterialsTable({
             const rec = m.sourceRecordId ? records.find((r) => r.id === m.sourceRecordId) : undefined;
             const prov: ProvKind = m.sourceRecordId
               ? provenanceFromRefs([m.sourceRecordId], [], records)
-              : 'demo';
+              : 'assumed';
             return (
               <tr key={m.name} className="border-b border-line/60 align-top">
                 <td className="px-1 py-1.5">
@@ -1264,7 +1264,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
             </div>
             <p className="text-caption text-ink-soft mt-2 flex items-start gap-1.5">
               <span className="mt-[5px] shrink-0">
-                <ProvDot p="demo" size={7} />
+                <ProvDot p="assumed" size={7} />
               </span>
               <span>
                 Amounts round to each material's own precision spec, so a scaled recipe stays

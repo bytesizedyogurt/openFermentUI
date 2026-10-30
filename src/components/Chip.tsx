@@ -44,7 +44,7 @@ export function CitationChip({
     );
   }
 
-  const prov: ProvKind = record ? provenanceOf(record) : 'demo';
+  const prov: ProvKind = record ? provenanceOf(record) : 'assumed';
   const target = record
     ? `/biorepo/paper/${paper.id}?span=${record.id}`
     : `/biorepo/paper/${paper.id}`;

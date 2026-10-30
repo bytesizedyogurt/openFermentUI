@@ -119,7 +119,7 @@ def test_a_design_is_kept_cited_by_its_artifact_id_and_marked_as_the_models(mark
     s = r.summary
     art = artifacts.get(ev.id)
     assert art.tool == vessel.TOOL and ev.id == s["artifactId"] == s["evidenceId"]
-    assert ev.provenance == art.provenance == s["provenance"] == "demo"  # a person's scale is an assumption
+    assert ev.provenance == art.provenance == s["provenance"] == "assumed"  # a person's scale is an assumption
     assert ev.unit == "vessels" and ev.figure == "oxygen-balance" and ev.basis.artifactId == art.id
     assert s["state"] == "open" and s["vesselType"] == "bubble-column" and s["assumedBy"] == [STANDIN_PERSON]
     assert s["design"] and s["cost"]["costIndex"] and len(json.dumps(s, ensure_ascii=False)) <= tools.MAX_SUMMARY_CHARS
@@ -157,7 +157,7 @@ def test_a_claim_cites_a_design_its_run_returned_and_no_other(marked, a_person_t
                 "support": "direct", "passages": [], "evidenceIds": list(evidence_ids), "moduleRefs": list(refs)}
 
     got = validate_plan([claim("c1", [ev.id]), claim("c2", ["0123456789abcdef"])], seen, pool)
-    assert [c.id for c in got.claims] == ["c1"] and got.claims[0].provenance == "demo"
+    assert [c.id for c in got.claims] == ["c1"] and got.claims[0].provenance == "assumed"
     assert "cites what no tool returned in this run: 0123456789abcdef" in got.reasons[0]
     # A refused call teaches the set nothing.
     nothing = SeenSet()
@@ -168,7 +168,7 @@ def test_a_claim_cites_a_design_its_run_returned_and_no_other(marked, a_person_t
     assert [row.ref for row in rows.rows] == [f"fermos/vessel/{ev.id}"]
     seen.add(rows)
     [c] = validate_plan([claim("c3", refs=[f"fermos/vessel/{ev.id}"])], seen, pool).claims
-    assert c.provenance == "demo"
+    assert c.provenance == "assumed"
 
 
 def test_a_design_read_as_a_row_is_cited_by_its_ref_and_one_cited_by_evidence_id_is_told_so(
@@ -193,7 +193,7 @@ def test_a_design_read_as_a_row_is_cited_by_its_ref_and_one_cited_by_evidence_id
     by_id = dict(by_ref, id="c2", moduleRefs=[], evidenceIds=[aid])
     ghost = dict(by_ref, id="c3", moduleRefs=["fermos/vessel/0123456789abcdef"])
     out = validate_plan([by_ref, by_id, ghost], seen, pool)
-    assert [c.id for c in out.claims] == ["c1"] and out.claims[0].provenance == "demo"
+    assert [c.id for c in out.claims] == ["c1"] and out.claims[0].provenance == "assumed"
     assert out.rejected == 2
     assert out.reasons[0].startswith(f"c2: cites {aid} by evidence id, which a read returned only as a row: cite {ref}")
     assert out.reasons[1].startswith("c3: cites what no tool returned in this run")
@@ -213,7 +213,7 @@ def test_fermos_read_lists_kept_designs_by_their_id_or_their_simulations(marked,
     assert [(r.kind, r.id) for r in by_sim.rows] == [("simulation", ANAEROBIC_ID), ("vessel", aid)]
     assert [r.id for r in read("fermos", c, ids=[ANAEROBIC_ID], kind="vessel").rows] == [aid]
     row = by_id.rows[0]
-    assert row.kind == "vessel" and row.state == "open" and row.provenance == "demo"
+    assert row.kind == "vessel" and row.state == "open" and row.provenance == "assumed"
     assert row.detail["unitClass"] == "NRELAnaerobicBatchBioreactor" and row.detail["source"] == ANAEROBIC_ID
     assert "NRELAnaerobicBatchBioreactor" in row.label and ANAEROBIC_ID in row.label
     assert [r.id for r in read("fermos", c, words="fermenter").rows] == [aid]

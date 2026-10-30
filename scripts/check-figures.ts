@@ -90,7 +90,7 @@ const E8: Record<Provenance, Row> = {
   computed: ['square', false, false, 'solid', 'dotted', 'normal', false],
   user: ['triangle', false, false, 'solid', 'solid', 'thin', false],
   'industry-estimate': ['diamond', false, false, 'dashed', 'long', 'normal', false],
-  demo: ['circle', false, false, 'dashed', 'short', 'normal', true],
+  assumed: ['circle', false, false, 'dashed', 'short', 'normal', true],
 };
 for (const p of Object.keys(E8) as Provenance[]) {
   const m = ENCODING[p];
@@ -121,7 +121,7 @@ for (const p of NEVER_EVIDENCE) {
 for (const p of Object.keys(ENCODING) as Provenance[]) {
   if (!NEVER_EVIDENCE.includes(p) && ENCODING[p].point.outline === 'dashed') problems.push(`${p} is evidence but draws a dashed outline`);
 }
-ok.push('industry-estimate and demo are dashed, and no class of evidence is');
+ok.push('industry-estimate and assumed are dashed, and no class of evidence is');
 
 // 3 — a table row per mark.
 // A test sample of placeholder values: each class of evidence the grammar
@@ -136,7 +136,7 @@ const SAMPLE: [Provenance, ExtractionRecord['status'], string][] = [
   ['computed', 'unverified', 'B'],
   ['user', 'unverified', 'A'],
   ['industry-estimate', 'unverified', 'B'],
-  ['demo', 'unverified', 'A'],
+  ['assumed', 'unverified', 'A'],
   ['curated', 'unverified', 'B'],
 ];
 const records = SAMPLE.map(
@@ -187,10 +187,10 @@ for (const p of Object.keys(ENCODING) as Provenance[]) if (!provs.has(p)) proble
 // §8.4 — a histogram bin or a percentile rule is a mark; so is a tornado row.
 const bins = [0, 1, 2].map((i) => ({ low: i, high: i + 1, count: i + 1 }));
 const quantiles = { p5: 0.2, p25: 0.8, p50: 1.5, p75: 2.2, p95: 2.9 };
-const distRows = distributionTable({ title: 't', quantity: 'q', unit: 'u', bins, quantiles, provenance: 'demo', samples: 6, infeasible: [] }).rows;
+const distRows = distributionTable({ title: 't', quantity: 'q', unit: 'u', bins, quantiles, provenance: 'assumed', samples: 6, infeasible: [] }).rows;
 if (distRows.length !== bins.length + 5) problems.push(`Distribution's table has ${distRows.length} rows for ${bins.length + 5} marks`);
-if (distRows.some((r) => r[3] !== 'demo')) problems.push("a Distribution's marks lose the run's provenance");
-const tRows = tornadoTable({ title: 't', drawn: 'd', series: ['a'], unit: 'u', provenance: 'demo', rows: [{ label: 'x', values: [0.2] }, { label: 'y', values: [-0.7] }] }).rows;
+if (distRows.some((r) => r[3] !== 'assumed')) problems.push("a Distribution's marks lose the run's provenance");
+const tRows = tornadoTable({ title: 't', drawn: 'd', series: ['a'], unit: 'u', provenance: 'assumed', rows: [{ label: 'x', values: [0.2] }, { label: 'y', values: [-0.7] }] }).rows;
 if (tRows.length !== 2 || tRows[0][0] !== 'y') problems.push('the Tornado table is not one row per input, strongest first');
 // §9.3 — one ledger row per prediction, each saying its kind and verdict.
 const lp = (id: string, extra: object) => ({ id, label: id, value: 5, unit: 'g L-1', confidence: 'low' as const, basis: 'b', ...extra });
@@ -219,10 +219,10 @@ for (const file of walk('src').filter((f) => /\.(ts|tsx)$/.test(f))) {
 ok.push('recharts is imported nowhere under src/');
 
 // 5 — what the review of Phase 6 found.
-const demoPoint = stripPoints(strip).points.find((p) => p.provenance === 'demo');
-if (!demoPoint?.heldOut) problems.push('a modeled (demo) mark enters the median');
-const demoRule = ceilingTable({ title: 't', records: [], unit: 'g g-1', quantity: 'q', ceilings: [{ value: 0.5, model: 'stand-in', provenance: 'demo' }] }).rows;
-if (demoRule[0]?.[4] !== 'demo') problems.push(`a demo ceiling's rule draws as ${demoRule[0]?.[4]}, not demo`);
+const assumedPoint = stripPoints(strip).points.find((p) => p.provenance === 'assumed');
+if (!assumedPoint?.heldOut) problems.push('an assumed mark enters the median');
+const assumedRule = ceilingTable({ title: 't', records: [], unit: 'g g-1', quantity: 'q', ceilings: [{ value: 0.5, model: 'stand-in', provenance: 'assumed' }] }).rows;
+if (assumedRule[0]?.[4] !== 'assumed') problems.push(`an assumed ceiling's rule draws as ${assumedRule[0]?.[4]}, not assumed`);
 const mk = (id: string, carbonSource?: string) => ({ ...records[0], id, carbonSource }) as unknown as ExtractionRecord;
 const sorted = yieldsOnSugar([mk('a', 'glucose'), mk('b', 'glycerol'), mk('c'), mk('d', 'D-glucose syrup')], 'glucose');
 if (sorted.on.map((r) => r.id).join() !== 'a,d' || sorted.elsewhere !== 2) problems.push(`yieldsOnSugar kept ${sorted.on.map((r) => r.id).join()} for glucose`);
@@ -236,7 +236,7 @@ const wantEthanol = yieldFieldKnown('ethanol') ? 'e' : '';
 if (onEthanol.on.map((r) => r.id).join() !== wantEthanol) problems.push(`an ethanol ceiling meets ${onEthanol.on.map((r) => r.id).join() || 'nothing'}, not ${wantEthanol || 'nothing'}`);
 const unknown = yieldsOnSugar([mk('a', 'glucose')], 'glucose', 'no-such-product');
 if (unknown.on.length || unknown.elsewhere) problems.push('a product with no yield field in the ontology draws records');
-ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, a yield meets only its own sugar\'s and its own product\'s ceiling');
+ok.push('an assumed mark is held out of the median, a ceiling keeps its provenance, a yield meets only its own sugar\'s and its own product\'s ceiling');
 
 // §9.R — the dossier keeps what came back, in the chain's order, and names
 // what did not; one missing artifact no longer blanks the band.
@@ -269,22 +269,22 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
     unit('C', { productIn: 52, productOnward: 47, productLost: 5, recovery: 47 / 52, cumulative: 0.9, lostTo: ['centrate'] }),
     unit('W', { onPath: false, recovery: null, cumulative: null, productOnward: null, productLost: null, note: "off the product's path" }),
   ];
-  const rows = recoveryTable({ title: 't', product: 'E', units, provenance: 'demo', massUnit: 'kg/hr' }).rows;
+  const rows = recoveryTable({ title: 't', product: 'E', units, provenance: 'assumed', massUnit: 'kg/hr' }).rows;
   if (rows.length !== units.length) problems.push(`RecoveryByUnit's table has ${rows.length} rows for ${units.length} units`);
   if (rows.some((r) => r.some((c) => /NaN|Infinity/.test(String(c))))) problems.push('a RecoveryByUnit cell holds NaN or Infinity');
   if (rows[0][7] !== '—' || !String(rows[0][10]).includes('formed here')) problems.push('a unit no product enters is given a recovery, or not told why');
   if (noBar(units[0]) == null || noBar(units[2]) == null || noBar(units[1]) != null) problems.push('RecoveryByUnit draws a bar for a unit with no recovery, or none for one with');
-  if (rows.some((r) => r[9] !== 'demo')) problems.push("a RecoveryByUnit row loses the run's provenance");
+  if (rows.some((r) => r[9] !== 'assumed')) problems.push("a RecoveryByUnit row loses the run's provenance");
   // §4.R: a run with no tables names no product too; the figure says the
   // tables are missing and why, in the train's words, never that the run's
   // flowsheet prices nothing.
   const why = 'this run was kept before runs carried their tables (OF-BLD-019 §2.1); run the scenario again';
-  const old = recoveryEmpty({ title: 't', product: null, units: [], provenance: 'demo', massUnit: 'kg/hr', why });
+  const old = recoveryEmpty({ title: 't', product: null, units: [], provenance: 'assumed', massUnit: 'kg/hr', why });
   if (!old || !/kept no unit table/.test(old.what) || /names no product/.test(old.what) || old.where !== why)
     problems.push(`a run that kept no unit table is drawn as one naming no product: ${JSON.stringify(old)}`);
-  const toy = recoveryEmpty({ title: 't', product: null, units, provenance: 'demo', massUnit: 'kg/hr' });
+  const toy = recoveryEmpty({ title: 't', product: null, units, provenance: 'assumed', massUnit: 'kg/hr' });
   if (!toy || !/names no product/.test(toy.what)) problems.push('a run with units and no product does not say it names none');
-  if (recoveryEmpty({ title: 't', product: 'E', units, provenance: 'demo', massUnit: 'kg/hr' }) !== null) problems.push('a train with a product and units is drawn empty');
+  if (recoveryEmpty({ title: 't', product: 'E', units, provenance: 'assumed', massUnit: 'kg/hr' }) !== null) problems.push('a train with a product and units is drawn empty');
   ok.push(`tables: recovery by unit ${rows.length}, one row per unit; a unit with no product in says why and draws no bar; a run with no unit table says so before naming no product`);
 }
 
@@ -293,12 +293,12 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
   const line = (key: string, perUnit: number | null) => ({ key, label: key, perUnit, usdPerYear: 1000, reads: `TEA ${key}` });
   // The lines sum to 1.3; the run's price is 1.5, so a total the figure made itself shows.
   const lines = [line('feedstock', 1.0), line('utilities', 0.4), line('otherVariable', null), line('coproductCredits', -0.1)];
-  const props = { title: 't', lines, total: { label: 'Base-case price', value: 1.5 }, unit: 'USD per kg', annualUnit: 'USD/yr', provenance: 'demo' as const };
+  const props = { title: 't', lines, total: { label: 'Base-case price', value: 1.5 }, unit: 'USD per kg', annualUnit: 'USD/yr', provenance: 'assumed' as const };
   const rows = waterfallTable(props).rows;
   if (rows.length !== lines.length + 1) problems.push(`CostWaterfall's table has ${rows.length} rows for ${lines.length} lines and the price`);
   const last = rows[rows.length - 1];
   if (last?.[1] !== '1.5') problems.push(`CostWaterfall's last row is ${last?.[1]}, not the price the run solved`);
-  if (rows.some((r) => r[4] !== 'demo')) problems.push("a CostWaterfall row loses the run's provenance");
+  if (rows.some((r) => r[4] !== 'assumed')) problems.push("a CostWaterfall row loses the run's provenance");
   if (rows.some((r) => r.some((c) => /NaN|Infinity/.test(String(c))))) problems.push('a CostWaterfall cell holds NaN or Infinity');
   const drawn = waterfallBars(props);
   if (drawn.some((b) => b.key === 'otherVariable')) problems.push('CostWaterfall draws a bar for a line with no per-unit value');
@@ -331,7 +331,7 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
       { key: 'X', label: 'Cells (X)', unit: 'g L⁻¹', values: [0.1, 0.5, 1.2] },
       { key: 'S', label: 'Substrate (S)', unit: 'g L⁻¹', values: [50, 40, 20] },
     ],
-    provenance: 'demo',
+    provenance: 'assumed',
     our: { unit: 'g O2 L⁻¹ h⁻¹', values: [0, 0.1, 0.2] },
     readings: [{ key: 'X', points: [{ t: 0, value: 0.1 }, { t: 2, value: 1.1 }] }],
     bands: [{ key: 'S', t: [0, 1], low: [48, 37], high: [52, 43], provenance: 'computed' }],
@@ -348,7 +348,7 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
   if (rows.length !== marks) problems.push(`TimeCourse's table has ${rows.length} rows for ${marks} marks`);
   if (rows.some((r) => r.some((c) => /NaN|Infinity/.test(String(c))))) problems.push('a TimeCourse cell holds NaN or Infinity');
   const curves = rows.filter((r) => String(r[1]).startsWith('computed curve'));
-  if (curves.length !== 9 || curves.some((r) => r[5] !== 'demo')) problems.push("a simulation's curves lose its provenance in TimeCourse's table");
+  if (curves.length !== 9 || curves.some((r) => r[5] !== 'assumed')) problems.push("a simulation's curves lose its provenance in TimeCourse's table");
   if (rows.filter((r) => r[1] === 'reading').some((r) => r[5] !== 'measured')) problems.push('a reading drawn against a simulation is not measured');
   const rule = rows.find((r) => r[1] === 'ceiling, a rule');
   if (!rule || rule[5] !== 'computed') problems.push("a ceiling's rule does not keep its own provenance");
@@ -371,10 +371,10 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
 {
   const t = [0, 1, 2, 3, 4];
   const our = [0.5, 1.5, 2.5, 1.5, 0.5];
-  const props = { title: 't', t, our, otr: 2, unit: 'mmol L⁻¹ h⁻¹', short: [[1.5, 2.5]], provenance: 'demo' as const };
+  const props = { title: 't', t, our, otr: 2, unit: 'mmol L⁻¹ h⁻¹', short: [[1.5, 2.5]], provenance: 'assumed' as const };
   const rows = oxygenTable(props).rows;
   if (rows.length !== t.length) problems.push(`OxygenBalance's table has ${rows.length} rows for ${t.length} hours of uptake`);
-  if (rows.some((r) => r[5] !== 'demo')) problems.push("an OxygenBalance row loses the design's provenance");
+  if (rows.some((r) => r[5] !== 'assumed')) problems.push("an OxygenBalance row loses the design's provenance");
   if (rows.some((r) => r.some((c) => /NaN|Infinity/.test(String(c))))) problems.push('an OxygenBalance cell holds NaN or Infinity');
   if (rows.some((r) => r[2] !== fmt(2))) problems.push("OxygenBalance's transfer is not the design's one value on every row");
   if (rows.map((r) => r[4]).join() !== 'no,no,yes,no,no') problems.push(`OxygenBalance's short hours are not the service's intervals (${rows.map((r) => r[4]).join()})`);
@@ -415,12 +415,12 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
     stream('U3_0', 940, 0.0526, [['Water', 0.94]]),
   ];
   const props: PurityByStreamProps = {
-    title: 't', product: 'Ethanol', productStream: 'U3_0', streams, provenance: 'demo', massUnit: 'kg/hr',
+    title: 't', product: 'Ethanol', productStream: 'U3_0', streams, provenance: 'assumed', massUnit: 'kg/hr',
     routes: { U1_in: { source: null, sink: 'U1' }, U1_0: { source: 'U1', sink: null }, U1_1: { source: 'U1', sink: 'U2' } },
   };
   const rows = purityTable(props).rows;
   if (rows.length !== streams.length) problems.push(`PurityByStream's table has ${rows.length} rows for ${streams.length} streams`);
-  if (rows.some((r) => r[7] !== 'demo')) problems.push("a PurityByStream row loses the run's provenance");
+  if (rows.some((r) => r[7] !== 'assumed')) problems.push("a PurityByStream row loses the run's provenance");
   if (rows.some((r) => r.some((c) => /NaN|Infinity/.test(String(c))))) problems.push('a PurityByStream cell holds NaN or Infinity');
   if (rows.filter((r) => r[6] === 'yes').map((r) => r[0]).join() !== 'U3_0') problems.push('PurityByStream names a product stream the service did not');
   if (rows[3][4] !== '—' || purityNoBar(streams[3]) == null || purityNoBar(streams[0]) != null) problems.push('PurityByStream gives a share to a stream that carries nothing, or none to one that carries the product');

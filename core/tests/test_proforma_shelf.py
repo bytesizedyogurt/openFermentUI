@@ -101,7 +101,7 @@ def test_run_flowsheet_refuses_the_toy_a_reference_and_what_waits(store):
 def test_a_run_stored_before_the_tables_still_reads():
     inputs = [BasisInput(name="flowsheet", value=ETHANOL, unit="", source=BasisSource(kind="convention"))]
     old = Artifact(id="0" * 16, tool=proforma.RUN, toolVersion=f"{ETHANOL} · biosteam 2.54.0 · biorefineries 2.35.1",
-                   inputs=inputs, output={"quantiles": {}, "basePrice": None}, outputHash="", provenance="demo",
+                   inputs=inputs, output={"quantiles": {}, "basePrice": None}, outputHash="", provenance="assumed",
                    createdAt="2026-10-15T00:00:00Z", durationMs=0)
     t = proforma.tables_of(old)
     assert t.flowsheet == ETHANOL and t.tea is None and t.streams == [] and t.units == [] and t.diagram is None
@@ -147,7 +147,7 @@ def test_the_toy_run_artifact_carries_every_table(warm, store):
     import shutil
 
     art = proforma.run_flowsheet("toy", TOY, samples=8, seed=3, allow_toy=True)
-    assert art.tool == proforma.RUN and art.provenance == "demo"  # every input a fixture's assumption
+    assert art.tool == proforma.RUN and art.provenance == "assumed"  # every input a fixture's assumption
     assert set(art.output) == EVERY_KEY
     t = proforma.tables_of(art)
     assert t.flowsheet == "toy" and t.tablesSource.startswith("BioSTEAM ") and t.tea is None  # the toy prices nothing

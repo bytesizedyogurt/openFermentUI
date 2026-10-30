@@ -140,7 +140,7 @@ export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; pri
               </>
             )}
             . Provenance {view.provenance}
-            {view.provenance === 'demo' ? ': it rests on at least one named person’s assumption.' : '.'}
+            {view.provenance === 'assumed' ? ': it rests on at least one named person’s assumption.' : '.'}
           </div>
         </Tick>
       ) : (

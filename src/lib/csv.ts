@@ -1,4 +1,4 @@
-// CSV export. Every export carries the demo disclosure header so a file can't
+// CSV export. Every export carries the disclosure header so a file can't
 // launder synthetic data into a real analysis (OF-DES-001 §20.7).
 import { useStore } from '@/store';
 
@@ -19,7 +19,7 @@ export const DISCLOSURE = [
   '#                     against the source PDF — verify before citing',
   '#   unverified        extractor output, not reviewed',
   '#   industry-estimate non-peer-reviewed market/vendor figure — not evidence',
-  '#   demo              modeled, not measured (simulation outputs)',
+  '#   assumed           rests on an assumption or an estimate, not measured',
   '# Simulation economics are illustrative models, not validated.',
 ];
 

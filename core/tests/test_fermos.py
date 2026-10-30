@@ -205,7 +205,7 @@ def test_a_forecast_that_exhausts_its_substrate_ends_at_that_hour():
     assert sub["median"][-1] <= 0 < sub["median"][-2]
 
 
-def test_a_kept_forecast_is_computed_and_a_changed_start_makes_it_demo(store):
+def test_a_kept_forecast_is_computed_and_a_changed_start_makes_it_assumed(store):
     fit = fermos.fit("dep-f", batch(T, np.random.default_rng(4), SD))
     kept = fermos.forecast_run(fit_artifact=fit.kineticArtifactId)
     assert kept.evidence.provenance == "computed" and kept.evidence.figure == "trajectory" and kept.artifactId
@@ -213,13 +213,13 @@ def test_a_kept_forecast_is_computed_and_a_changed_start_makes_it_demo(store):
     with pytest.raises(fermos.FitRefused, match="needs the name"):
         fermos.forecast_run(fit_artifact=fit.kineticArtifactId, start=fermos.StartValues(S0=60.0))
     changed = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, start=fermos.StartValues(S0=60.0), changed_by="Sean Creighton")
-    assert changed.evidence.provenance == "demo"
+    assert changed.evidence.provenance == "assumed"
 
 
 def test_the_sample_forecast_is_inline_and_kept_nowhere(store):
     k = fermos.kinetic_fit(batch(T, np.random.default_rng(6), SD))
     out = fermos.forecast_run(fit_inline=k, sample=True)
-    assert out.artifactId is None and out.sample and out.evidence.provenance == "demo"
+    assert out.artifactId is None and out.sample and out.evidence.provenance == "assumed"
     assert artifacts.all_artifacts() == []
 
 
@@ -331,7 +331,7 @@ def test_a_simulation_is_kept_with_every_parameter_and_override_named(store):
     assert art.tool == fermos.SIMULATION and set(art.output) == OUTPUT_KEYS
     assert art.toolVersion == f"kinetics {BATCH} {fermos.SIMULATION_RUN} · scipy {kinetics.versions()['scipy']}"
     # An override is a named person's assumption, so the simulation is standins.
-    assert r.provenance == "demo" == art.provenance
+    assert r.provenance == "assumed" == art.provenance
     by_name = {i.name: i for i in art.inputs}
     for key in STANDIN_TYPED:
         assert by_name[key].source.kind == "assumption" and by_name[key].source.by == BY, key
@@ -420,14 +420,14 @@ def test_the_family_endpoints_and_the_simulation_endpoints(store):
     assert "mu_max" in scope.json()["waiting"] and "kd" not in scope.json()["waiting"]
     body = {"family": BATCH, "overrides": [o.model_dump(mode="json") for o in typed(**STANDIN_TYPED)]}
     ok = c.post("/api/fermos/simulate", json=body)
-    assert ok.status_code == 200 and ok.json()["provenance"] == "demo" and ok.json()["basis"]["tool"] == fermos.SIMULATION
+    assert ok.status_code == 200 and ok.json()["provenance"] == "assumed" and ok.json()["basis"]["tool"] == fermos.SIMULATION
     for bad, words in (({"family": BATCH}, "cannot run yet"), ({"family": "light_v1"}, "not built"),
                        ({**body, "overrides": body["overrides"][:1] + [{**body["overrides"][1], "value": "words"}]},
                         "takes a number")):
         r = c.post("/api/fermos/simulate", json=bad)
         assert r.status_code == 422 and words in r.json()["detail"], (bad, r.json())
     kept = c.get("/api/fermos/simulations").json()
-    assert [k["artifactId"] for k in kept] == [ok.json()["artifactId"]] and kept[0]["provenance"] == "demo"
+    assert [k["artifactId"] for k in kept] == [ok.json()["artifactId"]] and kept[0]["provenance"] == "assumed"
     assert c.post("/api/fermos/simulate", json=body, headers={"Origin": "https://evil.example"}).status_code == 403
 
 

@@ -139,7 +139,7 @@ export default function BioRepo() {
           ingestKey === 'failed'
             ? 'rejected'
             : ingestKey === 'ingesting'
-              ? 'demo'
+              ? 'assumed'
               : ingestKey === 'catalogued' && agg.gold === 0 && agg.verified === 0
                 ? 'curated'
                 : agg.gold > 0

@@ -177,7 +177,7 @@ export const simulateFromFitPath = (family: string, fitId: string) =>
  * never computed. Unset ones are the run's own; a changed start names the
  * person who typed it, and a changed length the person who typed that
  * (`durationBy`, OF-BLD-020 §3.R): the service keeps each an assumption by
- * name, and the forecast is demo.
+ * name, and the forecast is assumed.
  */
 export function forecastAsk(overrides: Override[]): {
   start: Partial<StartValues>;

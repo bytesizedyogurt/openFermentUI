@@ -19,7 +19,7 @@ export interface Ceiling {
   /** The model that made it. */
   model: string;
   basis?: ComputedBasis;
-  /** Its own provenance: computed, or demo for a stand-in network. */
+  /** Its own provenance: computed, or assumed for a stand-in network. */
   provenance?: Provenance;
 }
 

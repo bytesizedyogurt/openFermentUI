@@ -42,7 +42,7 @@ const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string;
     tick: 'tick-unverified',
   },
   user: { label: 'User-entered', Icon: UserPen, color: 'text-signal-info', tick: 'tick-user' },
-  demo: { label: 'Modeled · not measured', Icon: FlaskConical, color: 'text-signal-warn', tick: 'tick-demo' },
+  assumed: { label: 'Assumed · not measured', Icon: FlaskConical, color: 'text-signal-warn', tick: 'tick-assumed' },
   rejected: { label: 'Rejected', Icon: Ban, color: 'text-signal-error', tick: 'tick-rejected' },
 };
 
@@ -103,7 +103,7 @@ export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
     'industry-estimate': 'bg-ink-soft/60',
     unverified: 'bg-ink-soft',
     user: 'bg-signal-info',
-    demo: 'bg-signal-warn',
+    assumed: 'bg-signal-warn',
     rejected: 'bg-signal-error',
   };
   return (
@@ -116,7 +116,7 @@ export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
 }
 
 /** The levels in the order the legend shows them. */
-const LEGEND_ORDER: ProvKind[] = ['measured', 'gold', 'verified', 'curated', 'computed', 'unverified', 'industry-estimate', 'user', 'demo'];
+const LEGEND_ORDER: ProvKind[] = ['measured', 'gold', 'verified', 'curated', 'computed', 'unverified', 'industry-estimate', 'user', 'assumed'];
 
 /**
  * Whether a verified primary record at this level enters a median, a range

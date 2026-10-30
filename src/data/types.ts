@@ -3,10 +3,10 @@
 /**
  * Provenance classes (OF-DES-001 §7.4, revised by OF-COR-001 §20).
  *
- * With a real corpus, 'demo' no longer means "this whole platform is fake" —
- * it is reserved for the three surfaces that remain modeled rather than
- * measured: simulation response grids, scripted agent answer text, and
- * anything derived from them.
+ * 'assumed' (alpha 1.0's 'demo', renamed by ADR-006) marks a value that rests
+ * on a named person's assumption or a model's estimate rather than a
+ * measurement: a simulation run on a typed value, a stand-in model's answer,
+ * and anything derived from them.
  *
  * 'curated' is new and load-bearing. It marks a value transcribed from the
  * curation document (OF-COR-001) rather than read off the source PDF. The
@@ -42,7 +42,7 @@ export type Provenance =
   | 'unverified'
   | 'user'
   | 'industry-estimate'
-  | 'demo';
+  | 'assumed';
 
 export type ParameterFamily =
   | 'expression'
@@ -882,8 +882,8 @@ export interface Product {
   tags: string[];
   valueDensityBand: ValueDensityBand;
   /**
-   * Always 'demo' — every product record is modeled, not measured, and renders
-   * as "Modeled · not measured" through the existing provenance system.
+   * Always 'assumed' — every product record is modeled, not measured, and renders
+   * as "Assumed · not measured" through the existing provenance system.
    */
   provenance: Provenance;
   note: string | null;
@@ -3187,7 +3187,7 @@ export interface Volatility {
 // `GET /api/params/{scope}` serves a scope's specs with each value and where
 // it came from. A person's change is an `Override`: a named assumption the
 // project keeps in its rows (`parameterOverrides`, D3) and a run
-// carries; the basis names it as an `assumption`, so the result is `demo`.
+// carries; the basis names it as an `assumption`, so the result is `assumed`.
 // Bounds are conventions with a written reason (D4): a value outside them is
 // kept and flagged in words, never clamped. A model never sets one.
 
@@ -3461,7 +3461,7 @@ export interface VesselSummary {
 // `ParameterSpec`s; a simulation resolves them with their sources, integrates
 // on scipy, and keeps one `fermos.simulation` artifact whose basis names
 // every parameter, start value and override. A person's override makes it
-// `demo`; nothing here is computed in the browser.
+// `assumed`; nothing here is computed in the browser.
 
 /** `GET /api/fermos/families`: a model family as the panel shows it. */
 export interface FamilyInfo {

@@ -379,10 +379,10 @@ export default function Home() {
       if (!v) continue;
       for (const m of v.materials) {
         const rec = m.sourceRecordId ? byId.get(m.sourceRecordId) : undefined;
-        provs.push(rec ? (provenanceOf(rec) as ProvKind) : 'demo');
+        provs.push(rec ? (provenanceOf(rec) as ProvKind) : 'assumed');
       }
     }
-    return dominant(provs, 'demo');
+    return dominant(provs, 'assumed');
   }, [protocols, records]);
 
   // ── catalogue numbers (OF-BLD-005) ───────────────────────────────────
@@ -447,8 +447,8 @@ export default function Home() {
               <Explain label="What do the tick marks mean?">
                 Every number in openFerment carries a provenance tick: a solid gold bar for
                 curated gold-set values, green for human-verified extractions, grey for
-                unverified machine output, and a dashed amber bar for demonstration data with
-                no literature ancestry. The tiles below wear the dominant tick of the data
+                unverified machine output, and a dashed amber bar for a value that rests on an
+                assumption or an estimate. The tiles below wear the dominant tick of the data
                 behind them.
               </Explain>
             }
@@ -592,7 +592,7 @@ export default function Home() {
               <VitalTile
                 to="/runbooks"
                 label="Runbooks"
-                prov="demo"
+                prov="assumed"
                 tickTitle="Synthesised answers — modeled throughout, and never a clearance opinion"
                 sub={
                   <>
@@ -698,7 +698,7 @@ export default function Home() {
                       ? runbooksWaiting[0].title
                       : `${runbooksWaiting.length} runbooks need a decision`
                   }
-                  prov="demo"
+                  prov="assumed"
                   meta={runbooksWaiting
                     .map((r) => RUNBOOK_STATUS_LABEL[r.status])
                     .join(' · ')}

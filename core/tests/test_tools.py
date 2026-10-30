@@ -287,7 +287,7 @@ def test_selling_price_cites_the_newest_run_of_a_seed_scenario(proforma_store, m
     assert r.error is None, r.error
     (ev,) = r.evidence
     assert ev.id == newer.artifactId == r.summary["evidenceId"] and ev.figure == "distribution"
-    assert ev.unit == shelf.ETHANOL_PRICE_BASIS and ev.provenance == "demo" == r.summary["provenance"]
+    assert ev.unit == shelf.ETHANOL_PRICE_BASIS and ev.provenance == "assumed" == r.summary["provenance"]
     assert r.summary["scenarioId"] == test_seed and r.summary["flowsheet"] == "ethanol_glucose_v0"
     assert r.summary["leavesOut"] == shelf.ETHANOL_LEAVES_OUT
     assert r.summary["assumedInputs"] == ["glucose_price", "plant_scale"]
@@ -540,7 +540,7 @@ def test_fermos_simulate_runs_a_family_from_record_ids_keeps_one_simulation_and_
     assert s["state"] == "open" and s["family"] == "batch_v1" and ev.id == s["artifactId"] == s["evidenceId"]
     art = artifacts.get(ev.id)
     assert art.tool == fermos.SIMULATION and ev.basis.tool == fermos.SIMULATION and ev.basis.artifactId == ev.id
-    assert ev.provenance == s["provenance"] == art.provenance == "demo", "its start rests on a person's values"
+    assert ev.provenance == s["provenance"] == art.provenance == "assumed", "its start rests on a person's values"
     assert ev.value == pytest.approx(art.output["finalTitre"]) and ev.unit == art.output["units"]["P"]
     assert len(json.dumps(s, ensure_ascii=False)) <= tools.MAX_SUMMARY_CHARS
     # What bound each parameter, in words and counts; its value is in the artifact.

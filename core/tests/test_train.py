@@ -465,7 +465,7 @@ def test_a_run_keeps_one_artifact_whose_basis_names_every_unit_and_source(store,
     run = pureos.run_train(spec, [Override(scope="pureos:unit:t1:F1", key="V", value=0.2, by="Another Person", at=AT,
                                            note=STANDIN)])
     art = artifacts.get(run.artifactId)
-    assert art.tool == "pureos.train_run" and run.provenance == "demo" == art.provenance
+    assert art.tool == "pureos.train_run" and run.provenance == "assumed" == art.provenance
     by = {b.name: b for b in art.inputs}
     assert by["C1 type"].value == "centrifugation" and by["C1 class"].value == "SolidsCentrifuge"
     assert by["C1 class"].source == BasisSource(kind="model", id="biosteam@0.0-standin",
@@ -846,7 +846,7 @@ def test_a_three_unit_train_converges_and_its_recovery_is_the_product_of_its_onw
     assert run.inlet.water > 0 and "Water is the balance" in run.inlet.waterNote
     assert run.inlet.flows["Ethanol"] == pytest.approx(50.0)
     assert all(c.costModel and c.installedCost > 0 for c in run.costs)
-    assert run.provenance == "demo"
+    assert run.provenance == "assumed"
     assert artifacts.replay(run.artifactId).identical
 
 

@@ -5,8 +5,8 @@ source. Its provenance follows from those sources and from nothing else: no
 model output and no person sets it, and the browser shows what this function
 returned. There is no TypeScript copy of the rule.
 
-- Any input whose source is an `assumption` makes the value `demo`, which the
-  product labels *Modeled · not measured*.
+- Any input whose source is an `assumption` makes the value `assumed`, which the
+  product labels *Assumed · not measured*.
 - Otherwise the value is the weakest of: `computed`; the provenance of every
   `record` input; `measured` for a `deposition` input; the provenance of every
   `artifact` input.
@@ -43,7 +43,7 @@ def assumption_source(by: str, at: str, note: str | None = None) -> BasisSource:
     an `Override` from the parameter panel (OF-BLD-020 D3). Its kind is
     `assumption`, the person is `by`, and `note` says the day it was typed and
     what it rests on, so the basis names both and `basis_provenance` makes
-    whatever rests on it `demo`."""
+    whatever rests on it `assumed`."""
     return BasisSource(kind="assumption", by=by.strip(), note=f"typed on {at}" + (f": {note}" if note else ""))
 
 
@@ -54,7 +54,7 @@ def basis_provenance(
 ) -> str:
     """The provenance of a value computed on `basis` (E.4)."""
     if any(i.source.kind == "assumption" for i in basis.inputs):
-        return "demo"
+        return "assumed"
     classes = ["computed"]
     for i in basis.inputs:
         kind = i.source.kind

@@ -62,7 +62,7 @@ def keep(aid: str, output: dict, tool: str = vessel.SIMULATION) -> Artifact:
     """Write a stand-in artifact straight into the test's store."""
     art = Artifact(id=aid, tool=tool, toolVersion=STANDIN, inputs=[BasisInput(
         name="stand-in", value=STANDIN, unit="", source=BasisSource(kind="assumption", by=BY, note=STANDIN))],
-        output=output, outputHash=artifacts.output_hash(output), provenance="demo", createdAt="2026-10-21T00:00:00Z",
+        output=output, outputHash=artifacts.output_hash(output), provenance="assumed", createdAt="2026-10-21T00:00:00Z",
         durationMs=0, seed=None)
     from standins import plant_artifact
 
@@ -268,8 +268,8 @@ def test_the_basis_names_every_parameter_its_source_and_the_person(store, worker
     assert named["vessel class"].value == "AeratedBioreactor" and named["unit id"].value == "R1"
     assert named["tau"].source.id == AEROBIC_ID
     assert {"utility prices and cost index", "chemicals", "operating hours", "heat per oxygen consumed"} <= set(named)
-    # An assumption makes it demo (D1, D3).
-    assert d.provenance == "demo" and art.tool == vessel.TOOL
+    # An assumption makes it assumed (D1, D3).
+    assert d.provenance == "assumed" and art.tool == vessel.TOOL
     p = by_key(d.parameters)
     assert p["theta_O2"].overriddenBy == BY and p["theta_O2"].libraryDefault == 0.5
     assert p["loading_time"].value is None and p["loading_time"].origin == "library-default"
@@ -572,7 +572,7 @@ def test_an_aerobic_simulation_designs_a_stirred_tank_sized_for_its_peak(real):
     assert ox.kLaNeededAtPeak == pytest.approx(ox.kLa, rel=1e-6)
     assert _row(d, "Compressor power") > 0 and d.cost.installed > d.cost.purchase > 0
     assert d.heat.bst < 0 and d.heat.convention is not None and d.heat.convention < 0
-    assert d.cost.costIndex > 0 and d.provenance == "demo"
+    assert d.cost.costIndex > 0 and d.provenance == "assumed"
     # Sized for the batch average, as BioSTEAM sizes of itself, the peak is short.
     mean = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
         *scale, override(AEROBIC_ID, "oxygen_basis", "batch-average")]))

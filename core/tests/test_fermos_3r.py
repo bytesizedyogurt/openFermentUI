@@ -101,7 +101,7 @@ def _logistic_fit():
     return fermos.fit("dep-synthetic", series).kineticArtifactId
 
 
-def test_a_forecast_length_a_person_typed_is_their_assumption_and_makes_the_forecast_demo(store):
+def test_a_forecast_length_a_person_typed_is_their_assumption_and_makes_the_forecast_assumed(store):
     fit_id = _logistic_fit()
     scope = fermos.forecast_scope(fit_id)
     o = Override(scope=scope, key="t_end", value=12.0, by=BY, at="2026-10-21", note="a STAND-IN for a test")
@@ -112,19 +112,19 @@ def test_a_forecast_length_a_person_typed_is_their_assumption_and_makes_the_fore
     fc = fermos.forecast_run(fit_artifact=fit_id, duration_h=12.0, duration_by=BY)
     named = {i.name: i for i in artifacts.get(fc.artifactId).inputs}
     assert named["duration"].source.kind == "assumption" and named["duration"].source.by == BY
-    assert fc.evidence.provenance == "demo"
+    assert fc.evidence.provenance == "assumed"
     # The reviewer's call: the one who changed a start names the length when nobody else is named.
     fc = fermos.forecast_run(fit_artifact=fit_id, duration_h=12.0, changed_by=BY)
-    assert artifacts.get(fc.artifactId).provenance == "demo"
-    # Through the API, and on to Proforma: what the forecast feeds is demo too.
+    assert artifacts.get(fc.artifactId).provenance == "assumed"
+    # Through the API, and on to Proforma: what the forecast feeds is assumed too.
     r = _api().post("/api/fermos/forecast", json={"fitArtifactId": fit_id, "durationH": 12.0, "durationBy": BY})
-    assert r.status_code == 200 and r.json()["evidence"]["provenance"] == "demo"
+    assert r.status_code == 200 and r.json()["evidence"]["provenance"] == "assumed"
     info = proforma.fit_info(artifacts.get(r.json()["artifactId"]), ETHANOL)
-    assert info.provenance == "demo"
+    assert info.provenance == "assumed"
     # A length nobody is named for stays the caller's convention, as asked.
     fc = fermos.forecast_run(fit_artifact=fit_id, duration_h=12.0)
     named = {i.name: i for i in artifacts.get(fc.artifactId).inputs}
-    assert named["duration"].source.kind == "convention" and fc.evidence.provenance != "demo"
+    assert named["duration"].source.kind == "convention" and fc.evidence.provenance != "assumed"
 
 
 # ── a forecast chosen as the fit gives what it holds (finding 13) ───────

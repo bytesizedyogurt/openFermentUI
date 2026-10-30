@@ -150,10 +150,10 @@ def test_a_stream_is_read_from_the_run_and_its_answer_kept(store, worker):
     assert again.id == art.id and len(worker.calls) == 1
 
 
-def test_a_run_resting_on_an_assumption_makes_its_streams_answers_demo(store, worker):
-    _keep(_run("bbbbbbbbbbbbbbb2", provenance="demo"))
+def test_a_run_resting_on_an_assumption_makes_its_streams_answers_assumed(store, worker):
+    _keep(_run("bbbbbbbbbbbbbbb2", provenance="assumed"))
     art = thermo.props(ThermoPropsRequest(artifactId="bbbbbbbbbbbbbbb2", streamId="beer"))
-    assert art.provenance == "demo"
+    assert art.provenance == "assumed"
 
 
 def test_stored_reads_without_asking_the_worker(store, worker):

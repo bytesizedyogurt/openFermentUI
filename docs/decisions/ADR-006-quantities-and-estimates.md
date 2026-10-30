@@ -46,3 +46,27 @@ task (development plan §8).
 - `core/openferment_core/postdoc_agent.py`, `validate.py`, `tools/__init__.py` (`numbers_in`) at
   `alpha-1.0`; development plan §2 "A conflict we need to resolve deliberately" and §8 "Make
   estimates useful and honest".
+
+## Implementation
+
+### 4.4 (2026-10-30): `demo` renamed `assumed`
+
+- The class is renamed everywhere it is written: `Provenance` and `PROVENANCE_ORDER` in
+  `models.py` (still ninth and weakest), `weakest_provenance`'s answer for a class it does not
+  know, `basis_provenance`, and on the browser's side the `Provenance` union, `PROVENANCE_RANK`,
+  the tick (`tick-assumed`), the legend, the figure encoding (`ENCODING.assumed`, still amber,
+  hollow and short-dashed, and one of the two classes in `NEVER_EVIDENCE`), the CSV disclosure
+  and every screen that names it. The label reads *Assumed · not measured*. `check:plan` holds
+  the two vocabularies equal and `check:figures` holds the encoding.
+- Rows already stored are rewritten by migration 0003 (`db/alembic/versions/0003_assumed.py`):
+  every text column named `provenance`, and in every JSON column of the schema the value of
+  every key named `provenance`; nothing else in a row changes. An artifact whose output named
+  the class has its output hash computed again over the output as rewritten, so a replay
+  compares like with like; artifact ids hash the inputs, which name no provenance, and runbook
+  lock hashes cover predictions' values and measures, which name none, so both stay. The
+  downgrade renames it back. `test_db.py` moves a database from 0002 to 0003 and back.
+- Alpha 1.0's files say `demo`: `import_alpha1` reads every `provenance` through
+  `models.renamed_provenance` (the map `RENAMED_PROVENANCE`) before a model checks it, and gives
+  an artifact whose output changed the hash of its output as read, as the migration does.
+- The lesson embed `chip-demo` (a demonstration of a citation chip), the `demo.py` the tests'
+  stand-ins came from and the kit's demo corpus keep their names: none is the class.
