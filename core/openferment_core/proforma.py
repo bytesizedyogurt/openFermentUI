@@ -1,98 +1,30 @@
 """Proforma on the service's side (OF-BLD-014 §8.1).
 
-One `SimWorker` runs BioSTEAM in its own process. Its cold start takes about
-forty seconds, so the worker starts on first use, or with the service when
-`OPENFERMENT_WARM_PROFORMA=1`, and `status()` says where it is: `cold`,
-`starting`, `ready` or `failed`, so the screen can say the simulator is
-starting rather than look stuck.
+The worker that runs BioSTEAM is managed by engine/simulator.py; this module
+re-exports its `call`, `start`, `status` and `worker`, the names the shelf's
+runs, thermo.py, vessel.py and pureOS call it by (and tests stand in for).
 """
 from __future__ import annotations
 
 import math
-import os
 import re
 import shutil
-import threading
-from typing import Any, Literal
+from typing import Any
 
 from . import binding as _binding
 from .binding import exclusion as _exclusion
+from .engine.simulator import (  # noqa: F401  (re-exported: the names callers and tests use)
+    CALL_TIMEOUT_S,
+    START_TIMEOUT_S,
+    Status,
+    call,
+    start,
+    status,
+    warm_on_start,
+    worker,
+)
 from .flowsheets import shelf as _shelf
-from .workers import SimWorker, WorkerCrashed, WorkerError, WorkerTimeout
-
-# A cold import plus a first build; a setting, not a measurement (B.3 measured
-# the import at forty seconds).
-START_TIMEOUT_S = 240.0
-CALL_TIMEOUT_S = 600.0
-
-Status = Literal["cold", "starting", "ready", "failed"]
-
-_WORKER: SimWorker | None = None
-_STATE: dict[str, Any] = {"status": "cold", "error": None}
-_LOCK = threading.Lock()
-# Set when a start in progress has settled, ready or failed (OF-BLD-019
-# §7.R): a request arriving while another starts the worker waits on it.
-_SETTLED = threading.Event()
-
-
-def worker() -> SimWorker:
-    global _WORKER
-    with _LOCK:
-        if _WORKER is None:
-            _WORKER = SimWorker("openferment_core.workers.proforma_worker", timeout_s=CALL_TIMEOUT_S)
-        return _WORKER
-
-
-def status() -> dict[str, Any]:
-    return dict(_STATE)
-
-
-def _warm() -> None:
-    try:
-        worker().ping(timeout_s=START_TIMEOUT_S)
-        _STATE.update(status="ready", error=None)
-    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
-        _STATE.update(status="failed", error=str(e) or type(e).__name__)
-    finally:
-        _SETTLED.set()
-
-
-def start(background: bool = True) -> dict[str, Any]:
-    """Start the worker if it is cold or failed; return the status."""
-    with _LOCK:
-        if _STATE["status"] in ("cold", "failed"):
-            _STATE.update(status="starting", error=None)
-            _SETTLED.clear()
-            go = True
-        else:
-            go = False
-    if go:
-        if background:
-            threading.Thread(target=_warm, name="proforma-warm", daemon=True).start()
-        else:
-            _warm()
-    return status()
-
-
-def call(op: str, args: dict[str, Any]) -> Any:
-    """A request on the warm worker; the first one starts it and waits, and
-    one arriving while another starts it waits for that start, as long as
-    a start may take (OF-BLD-019 §7.R), then says in words why it cannot
-    run: the start's own error, or that the simulator is still starting."""
-    if _STATE["status"] != "ready":
-        start(background=False)
-    if _STATE["status"] == "starting":
-        _SETTLED.wait(timeout=START_TIMEOUT_S)
-    if _STATE["status"] == "starting":
-        raise WorkerError("the Proforma simulator is still starting; try again in a minute")
-    if _STATE["status"] != "ready":
-        raise WorkerError(f"the Proforma simulator could not start: {_STATE['error'] or 'it gave no reason'}")
-    return worker().call(op, args)
-
-
-def warm_on_start() -> bool:
-    return os.environ.get("OPENFERMENT_WARM_PROFORMA", "").strip() == "1"
-
+from .workers import WorkerError
 
 # ── The benchmark (§8.2) ────────────────────────────────────────────────
 
@@ -813,6 +745,28 @@ def _run_scenario(inputs, seed):
         "unitOrder": t.get("unitOrder") or [],
         "tableUnits": t.get("tableUnits") or {},
     }
+
+
+def plant_of(art) -> dict[str, Any]:
+    """What the worker rebuilds a run's base case from, read from the run's
+    basis alone, for its SFF file (ADR-003, engine/sff.py `export`): a
+    reference run's flowsheet, the benchmark's corn stover plant, or a shelf
+    run's flowsheet with its base values and, for a composite, its structure."""
+    if art.tool == REFERENCE:
+        return {"flowsheet": str(_named(art.inputs, "flowsheet"))}
+    if art.tool == BENCHMARK:
+        return {"flowsheet": "cornstover_benchmark"}
+    if art.tool == RUN:
+        from . import composite
+
+        flowsheet = str(_named(art.inputs, "flowsheet"))
+        _, base, _ = _specs(art.inputs)
+        plant: dict[str, Any] = {"flowsheet": flowsheet, "base": base}
+        if flowsheet == composite.FLOWSHEET:
+            plant["structure"] = composite.structure_of(art.inputs)
+        return plant
+    raise ScenarioRefused(f"{art.tool} is not a run of a flowsheet: a shelf run, a reference run or the benchmark is "
+                          "exported as SFF")
 
 
 # A run that carries its tables (OF-BLD-019 §2.1); a run stored before them

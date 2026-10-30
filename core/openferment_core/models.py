@@ -3472,3 +3472,182 @@ ProformaRunRequest.model_rebuild()
 ParamResolveRequest.model_rebuild()
 AnswerPlan.model_rebuild()
 ToolResult.model_rebuild()
+
+
+# ── SFF flowsheet records (alpha 2.0, ADR-003; engine/sff.py) ─────────────
+#
+# A flowsheet travels in and out as an SFF file (the PISCES Standard
+# Flowsheet Format). A record holds the file, what the vendored toolkit said
+# of it, the graph the UI draws, and where it came from. Every field below
+# the file is computed: the toolkit's verdicts in the worker, the graph and
+# the origin from the file itself.
+
+SFFOrigin = Literal["run", "library", "imported"]
+
+
+class SFFFinding(BaseModel):
+    """One result of the toolkit's validator that did not pass: the check's
+    id in its catalogue (validate/sff_checks.md), how severe a failure is,
+    whether it failed or was skipped, and its words."""
+
+    checkId: str
+    severity: str
+    status: str
+    message: str
+    path: str
+
+
+class SFFValidation(BaseModel):
+    """The toolkit's verdict against the schema it ships: valid unless the
+    schema gate or an error-severity check fails. `summary` counts every
+    result by severity and status; `findings` lists those that did not pass."""
+
+    valid: bool
+    schemaVersion: str
+    summary: dict[str, dict[str, int]] = Field(default_factory=dict)
+    findings: list[SFFFinding] = Field(default_factory=list)
+
+
+class SFFCriterion(BaseModel):
+    """One criterion of the toolkit's completeness registry, as it scored."""
+
+    id: str
+    category: str
+    criticality: str
+    weight: float
+    representable: bool
+    status: str
+    score: float | None = None
+    message: str
+    missing: list[str] = Field(default_factory=list)
+
+
+class SFFCompleteness(BaseModel):
+    """The toolkit's completeness report: how much of what BioSTEAM needs to
+    rebuild, simulate and cost the plant the file states. `score` weighs
+    every scored criterion; `representableScore` those the file's own SFF
+    version can state. `report` is the toolkit's plain-text rendering."""
+
+    score: float | None = None
+    representableScore: float | None = None
+    categories: dict[str, float | None] = Field(default_factory=dict)
+    criticalities: dict[str, float | None] = Field(default_factory=dict)
+    criteria: list[SFFCriterion] = Field(default_factory=list)
+    sffVersion: str | None = None
+    recipe: dict[str, Any] = Field(default_factory=dict)
+    report: str = ""
+
+
+class SFFTag(BaseModel):
+    """One of the toolkit's tags: whether the file earns it (None: not
+    evaluated; the reproducible tag needs the toolkit's conda harness, which
+    openFerment does not run), whether the file declares it, and what blocks it."""
+
+    earned: bool | None = None
+    declared: bool
+    blocking: list[str] = Field(default_factory=list)
+
+
+class SFFNode(BaseModel):
+    """A unit operation: a node of the graph. `rank` is its column when the
+    graph is drawn left to right, counted from the feeds."""
+
+    id: str
+    type: str
+    method: str | None = None
+    rank: int
+
+
+class SFFEdge(BaseModel):
+    """A stream from one unit to another: an edge of the graph."""
+
+    id: str
+    source: str
+    sink: str
+    massFlow: float | None = None
+
+
+class SFFBoundary(BaseModel):
+    """A stream crossing the plant's boundary: a feed enters `unit`, a
+    product leaves it. `name` is the display name the file's metadata gives
+    the feedstock or product it names; streams it does not name have none."""
+
+    id: str
+    unit: str
+    name: str | None = None
+    massFlow: float | None = None
+    price: float | None = None
+
+
+class SFFGraph(BaseModel):
+    """The flowsheet as the UI draws it, read from the file's units and
+    streams (`"None"` is the toolkit's boundary sentinel). A stream naming a
+    unit the file does not list is counted in `dangling`, never drawn."""
+
+    nodes: list[SFFNode] = Field(default_factory=list)
+    edges: list[SFFEdge] = Field(default_factory=list)
+    feeds: list[SFFBoundary] = Field(default_factory=list)
+    products: list[SFFBoundary] = Field(default_factory=list)
+    dangling: list[str] = Field(default_factory=list)
+    massFlowUnit: str = "kg/hr"
+
+
+class SFFFlowsheet(BaseModel):
+    """An SFF flowsheet record (GET /api/flowsheets/{id}).
+
+    `origin` is computed: `run` for a run of this project exported by
+    openFerment; `library` for a file whose sha256 is one of the toolkit's
+    reference flowsheets at the pinned commit, whichever door it came
+    through; `imported` for any other file. `sffVersion` is what the file
+    declares; `validation.schemaVersion` is the schema it was checked
+    against. `graph` is left out of a listing."""
+
+    id: str
+    title: str
+    origin: SFFOrigin
+    source: str
+    sffVersion: str | None = None
+    sha256: str
+    bytes: int
+    simulator: str | None = None
+    runArtifactId: str | None = None
+    libraryId: str | None = None
+    units: int
+    streams: int
+    validation: SFFValidation
+    completeness: SFFCompleteness
+    tags: dict[str, SFFTag] = Field(default_factory=dict)
+    graph: SFFGraph | None = None
+    toolkit: str
+    createdBy: str
+    createdAt: str
+
+
+class SFFLibraryEntry(BaseModel):
+    """One of the toolkit's reference flowsheets at the pinned commit
+    (GET /api/flowsheets/library): what the manifest says of it, and whether
+    this machine has fetched it."""
+
+    id: str
+    title: str
+    sffVersion: str | None = None
+    sha256: str
+    bytes: int
+    url: str
+    model: str | None = None
+    fetched: bool
+
+
+class SFFExportRequest(BaseModel):
+    """POST /api/flowsheets/export: the run whose base case is written as an
+    SFF file, and who asked."""
+
+    artifactId: str = Field(min_length=1, max_length=64)
+    by: str = Field(min_length=1, max_length=200)
+
+
+class SFFLibraryImport(BaseModel):
+    """POST /api/flowsheets/library/{id}: who keeps the reference flowsheet
+    in the project."""
+
+    by: str = Field(min_length=1, max_length=200)

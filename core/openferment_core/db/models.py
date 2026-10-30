@@ -179,10 +179,17 @@ candidates = Table(
 
 # ── Engine and studies (stages 4 and 5 fill these) ────────────────────────
 
+# An SFF flowsheet record (ADR-003, engine/sff.py): the record in `body`, the
+# file whole and as it came in `document`, and what a listing filters on.
+# `schema_version` is the SFF version the file declares ("unstated" when it
+# declares none); `origin` is run, library or imported; `sha256` is the file's.
 flowsheets = _scoped(
     "flowsheets",
     Column("schema_version", Text, nullable=False),
     Column("recipe", Text),
+    Column("origin", Text, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("document", Text, nullable=False),
 )
 
 runs = _scoped(

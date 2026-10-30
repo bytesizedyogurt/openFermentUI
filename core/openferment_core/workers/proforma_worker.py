@@ -61,6 +61,15 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 (`flowsheets/train.py`), simulated whole with its recycles,
                 and read: stream, unit and utility tables, the diagram or
                 the unit list, each unit's costs, the inlet as built
+    sff_export  a run's base case written as an SFF file (alpha 2.0,
+                ADR-003): a reference biorefinery built afresh inside
+                `package_defaults()` as its reference run builds it, or a
+                shelf flowsheet's warm plant set to the run's base values
+                (its solved price on the product while it is written, as
+                its tables are read); then validated, scored and tagged by
+                the vendored toolkit (`sff_toolkit.export_checked`)
+    sff_validate, sff_score  a file the service wrote, checked by the
+                vendored toolkit (`sff_toolkit`)
 
 NO WORKER STOPS IN A DEBUGGER. BioSTEAM 2.54.0's AeratedBioreactor answers a
 failure of its bubble-column correlation with a bare `breakpoint()`, which
@@ -114,7 +123,7 @@ from thermosteam.utils import chemical_cache
 
 from .. import flowsheets
 from ..flowsheets.shelf import TABLE_UNITS
-from . import serve
+from . import serve, sff_toolkit
 from .dot_names import stable_names
 
 _BUILT: dict[str, Any] = {}
@@ -1114,12 +1123,50 @@ def _op_train_run(args):
         }
 
 
+def _op_sff_export(args):
+    """A run's base case written as an SFF file at the path the service names,
+    with openFerment's block in its metadata, then checked (ADR-003). A
+    reference biorefinery is built afresh inside `package_defaults()`, as
+    its reference run builds it; a shelf flowsheet's warm plant is set to
+    the run's base values and simulated, as `run` sets its base case, and
+    its solved price stands on the product while the file is written."""
+    name = str(args["flowsheet"])
+    path = str(args["path"])
+    meta = args.get("metadata") or None
+    title = args.get("title") or None
+    try:
+        module = flowsheets.load(name)
+    except KeyError as e:
+        raise Refused(str(e)) from e
+    if hasattr(module, "load"):
+        with package_defaults():
+            b = module.load()
+            parts = module.parts(b)
+            return sff_toolkit.export_checked(parts["system"], parts.get("tea"), path, metadata=meta,
+                                              process_title=title)
+    structure = args.get("structure")
+    module, b = built(name, structure)
+    evaluate(name, {k: float(v) for k, v in (args.get("base") or {}).items()}, structure)
+    parts = module.parts(b) if hasattr(module, "parts") else {"system": b}
+    product, price = parts.get("product"), parts.get("price")
+    before = product.price if product is not None else None
+    try:
+        if product is not None and price is not None:
+            product.price = price
+        return sff_toolkit.export_checked(parts["system"], parts.get("tea"), path, metadata=meta, process_title=title)
+    finally:
+        if product is not None:
+            product.price = before
+
+
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
             "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
             "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design,
             "catalogue_specs": _op_catalogue_specs, "catalogue_unit_check": _op_catalogue_unit_check}
 
 HANDLERS["volatility"] = _op_volatility  # OF-BLD-020 §7.1
+HANDLERS.update(sff_export=_op_sff_export, sff_validate=sff_toolkit.op_validate,
+                sff_score=sff_toolkit.op_score)  # alpha 2.0, ADR-003
 HANDLERS.update(train_specs=_op_train_specs, flowsheet_unit_values=_op_flowsheet_unit_values,
                 train_run=_op_train_run)  # OF-BLD-020 §5.2
 

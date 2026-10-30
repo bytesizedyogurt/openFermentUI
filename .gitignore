@@ -79,6 +79,9 @@ core/data/artifacts/
 core/data/index/
 # OF-BLD-014 §6.2 — downloaded model files; THIRD_PARTY.md gives each its source and hash.
 core/data/models/
+# alpha 2.0 (ADR-003) — the SFF toolkit's reference flowsheets, fetched from the
+# pinned commit and checked against core/openferment_core/engine/sff_library.json.
+core/data/sff-library/
 # OF-BLD-014 §4.3 — retrieval questions and their scores; the data branch keeps them.
 core/data/rageval/
 # OF-BLD-014 E.10 — what the live runs saved; the data branch carries it between machines.

@@ -42,7 +42,10 @@ lit = ["sci-rag-kit==0.5.0", "fastembed==0.9.0"]
 # also serves fermOS's fits (§7.2).
 # OF-BLD-014 §10.1 — the MCP server that opens the tool registry to outside assistants.
 agent = ["mcp>=2.3,<3"]
-sim = ["cobra==0.32.1", "scipy", "biosteam==2.54.0", "biorefineries==2.35.1"]
+# alpha 2.0 (ADR-003) — the vendored SFF toolkit (core/vendor/pisces_sff/) runs
+# in the Proforma worker beside BioSTEAM and needs jsonschema and pyyaml
+# (pyyaml is also a base dependency, for the schema readers).
+sim = ["cobra==0.32.1", "scipy", "biosteam==2.54.0", "biorefineries==2.35.1", "jsonschema>=4.23", "pyyaml>=6"]
 
 [build-system]
 requires = ["hatchling"]

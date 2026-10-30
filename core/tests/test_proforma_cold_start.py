@@ -1,7 +1,7 @@
 """A second request while the simulator starts waits for that start
 (OF-BLD-019 §7.R, finding 6).
 
-`proforma.call` starts a cold worker and waits; a request arriving while
+`proforma.call` (engine/simulator.py's `call`) starts a cold worker and waits; a request arriving while
 another is starting it used to see `starting`, wait for nothing, and fail
 with "the Proforma simulator could not start: None". It now waits for the
 start in progress, bounded by the start's own timeout, and says in words
@@ -16,6 +16,7 @@ import time
 import pytest
 
 from openferment_core import proforma
+from openferment_core.engine import simulator
 from openferment_core.workers import WorkerError
 
 
@@ -39,8 +40,8 @@ class SlowStart:
 @pytest.fixture
 def cold(monkeypatch):
     def install(w):
-        monkeypatch.setattr(proforma, "_WORKER", w)
-        monkeypatch.setattr(proforma, "_STATE", {"status": "cold", "error": None})
+        monkeypatch.setattr(simulator, "_WORKER", w)
+        monkeypatch.setattr(simulator, "_STATE", {"status": "cold", "error": None})
         return w
     return install
 
@@ -84,7 +85,7 @@ def test_a_start_that_fails_is_told_in_its_own_words_to_both(cold):
 
 def test_a_start_longer_than_its_timeout_is_said_to_be_starting(cold, monkeypatch):
     cold(SlowStart(1.5))
-    monkeypatch.setattr(proforma, "START_TIMEOUT_S", 0.3)
+    monkeypatch.setattr(simulator, "START_TIMEOUT_S", 0.3)
     out = _two_calls()
     assert isinstance(out["b"], WorkerError)
     assert "still starting" in str(out["b"]) and "None" not in str(out["b"])

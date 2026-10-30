@@ -123,6 +123,9 @@ ALLOWED = {
     # service's modules. The workers and the flowsheets they run may use it
     # (worker side).
     "scipy": {"kinetics.py", "fermos.py"},
+    # alpha 2.0 (ADR-003): the vendored SFF toolkit imports BioSTEAM when it is
+    # imported, so it is imported in its worker module alone.
+    "pisces_sff": {"workers/sff_toolkit.py"},
 }
 # What runs in a worker's process, not the service's.
 WORKER_SIDE = ("workers/", "flowsheets/")

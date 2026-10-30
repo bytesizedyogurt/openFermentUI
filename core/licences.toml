@@ -123,3 +123,17 @@ licence = "no licence metadata"
 by = "Sean Creighton"
 date = 2026-10-15
 why = "thermosteam's dependency, pulled in by BioSTEAM in the sim extra and loaded in the Proforma worker; its metadata states no licence, and its repository (github.com/pyglet/pyglet) carries a BSD 3-clause LICENSE, read 2026-10-15."
+
+# Vendored code (alpha 2.0, ADR-003): source copied into the repository
+# unmodified at a pinned commit, with its LICENSE beside it. `pnpm
+# check:licences` holds each entry to its directory: the directory and its
+# LICENSE are there, and the licence is one `allowed` lists.
+
+[vendored.pisces_sff]
+licence = "MIT"
+source = "github.com/sustainability-software-lab/pisces-standard-flowsheet-format, the pisces_sff package (SFF schema 0.2.4)"
+revision = "e236e3250414f45cf9fd7b8b854f1afc67fc2cad"
+schema = "0.2.4"
+path = "core/vendor/pisces_sff"
+left_out = "export/exported_flowsheets/ and export/models/: the reference flowsheets and the model registry are fetched on demand from the same commit by engine/sff.py, each checked against the sha256 in core/openferment_core/engine/sff_library.json"
+why = "The PISCES Standard Flowsheet Format toolkit exports a BioSTEAM system to an SFF file, validates it and scores its completeness; it ships no packaging metadata, so it is vendored (execution prompt of 29 October 2026, §4.3 and §8.3). It runs in the Proforma worker alone."

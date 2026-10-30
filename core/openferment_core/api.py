@@ -91,6 +91,10 @@ from .models import (
     ProjectCreate,
     ReplayResult,
     ReviewDecision,
+    SFFExportRequest,
+    SFFFlowsheet,
+    SFFLibraryEntry,
+    SFFLibraryImport,
     ToolInfo,
     ToolResult,
     Usage,
@@ -665,6 +669,117 @@ def proforma_reference_run(flowsheet_id: str) -> dict:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {flowsheet_id}: {e}") from e
+
+
+# ── SFF flowsheet records (alpha 2.0, ADR-003; engine/sff.py) ────────────
+
+
+def _sff_refused(e: Exception, status: int = 422) -> HTTPException:
+    return HTTPException(status_code=status, detail=str(e))
+
+
+@app.get("/api/flowsheets", response_model=list[SFFFlowsheet])
+def flowsheets_listed() -> list[SFFFlowsheet]:
+    """The project's SFF records, newest first, without their graphs."""
+    from .engine import sff
+
+    return sff.listed(project_id=projects.current())
+
+
+@app.get("/api/flowsheets/library", response_model=list[SFFLibraryEntry])
+def flowsheets_library() -> list[SFFLibraryEntry]:
+    """The toolkit's reference flowsheets at the pinned commit, and which this
+    machine has fetched. A read: it fetches nothing and starts no worker."""
+    from .engine import sff
+
+    return sff.library()
+
+
+@app.post("/api/flowsheets/library/{file_id}", response_model=SFFFlowsheet)
+def flowsheets_library_import(file_id: str, request: SFFLibraryImport) -> SFFFlowsheet:
+    """One reference flowsheet fetched from the pinned commit (or found here),
+    its hash checked, checked by the toolkit in the worker, drawn and kept in
+    the project with origin `library`."""
+    from .engine import sff
+
+    try:
+        return sff.import_library(file_id, project_id=projects.current(), by=request.by)
+    except sff.FlowsheetNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+    except sff.SFFRefused as e:
+        raise _sff_refused(e) from e
+    except sff.LibraryUnavailable as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not check {file_id}: {e}") from e
+
+
+@app.post("/api/flowsheets/import", response_model=SFFFlowsheet)
+def flowsheets_import(file: UploadFile = File(...), by: str = Form(..., min_length=1, max_length=200)) -> SFFFlowsheet:
+    """An SFF file a person uploads: read, checked by the toolkit in the
+    worker (a file that fails validation is kept with its findings), drawn
+    and kept. 413 past the size an import takes; 422 for a file that is not
+    an SFF flowsheet."""
+    from .engine import sff
+
+    data = file.file.read(sff.MAX_FILE + 1)
+    if len(data) > sff.MAX_FILE:
+        raise HTTPException(status_code=413, detail=f"{file.filename} is larger than {sff.MAX_FILE // (1024 * 1024)} MB")
+    try:
+        return sff.import_sff(data, file.filename or "", project_id=projects.current(), by=by)
+    except sff.SFFRefused as e:
+        raise _sff_refused(e) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not check the file: {e}") from e
+
+
+@app.post("/api/flowsheets/export", response_model=SFFFlowsheet)
+def flowsheets_export(request: SFFExportRequest) -> SFFFlowsheet:
+    """A kept run's base case written as an SFF file by the toolkit in the
+    worker, checked, drawn and kept with origin `run`. 404 for a run the
+    project does not hold; 422 for an artifact that is not a run."""
+    from . import proforma
+    from .engine import sff
+
+    try:
+        art = artifacts.get(request.artifactId)
+    except artifacts.ArtifactNotFound as e:
+        raise HTTPException(status_code=404, detail=f"the project holds no run {request.artifactId}") from e
+    try:
+        plant = proforma.plant_of(art)
+        return sff.export(plant, project_id=projects.current(), run_artifact_id=art.id, by=request.by)
+    except (proforma.ScenarioRefused, sff.SFFRefused) as e:
+        raise _sff_refused(e) from e
+    except WorkerError as e:
+        raise HTTPException(status_code=409, detail=f"the run's base case could not be exported: {e}") from e
+    except (WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not export the run: {e}") from e
+
+
+@app.get("/api/flowsheets/{record_id}", response_model=SFFFlowsheet)
+def flowsheets_record(record_id: str) -> SFFFlowsheet:
+    """One SFF record, its graph included."""
+    from .engine import sff
+
+    try:
+        return sff.get(record_id, project_id=projects.current())
+    except sff.FlowsheetNotFound as e:
+        raise HTTPException(status_code=404, detail=f"the project holds no flowsheet {record_id}") from e
+
+
+@app.get("/api/flowsheets/{record_id}/file")
+def flowsheets_file(record_id: str):
+    """The SFF file as it is held, byte for byte as it came."""
+    from fastapi.responses import Response
+
+    from .engine import sff
+
+    try:
+        text = sff.document(record_id, project_id=projects.current())
+    except sff.FlowsheetNotFound as e:
+        raise HTTPException(status_code=404, detail=f"the project holds no flowsheet {record_id}") from e
+    return Response(content=text.encode("utf-8"), media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="{record_id}.sff.json"'})
 
 
 @app.get("/api/proforma/scenarios")

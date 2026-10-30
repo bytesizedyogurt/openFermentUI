@@ -16,16 +16,17 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 4, step 4.1** — the BioSTEAM adapter and SFF (ADR-003, ADR-004): read the
-   stage 4 text of the execution prompt (§10) and §8.3 first.
+4. **Next step: stage 4, step 4.2** — `engine/library.py`, the library plant runner, and the shelf
+   regenerated from discovery (ADR-004; execution prompt §8.4). Step 4.1 (the SFF toolkit, its
+   worker ops, `engine/sff.py`) is committed; ADR-003's Implementation section says what it built.
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 4 — the BioSTEAM adapter and SFF — is next. Stage 3 is complete: 3.1 wired Sci RAG Kit in
-(the collectors, Intake, `/rag`, its MCP server), 3.2 moved extraction, anchoring, BioRepo and
-Witness onto the kit's text, and 3.3 added Search, cited answers, the retrieval report and the
-gate over the demo corpus. Stages 0 to 2 are complete (the tag push waits on the owner; see
+Stage 4 — the BioSTEAM adapter and SFF — is in progress: 4.1 (the vendored SFF toolkit, its
+worker ops, SFF records, the reference corpus fetched and hashed) is done; 4.2 (the library plant
+runner), 4.3 (the openFerment cellulosic ethanol flowsheet) and 4.4 (runs on `Quantity` with
+origins, the gate) remain. Stages 0 to 3 are complete (the tag push waits on the owner; see
 Blockers).
 
 ## Last green runs
@@ -49,6 +50,9 @@ Blockers).
 | 2026-10-30 08:51 | `test:core` with 3.2; `test:lit`; `pnpm smoke` | 2003 passed, 2 skipped, 133 deselected; 5 passed; 11 of 11 | 5 min 5 s | 3.2 |
 | 2026-10-30 09:16 | Stage 3 gate in a clean worktree: `test:core`; `test:lit` (the demo corpus gate); `test:sim` | 2008 passed, 2 skipped, 138 deselected; 10 passed; 102 passed, 2046 deselected | 5 min 37 s; 15 s; 4 min 37 s | 3.3 |
 | 2026-10-30 09:16 | Stage 3 gate: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile; no full-text cache left | all passed; 11 of 11 rail entries open | | 3.3 |
+| 2026-10-30 09:22 | `test_sff_sim.py` (`sim`: a reference run and a shelf run exported, validated and scored; two reference files fetched from the pin, imported and drawn) | 5 passed | 40 s | 4.1 |
+| 2026-10-30 09:43 | `test:core` with 4.1 | 2038 passed, 2 skipped, 143 deselected | 5 min 23 s | 4.1 |
+| 2026-10-30 09:48 | `test:sim` with 4.1 | 107 passed, 2076 deselected | 4 min 31 s | 4.1 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -83,6 +87,9 @@ Blockers).
 | §8.2, stage 3.2 | Extraction anchors to the kit's chunks as passages (`p<index>`), a candidate's `sectionId` naming one; neighbouring passages of a section share the kit's overlap, so a sentence may stand in two and either anchors | The kit's chunks are its text; rebuilding sections from them would undo the overlap by guesswork, since the overlap's whitespace is the kit's own |
 | §6.2, stage 3.2 | Witness scores a run against the values reviewers typed (a gold value or a correction on a decision), where alpha 1.0 scored it against the seed's curated records | The seed is gone (ADR-010); a value a person typed is independent of the extractor, and one accepted as the extractor wrote it is not |
 | stage 3.2 | The overlay carries every held document's passages on every load, as the fetched papers' sections were | The reader, the review card and Witness read a paper's sections from the store today; reading them on demand is stage 7's |
+| §8.3, stage 4.1 | `sff_export` is an op of its own that rebuilds a run's base case from the run's basis, where "every engine run writes an SFF file" could fold it into the run | A replay changes nothing stored and must reproduce the run's output hash; a file written inside the run would do neither (ADR-003, Implementation) |
+| §8.3, stage 4.1 | A file that fails validation under schema 0.2.4 is kept as a record with its findings; only a file with no readable graph is refused | Seventeen of the toolkit's eighteen reference files declare SFF 0.0.3 and fail the 0.2.4 schema gate |
+| §7.2, stage 4.1 | The Proforma worker's manager moved from `proforma.py` to `engine/simulator.py` (re-exported by `proforma`); engine functions take the project id from their caller | The engine reaches the worker without importing `proforma`, and imports what §7.2 lists, `projects` not among them |
 | §10 stage 1.1 | Section 5 runs in the order 5.4 + 5.3 (one commit), 5.1, 5.2, 5.5, 5.6, 5.7 | `demo.py`, `retrieve.py` and `rageval.py` were the heaviest users of the program machinery and build their fixtures through each other; deleting them first spares edits to files deleted one step later, and a commit between 5.4 and 5.3 could not be green |
 | §5.3 | `demo.py`'s stand-in evaluator and stand-in records moved to `core/tests/standins.py` (test-only) | Thirteen kept test files (Proforma, fermOS, params, pureOS, tools) test binding, override, ceiling and run-contract rules on them. Stage 4 replaces them with fixtures read from library plants (debt recorded below) |
 | §5.4 | `search_passages` stays registered, with one seam (`tools/passages.py: search`) that answers "no literature index exists yet" | Postdoc's quote validation and its tests keep the passage contract; stage 3 fills the seam with Sci RAG Kit. The whole-sentence rule moved to `quotes.py` |
@@ -128,6 +135,8 @@ Blockers).
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run: this container has no Docker daemon, so stages 2 and 3 run on the distribution's PostgreSQL 16 with pgvector 0.6.0. CI's verify runs the same image as a service from 3.1 on (the workflow had no database through stage 2, so verify failed in CI on the stage 2 pushes) | the first CI run of 3.1, or the owner's machine |
 | The kit's MCP server (`literature_mcp.py`) has run only as an import here: the session's MCP clients start from `.mcp.json` at session start | the next session, or the owner's Claude Code |
 | `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7 |
+| Runs do not yet write their SFF file on their own: a run is exported through `POST /api/flowsheets/export` | stage 4.4, when runs move to the `runs` table |
+| `docs/api/workers.md` gives the SFF ops' requests and results in full and the other ops by name | the stage 4 gate |
 
 ## Owner questions (execution prompt §13) and the defaults taken
 
@@ -325,3 +334,25 @@ Blockers).
   passage and a gold decision on it is accepted and scored by Witness, and each project sees
   its own documents alone.
 
+### Stage 4 — 2026-10-30
+
+- 4.1 The SFF toolkit (ADR-003, Implementation). Vendored at `core/vendor/pisces_sff/` (`e236e32`,
+  MIT, schema 0.2.4) without its exported flowsheets and model recipes, recorded in
+  `core/licences.toml` (`[vendored.pisces_sff]`, which `check:licences` now verifies and lists);
+  `jsonschema` and `pyyaml` in the `sim` extra. `workers/sff_toolkit.py` imports it in the
+  Proforma worker alone and turns the toolkit's answers into JSON; the worker answers
+  `sff_export` (a reference plant built afresh in `package_defaults()`, or a warm shelf plant set
+  to the run's base values with its solved price on the product), `sff_validate` and
+  `sff_score`. `engine/` begins: `simulator.py` (the worker's manager, moved from `proforma.py`)
+  and `sff.py`: the `SFFFlowsheet` record in `flowsheets` (migration 0002: `origin`, `sha256`, the
+  file as `document`), `import_sff` (read, checked in the worker, drawn, kept; invalid files kept
+  with their findings), `export` (a run's base case, with `metadata.openferment`), the graph
+  (nodes ranked left to right, edges, feeds, products, dangling streams, either unit style), and
+  the reference corpus: `sff_library.json` names the eighteen files and the registry with their
+  hashes, `fetch` brings one from the pinned commit and refuses a hash mismatch,
+  `library_flowsheets()` loads them as `library` records, `import_library` keeps one. Routes
+  under `/api/flowsheets`. Docs: `docs/api/sff.md`, `docs/api/workers.md`. Tests: `test_sff.py`
+  (offline, the worker and GitHub stood in) and `test_sff_sim.py` (`sim`: the corn stover
+  reference run and an ethanol shelf run exported, valid, scored, and the same base case as
+  their runs read; `SF_BST_01` fetched, imported, valid and drawn with 71 units; `SF_BST_15` kept
+  invalid with its findings and drawn).

@@ -1,6 +1,6 @@
 """Alembic's environment for the `openferment` schema (ADR-001).
 
-Run through `python -m openferment_core.db migrate` (`pnpm db:migrate`), which
+Run through `python -m openferment_core.migrations migrate` (`pnpm db:migrate`), which
 hands over the address in `config.attributes["url"]`. The version table lives
 in the schema it versions, so Sci RAG Kit's history in `sci_rag` and ours
 never meet, and autogenerate compares our schema alone.
