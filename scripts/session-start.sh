@@ -12,7 +12,10 @@
 #      by git, and the value is never printed.
 #   2. pnpm install --frozen-lockfile
 #   3. uv sync --all-extras, in core/
-#   4. pnpm ready, whatever it exits with
+#   4. the database (ADR-001): when PostgreSQL answers on 127.0.0.1 and
+#      core/.env names none, the development address (compose.yaml's) joins
+#      core/.env; then pnpm db:migrate, whatever it exits with
+#   5. pnpm ready, whatever it exits with
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -48,6 +51,13 @@ pnpm install --frozen-lockfile || die "pnpm install failed"
 
 say "uv sync --all-extras"
 (cd core && uv sync --all-extras) || die "uv sync failed"
+
+say "the database"
+if [ -e core/.env ] && ! grep -q '^OPENFERMENT_DATABASE_URL=' core/.env && command -v pg_isready >/dev/null && pg_isready -q -h 127.0.0.1; then
+  printf 'OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev\n' >> core/.env
+  echo "OPENFERMENT_DATABASE_URL added to core/.env (the development address)"
+fi
+pnpm --silent db:migrate || echo "the database is not migrated; pnpm ready says what is missing"
 
 say "pnpm ready"
 pnpm --silent ready || true

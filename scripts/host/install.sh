@@ -51,6 +51,9 @@ else
   echo "copy core/.env.example to core/.env and add one (set a spend cap in the Anthropic console first)."
 fi
 
+say "PostgreSQL, the one store"
+ensure_database
+
 "$REPO/scripts/host/deploy.sh" --no-pull --no-restart
 
 say "Power: never sleep, restart after a power failure, wake for network access"

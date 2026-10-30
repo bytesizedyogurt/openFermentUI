@@ -2,13 +2,14 @@
 # Bring the Mini up to main and restart the service (OF-BLD-012 §B.7).
 # Run as yourself, from anywhere; it asks for your password once, to restart.
 #
-#   scripts/host/deploy.sh                    pull, install, build, restart, check health
+#   scripts/host/deploy.sh                    pull, install, migrate, build, restart, check health
 #   scripts/host/deploy.sh --verify           the same, with the full offline gate first
 #
-# Guild writes review decisions into core/data/biorepo.json in this checkout,
-# a committed file until stage 2 of alpha 2.0 moves them into PostgreSQL. A
-# pull over uncommitted decisions could fail halfway, so deploy stops until a
-# person commits and pushes them.
+# Since alpha 2.0 every record lives in PostgreSQL (ADR-001), and each deploy
+# brings the database to the newest schema. core/data/biorepo.json holds the
+# review decisions made here before then; the service no longer reads it, so
+# decisions still in it are carried into a project first (`pnpm
+# db:import-alpha1`), and deploy stops until they are.
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
@@ -31,12 +32,12 @@ if [ -n "$changed" ] && [ "$changed" != "core/data/biorepo.json" ]; then
   die "uncommitted changes in: ${changed//$'\n'/ }. A deploy pulls main over them. Commit or stash them first."
 fi
 if [ -n "$changed" ]; then
-  die "core/data/biorepo.json holds review decisions made in Guild on this machine that are not committed yet. Commit and push it first: git add core/data/biorepo.json && git commit -m 'Guild decisions' && git push"
+  die "core/data/biorepo.json holds review decisions made on this machine before alpha 2.0, which the service no longer reads. Carry core/data into a project first: pnpm db:import-alpha1 --name 'Alpha 1.0 records' --by '<your name>'. Once the project reads right, put the file back as committed (git checkout -- core/data/biorepo.json) and deploy again"
 fi
 
 if [ "$PULL" = 1 ]; then
   say "Pulling main"
-  git pull --ff-only || die "this checkout and GitHub have diverged, usually over decisions committed here and not yet pushed. Push them, or rebase onto main, then deploy again"
+  git pull --ff-only || die "this checkout and GitHub have diverged, usually over commits made here and not yet pushed. Push them, or rebase onto main, then deploy again"
 fi
 
 say "Installing packages"
@@ -45,6 +46,10 @@ pnpm install --frozen-lockfile
 # and Proforma, rag for the hybrid lane, agent for the MCP server), and a
 # sync is exact, so naming one extra would remove the others.
 (cd core && uv sync --frozen --all-extras)
+
+say "Bringing the database to the newest schema"
+(cd core && .venv/bin/python -m openferment_core.db migrate) ||
+  die "the migration did not run; the lines above say why. Is PostgreSQL running, and does core/.env name it (OPENFERMENT_DATABASE_URL)?"
 
 if [ "$VERIFY" = 1 ]; then
   say "Running the offline gate (includes the build)"

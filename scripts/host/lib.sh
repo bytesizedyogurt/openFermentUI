@@ -91,3 +91,35 @@ has_key() {
     grep -qE '^ANTHROPIC_API_KEY=sk-ant-' "$REPO/core/.env" &&
     ! grep -qE '^ANTHROPIC_API_KEY=sk-ant-\.\.\.\s*$' "$REPO/core/.env"
 }
+
+# A setting from core/.env, by name, for the names that are not the key
+# (OPENFERMENT_DATABASE_URL, OPENFERMENT_PROJECT): the environment's value
+# when it has one, else the file's last line for it. Never reads the key.
+env_setting() {
+  local name="$1"
+  if [ -n "${!name:-}" ]; then
+    printf '%s' "${!name}"
+  elif [ -f "$REPO/core/.env" ]; then
+    grep -E "^$name=" "$REPO/core/.env" | tail -1 | cut -d= -f2-
+  fi
+}
+
+# PostgreSQL, the one store (alpha 2.0, ADR-001): Homebrew's postgresql@17
+# with pgvector, answering on this Mac, a database named `openferment`, and
+# its address in core/.env. Makes what is missing and says what it made.
+ensure_database() {
+  command -v pg_isready >/dev/null ||
+    die "PostgreSQL is not installed. Run: brew install postgresql@17 pgvector && brew services start postgresql@17"
+  pg_isready -q -h 127.0.0.1 ||
+    die "PostgreSQL is not answering on 127.0.0.1. Run: brew services start postgresql@17"
+  if [ -n "$(env_setting OPENFERMENT_DATABASE_URL)" ]; then
+    echo "core/.env names the database."
+    return
+  fi
+  psql -h 127.0.0.1 -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'openferment'" | grep -q 1 ||
+    createdb -h 127.0.0.1 openferment || die "createdb openferment failed; the message above says why"
+  printf 'OPENFERMENT_DATABASE_URL=postgresql://%s@127.0.0.1:5432/openferment\n' "$(id -un)" >> "$REPO/core/.env"
+  chmod 600 "$REPO/core/.env"
+  echo "Database openferment is ready, and its address is in core/.env."
+}
+

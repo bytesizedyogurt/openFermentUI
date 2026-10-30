@@ -86,7 +86,11 @@ extension is created once in `public` by the migrate step.
   and the `openferment-data` convention are deleted (ADR-010).
 - The browser's Durable tier keeps UI preferences only.
 - `ready.py` gains database, schema, pgvector and embedder rows; `install.sh` and `deploy.sh` gain
-  the PostgreSQL steps and the alembic upgrade.
+  the PostgreSQL steps and the alembic upgrade. (Stage 2: the data row and both steps; pgvector
+  and the embedder arrive with the kit at stage 3.)
+- A live instance's alpha 1.0 files are carried into a new project by `pnpm db:import-alpha1`,
+  whole or not at all, the files left in place; `core/data/biorepo.json` stays tracked until the
+  owner has run it, because a pull that deleted it would take uncarried decisions with it.
 
 ## Revisit condition
 

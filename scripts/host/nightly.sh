@@ -9,8 +9,18 @@
 # the new files on its next request; no restart. Exits non-zero when either
 # batch failed, so the log says so.
 set -uo pipefail
-cd "$(dirname "$0")/../../core" || exit 1
+# shellcheck source=lib.sh
+source "$(dirname "$0")/lib.sh"
+cd "$REPO/core" || exit 1
 PY=.venv/bin/python
+
+# The database and the project the night's extraction writes into (ADR-001,
+# ADR-005), from core/.env when the environment lacks them; nothing else is
+# read from that file here, and each command reads the key itself.
+for name in OPENFERMENT_DATABASE_URL OPENFERMENT_PROJECT; do
+  value="$(env_setting "$name")"
+  [ -n "$value" ] && export "$name=$value"
+done
 
 echo "── $(date '+%Y-%m-%d %H:%M:%S') nightly intake"
 
@@ -37,7 +47,12 @@ EOF
 
 status=0
 "$PY" -m openferment_core.intake --all || status=$?
-"$PY" -m openferment_core.extract --all || status=$?
+# Candidates belong to a project: the one OPENFERMENT_PROJECT names.
+if [ -n "${OPENFERMENT_PROJECT:-}" ]; then
+  "$PY" -m openferment_core.extract --all || status=$?
+else
+  echo "no OPENFERMENT_PROJECT in core/.env, so tonight's extraction waits: name the project it extracts into"
+fi
 # Every fetched model file against its pinned hash, and the ten newest
 # artifacts recomputed and compared with what was kept. A difference is
 # reported and fails the night; nothing is rewritten.

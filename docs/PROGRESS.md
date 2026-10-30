@@ -16,18 +16,18 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 2, step 2.4 (the gate)** — the restart test (a real service process
-   stores, stops, starts and serves the same rows); `python -m openferment_core.db import-files`
-   for a live instance's alpha 1.0 stores; `ready.py`, `install.sh`, `deploy.sh` and `nightly.sh`
-   with PostgreSQL; then `test:core`, `test:sim`, typecheck, build and the smoke in a clean
-   worktree, and push.
+4. **Next step: stage 3, step 3.1** — Sci RAG Kit as the literature layer: the `lit` extra
+   (`sci-rag-kit==0.5.0` with `fastembed`), the kit's role (`sci_rag`, search path `sci_rag,
+   public`) and its vendored migrations in `db:migrate`, `literature/kit.py` (settings bridge,
+   one `RagService` with a local FastEmbed embedder injected, generation through `llm.py`),
+   the collectors, Intake wired, the kit's REST at `/rag` and its MCP in `.mcp.json`.
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 2 — PostgreSQL and the record stores. 2.1 (the `db/` package), 2.2 (projects and request
-scoping) and 2.3 (every store on its table; the browser's scientific state on the service) are
-committed; 2.4, the gate, is next. Stage 1 is
+Stage 3 — Sci RAG Kit — is next. Stage 2 is complete: 2.1 to 2.4 put every store on PostgreSQL,
+scope every request to a project, move the browser's scientific state to the service, and passed
+the gate in a clean worktree. Stages 0 and 1 are complete (the tag push waits on the owner). Stage 1 is
 complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Blockers).
 
 ## Last green runs
@@ -45,6 +45,8 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | 2026-10-30 06:10 | Stage 1 gate: `test_no_seed.py`, `test:sim`, `pnpm smoke` | 45 passed; 102 passed, 1916 deselected; 11 of 11 rail entries open | 4 s; 3 min 59 s; 22 s | 1.6 |
 | 2026-10-30 06:25 | `test:core` with 2.1 | 1905 passed, 2 skipped, 128 deselected | 4 min 33 s | 2.1 |
 | 2026-10-30 07:16 | `test:core` with 2.3 | 1947 passed, 2 skipped, 128 deselected | 4 min 25 s | 2.3 |
+| 2026-10-30 07:43 | Stage 2 gate in a clean worktree: `test:core`; the store rules with the restart test; `test:sim` | 1952 passed, 2 skipped, 128 deselected; 258 passed; 102 passed, 1980 deselected | 4 min 28 s; 28 s; 4 min 0 s | 2.4 |
+| 2026-10-30 07:43 | Stage 2 gate: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile | all passed; 11 of 11 rail entries open in the project | | 2.4 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -84,12 +86,14 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | §5.5, stage 2 | The browser keeps an outbox: review decisions, Guild changes and project rows the service has not yet acknowledged, saved in IndexedDB until sent; and three preferences, who is deciding, who is acting in Guild, and the lessons finished here | A deposition at the bench must survive a reload while the service is away (the reason Durable state existed); the outbox holds nothing the service already has |
 | §7.4, stage 2 | A Live conversation is kept whole in `conversations.body`; `turns` and `tool_calls` wait for stage 6 | Stage 6 gives Postdoc its memory on the server and fills them |
 | §7.4, stage 2 | `project_state.py` checks a page's row for kind, id and shape, and keeps its content as sent | The content's rules run where they always ran; stage 7 generates the page's types from Pydantic models |
+| §5.5, stage 2 | `core/data/biorepo.json` stays tracked, and nothing reads it | Removing it from git would delete a live instance's working copy on its next pull, decisions and all, before they could be carried into a project (§11.1). `pnpm db:import-alpha1` carries it; it leaves git once the owner says the live instance's import read right |
 | §4, §5.2 | The record fields, the vocabulary (carbon sources and unit operations) and the unit tables live in `core/openferment_core/schema/` (`fields.yaml`, `vocabulary.yaml`, `units.json`), with no range and no example value; `src/data/ontology.ts` and `vocabulary.ts` mirror them, held equal by `test_schema.py` through the fixture `pnpm export:unit-fixtures` writes. BioRepo's typed-value refusal is renamed `range` → `unit`; `pyyaml` is a direct dependency | The service needs the fields without the TypeScript seed; a range is a number about a field (ADR-010) |
 
 ## Blockers
 
 | Since | Blocker | Next command |
 |---|---|---|
+| 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. Nothing is lost by waiting: the service no longer writes them | On the Mini: `brew install postgresql@17 pgvector && brew services start postgresql@17`; `scripts/host/install.sh` (makes the database `openferment` and names it in `core/.env`; when `core/data/biorepo.json` holds uncommitted decisions, the old deploy asks to commit and push them first, which keeps them); then `pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, and `OPENFERMENT_PROJECT=<the id it prints>` in `core/.env` for the nightly extraction |
 | 2026-10-30 | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0` ends with "unexpected disconnect while reading sideband packet", lightweight and annotated alike. The tag exists in this container only. Commit `d19224f` stays reachable as an ancestor of `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git push origin alpha-1.0` |
 
 ## Known debts (each names the stage that pays it)
@@ -110,6 +114,8 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | `test_proforma.py` holds the package's own regression values and this build's benchmark price to test the parser | stage 4 (A4 review) |
 | `core/tests/standins.py` keeps a closed-form ethanol evaluator, stand-in yeast records and `STANDIN_THEORETICAL` | stage 4 (with the row above on stand-ins) |
 | `pnpm smoke` opens the rail entries and checks nothing more; alpha 1.0's smoke also walked review, deposition, the runs and the redirects against the service double | stage 7 extends it over the real service |
+| `test_biorepo.py::test_the_committed_file_is_the_model_and_starts_empty` holds the shape of a tracked file nothing reads | when `core/data/biorepo.json` leaves git (owner action above) |
+| The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run only as `bash -n` here: this container is not a Mac | the owner's first install on the Mini |
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run: this container has no Docker daemon, so stage 2 runs on the distribution's PostgreSQL 16 | CI, or the owner's machine |
 | `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7 |
 
@@ -245,3 +251,13 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
   IndexedDB until the service acknowledges it (`src/lib/projectState.ts`, `pnpm check:state`);
   a snapshot from before alpha 2.0 is carried to the open project once; a browser reset never
   takes back a row on the service. `check:tools` reads row writes as it read file writes.
+- 2.4 The gate's pieces. `test_restart.py`: a real service process on a committed database makes a
+  project, keeps a train, a lock and a Guild lead through the API, stops; a second process serves
+  every row as it was (11 s). `import_alpha1.py` (`pnpm db:import-alpha1 --name --by [--data]`)
+  carries an alpha 1.0 data directory into a new project, read and checked first, written in one
+  transaction, the files left in place; `test_import_alpha1.py`. Host scripts: `lib.sh` gains
+  `env_setting` (reads `core/.env` by name, never the key) and `ensure_database`; `install.sh`
+  makes the database and names it; `deploy.sh` migrates on every deploy and sends decisions
+  still in `core/data/biorepo.json` to the import; `nightly.sh` reads the database and the
+  project, and extraction waits when no project is named. `session-start.sh` names the
+  development database when PostgreSQL answers, and migrates.
