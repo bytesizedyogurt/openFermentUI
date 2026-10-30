@@ -15,6 +15,7 @@
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:licences": "cd core && uv run --all-extras python ../scripts/check-licences.py",
     "check:tools": "cd core && uv run --all-extras python ../scripts/check-tools.py",
+    "gen:tools": "cd core && uv run --all-extras python ../scripts/gen-tools.py",
     "check:plan": "node scripts/check-plan.mjs",
     "export:unit-fixtures": "tsx scripts/export-unit-fixtures.ts",
     "export:competence-fixtures": "tsx scripts/export-competence-fixtures.ts",

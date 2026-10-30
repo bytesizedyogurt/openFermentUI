@@ -1,7 +1,9 @@
 // Rendering an AnswerPlan (OF-BLD-007 §8).
 //
-// THIS COMPONENT IS WHERE RULE 1 BECOMES VISIBLE. The model wrote the sentence
-// and cited a record; every number on this screen is read out of that record by
+// THIS COMPONENT IS WHERE ADR-006 BECOMES VISIBLE. The model wrote the sentence
+// and cited a record; every number on this screen is read out of that record, or
+// out of a claim's typed values (a computed value or a record the service read,
+// or the model's own estimate, marked as one with the model that made it), by
 // the code below. Nothing here prints model prose containing a quantity,
 // because the validator guarantees the prose has none:
 //
@@ -12,7 +14,18 @@
 // The provenance tick reuses the existing visual language rather than inventing
 // a fourth one — a claim is evidence, and evidence in this system is ticked.
 import { AlertTriangle, ExternalLink, HelpCircle, Quote, SearchX } from 'lucide-react';
-import type { AnswerPlan, Claim, CoverageMap, ModuleRow, Evidence, ExtractionRecord, Paper, Passage, RunbookDraft } from '@/data/types';
+import type {
+  AnswerPlan,
+  Claim,
+  ClaimValue,
+  CoverageMap,
+  ModuleRow,
+  Evidence,
+  ExtractionRecord,
+  Paper,
+  Passage,
+  RunbookDraft,
+} from '@/data/types';
 import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
@@ -47,6 +60,46 @@ function RecordValue({ record }: { record: ExtractionRecord }) {
         {record.quote}
       </div>
     </Tick>
+  );
+}
+
+/**
+ * ADR-006 — the numbers a claim states, each with where it came from, as the
+ * validator typed them. A model's estimate is marked as one wherever it
+ * appears: the model that made it and what it rests on, under the assumed mark.
+ */
+function ClaimValues({ values }: { values: ClaimValue[] }) {
+  if (!values.length) return null;
+  return (
+    <ul className="mt-2 space-y-1" data-testid="claim-values">
+      {values.map((v) => {
+        const q = v.quantity;
+        const o = q.origin;
+        const range = q.low != null && q.high != null ? ` (${fmt(q.low)} to ${fmt(q.high)})` : '';
+        return (
+          <li key={`${v.label}-${v.source ?? 'estimate'}`} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-caption text-ink-soft">{v.label}</span>
+            <span className="font-num text-reading text-ink">
+              {fmt(q.value)} {q.unit}
+              {range}
+            </span>
+            {o?.kind === 'model-estimate' ? (
+              <span className="inline-flex flex-wrap items-baseline gap-1 text-caption text-ink-soft">
+                <ProvenanceBadge p="assumed" compact />
+                <span>
+                  an estimate by {o.by}
+                  {o.note ? `, resting on ${o.note}` : ''}
+                </span>
+              </span>
+            ) : (
+              <span className="font-num text-caption text-ink-soft">
+                {o?.kind === 'record' ? 'record' : 'computed'} {v.source}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -129,6 +182,8 @@ function ClaimRow({
           {/* The claim, exactly as written. It contains no number — that is
               enforced server-side, not hoped for here. */}
           <p className="text-reading text-ink">{claim.text}</p>
+
+          <ClaimValues values={claim.values ?? []} />
 
           {cited.length > 0 && (
             <div className="mt-2 space-y-1.5">

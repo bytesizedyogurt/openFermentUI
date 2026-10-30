@@ -103,3 +103,30 @@ task (development plan §8).
 - Unchanged on purpose: `BasisSource` and `BasisInput` gain no field, so every artifact id stays
   what it was (§7.4); ParamOrigin and the sourceRule keep the word `assumption` for a person's
   value, the name ADR-006 gives it being `person-assumption` in `Origin`.
+
+### 6.2 (2026-10-30): numbers in claims and in tool inputs
+
+- A claim carries its numbers in `values` (`models.ClaimValue`: a label in words, a `Quantity`
+  with its origin, and the id it was read from). The plan names each value's one source: a computed
+  value a tool returned (`evidenceId`), a record a tool returned (`recordId`), or the answering
+  model's estimate (`estimate`: a finite value, a unit, a low and a high when it has a range, and
+  in `basis` what it rests on, in words). `validate.claim_values` reads the number of an evidence or
+  a record from it, never from the plan, writes an estimate's origin as `model-estimate` with the
+  model that wrote the plan and the moment, and cites the evidence or record a value is read from
+  with the claim. A claim stating an estimate is `assumed`. A value with no single source, an id no
+  tool returned, a label or a basis holding a number, or an estimate outside its own range drops
+  its claim, counted with its reason; text with a bare number is dropped as before.
+- A tool's input carries a number only inside a quantity, an object of `value` and a string
+  `unit` (and `low` and `high`), standing where the tool's input schema asks for one
+  (`tools.quantity_paths`; `study_scenario`'s values alone today): `tools.numbers_in` lets those
+  through and refuses every other number but `k` and `limit`, so a module write's `fields` that
+  hold a value and a unit in words stay words. The registry writes each quantity's origin from who called
+  (`ToolContext.author`, `tools.stamped`): the answering model's estimate with its id, the person
+  `POST /api/tools/{name}?by=` names, or, over MCP, an estimate by `an assistant over MCP`; it keeps
+  the note the caller wrote and nothing else of what the caller put there, and refuses a quantity
+  nobody can be named for. A study scenario's values arrive this way (`study_scenario`).
+- The prompt's rules say so (5, 8, 9, 18 to 20), the plan schema carries `values`, and the answer
+  screen shows each value with where it came from, an estimate under the assumed mark with the
+  model that made it and what it rests on (`AnswerPlanView`'s `ClaimValues`).
+- `check:tools` rule 6 holds every tool's input schema to the same line: a number at the count
+  fields or a quantity's value and range, and none at all in a fermOS or pureOS tool (E.4‴).

@@ -174,6 +174,7 @@ SIMULATE_TOOL = register(
         input_model=FermosSimulateInput,
         run=_simulate,
         strict=False,
+        writes=True,
     )
 )
 
@@ -221,5 +222,6 @@ VESSEL_TOOL = register(
         input_model=FermosVesselInput,
         run=_vessel,
         strict=False,
+        writes=True,
     )
 )

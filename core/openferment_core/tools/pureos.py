@@ -166,6 +166,7 @@ BUILD_TOOL = register(
         input_model=PureosBuildInput,
         run=_build,
         strict=False,
+        writes=True,
     )
 )
 

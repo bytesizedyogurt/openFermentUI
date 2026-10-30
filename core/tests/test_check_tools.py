@@ -172,6 +172,10 @@ def test_rule_6_names_a_numeric_field_in_a_fermos_tools_input_and_lets_the_top_l
     out = _check(root)
     assert out.returncode == 1, out.stdout + out.stderr
     errors = [line.strip()[2:] for line in out.stdout.splitlines() if line.strip().startswith("- ")]
+    # A field planted in a tool's input is a schema docs/TOOLS.md does not hold yet (rule 5).
+    stale = [e for e in errors if e.startswith("docs/TOOLS.md differs from what the registry writes")]
+    errors = [e for e in errors if e not in stale]
+    assert len(stale) == 1, out.stdout
     where = sorted(e.split(" at ", 1)[1].split(":", 1)[0] for e in errors)
     assert where == ["byKey.additionalProperties.items", "hours", "limit.additionalProperties"], out.stdout
     assert all(e.startswith("fermos_simulate's input schema holds a numeric field at ") and "(E.4‴)" in e

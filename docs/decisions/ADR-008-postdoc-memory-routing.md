@@ -52,6 +52,27 @@ thirty-four.
   The stream waits on the event loop and holds no thread. The UI's cards over these events are
   stage 7's.
 
+### 6.2 (2026-10-30)
+
+- Nine tools join the registry, forty-three in all: `engine_plants`, `engine_parameters`,
+  `engine_run` and `engine_report` over the library shelf and the project's engine runs (a run's
+  numbers are evidence ids on its artifact, `<artifact id>:<block>.<key>`); `study_scenario`,
+  `study_compare` and `study_read` over its studies (a comparison's changes are evidence ids on
+  its artifact); `literature_sources` and `literature_document` over the documents it holds (a
+  section's passages are quoted as `search_passages`' are). The writes go through
+  `tools/writes.py` (`run_engine`, `make_scenario`, `make_comparison`), audited as their caller's.
+- Every tool carries a project scope and `tools.run` runs it in `ToolContext.project` when one is
+  named (A5). The MCP server acts in the project `--project` names, else `OPENFERMENT_PROJECT`, and
+  a server started in none answers every call with the words to start it in one.
+- `docs/TOOLS.md` is written from the registry by `pnpm gen:tools` (`tools/reference.py`): each
+  tool's family, whether it writes, its scope, its description and its fields, the gate table and
+  the MCP server's two names. `check:tools` fails when the file differs from what the registry
+  writes (rule 5), holds every schema's numbers to quantities and counts (rule 6), holds every
+  tool to a project scope (rule 7), and counts an engine run, a scenario and a comparison among
+  what only `tools/writes.py` keeps.
+- The loop's rules name the new tools (18 to 20), drop the module read the Dominion deletion
+  left in rule 11, and its trace says what each new tool did.
+
 ## Revisit condition
 
 That evaluation (development plan §8, "Let the simple system compete").

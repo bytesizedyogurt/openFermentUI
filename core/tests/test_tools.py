@@ -194,13 +194,25 @@ READS = [f"{m}_read" for m in MODULES] + [f"{m}_write" for m in MODULES]
 # other test derives its count from tools.WHITELIST (OF-BLD-019 §6.1).
 NAMES = (["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast", "selling_price",
           "draft_runbook"] + READS + ["thermo_props", "run_flowsheet", "stream_table", "fermos_simulate",
-                                       "fermos_vessel", "pureos_build", "pureos_propose"])
+                                       "fermos_vessel", "pureos_build", "pureos_propose",
+                                       "engine_plants", "engine_parameters", "engine_run", "engine_report",
+                                       "study_scenario", "study_compare", "study_read",
+                                       "literature_sources", "literature_document"])
 
 
 def test_only_the_whitelisted_names_may_register():
     with pytest.raises(ValueError):
         tools.register(tools.Tool("run_shell", "d", tools.records.SearchRecordsInput, lambda i, c: None))
     assert [t.name for t in tools.infos()] == NAMES == list(tools.WHITELIST)
+
+
+def test_the_tools_that_keep_something_say_so_and_every_tool_acts_in_one_project():
+    from openferment_core import module_stores
+
+    assert {n for n, t in tools.REGISTRY.items() if t.writes} == {f"{m}_write" for m in module_stores.MODULES} | {
+        "run_flowsheet", "fermos_simulate", "fermos_vessel", "pureos_build", "engine_run", "study_scenario",
+        "study_compare"}
+    assert {t.scope for t in tools.REGISTRY.values()} == {"project"}
 
 
 # ── the endpoints ──────────────────────────────────────────────────────

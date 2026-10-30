@@ -13,17 +13,25 @@ signs.
 
 `.mcp.json` at the repository root starts it:
 
-    uv run --project core --all-extras python -m openferment_core.mcp_server
+    uv run --project core --all-extras python -m openferment_core.mcp_server [--project <id>]
 
-It acts in one project, the one OPENFERMENT_PROJECT names, and reaches the
-database at OPENFERMENT_DATABASE_URL (ADR-005, ADR-001). Each is read from the
-environment, or from core/.env when the environment lacks it; nothing else is
-read from that file here.
+IT ACTS IN ONE PROJECT (ADR-005; execution prompt §7.3 item 4): the one
+`--project` names, else OPENFERMENT_PROJECT. Every call runs in it
+(`ToolContext.project`), and a server started in none answers every call
+with the words to start it in one. It reaches the database at
+OPENFERMENT_DATABASE_URL (ADR-001). The project and the address are read
+from the environment, or from core/.env when the environment lacks them;
+nothing else is read from that file here.
+
+A number an outside assistant types into a quantity is its estimate
+(ADR-006), and a write it makes is audited as its own: both are marked
+`AUTHOR`, since the protocol does not say which model the assistant runs.
 """
 from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +45,10 @@ from . import db, projects, tools
 
 NAME = "openferment"
 EXTRA = ("ask_postdoc", "get_artifact")
+# Who an outside assistant's typed numbers and writes are marked as (ADR-006).
+AUTHOR = "an assistant over MCP"
+NO_PROJECT = ("This openFerment server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT "
+              "(in the environment or core/.env) to the project's id.")
 
 
 class _Raw(ArgModelBase):
@@ -48,11 +60,23 @@ class _Raw(ArgModelBase):
         return dict(self.model_extra or {})
 
 
-def _register(server: MCPServer, name: str) -> None:
+def named_project(argv: list[str] | None = None) -> str | None:
+    """The project this server acts in: `--project <id>`, else OPENFERMENT_PROJECT."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    if "--project" in args:
+        at = args.index("--project") + 1
+        if at < len(args) and args[at].strip():
+            return args[at].strip()
+    return (os.environ.get(projects.ENV) or "").strip() or None
+
+
+def _register(server: MCPServer, name: str, project: str | None) -> None:
     tool = tools.REGISTRY[name]
 
     def call(**arguments: Any) -> str:
-        result = tools.run(name, arguments, tools.ToolContext())
+        if project is None:
+            return json.dumps({"error": NO_PROJECT})
+        result = tools.run(name, arguments, tools.ToolContext(project=project, model=AUTHOR))
         return result.model_dump_json(exclude_none=True)
 
     server.add_tool(call, name=name, description=tool.description, structured_output=False)
@@ -61,10 +85,13 @@ def _register(server: MCPServer, name: str) -> None:
     registered.fn_metadata.arg_model = _Raw
 
 
-def build() -> MCPServer:
-    server = MCPServer(NAME)
+def build(project: str | None = None) -> MCPServer:
+    """The server, acting in `project` (OPENFERMENT_PROJECT when None)."""
+    acting = project or named_project([])
+    server = MCPServer(NAME, instructions=(
+        f"openFerment's tools, acting in the project {acting}." if acting else NO_PROJECT))
     for info in tools.infos():
-        _register(server, info.name)
+        _register(server, info.name, acting)
 
     @server.tool(name="ask_postdoc", description=(
         "Ask Postdoc a question. It runs its bounded loop over openFerment's tools and returns the plan: claims "
@@ -75,8 +102,11 @@ def build() -> MCPServer:
 
         # §10.R: a loop that cannot run declines in words, as over HTTP,
         # rather than surfacing as a protocol error.
+        if acting is None:
+            return AnswerPlan(question=question, declined=NO_PROJECT).model_dump_json()
         try:
-            return postdoc_agent.ask(question, ctx=tools.ToolContext()).model_dump_json()
+            with projects.using(acting):
+                return postdoc_agent.ask(question, ctx=tools.ToolContext(project=acting)).model_dump_json()
         except Exception as e:
             return AnswerPlan(question=question, declined=f"Postdoc could not run: {e}").model_dump_json()
 
@@ -84,8 +114,11 @@ def build() -> MCPServer:
     def get_artifact(id: str) -> str:  # noqa: A002 (the E.6 name)
         from . import artifacts
 
+        if acting is None:
+            return json.dumps({"error": NO_PROJECT})
         try:
-            return artifacts.get(id).model_dump_json()
+            with projects.using(acting):
+                return artifacts.get(id).model_dump_json()
         except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged) as e:
             return json.dumps({"error": f"no readable artifact {id!r}: {e}"})
 
@@ -103,7 +136,7 @@ def _settings() -> None:
 
 def main() -> None:
     _settings()
-    build().run("stdio")
+    build(named_project()).run("stdio")
 
 
 if __name__ == "__main__":

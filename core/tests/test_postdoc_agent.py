@@ -668,3 +668,115 @@ def test_a_read_after_the_model_changed_its_train_reads_the_train_as_it_stands_n
     [third] = rows(made["third"])
     assert third["ref"] == f"pureos/train-run/{made['run']}" and third["detail"]["trainId"] == made["train"]
     assert [c.id for c in out.claims] == ["c1"]
+
+
+# ── a study, its estimates labelled (alpha 2.0 stage 6; ADR-006) ────────
+
+
+class Reading(Script):
+    """The stand-in, whose entries may be read off what the tools returned: a
+    callable entry is handed the conversation so far and gives the entry."""
+
+    def __call__(self, **kw):
+        if self.turns and callable(self.turns[0]):
+            self.turns[0] = self.turns[0](kw["messages"])
+        return super().__call__(**kw)
+
+
+def returned(messages, key):
+    """The newest tool result's `key`, as the model read it."""
+    for m in reversed(messages):
+        if m["role"] == "user" and isinstance(m["content"], list):
+            for b in m["content"]:
+                if b.get("type") == "tool_result" and not b.get("is_error"):
+                    found = json.loads(b["content"]).get(key)
+                    if found is not None:
+                        return found
+    raise AssertionError(f"no tool returned {key}")
+
+
+def valued(c, *values):
+    return {**c, "values": list(values)}
+
+
+def read_from(label, evidence_id):
+    return {"label": label, "evidenceId": evidence_id, "recordId": "", "estimate": None}
+
+
+def estimated(label, value, unit, basis, low=None, high=None):
+    return {"label": label, "evidenceId": "", "recordId": "",
+            "estimate": {"value": value, "unit": unit, "low": low, "high": high, "basis": basis}}
+
+
+def test_a_study_proposes_a_scenario_of_labelled_estimates_runs_it_and_explains_by_artifact_id(pool, monkeypatch):  # noqa: F811
+    from openferment_core.engine import library, simulator
+    from test_tools_study import Priced, dearer_cane
+
+    monkeypatch.setattr(simulator, "call", Priced())
+    monkeypatch.setattr(library, "_PARAMETERS", {})
+
+    def explained(messages):
+        price = f"{returned(messages, 'artifactId')}:price.solvedPrice"
+        return plan(
+            valued(claim("c1", "The scenario's run solves a selling price for the ethanol on a dearer cane.",
+                         support="inferred"),
+                   read_from("the selling price the run solves", price),
+                   estimated("the cane's price the scenario sets", 0.05, "USD/kg",
+                             "a delivered price above the package's", low=0.04, high=0.06)),
+            valued(claim("c2", "The run solves a selling price of 0.9 dollars a kilogram.", evidence=[price])),
+            valued(claim("c3", "The run's selling price stands beside the package's own.", evidence=[price]),
+                   estimated("the package's price", 0.8, "USD/kg", "the package's own price, as written")),
+        )
+
+    script = Reading(
+        [("engine_plants", {"words": "sugarcane"})],
+        [("study_scenario", dearer_cane())],
+        lambda m: [("engine_run", {"scenario": returned(m, "scenarioId")})],
+        explained,
+    )
+    out = ask(script, pool, question="What does a dearer cane do to the ethanol's selling price?")
+    assert [t.tool for t in out.trace if t.kind == "tool"] == ["engine_plants", "study_scenario", "engine_run"]
+    assert [c.id for c in out.claims] == ["c1", "c3"] and out.rejected == 1
+    assert "c2: claim text contains a number" in out.rejectionReasons[0]
+    c1 = out.claims[0]
+    read, guessed = c1.values
+    assert read.quantity.origin.kind == "artifact" and read.source in c1.evidenceIds, "a value read is cited"
+    assert (read.quantity.value, read.quantity.unit) == (0.9, "USD/kg")
+    assert read.quantity.origin.ref == read.source.split(":")[0]
+    assert guessed.quantity.origin.kind == "model-estimate" and guessed.quantity.origin.by == script.calls[-1]["model"]
+    assert (guessed.quantity.low, guessed.quantity.high, guessed.quantity.origin.note) == (
+        0.04, 0.06, "a delivered price above the package's")
+    assert c1.provenance == "assumed" and out.claims[1].provenance == "assumed"
+    assert [e.id for e in out.evidence] == [read.source]
+    assert out.evidence[0].basis.artifactId == read.quantity.origin.ref
+
+
+@pytest.mark.parametrize("values, why", [
+    ([{"label": "a price", "evidenceId": "ev-never-returned", "recordId": "", "estimate": None}], "which no tool returned"),
+    ([{"label": "a price", "evidenceId": "", "recordId": "", "estimate": None}], "names no source"),
+    ([{"label": "a price", "evidenceId": "", "recordId": "r-X1-1",
+       "estimate": {"value": 1, "unit": "g L-1", "low": None, "high": None, "basis": "a guess"}}], "names recordId and estimate"),
+    ([{"label": "the price in 2021", "evidenceId": "", "recordId": "r-X1-1", "estimate": None}], "label holds a number"),
+    ([{"label": "a titre", "evidenceId": "", "recordId": "",
+       "estimate": {"value": 3, "unit": "", "low": None, "high": None, "basis": "a guess"}}], "names its unit"),
+    ([{"label": "a titre", "evidenceId": "", "recordId": "",
+       "estimate": {"value": 3, "unit": "g L-1", "low": 4, "high": 5, "basis": "a guess"}}], "inside its own range"),
+    ([{"label": "a titre", "evidenceId": "", "recordId": "",
+       "estimate": {"value": 3, "unit": "g L-1", "low": None, "high": None, "basis": ""}}], "what it rests on"),
+    ([{"label": "a titre", "evidenceId": "", "recordId": "",
+       "estimate": {"value": 3, "unit": "g L-1", "low": None, "high": None, "basis": "the 2019 run"}}], "basis holds a number"),
+])
+def test_a_value_that_cannot_stand_drops_its_claim(pool, values, why):  # noqa: F811
+    script = Script([records()], plan(valued(claim(records=["r-X1-1"]), *values)))
+    out = ask(script, pool)
+    assert out.claims == [] and out.rejected == 1 and why in out.rejectionReasons[0], out.rejectionReasons
+
+
+def test_a_records_value_is_read_from_the_record_and_cited(pool):  # noqa: F811
+    script = Script([records()], plan(valued(claim(text="Polyhydroxybutyrate titre was reported on xylose hydrolysate."),
+                                             {"label": "the secreted titre", "evidenceId": "", "recordId": "r-X1-1",
+                                              "estimate": None})))
+    (c,) = ask(script, pool).claims
+    (v,) = c.values
+    assert (v.quantity.value, v.quantity.unit, v.quantity.origin.kind, v.source) == (2.5, "g L-1", "record", "r-X1-1")
+    assert c.recordIds == ["r-X1-1"] and c.provenance == "curated"

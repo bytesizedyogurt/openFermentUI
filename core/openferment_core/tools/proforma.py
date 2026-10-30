@@ -247,6 +247,7 @@ RUN_TOOL = register(
         input_model=RunFlowsheetInput,
         run=_run_flowsheet,
         strict=False,
+        writes=True,
     )
 )
 

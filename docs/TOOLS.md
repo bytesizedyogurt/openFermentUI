@@ -1,574 +1,700 @@
 # The tools
 
-One registry (`core/openferment_core/tools/__init__.py`), three callers:
-Postdoc's loop, `GET /api/tools` and `POST /api/tools/{name}`, and the MCP
-server (`core/openferment_core/mcp_server.py`). A tool is in `WHITELIST` or
-it does not exist. Every input carries ids and words: a JSON number anywhere
-outside `k` and `limit` refuses the call, and every refusal is a result with
-`error` set. A summary over 9,000 characters is replaced by an error, and
-`data` is emptied with it; a tool whose whole output is longer
-(`stream_table`) cuts its own summary, says how much it left out, and carries
-the whole in `ToolResult.data`, which the endpoint and the MCP server return
-and no model reads. The registry holds thirty-six names (OF-BLD-020 §3.4
-added `fermos_simulate`, §4.2 `fermos_vessel`, §5.4 `pureos_build` and §7.2
-`pureos_propose`); `test_tools.NAMES` is the one literal list of them in the
-tests, and every other count there is derived from `WHITELIST`.
+<!-- Written by `pnpm gen:tools` (core/openferment_core/tools/reference.py) from the registry in
+core/openferment_core/tools/. Edit a tool's registration, never this file: `pnpm check:tools` fails
+when the two differ. -->
 
-The names below are the registry's. The build document writes `runbooks.read`;
-the Messages API refuses a dot in a tool name, so the registry uses an
-underscore.
+One registry, three callers: Postdoc's loop, the HTTP endpoints (`GET /api/tools`, `POST
+/api/tools/{name}`) and the MCP server (`openferment`) run every tool through `tools.run`, so a rule
+the registry holds, it holds for each of them.
 
-## The seven (OF-BLD-014)
+- **Inputs** carry ids, words and quantities (ADR-006). A number stands only inside a quantity, an
+  object of `value` and `unit` (and `low` and `high` for a range), where a tool asks for one; a
+  number anywhere else, outside the count fields `k` and `limit`, refuses the call. The service
+  writes each quantity's origin from who called: the answering model's estimate with its id, or the
+  named person's assumption (`?by=` at the HTTP endpoint); a quantity nobody can be named for is
+  refused.
+- **Outputs** are a summary a model reads, at most 9,000 characters, and beside it what a
+  claim may cite (records, passages, evidence, module rows); the whole of a large output travels in
+  `data`, which no model reads.
+- **Scope**: every tool acts in one project (ADR-005): the request's, the question's, or the one the
+  MCP server was started in.
+- **Writes**: a tool marked *writes* keeps something new in the project, audited as its caller's,
+  through `tools/writes.py`; a read keeps nothing but the computations it caches.
 
-| Tool | In | Out |
-|---|---|---|
-| `search_records` | words, a field id, a strain id, a limit | records Postdoc may cite |
-| `convert_units` | a record id, a unit | a computed value, kept as an artifact |
-| `search_passages` | words, k | up to six passages, each citable by a whole sentence |
-| `yield_ceiling` | a model on geneOS's shelf, a product, a sugar | one evidence id, or a finding in words |
-| `growth_forecast` | a kept kinetic fit's artifact id | one evidence id and the final values as intervals |
-| `selling_price` | a seed BioSTEAM scenario's id (none since alpha 2.0 deleted the seed; stage 5 keeps scenarios), or `proforma_benchmark` | the newest kept run's price as one evidence id (the run's artifact id), with what its flowsheet leaves out; with no run on file, which inputs wait for a source as the service binds them and how a run is made; never runs a scenario |
-| `draft_runbook` | a title, a product, a strain, items by evidence or field, measures | a draft whose numbers the service wrote |
+43 tools.
 
-## Proforma's two (OF-BLD-019 §6.1)
+## The registry
 
-| Tool | In | Out |
-|---|---|---|
-| `run_flowsheet` | a scenario id, nothing else | runs the scenario as the service binds it through `proforma.run`, keeps one `proforma.run` artifact and returns its evidence id (the artifact id), the median price with its 5th to 95th percentile, each input's binding and the cost lines; or refuses with `proforma.run`'s own words (the 422's) naming the inputs that wait |
-| `stream_table` | a run's artifact id (`proforma.run` or `proforma.reference`) | the base case's stream table, the plant's feeds and products first, cut to the cap with the number of streams left out; the whole table in `ToolResult.data`; the run's evidence id |
-
-Both go out loose, as the module tools do. `run_flowsheet` is a free write:
-it spends no model money, and **it is at no gate** (`gates.py` is unchanged:
-a run keeps one artifact in the open lane, as a ceiling does). It is audited
-like every module write, `agent: model` with the model id, the effort and the
-ask id, `module: proforma`, `action: run`, and the tool's name in `detail`.
-The service holds no person's assumption (they are typed into Proforma's
-parameter panel and kept in the browser's Durable tier; *A person's value*,
-below), so the model never supplies one: an input no record binds waits, and
-the call refuses naming it. A scenario made with New
-scenario lives in the browser that made it and is refused in words. The run
-is `tools/writes.py`'s `run_scenario`, the same function `proforma_write`'s
-`run` calls, so `check:tools` reads the one call to `proforma.run` there; its
-rule 2b fails when any other tool file reaches what keeps a Proforma run or
-writes an audit line itself. What does is found, not listed (§6.R): every
-function of the service that calls `artifacts.compute` for a `proforma.run`,
-`proforma.reference` or `proforma_benchmark` artifact (or for a tool the check
-cannot name) or `audit.append`, and every function that reaches one of those,
-followed through imports as rule 2 follows them; `proforma.run_flowsheet`,
-the run endpoints and `proposals.propose` are among them. A tool file may
-also not call `artifacts.compute` for a run, hand a store module around bare
-or import by name at run time. `core/tests/test_check_tools.py` plants each
-way round in a copy of the package.
-
-`selling_price` reads, and never runs: the newest kept run of a seed BioSTEAM
-scenario (`proforma.latest_run`), cited by its artifact id, with what the
-run's flowsheet leaves out read from the shelf. With no run on file it names
-the inputs that wait as `proforma.bound` binds them now and says a person
-makes the run in Proforma (or `run_flowsheet`, when nothing waits). An
-authored cost surface keeps no run, an id the seed lacks lives in the browser
-that made it, and a reference biorefinery's run is read through
-`proforma_read` and `stream_table`; each is refused in words that say so.
-
-`stream_table` reads through `proforma.tables_of`, so a scenario's run and a
-reference biorefinery's (§2.2) read alike; anything else is refused in words.
-Each summary row names the stream,
-the unit it leaves and the unit it enters (none for a feed or a product), its
-phase, T, P, mass flow, price and largest components, to four significant
-digits; `data` holds every number as the run kept it.
-
-A run is cited like any computed value: both tools return it as one
-`Evidence` whose id is the artifact's (a scenario's run is its median price,
-a reference run the price its package gives on its own defaults), so it
-enters `SeenSet` and a claim citing it is kept, and a claim citing a run no
-tool returned in this conversation is dropped. Postdoc's prompt (rule 8)
-says a price, a cost or a recovery read from a run cites that run's evidence
-id.
-
-## fermOS simulates (OF-BLD-020 §3.4)
-
-| Tool | In | Out |
-|---|---|---|
-| `fermos_simulate` | a model family's id (`batch_v1`, `fedbatch_v1`, `chemostat_v1`; `light_v1` refuses in words), a strain, a product and a sugar by their ids (each may be empty), `recordsByParam` (a parameter's key to the record ids that bind it, exactly those records), a kept kinetic fit's or forecast's artifact id (`fitArtifact`), `startFrom` (`records`, `fit` or `simulation:<artifact id>`) and `durationPreset` (`until-sugar-runs-out` or `fit-length`) | runs `fermos.simulate` as the service binds the family's parameters, keeps one `fermos.simulation` artifact and returns its evidence id (the artifact id; its value the product's titre at harvest), what bound each parameter in words and counts (never the value, which the artifact holds), the end state, the ceiling rows beside Yp/s in words, and the flags (a value outside its bounds by its key alone, the value and its bounds left to the artifact; a long flag cut at a sentence or clause and said to be cut; each ending at a full stop, OF-BLD-020 §3.R); or refuses with `fermos.simulate`'s own words (the 422's) naming each parameter that waits and the field that would bind it |
-
-Offered loose, as the module tools are. Ids and words only (D13): a JSON
-number anywhere refuses the call, as for every tool, and no field of its
-schema is numeric (E.4‴, below). A parameter named in `recordsByParam` binds
-to exactly those records: each must be in the evidence pool the switch shows,
-a record of a field the parameter binds from (`ethanol_yield_substrate` for
-`yps`, say; the product's own field for another product), kept by the
-aggregate gate and in a unit `units.py` converts into the parameter's; one
-that is not refuses the call, naming the record and why. Named records bind
-ahead of a fit or a kept simulation (a person's override still wins, in the
-browser), their value is Proforma's statistic over them, the basis names
-each as a `record` input and says beside the value (`<key> origin`,
-`records named`) that they were named. The same field rides on
-`POST /api/fermos/simulate` (`SimulationRequest.recordsByParam`).
-
-It is a free write: compute, no model money, and **at no gate** (`gates.py`
-is unchanged, as for a flowsheet run). The integration is scipy's, in the
-service itself (`kinetics.py`: an open-source numerical library steps the
-family's rate equations forward in time), so it starts no worker; README.md
-(*fermOS simulates on scipy*) has the families and where each value comes
-from. It is audited like every module write,
-`agent: model` with the model id, the effort and the ask id, `module:
-fermos`, `action: simulate`, the family as target and the tool's name in
-`detail`. The service holds no person's assumption (they are typed in fermOS →
-Simulate and kept in the browser's Durable tier), so the model never supplies
-one: a parameter nothing binds waits, and the call refuses naming it. The run is
-`tools/writes.py`'s `run_simulation`, the same function `fermos_write`'s
-`simulate` calls, so `check:tools` reads the one call to `fermos.simulate`
-there.
-
-A simulation is cited like any computed value: the tool returns it as one
-`Evidence` whose id is the artifact's, so it enters `SeenSet` and a claim
-citing it is kept; a claim citing a simulation no tool returned in this
-conversation is dropped. `SeenSet.runs` learns every kept simulation a tool
-returned, from that `Evidence` and from a `fermos_read` row
-(`validate.KEPT_RUNS`): a simulation a read returned only as a row is cited by
-its ref in `moduleRefs`, and a claim citing it by evidence id is dropped with
-words that say so. Postdoc's prompt (rule 15) says a simulation's numbers are
-read from its artifact and never stated, and the simulation is cited by its
-artifact id.
-
-**Rule 2b and E.4‴** (`check:tools`). Rule 2b's kept runs grow from
-Proforma's to a `fermos.simulation`, a `fermos.vessel` and a
-`pureos.train_run` artifact: every function that keeps one is found by the
-same call-graph walk, never listed, and no tool file but `tools/writes.py`
-reaches one. A tool file may not reach a module by name at run time either:
-`__import__`, `importlib`, `sys.modules`, `vars()`, `globals()`, `locals()`
-or a module's `__dict__` each fail the rule (OF-BLD-020 §3.R). Rule 6 is E.4‴: no tool named `fermos_*` or `pureos_*` has a
-numeric field (`number` or `integer` anywhere in its input schema, a numeric
-`enum` or `const` included); the registry's two count fields, `k` and
-`limit`, at the top of an input stand aside, as `tools.numbers_in` lets them
-(`fermos_read` and `pureos_read` take `limit`). `core/tests/test_check_tools.py`
-plants each way round.
-
-## fermOS's vessel (OF-BLD-020 §4.2)
-
-| Tool | In | Out |
-|---|---|---|
-| `fermos_vessel` | a kept simulation's artifact id (`simulationArtifact`) or, for an anaerobic vessel, a kept kinetic fit's or forecast's (`fitArtifact`); `vesselType` (`stirred-tank` or `bubble-column`, or empty for BioSTEAM's own); `klaMethod` (a kLa correlation by the name BioSTEAM registers it and its class runs for the design, `Riet` or `Dewes`, or empty) | designs the vessel on BioSTEAM through `vessel.design` (the Proforma worker), keeps one `fermos.vessel` artifact and returns it as one evidence id (the artifact id): the vessels, volumes, times, powers, kLa, the oxygen balance in brief, heat (BioSTEAM's duty with how it found it, and the cross-check on the oxygen the simulation took up, each in the service's words) and cost with BioSTEAM's cost index, who assumed what, and the flags; or refuses in `vessel.design`'s own words |
-
-Offered loose, as the module tools are; every field is a string, an empty
-one meaning "none", and E.4‴ holds the schema to no numeric field. It is a
-free write at no gate, audited like every module write (`agent: model`,
-`module: fermos`, `action: design_vessel`, the tool's name in `detail`), and
-it is `tools/writes.py`'s `design_vessel`, the function `fermos_write`'s
-`design_vessel` action calls, so the one call to `vessel.design` stays where
-`check:tools` reads it (`vessel.design` is in `ALLOWED_WRITES`, and `vessel`
-among the stores rule 2 polices). A design needs a plant scale or one
-vessel's batch volume, a named person's assumption typed in fermOS → Vessel;
-the service holds none, so without one the tool returns the refusal's words
-and Postdoc says in gaps that the design waits for a person. The vessel type
-and the kLa correlation a call names are conventions of that request, named
-in the basis; a person's choice of either in the panel is an assumption by
-them, and the two must agree. A design is cited like any computed value: its
-`Evidence` id is the artifact's, so `SeenSet` keeps it, and a claim citing a
-design no tool returned in this conversation is dropped. `fermos_read`'s kind
-`vessel` lists the kept designs (`fermos/vessel/<artifact id>`, read by the
-design's id or the simulation's). A design is a kept run as a simulation is
-(`validate.KEPT_RUNS` maps `fermos.vessel` to the `vessel` row): `SeenSet.runs`
-learns it from the `Evidence` and from the row, so a design a read returned
-only as a row is cited by its ref in `moduleRefs`, and a claim citing it by
-evidence id is dropped with words that say so. Postdoc's prompt (rule 16)
-says a vessel's numbers are read from its artifact, never stated.
-
-The `Evidence`'s value is the number of vessels BioSTEAM sized; every other
-number stays in the artifact, which the MCP server's `get_artifact` reads
-whole. The design itself is BioSTEAM's, made in the Proforma
-worker, and spends no model money; what it computes, and where BioSTEAM
-overruled the build document, are in README.md (*fermOS sizes the vessel on
-BioSTEAM*).
-
-## pureOS builds a train (OF-BLD-020 §5.4)
-
-| Tool | In | Out |
-|---|---|---|
-| `pureos_build` | `action` (`new`, `add_unit`, `remove_unit`, `set_from_record`, `run` or `propose`) and the fields that action takes, every one a string, a list of strings or a word: `product` (the product's id, `ethanol`; for `new` empty takes a simulation inlet's own product, for `propose` it is required) and `inletRef` for `new` (a simulation, a vessel design or a run's stream) and for `propose` (a simulation or a run's stream, or empty for none); `host` for `propose`; `trainId` for every other action; `unitType` (a catalogue unit type's id) and `afterUnitId` (`inlet` for the first place, empty for the end) for `add_unit`; `unitId` for `remove_unit` and `set_from_record`; `recordsByParam` (a parameter's key on the unit to the record ids that bind it, exactly those records) for `set_from_record` | `new`, `add_unit`, `remove_unit`, `set_from_record` and `propose`: the train as kept, in ids and words (its id, product, program, inlet, each unit's id, type, class and routing, how many records are named for each key, who made it, when) and `toRun`, what a run of it would refuse now in the run's own words (`train_spec.check_train`: the validation's refusals, then each value that waits and each need of a unit; empty when the run would go), with `toRunNote` saying the values were not checked, and why, when the Proforma simulator cannot answer. `run`: the run as one evidence id (the `pureos.train_run` artifact's id; its value the overall recovery of the product to the product stream), each unit's recovery and the overall to four significant digits, the product's share of the product stream, what bound each parameter counted by origin (never a value), the flags and notes cut; the whole run in `ToolResult.data`, which no model reads. A refusal is in the service's words |
-
-The inlet a model names for `new` (`inletRef`): a kept simulation's artifact
-id (its broth at harvest, D10; its broth flow then waits for a person's
-value), a kept vessel design's (the harvest of the simulation it was designed
-for, the broth flow read from the design), or a kept run's stream as
-`<artifact id>/<stream id>` (a `proforma.run`, `proforma.reference` or
-`pureos.train_run`; `stream_table` lists a Proforma run's streams). For
-`propose` it is what the proposer takes (OF-BLD-020 §5.R, findings 19 and
-32): a kept simulation's id or a run's stream, or empty for an inlet a person
-types; a vessel design's id is refused there, and `propose` names its
-product, never empty. The train
-belongs to its inlet's program, else to the one active program, said so; only
-the yeast program has a chemical set, and a product thermosteam's `CHEMICALS`
-does not name is refused. A unit a model adds takes the catalogue's own
-routing (its onward port on, every other outlet to waste) and an id of its
-type's first letter and the smallest free count (`C1`, `D2`). D13 names seven
-inputs; the tree adds `unitId`, the unit `remove_unit` and `set_from_record`
-act on, since `afterUnitId` names where a unit goes, and `host` for `propose`
-(the proposer reads where the product is made). A field the action does
-not take is refused in words.
-
-`set_from_record` binds a parameter of a unit to exactly the records named
-for it, through the run's own check (`pureos.train_spec.unit_scope`): each
-must be in the evidence pool the switch shows, a record of the field the
-parameter's source rule names, on the train's program's papers, kept by the
-aggregate gate, naming the unit's step where its field says nothing of one
-(`step_recovery`, `product_purity`), in a unit the parameter reads, and, for a
-per-component key, the product's own component; a record that cannot bind
-refuses the call, naming it and why, and nothing changes. The check reads the
-class's parameters in the Proforma worker with the store let go, and the train
-is kept only if it did not change meanwhile.
-
-`run` runs the train through `pureos.train_spec.run_train`, in the Proforma
-worker, with no person's value: the service holds none, so a value nothing
-binds (a flash's two settings, a column's keys, a broth flow) waits, and the
-call returns the run's refusal (the 422's words) naming each one; a person
-types it in pureOS → Builder. `propose` keeps the train OF-BLD-020 §7.2's
-rules propose (`pureos.propose`, for `product` made in `host`, a geneOS host
-id) under an id of its own, with the proposer's reasons; a proposal that
-proposes nothing is refused in the words naming each missing property.
-
-**Where a model's train lives.** A person's trains stay in their browser
-(D9). A model builds across tool calls, and an outside assistant over MCP has
-no ask to hold a draft, so the service keeps a model's train in
-`core/data/pureos-trains.json` (`KeptTrain`: the train as data, `agent:
-model`, `madeBy` the model id, `effort`, `askId`, `at`, `updatedAt`),
-gitignored, on this machine alone and not on the data branch, written through
-`pureos.kept.keep_train` alone: every read-modify-write under the store's
-thread lock and file lock, through `atomic.write_text`.
-`GET /api/pureos/trains-kept` lists them, the most recently changed first.
-pureOS's index
-lists them under *Made by Postdoc* (name, product, units, the model, when,
-and the newest run joined by its `trainId`), and **Open a copy** opens one in
-the Builder as a new train of that browser (`/pureos/build/new?copy=<id>`):
-the kept train stays the model's (OF-BLD-020 §5.R).
-
-It is a free write: BioSTEAM's compute, no model money, **at no gate**
-(`gates.py` is unchanged), every action audited like every module write
-(`agent: model`, the model id, the effort, the ask id, `module: pureos`, the
-action as `new_train`, `add_unit`, `remove_unit`, `set_from_record`,
-`run_train` or `propose_train`, the train's id as target, the tool's name in
-`detail`). Each action is one function in `tools/writes.py`, the same one
-`pureos_write`'s action of that name calls (below), so `check:tools` reads the
-calls to `pureos.kept.keep_train` and `pureos.train_spec.run_train` there
-(both in `ALLOWED_WRITES`, `pureos.kept` and `pureos.train_spec` among the
-stores rule 2 polices). Rule 2b finds the kept store's writer from its file
-name (`KEPT_STORES`): every function of a module naming `pureos-trains.json`
-that writes through `atomic`, every function anywhere that writes through
-`atomic` and names the store by its module's path function or constant
-(`kept.path()`, `kept.FILE`; OF-BLD-020 §5.R, finding 18), and every function
-reaching one, which no tool file but `writes.py` may reach. A tool file
-writes no file itself: it may not reach `atomic.write_text` or `write_bytes`,
-nor call a path's or a handle's write, a dump, a file made, moved or taken
-away, or `open` with a mode that writes. Postdoc's loop never serves `pureos_build` or
-`pureos_write` from its per-question cache (`postdoc_agent.UNCACHED`): a
-train changes between calls, and its run is of the train as it stands. After
-either goes through, the question's reads read the kept trains and the
-artifacts afresh and no module read cached before it is served again
-(`postdoc_agent.CHANGES_ROWS`, `module_stores.Stores.forget`; OF-BLD-020
-§5.R, finding 21), so `pureos_read` finds the train and its run as they stand.
-
-A run is cited like any computed value: its `Evidence` id is the artifact's,
-so `SeenSet` keeps it, and a claim citing a run no tool returned in this
-conversation is dropped. A train run is a kept run (`validate.KEPT_RUNS` maps
-`pureos.train_run` to the `train-run` row): `SeenSet.runs` learns it from the
-`Evidence` and from `pureos_read`'s row, so a run a read returned only as a row
-is cited by its ref in `moduleRefs`, and a claim citing it by evidence id is
-dropped with words that say so. Postdoc's prompt (rule 17) says a train's
-numbers are read from its run's artifact and never stated.
-
-## pureOS proposes a train (OF-BLD-020 §7.2)
-
-| Tool | In | Out |
-|---|---|---|
-| `pureos_propose` | a product's id (`product`: a products seed entry, or a product thermosteam's library is asked about by name, ethanol); a host strain's id on geneOS's shelf (`host`); and optionally the train's inlet (`inletRef`: a kept fermOS simulation's artifact id, or a kept run's artifact id and one of its streams as `<artifact id>/<stream id>`; empty for none) | a train proposed by written rules (`pureos/proposer.py`): its units in order, catalogue types, each with the rule, the property it read and the artifact that holds it, in words with no number; every parameter left at its library default or waiting for a person; or nothing proposed and each missing property named. Each property read is its own evidence id (`<artifact id>:<property>`); the whole proposal is in `data` |
-
-Offered loose, as the module tools are; every field is a string, and E.4‴
-holds the schema to no numeric field. It is a read: it keeps nothing but the
-property artifacts it reads (`volatility` from thermosteam in the Proforma
-worker, `protparam` from Biopython's ProtParam on the sequence a products
-seed entry carries, OF-BLD-020 §7.1), writes no audit line and starts no run;
-the proposal goes to a person, who fills what waits in pureOS's Builder. The
-rules, each with its basis, are in `proposer.py`'s docstring: a small
-molecule lighter than water by thermosteam's boiling points is distilled
-(`distillation`), then dried on a `molecular-sieve` where thermosteam finds a
-minimum-boiling azeotrope with water; one heavier than water is extracted
-(`lle`); a secreted protein is clarified (`centrifugation`), concentrated
-(`uf-df`), captured and polished (`chromatography` twice, keyed on ProtParam's
-isoelectric point and molecular weight, the mode waiting while the inlet
-carries no pH) and spray-dried (`spray-dry`); an intracellular protein is
-harvested, disrupted and clarified first; an intracellular polymer is
-harvested, digested, washed and dried (`drying-drum`). The class is the
-products seed's `category`, or, for a product the seed holds no entry for,
-thermosteam's normal boiling point; whether a product is secreted is the
-entry's `location`, which no entry carries yet, so a protein says it is
-missing, as it says a sequence is. `POST
-/api/pureos/propose` answers the same, and pureOS's **Propose a train** shows
-it with each unit's reason beside it and keeps it under a new train id, which
-the Builder opens.
-
-## A person's value (OF-BLD-020 Phase 2)
-
-A number a person sets for a model reaches a run one way, and no tool is on it.
-
-1. The service declares the parameter (`params.py`) and serves it in a scope:
-   `GET /api/params/{scope}` gives its value and where the value came from.
-2. A person types a value into the parameter panel, under their reviewer
-   name. It is an `Override` (scope, key, value, low, high, by, at, note),
-   kept in that browser's Durable tier (`parameterOverrides`). The service
-   keeps none. `POST /api/params/{scope}/resolve` shows what it would change
-   and keeps nothing.
-3. The browser sends the scope's overrides with the run, as `overrides` in the
-   body of `POST /api/proforma/run`, `POST /api/fermos/vessel` or
-   `POST /api/fermos/simulate`. `GET /api/proforma/bind`, the ceiling check
-   and `GET /api/fermos/bind` take them as `?overrides=`. A logistic fit's
-   forecast scope (`fermos:forecast:<fit id>`) travels as the forecast's own
-   fields on `POST /api/fermos/forecast`: its start values, its length, and
-   who typed each (`changedBy`, `durationBy`). Proforma still reads the older
-   field, `assumptions`, the same way for one release.
-4. The service checks each one (a real name, when it was typed, a number or
-   one of the offered words, a parameter whose rule takes a person's value, a
-   value inside its own low and high) and refuses one that fails, in words. A
-   person's value wins over the records and any fit for its parameter. The
-   run's basis names it as an `assumption` by that person, so the run is
-   `assumed`.
-
-No tool takes a person's value, and no tool input carries an override: tool
-inputs carry ids and words. `run_flowsheet`, `proforma_write`'s `run`,
-`fermos_simulate`, `fermos_write`'s `simulate`, `fermos_vessel`,
-`fermos_write`'s `design_vessel`, `pureos_build`'s `run` and `pureos_write`'s
-`run_train` run as the service binds the scenario, the simulation, the design
-or the train, with no person's value, so an input that waits for one refuses
-the call, naming it. `proforma_write`'s `bind` is refused (the
-table below).
-
-## The read tools (OF-BLD-015 §7.2)
-
-One a module: `runbooks_read`, `geneos_read`, `fermos_read`,
-`pureos_read`, `proforma_read`, `biorepo_read`, `guild_read`, `primer_read`,
-`intake_read`, `home_read`. One input for all: `ids` (ids or refs), `words`,
-`kind` (one of the module's kinds, or empty), `state` (one of the enum, or
-empty), `limit` (at most 20). One output, `ModuleRow`: `ref`
-(`<module>/<kind>/<id>`, what a claim cites in `moduleRefs`), `label`,
-`state`, `status` (the module's own word), `provenance` (the mark, or null),
-`detail`. The count of every match by state rides on the summary, and a
-module read in part says so. An artifact row's `provenance` is worked out
-when the row is read, by `basis_provenance` over its inputs as they stand
-then, never copied from the stored file: a record rejected since it was
-computed brings the row, and a claim citing it, down with it.
-
-**fermOS reads its simulations** (OF-BLD-020 §3.4). `fermos_read` holds three
-kinds: `artifact` (the growth fits and forecasts), `simulation`, one row a
-kept `fermos.simulation`, ref `fermos/simulation/<artifact id>`, labelled with
-its family and strain, `open` and `computed`, its mark worked out from its
-inputs when it is read, and a `detail` of words, ids and flags alone (its
-family, title, strain, product and sugar, which keys each source bound, whether
-it is aerobic, whether its Yp/s is above a ceiling): its numbers stay in the
-artifact; and `vessel` (§4.2), one row a kept `fermos.vessel` design, ref
-`fermos/vessel/<artifact id>`, found by its own id or its simulation's,
-labelled with BioSTEAM's class and the vessel type, `open` and `computed`, its
-mark worked out from its inputs when it is read; its `detail` names the class,
-the vessel type and the source, and copies from the artifact the number of
-vessels, each vessel's volume and the installed cost.
-
-**pureOS reads trains** (OF-BLD-019 §4.1). `pureos_read` holds three kinds:
-`unit-operation` (the vocabulary, each with the BioSTEAM classes that perform
-it), `train` (the newest Proforma run of a scenario, one row a scenario, its
-id the scenario's, or the run's artifact id when no scenario claims the run)
-and `train-unit` (one unit of a train, id `<train>:<unit>`, in run order).
-A read by a scenario id or a run's artifact id returns the train and every
-unit of it; `kind: train-unit` narrows to the units. Every number in a train
-row's `detail` (product in and out, what is lost and to which outlet, the
-recovery, the cumulative share still on the path) is read by
-`pureos.train_of` from the run artifact's stream table, never typed and never
-simulated again; the row's mark is the run's, worked out as for any artifact
-row. This is a kind of the existing read, not a tool of its own. Since
-OF-BLD-020 §5.4 kind `train` also holds the trains a model built with
-`pureos_build` (`pureos/train/<train id>`, found by the train's id or a run's:
-its product, program, inlet, units and the keys records are named for, in ids
-and words, who made it and when, and its runs' ids; no mark, since a train is
-data), and kind `train-run` is one kept `pureos.train_run`
-(`pureos/train-run/<artifact id>`, found by its own id or its train's),
-labelled with its train's name and product, `open` and `computed`, its mark
-worked out from its inputs when it is read, and a `detail` of words, ids and
-flags alone: its numbers stay in the artifact. Proforma's
-rows list every scenario's runs and, since §6.1, the reference biorefineries'
-runs (`proforma.reference`). `GET /api/pureos/trains` and
-`GET /api/pureos/train/{key}` serve the same reading to the browser, the
-mark worked out the same way (§4.R). A unit whose passes BioSTEAM keeps
-apart (an `HXprocess`) is credited only on the pass that carries the product
-on, and product that enters a unit on the path and leaves by no outlet is
-lost there.
-
-Before round one, `module_stores.coverage` sweeps every module for what the
-question names and hands the model the map. A follow-up is swept with the
-earlier questions it reads (at most four), never with the earlier answers,
-which are the model's words, and the map then says what the conversation
-names.
-
-`state` is one enum, computed by `module_stores.py` from the module's own
-word and never by a model:
-
-| State | Means | Computed from |
-|---|---|---|
-| `open` | free to use, read or make | a draft or running runbook; a host, pathway, model or unit operation in the catalogue; an artifact, a kept simulation, and a train or a unit of one read from a run; a train a model built, and a run of one; an active person; a scheduled check |
-| `fenced` | held back | a runbook `blocked_unverified`; a fetch that failed; a model not fetched |
-| `approved` | a person or a source stands behind it | a record `measured`, `gold`, `verified` or `curated`; a protocol's current version; a lesson; a paper fetched with full text |
-| `locked` | frozen for a test | a runbook with `lockedAt`; a check run |
-| `proposed` | waits for a person | a candidate `unverified`; a runbook `needs_review` or `awaiting_budget`; a check proposed; a proposal at a gate; a paper waiting to be fetched |
-| `retired` | withdrawn | a record rejected; a person inactive; a check dismissed |
-
-Read in part: depositions, runbooks adopted or locked in a browser, and
-review decisions not yet posted stay in that browser. The footer names the
-modules it holds for.
-
-## thermosteam answers property questions (OF-BLD-019 §4.2)
-
-The thirtieth name, added by the build document's authority (OF-BLD-019
-Part C.8 and §4.2), before Proforma's two (§6.1), which brought the registry
-to thirty-two (OF-BLD-020 §3.4's `fermos_simulate` is the thirty-third,
-§4.2's `fermos_vessel` the thirty-fourth, §5.4's `pureos_build` the
-thirty-fifth and §7.2's `pureos_propose` the
-thirty-sixth);
-`check:tools` (rule 5) fails when a name in `WHITELIST` has no tool registered
-or no mention here.
-
-| Tool | In | Out |
-|---|---|---|
-| `thermo_props` | a Proforma run's artifact id and one of its stream ids; or the preset `ethanol-water-azeotrope`; or `beer-at-titre-of` with an ethanol titre record's id (every field a string, an empty one meaning "not this") | one evidence id a property thermosteam answered (density, heat capacity, viscosity, bubble point, dew point), the mixture's mass fractions and conditions, and the library's version; a chemical the library lacks refused in words |
-
-Offered loose, as the module tools are. A question carries ids and words;
-the service fills every number (`core/openferment_core/thermo.py`): a
-stream's composition, temperature, pressure and phase are its row of the
-run's stream table, and the run is a source of the answer; the azeotrope is
-the composition at which the library's own vapour-liquid equilibrium gives a
-vapour of the liquid's composition, at the library's default pressure; a
-beer is water and ethanol at the record's titre, read through `units.py` into
-kg m⁻³ and solved in the worker for the mass fraction that holds that much
-ethanol in a cubic metre of the mixture at its own density (the beer's cells,
-residual sugar and dissolved CO2 are not in it, and the answer says so). A
-temperature or pressure nobody gave is the library's own Stream default,
-said so. The Proforma worker asks thermosteam (op `thermo_props`); the answer
-is one `thermo_props` artifact whose basis names the library and its version,
-with provenance from `basis_provenance`: `computed` for the azeotrope, the
-weakest of that and the record's or the run's otherwise (`assumed` for a run
-resting on an assumption). Each property is its own `Evidence`, id
-`<artifact id>:<property>`, which `SeenSet` keeps and a claim cites like any
-computed value. `POST /api/thermo/props` asks and
-`GET /api/thermo/props` reads the stored answer to the same question (or
-`{"artifact": null}`), starting no simulator; pureOS → Train and fermOS show
-it in a **Properties** card.
-
-## The write tools (OF-BLD-015 §7.3)
-
-The pair of each read: `runbooks_write` … `home_write`. One input for all:
-`action`, `target` (an id), `fields` (names to words), `note` (why). A write
-tool never touches a store: each action calls the module's own write
-function, where the module's rules live, and `check:tools` fails when this
-file reaches a file or a store function `ALLOWED_WRITES` does not name. It
-reads `writes.py` as parsed Python and follows every name through its import,
-aliases included, so `from ..biorepo import write as keep` is caught as
-`biorepo.write`; a store module handed around bare, `getattr` on one, and
-`importlib` or `__import__` fail too. Every write that goes through lands in the open lane
-and is appended to the audit log (`core/data/audit.jsonl`, `GET /api/audit`)
-with `agent: model`, the model id (the one answering the run, after any
-fallback), the effort and the ask id. A call from `POST /api/tools/{name}` or
-the MCP server belongs to no ask, and its line carries `askId: null`. A
-person's carry-out or dismissal is appended the same way. A geneOS write that
-ends in a finding (a feed the model cannot take up) keeps nothing and is
-audited as `finding`.
-
-| Tool | Action | What happens | Through |
+| Tool | Family | Kind | Scope |
 |---|---|---|---|
-| `geneos_write` | `ceiling`, `frontier`, `mix` | computes and keeps an artifact; returns an evidence id | `geneos.ceiling` and kin |
-| `fermos_write` | `forecast` | forecasts from a kept fit and keeps it | `fermos.forecast_run` |
-| `fermos_write` | `fit` | refused: a deposition's series lives in the browser | — |
-| `fermos_write` | `simulate` | simulates the model family named in `target` as the service binds it, the same run as `fermos_simulate` (`run_simulation`); `fields` carry `strain`, `product`, `sugar`, `fitArtifact`, `startFrom`, `durationPreset` and `records.<parameter key>` (record ids, separated by commas or spaces), any other field refused; refuses naming each parameter that waits | `fermos.simulate` |
-| `fermos_write` | `design_vessel` | designs the vessel a kept simulation (or, anaerobic, a kept fit) needs on BioSTEAM, the same design as `fermos_vessel` (`design_vessel`); fields `simulationArtifact` or `fitArtifact`, `vesselType`, `klaMethod`; refuses in words while no plant scale (or, aerated, one vessel's batch volume) is given, which only a named person types in fermOS → Vessel | `vessel.design` |
-| `pureos_write` | `new_train`, `add_unit`, `remove_unit`, `set_from_record`, `run_train` | builds and runs a train as `pureos_build`'s `new`, `add_unit`, `remove_unit`, `set_from_record` and `run` do, the same function an action; the train in `target` (empty for `new_train`), the rest in `fields`: `product` and `inletRef`; `unitType` and `afterUnitId`; `unitId`; `unitId` and `records.<parameter key>` (record ids, separated by commas or spaces); any other field refused; a run refuses naming what waits | `pureos.kept.keep_train`, `pureos.train_spec.run_train` |
-| `proforma_write` | `run` | runs the BioSTEAM scenario named in `target` as the service binds it, the same run as `run_flowsheet` (`run_scenario`); refuses naming what waits, an empty target, or a scenario the service does not hold | `proforma.run` |
-| `proforma_write` | `bind` | refused: an assumption is a named person's, typed into the parameter panel and kept in the browser's Durable tier (*A person's value*, above) | — |
-| `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…`, kept in `candidates/hand/` apart from the extractor's file, so it never counts as an extraction; fields the action lists only, `negativeResult` and `isPrimary` as the word true or false | `extract.add_candidate` (§2.4's rules) |
-| `biorepo_write` | `decide` | refused: a decision is a person's | — |
-| `intake_write` | `fetch` | collects the document an identifier names into the project's literature (Sci RAG Kit) | `intake.collect` |
-| `intake_write` | `extract` | extracts a document the project holds; at the budget, a `spend` proposal | `extract.extract_paper` |
-| `intake_write` | `add` | refused: a source enters through a person's approval | — |
-| `runbooks_write` | `draft` | refused: use `draft_runbook` | — |
-| `runbooks_write` | `revise_protocol` | refused: protocols are seed, revised in the browser | — |
-| `guild_write` | `record_check` | refused: an assessor runs a check at the bench, criterion by criterion | — |
-| `guild_write`, `home_write`, `runbooks_write` | gated actions | a proposal (below) | `proposals.propose` |
-| `primer_write` | any | refused: no write function | — |
-| `pureos_write` | any other | refused: the unit operations and the unit catalogue are curated (`src/data/vocabulary.ts`, `pureos/catalogue.py`), no write function | — |
+| `search_records` | Records | read | project |
+| `convert_units` | Units | read | project |
+| `search_passages` | Literature | read | project |
+| `yield_ceiling` | geneOS | read | project |
+| `growth_forecast` | fermOS | read | project |
+| `selling_price` | Proforma | read | project |
+| `draft_runbook` | Runbooks | read | project |
+| `runbooks_read` | Module reads | read | project |
+| `geneos_read` | Module reads | read | project |
+| `fermos_read` | Module reads | read | project |
+| `pureos_read` | Module reads | read | project |
+| `proforma_read` | Module reads | read | project |
+| `biorepo_read` | Module reads | read | project |
+| `guild_read` | Module reads | read | project |
+| `primer_read` | Module reads | read | project |
+| `intake_read` | Module reads | read | project |
+| `home_read` | Module reads | read | project |
+| `runbooks_write` | Module writes | writes | project |
+| `geneos_write` | Module writes | writes | project |
+| `fermos_write` | Module writes | writes | project |
+| `pureos_write` | Module writes | writes | project |
+| `proforma_write` | Module writes | writes | project |
+| `biorepo_write` | Module writes | writes | project |
+| `guild_write` | Module writes | writes | project |
+| `primer_write` | Module writes | writes | project |
+| `intake_write` | Module writes | writes | project |
+| `home_write` | Module writes | writes | project |
+| `thermo_props` | thermosteam | read | project |
+| `run_flowsheet` | Proforma | writes | project |
+| `stream_table` | Proforma | read | project |
+| `fermos_simulate` | fermOS | writes | project |
+| `fermos_vessel` | fermOS | writes | project |
+| `pureos_build` | pureOS | writes | project |
+| `pureos_propose` | pureOS | read | project |
+| `engine_plants` | Engine | read | project |
+| `engine_parameters` | Engine | read | project |
+| `engine_run` | Engine | writes | project |
+| `engine_report` | Engine | read | project |
+| `study_scenario` | Studies | writes | project |
+| `study_compare` | Studies | writes | project |
+| `study_read` | Studies | read | project |
+| `literature_sources` | Literature | read | project |
+| `literature_document` | Literature | read | project |
 
-A refusal is a result Postdoc reports in `gaps`.
+## Records
+
+### `search_records`
+
+*read · scope: project · strict*
+
+Search the records Postdoc may cite: curated and verified records, and the extractor's anchored candidates nobody rejected, which are marked unverified. Returns at most ten, best match first, each with its record id, paper, what was measured, its value and unit as the paper wrote them, the quoted sentence, the strain, the carbon source when the paper states one, and its provenance. Filter by an ontology field id and by a strain id, or pass null for no filter. Returns none when nothing matches.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `query` | string | yes | Words to search the records for: what was measured, the organism, the product, the feed. |
+| `field` | string or null | yes | An ontology field id to keep only records of that field, or null for any field. |
+| `organism` | string or null | yes | A strain id to keep only records on that strain, or null for any organism. |
+| `limit` | integer | yes | How many records to return, at most 10. A count. |
+
+## Literature
+
+### `search_passages`
+
+*read · scope: project · strict*
+
+Search the full text of the project's documents for passages that bear on a question. Returns up to six passages, best first, each with its passage id, paper, year, section heading and text. Quote a sentence from a passage by its passage id, copied exactly; a quote not in its passage discards the claim. Use it when a claim needs the context a record does not hold.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `query` | string | yes | Words to search the papers' text for. |
+| `k` | integer | yes | How many passages to return, at most 6. A count. |
+
+### `literature_sources`
+
+*read · scope: project · loose*
+
+List the documents the project holds: each one's id, title, year, the collector that brought it, its licence class and how many passages the literature index keeps of it. Narrow by words in the title. A document enters the project only when a person selects it.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `words` | string | no | Words to narrow by (a title's words); empty for all. |
+| `limit` | integer | no | How many rows at most. A count. |
+
+### `literature_document`
+
+*read · scope: project · loose*
+
+Read one document the project holds: its citation (title, authors, year, journal, DOI, licence class) and its sections in order; name a section by its heading to read its passages, each with a passage id a claim quotes by a whole sentence, as search_passages' passages are quoted.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `document` | string | yes | A document's id, as literature_sources gives it. |
+| `section` | string | no | A section's heading as this tool lists it, whose passages to read; empty for the list of sections alone. |
+
+## Units
+
+### `convert_units`
+
+*read · scope: project · strict*
+
+Convert one record's own value into another unit with the platform's unit engine, which refuses a conversion that needs a quantity it does not have (a percentage of protein into a concentration, say) and says why. Returns one computed value with its basis, citable as evidence, or the refusal in words. Name the record by id and the unit in words; the value is read from the record.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `recordId` | string | yes | The id of the record whose value to convert. |
+| `toUnit` | string | yes | The unit to convert it to, written as the records write units. |
+
+## Engine
+
+### `engine_plants`
+
+*read · scope: project · loose*
+
+List what the library shelf runs: the biorefineries plants with an entry point and openFerment's own flowsheets, each with its configurations, the configuration a run takes when none is named, and the package a flowsheet is composed from. Narrow by words. Returns ids and words, nothing to cite.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `words` | string | no | Words to narrow the shelf by: a product, a feedstock, a plant's name; empty for all. |
+| `limit` | integer | no | How many rows at most. A count. |
+
+### `engine_parameters`
+
+*read · scope: project · loose*
+
+A plant's parameters as the package builds it: each key with its label, its unit, its group and the library's default, and the bounds it is held to. A scenario sets a parameter by its key in that unit. Narrow by words. The first call builds the plant in the simulator and may take half a minute.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `plant` | string | yes | A plant's id, as engine_plants gives it. |
+| `configuration` | string | no | One of the plant's configurations; empty for its own. |
+| `words` | string | no | Words to narrow the parameters by; empty for all. |
+| `limit` | integer | no | How many rows at most. A count. |
+
+### `engine_run`
+
+*writes · scope: project · loose*
+
+Run a plant from the library shelf at the library's defaults, or a study scenario (by its id) with the values it sets, as an engine run: kept in the project, marked as yours, with the SFF file it writes. Returns the run's id, its artifact id, its provenance (assumed when a value it set is an estimate or an assumption), the values it set with their origins, and each number its price and its flowsheet's outputs hold as an evidence id to cite. The same plant and values asked again answer from the run kept. A plant that refuses the values is kept as a receipt and refused in the plant's words.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `plant` | string | no | A plant's id, run at the library's defaults; empty when a scenario is named. |
+| `configuration` | string | no | One of the plant's configurations; empty for its own. |
+| `scenario` | string | no | A study scenario's id (study_scenario returns it), run on its plant with its values. |
+| `note` | string | no | Why the run is asked for, in words. |
+
+### `engine_report`
+
+*read · scope: project · loose*
+
+Read a kept engine run by its id: what ran, the values it set with their origins, its provenance, and each number its price and its flowsheet's outputs hold as an evidence id to cite; for a refused run, the plant's own words.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `run` | string | yes | A kept run's id, as engine_run or study_read gives it. |
+
+## Studies
+
+### `study_scenario`
+
+*writes · scope: project · loose*
+
+Keep a study scenario on a plant from the library shelf: a title, the plant and its configuration, and the values it sets, each a parameter's key and a quantity (value and unit, the parameter's own unit) with a note saying in words what the value rests on. Each value is marked as your estimate, with your model id, and a run of the scenario is assumed. Checked against the plant's parameters: a key it does not read, a unit it does not use or a value of the wrong kind is refused before anything is kept. The same plant and values are one scenario. Run it with engine_run.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `title` | string | yes | What the scenario asks, in words. |
+| `plant` | string | yes | A plant's id, as engine_plants gives it. |
+| `configuration` | string | no | One of the plant's configurations; empty for its own. |
+| `values` | list of `ScenarioValueIn` | yes | The parameters it sets, each a quantity in the parameter's own unit with a note saying what the value rests on; every other parameter keeps the library's default. |
+| `note` | string | no | Why the scenario, in words. |
+
+`QuantityIn`: A number you type: a value in a unit, and in words what it rests on. The service marks it with who typed it.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `value` | number | yes | A number of the quantity, marked as its caller's. |
+| `unit` | string | yes | The value's unit, as the tool names it. |
+| `note` | string | no | What the value rests on, in words. |
+
+`ScenarioValueIn`
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `key` | string | yes | The parameter's key, as engine_parameters gives it. |
+| `quantity` | `QuantityIn` | yes | The value, in the parameter's own unit, with what it rests on. |
+
+### `study_compare`
+
+*writes · scope: project · loose*
+
+Set two to twelve kept engine runs side by side as one comparison, kept in the project: every output the runs answer with each run's value and its change from the first run's, and every value any run set with its origin. Each later run's change from the first is an evidence id to cite; the comparison's provenance is the weakest of its runs'.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `title` | string | yes | What the comparison asks, in words. |
+| `runs` | list of string | yes | Kept runs' ids, the first the one each change is reckoned from. |
+
+### `study_read`
+
+*read · scope: project · loose*
+
+List the project's study scenarios (each with the values it sets, their origins and the runs made of it), its comparisons and the runbooks studies made. Narrow by kind and words. Returns ids and words to act on; a run's numbers are read with engine_report.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `kind` | one of `scenario`, `comparison`, `runbook`, empty | no | scenario, comparison or runbook; empty for every kind. |
+| `words` | string | no | Words to narrow by; empty for all. |
+| `limit` | integer | no | How many rows at most. A count. |
+
+## Proforma
+
+### `selling_price`
+
+*read · scope: project · strict*
+
+The minimum selling price the most recent kept run of a seed BioSTEAM scenario produced, as one evidence id to cite: the median with its 5th to 95th percentile, the infeasible share, which inputs rest on an assumption, and what the flowsheet leaves out. Refuses when no run is on file, naming the inputs still waiting for a source and how a run is made. With proforma_benchmark it returns the stored benchmark instead: the NREL 2011 corn stover ethanol design's minimum ethanol selling price as biorefineries.cornstover computes it. It cannot run a scenario or make an assumption.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `scenarioId` | string | yes | The id of a BioSTEAM scenario the service holds, whose newest kept run it reads; or proforma_benchmark, the NREL 2011 corn stover ethanol design as biorefineries.cornstover builds it. |
+
+### `run_flowsheet`
+
+*writes · scope: project · loose*
+
+Run a BioSTEAM scenario's flowsheet as the service binds its inputs, and keep the run: one artifact holding the minimum selling price across the inputs' ranges, the cost breakdown, the sensitivity and the base case's stream, unit and utility tables. Returns one evidence id to cite (the run's artifact id), the median price with its 5th to 95th percentile, how each input is bound and the cost lines. Takes a scenario id and nothing else: you never type an assumption, a value or a setting. An input no record binds waits for a named person's assumption, typed in Proforma; the call then refuses and names the inputs that wait, and nothing runs. It spends no model money and is at no gate; the run is marked as yours in the audit log until a person promotes it. A run can take minutes.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `scenarioId` | string | yes | The id of a BioSTEAM scenario the service holds; proforma_read lists them. Nothing else: no value, no assumption, no setting. |
+
+### `stream_table`
+
+*read · scope: project · loose*
+
+Read the stream table a kept Proforma run holds: every stream of the base case with the unit it leaves and the unit it enters (none for a feed or a product), its phase, temperature, pressure, mass flow, price and largest components, as BioSTEAM held them after the run. Takes the run's artifact id and nothing else (a scenario's proforma.run artifact, or a reference biorefinery's proforma.reference artifact); you never type a number. The plant's feeds and products come first; a long table is cut to what a model may read and says how many streams it left out. Returns the run's evidence id to cite: a price, a cost or a recovery read from a run is cited by it. It runs nothing.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `artifactId` | string | yes | The artifact id of a kept Proforma run: a proforma.run artifact (a scenario's run, as run_flowsheet, selling_price or proforma_read return it) or a proforma.reference artifact (a reference biorefinery's run, as proforma_read lists it). Nothing else: no number, no stream, no setting. |
+
+## fermOS
+
+### `growth_forecast`
+
+*read · scope: project · strict*
+
+Forecast a run like a fitted one: biomass, product and substrate as bands for readings, from a kept kinetic fit's artifact id, under the fitted run's own starting values and length. Returns one evidence id to cite and the final values as intervals. A fit whose growth rate or ceiling was not identified is refused with what run would identify it.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `fitArtifactId` | string | yes | The artifact id of a kept kinetic fit (tool kinetic_fit). |
+
+### `fermos_simulate`
+
+*writes · scope: project · loose*
+
+Simulate a fermentation with one of fermOS's model families (batch with Monod growth, product and substrate inhibition and Luedeking–Piret production; fed-batch; chemostat) and keep it: one artifact holding the time course of cells, sugar and product, the oxygen uptake, the end state, the hour the sugar runs out, the mass balance and the product yield beside the geneOS ceiling. Each parameter binds from a fit you name, the records (the ones you name for it in recordsByParam, else those the rule finds for the strain and sugar), a kept simulation, or a stated convention, and the summary says what bound each one. You never type a number: name the family, the strain, the product, the sugar, record ids and artifact ids. A parameter nothing binds waits for a named person's assumption, typed in fermOS → Simulate; the call then refuses and names each parameter that waits and the field that would bind it, and nothing is kept. Returns one evidence id to cite (the simulation's artifact id): a titre, a yield or a productivity read from a simulation is cited by it and never stated. It spends no model money and is at no gate; the simulation is marked as yours in the audit log until a person promotes it. The parameters a record can bind, with the fields they bind from: mu_max (growth_rate_mu), ks (monod_ks), yxs (biomass_yield_substrate), alpha (ethanol_lp_alpha), beta (ethanol_lp_beta), yps (ethanol_yield_substrate), maintenance (maintenance_coefficient), p_max (ethanol_max_conc), ki_substrate (substrate_inhibition_ki), yxo (biomass_yield_oxygen), s0 (medium_component_conc), feed_conc (medium_component_conc; fedbatch_v1, chemostat_v1). light_v1 is declared and not built: it refuses in words.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `family` | string | yes | A model family's id (batch_v1, fedbatch_v1, chemostat_v1, light_v1); GET /api/fermos/families and fermOS → Simulate list them with their equations. |
+| `strain` | string | no | A strain's id from geneOS's hosts (geneos_read, kind host), or an empty string: then the records of every strain bind. |
+| `product` | string | no | The product's id (ethanol), or an empty string. |
+| `sugar` | string | no | The sugar's carbon-source id (glucose), or an empty string. |
+| `recordsByParam` | map to list of string | no | A parameter's key to the record ids that bind it, exactly those records (search_records returns them): each must be a record of a field the parameter binds from, kept by the aggregate gate. Ids only, never a value. An empty object, and the records the rule finds bind each parameter. |
+| `fitArtifact` | string | no | A kept kinetic fit's or forecast's artifact id (fermos_read lists them), whose parameters bind first; or an empty string. |
+| `startFrom` | string | no | records, fit (the fit named in fitArtifact), or simulation:<artifact id> (a kept simulation's values bind where no fit or record does). |
+| `durationPreset` | one of `until-sugar-runs-out`, `fit-length` | no | until-sugar-runs-out (the run ends when the sugar runs out), or fit-length (as long as the fitted run, with a fit named). |
+
+### `fermos_vessel`
+
+*writes · scope: project · loose*
+
+Design on BioSTEAM the vessel a kept fermOS simulation needs: BioSTEAM's AeratedBioreactor (a stirred tank or a bubble column) for an aerobic simulation, its NREL batch fermenter for an anaerobic one or a kept kinetic fit. Pass the simulation's artifact id (or the fit's), the vessel type and a kLa correlation by name, or empty strings; never type a number. The design needs a plant scale or a batch volume, which only a named person types in fermOS → Vessel: without one the tool refuses in words, and you say in gaps that the design waits for it. A design is kept as an artifact, marked as yours, and comes back as one evidence id (the artifact's) with the vessels, volumes, times, powers, kLa, oxygen balance, heat and cost read from it; cite them by that id.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `simulationArtifact` | string | yes | The artifact id of a kept fermOS simulation (fermos_read lists them), or an empty string when a fit is named. |
+| `fitArtifact` | string | yes | The artifact id of a kept kinetic fit or forecast, for an anaerobic vessel (a fit gives no oxygen uptake), or an empty string. |
+| `vesselType` | string | yes | stirred-tank or bubble-column for an aerobic simulation, or an empty string for BioSTEAM's own default; an anaerobic vessel takes none. |
+| `klaMethod` | string | yes | A kLa correlation by the name BioSTEAM registers it (Riet for a stirred tank, Dewes for a bubble column), or an empty string for the class's own. |
+
+## pureOS
+
+### `pureos_build`
+
+*writes · scope: project · loose*
+
+Build a downstream train and run it on BioSTEAM, one action a call, from ids and words. new starts a train for a product (its id) from the inlet a kept artifact gives (inletRef: a kept simulation's artifact id, a kept vessel design's, or a kept run's stream as <artifact id>/<stream id>) and returns its trainId. add_unit adds a unit of a catalogue type (unitType: centrifugation, flash, distillation, molecular-sieve and the rest) after afterUnitId (inlet for the first place, empty for the end); remove_unit takes unitId out; set_from_record binds a parameter of unitId to exactly the record ids recordsByParam names for it (each must be a record of the field the parameter binds from, kept by the aggregate gate; one that cannot bind is refused naming the record and why); run runs the train in the Proforma worker as the service binds it; propose keeps the train the proposer's rules propose for the product (its id) made in host (a host strain id), its inlet a kept simulation's id, a kept run's stream or none (inletRef). You never type a number: every value binds from the records, the class's own default or a named person. A value nothing binds waits: the run then refuses naming each one, and nothing is kept; say in gaps that a person types it in pureOS → Builder. A run comes back as one evidence id (its artifact id) with each unit's recovery, the overall recovery and the product's share of the product stream read from it, and what bound each parameter in counts: cite a recovery or a purity by that id and never state it. The train is kept on the service as yours, every action marked so in the audit log; it spends no model money and is at no gate.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | one of `new`, `add_unit`, `remove_unit`, `set_from_record`, `run`, `propose` | yes | new, add_unit, remove_unit, set_from_record, run or propose. |
+| `trainId` | string | no | The train's id, as new or propose returned it (pureos_read lists the trains a model built, kind train); empty for new and propose. |
+| `unitType` | string | no | add_unit: a catalogue unit type's id (centrifugation, flash, distillation, molecular-sieve and the rest; GET /api/pureos/catalogue lists them). |
+| `afterUnitId` | string | no | add_unit: the unit the new one follows, inlet for the first place, or an empty string for the end. |
+| `unitId` | string | no | remove_unit and set_from_record: the unit acted on, by its id in the train. |
+| `product` | string | no | new: the product the train recovers, by its id (ethanol); empty takes a simulation inlet's own product. propose: the product's id, required (the proposer reads its class from it). |
+| `host` | string | no | propose: the host strain's id on geneOS's shelf of hosts, the cells the product is made in (the proposer's rules read where the product is made). |
+| `inletRef` | string | no | new: the artifact the inlet is read from: a kept simulation's artifact id (its broth at harvest; its broth flow then waits for a person), a kept vessel design's artifact id (the harvest of the simulation it was designed for, the broth flow read from the design), or a kept run's stream as <artifact id>/<stream id> (stream_table lists a Proforma run's streams). propose: a kept simulation's artifact id (its broth at harvest) or a kept run's stream as <artifact id>/<stream id>, or empty for none (a person types the inlet in pureOS → Builder). |
+| `recordsByParam` | map to list of string | no | set_from_record: a parameter's key on the unit (split.Ethanol, P, and the rest) to the record ids that bind it, exactly those records (search_records returns them); ids only, never a value. |
+
+### `pureos_propose`
+
+*read · scope: project · loose*
+
+Propose a downstream train for a product made in a host, by written rules that each name the property they read: a small molecule lighter than water by thermosteam's boiling points is distilled, then dried on a molecular sieve where thermosteam finds an azeotrope with water; a secreted protein is clarified, concentrated by ultrafiltration, captured and polished by chromatography (keyed on ProtParam's isoelectric point and molecular weight) and spray-dried; an intracellular one is harvested and disrupted first. Ids and words in: a product id, a host strain id, and optionally an inlet (a kept simulation's artifact id, or <run artifact id>/<stream id>). Returns the units in order, each with its rule, property and artifact, every parameter left at its library default or waiting for a person; or what property is missing. Each property read is one evidence id to cite. Proposes only: nothing runs.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `product` | string | yes | The product's id: a products seed entry (Dominion's molecules), or a product thermosteam's library is asked about by name (ethanol). |
+| `host` | string | yes | The host strain's id on geneOS's shelf of hosts: the cells the product is made in. |
+| `inletRef` | string | no | The train's inlet: a kept fermOS simulation's artifact id (its broth at harvest), or a kept run's artifact id and one of its streams as <artifact id>/<stream id>; an empty string for none (a person types the inlet). |
+
+## geneOS
+
+### `yield_ceiling`
+
+*read · scope: project · strict*
+
+The most product a published reaction network can make from one sugar, by flux balance analysis, kept as a computed value with its basis. Returns one evidence id to cite, the value in g per g and mol per mol, and the model it came from, a genome-scale network whose ceiling is the full network's. A sugar the model cannot take up, or a product it has no route to, comes back as a finding with no number.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `modelId` | string | yes | A model on geneOS's shelf, with the products it names a route to: iMM904 (ethanol); Yeast9 (ethanol). |
+| `product` | string | yes | The product: ethanol. |
+| `substrate` | string | yes | The sugar fed: glucose, fructose, xylose. |
+
+## thermosteam
+
+### `thermo_props`
+
+*read · scope: project · loose*
+
+Density, heat capacity, viscosity, and bubble and dew points of a mixture already on file, as thermosteam (BioSTEAM's property engine) computes them, kept as a computed value with its basis. Name a Proforma run's artifact id and one of its streams; or the preset ethanol-water-azeotrope; or beer-at-titre-of with an ethanol titre record's id (water and ethanol at that titre; the beer's cells and sugar are not in it). The service fills every number from what is on file. Returns one evidence id a property to cite. A chemical the library lacks is refused in words naming it.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `artifactId` | string | yes | A Proforma run's artifact id (tool proforma.run), with streamId; or an empty string. |
+| `streamId` | string | yes | One stream of that run's stream table, by its id; or an empty string. |
+| `preset` | string | yes | ethanol-water-azeotrope (the composition thermosteam's own vapour-liquid equilibrium gives), or beer-at-titre-of with recordId (water and ethanol at that record's titre); or an empty string when a stream is named. |
+| `recordId` | string | yes | An ethanol titre record's id (field ethanol_titre), for beer-at-titre-of; or an empty string. |
+
+## Runbooks
+
+### `draft_runbook`
+
+*read · scope: project · strict*
+
+Draft a runbook from what this run found: a title, a product id and a strain id, items that each name one evidence id or a field with record ids returned earlier in this run, and measures (label, unit, one of start, mid-run, harvest, after recovery, and the item label they test). Send no numbers: the service writes each prediction's value and interval from the evidence and the records. A person adopts and locks it.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `title` | string | yes | What the runbook tests, in words with no number. |
+| `productId` | string | yes | A product id. |
+| `strainId` | string | yes | A strain id. |
+| `items` | list of `DraftItem` | yes | Each prediction: one evidence id, or a field with record ids this run returned. |
+| `measures` | list of `DraftMeasure` | yes | What the bench records, each naming the item label it tests. |
+
+`DraftItem`: One prediction the agent asks for: one computed evidence item, or records of one field. The pair it leaves unused is empty.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `label` | string | yes |  |
+| `evidenceId` | string | no |  |
+| `field` | string | no |  |
+| `recordIds` | list of string | no |  |
+
+`DraftMeasure`
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `label` | string | yes |  |
+| `unit` | string | yes |  |
+| `timepoint` | one of `start`, `mid-run`, `harvest`, `after recovery` | yes |  |
+| `itemLabel` | string | yes |  |
+
+## Module reads
+
+### `runbooks_read`
+
+*read · scope: project · loose*
+
+Read Runbooks: the runbooks (their status, lock and what they predict) and the protocols (their versions). Kinds: runbook, protocol. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state. Read in part: depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+### `geneos_read`
+
+*read · scope: project · loose*
+
+Read geneOS: the hosts, the pathways, the genome-scale models on the shelf and the ceilings computed on them. Kinds: host, pathway, model, artifact. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+### `fermos_read`
+
+*read · scope: project · loose*
+
+Read fermOS: the growth fits and forecasts computed from deposited runs (kind artifact), the kept simulations of a model family (kind simulation: its family, strain, product and sugar, and what bound each parameter, in words; its numbers stay in the artifact, cited by the row's ref or the evidence id fermos_simulate returns), and the vessels BioSTEAM designed for kept simulations (kind vessel, read by the design's artifact id or the simulation's). Kinds: artifact, simulation, vessel. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state. Read in part: depositions stay in the browser; the service read the fits and forecasts it computed.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+### `pureos_read`
+
+*read · scope: project · loose*
+
+Read pureOS: the downstream unit operations, by stage (each with the BioSTEAM classes it is), and the trains Proforma's runs simulated (kind train, one a scenario: read by the scenario id or the run's artifact id); kind train-unit is one unit of a train, in run order, with the product in and out and the recovery read from the run's stream table. Kind train also holds the trains a model built with pureos_build (read by the train's id: its product, inlet and units in words and ids, who made it, its runs' ids), and kind train-run is one kept run of such a train (pureos/train-run/<artifact id>, read by its id or its train's: its train, product, units and product stream in words; its numbers stay in the artifact, cited by the row's ref or the evidence id pureos_build returns). Kinds: unit-operation, train, train-unit, train-run. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+### `proforma_read`
+
+*read · scope: project · loose*
+
+Read Proforma: the cost scenarios and the runs kept as artifacts: each scenario's runs and the reference biorefineries' runs (stream_table reads a run's streams). Kinds: scenario, artifact. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+### `biorepo_read`
+
+*read · scope: project · loose*
+
+Read BioRepo: the records, the extractor's candidates, the computed artifacts and the Witness runs that score the extractor. Kinds: record, candidate, artifact, witness-run. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state. Read in part: review decisions not yet posted from a browser stay in that browser.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+### `guild_read`
+
+*read · scope: project · loose*
+
+Read Guild: the people on the ledger (name, role, whether active) and the competence checks on skills; no level is stored and none is read. Kinds: person, check. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+### `primer_read`
+
+*read · scope: project · loose*
+
+Read Primer: the lessons, by module, and the skills each counts toward. Kinds: lesson. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+### `intake_read`
+
+*read · scope: project · loose*
+
+Read Intake: the documents the project holds in its literature: title, year, where each came from, its licence class and passages. Kinds: source. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+### `home_read`
+
+*read · scope: project · loose*
+
+Read Home: what waits for a person: candidates awaiting review and open checks. Kinds: review, check, proposal. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `ids` | list of string | yes | Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list. |
+| `words` | string | yes | Words to search the module for, or an empty string for no word search. |
+| `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
+| `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
+| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+
+## Module writes
+
+### `runbooks_write`
+
+*writes · scope: project · loose*
+
+Write to Runbooks, through the module's own write function. Actions — draft: draft a runbook: use the draft_runbook tool, which writes the numbers from the evidence; lock: lock a runbook's predictions before a run (gated) [gated: lock a prediction a person will test; becomes a proposal a person carries out on Home]; deposit: start a deposition of a protocol on the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; run: send a runbook's protocol to the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; publish: publish a runbook and its ledger to the commons (gated) [gated: publish to the commons; becomes a proposal a person carries out on Home]; revise_protocol: draft a protocol revision (fields: protocolId, change). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
+
+### `geneos_write`
+
+*writes · scope: project · loose*
+
+Write to geneOS, through the module's own write function. Actions — ceiling: compute and keep the yield ceiling of a model on a sugar (fields: modelId, product, substrate); frontier: compute and keep the growth–product frontier of a model on a sugar (fields: modelId, product, substrate); mix: compute and keep the ceiling across a mix of two sugars (fields: modelId, product, substrate, substrateB). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
+
+### `fermos_write`
+
+*writes · scope: project · loose*
+
+Write to fermOS, through the module's own write function. Actions — forecast: forecast a run from a kept kinetic fit and keep it (fields: fitArtifactId); fit: fit a deposited run's series (fields: depositionId); simulate: simulate the model family named in target (batch_v1 and the rest) and keep the simulation, as fermos_simulate does: each parameter binds from a fit, the records, a kept simulation or a stated convention, and the call refuses naming each parameter nothing binds; records.<parameter key> names the record ids, comma-separated, that bind that parameter (fields: strain, product, sugar, fitArtifact, startFrom, durationPreset, records.<key>); design_vessel: design on BioSTEAM the vessel a kept simulation (or, anaerobic, a kept kinetic fit) needs and keep it, as fermos_vessel does; refused in words while its plant scale waits for a person (fields: simulationArtifact, fitArtifact, vesselType, klaMethod). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
+
+### `pureos_write`
+
+*writes · scope: project · loose*
+
+Write to pureOS, through the module's own write function. Actions — new_train: start a train for a product (its id) from the inlet a kept artifact gives (inletRef: a kept simulation's artifact id, a kept vessel design's, or a kept run's stream as <artifact id>/<stream id>), kept on the service as the model's, as pureos_build's new does (fields: product, inletRef); add_unit: add a unit of a catalogue type to the train named in target, after the unit named (inlet for the first place; empty for the end) (fields: unitType, afterUnitId); remove_unit: take a unit out of the train named in target (fields: unitId); set_from_record: bind a unit's parameter to exactly the records named for it (records.<parameter key>, their ids separated by commas or spaces), each held to the parameter's field, the aggregate gate and its unit; refused naming a record that cannot bind and why (fields: unitId, records.<key>); run_train: run the train named in target in the Proforma worker as the service binds it and keep the run; refused naming each value that waits for a person's. pureOS's unit operations and its unit catalogue are curated (src/data/vocabulary.ts, core/openferment_core/pureos/catalogue.py); the service has no write function for them: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
+
+### `proforma_write`
+
+*writes · scope: project · loose*
+
+Write to Proforma, through the module's own write function. Actions — run: run the BioSTEAM scenario named in target as the service binds it and keep the run, as run_flowsheet does; refused naming the inputs that wait for a person's assumption; bind: bind an assumption to a scenario input (fields: key, value, basis). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
+
+### `biorepo_write`
+
+*writes · scope: project · loose*
+
+Write to BioRepo, through the module's own write function. Actions — candidate: create an extraction candidate anchored to a sentence of a fetched paper (fields: paperId, sectionId, field, value, unit, quote, organism, carbonSource, method); decide: accept, reject or correct a record (fields: recordId); publish: publish records to the commons (gated) [gated: publish to the commons; becomes a proposal a person carries out on Home]. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
+
+### `guild_write`
+
+*writes · scope: project · loose*
+
+Write to Guild, through the module's own write function. Actions — propose_check: propose a competence check on a person's skills (gated: a person asks for it) (fields: personId, skillIds) [gated: mark a personnel check; becomes a proposal a person carries out on Home]; record_check: mark a check's outcome (refused: an assessor runs a check at the bench) (fields: checkId); evidence: record evidence on the ledger (gated: a person signs it) (fields: personId, skillId, kind) [gated: sign a Guild entry; becomes a proposal a person carries out on Home]; person: add or change a person on the ledger (gated) (fields: personId, name) [gated: sign a Guild entry; becomes a proposal a person carries out on Home]; policy: change the lead's Guild policy (gated) (fields: criticality, mode) [gated: sign a Guild entry; becomes a proposal a person carries out on Home]. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
+
+### `primer_write`
+
+*writes · scope: project · loose*
+
+Write to Primer, through the module's own write function. Actions — lesson: write or change a lesson (fields: lessonId). Primer's lessons are curated seed (src/data/learn.ts); the service has no write function for them: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
+
+### `intake_write`
+
+*writes · scope: project · loose*
+
+Write to Intake, through the module's own write function. Actions — fetch: collect the document target names (a PMCID, a DOI, PMID:..., OSTI:..., an osti.gov or yeastgenome.org address) into the project's literature; extract: extract candidates from the project's document whose documentId is target (spends on the model) [at the budget, gated: becomes a spend proposal a person carries out on Home]; add: add a new source to the corpus (fields: doi). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
+
+### `home_write`
+
+*writes · scope: project · loose*
+
+Write to Home, through the module's own write function. Actions — note: propose a notebook note a person accepts under their name (gated) [gated: write a note under a person's name; becomes a proposal a person carries out on Home]. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `action` | string | yes | One of the actions in the tool's description. |
+| `target` | string | yes | The id or ref the action is on (a paper id, a scenario id, a runbook id), or an empty string. |
+| `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
+| `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
 
 ## The gates (OF-BLD-015 §7.4)
 
-The table is `core/openferment_core/tools/gates.py`; this is the same table
-for a person. An action here writes nothing: the call becomes a proposal
-(`core/data/proposals.json`, `GET /api/proposals`) with `state: proposed`,
-and Home shows it as a card with one button. Adding a gate is a row in both
-places.
+A write tool whose module and action a gate names writes nothing: the call becomes a proposal with `state: proposed`, and Home shows it with the one button a person presses (`tools/gates.py`).
 
 | Gate | Covers | Actions | The button |
 |---|---|---|---|
-| `publish` | publish to the commons | `biorepo publish`, `runbooks publish` | takes the person to the module to publish in their name |
-| `spend` | spend past the ask or the daily budget | `intake extract` when the budget refuses | the server extracts when the budget allows |
-| `lock` | lock a prediction a person will test | `runbooks lock` | takes the person to the runbook to press Lock predictions |
-| `sign` | sign a Guild entry | `guild evidence`, `guild person`, `guild policy` | takes the person to Guild to record it in their name |
-| `personnel` | mark a personnel check | `guild propose_check` | the server asks for the check in the person's name, by the Guild person the browser acts as (`checks.request`) |
-| `bench` | send a protocol to the bench | `runbooks deposit`, `runbooks run` | takes the person to the protocols to start the deposition |
-| `notebook` | write a note under a person's name | `home note` | the server keeps the note under the person's name (the notebook itself lands with OF-BLD-017 §5.3) |
-
-No gate covers a Proforma run (OF-BLD-019 §6.1): `run_flowsheet` and
-`proforma_write`'s `run` keep one `proforma.run` artifact in the open lane and
-spend no model money, so `gates.py` and this table are unchanged by them. Nor
-a simulation (OF-BLD-020 §3.4): `fermos_simulate` and `fermos_write`'s
-`simulate` keep one `fermos.simulation` artifact the same way. Nor a vessel
-design (§4.2): `fermos_vessel` and `fermos_write`'s `design_vessel` keep one
-`fermos.vessel` artifact the same way, and BioSTEAM's design spends no model
-money. Nor a train (§5.4): `pureos_build` and `pureos_write`'s train actions
-keep a model's train on the service and its runs as `pureos.train_run`
-artifacts, spending no model money.
-
-A proposal is carried out or dismissed by a named person (the reviewer name
-in Settings; placeholders are refused), and each carries their name and the
-time. `POST /api/proposals/{id}/carry-out` and `/dismiss` take `{person,
-reason, actingId}`: `actingId` is the Guild person the browser is acting as,
-and a check is asked for by them, because Guild knows people by id and the
-reviewer name is words; with none, a check proposal is refused in words. The
-model may propose a check and may never record or sign one: no gate's server
-action signs anything, and `guild record_check` is refused. A server gate is
-marked done only when its server action ran; one with none is refused and
-stays open to be dismissed. The store's locks are let go while the action
-runs (the proposal is marked running in the service), so a long extraction
-never holds up another proposal.
-
-The rules a proposal holds to (OF-BLD-016 §1.R, as `proposals.propose`, `_held_to_rule_one` and
-`shown` have them on 2026-10-20):
-
-- **Rule 1.** Its note, target, field values, title and why hold no number
-  (`validate.find_number`), and its target is one id or none. A write that
-  breaks either is refused whole, never repaired, and the model reports the
-  refusal in `gaps`. The title is the code's words and the target's id; a
-  spend proposal's why is the code's words, not the budget's figures.
-- **One of a kind.** One ask makes one open proposal per module, action and
-  target; a second (a restart, a call worded otherwise) is refused naming
-  the one waiting. Once it is carried out or dismissed, the ask may propose
-  it again.
-- **Who a check names is never shown before it is run.** A Guild proposal's
-  title names nobody. `GET /api/proposals` (`proposals.listed`) and
-  `home_read` serve it without its note, why and target, and keep its field
-  ids, as Guild's checks serve theirs; the store keeps every word. Home shows
-  it to the lead and assessors alone (`mayQueue`), never to the person it
-  names (`shownTo`), through `shownProposals` in `src/lib/proposals.ts`.
-- **Not filtered by program.** A proposal is work waiting for a person, so
-  Home's card lists every open one whatever the program switch says (the
-  service double's lock proposal names `rb-brazzein`, an example runbook).
+| `publish` | publish to the commons | `biorepo publish`, `runbooks publish` | publish it from the module, in your name |
+| `spend` | spend past the ask or the daily budget | `intake extract` | extract it when the budget allows |
+| `lock` | lock a prediction a person will test | `runbooks lock` | open the runbook and press Lock predictions |
+| `sign` | sign a Guild entry | `guild evidence`, `guild person`, `guild policy` | record it on Guild in your name |
+| `personnel` | mark a personnel check | `guild propose_check` | ask for the check in your name |
+| `bench` | send a protocol to the bench | `runbooks deposit`, `runbooks run` | start the deposition on the bench |
+| `notebook` | write a note under a person's name | `home note` | accept the note; it is kept under your name |
 
 ## The MCP server
 
-`core/openferment_core/mcp_server.py` lists `tools.infos()` and calls
-`tools.run`, so every tool above, with its marks, refusals and gates, is what
-Claude Desktop or Claude Code sees, plus `ask_postdoc` and `get_artifact`:
-thirty-eight in all. `test_mcp` counts them from `WHITELIST`, and holds
-`run_flowsheet`, `stream_table`, `fermos_simulate` and `pureos_propose` to the
-registry's own descriptions and schemas.
+`openferment` (`core/openferment_core/mcp_server.py`, started by `.mcp.json`) lists every tool above under its own name, description and input schema, and adds `ask_postdoc` and `get_artifact`: Postdoc's loop on a question, and a kept artifact by its id. It acts in one project, the one `--project` names or else `OPENFERMENT_PROJECT`, and a number an outside assistant types into a quantity is marked as an estimate by `an assistant over MCP`.

@@ -53,9 +53,11 @@ def test_every_read_tool_has_its_write_tool_in_the_whitelist():
     names = {t.name for t in tools.infos()}
     for m in module_stores.MODULES:
         assert {f"{m}_read", f"{m}_write"} <= names
-    # A pair a module and no third module tool; the count of the whole
-    # registry is test_tools.NAMES' (OF-BLD-019 §6.1).
-    assert len([n for n in tools.WHITELIST if n.endswith(("_read", "_write"))]) == 2 * len(module_stores.MODULES)
+    # A pair a module and no third module tool (study_read is the studies'
+    # read, no module's); the count of the whole registry is test_tools.NAMES'
+    # (OF-BLD-019 §6.1).
+    module_tools = [n for n in tools.WHITELIST if n.endswith(("_read", "_write")) and n.rsplit("_", 1)[0] in module_stores.MODULES]
+    assert len(module_tools) == 2 * len(module_stores.MODULES)
 
 
 def test_a_write_tool_never_touches_a_store():

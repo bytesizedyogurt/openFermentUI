@@ -41,6 +41,16 @@ The service makes `lc-…` and `turn-…` ids when none are named. The plan carr
 (`AnswerPlan.conversationId`, `turnId`), and the stream's first event, `turn`, names them before
 the first step. An id the page makes holds letters, digits and `. _ : | -`, at most 200.
 
+## A claim's values
+
+A plan's claim states no number in its words; the numbers it states are its `values`
+(`ClaimValue`, ADR-006): a label in words and a `Quantity` whose origin the validator wrote. A
+value read from a computed value names its evidence id in `source` and carries origin `artifact`
+(the evidence's artifact); one read from a record names the record and carries origin `record`;
+the answering model's estimate carries origin `model-estimate` with the model's id, the moment
+and what it rests on, and the claim stating it is `assumed`. A value's evidence or record is
+cited by its claim. The browser's `ClaimValue` mirrors it (`check:plan`).
+
 ## The page's writes
 
 The page keeps writing its Live conversations through `PUT /api/state/conversations/{id}`

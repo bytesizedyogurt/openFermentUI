@@ -16,21 +16,25 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 6, step 6.2** — typed values in claims (`numbers_in` generalized for
-   `Quantity`), the prompt rules revised, the `study_*`, `literature_*` and `engine_*` tools,
-   `docs/TOOLS.md` generated, `check:tools` revised, the MCP server project-scoped. Then 6.3
-   (`llm.ROUTES`; a change to how keys are read is the owner's, §11.1) and 6.4 (the evaluation set
-   as a table); the gate is proof step 6 offline, `test_postdoc_agent` extended, `check:tools`
-   green (execution prompt §10 stage 6). Step 6.1 is done: conversations, turns and tool calls on
-   the server (migration 0005), the loop's history read from them, and the event stream
-   (`docs/api/postdoc.md`). Stage 5 is complete: `studies/`, the studies screens and `pnpm prove`
-   (steps 1, 2, 4, 5, 7, 8; 34 checks).
+4. **Next step: stage 6, step 6.3** — `llm.ROUTES` (task family → ordered `provider:model` specs
+   and effort: `plan`, `explain`, `extract`, `index`, `judge`), the per-request key override shared
+   with the kit (a change to how keys are read is the owner's, §11.1), and the ask budget reserved
+   before the final turn. Then 6.4 (the evaluation set as a table); the gate is proof step 6
+   offline, `test_postdoc_agent` extended, `check:tools` green (execution prompt §10 stage 6).
+   Steps 6.1 and 6.2 are done: conversations, turns and tool calls on the server (migration 0005)
+   and the event stream (`docs/api/postdoc.md`); typed values in claims and quantities in tool
+   inputs (ADR-006, Implementation 6.2); the engine, study and literature tools, `docs/TOOLS.md`
+   written by `pnpm gen:tools`, and the MCP server in one project (ADR-008, Implementation 6.2).
+   Stage 5 is complete: `studies/`, the studies screens and `pnpm prove` (steps 1, 2, 4, 5, 7, 8;
+   34 checks).
 5. Files in flight: none.
 
 ## Current stage
 
 Stage 6 — Postdoc: server memory, typed values, routes, tools — is under way: step 6.1 put
-Postdoc's conversations on the server and opened the project's event stream. Stages 0 to 5 are
+Postdoc's conversations on the server and opened the project's event stream; step 6.2 typed the
+numbers of claims and tool inputs, added the engine, study and literature tools, generated the
+tool reference and scoped the MCP server to a project. Stages 0 to 5 are
 complete (the tag push waits on the owner; see Blockers). Stage 5 built the studies package:
 scenarios on a plant with each value's origin, run as engine runs; comparisons as artifacts over
 the runs'; runbooks made from a run's outputs and locked on the service under the browser's
@@ -82,6 +86,7 @@ installation).
 | 2026-10-30 15:25 | Stage 5 gate in a clean worktree at `f612377`: `test:core`; `test:lit`; `test:sim` (the flowsheet identical after sugarcane among them) | 2174 passed, 2 skipped, 168 deselected; 10 passed; 132 passed, 2212 deselected | 5 min 33 s; 10 s; 6 min 9 s | 5.2 (gate) |
 | 2026-10-30 15:25 | Stage 5 gate, the same worktree: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile, `pnpm prove` (steps 1, 2, 4, 5, 7, 8); the worktree left clean | all passed; 12 of 12 screens open; 34 of 34 checks hold | 1 min 56 s (prove) | 5.2 (gate) |
 | 2026-10-30 16:04 | `test:core` with 6.1 (conversations, events); typecheck, plan, secrets, state, guild, figures | 2193 passed, 2 skipped, 168 deselected; all passed. The run before it failed one test that read the ask stream's first event as a step (now `turn`) | 4 min 56 s | 6.1 |
+| 2026-10-30 16:40 | `test:core` with 6.2 (typed values, the study tools, the generated reference); `check:tools`, `gen:tools --check`, typecheck, plan, secrets | 2216 passed, 2 skipped, 168 deselected; all passed. The run before it failed seventeen tests: a module write's fields of a value and a unit in words were read as a quantity, so quantities now stand only where a tool's schema asks for one | 5 min 33 s | 6.2 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -159,7 +164,6 @@ installation).
 | The vessel's organism check reads the yeast program's species from a strain catalogue that is empty; its test supplies one | stage 3 (strains with a project's records) or stage 4 |
 | `test_proforma_slow.py` and `flowsheets/cornstover_benchmark.py` still state the benchmark price this build once measured (1.968 USD per gallon); the browser no longer shows it | stage 4: the adapter holds a library plant to its package's own test values |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program | the vocabulary review at stage 3 |
-| `docs/TOOLS.md` was edited by hand to remove Dominion and the program switch | stage 6 regenerates it (A5) |
 | `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's funnel | stage 7 |
 | Dead service paths the deletions left: the storage machinery (`kinetics.py`'s N and Q states, `fermos._no_broth_product`'s store-in-cells branch, `proforma.fit_info`'s store branch), `proforma._strain_labels`' program map, `proforma.basis_inputs`' `cap` and the yield cap in `_specs`; `fermos.NAMED_NOTE` still says "program" (its text is hashed into every simulation's basis) | stage 4, with the adapter |
 | Catalogues that left with the seed are empty in production and supplied by fixtures in tests: held scenarios, the strain catalogue and its aliases, the proposer's products and hosts. Until a project's records carry them, every pureOS proposal is refused for want of a host on file. Stage 2 gave each project its tables; what fills them is the literature | stage 3 (records), stage 5 (scenarios) |
@@ -562,3 +566,20 @@ installation).
   step `turn.delta` and its `turn.plan` or `turn.decline`. A page resumes with `Last-Event-ID`;
   one that falls behind is closed and reconnects; the stream holds no thread
   (`docs/api/postdoc.md`). `test_conversations.py`, `test_events.py`.
+- 6.2 (typed values) A claim states numbers only in its `values`, each read from a computed value
+  or a record by its id, or the model's own estimate with its unit, its range and what it rests
+  on, marked as the model's; a claim stating one is `assumed`, and the answer screen shows each
+  value with where it came from. A tool's input carries a number only inside a quantity, whose
+  origin the registry writes from who called; a quantity nobody can be named for is refused. The
+  prompt's rules say so; rule 11 no longer names the Dominion read. ADR-006, Implementation 6.2.
+  `test_postdoc_agent.py` (a study proposed, run and explained by artifact id; each way a value
+  drops its claim), `test_tools_study.py`.
+- 6.2 (tools) Nine tools: `engine_plants`, `engine_parameters`, `engine_run`, `engine_report`,
+  `study_scenario`, `study_compare`, `study_read`, `literature_sources`, `literature_document`
+  (forty-three in all; the registry's docstring had said thirty-six since Dominion left two). The
+  writes go through `tools/writes.py`, audited as their caller's; `POST /api/tools/{name}?by=`
+  names a person. Every tool carries a project scope; the MCP server acts in the project
+  `--project` names and marks an outside assistant's numbers as its estimates. `docs/TOOLS.md` is
+  written by `pnpm gen:tools` from the registry, and `check:tools` holds the file to it, every
+  schema's numbers to quantities and counts, and every tool to a project. ADR-008, Implementation
+  6.2.

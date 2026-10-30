@@ -1256,6 +1256,20 @@ export interface Claim {
   evidenceIds?: string[];
   /** OF-BLD-015 §7.2: module rows it rests on, as `<module>/<kind>/<id>`. Absent on older plans. */
   moduleRefs?: string[];
+  /** ADR-006: the numbers it states, each typed with its origin; its text holds none. Absent on older plans. */
+  values?: ClaimValue[];
+}
+
+/**
+ * A number a claim states (ADR-006): what it is, and the quantity with its
+ * origin, which the validator computed. A value read from a computed value or
+ * a record names it in `source`; a model's estimate carries `model-estimate`
+ * with the model's id, and the claim stating it is `assumed`.
+ */
+export interface ClaimValue {
+  label: string;
+  quantity: Quantity;
+  source?: string | null;
 }
 
 /** A sentence a claim quotes, and the passage it stands in. */

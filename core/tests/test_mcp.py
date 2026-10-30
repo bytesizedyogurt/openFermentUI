@@ -176,3 +176,38 @@ def test_the_server_offers_pureos_propose_as_the_registry_does(store):
         through = _text(asyncio.run(server.call_tool("pureos_propose", args)))
         assert through == json.loads(tools.run("pureos_propose", args).model_dump_json(exclude_none=True))
         assert through["error"]
+
+
+# ── alpha 2.0 stage 6: one project, an outside assistant's estimates ──────
+
+
+def test_the_server_acts_in_the_project_it_was_started_in(monkeypatch):
+    from openferment_core import projects
+
+    monkeypatch.setattr(intake, "held", lambda project_id=None: {"doc-1": {"title": projects.current()}})
+    out = _text(asyncio.run(mcp_server.build("another-project").call_tool("literature_sources", {})))
+    assert out["summary"]["documents"] == [{"documentId": "doc-1", "title": "another-project"}]
+    assert mcp_server.named_project(["--project", "p-1"]) == "p-1"
+    monkeypatch.setenv(projects.ENV, "p-2")
+    assert mcp_server.named_project([]) == "p-2"
+
+
+def test_a_server_started_in_no_project_says_how_to_start_it_in_one(monkeypatch):
+    from openferment_core import projects
+
+    monkeypatch.delenv(projects.ENV)
+    server = mcp_server.build()
+    assert "--project" in _text(asyncio.run(server.call_tool("search_records", {"query": "x"})))["error"]
+    assert "--project" in _text(asyncio.run(server.call_tool("ask_postdoc", {"question": "q?"})))["declined"]
+    assert "--project" in _text(asyncio.run(server.call_tool("get_artifact", {"id": "0000000000000000"})))["error"]
+
+
+def test_an_outside_assistants_numbers_are_its_estimates(monkeypatch):
+    from openferment_core.engine import library, simulator
+    from test_tools_study import Priced, dearer_cane
+
+    monkeypatch.setattr(simulator, "call", Priced())
+    monkeypatch.setattr(library, "_PARAMETERS", {})
+    out = _text(asyncio.run(mcp_server.build().call_tool("study_scenario", dearer_cane())))
+    (value,) = out["summary"]["values"]
+    assert (value["origin"], value["by"]) == ("model-estimate", mcp_server.AUTHOR)

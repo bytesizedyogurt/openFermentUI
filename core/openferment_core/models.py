@@ -94,6 +94,8 @@ class Claim(BaseModel):
     # OF-BLD-015 §7.2: module rows it rests on, as `<module>/<kind>/<id>`,
     # each returned by a module's read tool in this run.
     moduleRefs: list[str] = Field(default_factory=list)
+    # ADR-006: the numbers it states, each typed with its origin; its text holds none.
+    values: list[ClaimValue] = Field(default_factory=list)
 
 
 class PassageRef(BaseModel):
@@ -706,6 +708,20 @@ class Quantity(BaseModel):
                 if out.get(k) is None:
                     out.pop(k, None)
         return out
+
+
+class ClaimValue(BaseModel):
+    """A number a claim states, apart from its words (ADR-006): what it is,
+    and the quantity with its origin, which the validator computes from what
+    the plan names. A value read from a computed value or a record names it
+    in `source` and carries that origin; the answering model's estimate
+    carries `model-estimate` with the model's id, and the claim that states
+    it is `assumed`."""
+
+    label: str
+    quantity: Quantity
+    # The evidence id or the record id the value was read from; None for an estimate.
+    source: str | None = None
 
 
 class Range(BaseModel):

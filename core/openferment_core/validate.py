@@ -34,7 +34,17 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from .models import Candidate, Claim, DroppedCandidate, PassageRef, Quantity, Range, weakest_provenance
+from .models import (
+    Candidate,
+    Claim,
+    ClaimValue,
+    DroppedCandidate,
+    Origin,
+    PassageRef,
+    Quantity,
+    Range,
+    weakest_provenance,
+)
 from .units import (
     SCHEMA,
     UnitError,
@@ -355,8 +365,84 @@ def _whole_sentences(quote: str, passage: Any) -> bool:
     return is_whole_sentence(quote, passage)
 
 
-def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) -> ValidationResult:
-    """The agent's claims, each held to five rules; a claim that breaks one is
+def _number(x: Any) -> bool:
+    import math
+
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(float(x))
+
+
+def claim_values(raw: Any, seen: SeenSet, pool: Any, model: str, at: str) -> tuple[list[ClaimValue], str | None]:
+    """A claim's `values` as typed quantities with their origins (ADR-006),
+    or the reason they cannot stand. Each names one source: a computed value
+    a tool returned (its evidence id), a record a tool returned (its id), or
+    the answering model's estimate, with its unit, its range when it has one
+    and in words what it rests on. The number of an evidence or a record is
+    read from it, never from the plan."""
+    if raw is None:
+        return [], None
+    if not isinstance(raw, list):
+        return [], "its values are not a list"
+    out: list[ClaimValue] = []
+    for n, v in enumerate(raw, start=1):
+        if not isinstance(v, dict):
+            return [], f"value {n} is not an object"
+        label = str(v.get("label") or "").strip()
+        if not label:
+            return [], f"value {n} has no label"
+        if found := find_number(label):
+            return [], f"value {n}'s label holds a number ({found!r}); the number goes in the value"
+        evidence_id = str(v.get("evidenceId") or "").strip()
+        record_id = str(v.get("recordId") or "").strip()
+        estimate = v.get("estimate")
+        named = [k for k, x in (("evidenceId", evidence_id), ("recordId", record_id), ("estimate", estimate)) if x]
+        if len(named) != 1:
+            return [], f"value {n} ({label}) names {' and '.join(named) or 'no source'}; it names one: evidenceId, recordId or estimate"
+        if evidence_id:
+            e = seen.evidence.get(evidence_id)
+            if e is None:
+                return [], f"value {n} ({label}) reads {evidence_id}, which no tool returned in this run"
+            q = Quantity(value=e.value, unit=e.unit, low=e.interval.low if e.interval else None,
+                         high=e.interval.high if e.interval else None,
+                         origin=Origin(kind="artifact", ref=e.basis.artifactId))
+            out.append(ClaimValue(label=label, quantity=q, source=e.id))
+        elif record_id:
+            rec = pool.record(record_id)
+            if rec is None:
+                return [], f"value {n} ({label}) reads a record that does not exist: {record_id}"
+            if record_id not in seen.records:
+                return [], f"value {n} ({label}) reads {record_id}, which no tool returned in this run"
+            value, unit = rec.get("value"), rec.get("unit")
+            if value is None or not isinstance(unit, str):
+                return [], f"value {n} ({label}) reads {record_id}, which holds no value with a unit"
+            q = Quantity(value=value, unit=unit, origin=Origin(kind="record", ref=record_id))
+            out.append(ClaimValue(label=label, quantity=q, source=record_id))
+        else:
+            if not isinstance(estimate, dict):
+                return [], f"value {n} ({label}): an estimate is an object of value, unit, low, high and basis"
+            value, unit = estimate.get("value"), str(estimate.get("unit") or "").strip()
+            low, high = estimate.get("low"), estimate.get("high")
+            basis = str(estimate.get("basis") or "").strip()
+            if not _number(value):
+                return [], f"value {n} ({label}): an estimate's value is a finite number"
+            if not unit:
+                return [], f"value {n} ({label}): an estimate names its unit"
+            if any(x is not None and not _number(x) for x in (low, high)):
+                return [], f"value {n} ({label}): an estimate's low and high are finite numbers, or null"
+            if (low is not None and low > value) or (high is not None and high < value):
+                return [], f"value {n} ({label}): an estimate stands inside its own range"
+            if not basis:
+                return [], f"value {n} ({label}): an estimate says in words what it rests on (basis)"
+            if found := find_number(basis):
+                return [], f"value {n} ({label}): an estimate's basis holds a number ({found!r})"
+            q = Quantity(value=value, unit=unit, low=low, high=high,
+                         origin=Origin(kind="model-estimate", by=model or "the answering model", at=at, note=basis))
+            out.append(ClaimValue(label=label, quantity=q))
+    return out, None
+
+
+def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *, model: str = "",
+                  at: str = "") -> ValidationResult:
+    """The agent's claims, each held to six rules; a claim that breaks one is
     dropped whole and counted with its reason, never repaired.
 
     1. Its text holds a number.
@@ -370,12 +456,21 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
        or table row of its passage, or a run of them, after `normalize_text`
        (§5.R: a fragment can lift a number out of its negation).
     5. It cites nothing, and its support is not `unsupported`.
+    6. A value it states (ADR-006) names no single source, reads an id no
+       tool returned in this run, or is an estimate without a finite value,
+       a unit, a range it stands in, or words that say what it rests on
+       (`claim_values`). A value read from a computed value or a record is
+       cited by the claim with it.
 
     Its provenance is the weakest of its records, computed values and module
-    rows that carry a mark; a claim resting on quotes or unmarked rows alone
-    is `unverified`. Its papers are derived from
-    its records and passages, never taken from the model.
+    rows that carry a mark, and `assumed` when it states the model's
+    estimate (`model`, at `at`); a claim resting on quotes or unmarked rows
+    alone is `unverified`. Its papers are derived from its records and
+    passages, never taken from the model.
     """
+    from datetime import datetime, timezone
+
+    at = at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     out = ValidationResult()
     for index, raw in enumerate(raw_claims):
         if not isinstance(raw, dict):
@@ -436,6 +531,16 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
         if bad_quote:
             reject(bad_quote)
             continue
+        values, why = claim_values(raw.get("values"), seen, pool, model, at)
+        if why:
+            reject(why)
+            continue
+        for v in values:
+            if v.quantity.origin.kind == "artifact" and v.source not in evidence_ids:
+                evidence_ids.append(v.source)
+            elif v.quantity.origin.kind == "record" and v.source not in record_ids:
+                record_ids.append(v.source)
+        estimated = any(v.quantity.origin.kind == "model-estimate" for v in values)
         if not (record_ids or refs or evidence_ids or module_refs) and support != "unsupported":
             reject(f"cites nothing and support is '{support}', not 'unsupported'")
             continue
@@ -445,6 +550,8 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
         classes += [seen.rows[m].provenance for m in module_refs if seen.rows[m].provenance]
         if not classes and (refs or module_refs):
             classes = ["unverified"]
+        if estimated:
+            classes.append("assumed")
         papers = {pool.record(r)["paperId"] for r in record_ids}
         papers |= {seen.passages[str(r.get("passageId"))].paperId for r in refs}
         out.claims.append(
@@ -458,6 +565,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
                 passages=[PassageRef(passageId=str(r.get("passageId")), quote=str(r.get("quote"))) for r in refs],
                 evidenceIds=evidence_ids,
                 moduleRefs=module_refs,
+                values=values,
             )
         )
     return out

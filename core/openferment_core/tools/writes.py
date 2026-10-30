@@ -43,10 +43,19 @@ below, so the calls to `pureos.kept.keep_train` (the one write to the store of
 the trains a model built) and to `pureos.train_spec.run_train` stay in this
 file; each is free, at no gate, and audited with the model as agent.
 
-Inputs carry ids and words, as every tool's do: `action`, `target` (an id or
-ref), `fields` (names to words, what the action needs), `note` (the model's
-own words on why). A number anywhere is refused by the registry before this
-file runs.
+THE STUDY TOOLS (alpha 2.0 stage 6). `engine_run` (tools/engine.py) runs
+through `run_engine` below, the one call to `engine.runs.run` and to
+`studies.scenarios.run`; `study_scenario` and `study_compare`
+(tools/studies.py) keep through `make_scenario` and `make_comparison`, the
+one call each to `studies.scenarios.make` and `studies.comparisons.make`.
+Each is free, at no gate, and audited with its caller as agent: the model
+answering, or the person the HTTP endpoint names (`_actor`).
+
+The module write tools' inputs carry ids and words: `action`, `target` (an
+id or ref), `fields` (names to words, what the action needs), `note` (the
+model's own words on why). A number anywhere is refused by the registry
+before this file runs; a study scenario's values are quantities, whose
+origins the registry writes (ADR-006).
 """
 from __future__ import annotations
 
@@ -183,6 +192,26 @@ def _who(ctx: ToolContext | None = None) -> tuple[str, str]:
     loop owns it (§7.R finding 7), else the chain's first name."""
     model = getattr(ctx, "model", "") or llm.chain("answer")[0]
     return model, llm.effort()
+
+
+def _actor(ctx: ToolContext) -> tuple[str, str]:
+    """Who a study write is marked with: the model answering, the person the
+    HTTP endpoint names, else the chain's first model."""
+    if ctx.model.strip():
+        return "model", ctx.model.strip()
+    if ctx.person.strip():
+        return "person", ctx.person.strip()
+    return "model", _who(ctx)[0]
+
+
+def _audit_as(ctx: ToolContext, module: str, action: str, state: str, target: str | None,
+              detail: dict[str, Any]) -> None:
+    from .. import audit
+
+    agent, who = _actor(ctx)
+    audit.append(agent=agent, who=who, module=module, action=action, state=state, target=target,
+                 ask_id=getattr(ctx, "ask_id", None) or None, effort=llm.effort() if agent == "model" else None,
+                 detail=detail)
 
 
 def _audit(ctx: ToolContext, module: str, action: str, state: str, target: str | None, detail: dict[str, Any]) -> None:
@@ -365,6 +394,86 @@ def _fermos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
 
 RUN_WAITS = ("A named person types each waiting input in Proforma, on the scenario's page, under their reviewer "
              "name; a model never supplies one. Say in gaps which inputs wait.")
+
+
+def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note: str, ctx: ToolContext) -> ToolResult:
+    """Run a library plant at the library's defaults, or a study scenario
+    with its values, as an engine run, keep it and mark it as the caller's
+    (alpha 2.0 stage 6). A plant's refusal is kept as the run's receipt
+    (engine/runs.py) and comes back in the plant's words."""
+    from ..engine import library, runs
+    from ..studies import scenarios
+    from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
+    from .engine import run_result
+
+    _, who = _actor(ctx)
+    sid, pid = scenario_id.strip(), plant.strip()
+    if bool(sid) == bool(pid):
+        return ToolResult(error=f"{tool} refused: name a plant to run at the library's defaults, or a scenario to "
+                                "run with its values; one of the two")
+    try:
+        report = scenarios.run(sid, by=who) if sid else runs.run(pid, configuration.strip() or None, [], by=who)
+    except scenarios.ScenarioNotFound as e:
+        return ToolResult(error=f"{tool} refused: {str(e).strip(chr(39))} (study_read lists them)")
+    except runs.RunRefused as e:
+        _audit_as(ctx, "proforma", "engine_run", "refused", e.run_id, {"tool": tool, "scenarioId": sid or None,
+                                                                         "note": note})
+        return ToolResult(error=f"{tool}: the plant refused these values, in its words: {e}. The refusal is kept as "
+                                f"run {e.run_id}'s receipt.")
+    except library.LibraryRefused as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        return ToolResult(error=f"{tool} could not run the plant: {e}")
+    run = report.run
+    _audit_as(ctx, "proforma", "engine_run", "open", run.id, {"tool": tool, "artifactId": run.artifactId,
+                                                              "scenarioId": run.scenarioId, "note": note})
+    return run_result(report)
+
+
+def make_scenario(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
+    """Keep a study scenario whose values the caller typed, each marked by
+    the registry as the caller's (ADR-006), and audit it as theirs."""
+    from pydantic import ValidationError
+
+    from ..models import ScenarioCreate, ScenarioValue
+    from ..studies import scenarios
+
+    _, who = _actor(ctx)
+    try:
+        asked = ScenarioCreate(title=inp.title, plant=inp.plant.strip(), configuration=inp.configuration.strip() or None,
+                               values=[ScenarioValue(key=v.key, quantity=v.quantity.quantity()) for v in inp.values],
+                               note=inp.note.strip() or None, by=who)
+        made = scenarios.make(asked)
+    except ValidationError as e:
+        problems = "; ".join(str(err["msg"]).removeprefix("Value error, ") for err in e.errors())
+        return ToolResult(error=f"{tool} refused: {problems}")
+    except scenarios.ScenarioRefused as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    _audit_as(ctx, "proforma", "study_scenario", "open", made.id, {"tool": tool, "plant": made.plant,
+                                                                   "keys": [v.key for v in made.values]})
+    return ToolResult(summary={
+        "state": "open", "scenarioId": made.id, "title": made.title, "plant": made.plant,
+        "configuration": made.configuration, "runIds": made.runIds,
+        "values": [{"key": v.key, "value": v.quantity.value, "unit": v.quantity.unit, "origin": v.quantity.origin.kind,
+                    "by": v.quantity.origin.by, "note": v.quantity.origin.note} for v in made.values],
+        "next": "Run it with engine_run, naming this scenario.",
+    })
+
+
+def make_comparison(tool: str, title: str, run_ids: list[str], ctx: ToolContext) -> ToolResult:
+    """Keep a comparison of kept runs, and audit it as the caller's."""
+    from ..models import ComparisonCreate
+    from ..studies import comparisons
+    from .studies import comparison_result
+
+    _, who = _actor(ctx)
+    try:
+        report = comparisons.make(ComparisonCreate(title=title, runIds=[r.strip() for r in run_ids], by=who))
+    except comparisons.ComparisonRefused as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    _audit_as(ctx, "proforma", "study_compare", "open", report.comparison.id,
+              {"tool": tool, "runIds": report.comparison.runIds, "artifactId": report.comparison.artifactId})
+    return comparison_result(report)
 
 
 def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> ToolResult:
@@ -982,6 +1091,6 @@ def _description(module: str) -> str:
 
 TOOLS = {
     module: register(Tool(name=f"{module}_write", description=_description(module), input_model=ModuleWriteInput,
-                          run=_runner(module), strict=False))
+                          run=_runner(module), strict=False, writes=True))
     for module in module_stores.MODULES
 }

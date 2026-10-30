@@ -2283,13 +2283,15 @@ def audit_read(limit: int = 200) -> list[AuditEntry]:
 
 
 @app.post("/api/tools/{name}", response_model=ToolResult)
-def tools_run(name: str, body: dict[str, Any]) -> ToolResult:  # noqa: N803 (the wire name)
+def tools_run(name: str, body: dict[str, Any], by: str = "") -> ToolResult:  # noqa: N803 (the wire name)
     """Run one tool through the registry, the same path Postdoc's loop and
-    the MCP server take. A refusal is a result with `error` set; an unknown
-    tool is a 404. The body is the tool's input."""
+    the MCP server take, in the request's project. A refusal is a result
+    with `error` set; an unknown tool is a 404. The body is the tool's
+    input; `?by=` names the person calling, who is the author of any
+    quantity the input types (ADR-006) and of any study write it makes."""
     if name not in tools.REGISTRY:
         raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
-    return tools.run(name, body, tools.ToolContext())
+    return tools.run(name, body, tools.ToolContext(person=by.strip()[:200]))
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

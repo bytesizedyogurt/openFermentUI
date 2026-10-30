@@ -58,6 +58,7 @@ function tsFields(source, name) {
 
 const PAIRS = [
   ['Claim', 'Claim'],
+  ['ClaimValue', 'ClaimValue'],
   ['Usage', 'AnswerPlanUsage'],
   ['AnswerPlan', 'AnswerPlan'],
   // OF-BLD-015 §7.1 — the coverage map.
