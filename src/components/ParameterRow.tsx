@@ -78,7 +78,7 @@ export function ruleWords(entry: string, spec: ParameterSpec): string {
     case 'simulation':
       return 'a kept simulation';
     case 'assumption':
-      return 'a named person’s assumption';
+      return 'a named person’s assumption, or a model’s estimate';
     case 'convention':
       return spec.convention != null ? `a stated convention: ${shown(spec.convention)}` : 'a stated convention';
     case 'library-default':
@@ -168,6 +168,12 @@ export function SourceChip({ value, records }: { value: ParameterValue | null; r
       return (
         <span className="chip" data-testid="param-chip" data-origin="assumption">
           assumption by {value.overriddenBy ?? value.source?.by ?? 'nobody named'}
+        </span>
+      );
+    case 'model-estimate':
+      return (
+        <span className="chip" data-testid="param-chip" data-origin="model-estimate">
+          estimate by {value.overriddenBy ?? value.source?.by ?? 'no model named'}
         </span>
       );
     case 'convention':
@@ -408,7 +414,7 @@ export function ParameterRow({ spec, value, override, reviewer, readOnly, warnin
           </Button>
         )}
       </div>
-      {value?.detail && value.origin !== 'assumption' && (
+      {value?.detail && value.origin !== 'assumption' && value.origin !== 'model-estimate' && (
         <p className="text-caption text-ink-soft mt-0.5" data-testid="param-detail">
           {value.detail}
         </p>

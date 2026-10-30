@@ -44,6 +44,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import db, llm, projects
+from .basis import refuse_estimates
 from .db import models as t
 from .literature import collectors, kit
 from .models import AuditEvent, Candidate, ExtractResponse, Usage
@@ -379,6 +380,8 @@ async def _rows(project_id: str, source: str) -> list[dict[str, Any]]:
 
 
 async def _put(s: AsyncSession, project_id: str, source: str, result: ExtractResponse, by: str) -> None:
+    # A candidate is a record waiting for review: no model's estimate (ADR-006).
+    refuse_estimates(result, "the candidates store")
     stmt = insert(t.candidates).values(
         project_id=project_id, document_id=result.paperId, source=source, body=result.model_dump(mode="json"), created_by=by
     )

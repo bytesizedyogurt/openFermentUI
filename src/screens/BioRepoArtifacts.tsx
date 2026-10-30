@@ -135,6 +135,13 @@ function SourceChip({ source }: { source: BasisSource }) {
       ) : (
         <span className="text-ink-soft">an artifact, unnamed</span>
       );
+    case 'model-estimate':
+      return (
+        <span className="chip">
+          estimated by {source.by ?? 'no model named'}
+          {source.note ? ` — ${source.note}` : ''}
+        </span>
+      );
     case 'assumption':
       return (
         <span className="chip">

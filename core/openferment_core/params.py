@@ -361,10 +361,17 @@ def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
 
     if "assumption" not in spec.sourceRule:
         raise ParamRefused(_takes_no_person(spec))
-    name = (o.by or "").strip() or (by or "").strip()
-    why = reviewer_refusal(name)
-    if why:
-        raise ParamRefused(f"the override of {spec.key} needs a person's name: {why}")
+    if o.origin == "model-estimate":
+        # A model's estimate names the model that made it (ADR-006); the
+        # person sending the run is not its author.
+        name = (o.by or "").strip()
+        if not name or any(not ch.isprintable() for ch in name):
+            raise ParamRefused(f"the estimate of {spec.key} names the model that made it, on one line")
+    else:
+        name = (o.by or "").strip() or (by or "").strip()
+        why = reviewer_refusal(name)
+        if why:
+            raise ParamRefused(f"the override of {spec.key} needs a person's name: {why}")
     when = unstamped(o)
     if when:
         raise ParamRefused(when)
@@ -386,12 +393,13 @@ def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
 
 
 def _from_override(spec: ParameterSpec, o: Override) -> ParameterValue:
-    from .basis import assumption_source
+    from .basis import override_source
 
+    estimate = o.origin == "model-estimate"
     return ParameterValue(
-        key=spec.key, value=o.value, low=o.low, high=o.high, source=assumption_source(o.by, o.at, o.note),
-        origin="assumption", overriddenBy=o.by.strip(),
-        detail=f"typed by {o.by.strip()} on {o.at}" + (f": {o.note}" if o.note else ""))
+        key=spec.key, value=o.value, low=o.low, high=o.high, source=override_source(o),
+        origin="model-estimate" if estimate else "assumption", overriddenBy=o.by.strip(),
+        detail=f"{'estimated' if estimate else 'typed'} by {o.by.strip()} on {o.at}" + (f": {o.note}" if o.note else ""))
 
 
 def _first(spec: ParameterSpec, cands: Mapping[str, ParameterValue | None]) -> ParameterValue:

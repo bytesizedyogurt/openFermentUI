@@ -50,6 +50,7 @@ from typing import Any
 from sqlalchemy import insert, select
 
 from . import db, extract, projects
+from .basis import EstimateRefused, refuse_estimates
 from .literature import kit
 from .corpus import load_corpus
 from .db import models as t
@@ -59,7 +60,7 @@ from .validate import anchor_candidate
 
 log = logging.getLogger("openferment.biorepo")
 
-RULES = ("record", "reviewer", "fulltext", "quote", "paper", "unit", "status")
+RULES = ("record", "reviewer", "fulltext", "quote", "paper", "unit", "status", "estimate")
 
 # Names that are not a person (OF-BLD-012.1 F2). The README says a verified
 # record is one a NAMED reviewer promoted; a file signed 'you' is signed by
@@ -242,6 +243,11 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
             f"{reviewer!r} is a placeholder, not a person. Set a reviewer name in Settings — "
             "the decisions are the record of who decided what",
         )
+
+    try:
+        refuse_estimates(decision, "BioRepo")
+    except EstimateRefused as e:
+        raise WriteRefused("estimate", f"{decision.recordId}: {e}") from None
 
     rec = _resolve(decision.recordId)
     if rec is None:

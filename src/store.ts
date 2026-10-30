@@ -3575,7 +3575,7 @@ export function provenanceOf(r: ExtractionRecord): Provenance {
  * to the statistic only: the records stay visible in per-record tables and
  * plots, because they are real values, just not independent evidence.
  */
-export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'not-primary';
+export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'assumed' | 'not-primary';
 
 export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | null {
   if (r.status === 'rejected') return 'rejected';
@@ -3583,6 +3583,8 @@ export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | nu
   // A computed value is derived from inputs already counted on their own
   // (OF-BLD-014 E.4); counting it beside them counts them twice.
   if (r.provenance === 'computed') return 'computed';
+  // A person's assumption or a model's estimate is never evidence (ADR-006).
+  if (r.provenance === 'assumed') return 'assumed';
   if (r.isPrimary === false) return 'not-primary';
   return null;
 }
@@ -3597,6 +3599,7 @@ export const EXCLUSION_NOTE: Record<AggregateExclusion, string> = {
   rejected: 'rejected — excluded from statistics',
   'industry-estimate': 'industry estimate — excluded from statistics',
   computed: 'computed from other values — excluded from statistics',
+  assumed: 'an assumption or an estimate — excluded from statistics',
   'not-primary': 'reports another study\u2019s measurement — excluded from statistics',
 };
 

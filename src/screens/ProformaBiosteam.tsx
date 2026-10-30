@@ -41,6 +41,7 @@ import {
 export const SOURCE_WORDS: Record<string, string> = {
   record: 'records',
   assumption: 'assumption',
+  'model-estimate': 'a model’s estimate',
   model: 'reference model',
   artifact: 'artifact',
   convention: 'convention',

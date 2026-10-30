@@ -1065,7 +1065,8 @@ def _parameters(inputs: list[BasisInput], kind: str, source_id: str, source_tool
     default beside it, and a value outside its bounds flagged. A default
     BioSTEAM leaves as None (the class decides at run time) is in no basis,
     and reads here as that default."""
-    origin = {"assumption": "assumption", "model": "library-default", "convention": "convention"}
+    origin = {"assumption": "assumption", "model-estimate": "model-estimate", "model": "library-default",
+              "convention": "convention"}
     ws = worker_specs(kind)
     given = {i.name: i for i in inputs}
     design = _named(inputs, "vessel type")
@@ -1092,7 +1093,7 @@ def _parameters(inputs: list[BasisInput], kind: str, source_id: str, source_tool
         low, high = given.get(f"{d.key} low"), given.get(f"{d.key} high")
         v = ParameterValue(key=d.key, value=i.value, low=float(low.value) if low else None,
                            high=float(high.value) if high else None, source=i.source, origin=o,
-                           overriddenBy=i.source.by if o == "assumption" else None,
+                           overriddenBy=i.source.by if o in ("assumption", "model-estimate") else None,
                            libraryDefault=lib, detail=i.source.note)
         v.outOfBounds = params.bounds_check(_spec(d, [] if d.choice else None, bounds=_class_bounds(d, ws)), v.value,
                                             v.low, v.high)

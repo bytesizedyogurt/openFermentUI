@@ -91,6 +91,7 @@ const PAIRS = [
   // OF-BLD-012 §2.5 — extraction and review. The service's names differ
   // from the browser's where the browser already had one.
   ['Quantity', 'Quantity'],
+  ['Origin', 'Origin'],
   ['Range', 'Range'],
   ['Candidate', 'Candidate'],
   ['ExtractRunResult', 'RunResult'],

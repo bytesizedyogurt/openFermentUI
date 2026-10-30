@@ -397,9 +397,37 @@ export type ValueBasis =
   | 'negation';
 
 /** A value and its unit. Categorical fields carry a string value. */
+/** Where a number came from (ADR-006). */
+export type OriginKind = 'record' | 'artifact' | 'person-assumption' | 'model-estimate' | 'library-default' | 'convention';
+/** The origins a value set for one run can have (an Override's origin). */
+export type OverrideOrigin = 'person-assumption' | 'model-estimate';
+
+export interface Origin {
+  kind: OriginKind;
+  /** The record, the artifact or the library entry it was read from. */
+  ref?: string | null;
+  /** The person who typed it, or the id of the model that estimated it. */
+  by?: string | null;
+  /** The day it was typed, or the moment it was estimated. */
+  at?: string | null;
+  /** What it rests on, in words. */
+  note?: string | null;
+}
+
+/**
+ * A value and its unit (ADR-006). A number a model, a person or a library
+ * supplies carries its origin; a value code derives from another (the SI
+ * form of a record's value) carries none, and the service leaves an absent
+ * basis, range or origin out.
+ */
 export interface Quantity {
   value: number | string;
   unit: string;
+  /** What the value is reckoned on, in words (dry basis, per litre of broth). */
+  basis?: string | null;
+  low?: number | null;
+  high?: number | null;
+  origin?: Origin | null;
 }
 
 /** One gold record scored against a run. */
@@ -2181,7 +2209,8 @@ export interface CheckRecord {
 // where it came from. Its provenance is what the service's `basis_provenance`
 // computed; the browser shows it and keeps no copy of the rule.
 
-export type BasisSourceKind = 'record' | 'deposition' | 'artifact' | 'model' | 'convention' | 'assumption';
+/** `assumption` is a named person's value; `model-estimate` a model's, its id in `by` (ADR-006). */
+export type BasisSourceKind = 'record' | 'deposition' | 'artifact' | 'model' | 'convention' | 'assumption' | 'model-estimate';
 
 export interface BasisSource {
   kind: BasisSourceKind;
@@ -2189,7 +2218,7 @@ export interface BasisSource {
   id: string | null;
   /** What the convention is, or what the assumption rests on. */
   note: string | null;
-  /** The named person, for an assumption. */
+  /** The named person, for an assumption; the model's id, for an estimate. */
   by: string | null;
 }
 
@@ -3192,7 +3221,7 @@ export interface Volatility {
 // kept and flagged in words, never clamped. A model never sets one.
 
 /** The chip a value shows: finer than `BasisSourceKind` (a fit and a simulation are artifacts; a library default is a model source). */
-export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'convention' | 'library-default' | 'waiting' | 'not-read';
+export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'model-estimate' | 'convention' | 'library-default' | 'waiting' | 'not-read';
 
 /** What a scope parameterises. */
 export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'fermos-forecast' | 'pureos-unit' | 'proforma';
@@ -3263,6 +3292,8 @@ export interface Override {
   by: string;
   at: string;
   note: string | null;
+  /** A person's assumption unless it says otherwise; a model's estimate names the model in `by` (ADR-006). */
+  origin?: OverrideOrigin;
 }
 
 /** `GET /api/params/{scope}`: a scope's specs with their current values. */

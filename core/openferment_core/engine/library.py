@@ -41,6 +41,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+from ..basis import ASSUMED_KINDS, override_source
 from ..flowsheets import shelf as _shelf
 from ..models import (
     BasisInput,
@@ -255,10 +256,9 @@ def _override_input(o: Override, unit: str) -> BasisInput:
         raise LibraryRefused(f"the override of {o.key} gives a range; a library run sets one value per parameter, "
                              "and a range is a study's to sample")
     if not o.by.strip():
-        raise LibraryRefused(f"the override of {o.key} needs the name of the person who set it")
-    note = f"typed on {o.at}" + (f": {o.note}" if o.note else "")
-    return BasisInput(name=o.key, value=float(o.value), unit=unit,
-                      source=BasisSource(kind="assumption", by=o.by.strip(), note=note))
+        raise LibraryRefused(f"the override of {o.key} needs the name of the "
+                             + ("model that estimated it" if o.origin == "model-estimate" else "person who set it"))
+    return BasisInput(name=o.key, value=float(o.value), unit=unit, source=override_source(o))
 
 
 def run_inputs(plant_id: str, configuration: str | None, overrides: list[Override]) -> list[BasisInput]:
@@ -317,7 +317,7 @@ def _named(inputs: list[BasisInput], name: str) -> Any:
 
 
 def _overrides_of(inputs: list[BasisInput]) -> dict[str, float]:
-    return {i.name: float(i.value) for i in inputs if i.source.kind == "assumption"}
+    return {i.name: float(i.value) for i in inputs if i.source.kind in ASSUMED_KINDS}
 
 
 def _run_library(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:

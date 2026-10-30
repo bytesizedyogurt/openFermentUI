@@ -63,6 +63,7 @@ import math
 from typing import Any, Iterable, NamedTuple
 
 from . import params
+from .basis import ASSUMED_KINDS
 from .flowsheets import shelf as _shelf
 from .models import Artifact, BasisInput, BasisSource, Override, ParameterSpec, ParameterValue
 
@@ -529,7 +530,7 @@ def basis_inputs(parts: Parts, finance: list[ParameterValue]) -> list[BasisInput
             # design, so the run's provenance follows the artifact.
             out.append(BasisInput(name=f"{FERMENTER}{key}{part}", value=i.value, unit=i.unit, source=BasisSource(
                 kind="artifact", id=v.id, note=f"as vessel design {v.id} holds it ({words})",
-                by=i.source.by if i.source.kind == "assumption" else None)))
+                by=i.source.by if i.source.kind in ASSUMED_KINDS else None)))
     if named.get("vessel type") is not None:
         vt = named["vessel type"]
         out.append(BasisInput(name=f"{FERMENTER}design", value=vt.value, unit="", source=BasisSource(

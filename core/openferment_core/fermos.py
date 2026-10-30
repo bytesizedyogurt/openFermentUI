@@ -114,6 +114,7 @@ from scipy.optimize import least_squares, lsq_linear
 from scipy.stats import t as student_t
 
 from . import artifacts, binding, kinetics, params, units
+from .basis import ASSUMED_KINDS
 from .models import (
     Band,
     BasisInput,
@@ -2090,12 +2091,13 @@ def _values_of(specs: list[ParameterSpec], inputs: list[BasisInput]) -> list[Par
         word = str(said.value) if said is not None and said.source.kind == "convention" else None
         identified = ORIGIN_WORDS.get(word) if word in ORIGIN_WORDS else None
         origin = ("record" if records else "assumption" if kind == "assumption"
+                  else "model-estimate" if kind == "model-estimate"
                   else "fit" if word in ORIGIN_WORDS or kind == "deposition"
                   else "simulation" if word == "simulation" else "artifact" if kind == "artifact" else "convention")
         v = ParameterValue(key=spec.key, value=i.value, low=float(low.value) if low else None,
                            high=float(high.value) if high else None, source=i.source, origin=origin,
                            identified=identified if origin == "fit" else None,
-                           overriddenBy=i.source.by if kind == "assumption" else None, recordIds=records,
+                           overriddenBy=i.source.by if kind in ASSUMED_KINDS else None, recordIds=records,
                            detail=i.source.note)
         v.outOfBounds = params.bounds_check(spec, v.value, v.low, v.high)
         out.append(v)

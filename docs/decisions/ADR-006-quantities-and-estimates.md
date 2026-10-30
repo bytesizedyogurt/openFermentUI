@@ -70,3 +70,36 @@ task (development plan §8).
   an artifact whose output changed the hash of its output as read, as the migration does.
 - The lesson embed `chip-demo` (a demonstration of a citation chip), the `demo.py` the tests'
   stand-ins came from and the kit's demo corpus keep their names: none is the class.
+
+### 4.4 (2026-10-30): quantities with origins, a model's estimate, the record stores' refusal
+
+- `models.Origin {kind, ref, by, at, note}` with the six kinds this record names: a
+  person-assumption or a model-estimate names its author (`by`), a record, an artifact or a
+  library default names what it was read from (`ref`). `Quantity` gains `basis`, `low`, `high` and
+  `origin`, all optional; a quantity with none of them is written exactly as before (a wrap
+  serializer drops them), so stored outputs keep their hashes and stored records their rows. The
+  browser's `Quantity`, `Origin`, `OriginKind` and `OverrideOrigin` mirror them (`check:plan`
+  pairs `Origin`).
+- A basis source may be a `model-estimate` (`basis.estimate_source`: the model's id in `by`, the
+  moment in its note). `basis_provenance` makes anything resting on one `assumed`, as it does an
+  `assumption` (`ASSUMED_KINDS`); `basis.origin_of` reads any basis source as its origin, the day
+  stamped in its note included.
+- An `Override` carries `origin`: `person-assumption` (the default, as every override was) or
+  `model-estimate`, whose `by` names the model. `params.checked` holds a person's name to the
+  reviewer rule and a model's to one line; `_from_override` and the library runner take their
+  source from `basis.override_source`; the panel's chip reads `model-estimate` (`ParamOrigin`), and
+  every reader of a run's basis (Proforma's sampling, fermOS's and pureOS's read-back, the vessel
+  design, the composite, the tools' words) reads an estimate where it reads a person's value. The
+  sourceRule entry `assumption` (a value set for the run may set this parameter) admits both.
+- `binding.exclusion` (and the browser's `aggregateExclusion`) keeps an `assumed` value out of
+  every aggregate.
+- No record store takes an estimate: `basis.refuse_estimates` finds an origin or a source of kind
+  `model-estimate`, or a provenance `assumed`, anywhere in what a store is asked to keep, and
+  BioRepo (`WriteRefused` rule `estimate`, a dry run included), the candidates store and a
+  project's depositions and measurements (`StateRefused`) refuse it before writing.
+  `test_estimates.py` plants one at each and watches the refusal (A6), and shows an estimate
+  reaching a library run (whose basis names the model and which is `assumed`), a parameter panel
+  and a scenario's overrides.
+- Unchanged on purpose: `BasisSource` and `BasisInput` gain no field, so every artifact id stays
+  what it was (§7.4); ParamOrigin and the sourceRule keep the word `assumption` for a person's
+  value, the name ADR-006 gives it being `person-assumption` in `Origin`.

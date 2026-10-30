@@ -12,6 +12,7 @@ import shutil
 from typing import Any
 
 from . import binding as _binding
+from .basis import ASSUMED_KINDS
 from .binding import exclusion as _exclusion
 from .engine.simulator import (  # noqa: F401  (re-exported: the names callers and tests use)
     CALL_TIMEOUT_S,
@@ -564,6 +565,7 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
 
     vals: dict[str, list[float]] = {}
     assumed: dict[str, dict[str, float]] = {}
+    estimated: set[str] = set()
     fitted: dict[str, dict[str, float]] = {}
     cap = next((float(i.value) for i in inputs if i.name == "yield cap"), None)
     from . import composite
@@ -582,9 +584,11 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
             v = float(i.value)
             key = i.name.removesuffix(" record")
             vals.setdefault(key, []).append(min(v, cap) if key == "yield" and cap is not None else v)
-        elif i.source.kind == "assumption":
+        elif i.source.kind in ASSUMED_KINDS:
             key, _, part = i.name.partition(" ")
             assumed.setdefault(key, {})[part or "value"] = float(i.value)
+            if i.source.kind == "model-estimate":
+                estimated.add(key)
     specs, base, kinds = {}, {}, {}
     for key, vs in vals.items():
         vs = sorted(vs)
@@ -597,7 +601,7 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
         else:
             specs[key], base[key] = {"kind": "fixed", "value": vs[0]}, vs[0]
     for key, a in assumed.items():
-        kinds[key] = "assumption"
+        kinds[key] = "model-estimate" if key in estimated else "assumption"
         base[key] = a["value"]
         specs[key] = ({"kind": "fixed", "value": a["value"]} if a["low"] == a["high"]
                       else {"kind": "uniform", "low": a["low"], "high": a["high"]})

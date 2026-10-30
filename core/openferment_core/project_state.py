@@ -34,6 +34,7 @@ from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import audit, db, projects
+from .basis import EstimateRefused, refuse_estimates
 from .db import models as t
 from .db import rows
 
@@ -79,6 +80,9 @@ KINDS: dict[str, Kind] = {
         Kind("conversations", t.conversations, "home", columns=_title),
     )
 }
+# A deposition and a measurement are records of the bench: no model's
+# estimate enters them (ADR-006).
+RECORD_KINDS = ("depositions", "measuredEvidence")
 # Two kinds keep their own tables' shapes: a lock is (runbook, hash, when),
 # and the overrides of one scope are one row per key.
 LOCKS, OVERRIDES = "runbookLocks", "overrides"
@@ -92,6 +96,11 @@ def _checked(kind: str, item_id: str, value: Any) -> Any:
         raise StateRefused(f"{item_id!r} is not an id: letters, digits and . _ : | -, at most 200")
     if len(json.dumps(value)) > MAX_BYTES:
         raise StateRefused(f"this {kind} row is over {MAX_BYTES // 1_000_000} MB; a page sends less")
+    if kind in RECORD_KINDS:
+        try:
+            refuse_estimates(value, f"a project's {kind}")
+        except EstimateRefused as e:
+            raise StateRefused(str(e)) from None
     if kind == OVERRIDES:
         if not isinstance(value, list) or not all(isinstance(o, dict) and o.get("scope") == item_id and
                                                   isinstance(o.get("key"), str) and o["key"] for o in value):

@@ -60,6 +60,7 @@ Blockers).
 | 2026-10-30 11:08 | `test:sim` with 4.3 (the composed flowsheet's sim tests among them) | 126 passed, 2112 deselected | 5 min 6 s | 4.3 |
 | 2026-10-30 11:14 | `test:core` with 4.3 | 2074 passed, 2 skipped, 162 deselected | 5 min 19 s | 4.3 |
 | 2026-10-30 11:31 | `test:core` with 4.4 (the rename); `typecheck`, `check:plan`, `check:figures`, `check:tools`, `check:state`, `check:guild`, `check:secrets` | 2076 passed, 2 skipped, 162 deselected; all passed | 5 min 16 s | 4.4 (rename) |
+| 2026-10-30 11:48 | `test:core` with 4.4 (origins); `typecheck`, `check:plan`, `check:figures` | 2090 passed, 2 skipped, 162 deselected; all passed | 4 min 59 s | 4.4 (origins) |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -420,3 +421,10 @@ Blockers).
   lock hashes untouched) and renames back on downgrade; `import_alpha1` reads alpha 1.0's word
   under the new name. Tests: `test_db.py` (0002 → 0003 → 0002 over a record, an artifact and
   its output), `test_import_alpha1.py` (an alpha 1.0 artifact that says `demo`).
+- 4.4 (origins) Typed quantities with origins (ADR-006, Implementation 4.4): `Origin` and the
+  fuller `Quantity` (a bare one written as before), a `model-estimate` basis source and override
+  origin that make a result `assumed`, every reader of a run's basis reading an estimate where it
+  reads a person's value, `assumed` kept out of every aggregate, and BioRepo, the candidates
+  store and a project's depositions and measurements refusing an estimate before writing.
+  Tests: `test_estimates.py` (A6: an estimate planted at each record store and refused; one
+  reaching a library run, a parameter panel and a scenario's overrides).

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
 # Mirrors the Provenance union in src/data/types.ts, weakest last. The order IS
 # the ranking: `weakest_provenance` walks this list, so adding a class in the
@@ -574,11 +574,69 @@ class AuditEvent(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+# ── typed quantities with origins (ADR-006; execution prompt §4.6) ─────
+#
+# Every number a model, a person or a library supplies enters as a
+# `Quantity` with an `Origin`. Provenance is computed from origins by code
+# (`basis.basis_provenance`), never set by a model or a person. A model's
+# number is an estimate: its origin names the model, whatever rests on it is
+# `assumed`, it is never averaged into evidence, and no record store takes it
+# (`basis.refuse_estimates`).
+
+OriginKind = Literal["record", "artifact", "person-assumption", "model-estimate", "library-default", "convention"]
+# The origins a value set for one run can have (an `Override`'s `origin`).
+OverrideOrigin = Literal["person-assumption", "model-estimate"]
+
+
+class Origin(BaseModel):
+    """Where a number came from (ADR-006)."""
+
+    kind: OriginKind
+    # The record, the artifact or the library entry it was read from.
+    ref: str | None = None
+    # The person who typed it, or the id of the model that estimated it.
+    by: str | None = None
+    # The day it was typed, or the moment it was estimated.
+    at: str | None = None
+    # What it rests on, in words.
+    note: str | None = None
+
+    @model_validator(mode="after")
+    def _names_its_source(self) -> "Origin":
+        if self.kind in ("person-assumption", "model-estimate") and not (self.by or "").strip():
+            who = "the person who typed it" if self.kind == "person-assumption" else "the model that estimated it"
+            raise ValueError(f"a {self.kind} names {who} (by)")
+        if self.kind in ("record", "artifact", "library-default") and not (self.ref or "").strip():
+            raise ValueError(f"a {self.kind} origin names what it was read from (ref)")
+        return self
+
+
 class Quantity(BaseModel):
-    """A value and its unit. Categorical fields carry a string value."""
+    """A value and its unit; a categorical field carries a string value. A
+    number a model, a person or a library supplies carries its origin
+    (ADR-006); a value code derives from another (the SI form of a record's
+    value) carries none, the thing it was derived from being its source."""
 
     value: float | str
     unit: str
+    # What the value is reckoned on, in words (dry basis, per litre of
+    # broth); None when the unit says it all.
+    basis: str | None = None
+    low: float | None = None
+    high: float | None = None
+    origin: Origin | None = None
+
+    @model_serializer(mode="wrap")
+    def _as_before_when_bare(self, handler: Any) -> Any:
+        # A quantity with no basis, range or origin is written as it was
+        # before they existed, so a stored output's hash and a stored
+        # record's row read the same (ADR-006).
+        out = handler(self)
+        if isinstance(out, dict):
+            for k in ("basis", "low", "high", "origin"):
+                if out.get(k) is None:
+                    out.pop(k, None)
+        return out
 
 
 class Range(BaseModel):
@@ -1142,7 +1200,10 @@ class CheckRecord(BaseModel):
 # where it came from. Its provenance is `basis.basis_provenance(...)`, never a
 # model's or a person's choice.
 
-BasisSourceKind = Literal["record", "deposition", "artifact", "model", "convention", "assumption"]
+# `assumption` is a named person's value (ADR-006's person-assumption);
+# `model-estimate` a model's, its id in `by`. Either makes whatever rests on
+# it `assumed`.
+BasisSourceKind = Literal["record", "deposition", "artifact", "model", "convention", "assumption", "model-estimate"]
 
 
 class BasisSource(BaseModel):
@@ -1151,7 +1212,7 @@ class BasisSource(BaseModel):
     id: str | None = None
     # What the convention is, or what the assumption rests on.
     note: str | None = None
-    # The named person, for an assumption.
+    # The named person, for an assumption; the model's id, for an estimate.
     by: str | None = None
 
 
@@ -2360,8 +2421,10 @@ class RunbookDraft(BaseModel):
 # `not-read`: a parameter the request's other choices leave unread (a
 # fed-batch's mu_set under a constant feed), which waits for nothing
 # (OF-BLD-020 §3.R, finding 16).
-ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "convention", "library-default", "waiting",
-                      "not-read"]
+# `assumption` is a person's value set by an Override, `model-estimate` a
+# model's (ADR-006).
+ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "model-estimate", "convention",
+                      "library-default", "waiting", "not-read"]
 # What a scope parameterises: a fermOS model family, a vessel designed for
 # a simulation, one unit of a pureOS train, or a Proforma scenario.
 ParamScopeKind = Literal["fermos-family", "fermos-vessel", "fermos-forecast", "pureos-unit", "proforma"]
@@ -2453,8 +2516,9 @@ class ParameterValue(BaseModel):
 
 
 class Override(BaseModel):
-    """A person's change to one parameter of one scope: a named assumption,
-    kept in the browser that typed it and sent with the run (D3)."""
+    """A change to one parameter of one scope for a run (D3): a named
+    person's assumption, or a model's estimate (ADR-006), `by` naming the
+    person or the model."""
 
     scope: str
     key: str
@@ -2464,6 +2528,7 @@ class Override(BaseModel):
     by: str
     at: str
     note: str | None = None
+    origin: OverrideOrigin = "person-assumption"
 
     @field_validator("value", "low", "high", mode="before")
     @classmethod

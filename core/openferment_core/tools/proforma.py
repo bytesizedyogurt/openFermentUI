@@ -49,6 +49,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from .. import proforma
+from ..basis import ASSUMED_KINDS
 from ..models import Evidence, ToolResult
 from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 
@@ -163,7 +164,7 @@ def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
     except shelf.NotOnShelf:
         flowsheet, info = seed["modelId"], shelf.info(seed["modelId"])
     o = art.output
-    assumed = sorted({i.name.split(" ")[0] for i in art.inputs if i.source.kind == "assumption"})
+    assumed = sorted({i.name.split(" ")[0] for i in art.inputs if i.source.kind in ASSUMED_KINDS})
     return ToolResult(
         summary={
             "evidenceId": ev.id,
