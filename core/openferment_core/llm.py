@@ -72,6 +72,7 @@ a non-streaming request is cut off at ten; the final message is the same.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import logging
 import os
@@ -269,6 +270,27 @@ class ModelUnavailable(RuntimeError):
     def __init__(self, message: str, usage: Usage | None = None):
         super().__init__(message)
         self.usage = usage or Usage()
+
+
+#: What the API answers (HTTP 400) when the one grammar it compiles for a
+#: request's answer schema and its strict tools grows too large. Measured
+#: 2026-10-30: Postdoc's plan schema, with each claim's typed values, beside
+#: seven strict tools; the same schema with every tool loose was accepted.
+GRAMMAR_TOO_LARGE = "compiled grammar is too large"
+
+
+class GrammarTooLarge(ModelUnavailable):
+    """The API refused a request because its compiled grammar is too large."""
+
+
+#: Requests found too large, by their answer schema and strict tools: their
+#: tools go out loose from then on, so no turn pays the refusal twice.
+_TOO_LARGE: set[str] = set()
+
+
+def _grammar_key(schema: dict[str, Any] | None, strict: list[dict[str, Any]]) -> str:
+    held = [schema, sorted((t["name"], t["input_schema"]) for t in strict)]
+    return hashlib.sha256(json.dumps(held, sort_keys=True, default=str).encode()).hexdigest()
 
 
 class BudgetExhausted(ModelUnavailable):
@@ -713,12 +735,26 @@ def converse(
         "output_config": output_config,
         "cache_control": {"type": "ephemeral"},
     }
+    strict = [t for t in tools if t.get("strict", True)]
+    key = _grammar_key(schema, strict)
     if tools:
-        request["tools"] = [tool_param(t["name"], t["description"], t["input_schema"], t.get("strict", True)) for t in tools]
+        request["tools"] = [tool_param(t["name"], t["description"], t["input_schema"],
+                                       t.get("strict", True) and key not in _TOO_LARGE) for t in tools]
         request["tool_choice"] = {"type": tool_choice}
     held = _reserve(model, request, max_tokens, Usage(), role)
     try:
-        response = _converse_once(request, ask, model)
+        try:
+            response = _converse_once(request, ask, model)
+        except GrammarTooLarge:
+            if not strict or key in _TOO_LARGE:
+                raise
+            # The answer schema stays strict and the tools go loose: `tools.run`
+            # validates every tool's input alike, strict or not.
+            _TOO_LARGE.add(key)
+            log.warning("the API's grammar for %d strict tools and the answer schema is too large; "
+                        "sending the tools loose", len(strict))
+            request["tools"] = [tool_param(t["name"], t["description"], t["input_schema"], False) for t in tools]
+            response = _converse_once(request, ask, model)
     except BaseException:
         spend.settle(held, role, 0.0)
         raise
@@ -751,7 +787,8 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
     except anthropic.APIConnectionError as e:
         raise ModelUnavailable(f"Could not reach the Anthropic API: {e}") from e
     except anthropic.BadRequestError as e:
-        raise ModelUnavailable(f"The Anthropic API refused the request as malformed: {e.message}") from e
+        refused = GrammarTooLarge if GRAMMAR_TOO_LARGE in str(e.message).lower() else ModelUnavailable
+        raise refused(f"The Anthropic API refused the request as malformed: {e.message}") from e
     except (anthropic.NotFoundError, anthropic.PermissionDeniedError) as e:
         raise ModelUnavailable(f"{model} is not available to this key ({e.status_code})") from e
     except (anthropic.APIError, _http.TransportError) as e:

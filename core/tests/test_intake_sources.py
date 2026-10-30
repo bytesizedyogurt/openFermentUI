@@ -238,3 +238,17 @@ def test_an_outage_is_transient_and_a_page_in_place_of_a_pdf_is_not(monkeypatch)
     monkeypatch.setattr(collectors, "_get", answer(stream))
     found = collectors.osti(OSTI_URL)
     assert found.sections == 2 and found.citation.title == "OSTI report 1013269"
+
+
+@pytest.mark.parametrize("status, where", [(200, "https://www.osti.gov/errors/error429.html"),
+                                           (429, "https://www.osti.gov/servlets/purl/1013269")])
+def test_osti_asking_to_slow_down_is_the_networks_condition_and_asked_again_later(monkeypatch, status, where):
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "")
+    page = httpx.Response(status, headers={"content-type": "text/html"}, content=b"<html>Too many requests</html>",
+                          request=httpx.Request("GET", where))
+    monkeypatch.setattr(collectors, "_get", lambda url, **kw: page)
+    with pytest.raises(collectors.Transient):
+        collectors.fetch_pdf(OSTI_URL)
+    with pytest.raises(NotCollected) as e:
+        collectors._network("OSTI", collectors.fetch_pdf, OSTI_URL)
+    assert e.value.transient

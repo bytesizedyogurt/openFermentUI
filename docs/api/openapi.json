@@ -1533,7 +1533,7 @@
         "type": "object"
       },
       "CollectRequest": {
-        "description": "POST /api/intake/collect: a paper, a report or a strain entry by its\nidentifier (a PMCID, a DOI, `PMID:<id>`, `OSTI:<id>`, an osti.gov or a\nyeastgenome.org address), who asked, and why.",
+        "description": "POST /api/intake/collect: a paper, a report or a strain entry by its\nidentifier (a PMCID, a DOI, `PMID:<id>`, `OSTI:<id>`, `SGD:<SGDID>`, an\nosti.gov or a yeastgenome.org address), who asked, and why.",
         "properties": {
           "by": {
             "maxLength": 200,

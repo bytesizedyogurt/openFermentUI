@@ -8,10 +8,10 @@
 # and serves the build on 127.0.0.1:4173 with /api passed through to the
 # service. Then it prints the address. Ctrl-C stops both.
 #
-# This is the live app. The service reads and writes core/data/: what this
-# machine fetched, extracted and decided. With a key in core/.env, Extract
-# and Postdoc's Live mode spend money, and a Guild decision lands in the
-# committed core/data/biorepo.json.
+# This is the live app. The service keeps every record in the PostgreSQL
+# database core/.env names (session-start.sh migrates it): what this machine
+# collected, extracted and decided. With a key in core/.env, extraction and
+# Postdoc spend money under the day's cap.
 # Both servers listen on loopback alone.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"

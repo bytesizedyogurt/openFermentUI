@@ -128,6 +128,18 @@ thirty-four.
 
 That evaluation (development plan §8, "Let the simple system compete").
 
+## Implementation 8 (found by the live proof)
+
+`pnpm prove --live` asked Postdoc's evaluation set of the routed model (2026-10-30, `claude-haiku-5-5`)
+and every request came back HTTP 400: "The compiled grammar is too large, which would cause
+performance issues." The API compiles one grammar for a request's answer schema and its strict tools.
+Measured with one request each: the plan schema, with each claim's typed values (stage 6.2), beside
+the registry's seven strict tools was refused; the same schema with every tool loose was accepted, as
+were the seven strict tools with no answer schema. `llm.converse` now sends such a request again
+with its tools loose and its answer schema strict, and remembers its shape, so the next turn goes
+loose at once (`GrammarTooLarge`; `test_llm.py`). `tools.run` validates every tool's input alike,
+strict or not. The offline suites could not see it: the API compiles the grammar.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

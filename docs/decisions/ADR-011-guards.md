@@ -27,3 +27,26 @@ A guard proves necessary again: it returns with a test that fails on the thing i
 ## Evidence
 
 - `package.json` `verify` at `alpha-1.0` (24 stages).
+
+## Implementation 8 (stage 8 settles the list)
+
+`package.json` `verify`, in order, sixteen stages: `check:secrets` (first), `typecheck`,
+`gen:api --check`, `gen:components --check`, `check:plan`, `test:core`, `test:sim`, `test:lit`,
+`check:licences`, `check:tools`, `check:guild`, `check:state`, `check:figures`, `build`, `smoke`
+(the decision's `test:smoke`), `test:reconcile`. CI (`.github/workflows/verify.yml`) runs it with a
+`pgvector/pgvector:pg17` service, then `pnpm prove`, every step of the proof with the UI walk
+among them (acceptance A2).
+
+Beyond the decision's list, five stages stay, each guarding a rule this build keeps:
+
+- `gen:components --check`: `COMPONENTS.md` is what the package map writes (stage 8.3).
+- `check:plan`: the hand-kept `src/data/types.ts` and the service's models name the same fields,
+  and `PROVENANCE_RANK` holds the service's order; it goes when the screens read
+  `src/api/types.gen.ts` alone (a debt in `docs/PROGRESS.md`).
+- `check:state`: the browser's outbox of writes the service has not acknowledged (ADR-014).
+- `check:figures`: every provenance draws its own mark, `assumed` among them (execution prompt §7.5).
+- `test:reconcile`: the prediction kinds a deposition reconciles, the code the bench page draws from.
+
+`check:tools` holds `docs/TOOLS.md` to the registry (rule 5), which covers what `gen:tools --check`
+would. `pnpm record:fixtures` waits: no component test replays recorded responses yet, and the walk
+and the smoke run against the real service (a debt in `docs/PROGRESS.md`).

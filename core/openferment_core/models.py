@@ -501,8 +501,8 @@ class CollectOutcome(BaseModel):
 
 class CollectRequest(BaseModel):
     """POST /api/intake/collect: a paper, a report or a strain entry by its
-    identifier (a PMCID, a DOI, `PMID:<id>`, `OSTI:<id>`, an osti.gov or a
-    yeastgenome.org address), who asked, and why."""
+    identifier (a PMCID, a DOI, `PMID:<id>`, `OSTI:<id>`, `SGD:<SGDID>`, an
+    osti.gov or a yeastgenome.org address), who asked, and why."""
 
     identifier: str = Field(min_length=1, max_length=500)
     by: str = Field(min_length=1, max_length=200)

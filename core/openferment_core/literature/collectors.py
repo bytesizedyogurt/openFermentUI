@@ -812,6 +812,10 @@ def fetch_pdf(url: str) -> bytes:
     response = _get(url, follow_redirects=True)
     if response.status_code >= 500:
         raise Transient(f"OSTI returned {response.status_code} for {url}")
+    # OSTI asks a client to slow down with a 429, or by redirecting it to its
+    # rate-limit page (seen 2026-10-30): the network's condition, asked again later.
+    if response.status_code == 429 or "error429" in response.url.path:
+        raise Transient(f"OSTI asked to slow down (its rate limit) for {url}")
     if response.status_code != 200:
         raise httpx.HTTPStatusError(
             f"OSTI returned {response.status_code} for {url}", request=response.request, response=response,
@@ -1172,6 +1176,9 @@ _PMCID = re.compile(r"^PMC\d+$", re.I)
 _DOI = re.compile(r"^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)?(10\.\d{4,9}/\S+)$", re.I)
 _PMID = re.compile(r"^(?:pmid:?\s*)(\d{1,9})$", re.I)
 _OSTI = re.compile(r"^(?:osti:?\s*)(\d{1,10})$", re.I)
+_SGD = re.compile(r"^(?:sgd:?\s*)(S\d{9})$", re.I)
+# Where SGD serves a strain entry as JSON, by its SGDID.
+SGD_STRAIN = "https://www.yeastgenome.org/backend/strain"
 
 
 def europepmc_hit(query: str) -> dict[str, Any] | None:
@@ -1291,9 +1298,9 @@ def sgd(identifier: str) -> Collected:
 
 def by_identifier(identifier: str) -> Collected:
     """The collector an identifier names: an osti.gov address or `OSTI:<id>`
-    is OSTI's, a yeastgenome.org address SGD's, and a PMCID, a DOI or
-    `PMID:<id>` Europe PMC's. A bare number is refused, since PMIDs and OSTI
-    ids look alike."""
+    is OSTI's, a yeastgenome.org address or `SGD:<SGDID>` SGD's, and a
+    PMCID, a DOI or `PMID:<id>` Europe PMC's. A bare number is refused, since
+    PMIDs and OSTI ids look alike."""
     asked = identifier.strip()
     if not asked:
         raise NotCollected("no identifier given")
@@ -1302,6 +1309,8 @@ def by_identifier(identifier: str) -> Collected:
         return osti(asked)
     if host == "yeastgenome.org" or host.endswith(".yeastgenome.org"):
         return sgd(asked)
+    if strain := _SGD.match(asked):
+        return sgd(f"{SGD_STRAIN}/{strain.group(1).upper()}")
     if asked.isdigit():
         raise NotCollected(f"{asked} could be a PMID or an OSTI id; write PMID:{asked} or OSTI:{asked}")
     return europepmc(asked)

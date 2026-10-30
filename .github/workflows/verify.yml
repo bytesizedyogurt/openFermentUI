@@ -78,8 +78,8 @@ jobs:
 
       - run: pnpm verify
 
-      # The UI walk against a real service (execution prompt §10 stage 7 gate,
-      # §9.1 step 9): the proof's steps it stands on, then Chromium through the
-      # built app.
-      - name: The UI walk
-        run: pnpm prove --steps 9
+      # The proof (execution prompt §9.1, acceptance A2): every step offline
+      # against a real service on a database of its own, the UI walk in
+      # Chromium through the app verify built among them (step 9).
+      - name: The proof
+        run: pnpm prove

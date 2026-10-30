@@ -1,7 +1,7 @@
 """Alembic's environment for Sci RAG Kit's schema, `sci_rag` (ADR-001, ADR-002).
 
 The six migrations in versions/ are the kit's own, from its pinned commit and
-under its licence (LICENSE-sci-rag-kit): its wheel leaves them out. This file
+under its licence (versions/LICENSE): its wheel leaves them out. This file
 is openFerment's. It runs them with the kit's tables in their own schema and
 the version table beside them, so the kit's history and ours
 (db/alembic/) never meet. `openferment_core.migrations` runs it after ours,

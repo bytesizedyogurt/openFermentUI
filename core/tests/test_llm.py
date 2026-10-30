@@ -772,3 +772,45 @@ def test_a_turn_on_a_provider_that_waits_is_unavailable_in_words():
     with pytest.raises(llm.ModelUnavailable, match="waits for the owner"):
         llm.converse(system="s", messages=[{"role": "user", "content": "q"}], tools=[], schema=None, max_tokens=10,
                      model="openai-compatible:qwen3-32b", ask=lambda request: None)
+
+
+def test_a_grammar_too_large_sends_the_tools_loose_and_is_remembered(monkeypatch):
+    """The API compiles one grammar for the answer schema and every strict
+    tool and refuses one too large (measured 2026-10-30 on Postdoc's plan
+    schema beside seven strict tools): the request goes again with its tools
+    loose and its answer schema strict, and the next turn goes loose at once."""
+    import anthropic
+    import httpx
+
+    monkeypatch.setattr(llm, "_TOO_LARGE", set())
+    refusal = anthropic.BadRequestError(
+        message="The compiled grammar is too large, which would cause performance issues.",
+        response=httpx.Response(400, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages")), body=None)
+    sent = []
+
+    def ask(request):
+        sent.append([t["strict"] for t in request["tools"]])
+        if len(sent) == 1:
+            raise refusal
+        return _turn([SimpleNamespace(type="text", text='{"candidates": []}')])
+
+    assert _converse(ask).data == {"candidates": []}
+    _converse(ask)
+    assert sent == [[True], [False], [False]]
+
+
+def test_any_other_malformed_request_is_unavailable_as_before():
+    import anthropic
+    import httpx
+
+    refusal = anthropic.BadRequestError(message="messages: at least one message is required",
+                                        response=httpx.Response(400, request=httpx.Request("POST", "https://x")), body=None)
+    sent = []
+
+    def ask(request):
+        sent.append(request)
+        raise refusal
+
+    with pytest.raises(llm.ModelUnavailable) as e:
+        _converse(ask)
+    assert not isinstance(e.value, llm.GrammarTooLarge) and len(sent) == 1

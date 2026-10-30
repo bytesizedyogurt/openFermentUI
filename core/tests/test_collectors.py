@@ -101,6 +101,8 @@ def test_the_markdown_keeps_each_section_under_its_heading_and_a_table_as_rows()
         ("OSTI:1013269", "osti"),
         ("https://www.osti.gov/biblio/1013269", "osti"),
         ("https://www.yeastgenome.org/backend/strain/S000203483", "sgd"),
+        ("SGD:S000203483", "sgd"),
+        ("sgd:S000203483", "sgd"),
     ],
 )
 def test_an_identifier_goes_to_the_collector_that_serves_it(monkeypatch, identifier, collector):
@@ -259,3 +261,21 @@ def test_an_upload_keeps_the_title_it_gives_itself():
     plain = collectors.uploaded("plain.txt", b"no title here")
     assert plain.citation.title == "plain"
     assert collectors.uploaded("notes.md", b"# Own", title="Given").citation.title == "Given"
+
+
+def test_an_sgdid_is_asked_for_at_the_address_sgd_serves_its_entry_from(monkeypatch):
+    asked: list[str] = []
+    monkeypatch.setattr(collectors, "sgd", lambda url: asked.append(url))
+    collectors.by_identifier("sgd:s000203459")
+    assert asked == [f"{collectors.SGD_STRAIN}/S000203459"]
+
+
+def test_every_identifier_in_the_ethanol_sources_names_a_collector(monkeypatch):
+    sources = Path(__file__).resolve().parents[2] / "docs" / "corpus" / "ethanol-sources.txt"
+    named = [line.split("#", 1)[0].strip() for line in sources.read_text(encoding="utf-8").splitlines()]
+    called: list[str] = []
+    for name in ("europepmc", "osti", "sgd"):
+        monkeypatch.setattr(collectors, name, lambda asked, name=name: called.append(name))
+    for identifier in filter(None, named):
+        collectors.by_identifier(identifier)
+    assert len(called) == len(list(filter(None, named))) and {"europepmc", "osti", "sgd"} <= set(called)

@@ -16,32 +16,26 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 8** — guidance reconciliation and closing (execution prompt §10 stage 8): the
-   new `CLAUDE.md` (under 250 lines, every line labelled), `README.md` (two screens),
-   `COMPONENTS.md` from the package map, proof step 3 (the kit's demo corpus ingested, searched,
-   a candidate anchored and accepted, the record in BioRepo), the full `pnpm verify` and
-   `pnpm prove`, then the pull request with the completion report (§12). Stages 0 to 7 are
-   complete: stage 7 gave the UI the generated API (`pnpm gen:api`), project addresses, Home and
-   the project home, the live trace cards, the SFF graph and the walk (`scripts/walk.ts`, proof
-   step 9, run in CI). The per-request key override waits for the owner (owner question 10).
+4. **Next step: the owner's.** The alpha 2.0 foundation build is complete (stages 0 to 8), and its
+   pull request carries the completion report. What waits is the owner's: owner questions 1 to 10
+   below, the tag push and the live Mini's first alpha 2.0 install (Blockers), then the review. A
+   session that continues the work starts from the Known debts, each naming what pays it, and runs
+   `pnpm verify` and `pnpm build && pnpm prove` first; `pnpm prove --live` needs the key in
+   `core/.env` (`bash scripts/session-start.sh` writes it from `OPENFERMENT_API_KEY`).
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 8 — guidance reconciliation and closing — is next. Stages 0 to 7 are complete. Stage 6 put
-Postdoc's conversations on the server with the project's event stream, typed the numbers of
-claims and tool inputs, added the engine, study and literature tools, routed models by family
-and scored an evaluation set; stage 7 wired the UI to it: project addresses, Home and the
-project home, the live trace cards, the SFF graph, the generated API and the walk. Stages 0 to 5 are
-complete (the tag push waits on the owner; see Blockers). Stage 5 built the studies package:
-scenarios on a plant with each value's origin, run as engine runs; comparisons as artifacts over
-the runs'; runbooks made from a run's outputs and locked on the service under the browser's
-digest, which the store then holds them to; the export package that opens without the service;
-the run, comparison and studies screens on `RunReport`, the figure grammar and the parameter
-panel; and `scripts/prove.py`, whose steps 5 and 8 are the stage's gate. The proof found and the
-worker now closes one leak between builds (a plant's stream prices, ADR-004 Implementation 5.2);
-ADR-013 records the one departure the proof holds (cornstover's package test on this
-installation).
+The alpha 2.0 foundation build is complete: stages 0 to 8. Stage 8 reconciled the guidance
+(`CLAUDE.md`, 134 lines, every line labelled, held by `test_guidance.py`; `README.md`;
+`COMPONENTS.md` written by `pnpm gen:components` from the package map; `docs/api/intake.md`),
+settled verify's sixteen stages (ADR-011, Implementation 8) and finished the proof: step 3 takes the
+kit's demo corpus in through Intake, searches it, anchors a stand-in's candidate to the stored text
+and accepts it into BioRepo, and `pnpm prove --live` runs the proof with the key, the ethanol
+sources and the routed models. The live run found two faults the offline suites could not see, both
+fixed here: Intake refused the `SGD:<id>` form the sources file uses, and the API refused every
+Postdoc request once the plan schema's typed values joined seven strict tools (ADR-008,
+Implementation 8).
 
 ## Last green runs
 
@@ -92,6 +86,9 @@ installation).
 | 2026-10-30 17:24 | Stage 6 gate, the same worktree: secrets, typecheck, plan, licences, tools, `gen:tools --check`, guild, state, figures, build, `pnpm smoke`, reconcile, `pnpm prove` (steps 1, 2, 4, 5, 6, 7, 8); the worktree left clean | all passed; 43 of 43 checks hold | 2 min 38 s (prove) | 6.4 (gate) |
 | 2026-10-30 17:39 | `pnpm prove --steps 9` (steps 1, 2, 5, 6, 9), the walk in Chromium through the built app | 33 of 33 checks hold | 2 min 3 s | 7.2 |
 | 2026-10-30 17:45 | `test:core` with stage 7; typecheck, plan, secrets, `gen:api --check`, `gen:tools --check`, `pnpm smoke` | 2236 passed, 2 skipped, 168 deselected; all passed; 12 of 12 screens | 5 min 28 s | 7.2 |
+| 2026-10-30 18:12 | `pnpm prove --steps 3,8` (steps 1, 2, 3, 8), offline: the kit's demo corpus, a stand-in's candidate anchored, refused and accepted | 21 of 21 checks hold; the proof's spend table holds no call | 60 s | 8.4 |
+| 2026-10-30 18:58 | `test:core` with stage 8 (the guidance test, the SGD form, the grammar fix, OSTI's rate limit) | 2250 passed, 2 skipped, 168 deselected | 5 min 17 s | 8.4 |
+| 2026-10-30 18:39 | `pnpm prove --live` (steps 1 to 8): 22 of 22 ethanol sources, 814 chunks; PMC4842200 extracted by `claude-haiku-5-5` (8 candidates kept, 2 refused); the evaluation set answered live | 46 of 46 checks hold; 10 calls, $0.0163 from the proof's spend table | 7 min 21 s | 8.4 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -109,13 +106,16 @@ installation).
 | [008](decisions/ADR-008-postdoc-memory-routing.md) | Postdoc memory on the server; model routes | accepted, stage 6 |
 | [009](decisions/ADR-009-ui.md) | The UI is kept and wired | accepted, stage 7 |
 | [010](decisions/ADR-010-deletions.md) | Deletions | accepted, stage 1 |
-| [011](decisions/ADR-011-guards.md) | Guards and verify stages | accepted, stages 1 and 8 |
+| [011](decisions/ADR-011-guards.md) | Guards and verify stages | accepted, stages 1 and 8 (Implementation 8: sixteen stages) |
 | [012](decisions/ADR-012-licence-undecided.md) | Licence undecided | open (owner) |
+| [013](decisions/ADR-013-cornstover-package-test.md) | The corn stover plant's two values its package's own test fails, held to the package's measurement | accepted, stage 5 |
+| [014](decisions/ADR-014-durable-write-queue.md) | The Durable snapshot keeps the writes the service has not acknowledged | accepted, stage 7 (a departure) |
 
 ## Departures from the execution prompt
 
 | Where | Departure | Why |
 |---|---|---|
+| A4, stage 8 | `test_no_seed.py` holds what A4 names (each deleted module absent, no `.ts` under `src/data/` exporting content, the shipped stores empty), and an `rg` over `core/tests/` still finds test values: `standins.py` (stand-in records on real strain ids, a closed-form ethanol evaluator with the theoretical yield on glucose; 27 test files use it) and `test_proforma_slow.py` (the benchmark price this build once measured). `src/` and the service's code hold none | The stand-ins carry rule tests (binding, overrides, ceilings, run contracts) that stage 4's library fixtures were to replace; that work did not fit stages 4 to 8 (a debt below) |
 | §5.5, A3, stage 7.1 | The Durable snapshot keeps the writes the service has not acknowledged (review decisions, Guild entries, project rows), beside the preferences; a record the service holds is never kept there (ADR-014) | Without the queue, a reviewer's decision made while the service is away is lost on the next reload |
 | §4.8, §11.1, stage 6.3 | The per-request key override and a route's non-Anthropic model are not built; each would change how a key is read, which the owner decides (owner question 10; ADR-008, Implementation 6.3) | §11.1 asks the owner before a change to how keys are stored or read |
 | §10 stage 8.1 | The old `CLAUDE.md` moved to `docs/history/CLAUDE-2026-10-21.md` at stage 0, with a short interim `CLAUDE.md` | Claude Code injects `CLAUDE.md` into every new session as binding instructions; the old file (96,858 bytes) would direct a resuming session against this build. Stage 8 still writes the final file |
@@ -165,31 +165,43 @@ installation).
 
 | Debt | Paid at |
 |---|---|
-| `core/tests/standins.py` carries invented stand-in records (on real strain ids) and a closed-form evaluator for rule tests | stage 4: fixtures from `biorefineries` library plants |
-| `program` survives as pureOS's chemical-set key (`TrainSpec.program`), and as a field of `FlowsheetInfo`, `VesselSummary`, `TrainSummary` and `TrainProposal`; the UI no longer shows or filters by it; projects (stage 2) took the scoping, so what remains is the chemical-set key | stage 4 (the adapter) |
-| Proforma tool rules that need a successful run of a seed scenario (`run_flowsheet` keeps one run and audits it; `stream_table` on a scenario's run) lost their tests with the seed scenarios | stage 5, when scenarios live in projects |
-| The vessel's organism check reads the yeast program's species from a strain catalogue that is empty; its test supplies one | stage 3 (strains with a project's records) or stage 4 |
-| `test_proforma_slow.py` and `flowsheets/cornstover_benchmark.py` still state the benchmark price this build once measured (1.968 USD per gallon); the browser no longer shows it | stage 4: the adapter holds a library plant to its package's own test values |
-| `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program | the vocabulary review at stage 3 |
+| `core/tests/standins.py` (27 test files use it) and `test_proforma_slow.py` keep test values that A4's `rg` clause would find: stand-in records on real strain ids, a closed-form ethanol evaluator with the theoretical yield, and the benchmark price this build once measured (a departure above) | after alpha 2.0: fixtures read from the library plants |
+| A review decision's provenance is the label of the reviewer's action, kept as the decision carries it (alpha 1.0's shape); `biorepo.write` refuses `assumed`, any estimate and a gold value on an unverified decision, and otherwise keeps the label as sent. Computing it from the decision's kind (verified → curated, a gold value → gold) is owed to ADR-006 | the next change to `biorepo.write` |
+| A retrieval report over a project's own corpus with the lanes that call a model (the graph, HyDE, a judge grading the answers): alpha 1.0's paid lanes (Live owed, §4.5) | after alpha 2.0, with the key: `pnpm lit:report` extended to a project and a judge route |
+| The `openferment` MCP server did not connect at this session's start within the client's 30 s (no `core/.env` then, so no database named); `pnpm test:core`'s `test_mcp.py` holds its tools in process | the next session with `core/.env` written before it starts |
+| `core/tests/standins.py` carries invented stand-in records (on real strain ids) and a closed-form evaluator for rule tests | stage 4: fixtures from `biorefineries` library plants; still open at stage 8: after alpha 2.0 |
+| `program` survives as pureOS's chemical-set key (`TrainSpec.program`), and as a field of `FlowsheetInfo`, `VesselSummary`, `TrainSummary` and `TrainProposal`; the UI no longer shows or filters by it; projects (stage 2) took the scoping, so what remains is the chemical-set key | stage 4 (the adapter); still open at stage 8: after alpha 2.0 |
+| Proforma tool rules that need a successful run of a seed scenario (`run_flowsheet` keeps one run and audits it; `stream_table` on a scenario's run) lost their tests with the seed scenarios | stage 5, when scenarios live in projects; still open at stage 8: after alpha 2.0 |
+| The vessel's organism check reads the yeast program's species from a strain catalogue that is empty; its test supplies one | stage 3 (strains with a project's records) or stage 4; still open at stage 8: after alpha 2.0 |
+| `test_proforma_slow.py` and `flowsheets/cornstover_benchmark.py` still state the benchmark price this build once measured (1.968 USD per gallon); the browser no longer shows it | stage 4: the adapter holds a library plant to its package's own test values; still open at stage 8: after alpha 2.0 |
+| `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program | the vocabulary review at stage 3; still open at stage 8: after alpha 2.0 |
 | `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's funnel | after alpha 2.0 (stage 7 left the module screens as they were, now views inside a project) |
 | `src/data/types.ts` is still hand-kept beside the generated `src/api/types.gen.ts`, held to the service by `check:plan`'s pairs; the screens read the hand-kept types | the screens move to the generated types one by one, after alpha 2.0 |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, §9.3) are not built; the walk and the smoke run against the real service | after alpha 2.0 |
-| Dead service paths the deletions left: the storage machinery (`kinetics.py`'s N and Q states, `fermos._no_broth_product`'s store-in-cells branch, `proforma.fit_info`'s store branch), `proforma._strain_labels`' program map, `proforma.basis_inputs`' `cap` and the yield cap in `_specs`; `fermos.NAMED_NOTE` still says "program" (its text is hashed into every simulation's basis) | stage 4, with the adapter |
-| Catalogues that left with the seed are empty in production and supplied by fixtures in tests: held scenarios, the strain catalogue and its aliases, the proposer's products and hosts. Until a project's records carry them, every pureOS proposal is refused for want of a host on file. Stage 2 gave each project its tables; what fills them is the literature | stage 3 (records), stage 5 (scenarios) |
-| No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | stage 4 |
-| `test_proforma.py` holds the package's own regression values and this build's benchmark price to test the parser | stage 4 (A4 review) |
-| `core/tests/standins.py` keeps a closed-form ethanol evaluator, stand-in yeast records and `STANDIN_THEORETICAL` | stage 4 (with the row above on stand-ins) |
-| `pnpm smoke` opens the rail entries and checks nothing more; alpha 1.0's smoke also walked review, deposition, the runs and the redirects against the service double | stage 7 extends it over the real service |
+| Dead service paths the deletions left: the storage machinery (`kinetics.py`'s N and Q states, `fermos._no_broth_product`'s store-in-cells branch, `proforma.fit_info`'s store branch), `proforma._strain_labels`' program map, `proforma.basis_inputs`' `cap` and the yield cap in `_specs`; `fermos.NAMED_NOTE` still says "program" (its text is hashed into every simulation's basis) | stage 4, with the adapter; still open at stage 8: after alpha 2.0 |
+| Catalogues that left with the seed are empty in production and supplied by fixtures in tests: held scenarios, the strain catalogue and its aliases, the proposer's products and hosts. Until a project's records carry them, every pureOS proposal is refused for want of a host on file. Stage 2 gave each project its tables; what fills them is the literature | stage 3 (records), stage 5 (scenarios); still open at stage 8: after alpha 2.0 |
+| No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | stage 4; still open at stage 8: after alpha 2.0 |
+| `test_proforma.py` holds the package's own regression values and this build's benchmark price to test the parser | stage 4 (A4 review); still open at stage 8: after alpha 2.0 |
+| `core/tests/standins.py` keeps a closed-form ethanol evaluator, stand-in yeast records and `STANDIN_THEORETICAL` | stage 4 (with the row above on stand-ins); still open at stage 8: after alpha 2.0 |
+| `pnpm smoke` opens the rail entries and checks nothing more; alpha 1.0's smoke also walked review, deposition, the runs and the redirects against the service double | paid at stage 7: the walk (`scripts/walk.ts`, proof step 9) goes through Home, a project, a document pasted and searched, a run's report and its graph, a conversation and a runbook on the real service |
 | `test_biorepo.py::test_the_committed_file_is_the_model_and_starts_empty` holds the shape of a tracked file nothing reads | when `core/data/biorepo.json` leaves git (owner action above) |
 | The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run only as `bash -n` here: this container is not a Mac | the owner's first install on the Mini |
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run: this container has no Docker daemon, so stages 2 and 3 run on the distribution's PostgreSQL 16 with pgvector 0.6.0. CI's verify runs the same image as a service from 3.1 on (the workflow had no database through stage 2, so verify failed in CI on the stage 2 pushes) | the first CI run of 3.1, or the owner's machine |
 | The kit's MCP server (`literature_mcp.py`) has run only as an import here: the session's MCP clients start from `.mcp.json` at session start | the next session, or the owner's Claude Code |
-| `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7 |
-| fermOS, pureOS and Proforma take a run's values as `Override`s (a person's assumption or a model's estimate) and name each input's source in the basis, which `basis.origin_of` reads as an `Origin`; their requests are not yet lists of `Quantity` objects, and their runs are artifacts with no row in `runs` (engine runs alone are) | stage 6 (tool inputs as `Quantity` objects), stage 7 (`gen:api`) |
-| The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | stage 7, when the UI reads the library shelf |
+| `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7; still open at stage 8: after alpha 2.0 |
+| fermOS, pureOS and Proforma take a run's values as `Override`s (a person's assumption or a model's estimate) and name each input's source in the basis, which `basis.origin_of` reads as an `Origin`; their requests are not yet lists of `Quantity` objects, and their runs are artifacts with no row in `runs` (engine runs alone are) | stage 6 (tool inputs as `Quantity` objects), stage 7 (`gen:api`); still open at stage 8: after alpha 2.0 |
+| The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | stage 7, when the UI reads the library shelf; still open at stage 8: after alpha 2.0 |
 | A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and not offered | after alpha 2.0 (4.3 composes the cellulosic plant's pretreatment and fermentation instead) |
 | A second organism's reaction set for the composed flowsheet: the package holds one | when a package or a record gives another |
-| Small handler mismatches the worker op reference found (4.4): `train_spec.py` sends `train_run` a `product` its handler reads nowhere; `grid` and `montecarlo` leave out the `structure` that `evaluate` and `run` pass on (both ops are called by tests alone); an unknown flowsheet's refusal arrives quoted (`Refused: 'there is no flowsheet …'`); an unknown catalogue type raises `CatalogueUnknown`, which callers avoid by checking the type first | the next change to those ops (stage 5 reshapes the Proforma scenarios) |
+| Small handler mismatches the worker op reference found (4.4): `train_spec.py` sends `train_run` a `product` its handler reads nowhere; `grid` and `montecarlo` leave out the `structure` that `evaluate` and `run` pass on (both ops are called by tests alone); an unknown flowsheet's refusal arrives quoted (`Refused: 'there is no flowsheet …'`); an unknown catalogue type raises `CatalogueUnknown`, which callers avoid by checking the type first | the next change to those ops (stage 5 reshapes the Proforma scenarios); still open at stage 8: after alpha 2.0 |
+## Live owed (folded from `docs/history/STATE-2026-10-21.md` at stage 8)
+
+The two LIVE steps alpha 1.0 still owed, each judged against this build:
+
+| Owed at alpha 1.0 | Now |
+|---|---|
+| §4.5, the paid lanes of the retrieval evaluation (`pnpm rag:eval && pnpm data:push`), waiting on a helper model the safety classifier lets through | Retired with their code: the bespoke retrieval stack and the data branch are deleted (§5.4, §5.5; ADR-010). Its successor is the kit's retrieval report, `pnpm lit:report`, which asks no model. A report with the lanes that call one (the graph, HyDE, a judge grading the answers), over a project's own corpus, is a debt below |
+| §10.3, the saved answer (`pnpm demo:fixtures --real && pnpm data:push`): a real Postdoc answer, its artifacts and the retrieval report saved | Retired with the demo infrastructure (§5.3; ADR-010). A real answer is now a turn of a conversation the service keeps, with its tool calls and the artifacts they made (stage 6); `pnpm prove --live` step 6 keeps two, asked of the routed models |
 
 ## Owner questions (execution prompt §13) and the defaults taken
 
@@ -219,6 +231,11 @@ installation).
   Container state, gone with the container.
 - CI went green again on `1393b1c` (the stage 4 gate's last commit), the whole verify passing on
   the runner.
+- Stage 8: `bash scripts/session-start.sh` wrote `core/.env` from `OPENFERMENT_API_KEY` (mode 600,
+  ignored by git; the value never printed). The session's environment sets every route to
+  `claude-haiku-5-5` at effort medium (`OPENFERMENT_MODEL`, its fallback and the index model).
+  Europe PMC, OSTI, SGD and the Anthropic API answer from this container; OSTI rate-limits a
+  burst of report fetches with a redirect to its 429 page.
 - CI (`.github/workflows/verify.yml`, read through the GitHub tools, 2026-10-30): verify runs on
   the runner's Python 3.12 with a `pgvector/pgvector:pg17` service. Green on 3.1 and 4.1; red on
   3.2 and 3.3 (fixed by 4.1), on 4.2 (`test_proforma_worker.py`'s toy fixture compared floats
@@ -628,3 +645,42 @@ installation).
   a record the service holds is never kept there (ADR-014, a departure from §5.5 and A3).
 - 7.2 (the walk) `scripts/walk.ts` walks the built app in Chromium against a real service; it is
   the proof's step 9, run in CI after verify. ADR-009, Implementation 7.2.
+
+### Stage 8 — 2026-10-30
+
+- 8.1 The old guidance moved to `docs/history/` at stage 0 (a departure above); STATE.md's two
+  still-open "Live owed" items are folded into the section of that name, each judged against this
+  build.
+- 8.2 `CLAUDE.md`: 134 lines, every line labelled R, P or C, the ten sections stage 8 names; each
+  architecture line names its decision record and each contract line its document, held by
+  `core/tests/test_guidance.py` (A7) with the decision records 000 to 014 and this file's Resume.
+- 8.3 `README.md` (two screens); `COMPONENTS.md` written by `pnpm gen:components` from the package
+  map `test_boundaries.py` enforces and each module's docstring, checked in verify;
+  `docs/api/intake.md` (§7.3 item 6); `pnpm gen:api` and `pnpm gen:tools` regenerate the rest of
+  `docs/api/` and `docs/TOOLS.md`. Verify settled at sixteen stages (ADR-011, Implementation 8); CI
+  runs `pnpm prove`, every step, after verify. `scripts/prototype-up.sh`'s header says where the
+  records live now.
+- 8.4 Proof step 3, offline: the kit's demo corpus (five fictional documents, CC0) through Intake's
+  upload; 5 documents in 34 chunks, every chunk embedded; each of the kit's 9 seed questions answered
+  by the passage that holds it, in the top five, with its citation; the service in fixture mode
+  reads a stand-in's written response at the extract route and anchors its candidate to the stored
+  passage, and refuses its second, quoting words the document does not hold (rule `quote`); a
+  decision carrying a model's estimate refused at the record store (rule `estimate`); a person's
+  decision accepting the candidate, and the record in BioRepo, verified and curated; after the
+  restart, the documents and the record reload. The proof's last check reads its own spend table:
+  offline it holds no call.
+- 8.4 `pnpm prove --live`: the key from `core/.env`, the network, the routed models (here every
+  route `claude-haiku-5-5` at effort medium, the session's settings). Step 3 collects the ethanol
+  sources (`docs/corpus/ethanol-sources.txt`) and the model extracts PMC4842200 through the service;
+  step 6 asks the evaluation set of the routed model. Its first run found two faults, fixed:
+  - Intake refused `sgd:S000203483` and `sgd:S000203459`, the form the sources file documents:
+    `collectors.by_identifier` takes `SGD:<SGDID>` to SGD's strain address, and a test holds every
+    identifier in the file to a collector.
+  - Every Postdoc request was refused with HTTP 400, "The compiled grammar is too large": the plan
+    schema's typed values beside seven strict tools. `llm.converse` sends such a request again
+    with its tools loose and remembers it (ADR-008, Implementation 8).
+  - Its second run met OSTI's rate limit: both report addresses redirected to OSTI's 429 page,
+    which Intake read as a source serving HTML. `fetch_pdf` now says it is the network's condition
+    (`transient`), and the live proof asks such a source again once, two minutes later.
+- 8.4 A8: the kit's vendored migrations and prompt templates join `core/licences.toml` as vendored
+  code (BSD-3-Clause at `26b3990`), each with its `LICENSE` beside it; `THIRD_PARTY.md` regenerated.

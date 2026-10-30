@@ -3,7 +3,7 @@
 # What the kit's graph extractor looks for, and how HyDE writes its
 # hypothetical passage, in the language of bioprocess development. The
 # prompts/ folder beside this file is the kit's own (BSD-3-Clause,
-# LICENSE-sci-rag-kit); this file is openFerment's. It names kinds of things
+# prompts/LICENSE); this file is openFerment's. It names kinds of things
 # and how they relate; it holds no value of any kind.
 
 name: "openFerment bioprocess literature"

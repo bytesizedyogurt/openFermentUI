@@ -1,19 +1,31 @@
 """The proof (execution prompt §9.1): an end-to-end path with nothing seeded.
 
-    pnpm prove                    every step this build holds: 1, 2, 4, 5, 6, 7, 8, 9
+    pnpm prove                    every step: 1 to 9
     pnpm prove --steps 5,8        the steps named, after the steps they stand on
     pnpm prove --keep             leave the service running at the end, and say where
+    pnpm prove --live             with the key in core/.env and the network: step 3 collects the
+                                  ethanol sources (docs/corpus/ethanol-sources.txt) and the routed
+                                  model extracts a paper; step 6 asks the routed models; every step
+                                  but the walk, unless --steps names it. It spends, under the cap
 
 The service runs on loopback as a host serves it (uvicorn, `openferment_core.api`), on a
 database of the proof's own, made on the tests' server (OPENFERMENT_TEST_DATABASE_URL) and
 dropped at the end, with a data directory of its own: a proof touches no core/data/ and no
-other database. It runs without the model key and makes no model call: step 6 asks Postdoc
-through its evaluation's offline stand-in. Step 3, which reads the literature, arrives with
-stage 8. Every check prints ✓ or ✗ with what it saw; the proof exits 1 when a check fails, 2
-when it cannot start.
+other database. It runs without the model key and makes no model call, and in fixture mode,
+so its collectors refuse the network: step 3's extraction reads a stand-in's written response
+where it would call a model, and step 6 asks Postdoc through its evaluation's offline stand-in.
+Its last check reads the proof's own spend table: offline it holds no call. Every check prints ✓
+or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot start.
 
     1  a fresh database, migrated to its head; `ready --offline` green
     2  a project made through the API
+    3  Sci RAG Kit's demo corpus (five fictional documents, CC0) taken in through Intake's upload:
+       its documents, chunks and embeddings held by the project; a search in words for each of the
+       kit's seed questions answered by the passage that holds it, with its citation; a stand-in's
+       candidate extracted through the service and anchored to the stored text, its second,
+       quoting words the document does not hold, refused; a decision carrying a model's estimate
+       refused at the record store; a person's decision accepting the candidate, and the record in
+       BioRepo with its status, provenance and reviewer
     4  the library's plants listed; the cellulosic ethanol reference plant (the package's
        cornstover) run and held to the package's own test within its tolerance, the two values
        the package's own test fails on this installation each held to what the package's code
@@ -72,6 +84,18 @@ FLOWSHEET = "cellulosic_ethanol_v0"
 OTHER_PLANT = "sugarcane"
 # One of the toolkit's reference SFF files (engine/sff_library.json): Sugarcane → Ethanol.
 REFERENCE_FILE = "SF_BST_15"
+# Sci RAG Kit's demo corpus (five fictional documents, CC0), and the one the extraction reads.
+DEMO = CORE / "tests" / "fixtures" / "kit-demo"
+DEMO_LICENCE = "CC0, as the manifest of Sci RAG Kit's demo corpus states (core/tests/fixtures/kit-demo/manifest.jsonl)"
+POLICY = "Demo Region Policy Landscape for Agricultural Residue Utilization"
+# Live: the ethanol sources (docs/corpus/ethanol-sources.txt), a question in words over them, and the paper
+# the routed model extracts.
+SOURCES = ROOT / "docs" / "corpus" / "ethanol-sources.txt"
+LIVE_QUESTION = "ethanol yield of Saccharomyces cerevisiae on glucose"
+LIVE_PAPER = "PMC4842200"
+# How long a live proof waits before asking a source again that asked it to slow down.
+RETRY_AFTER_S = 120.0
+KEY_FILE = CORE / ".env"
 # The values the package's own test fails on this installation, each with what the package's
 # own code measures here (ADR-013), held to the run's ten significant digits.
 DEPARTURES = {
@@ -80,14 +104,16 @@ DEPARTURES = {
 }
 DIGITS = 10
 # A step, and the steps it stands on.
-STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,), 9: (5, 6)}
+STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 3: (2,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,), 9: (5, 6)}
 TITLES = {
     1: "a fresh database, migrated; ready green",
     2: "a project made through the API",
+    3: "documents taken in, embedded and searched; a candidate extracted, anchored and accepted; the record in "
+       "BioRepo",
     4: "the library's plants; the cellulosic ethanol reference plant held to its package's test",
     5: "the flowsheet on the library's defaults; A→B→A; a scenario, a comparison, a runbook, the export",
-    6: "Postdoc offline: cites a run, proposes and runs a scenario of a labelled estimate, drops a bare number, "
-       "reads its history",
+    6: "Postdoc: its evaluation set asked through the service's answer path and scored by code; a follow-up reads "
+       "its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
     9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a conversation, a runbook",
@@ -137,6 +163,8 @@ class Proof:
     database: str = ""
     data_dir: Path = Path()
     project: str = ""
+    # Live: the key in core/.env, the network, the routed models (--live).
+    live: bool = False
     failed: int = 0
     passed: int = 0
     # What the steps made, for step 8 to reload.
@@ -180,7 +208,14 @@ def environment(proof: Proof, port: int) -> dict[str, str]:
     """The service's environment: the proof's database and data directory, the toolkit's
     reference files fetched into it, and no model key."""
     env = {k: v for k, v in os.environ.items() if k not in ("OPENFERMENT_API_KEY", "ANTHROPIC_API_KEY")}
-    return {**env, "OPENFERMENT_DATABASE_URL": on_server(SERVER, proof.database), "OPENFERMENT_DATA_DIR": str(proof.data_dir),
+    # Live, the service reads the key from core/.env as a host's does. Offline, an empty key stands over
+    # core/.env's (which the service loads without overriding what is set), the collectors refuse the
+    # network, and the extract route reads a written response from the proof's own fixtures (step 3)
+    # where it would call a model.
+    mode = {} if proof.live else {"ANTHROPIC_API_KEY": "", "OPENFERMENT_FIXTURES": "1",
+                                  "OPENFERMENT_FIXTURE_DIR": str(proof.data_dir / "fixtures")}
+    return {**env, **mode,
+            "OPENFERMENT_DATABASE_URL": on_server(SERVER, proof.database), "OPENFERMENT_DATA_DIR": str(proof.data_dir),
             "OPENFERMENT_SFF_LIBRARY": str(proof.data_dir / "sff-library"), "OPENFERMENT_DIST_DIR": str(ROOT / "dist"),
             "OPENFERMENT_POLL_HOST": HOST, "OPENFERMENT_PORT": str(port)}
 
@@ -249,11 +284,13 @@ def step_1(proof: Proof) -> None:
                 "migrated to the head of each schema: " + ", ".join(f"{schema} at {at} of {head}" for schema, (at, head) in revisions.items()))
     start(proof)
     proof.check(True, f"the service answers at {proof.origin}, on its own database and data directory")
-    ready = subprocess.run([sys.executable, "-m", "openferment_core.ready", "--offline"], cwd=CORE, text=True,
-                           capture_output=True, env=environment(proof, int(proof.origin.rsplit(":", 1)[1])), timeout=600)
+    ready = subprocess.run([sys.executable, "-m", "openferment_core.ready", *([] if proof.live else ["--offline"])],
+                           cwd=CORE, text=True, capture_output=True,
+                           env=environment(proof, int(proof.origin.rsplit(":", 1)[1])), timeout=600)
     lines = ready.stdout.strip().splitlines()
     failed = [line for line in lines if line.startswith("✗")]
-    proof.check(ready.returncode == 0, "ready green (--offline: no network, no key): " + (
+    proof.check(ready.returncode == 0, ("ready green, the key and the model routes among its rows: " if proof.live else
+                                        "ready green (--offline: no network, no key): ") + (
         "every row passes or warns" if ready.returncode == 0 else "; ".join(failed) or ready.stderr.strip()[-300:]))
 
 
@@ -264,6 +301,161 @@ def step_2(proof: Proof) -> None:
     proof.made["project"] = made["id"]
     listed = api(proof, "GET", "/api/projects", project=False)
     proof.check(any(p["id"] == proof.project for p in listed), f"project {proof.project} made through the API and listed")
+
+
+def upload(proof: Proof, path: Path, row: dict[str, Any]) -> dict[str, Any]:
+    """One file through Intake's upload, as a person uploads it."""
+    r = httpx.post(f"{proof.origin}/api/intake/upload", headers={PROJECT_HEADER: proof.project}, timeout=600,
+                   files={"file": (path.name, path.read_bytes(), "text/markdown")},
+                   data={"by": PERSON, "title": row["title"], "licenceClass": row["license_class"],
+                         "licence": DEMO_LICENCE, "reason": "Sci RAG Kit's demo corpus, for the proof"})
+    if r.status_code != 200:
+        raise Stop(f"POST /api/intake/upload answered {r.status_code} for {path.name}: {r.text[:300]}")
+    return r.json()
+
+
+def demo_rows(name: str) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in (DEMO / name).read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")]
+
+
+def documents_held(proof: Proof, want: int) -> dict[str, dict[str, Any]]:
+    """The project's documents by title, checked with their chunks and embeddings."""
+    docs = {d["title"]: d for d in api(proof, "GET", "/api/literature/documents")}
+    stats = api(proof, "GET", "/api/literature/stats")
+    embedded = sum((stats.get("embedding_versions") or {}).values())
+    proof.check(len(docs) == want and all(d["chunks"] > 0 for d in docs.values()) and stats["documents"] == want
+                and stats["chunks"] > 0 and embedded == stats["chunks"],
+                f"the project holds {stats['documents']} documents in {stats['chunks']} chunks, every chunk embedded: "
+                + ", ".join(f"{v} by {k}" for k, v in (stats.get("embedding_versions") or {}).items()))
+    return docs
+
+
+def accept(proof: Proof, record_id: str, quote: str) -> None:
+    """A person's decision accepting a candidate, and the record as BioRepo holds it."""
+    at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    decided = api(proof, "POST", "/api/biorepo/decisions", {"status": "verified", "provenance": "curated",
+                                                            "reviewer": PERSON, "recordId": record_id, "at": at})
+    held = api(proof, "GET", "/api/biorepo/overlay")
+    record = held["records"].get(record_id) or {}
+    candidate = next((c for c in held["candidates"] if c["id"] == record_id), {})
+    proof.check(decided["status"] == "verified" and record.get("status") == "verified"
+                and record.get("reviewer") == PERSON and candidate.get("quote") == quote,
+                f"{PERSON} accepted it: record {record_id} in BioRepo, {record.get('status')}, "
+                f"{record.get('provenance')}, decided by {record.get('reviewer')}, on \"{candidate.get('quote')}\"")
+    proof.made["record"] = (record_id, record.get("status"), record.get("provenance"))
+
+
+def step_3_live(proof: Proof) -> None:
+    """Live: the ethanol sources collected over the network, a paper extracted by the routed model."""
+    sources = [line.split("#", 1)[0].strip() for line in SOURCES.read_text(encoding="utf-8").splitlines()]
+    sources = [s for s in sources if s]
+    def collect(identifier: str) -> dict[str, Any]:
+        return api(proof, "POST", "/api/intake/collect", {"identifier": identifier, "by": PERSON,
+                                                          "reason": "the ethanol sources, for the live proof"},
+                   timeout=600)
+
+    outcomes = [collect(s) for s in sources]
+    # A failure that was the network's condition (a source asking to slow down) is asked again once, later.
+    again = [n for n, o in enumerate(outcomes) if o["status"] == "failed" and o.get("transient")]
+    if again:
+        time.sleep(RETRY_AFTER_S)
+        for n in again:
+            outcomes[n] = collect(sources[n])
+    failed = [f"{o['identifier']} ({o.get('reason')})" for o in outcomes if o["status"] == "failed"]
+    proof.check(not failed, f"the ethanol sources collected through Intake: {len(sources) - len(failed)} of "
+                f"{len(sources)} ({SOURCES.relative_to(ROOT)})" + (f", {len(again)} asked again after the network's "
+                                                                   "condition" if again else "")
+                + (f"; not collected: {', '.join(failed)}" if failed else ""))
+    docs = documents_held(proof, len(sources) - len(failed))
+    hits = httpx.get(f"{proof.origin}/api/literature/search", params={"q": LIVE_QUESTION, "topK": 5},
+                     headers={PROJECT_HEADER: proof.project}, timeout=120).json()["hits"]
+    held = {d["documentId"] for d in docs.values()}
+    proof.check(bool(hits) and all(h["citation"] and h["passageId"] and h["documentId"] in held for h in hits),
+                f"a search in words (\"{LIVE_QUESTION}\"): {len(hits)} passages of the project's documents, each with "
+                "its passage id and citation")
+    paper = next((o for o in outcomes if o["identifier"].upper() == LIVE_PAPER and o.get("documentId")), None)
+    if not proof.check(paper is not None, f"{LIVE_PAPER} held to extract"):
+        raise Stop("no paper to extract")
+    got = api(proof, "POST", f"/api/intake/{paper['documentId']}/extract?force=true", timeout=900)
+    sections = {s["id"]: s["text"] for s in api(proof, "GET", "/api/biorepo/overlay")["papers"][paper["documentId"]]["sections"]}
+    kept = got["candidates"]
+    anchored = [c for c in kept if c["quote"] in sections.get(c["sectionId"] or "", "")]
+    proof.check(bool(kept) and len(anchored) == len(kept) and got["usage"]["models"] and got["usage"]["costUsd"] > 0,
+                f"{LIVE_PAPER} extracted by {', '.join(got['usage']['models'])} through the service for "
+                f"${got['usage']['costUsd']:.4f}: {len(kept)} candidates kept, each quote verbatim in the passage it "
+                f"names; {got['rejected']} refused by the anchoring rules")
+    if not kept:
+        raise Stop("no candidate to decide on")
+    accept(proof, kept[0]["id"], kept[0]["quote"])
+    proof.made["documents"] = sorted(held)
+
+
+def step_3(proof: Proof) -> None:
+    from openferment_core.postdoc.evaluate import STANDIN
+
+    if proof.live:
+        return step_3_live(proof)
+    rows = demo_rows("manifest.jsonl")
+    stored = [upload(proof, DEMO / row["path"], row) for row in rows]
+    proof.check(len(stored) == len(rows) and all(s["status"] == "ingested" and s.get("documentId") for s in stored),
+                f"the kit's demo corpus taken in through Intake's upload: {len(rows)} documents, each "
+                + ", ".join(sorted({s['status'] for s in stored})))
+    docs = documents_held(proof, len(rows))
+    proof.check(set(docs) == {r["title"] for r in rows}, "each by the title its manifest row gives")
+    asked = [q for q in demo_rows("eval_seed_questions.jsonl") if "unanswerable" not in q.get("tags", [])]
+    found, cited = 0, True
+    for q in asked:
+        hits = httpx.get(f"{proof.origin}/api/literature/search", params={"q": q["question"], "topK": 5},
+                         headers={PROJECT_HEADER: proof.project}, timeout=120).json()["hits"]
+        cited &= bool(hits) and all(h["citation"] and h["passageId"] for h in hits)
+        phrases = [p.lower() for p in q["evidence_phrases"]]
+        found += any(h["title"] in q["reference_titles"] and any(p in h["text"].lower() for p in phrases) for h in hits)
+    proof.check(cited and found >= 0.8 * len(asked),
+                f"a search in words for each of the kit's {len(asked)} seed questions: {found} answered by a passage "
+                "of the document that holds the answer in the top five, every hit with its passage id and citation")
+
+    # The extraction, offline: the service is in fixture mode, so the extract route reads the response the
+    # stand-in wrote for the document in place of a model's, and anchors it by its own rules. The demo corpus
+    # is about agricultural residues and holds no fermentation value: the field is chosen for the mechanics
+    # alone, and the record is the proof's, dropped with its database.
+    title, words = POLICY, "a target decision time of 120 days"
+    document_id = docs[title]["documentId"]
+    papers = api(proof, "GET", "/api/biorepo/overlay")["papers"]
+    where = next((s["id"] for s in papers[document_id]["sections"] if words in s["text"]), None)
+    if not proof.check(where is not None, f"{title}: the words the stand-in quotes stand in its passage {where}"):
+        raise Stop("no passage to anchor to")
+    named = {"sectionId": where, "field": "time_to_colony", "value": 120, "unit": "d", "isPrimary": True,
+             "confidence": 0.9}
+    response = {"_note": f"The proof's stand-in extractor ({STANDIN}), written by scripts/prove.py: no model "
+                         "answered.",
+                "raw": {"candidates": [{**named, "quote": words},
+                                       {**named, "value": 90, "quote": "a target decision time of 90 days"}]},
+                "usage": {"models": [STANDIN]}}
+    (proof.data_dir / "fixtures" / "extract").mkdir(parents=True, exist_ok=True)
+    (proof.data_dir / "fixtures" / "extract" / f"{document_id}.json").write_text(json.dumps(response), encoding="utf-8")
+    got = api(proof, "POST", f"/api/intake/{document_id}/extract?force=true", timeout=300)
+    kept = got["candidates"]
+    proof.check(len(kept) == 1 and (kept[0]["paperId"], kept[0]["sectionId"], kept[0]["quote"]) == (document_id, where, words)
+                and got["usage"]["models"] == [STANDIN],
+                f"extracted through the service: candidate {kept[0]['id'] if kept else None} anchored to passage {where} "
+                f"of the stored text, in its words \"{words}\"")
+    proof.check(got["rejected"] == 1 and got["rejectionReasons"].get("quote") == 1,
+                f"the stand-in's second candidate, quoting words the document does not hold, refused: "
+                f"{got['rejected']} refused, by rule {', '.join(k for k, v in got['rejectionReasons'].items() if v)}")
+    if not kept:
+        raise Stop("no candidate to decide on")
+    record_id = kept[0]["id"]
+    at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    estimate = {"value": 120, "unit": "d", "origin": {"kind": "model-estimate", "by": STANDIN, "at": at}}
+    asked_with = api(proof, "POST", "/api/biorepo/check", {"status": "verified", "provenance": "curated",
+                                                           "reviewer": PERSON, "recordId": record_id, "at": at,
+                                                           "gold": estimate})
+    proof.check(asked_with["ok"] is False and asked_with["rule"] == "estimate",
+                f"a decision carrying a model's estimate as its value refused at the record store: rule "
+                f"{asked_with['rule']}")
+    accept(proof, record_id, words)
+    proof.made["documents"] = sorted(d["documentId"] for d in docs.values())
 
 
 def step_4(proof: Proof) -> None:
@@ -406,11 +598,38 @@ def evaluation(proof: Proof, *args: str) -> dict[str, Any]:
     return json.loads(done.stdout.strip().splitlines()[-1])
 
 
+def step_6_live(proof: Proof) -> None:
+    """Live: the evaluation set asked of the routed models, each answer scored by code."""
+    from openferment_core.postdoc import evaluate
+
+    report = evaluation(proof, "run", "--live")
+    runs = {r["questionId"]: r for r in report["runs"]}
+    price, dearer = runs.get("eq-price"), runs.get("eq-dearer")
+    if price is None or dearer is None:
+        raise Stop(f"the evaluation answered {', '.join(runs) or 'nothing'}, not both questions")
+    models = sorted({m for r in runs.values() for m in r["models"]})
+    proof.check(all(r["mode"] == "live" for r in runs.values()) and bool(models) and evaluate.STANDIN not in models,
+                f"asked live, through the service's answer path, of {', '.join(models)}")
+    turns = api(proof, "GET", f"/api/conversations/{price['conversationId']}")["turns"]
+    declined = [str((t.get("plan") or {}).get("declined"))[:200] for t in turns if (t.get("plan") or {}).get("declined")]
+    proof.check(dearer["conversationId"] == price["conversationId"] and len(turns) == 2
+                and all(t["status"] == "answered" for t in turns) and not declined,
+                f"both questions answered in conversation {price['conversationId']}, the follow-up reading its history "
+                f"from the service" + (f"; declined: {' | '.join(declined)}" if declined else ""))
+    proof.check(all(set(r["scores"]) == {"tools", "citations", "estimates", "bareNumbers"} for r in runs.values()),
+                "each answer scored by code and kept: " + "; ".join(
+                    f"{q} {r['scores']}, {r['claims']} claims kept, {r['droppedForNumbers']} dropped for a number"
+                    for q, r in runs.items()))
+    proof.made["conversation"] = dearer["conversationId"]
+
+
 def step_6(proof: Proof) -> None:
     from openferment_core.postdoc import evaluate
 
     seeded = evaluation(proof, "seed")["seeded"]
     proof.check(seeded == ["eq-price", "eq-dearer"], f"the evaluation set kept in the project as rows: {', '.join(seeded)}")
+    if proof.live:
+        return step_6_live(proof)
     report = evaluation(proof, "run")
     runs = {r["questionId"]: r for r in report["runs"]}
     price, dearer = runs.get("eq-price"), runs.get("eq-dearer")
@@ -491,6 +710,12 @@ def step_8(proof: Proof) -> None:
     m = proof.made
     projects = api(proof, "GET", "/api/projects", project=False)
     proof.check(any(p["id"] == m.get("project") for p in projects), f"project {m.get('project')} reloads")
+    if "record" in m:
+        held = {d["documentId"] for d in api(proof, "GET", "/api/literature/documents")}
+        record_id, status, provenance = m["record"]
+        record = api(proof, "GET", "/api/biorepo/overlay")["records"].get(record_id) or {}
+        proof.check(set(m["documents"]) <= held and (record.get("status"), record.get("provenance")) == (status, provenance),
+                    f"its {len(held)} documents reload, and record {record_id}, {status} and {provenance}")
     runs = {r["id"]: r for r in api(proof, "GET", "/api/runs")}
     want = [m[k] for k in ("reference", "flowsheet", "other", "scenarioRun") if k in m]
     proof.check(all(r in runs for r in want), f"its {len(runs)} engine runs reload: {', '.join(want)}")
@@ -520,8 +745,33 @@ def step_8(proof: Proof) -> None:
                        f"within its tolerance: {again['withinTolerance']} ({len(again['differences'])} differences)"))
 
 
-RUNNERS: dict[int, Callable[[Proof], None]] = {1: step_1, 2: step_2, 4: step_4, 5: step_5, 6: step_6, 7: step_7,
-                                               8: step_8, 9: step_9}
+RUNNERS: dict[int, Callable[[Proof], None]] = {1: step_1, 2: step_2, 3: step_3, 4: step_4, 5: step_5, 6: step_6,
+                                               7: step_7, 8: step_8, 9: step_9}
+
+
+def spent(proof: Proof) -> None:
+    """What the proof spent, from its database's spend table: offline, no call at all."""
+    read = "import json; from openferment_core import spend; print(json.dumps(spend.state()))"
+    done = subprocess.run([sys.executable, "-c", read], cwd=CORE, text=True, capture_output=True,
+                          env=environment(proof, 0), timeout=120)
+    if done.returncode != 0:
+        proof.check(False, f"the spend table could not be read: {(done.stderr or done.stdout).strip()[-300:]}")
+        return
+    day = json.loads(done.stdout.strip().splitlines()[-1])
+    words = ", ".join(f"{role} ${usd:.4f}" for role, usd in day["byRole"].items())
+    if proof.live:
+        proof.check(True, f"spent, from the proof's spend table: {day['calls']} calls, ${day['totalUsd']:.4f} ({words})")
+    else:
+        proof.check(day["calls"] == 0 and day["totalUsd"] == 0, f"no model call: the proof's spend table holds "
+                    f"{day['calls']} calls, ${day['totalUsd']:.4f}")
+
+
+def has_key() -> bool:
+    """Whether core/.env names a key (read, never printed)."""
+    if not KEY_FILE.exists():
+        return False
+    return any(line.startswith("ANTHROPIC_API_KEY=") and line.split("=", 1)[1].strip().strip("'\"")
+               for line in KEY_FILE.read_text(encoding="utf-8").splitlines())
 
 
 def order(asked: list[int]) -> list[int]:
@@ -541,19 +791,29 @@ def order(asked: list[int]) -> list[int]:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="pnpm prove", description=__doc__.split("\n\n")[0])
-    parser.add_argument("--steps", default=",".join(str(n) for n in STEPS), help="the steps to prove, e.g. 5,8")
+    parser.add_argument("--steps", default=None, help="the steps to prove, e.g. 5,8 (live: every step but 9)")
     parser.add_argument("--keep", action="store_true", help="leave the service and its database at the end")
+    parser.add_argument("--live", action="store_true",
+                        help="the key in core/.env, the network and the routed models: step 3 collects the ethanol "
+                             "sources and a model extracts a paper, step 6 asks the routed models; it spends")
     args = parser.parse_args(argv)
+    if args.live and not has_key():
+        parser.error("--live reads the key from core/.env, which names none: with OPENFERMENT_API_KEY set, "
+                     "`bash scripts/session-start.sh` writes it")
+    # The walk (9) reads the offline conversation's labelled estimate, so a live proof leaves it out unless asked.
+    steps = args.steps or ",".join(str(n) for n in STEPS if not (args.live and n == 9))
     try:
-        asked = [int(x) for x in args.steps.split(",") if x.strip()]
+        asked = [int(x) for x in steps.split(",") if x.strip()]
     except ValueError:
         parser.error("--steps names steps by number, e.g. 5,8")
     unknown = [n for n in asked if n not in STEPS]
     if unknown:
         parser.error(f"this build proves steps {', '.join(map(str, STEPS))}; not {', '.join(map(str, unknown))}")
-    proof = Proof(database=f"openferment_proof_{os.urandom(4).hex()}", data_dir=Path(tempfile.mkdtemp(prefix="openferment-proof-")))
+    proof = Proof(database=f"openferment_proof_{os.urandom(4).hex()}", data_dir=Path(tempfile.mkdtemp(prefix="openferment-proof-")),
+                  live=args.live)
     proof.log = proof.data_dir / "service.log"
-    print(f"openFerment proof: steps {', '.join(map(str, order(asked)))} on database {proof.database}\n")
+    print(f"openFerment proof{' (live)' if proof.live else ''}: steps {', '.join(map(str, order(asked)))} "
+          f"on database {proof.database}\n")
     started = time.monotonic()
     try:
         for n in order(asked):
@@ -568,6 +828,10 @@ def main(argv: list[str]) -> int:
             except (httpx.HTTPError, KeyError, TypeError, ValueError) as e:
                 proof.check(False, f"step {n} stopped: {type(e).__name__}: {e}")
             print(f"  ({time.monotonic() - t0:.0f} s)\n")
+        if proof.origin:
+            print("── the spend")
+            spent(proof)
+            print()
     finally:
         if args.keep and proof.service is not None and proof.service.poll() is None:
             print(f"kept: the service at {proof.origin} (project {proof.project}), database {proof.database}, "

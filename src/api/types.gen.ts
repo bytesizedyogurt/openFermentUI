@@ -3085,8 +3085,8 @@ export interface components {
         /**
          * CollectRequest
          * @description POST /api/intake/collect: a paper, a report or a strain entry by its
-         *     identifier (a PMCID, a DOI, `PMID:<id>`, `OSTI:<id>`, an osti.gov or a
-         *     yeastgenome.org address), who asked, and why.
+         *     identifier (a PMCID, a DOI, `PMID:<id>`, `OSTI:<id>`, `SGD:<SGDID>`, an
+         *     osti.gov or a yeastgenome.org address), who asked, and why.
          */
         CollectRequest: {
             /** By */
