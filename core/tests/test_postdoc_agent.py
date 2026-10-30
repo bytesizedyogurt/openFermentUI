@@ -169,11 +169,24 @@ def test_rounds_end_the_loop(pool):  # noqa: F811
     assert out.stopped == "rounds" and script.calls[-1]["tool_choice"] == "none"
 
 
-def test_the_cost_budget_ends_the_loop(pool, monkeypatch):  # noqa: F811
-    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.002")
+def test_the_cost_budget_ends_the_loop_keeping_back_what_the_final_turn_could_cost(pool, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.003")
+    monkeypatch.setattr(postdoc_agent, "_final_turn_usd", lambda model, messages, defs: 0.0015)
     script = Script([records()], [records("again")], [records("third")], plan())
     out = ask(script, pool)
-    assert out.stopped == "cost" and len(script.calls) == 3
+    assert out.stopped == "cost" and len(script.calls) == 3, "two rounds, then the final turn the budget kept back"
+    monkeypatch.setattr(postdoc_agent, "_final_turn_usd", lambda model, messages, defs: 0.0)
+    script = Script([records()], [records("again")], [records("third")], [records("fourth")], plan())
+    assert ask(script, pool).stopped == "cost" and len(script.calls) == 4, "nothing kept back, a round more"
+
+
+def test_the_final_turns_worst_case_is_its_conversation_and_every_output_token():
+    said = [{"role": "user", "content": "q?"}]
+    held = postdoc_agent._final_turn_usd(llm.DEFAULT_PRIMARY, said, [])
+    assert held == llm.worst_case_usd(llm.DEFAULT_PRIMARY, {"system": postdoc_agent.AGENT_SYSTEM, "messages": said,
+                                                            "tools": []}, postdoc_agent.MAX_TOKENS) > 0
+    assert postdoc_agent._final_turn_usd(f"anthropic:{llm.DEFAULT_PRIMARY}", said, []) == held
+    assert postdoc_agent._final_turn_usd("an-unpriced-model", said, []) == 0.0
 
 
 def test_wall_time_ends_the_loop(pool):  # noqa: F811

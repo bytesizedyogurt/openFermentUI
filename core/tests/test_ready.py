@@ -145,6 +145,19 @@ def test_model_waits_for_a_key_and_for_the_network():
     assert ready.check_model(False).mark == "skip"
 
 
+def test_a_routing_table_that_cannot_route_fails_before_any_call(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"effort": "huge"}}')
+    check = ready.check_model(False)
+    assert check.mark == "fail" and "OPENFERMENT_ROUTES.plan.effort" in check.detail
+
+
+def test_a_route_to_a_provider_that_waits_is_named(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"index": {"models": ["openai-compatible:qwen3-32b"]}}')
+    check = ready.check_model(True, client_factory=FakeClient)
+    assert check.mark == "warn" and "openai-compatible:qwen3-32b" in check.detail, check.detail
+    assert "waits for the owner" in check.detail
+
+
 def test_network_checks_skip_in_fixture_mode(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     assert ready.check_model(True, client_factory=FakeClient).mark == "skip"

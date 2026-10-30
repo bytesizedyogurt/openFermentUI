@@ -713,3 +713,62 @@ def test_every_response_is_charged_to_its_role():
     llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: client, role="index")
     assert spend.state()["byRole"]["index"] == llm.cost_usd(HAIKU, 1000, 500)
     assert spend.state()["byRole"]["answer"] == 0.0
+
+
+# ── the routing table (execution prompt §4.8; ADR-008; alpha 2.0 stage 6.3) ──
+
+
+def test_the_routing_table_names_each_familys_models_and_effort(monkeypatch):
+    table = llm.routes()
+    assert set(table) == set(llm.FAMILIES) == {"plan", "explain", "extract", "index", "judge"}
+    assert table == llm.ROUTES, "with core/.env silent, the table is ROUTES"
+    assert table["plan"].models == (OPUS, SONNET) and table["index"].models == (HAIKU, OPUS, SONNET)
+    assert {f: llm.SPEND_ROLES[f] for f in llm.FAMILIES} == {"plan": "answer", "explain": "answer", "extract": "answer",
+                                                            "index": "index", "judge": "answer"}
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"judge": {"models": [f"anthropic:{SONNET}"], "effort": "low"},
+                                                         "index": {"effort": "high"}}))
+    table = llm.routes()
+    assert table["judge"] == llm.Route((f"anthropic:{SONNET}",), "low")
+    assert table["index"] == llm.Route((HAIKU, OPUS, SONNET), "high") and table["plan"] == llm.ROUTES["plan"]
+    assert llm.chain("judge") == [f"anthropic:{SONNET}"] and llm.chain("answer") == llm.chain("plan")
+
+
+@pytest.mark.parametrize("raw, says", [
+    ("not json", "is not JSON"),
+    ('["plan"]', "an object of family to route"),
+    ('{"answer": {}}', "names 'answer'"),
+    ('{"plan": {"models": []}}', "a list of model specs"),
+    ('{"plan": {"models": ["nonesuch:model"]}}', "names the provider 'nonesuch'"),
+    ('{"plan": {"models": ["anthropic:"]}}', "names a provider and no model"),
+    ('{"plan": {"effort": "huge"}}', "effort is one of"),
+    ('{"plan": {"temperature": 1}}', "an object of models and effort"),
+])
+def test_a_routing_table_that_cannot_route_says_why(monkeypatch, raw, says):
+    monkeypatch.setenv("OPENFERMENT_ROUTES", raw)
+    with pytest.raises(llm.RoutesInvalid, match=says):
+        llm.routes()
+
+
+def test_a_spec_is_the_kits_provider_and_model_and_a_bare_id_is_anthropics():
+    assert llm.spec(OPUS) == ("anthropic", OPUS) and llm.spec(f"anthropic:{OPUS}") == ("anthropic", OPUS)
+    assert llm.spec("openai-compatible:qwen3-32b") == ("openai-compatible", "qwen3-32b")
+
+
+def test_a_call_runs_at_its_familys_effort_on_its_anthropic_spec_and_passes_over_a_provider_that_waits(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps(
+        {"extract": {"models": ["openai-compatible:qwen3-32b", f"anthropic:{SONNET}"], "effort": "high"}}))
+    client = FakeClient({SONNET: answer(SONNET)})
+    result = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: client,
+                      family="extract")
+    assert result.model == SONNET and result.tried == [SONNET] and client.asked == [SONNET]
+    assert client.requests[0]["output_config"]["effort"] == "high"
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"extract": {"models": ["openai-compatible:qwen3-32b"]}}))
+    with pytest.raises(llm.ModelUnavailable, match="waits for the owner"):
+        llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: FakeClient({}),
+                 family="extract")
+
+
+def test_a_turn_on_a_provider_that_waits_is_unavailable_in_words():
+    with pytest.raises(llm.ModelUnavailable, match="waits for the owner"):
+        llm.converse(system="s", messages=[{"role": "user", "content": "q"}], tools=[], schema=None, max_tokens=10,
+                     model="openai-compatible:qwen3-32b", ask=lambda request: None)

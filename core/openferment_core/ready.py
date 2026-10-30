@@ -330,6 +330,11 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
     if llm.effort() not in llm.EFFORTS:
         return Check("model", "fail", f"OPENFERMENT_EFFORT={llm.effort()} is not one of "
                      f"{', '.join(llm.EFFORTS)}, so every call would be refused")
+    try:
+        table = llm.routes()
+    except llm.RoutesInvalid as e:
+        return Check("model", "fail", f"{e}, so no call can be routed")
+    waiting = sorted({m for r in table.values() for m in r.models if llm.spec(m)[0] not in llm.SERVED})
     if not have_key:
         return Check("model", "skip", "needs the key")
     if intake.fixtures_only():
@@ -339,7 +344,10 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
     client = (client_factory or llm.make_client)()
     offered: list[str] = []
     missing: list[str] = []
-    for model in llm.chain():
+    for named in llm.chain():
+        provider, model = llm.spec(named)
+        if provider not in llm.SERVED:
+            continue
         try:
             client.models.retrieve(model, timeout=15)
         except anthropic.AuthenticationError:
@@ -362,6 +370,9 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
     if unpriced:
         return Check("model", "warn", f"no price on file for {', '.join(unpriced)}, so its cost shows as $0. "
                      "Add it to PRICES in core/openferment_core/llm.py")
+    if waiting:
+        return Check("model", "warn", f"the key is accepted; {' then '.join(offered)}; the routes name "
+                     f"{', '.join(waiting)}, which wait: {llm.waits(waiting[0]).split(': ', 1)[1]}")
     return Check("model", "ok", f"the key is accepted; {' then '.join(offered)}, effort {llm.effort()}")
 
 

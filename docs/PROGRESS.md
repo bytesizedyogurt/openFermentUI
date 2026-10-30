@@ -16,12 +16,13 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 6, step 6.3** — `llm.ROUTES` (task family → ordered `provider:model` specs
-   and effort: `plan`, `explain`, `extract`, `index`, `judge`), the per-request key override shared
-   with the kit (a change to how keys are read is the owner's, §11.1), and the ask budget reserved
-   before the final turn. Then 6.4 (the evaluation set as a table); the gate is proof step 6
-   offline, `test_postdoc_agent` extended, `check:tools` green (execution prompt §10 stage 6).
-   Steps 6.1 and 6.2 are done: conversations, turns and tool calls on the server (migration 0005)
+4. **Next step: stage 6, step 6.4** — the evaluation set as a table (questions over the proof
+   project, scored on tool choice, citations, labelled estimates and the absence of bare numbers;
+   offline with the stand-in, live with a key), then `scripts/prove.py` step 6 offline and the
+   stage 6 gate (proof step 6 offline, `test_postdoc_agent` extended, `check:tools` green;
+   execution prompt §10 stage 6). Step 6.3 is done: `llm.ROUTES` with `provider:model` specs and
+   the final turn kept back from the ask budget; the per-request key override and other providers'
+   keys wait for the owner (owner question 10, §11.1). Steps 6.1 and 6.2 are done: conversations, turns and tool calls on the server (migration 0005)
    and the event stream (`docs/api/postdoc.md`); typed values in claims and quantities in tool
    inputs (ADR-006, Implementation 6.2); the engine, study and literature tools, `docs/TOOLS.md`
    written by `pnpm gen:tools`, and the MCP server in one project (ADR-008, Implementation 6.2).
@@ -87,6 +88,7 @@ installation).
 | 2026-10-30 15:25 | Stage 5 gate, the same worktree: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile, `pnpm prove` (steps 1, 2, 4, 5, 7, 8); the worktree left clean | all passed; 12 of 12 screens open; 34 of 34 checks hold | 1 min 56 s (prove) | 5.2 (gate) |
 | 2026-10-30 16:04 | `test:core` with 6.1 (conversations, events); typecheck, plan, secrets, state, guild, figures | 2193 passed, 2 skipped, 168 deselected; all passed. The run before it failed one test that read the ask stream's first event as a step (now `turn`) | 4 min 56 s | 6.1 |
 | 2026-10-30 16:40 | `test:core` with 6.2 (typed values, the study tools, the generated reference); `check:tools`, `gen:tools --check`, typecheck, plan, secrets | 2216 passed, 2 skipped, 168 deselected; all passed. The run before it failed seventeen tests: a module write's fields of a value and a unit in words were read as a quantity, so quantities now stand only where a tool's schema asks for one | 5 min 33 s | 6.2 |
+| 2026-10-30 16:52 | `test:core` with 6.3 (the routing table, the final turn kept back); secrets | 2231 passed, 2 skipped, 168 deselected; passed | 5 min 21 s | 6.3 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -195,6 +197,7 @@ installation).
 | 7 | Kit REST under `/rag` on the same port | yes, behind `OPENFERMENT_RAG_KEY` | no |
 | 8 | Licence | none added | no |
 | 9 | Accounts: tables and a membership stub only | yes | no |
+| 10 | §11.1, asked at stage 6.3: the per-request key override (§4.8), and keys for a route's non-Anthropic model (read through Sci RAG Kit's settings). Each changes how a key is read | neither built: a route's other-provider model is passed over in words, every key is core/.env's; the design the override would take is in ADR-008, Implementation 6.3 | no |
 
 ## Environment facts measured in this container (2026-10-30)
 
@@ -583,3 +586,11 @@ installation).
   written by `pnpm gen:tools` from the registry, and `check:tools` holds the file to it, every
   schema's numbers to quantities and counts, and every tool to a project. ADR-008, Implementation
   6.2.
+- 6.3 (routes) `llm.ROUTES`: the families `plan`, `explain`, `extract`, `index` and `judge`, each
+  an ordered list of `provider:model` specs in Sci RAG Kit's syntax and an effort, with
+  `OPENFERMENT_ROUTES` laid over it and `pnpm ready` failing on a table that cannot route. Every
+  caller names its family. Anthropic's models are served; a route's model of another provider is
+  passed over in words, since calling it reads that provider's key through the kit (§11.1), and
+  the per-request key override waits for the owner the same way (owner question 10; ADR-008,
+  Implementation 6.3, has the design it would take). The ask budget now keeps back the final
+  turn's worst case before another round. `test_llm.py`, `test_ready.py`, `test_postdoc_agent.py`.

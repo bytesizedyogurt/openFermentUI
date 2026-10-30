@@ -493,12 +493,26 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
     return block
 
 
-def _out_of_budget(run: _Run, rounds: int, budget_usd: float) -> str | None:
+def _final_turn_usd(model: str, messages: list[dict[str, Any]], defs: list[dict[str, Any]]) -> float:
+    """The most the final turn could cost, held back from the question's
+    budget before another round is asked (execution prompt §10 stage 6.3):
+    the conversation so far read as input, and every output token it allows.
+    Nothing for a model with no price on file, which the daily cap refuses."""
+    _, model_id = llm.spec(model)
+    if model_id not in llm.PRICES:
+        return 0.0
+    return llm.worst_case_usd(model_id, {"system": AGENT_SYSTEM, "messages": messages, "tools": defs}, MAX_TOKENS)
+
+
+def _out_of_budget(run: _Run, rounds: int, budget_usd: float, final_usd: float = 0.0) -> str | None:
+    """Why the loop stops asking for tools, or None. The cost it may run to
+    keeps back what the final turn could cost (`final_usd`), so the answer is
+    always paid for within the question's budget."""
     if run.calls >= MAX_TOOL_CALLS:
         return "calls"
     if rounds >= MAX_ROUNDS:
         return "rounds"
-    if run.spent.costUsd >= budget_usd:
+    if run.spent.costUsd + final_usd >= budget_usd:
         return "cost"
     if run.clock() - run.started >= MAX_SECONDS:
         return "time"
@@ -544,7 +558,8 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
                 continue
             run.calls += 1
             blocks.append(_run_tool(run, call))
-        stopped = _out_of_budget(run, rounds, budget_usd)
+        stopped = _out_of_budget(run, rounds, budget_usd,
+                                 _final_turn_usd(model, [*messages, {"role": "user", "content": blocks}], defs))
         if stopped:
             blocks.append({"type": "text", "text": f"The budget is spent ({STOP_WORDS[stopped]}). Answer now, from what is in hand; no more tools."})
             messages.append({"role": "user", "content": blocks})
@@ -656,7 +671,7 @@ def ask(
 
     _sweep(run, ctx)
 
-    models = llm.chain("answer")
+    models = llm.chain("plan")
     answer: llm.Turn | None = None
     stopped = "done"
     failure: Exception | None = None

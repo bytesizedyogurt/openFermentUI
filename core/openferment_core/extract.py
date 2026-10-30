@@ -334,6 +334,7 @@ def call_model(paper_id: str, user_text: str, tool: dict[str, Any]) -> tuple[dic
             schema=tool["input_schema"],
             max_tokens=MAX_TOKENS,
             label=f"{paper_id}: ",
+            family="extract",
         )
     except llm.ModelRefused as e:
         # Not cached: a later model, or a later version of this one, may take

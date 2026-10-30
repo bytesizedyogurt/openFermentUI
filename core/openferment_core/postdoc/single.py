@@ -216,6 +216,7 @@ def ask_model(question: str, records: list[dict[str, Any]], corpus) -> tuple[dic
             schema=TOOL["input_schema"],
             max_tokens=MAX_TOKENS,
             label="postdoc: ",
+            family="explain",
         )
     except llm.ModelRefused as e:
         log.warning("postdoc: %s", e)

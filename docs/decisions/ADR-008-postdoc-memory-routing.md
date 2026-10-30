@@ -73,6 +73,34 @@ thirty-four.
 - The loop's rules name the new tools (18 to 20), drop the module read the Dominion deletion
   left in rule 11, and its trace says what each new tool did.
 
+### 6.3 (2026-10-30)
+
+- `llm.ROUTES` and `llm.routes()`: the families `plan` (Postdoc's loop), `explain` (an answer in
+  one call, the kit's cited answers), `extract`, `index` (OPENFERMENT_INDEX_MODEL first) and
+  `judge`, each an ordered list of model specs and an effort. The table core/.env leaves alone is
+  `ROUTES`; the models and effort it names still set the defaults, and `OPENFERMENT_ROUTES` (a
+  JSON object of family to `{"models", "effort"}`) lays a route over a family, refused in words
+  when it cannot route (`RoutesInvalid`, and `pnpm ready` fails on it). Every caller names its
+  family: the loop `plan`, the single call `explain`, extraction `extract`, and the kit's answer,
+  extraction and judge roles `explain`, `index` and `judge`. The day's spend keeps its two roles
+  (`SPEND_ROLES`).
+- A model is a spec in Sci RAG Kit's syntax, `provider:model` (`anthropic`, `openai-compatible`,
+  `google`), a bare id being Anthropic's. The service serves Anthropic's models; a route's model
+  of another provider is passed over in words and the next one answers, because calling it
+  through the kit reads that provider's key from the kit's settings, a change to how keys are read
+  (execution prompt §11.1). `pnpm ready` names such a route. Serving it is the owner's call,
+  asked in `docs/PROGRESS.md`'s owner questions with the per-request key override below.
+- The per-request key override (§4.8) changes how a key is read, and waits for the owner
+  (§11.1). The design it would take: a request names a key for its own calls in a header the
+  guard reads on loopback alone; `llm` holds it in a context variable for the request, its
+  clients use it in place of `core/.env`'s, and the kit's calls reach it through `llm.call` (the
+  kit's client already calls there), so the key reaches both and never a log, a response or a
+  row.
+- The ask budget keeps back the final turn's worst case before another round is asked
+  (`postdoc_agent._final_turn_usd`: the conversation so far read as input, and every output token
+  the turn allows): the loop stops asking for tools when what it spent and what the answer could
+  cost reach the question's budget, so the answer is paid for within it.
+
 ## Revisit condition
 
 That evaluation (development plan §8, "Let the simple system compete").
