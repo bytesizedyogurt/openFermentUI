@@ -141,7 +141,7 @@ export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; pri
               </>
             )}
             . Provenance {view.provenance}
-            {view.provenance === 'assumed' ? ': it rests on at least one named person’s assumption.' : '.'}
+            {view.provenance === 'assumed' ? ': it rests on at least one named person’s assumption or a model’s estimate.' : '.'}
           </div>
         </Tick>
       ) : (
@@ -612,6 +612,8 @@ export function inputLabels(inputs: ScenarioInput[] | null, flowsheet: Flowsheet
  * the cost breakdown, the sensitivity, the distribution, the sliders when
  * the run walked a grid, the streams, the equipment, the utilities, the
  * diagram, and what the run read back, each value credited to whoever set it.
+ * A run of one case (an engine run, execution prompt §7.4) has no samples, so
+ * it has no sensitivity, distribution or sliders, and shows none.
  */
 export function RunReport({
   view,
@@ -621,6 +623,7 @@ export function RunReport({
   scenarioId,
   csvName,
   flowsheet = null,
+  oneCase = false,
 }: {
   view: RunView;
   priceBasis: string;
@@ -631,14 +634,20 @@ export function RunReport({
   csvName: string;
   /** The run's flowsheet as the shelf lists it: which read-back value each input or setting gave. */
   flowsheet?: FlowsheetInfo | null;
+  /** The run is one case, sampled nowhere. */
+  oneCase?: boolean;
 }) {
   return (
     <div className="space-y-4" data-testid="run-report">
       <RunResult view={view} priceBasis={priceBasis} scenarioId={scenarioId} />
       <CostBreakdown view={view} priceBasis={priceBasis} csvName={csvName} />
-      <Sensitivity view={view} labels={labels} csvName={csvName} />
-      <PriceDistribution view={view} priceBasis={priceBasis} csvName={csvName} />
-      <Sliders key={view.artifactId} view={view} labels={unitLabels} priceBasis={priceBasis} scenarioId={scenarioId} />
+      {!oneCase && (
+        <>
+          <Sensitivity view={view} labels={labels} csvName={csvName} />
+          <PriceDistribution view={view} priceBasis={priceBasis} csvName={csvName} />
+          <Sliders key={view.artifactId} view={view} labels={unitLabels} priceBasis={priceBasis} scenarioId={scenarioId} />
+        </>
+      )}
       <StreamsTable view={view} csvName={csvName} />
       <EquipmentTable view={view} csvName={csvName} />
       <UtilitiesCard view={view} csvName={csvName} />

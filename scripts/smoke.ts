@@ -1,6 +1,7 @@
 /**
  * The stage 1 smoke: the app starts and every rail entry opens (execution
- * prompt §10, stage 1 gate).
+ * prompt §10, stage 1 gate), and so do the screens beyond the rail that an
+ * empty project opens too (`ALSO`: the studies of stage 5).
  *
  * It runs the real service on loopback with dist/ mounted, so the page and its
  * /api calls share one origin the way the host serves them, and opens each
@@ -36,6 +37,9 @@ const MIN_TEXT = 60;
 /** The server the smoke makes its database on: the tests' (core/tests/conftest.py). */
 const SERVER = process.env.OPENFERMENT_TEST_DATABASE_URL?.trim() || 'postgresql://openferment:openferment@127.0.0.1:5432/openferment_test';
 const PROJECT = { name: 'Smoke', by: 'Smoke Test' };
+/** Screens beyond the rail that open on an empty project (execution prompt §9.1 step 5), each with the test id its screen draws. */
+const ALSO = [{ label: 'Studies', to: '/proforma/studies', testid: 'proforma-studies' }];
+const SCREENS: { label: string; to: string; testid?: string }[] = [...RAIL.map((e) => ({ label: e.label, to: e.to })), ...ALSO];
 
 function freePort(): Promise<number> {
   return new Promise((done, fail) => {
@@ -140,7 +144,7 @@ async function main(): Promise<number> {
     const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium';
     const browser = await chromium.launch(existsSync(executablePath) ? { executablePath } : {});
     try {
-      for (const entry of RAIL) {
+      for (const entry of SCREENS) {
         const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
         const problems: string[] = [];
         page.on('console', (m) => {
@@ -164,6 +168,7 @@ async function main(): Promise<number> {
           const open = (await page.locator('[data-testid="project-switch"]').innerText().catch(() => '')).trim();
           if (open !== PROJECT.name) problems.push(`the top bar names the project ${JSON.stringify(open)}, not ${PROJECT.name}`);
           if (/Route not found/i.test(text)) problems.push('the path opened the not-found page');
+          if (entry.testid && !(await page.locator(`[data-testid="${entry.testid}"]`).count())) problems.push(`the path drew no ${entry.testid} screen`);
           if (problems.length) {
             failures.push(label);
             console.log(`✗ ${label}`);
@@ -199,7 +204,11 @@ async function main(): Promise<number> {
     }
   }
 
-  console.log(failures.length ? `\n${failures.length} failed of ${RAIL.length} rail entries` : `\nall ${RAIL.length} rail entries open`);
+  console.log(
+    failures.length
+      ? `\n${failures.length} failed of ${SCREENS.length} screens`
+      : `\nall ${SCREENS.length} screens open: ${RAIL.length} rail entries and ${ALSO.length} more`,
+  );
   return failures.length ? 1 : 0;
 }
 

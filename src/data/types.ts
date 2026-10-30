@@ -3235,7 +3235,7 @@ export interface Volatility {
 export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'model-estimate' | 'convention' | 'library-default' | 'waiting' | 'not-read';
 
 /** What a scope parameterises. */
-export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'fermos-forecast' | 'pureos-unit' | 'proforma';
+export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'fermos-forecast' | 'pureos-unit' | 'proforma' | 'library';
 
 /** One parameter as its model, unit or flowsheet declares it. */
 export interface ParameterSpec {
@@ -4081,4 +4081,251 @@ export interface TrainProposal {
   /** The property artifacts read (volatility, protparam), by id. */
   artifacts: string[];
   notes: string[];
+}
+
+// ── SFF flowsheet records (execution prompt §7.5; ADR-003) ─────────────
+//
+// Mirrored from core/openferment_core/models.py; `pnpm check:plan` pairs
+// each. Stage 7 generates these from the Pydantic models.
+
+/** How a record came: a run of this project, one of the toolkit's reference files, or any other file. */
+export type SFFOrigin = 'run' | 'library' | 'imported';
+
+/** One result of the toolkit's validator that did not pass. */
+export interface SFFFinding {
+  checkId: string;
+  severity: string;
+  status: string;
+  message: string;
+  path: string;
+}
+
+/** The toolkit's verdict against the schema it ships. */
+export interface SFFValidation {
+  valid: boolean;
+  schemaVersion: string;
+  summary: Record<string, Record<string, number>>;
+  findings: SFFFinding[];
+}
+
+/** One criterion of the toolkit's completeness registry, as it scored. */
+export interface SFFCriterion {
+  id: string;
+  category: string;
+  criticality: string;
+  weight: number;
+  representable: boolean;
+  status: string;
+  score: number | null;
+  message: string;
+  missing: string[];
+}
+
+/** How much of what BioSTEAM needs to rebuild, simulate and cost the plant the file states. */
+export interface SFFCompleteness {
+  score: number | null;
+  representableScore: number | null;
+  categories: Record<string, number | null>;
+  criticalities: Record<string, number | null>;
+  criteria: SFFCriterion[];
+  sffVersion: string | null;
+  recipe: Record<string, unknown>;
+  report: string;
+}
+
+/** One of the toolkit's tags: earned (null: not evaluated), declared, and what blocks it. */
+export interface SFFTag {
+  earned: boolean | null;
+  declared: boolean;
+  blocking: string[];
+}
+
+/** A unit operation: a node of the graph, `rank` its column counted from the feeds. */
+export interface SFFNode {
+  id: string;
+  type: string;
+  method: string | null;
+  rank: number;
+}
+
+/** A stream from one unit to another. */
+export interface SFFEdge {
+  id: string;
+  source: string;
+  sink: string;
+  massFlow: number | null;
+}
+
+/** A stream crossing the plant's boundary: a feed entering `unit`, or a product leaving it. */
+export interface SFFBoundary {
+  id: string;
+  unit: string;
+  name: string | null;
+  massFlow: number | null;
+  price: number | null;
+}
+
+/** The flowsheet as the UI draws it, read from the file's units and streams. */
+export interface SFFGraph {
+  nodes: SFFNode[];
+  edges: SFFEdge[];
+  feeds: SFFBoundary[];
+  products: SFFBoundary[];
+  dangling: string[];
+  massFlowUnit: string;
+}
+
+/** An SFF flowsheet record (GET /api/flowsheets/{id}); `graph` is left out of a listing. */
+export interface SFFFlowsheet {
+  id: string;
+  title: string;
+  origin: SFFOrigin;
+  source: string;
+  sffVersion: string | null;
+  sha256: string;
+  bytes: number;
+  simulator: string | null;
+  runArtifactId: string | null;
+  libraryId: string | null;
+  units: number;
+  streams: number;
+  validation: SFFValidation;
+  completeness: SFFCompleteness;
+  tags: Record<string, SFFTag>;
+  graph: SFFGraph | null;
+  toolkit: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+// ── Engine runs (execution prompt §7.4; engine/runs.py) ────────────────
+
+export type RunStatus = 'done' | 'refused';
+
+/** One input of an engine run: its name, and its value as a quantity with its origin (ADR-006). */
+export interface RunInput {
+  name: string;
+  quantity: Quantity;
+}
+
+/** The SFF file a run wrote: its flowsheet record and what the toolkit said of it. */
+export interface RunSFF {
+  recordId: string;
+  valid: boolean;
+  score: number | null;
+  tags: string[];
+}
+
+/** One engine run in a project: a row of `runs` (GET /api/runs). */
+export interface EngineRun {
+  /** Its computation's id: the artifact id of its basis. */
+  id: string;
+  plant: string;
+  configuration: string | null;
+  status: RunStatus;
+  tool: string;
+  toolVersion: string;
+  inputs: RunInput[];
+  /** The artifact's, computed on its basis; null for a refused run. */
+  provenance: Provenance | null;
+  artifactId: string | null;
+  /** The price, a flowsheet's own outputs, and how the package's test held it. */
+  outputs: Record<string, unknown>;
+  versions: Record<string, string>;
+  sff: RunSFF | null;
+  /** Why no SFF file could be written, in the toolkit's or the worker's words. */
+  sffRefused: string | null;
+  /** The plant's own words, for a refused run. */
+  refused: string | null;
+  /** The study scenario that asked for it first. */
+  scenarioId: string | null;
+  by: string;
+  at: string;
+  durationMs: number | null;
+}
+
+/** GET /api/runs/{id}: a run, its computation, its SFF record, and its parameters as the panel reads them. */
+export interface RunReport {
+  run: EngineRun;
+  artifact: Artifact | null;
+  flowsheet: SFFFlowsheet | null;
+  /** Each value the run's own, with its origin; null for a refused run. */
+  parameters: ParamScope | null;
+}
+
+// ── Studies (execution prompt §7.2, §9.1 step 5; studies/) ─────────────
+
+/** One value a scenario sets: the parameter's key, and a quantity whose origin is a person's assumption or a model's estimate. */
+export interface ScenarioValue {
+  key: string;
+  quantity: Quantity;
+}
+
+/** POST /api/studies/scenarios. */
+export interface ScenarioCreate {
+  title: string;
+  plant: string;
+  configuration?: string | null;
+  values: ScenarioValue[];
+  note?: string | null;
+  by: string;
+}
+
+/** A study's scenario: a plant, its configuration and the values it sets, and the engine runs made of it. */
+export interface StudyScenario {
+  id: string;
+  kind: 'engine';
+  title: string;
+  plant: string;
+  configuration: string | null;
+  values: ScenarioValue[];
+  note: string | null;
+  /** Oldest first; a refused run's receipt among them. */
+  runIds: string[];
+  by: string;
+  at: string;
+}
+
+/** Who asks: a run of a scenario, a lock. */
+export interface StudyRequest {
+  by: string;
+}
+
+/** POST /api/studies/comparisons: the runs in the order the comparison reads them (each change is reckoned from the first). */
+export interface ComparisonCreate {
+  title: string;
+  runIds: string[];
+  by: string;
+}
+
+/** A comparison of engine runs, under the id of the `study.comparison` artifact that computes it. */
+export interface StudyComparison {
+  id: string;
+  title: string;
+  runIds: string[];
+  artifactId: string;
+  /** The weakest of the runs' (ADR-006). */
+  provenance: Provenance;
+  by: string;
+  at: string;
+}
+
+/** GET /api/studies/comparisons/{id}: the comparison and its artifact (runs, rows, values). */
+export interface ComparisonReport {
+  comparison: StudyComparison;
+  artifact: Artifact;
+}
+
+/** One output of an engine run a runbook predicts: `outputs.<key>` or `price.<key>`, and what the bench calls it. */
+export interface PredictedOutput {
+  output: string;
+  label: string;
+}
+
+/** POST /api/studies/runbooks: a runbook predicting outputs of one engine run, in its units, measured at harvest. */
+export interface RunbookCreate {
+  title: string;
+  runId: string;
+  predict: PredictedOutput[];
+  by: string;
 }

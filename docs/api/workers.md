@@ -401,7 +401,7 @@ worker finds no such test there). A `kind` other than `aerobic` or `anaerobic` i
 ### `vessel_design`
 
 One vessel designed for a fermOS simulation or kinetic fit (D7; `flowsheets/vessel.py` `design`):
-built afresh inside `package_defaults()` on BioSTEAM's default utility prices and cost index,
+built afresh inside `package_defaults()` on BioSTEAM's default utility and stream prices and cost index,
 simulated, and read. An aerated vessel is designed once on its balanced reaction, its reaction's
 oxygen is scaled so the uptake BioSTEAM sizes for is `ourTarget`, and it is designed again.
 `vessel.py` builds the request from a design's basis (`worker_request`) and keeps the answer as one
@@ -498,7 +498,7 @@ anything else as its text. A per-component split the class fills itself adds `by
 ### `catalogue_unit_check`
 
 One unit of a type built alone on given inlets and values, simulated and read, inside
-`package_defaults()` on BioSTEAM's default utility prices and cost index (`catalogue.build_unit`,
+`package_defaults()` on BioSTEAM's default utility and stream prices and cost index (`catalogue.build_unit`,
 `catalogue.unit_report`). The catalogue's sim test (`core/tests/test_catalogue.py`) is its one
 caller. Request `{"type", "ins": [inlet, …], "values": {key: value}, "hold": [attribute, …]}`. An
 inlet is `{"flows": {chemical: kg/hr}, "phase", "T", "P"}` (`phase` is `l` when not given),

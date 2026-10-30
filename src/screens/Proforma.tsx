@@ -442,6 +442,9 @@ export default function Proforma() {
         subtitle="Techno-economics on BioSTEAM: published reference biorefineries run whole on their package's defaults, and scenarios made from a flowsheet on the shelf, each input bound to records or to a named person's assumption."
         actions={
           <>
+            <LinkButton to="/proforma/studies">
+              <BookOpen size={14} /> Studies
+            </LinkButton>
             <LinkButton to="/biorepo/compare">
               <GitCompare size={14} /> Compare
               {pinnedCount > 0 && <span className="font-num text-caption ml-1">({pinnedCount} pinned)</span>}

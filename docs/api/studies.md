@@ -108,3 +108,14 @@ is there as its receipt, with no artifact and no SFF file.
 |---|---|
 | `GET /api/studies/export?by=` | The package, `application/zip`, named `<project>-studies.zip` |
 | `python -m openferment_core.studies.exports OUT.zip` | The same for the project `OPENFERMENT_PROJECT` names, reading that name and the database address alone from `core/.env` when the environment does not set them (ADR-005) |
+
+## Screens
+
+The browser reads every list and report above and computes nothing of its own (`src/lib/studies.ts`).
+
+| Path | Screen | What it shows |
+|---|---|---|
+| `#/proforma/studies` | `ProformaStudies.tsx` | The project's runs (two or more compared from here), scenarios (each run again from here), comparisons and study runbooks; the export package to download |
+| `#/proforma/runs/{id}` | `ProformaRun.tsx` | One run: its parameters in the parameter panel, read-only (the values the run set first, all of them on asking), its basis with each origin, the package's own test, the `RunReport` sections over its artifact as one case, its SFF file, and a runbook made from its numbers |
+| `#/proforma/comparisons/{id}` | `ProformaComparison.tsx` | The runs in order, each output's change from the first as a `Tornado` in the figure grammar's `FigureFrame` (the comparison's provenance on every bar), every number run by run, and the values the runs set with their origins |
+| `#/runbooks/{id}` | `RunbookDetail.tsx` | A study's runbook beside a person's: each prediction links to the run it came from, and the page locks it under the same digest the service writes |

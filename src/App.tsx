@@ -50,6 +50,9 @@ import DepositionDetail from '@/screens/DepositionDetail';
 import Proforma from '@/screens/Proforma';
 import ProformaScenario from '@/screens/ProformaScenario';
 import ProformaReference from '@/screens/ProformaReference';
+import ProformaRun from '@/screens/ProformaRun';
+import ProformaComparison from '@/screens/ProformaComparison';
+import ProformaStudies from '@/screens/ProformaStudies';
 import Compare from '@/screens/Compare';
 import Primer from '@/screens/Primer';
 import PrimerLesson from '@/screens/PrimerLesson';
@@ -202,6 +205,13 @@ function Screen() {
       // when the reader moves to the other reference lands on the page that
       // asked, never on this one.
       if (b === 'reference') return c ? <ProformaReference key={c} flowsheetId={c} /> : <Proforma />;
+      // Execution prompt §9.1 step 5 — 'studies', 'runs' and 'comparisons' are
+      // reserved too: the project's studies, an engine run by its id, a
+      // comparison by its artifact's id. Keyed by id, so one page opened over
+      // another starts from its own state.
+      if (b === 'studies') return <ProformaStudies />;
+      if (b === 'runs') return c ? <ProformaRun key={c} runId={c} /> : <ProformaStudies />;
+      if (b === 'comparisons') return c ? <ProformaComparison key={c} comparisonId={c} /> : <ProformaStudies />;
       return <Proforma />;
     case 'runbooks':
       // 'protocols' and 'depositions' are reserved second segments. Runbook ids

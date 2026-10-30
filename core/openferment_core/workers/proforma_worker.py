@@ -138,6 +138,13 @@ from ..flowsheets.shelf import TABLE_UNITS
 from . import library_plants, serve, sff_toolkit
 from .dot_names import stable_names
 
+# BioSTEAM's stream utility prices as it imports them (process water, natural
+# gas, ash disposal, ...). `bst.process_tools.default()` leaves them as the last
+# plant set them, and a package's process settings set some (sugarcane's set
+# process water to 0.000254 USD/kg, which a composed flowsheet built after it
+# then paid): every build starts from these.
+DEFAULT_STREAM_PRICES = dict(bst.settings.stream_prices)
+
 _BUILT: dict[str, Any] = {}
 
 
@@ -597,8 +604,9 @@ def package_defaults() -> Iterator[None]:
     package's own test runs it (`default_settings` in
     biorefineries/tests/test_biorefineries.py calls
     `bst.process_tools.default()`, which also clears the tickets and
-    thermosteam's chemical cache), and every package's chemicals made anew
-    from empty caches (OF-BLD-019 §2.R). Afterwards what the worker held
+    thermosteam's chemical cache), the stream utility prices BioSTEAM
+    imports with (which `default()` leaves as the last plant set them), and
+    every package's chemicals made anew from empty caches (OF-BLD-019 §2.R). Afterwards what the worker held
     before is put back, not the defaults, because the worker keeps other
     plants warm whose costs read these globals (a PowerUtility's cost reads
     the class's price when it is asked); a chemicals cache first filled
@@ -607,6 +615,7 @@ def package_defaults() -> Iterator[None]:
     saved = {
         "cachedChemicals": {k: _cache_of(fn).cell_contents for k, fn in cached.items()},
         "CE": bst.CE,
+        "streamPrices": dict(bst.settings.stream_prices),
         "power": bst.PowerUtility.price,
         "powerFactors": dict(bst.PowerUtility.characterization_factors),
         "heating": bst.HeatUtility.heating_agents,
@@ -619,6 +628,9 @@ def package_defaults() -> Iterator[None]:
     for fn in cached.values():
         _fresh_cache(fn)
     bst.process_tools.default()
+    # One dict, which bst.stream_utility_prices names too: set in place.
+    bst.settings.stream_prices.clear()
+    bst.settings.stream_prices.update(DEFAULT_STREAM_PRICES)
     try:
         yield
     finally:
@@ -628,6 +640,8 @@ def package_defaults() -> Iterator[None]:
             else:  # a module first imported inside: its cache holds this plant's chemicals
                 _fresh_cache(fn)
         bst.CE = saved["CE"]
+        bst.settings.stream_prices.clear()
+        bst.settings.stream_prices.update(saved["streamPrices"])
         bst.PowerUtility.price = saved["power"]
         bst.PowerUtility.characterization_factors.clear()
         bst.PowerUtility.characterization_factors.update(saved["powerFactors"])

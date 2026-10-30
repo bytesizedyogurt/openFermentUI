@@ -21,7 +21,7 @@ from openferment_core.api import app
 from openferment_core.engine import library, runs, sff, simulator
 from openferment_core.models import BasisInput, BasisSource, ReplayTolerance
 
-from test_library import StandInWorker, over
+from test_library import SUGARCANE_PARAMETERS, StandInWorker, over
 from test_sff import StandInToolkit
 
 # The model the service calls first: the one whose estimates these are.
@@ -120,6 +120,22 @@ def test_a_models_estimate_reaches_a_run_and_the_run_is_assumed(worker):
     assert rep.run.provenance == rep.artifact.provenance == "assumed"
 
 
+def test_a_runs_parameters_read_as_the_panel_reads_them_each_value_the_runs_own(worker):
+    estimate = over("stream.sugarcane.F_mass", 300_000.0, by=MODEL, origin="model-estimate", note="a typical mill")
+    rep = runs.run("sugarcane", None, [over("stream.sugarcane.price", 0.05, by="Ada Moreno", note="a quote"), estimate],
+                   by="Ada Moreno")
+    panel = rep.parameters
+    assert (panel.scope, panel.kind, panel.waiting) == ("library:sugarcane", "library", [])
+    assert [s.key for s in panel.specs] == [p["key"] for p in SUGARCANE_PARAMETERS]
+    values = {v.key: v for v in panel.values}
+    price, flow, vessel = (values[k] for k in ("stream.sugarcane.price", "stream.sugarcane.F_mass", "unit.T202.vessel_type"))
+    assert (price.value, price.origin, price.overriddenBy, price.source.kind) == (0.05, "assumption", "Ada Moreno", "assumption")
+    assert (flow.value, flow.origin, flow.overriddenBy) == (300_000.0, "model-estimate", MODEL)
+    assert (vessel.value, vessel.origin, vessel.libraryDefault) == ("Field erected", "library-default", "Field erected")
+    assert vessel.source.id == "biorefineries.sugarcane@" + library._installed("biorefineries")
+    assert runs.report(rep.run.id).parameters == panel
+
+
 def test_a_replay_holds_a_run_to_the_precision_its_basis_states(monkeypatch):
     inputs = [BasisInput(name="x", value=1.0, unit="", source=BasisSource(kind="convention", note="n"))]
     state = {"price": 0.6588136420, "tiny": 0.0, "name": "ethanol"}
@@ -167,6 +183,7 @@ def test_the_routes_run_list_report_and_refuse(worker):
     assert [r["id"] for r in listed] == [body["run"]["id"]]
     report = client.get(f"/api/runs/{body['run']['id']}").json()
     assert report["run"] == body["run"] and report["flowsheet"]["id"] == f"run-{body['run']['id']}"
+    assert report["parameters"]["kind"] == "library" and report["parameters"] == body["parameters"]
     assert client.get("/api/runs/0000000000000000").status_code == 404
     refused = client.post("/api/library/sugarcane/run", json={"overrides": [over("stream.nosuch.price", 1.0).model_dump()]})
     assert refused.status_code == 422 and "no parameter" in refused.json()["detail"]

@@ -527,8 +527,10 @@ export const REDIRECTS: Record<string, string> = {
  */
 const PATTERN_REDIRECTS: [RegExp, string][] = [
   // /proforma/sc-s1 → /proforma/scenario/sc-s1 (but not /proforma/scenario/…,
-  // nor the reserved /proforma/reference, OF-BLD-019 §3.3)
-  [/^\/proforma\/(?!(?:scenario|reference)(?:\/|$))([^/]+)$/, '/proforma/scenario/$1'],
+  // nor the reserved /proforma/reference, OF-BLD-019 §3.3, nor the studies'
+  // /proforma/studies, /proforma/runs and /proforma/comparisons, execution
+  // prompt §9.1 step 5)
+  [/^\/proforma\/(?!(?:scenario|reference|studies|runs|comparisons)(?:\/|$))([^/]+)$/, '/proforma/scenario/$1'],
   // /simulate/sc-s1 → /proforma/scenario/sc-s1. The `compare` exclusion is
   // redundant now that exact entries run first, and is kept so the pattern is
   // still correct on its own if that entry is ever removed.

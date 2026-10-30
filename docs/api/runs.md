@@ -41,4 +41,4 @@ the same; `withinTolerance` whether every difference is a number within that tol
 |---|---|
 | `POST /api/library/{plant}/run` | `{configuration?, overrides?, by?}`: one engine run, kept; answers the run's report. Values the plant refuses: 422 in its words, the receipt kept |
 | `GET /api/runs` | The project's runs, newest first |
-| `GET /api/runs/{id}` | `{run, artifact, flowsheet}`: one run's report; 404 for a run the project does not hold |
+| `GET /api/runs/{id}` | `{run, artifact, flowsheet, parameters}`: one run's report; 404 for a run the project does not hold. `parameters` is the run's parameters as the parameter panel reads them (a `ParamScope` of kind `library`): each as its plant declares it, its value the run's, a person's assumption or a model's estimate where the run set one and the library's own default elsewhere, built from the run's artifact alone (`engine/runs.py` `parameters_of`); null for a refused run |

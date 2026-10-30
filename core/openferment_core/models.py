@@ -2484,8 +2484,9 @@ class Runbook(BaseModel):
 ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "model-estimate", "convention",
                       "library-default", "waiting", "not-read"]
 # What a scope parameterises: a fermOS model family, a vessel designed for
-# a simulation, one unit of a pureOS train, or a Proforma scenario.
-ParamScopeKind = Literal["fermos-family", "fermos-vessel", "fermos-forecast", "pureos-unit", "proforma"]
+# a simulation, one unit of a pureOS train, a Proforma scenario, or a library
+# plant (an engine run's parameters, engine/runs.py `parameters_of`).
+ParamScopeKind = Literal["fermos-family", "fermos-vessel", "fermos-forecast", "pureos-unit", "proforma", "library"]
 # The entries a sourceRule may hold besides a record's, which names its
 # field as "record:<ontology field id>".
 SOURCE_RULE_ENTRIES = ("fit", "artifact", "simulation", "assumption", "convention", "library-default")
@@ -3964,11 +3965,14 @@ class EngineRun(BaseModel):
 
 
 class RunReport(BaseModel):
-    """GET /api/runs/{id}: a run with its computation and its SFF record."""
+    """GET /api/runs/{id}: a run with its computation, its SFF record, and
+    its parameters as the parameter panel reads them (each value the run's,
+    with its origin; None for a refused run)."""
 
     run: EngineRun
     artifact: Artifact | None = None
     flowsheet: SFFFlowsheet | None = None
+    parameters: ParamScope | None = None
 
 
 # ── studies (execution prompt §7.2, §9.1 step 5; studies/) ──────────────

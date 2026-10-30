@@ -27,7 +27,8 @@ read-back stay in the artifact; `report` reads the run, its artifact and its
 SFF record together.
 
     GET  /api/runs                 the project's runs, newest first
-    GET  /api/runs/{id}            one run's report: the run, its artifact, its SFF record
+    GET  /api/runs/{id}            one run's report: the run, its artifact, its SFF record,
+                                   its parameters as the parameter panel reads them
     POST /api/library/{plant}/run  a library plant or a flowsheet run and kept (api.py)
 """
 from __future__ import annotations
@@ -37,10 +38,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .. import artifacts, db, projects
-from ..basis import origin_of
+from ..basis import ASSUMED_KINDS, origin_of
 from ..db import models as t
 from ..db import rows
-from ..models import Artifact, BasisInput, EngineRun, Override, Quantity, RunInput, RunReport, RunSFF
+from ..models import (Artifact, BasisInput, BasisSource, EngineRun, Override, ParameterValue, ParamScope, Quantity, RunInput,
+                      RunReport, RunSFF)
 from ..workers import WorkerError
 from . import library, sff
 
@@ -131,13 +133,50 @@ def listed() -> list[EngineRun]:
     return db.run(_listed(projects.current()))
 
 
+def parameters_of(run: EngineRun, art: Artifact) -> ParamScope | None:
+    """The run's parameters as the parameter panel reads them: each as its
+    plant declares it (library._spec), its value the run's, a person's
+    assumption or a model's estimate where the run set one and the library's
+    own default elsewhere, read from the run's artifact alone."""
+    read = art.output.get("parameters")
+    if not isinstance(read, list):
+        return None
+    defaults = art.output.get("libraryDefaults") or {}
+    plant = next((i for i in art.inputs if i.name == "plant"), None)
+    own = BasisSource(kind="model", id=plant.source.id if plant else None,
+                      note="read back from the plant as the package builds it")
+    set_here = {i.name: i for i in art.inputs if i.source.kind in ASSUMED_KINDS}
+    values = []
+    for p in read:
+        i = set_here.get(p["key"])
+        if i is None:
+            values.append(ParameterValue(key=p["key"], value=p["value"], source=own, origin="library-default",
+                                         libraryDefault=defaults.get(p["key"], p["value"]), detail=p["note"]))
+            continue
+        values.append(ParameterValue(key=p["key"], value=i.value, source=i.source,
+                                     origin="model-estimate" if i.source.kind == "model-estimate" else "assumption",
+                                     overriddenBy=i.source.by, libraryDefault=defaults.get(p["key"]), detail=i.source.note))
+    where = run.plant + (f" ({run.configuration})" if run.configuration else "")
+    return ParamScope(scope=library.scope(run.plant, run.configuration), kind="library",
+                      title=f"{where}: the values this run was bound with", specs=[library._spec(p) for p in read],
+                      values=values, waiting=[], notes=[
+                          "Each value is the run's own: a person's assumption or a model's estimate where the run set "
+                          "one, the library's default elsewhere. A different value is a new scenario, and a new run."])
+
+
+def _report(run: EngineRun, art: Artifact | None, flowsheet) -> RunReport:
+    return RunReport(run=run, artifact=art, flowsheet=flowsheet,
+                     parameters=parameters_of(run, art) if art is not None else None)
+
+
 def report(run_id: str) -> RunReport:
-    """One run with its artifact and its SFF record (the file itself is
-    `GET /api/flowsheets/{id}/file`)."""
+    """One run with its artifact, its SFF record (the file itself is
+    `GET /api/flowsheets/{id}/file`) and its parameters as the panel reads
+    them."""
     run = get(run_id)
     art = artifacts.get(run.artifactId) if run.artifactId else None
     flowsheet = sff.get(run.sff.recordId, project_id=projects.current()) if run.sff else None
-    return RunReport(run=run, artifact=art, flowsheet=flowsheet)
+    return _report(run, art, flowsheet)
 
 
 def run(plant_id: str, configuration: str | None = None, overrides: list[Override] | None = None, *,
@@ -181,4 +220,4 @@ def run(plant_id: str, configuration: str | None = None, overrides: list[Overrid
                                 score=flowsheet.completeness.score,
                                 tags=sorted(k for k, v in flowsheet.tags.items() if v.earned)) if flowsheet else None)
     db.run(_put(project_id, kept, who))
-    return RunReport(run=kept, artifact=art, flowsheet=flowsheet)
+    return _report(kept, art, flowsheet)

@@ -290,6 +290,32 @@ const PAIRS = [
   ['TrainFromRunRequest', 'TrainFromRunRequest'],
   ['TrainUnmapped', 'TrainUnmapped'],
   ['TrainFromRun', 'TrainFromRun'],
+  // Execution prompt §7.5 — SFF flowsheet records (engine/sff.py).
+  ['SFFFinding', 'SFFFinding'],
+  ['SFFValidation', 'SFFValidation'],
+  ['SFFCriterion', 'SFFCriterion'],
+  ['SFFCompleteness', 'SFFCompleteness'],
+  ['SFFTag', 'SFFTag'],
+  ['SFFNode', 'SFFNode'],
+  ['SFFEdge', 'SFFEdge'],
+  ['SFFBoundary', 'SFFBoundary'],
+  ['SFFGraph', 'SFFGraph'],
+  ['SFFFlowsheet', 'SFFFlowsheet'],
+  // Execution prompt §7.4 — engine runs (engine/runs.py).
+  ['RunInput', 'RunInput'],
+  ['RunSFF', 'RunSFF'],
+  ['EngineRun', 'EngineRun'],
+  ['RunReport', 'RunReport'],
+  // Execution prompt §9.1 step 5 — studies (studies/).
+  ['ScenarioValue', 'ScenarioValue'],
+  ['ScenarioCreate', 'ScenarioCreate'],
+  ['StudyScenario', 'StudyScenario'],
+  ['StudyRequest', 'StudyRequest'],
+  ['ComparisonCreate', 'ComparisonCreate'],
+  ['StudyComparison', 'StudyComparison'],
+  ['ComparisonReport', 'ComparisonReport'],
+  ['PredictedOutput', 'PredictedOutput'],
+  ['RunbookCreate', 'RunbookCreate'],
 ];
 
 let compared = 0;

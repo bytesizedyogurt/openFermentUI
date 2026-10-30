@@ -35,7 +35,11 @@ export function toCSV(headers: string[], rows: unknown[][]): string {
 }
 
 export function download(filename: string, content: string, mime = 'text/csv') {
-  const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+  downloadBlob(filename, new Blob([content], { type: `${mime};charset=utf-8` }));
+}
+
+/** A file the service answered, handed to the person as it came. */
+export function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

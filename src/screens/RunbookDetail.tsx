@@ -323,7 +323,23 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
                       : `tested at ${tests.map((m) => m.timepoint).join(', ')}`}
                   </span>
                 </div>
-                <div className="text-caption text-ink-soft mt-0.5">{p.basis}</div>
+                <div className="text-caption text-ink-soft mt-0.5">
+                  {p.basis}
+                  {p.artifactId && (
+                    <>
+                      {' '}
+                      ·{' '}
+                      {/* A study's runbook predicts an engine run's outputs, and the run's id is its artifact's. */}
+                      <a
+                        className="font-num underline underline-offset-2 hover:text-accent"
+                        href={href(runbook.id.startsWith('rb-study-') ? `/proforma/runs/${p.artifactId}` : `/biorepo/artifacts/${p.artifactId}`)}
+                        data-testid="prediction-artifact"
+                      >
+                        {runbook.id.startsWith('rb-study-') ? 'the run' : 'its artifact'} {p.artifactId}
+                      </a>
+                    </>
+                  )}
+                </div>
               </li>
             );
           })}

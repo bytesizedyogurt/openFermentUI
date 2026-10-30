@@ -628,6 +628,28 @@ export function runViewOfReference(art: Artifact): RunView | null {
   return { ...view, basePrice: num(view.tables.tea?.productPrice) };
 }
 
+/** The tool every engine run of a library plant or a flowsheet is kept under (engine/library.py LIBRARY_RUN). */
+export const LIBRARY_RUN_TOOL = 'library.run';
+
+/**
+ * An engine run in the shape a scenario run reads (execution prompt §7.4):
+ * the same tables under the same keys, one case and no samples, as a
+ * reference run reads. Its base price is the price the run's TEA solved
+ * for (`price.solvedPrice`, USD/kg, BioSTEAM's), else the TEA's own product
+ * price; nothing is computed here.
+ */
+export function runViewOfRun(art: Artifact): RunView | null {
+  if (art.tool !== LIBRARY_RUN_TOOL) return null;
+  const view = viewOf(art.output, {
+    artifactId: art.id,
+    createdAt: art.createdAt,
+    durationMs: art.durationMs,
+    provenance: art.provenance,
+    basis: { tool: art.tool, toolVersion: art.toolVersion, inputs: art.inputs, artifactId: art.id, at: art.createdAt, seed: art.seed },
+  });
+  return { ...view, basePrice: num(rec<unknown>(art.output.price).solvedPrice) ?? num(view.tables.tea?.productPrice) };
+}
+
 /** One of a reference run's checks against its package's own test, as the service wrote it (`output.checks`). */
 export const referenceChecks = (art: Artifact | null): RegressionCheck[] => arr<RegressionCheck>(art?.output?.checks);
 

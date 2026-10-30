@@ -94,6 +94,17 @@ def test_a_run_replays_within_its_precision_after_another_plant_ran_between(warm
     assert a.output["libraryDefaults"]["utility.CEPCI"] == pytest.approx(525.4), "the package's own cost index"
 
 
+def test_the_flowsheet_replays_identical_after_a_plant_that_prices_its_own_process_water(warm):
+    # Sugarcane's process settings price process water at 0.000254 USD/kg, and
+    # BioSTEAM's default() leaves that for the next plant: the worker starts each
+    # build from the stream prices BioSTEAM imports with (proforma_worker
+    # DEFAULT_STREAM_PRICES), so the composed flowsheet pays its own price again.
+    a = library.run("cellulosic_ethanol_v0")
+    library.run("sugarcane")
+    replayed = artifacts.replay(a.id)
+    assert replayed.identical, replayed.differences[:5]
+
+
 def test_the_parameters_read_back_are_the_library_defaults_a_run_starts_from(warm):
     got = library.parameters("cornstover")
     keys = {s.key for s in got.specs}

@@ -169,6 +169,20 @@ determinism after `empty_recycles()` and `tea._sales = 0`.
   `library_run` and `library_cases`), which reads 0 for each of those. The A→B→A replay test holds
   a run to its precision (`withinTolerance`).
 
+### 5.2 (2026-10-30): a plant's stream prices stay its own
+
+- `scripts/prove.py` step 5 replayed openFerment's composed flowsheet after sugarcane ran in the
+  same worker, and thirteen numbers moved past the run's precision: the utility cost by 14 kUSD/yr
+  and everything priced from it. Sugarcane's process settings price process water at 0.000254
+  USD/kg (BioSTEAM imports it at 0.00027); `bst.process_tools.default()` resets utilities and the
+  cost index and leaves `bst.settings.stream_prices` as the last plant set them, and the composed
+  flowsheet's recipe sets none of its own, so it paid sugarcane's price. Measured by diffing every
+  class attribute and every settings dict of BioSTEAM and thermosteam between two builds of the
+  flowsheet with sugarcane between: the one difference was that price. `package_defaults()` now
+  starts every build from the stream prices BioSTEAM imports with (`DEFAULT_STREAM_PRICES`) and
+  puts back what the worker held after; the flowsheet replays identical after sugarcane
+  (`test_library_sim.py`), and the proof's A→B→A check holds it identical.
+
 ## Revisit condition
 
 A second engine; NSKinetics once a kinetic model exists.
