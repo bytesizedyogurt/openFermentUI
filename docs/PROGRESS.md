@@ -16,24 +16,30 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 5, step 5.1** — the `studies/` package and its tables (scenarios,
-   comparisons, runbooks), comparison and runbook artifacts, the export package (JSON, Markdown,
-   SFF files, versions) and routes; then 5.2, the run report, comparison and runbook screens on
-   `RunReport`, `FigureFrame` and `ParameterPanel`; the gate is steps 5 and 8 of `scripts/prove.py`
-   (execution prompt §10 stage 5, §9.1). Stage 4 is complete: engine runs live on the `runs` table
-   (`engine/runs.py`, `docs/api/runs.md`), each with its inputs' origins and its SFF file; a
-   scenario's overrides may carry a model's estimate (ADR-006), and `studies/` is held to its row
-   of §7.2 by `test_boundaries.py` from its first commit.
+4. **Next step: stage 6, step 6.1** — Postdoc's conversations on the server: conversation, turn
+   and tool-call tables under a project; the loop reads a follow-up's history from the server; tool
+   traces and the artifacts each turn produced linked to it; SSE events (`job.*`, `tool.call/result`,
+   `artifact.kept`, `turn.*`) on `/api/events?project=`. Then 6.2 (typed values in claims, the
+   study, literature and engine tools, `docs/TOOLS.md` generated, the MCP server project-scoped),
+   6.3 (`llm.ROUTES`; a change to how keys are read is the owner's, §11.1) and 6.4 (the evaluation
+   set as a table); the gate is proof step 6 offline, `test_postdoc_agent` extended, `check:tools`
+   green (execution prompt §10 stage 6). Stage 5 is complete: `studies/` (scenarios, comparisons,
+   runbooks locked under the browser's digest, the export package), the run, comparison and
+   studies screens, and `pnpm prove` (steps 1, 2, 4, 5, 7, 8; 34 checks; `docs/api/studies.md`).
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 5 — studies: scenarios, comparisons, runbooks, exports — is next. Stages 0 to 4 are
-complete (the tag push waits on the owner; see Blockers). Stage 4 built the vendored SFF toolkit
-and its worker ops (4.1), the library plant runner (4.2), the composed cellulosic ethanol flowsheet
-(4.3), and in 4.4 the rename of `demo` to `assumed`, quantities with origins and the model's
-estimate, engine runs on the `runs` table writing their SFF files, replay within a run's stated
-precision, the package rules of §7.2 as a test, the worker op reference, and two CI fixes.
+Stage 6 — Postdoc: server memory, typed values, routes, tools — is next. Stages 0 to 5 are
+complete (the tag push waits on the owner; see Blockers). Stage 5 built the studies package:
+scenarios on a plant with each value's origin, run as engine runs; comparisons as artifacts over
+the runs'; runbooks made from a run's outputs and locked on the service under the browser's
+digest, which the store then holds them to; the export package that opens without the service;
+the run, comparison and studies screens on `RunReport`, the figure grammar and the parameter
+panel; and `scripts/prove.py`, whose steps 5 and 8 are the stage's gate. The proof found and the
+worker now closes one leak between builds (a plant's stream prices, ADR-004 Implementation 5.2);
+ADR-013 records the one departure the proof holds (cornstover's package test on this
+installation).
 
 ## Last green runs
 
@@ -69,6 +75,12 @@ precision, the package rules of §7.2 as a test, the worker op reference, and tw
 | 2026-10-30 12:05 | Stage 4 gate in a clean worktree at `309e8ab`: `test:core`; `test:lit`; `test:sim` (the library plants with their regression, the composed flowsheet, A→B→A, SFF export, import and drawing, engine runs and replay within tolerance) | 2112 passed, 2 skipped, 166 deselected; 10 passed; 130 passed, 2150 deselected | 5 min 46 s; 14 s; 6 min 44 s | 4.4 (gate) |
 | 2026-10-30 12:05 | Stage 4 gate, the same worktree: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile; the worktree left clean | all passed; 11 of 11 rail entries open | | 4.4 (gate) |
 | 2026-10-30 12:22 | `test:core` with the CI fixes; `test_cellulosic.py`; `test_proforma_worker.py` (`sim`) | 2112 passed, 2 skipped, 166 deselected; 7 passed; 7 passed | 5 min 19 s | `49b8eac` |
+| 2026-10-30 13:35 | `test:core` with 5.1 (scenarios, fresh builds, comparisons); the studies `sim` test | 2133 passed, 2 skipped, 167 deselected; 1 passed | | `99b6e62` |
+| 2026-10-30 14:03 | `test:core` with 5.1 (runbooks); the studies `sim` test with a runbook locked | 2166 passed, 2 skipped, 167 deselected; 1 passed | 6 min 37 s; 49 s | `7347bde` |
+| 2026-10-30 14:14 | `test:core` with 5.1 (exports); the studies and runs `sim` tests | 2172 passed, 2 skipped, 167 deselected; 5 passed | 5 min 54 s | `074ab2b` |
+| 2026-10-30 15:03 | `test:core` with 5.2 (screens, stream prices); typecheck, plan, figures, secrets | 2173 passed, 2 skipped, 168 deselected; all passed | 5 min 30 s | `a965984` |
+| 2026-10-30 15:25 | Stage 5 gate in a clean worktree at `f612377`: `test:core`; `test:lit`; `test:sim` (the flowsheet identical after sugarcane among them) | 2174 passed, 2 skipped, 168 deselected; 10 passed; 132 passed, 2212 deselected | 5 min 33 s; 10 s; 6 min 9 s | 5.2 (gate) |
+| 2026-10-30 15:25 | Stage 5 gate, the same worktree: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile, `pnpm prove` (steps 1, 2, 4, 5, 7, 8); the worktree left clean | all passed; 12 of 12 screens open; 34 of 34 checks hold | 1 min 56 s (prove) | 5.2 (gate) |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -527,3 +539,7 @@ precision, the package rules of §7.2 as a test, the worker op reference, and tw
   `pnpm ready --offline` asks for no key and no network, as an offline run needs. Step 4 holds
   cornstover's two values outside its package test's tolerance to what the package's own code
   measures here (ADR-013, a departure). Steps 3 and 6 arrive with stages 6 and 8.
+- 5.2 (gate run) In a clean worktree at `f612377`: `test:core` 2174 passed, 2 skipped; `test:lit`
+  10 passed; `test:sim` 132 passed; secrets, typecheck, plan, licences, tools, guild, state,
+  figures, build, `pnpm smoke` (12 of 12 screens) and reconcile passed; `pnpm prove` held 34 of 34
+  checks; the worktree stayed clean.
