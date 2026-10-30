@@ -240,6 +240,8 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
   `claude-haiku-5-5` at effort medium (`OPENFERMENT_MODEL`, its fallback and the index model).
   Europe PMC, OSTI, SGD and the Anthropic API answer from this container; OSTI rate-limits a
   burst of report fetches with a redirect to its 429 page.
+- A container restart stops the local PostgreSQL: `service postgresql start`, then `pg_isready -h
+  127.0.0.1`. `core/.env`, the virtual environment and `node_modules` survive it.
 - CI (`.github/workflows/verify.yml`, read through the GitHub tools, 2026-10-30): verify runs on
   the runner's Python 3.12 with a `pgvector/pgvector:pg17` service. Green on 3.1 and 4.1; red on
   3.2 and 3.3 (fixed by 4.1), on 4.2 (`test_proforma_worker.py`'s toy fixture compared floats
@@ -702,3 +704,9 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
   its `ToolError`, and the kit's service refuses with its REST `ApiError`. `literature_mcp.py` now
   raises each refusal as a `ToolError` in its words, takes `--project`, and leaves off the kit's
   two tools that read the concept graph whole (ADR-002, Implementation 8; `test_literature_mcp.py`).
+- 8.4, after the pull request: the session's own client, its servers restarted on the new code,
+  still read "Error executing tool corpus_stats": the container had restarted, PostgreSQL with it
+  stopped, and the kit's `stats` query the database before they ask for a project. `InWords` now
+  asks for the project before any call and says any failure in words, as `tools.run` does for
+  openFerment's own server; checked over stdio with the database down (both refusals in words) and
+  up again.

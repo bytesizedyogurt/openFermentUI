@@ -132,14 +132,19 @@ Two adaptations, both offered upstream:
 Called over stdio as `.mcp.json` starts it (2026-10-30), the kit's MCP server answered
 `corpus_stats` with "Error executing tool corpus_stats" and nothing more: it had started with no
 project, the kit's service refuses with its REST `ApiError`, and the MCP SDK (2.3) hands a client
-only that line for an exception other than its `ToolError`. `literature_mcp.py` now wraps the
-service so each refusal reaches the client as a `ToolError` in its words (no project named, a
-document the project does not hold), and takes `--project` as openFerment's own server does. The
+only that line for an exception other than its `ToolError`. The kit's `stats` also query the
+database before they ask for a project, so with the database down the same line came back.
+`literature_mcp.py` now wraps the service as openFerment's own server answers: each call asks for
+a project first, and each refusal or failure reaches the client as a `ToolError` in its words (no
+project named, a document the project does not hold, a database that does not answer); it takes
+`--project` as that server does. The
 kit's `search_entities` and `get_entity_relationships` read the concept graph whole, every
 project's entities, relationships and evidence quotes, so the server leaves them off; nothing in
 openFerment builds the graph yet, and scoping them is a debt. Checked over stdio on a proof
 database: with no project, a refusal in words; with `--project`, the project's 5 documents and 34
-chunks, a search with its hits, an unknown document refused in words (`test_literature_mcp.py`).
+chunks, a search with its hits, an unknown document refused in words; with the database down, the
+refusal with no project and, with one, the connection's failure, each in words
+(`test_literature_mcp.py`).
 
 ## Revisit condition
 

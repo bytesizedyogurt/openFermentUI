@@ -4,8 +4,10 @@ kit's tools that read the concept graph whole are left off.
 
 The MCP SDK hands a client only "Error executing tool <name>" for an exception
 other than its ToolError (seen 2026-10-30: corpus_stats asked of a server
-started with no project). The service here is a stand-in that refuses as the
-kit's ProjectService does; the server is the kit's, built as main() builds it.
+started with no project, and again with the database down, since the kit's
+stats query the database before they ask for a project). The service here is a
+stand-in that refuses or fails as the kit's ProjectService does; the server is
+the kit's, built as main() builds it.
 """
 from __future__ import annotations
 
@@ -86,3 +88,21 @@ def test_the_server_acts_in_the_project_its_command_names(monkeypatch):
     assert os.environ[projects.ENV] == "p-lit"
     monkeypatch.delenv(projects.ENV, raising=False)
     assert literature_mcp.act_in([]) is None and projects.ENV not in os.environ
+
+
+DOWN = ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 5432)")
+
+
+def test_a_server_acting_in_no_project_says_so_before_it_reaches_the_database():
+    with projects.using(None):
+        refused = _refused(literature_mcp.build(Refusing(DOWN)), "corpus_stats", {})
+    assert literature_mcp.NO_PROJECT in str(refused)
+
+
+@pytest.mark.parametrize("tool, arguments", [
+    ("corpus_stats", {}),
+    ("answer_question", {"query": "What was the ethanol yield?"}),
+])
+def test_a_database_that_does_not_answer_is_said_in_words(tool, arguments):
+    refused = _refused(literature_mcp.build(Refusing(DOWN)), tool, arguments)
+    assert "The kit's service failed: ConnectionRefusedError" in str(refused) and "5432" in str(refused)

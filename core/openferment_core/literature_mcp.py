@@ -14,10 +14,12 @@ needs the model, which llm.py reaches only with a key in the environment. It
 lives outside `literature/` because it installs llm.py's client, which
 `literature/` does not import (§7.2).
 
-A refusal of the kit's service (no project named, a document the project does
-not hold) reaches the client in its words: the MCP SDK hands a client only
-"Error executing tool <name>" for an exception other than its `ToolError`,
-so `InWords` raises the service's refusals as one.
+Every failure reaches the client in words, as openFerment's own server says
+its own: the MCP SDK hands a client only "Error executing tool <name>" for an
+exception other than its `ToolError`. `InWords` asks for a project before the
+service is called, so that refusal holds with the database down too, and raises
+the service's refusals (a document the project does not hold) and its failures
+(a database that does not answer) as a `ToolError` in their words.
 """
 from __future__ import annotations
 
@@ -40,15 +42,23 @@ NO_PROJECT = ("This Sci RAG Kit server acts in no project. Start it with --proje
 UNSCOPED = ("search_entities", "get_entity_relationships")
 
 
-def _words(e: ApiError) -> str:
-    if e.code == "project_required":
-        return NO_PROJECT
-    return f"{e.title}: {e.detail}" if e.detail else e.title
+def _named() -> None:
+    if projects.current_or_none() is None:
+        raise ToolError(NO_PROJECT)
+
+
+def _in_words(e: Exception) -> ToolError:
+    if isinstance(e, ApiError):
+        if e.code == "project_required":
+            return ToolError(NO_PROJECT)
+        return ToolError(f"{e.title}: {e.detail}" if e.detail else e.title)
+    return ToolError(f"The kit's service failed: {type(e).__name__}: {e}")
 
 
 class InWords:
-    """The kit's service as its MCP tools call it: each refusal it raises
-    reaches the client as a `ToolError` in its words."""
+    """The kit's service as its MCP tools call it: each call asks for a
+    project first, and each refusal or failure reaches the client as a
+    `ToolError` in its words."""
 
     def __init__(self, service: Any) -> None:
         self._service = service
@@ -58,27 +68,33 @@ class InWords:
         if inspect.iscoroutinefunction(found):
             @functools.wraps(found)
             async def call(*args: Any, **kwargs: Any) -> Any:
+                _named()
                 try:
                     return await found(*args, **kwargs)
-                except ApiError as e:
-                    raise ToolError(_words(e)) from e
+                except ToolError:
+                    raise
+                except Exception as e:
+                    raise _in_words(e) from e
 
             return call
         if name == "answer_stream":
             # A stream refuses as it starts or once it is read.
             @functools.wraps(found)
             def stream(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
+                _named()
                 try:
                     events = found(*args, **kwargs)
-                except ApiError as e:
-                    raise ToolError(_words(e)) from e
+                except Exception as e:
+                    raise _in_words(e) from e
 
                 async def each() -> AsyncIterator[Any]:
                     try:
                         async for event in events:
                             yield event
-                    except ApiError as e:
-                        raise ToolError(_words(e)) from e
+                    except ToolError:
+                        raise
+                    except Exception as e:
+                        raise _in_words(e) from e
 
                 return each()
 
