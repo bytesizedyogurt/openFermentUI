@@ -24,6 +24,11 @@ dependencies = [
     # alpha 2.0 — the record fields and the vocabulary are YAML under
     # openferment_core/schema/, read by units.py and validate.py.
     "pyyaml>=6",
+    # alpha 2.0 (ADR-001) — PostgreSQL is the one store: SQLAlchemy 2 async
+    # over asyncpg, the driver Sci RAG Kit uses, and alembic for our schema.
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]

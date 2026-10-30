@@ -13,6 +13,7 @@ accepted licence strings, and every package a person accepted, are in
 
 | Package | Version | Licence | Used by | Passes as |
 |---|---|---|---|---|
+| alembic | 1.20.1 | MIT | service | allowed |
 | annotated-doc | 0.0.5 | MIT | service, through fastapi | allowed |
 | annotated-types | 0.8.0 | MIT | service, through anthropic, fastapi, pydantic | allowed |
 | ansicolors | 1.1.8 | ISC | the geneOS worker, through biorefineries, biosteam | allowed |
@@ -20,6 +21,7 @@ accepted licence strings, and every package a person accepted, are in
 | anyio | 4.14.2 | MIT | service, through anthropic, fastapi, httpx, uvicorn | allowed |
 | appdirs | 1.4.4 | MIT | the geneOS worker, through cobra | allowed |
 | asttokens | 3.0.2 | Apache 2.0 | the geneOS worker, through biorefineries, biosteam | allowed |
+| asyncpg | 0.32.0 | Apache-2.0 | service | allowed |
 | attrs | 26.1.0 | MIT | extra agent, through mcp | allowed |
 | biopython | 1.88 | LicenseRef-Biopython-License-Agreement | service | allowed |
 | biorefineries | 2.35.1 | MIT | the geneOS worker | allowed |
@@ -55,6 +57,7 @@ accepted licence strings, and every package a person accepted, are in
 | fsspec | 2026.9.0 | BSD-3-Clause | extra rag, through fastembed | allowed |
 | future | 1.0.0 | MIT | the geneOS worker, through cobra | allowed |
 | graphviz | 0.21 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
+| greenlet | 3.5.6 | MIT AND PSF-2.0 | service, through sqlalchemy | allowed |
 | h11 | 0.16.0 | MIT | service, through anthropic, httpx, uvicorn | allowed |
 | hensmith | 0.1.2 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | hf-xet | 1.7.0 | Apache-2.0 | extra rag, through fastembed | allowed |
@@ -78,7 +81,9 @@ accepted licence strings, and every package a person accepted, are in
 | kiwisolver | 1.5.1 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | llvmlite | 0.50.0 | BSD-2-Clause AND Apache-2.0 WITH LLVM-exception | the geneOS worker, through biorefineries, biosteam | allowed |
 | loguru | 0.7.3 | License :: OSI Approved :: MIT License | extra rag, through fastembed | allowed |
+| Mako | 1.4.3 | MIT | service, through alembic | allowed |
 | markdown-it-py | 4.2.0 | License :: OSI Approved :: MIT License | the geneOS worker, through cobra | allowed |
+| MarkupSafe | 3.0.4 | BSD-3-Clause | service, through alembic | allowed |
 | matplotlib | 3.11.2 | License :: OSI Approved :: Python Software Foundation License | the geneOS worker, through biorefineries, biosteam | allowed |
 | matplotlib-inline | 0.2.2 | BSD-3-Clause | the geneOS worker, through biorefineries, biosteam | allowed |
 | mcp | 2.3.0 | MIT | extra agent | allowed |
@@ -138,6 +143,7 @@ accepted licence strings, and every package a person accepted, are in
 | setuptools | 84.0.0 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | six | 1.17.0 | MIT | the geneOS worker, through biorefineries, biosteam, cobra | allowed |
 | sniffio | 1.3.1 | MIT OR Apache-2.0 | service, through anthropic | allowed |
+| SQLAlchemy | 2.1.6 | MIT | service | allowed |
 | sse-starlette | 3.5.0 | BSD-3-Clause | extra agent, through mcp | allowed |
 | stack-data | 0.6.3 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | starlette | 1.6.0 | BSD-3-Clause | service, through fastapi | allowed |
@@ -150,7 +156,7 @@ accepted licence strings, and every package a person accepted, are in
 | tqdm | 4.70.1 | MPL-2.0 AND MIT | extra rag, through fastembed | accepted by Sean Creighton on 2026-10-15 |
 | traitlets | 5.16.1 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | truststore | 0.10.4 | MIT | service, through anthropic | allowed |
-| typing_extensions | 4.16.0 | PSF-2.0 | service, through anthropic, fastapi, httpx, pydantic, uvicorn | allowed |
+| typing_extensions | 4.16.0 | PSF-2.0 | service, through alembic, anthropic, fastapi, httpx, pydantic, sqlalchemy, uvicorn | allowed |
 | typing-inspection | 0.4.4 | MIT | service, through anthropic, fastapi, pydantic | allowed |
 | tzdata | 2026.5 | Apache-2.0 | the geneOS worker, through biorefineries, biosteam, cobra | allowed |
 | urllib3 | 2.8.0 | MIT | extra rag, through fastembed | allowed |

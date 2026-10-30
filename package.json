@@ -31,7 +31,10 @@
     "ask:batch": "cd core && uv run --all-extras python ../scripts/ask-batch.py",
     "prototype:up": "bash scripts/prototype-up.sh",
     "check:guild": "tsx scripts/check-guild.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "db:up": "docker compose up -d --wait db",
+    "db:migrate": "cd core && uv run python -m openferment_core.db migrate",
+    "db:reset": "cd core && uv run python -m openferment_core.db reset"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

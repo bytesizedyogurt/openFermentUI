@@ -10,20 +10,24 @@ checkpoint. A fresh session continues from this file and `git log` alone.
 2. Environment:
    - `pnpm install --frozen-lockfile`
    - `cd core && uv sync --all-extras`
-   - From stage 2 on: `pnpm db:up` (or a local PostgreSQL with pgvector), then `pnpm db:migrate`.
+   - From stage 2 on, PostgreSQL: `pnpm db:up` (compose.yaml), or a local PostgreSQL 16 or later
+     with pgvector and a role that may create databases. `OPENFERMENT_DATABASE_URL` in `core/.env`
+     (`core/.env.example` has the development address), then `pnpm db:migrate`. The tests make a
+     database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
+     compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 2, step 2.1** — the `db/` package (the async engine over asyncpg, sessions,
-   the table models of §7.4), `compose.yaml`, alembic `0001_initial`, `pnpm db:up`, `db:migrate`
-   and `db:reset`, and the test database fixture (`OPENFERMENT_TEST_DATABASE_URL`, created per
-   session, rolled back per test).
+4. **Next step: stage 2, step 2.2** — projects: the `projects/` package (`current()`, `using()`,
+   create, get, list), `/api/projects`, every request naming its project (`X-OpenFerment-Project`
+   or `?project=`, set by a middleware, a 422 in words when a store call names none), the test
+   project the per-test binding prepares, and the client sending the header and choosing a
+   project (the last-open project in `durable.ts`).
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 1 — delete — is complete: 1.1 to 1.5 delete section 5, and 1.6 passed the gate in a clean
-worktree (the smoke, typecheck, build, `test:core`, `test_no_seed.py`, `test:sim`). Stage 2 —
-PostgreSQL and the record stores — is next. Stage 0 is complete except the tag push (see
-Blockers).
+Stage 2 — PostgreSQL and the record stores. 2.1 (the `db/` package, migrations, commands and the
+test database) is committed; 2.2 (projects) is next, then the stores one by one. Stage 1 is
+complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Blockers).
 
 ## Last green runs
 
@@ -71,6 +75,7 @@ Blockers).
 | §5.2 | Tests that held seeded content were deleted with it; rule tests that only used it as material now run on fictional fixtures: `core/tests/fixtures/test-corpus.json` (placeholder papers and records, the `test_corpus` fixture), placeholder Guild skills and protocols in the alpha 1.0 shape, small fictional projections inside tests, and a test-only categorical field | A4 forbids seeded values under `core/`; the rules (anchoring, review decisions, retrieval, coverage, Guild) stay tested |
 | §5.2 | Eval set O (`evalo.py`, `pnpm eval:o`) and the identifier tooling (`identifiers.py`, `scripts/resolve-identifiers.py`, `pnpm ids:*`) are deleted | Eval set O's ten questions named the seed; the identifier tooling patched DOIs into the TypeScript seed |
 | §5.5, §10 stage 1 | Stage 1 deletes the merge driver, the data-sync, data-prepare and decisions-push scripts, `sync_decisions.sh` and the `openferment-data` branch convention. The file stores (`core/data/*.json`, `audit.jsonl`, `artifacts/`, `candidates/`, `live/`) and the browser's Durable scientific state stay until stage 2 replaces each with its PostgreSQL store, as stage 2 step 2 says; `core/data/biorepo.json` stays tracked until then | Untracking `biorepo.json` would make the live Mini's next pull delete the review decisions people made there (§11.1); stage 2 imports them into PostgreSQL |
+| §7.4 | Tables `overrides`, `fits`, `trains` and `practice_scenarios`, and `projects.settings`, beyond the list; each table keeps its lookup keys as columns and the rest of a row as `body`, the Pydantic model as JSONB | §5.5 moves those browser states to the server; the Pydantic models stay the one description of content (ADR-001, Implementation) |
 | §4, §5.2 | The record fields, the vocabulary (carbon sources and unit operations) and the unit tables live in `core/openferment_core/schema/` (`fields.yaml`, `vocabulary.yaml`, `units.json`), with no range and no example value; `src/data/ontology.ts` and `vocabulary.ts` mirror them, held equal by `test_schema.py` through the fixture `pnpm export:unit-fixtures` writes. BioRepo's typed-value refusal is renamed `range` → `unit`; `pyyaml` is a direct dependency | The service needs the fields without the TypeScript seed; a range is a number about a field (ADR-010) |
 
 ## Blockers
@@ -97,6 +102,7 @@ Blockers).
 | `test_proforma.py` holds the package's own regression values and this build's benchmark price to test the parser | stage 4 (A4 review) |
 | `core/tests/standins.py` keeps a closed-form ethanol evaluator, stand-in yeast records and `STANDIN_THEORETICAL` | stage 4 (with the row above on stand-ins) |
 | `pnpm smoke` opens the rail entries and checks nothing more; alpha 1.0's smoke also walked review, deposition, the runs and the redirects against the service double | stage 7 extends it over the real service |
+| `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run: this container has no Docker daemon, so stage 2 runs on the distribution's PostgreSQL 16 | CI, or the owner's machine |
 | `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7 |
 
 ## Owner questions (execution prompt §13) and the defaults taken
@@ -121,6 +127,9 @@ Blockers).
 - GitHub reachable for clones; PyPI and npm reachable; `sci-rag-kit` 0.5.0 is on PyPI.
 - `OPENFERMENT_API_KEY` is set in the session environment (value never printed);
   `ANTHROPIC_API_KEY` unset, as it should be.
+- Stage 2: a role `openferment` (password `openferment`, may create databases) and a database
+  `openferment_dev` on the local cluster, for the development address and the tests' default.
+  Container state, gone with the container.
 
 ## Log
 
@@ -180,3 +189,18 @@ Blockers).
   Chromium when the repository's Playwright expects another build. The gate ran in a clean
   worktree of the commit's tree: all green (Last green runs). Sections 10.1.3 (the thread Q list)
   and 10.1.4 (the kit's suite, the Python pin) were done at 1.2 and stage 0.
+
+### Stage 2 — 2026-10-30
+
+- 2.1 `core/openferment_core/db/`: one async engine over asyncpg reached by synchronous callers
+  through one owned event loop (`db.run`, `db.arun`), one transaction per top-level call
+  (`db.session`), a transaction-scoped advisory lock (`db.lock`), 30 tables (the 26 of §7.4 and
+  four more, Departures) as SQLAlchemy Core with a JSONB `body` (ADR-001, Implementation), alembic `0001_initial`, and
+  `python -m openferment_core.db migrate | reset NAME | revision` behind `pnpm db:migrate` and
+  `pnpm db:reset`; `compose.yaml` and `pnpm db:up` for a developer's PostgreSQL 17. The tests make
+  one database per session on first use and roll every test back (`conftest.py`); `test_db.py`
+  holds the migration equal to the models, the rollback, the joined sessions, the lock under
+  eight concurrent writers, and the refusals. Dependencies: `sqlalchemy[asyncio]`, `asyncpg`,
+  `alembic` (greenlet's `MIT AND PSF-2.0` joins the allowed licence strings). `check:secrets`
+  refuses a database address in the browser and a database password in a tracked file for a host
+  off loopback.
