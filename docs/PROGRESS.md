@@ -89,6 +89,8 @@ Implementation 8).
 | 2026-10-30 18:12 | `pnpm prove --steps 3,8` (steps 1, 2, 3, 8), offline: the kit's demo corpus, a stand-in's candidate anchored, refused and accepted | 21 of 21 checks hold; the proof's spend table holds no call | 60 s | 8.4 |
 | 2026-10-30 18:58 | `test:core` with stage 8 (the guidance test, the SGD form, the grammar fix, OSTI's rate limit) | 2250 passed, 2 skipped, 168 deselected | 5 min 17 s | 8.4 |
 | 2026-10-30 18:39 | `pnpm prove --live` (steps 1 to 8): 22 of 22 ethanol sources, 814 chunks; PMC4842200 extracted by `claude-haiku-5-5` (8 candidates kept, 2 refused); the evaluation set answered live | 46 of 46 checks hold; 10 calls, $0.0163 from the proof's spend table | 7 min 21 s | 8.4 |
+| 2026-10-30 19:13 | Stage 8 gate in a clean worktree at `7e513d9`, no key: `pnpm verify`, all sixteen stages; `test:core`; `test:sim`; `test:lit`; `smoke` | every stage green; 2250 passed, 2 skipped, 168 deselected; 132 passed; 10 passed; 12 of 12 screens open | 13 min 33 s (verify) | 8.4 (gate) |
+| 2026-10-30 19:16 | Stage 8 gate, the same worktree: `pnpm prove`, steps 1 to 9 offline (1: 4 checks, 2: 1, 3: 9, 4: 7, 5: 10, 6: 9, 7: 3, 9: 9, 8: 10, the spend: 1); the worktree left clean | 63 of 63 checks hold; the proof's spend table holds no call | 2 min 47 s | 8.4 (gate) |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -684,3 +686,8 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
     (`transient`), and the live proof asks such a source again once, two minutes later.
 - 8.4 A8: the kit's vendored migrations and prompt templates join `core/licences.toml` as vendored
   code (BSD-3-Clause at `26b3990`), each with its `LICENSE` beside it; `THIRD_PARTY.md` regenerated.
+- 8.4 The gate, in a clean worktree at `7e513d9` with no key: `pnpm verify` green, all sixteen
+  stages; `pnpm prove` holds 63 of 63 checks offline, steps 1 to 9; the worktree left clean. With
+  the key, `pnpm prove --live` held 46 of 46 (steps 1 to 8) on the same tree. Acceptance A1 to A8
+  hold, with the departures recorded above (A3: ADR-014 and the tracked `biorepo.json`; A4: the test
+  stand-ins). The pull request carries the completion report (§12).
