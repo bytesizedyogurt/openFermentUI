@@ -1,6 +1,6 @@
 // Hash-based router (OF-DES-001 §13.2) — self-contained, no history API,
 // so deep links survive inside an embedded artifact frame.
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface Route {
   path: string; // "/biorepo/paper/SP-004"
@@ -55,10 +55,6 @@ export function navigate(to: string, opts?: { replace?: boolean }) {
       document.getElementById('of-main')?.scrollTo({ top: 0 });
     });
   }
-}
-
-export function useNavigate() {
-  return useCallback(navigate, []);
 }
 
 /** <a href> that routes internally; keeps middle-click / cmd-click semantics. */

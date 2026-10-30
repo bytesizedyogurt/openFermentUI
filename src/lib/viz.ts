@@ -31,35 +31,6 @@ export function useCategorical(): string[] {
   return theme === 'night' ? CATEGORICAL_DARK : CATEGORICAL_LIGHT;
 }
 
-export function useSeriesColor(): (i: number) => string {
-  const palette = useCategorical();
-  return (i: number) => palette[i % palette.length];
-}
-
-/** Viridis stops for sequential surfaces (sweep grids, heatmaps). */
-const VIRIDIS = [
-  [68, 1, 84],
-  [72, 40, 120],
-  [62, 74, 137],
-  [49, 104, 142],
-  [38, 130, 142],
-  [31, 158, 137],
-  [53, 183, 121],
-  [110, 206, 88],
-  [181, 222, 43],
-  [253, 231, 37],
-];
-
-export function viridis(t: number): string {
-  const x = Math.max(0, Math.min(1, t)) * (VIRIDIS.length - 1);
-  const i = Math.floor(x);
-  const f = x - i;
-  const a = VIRIDIS[i];
-  const b = VIRIDIS[Math.min(VIRIDIS.length - 1, i + 1)];
-  const c = a.map((v, k) => Math.round(v + (b[k] - v) * f));
-  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
-}
-
 /** Blue–grey–orange diverging ramp for comparisons (t in −1…1). */
 export function diverging(t: number): string {
   const x = Math.max(-1, Math.min(1, t));
@@ -83,22 +54,5 @@ export function useChartTheme() {
     accent: dark ? '#6FAE8F' : '#2E6B4F',
     warn: dark ? '#D97A45' : '#B3541E',
     gold: dark ? '#D3A24C' : '#B07C22',
-  };
-}
-
-/** Shared recharts tooltip styling. */
-export function tooltipStyle(t: ReturnType<typeof useChartTheme>) {
-  return {
-    contentStyle: {
-      background: t.surface,
-      border: `1px solid ${t.grid}`,
-      borderRadius: 8,
-      fontSize: 12,
-      fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
-      color: t.ink,
-      boxShadow: '0 8px 24px -6px rgba(0,0,0,0.18)',
-    },
-    labelStyle: { color: t.axis, fontSize: 11, marginBottom: 2 },
-    itemStyle: { color: t.ink, fontSize: 12 },
   };
 }

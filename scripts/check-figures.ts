@@ -8,8 +8,8 @@
  *    value alone (rule 3).
  * 2. The two classes that are never evidence are dashed, point and line.
  * 3. Each figure's `toTable` returns one row per mark of the gallery's sample.
- * 4. `recharts` is imported only under src/components/figures/ and in the two
- *    screens that used it before the grammar, by any import form.
+ * 4. `recharts` is imported nowhere under src/, by any import form: every
+ *    chart is drawn from src/components/figures/ (the dependency is gone).
  * 5. What the review of Phase 6 found (§6.R): a modeled mark is held out of
  *    the median, a ceiling's rule keeps its own provenance, and a yield is
  *    held against a sugar's ceiling only when it was measured on that sugar.
@@ -204,8 +204,7 @@ if (lRows.length !== 3 || lRows.map((r) => `${r[1]}:${r[6]}`).join() !== 'point:
 ok.push(`tables: distribution ${distRows.length}, tornado ${tRows.length}, one row per mark, strongest input first`);
 ok.push(`tables: strip ${stripRows}, ceiling ${ceilingRows}, frontier ${frontierRows}, one row per mark; the sample draws all ${provs.size} classes`);
 
-// 4 — recharts stays where it was.
-const ALLOWED = ['src/screens/Compare.tsx', 'src/screens/ProformaScenario.tsx'];
+// 4 — recharts is gone, and stays gone.
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
     const p = join(dir, n);
@@ -215,10 +214,9 @@ function walk(dir: string): string[] {
 for (const file of walk('src').filter((f) => /\.(ts|tsx)$/.test(f))) {
   const rel = relative('.', file).split('\\').join('/');
   if (!/(from\s*|import\s*\(\s*|require\s*\(\s*)['"]recharts(\/[^'"]*)?['"]/.test(readFileSync(file, 'utf8'))) continue;
-  if (rel.startsWith('src/components/figures/') || ALLOWED.includes(rel)) continue;
   problems.push(`${rel} imports recharts; charts are drawn from src/components/figures/`);
 }
-ok.push('recharts is imported only under src/components/figures/ and in Compare and ProformaScenario');
+ok.push('recharts is imported nowhere under src/');
 
 // 5 — what the review of Phase 6 found.
 const demoPoint = stripPoints(strip).points.find((p) => p.provenance === 'demo');

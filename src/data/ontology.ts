@@ -313,14 +313,6 @@ export const ONTOLOGY_BY_ID: Record<FieldId, ParameterDef> = Object.fromEntries(
   ONTOLOGY.map((d) => [d.id, d]),
 ) as Record<FieldId, ParameterDef>;
 
-export const ONTOLOGY_BY_FAMILY: Record<ParameterFamily, ParameterDef[]> = ONTOLOGY.reduce(
-  (acc, d) => {
-    (acc[d.family] ??= []).push(d);
-    return acc;
-  },
-  {} as Record<ParameterFamily, ParameterDef[]>,
-);
-
 export function fieldName(id: FieldId): string {
   return ONTOLOGY_BY_ID[id]?.name ?? id;
 }

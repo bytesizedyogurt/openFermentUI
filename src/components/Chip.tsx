@@ -7,7 +7,7 @@ import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
 import { fieldName } from '@/data/ontology';
 import { Popover, cx } from './ui';
-import { ProvenanceBadge, provMeta, type ProvKind } from './Provenance';
+import { ProvenanceBadge, type ProvKind } from './Provenance';
 
 function shortTitle(t: string, max = 64) {
   return t.length > max ? t.slice(0, max - 1) + '…' : t;
@@ -143,17 +143,4 @@ export function CitationChip({
       </div>
     </Popover>
   );
-}
-
-/** Compact record chip that reads "ex-0112" — used in audit and assumption rows. */
-export function RecordChip({ recordId }: { recordId: string }) {
-  const record = useStore((s) => s.records.find((r) => r.id === recordId));
-  if (!record) return <CitationChip recordId={recordId} label={recordId} />;
-  return <CitationChip recordId={recordId} label={record.id} />;
-}
-
-/** A tiny inline provenance mark used where a chip would be too heavy. */
-export function ProvMark({ p }: { p: ProvKind }) {
-  const { Icon, color, label } = provMeta(p);
-  return <Icon size={12} className={cx('inline align-[-2px]', color)} aria-label={label} />;
 }

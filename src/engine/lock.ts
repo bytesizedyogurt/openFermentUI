@@ -75,13 +75,3 @@ export function lockIntact(runbook: {
   if (!runbook.lockedAt || !runbook.lockHash) return true;
   return runbookLockHash(runbook.predictions, runbook.measurementSchema) === runbook.lockHash;
 }
-
-/**
- * Predictions freeze once a runbook has done anything. Draft and
- * awaiting-budget runbooks have not started, so theirs are still editable;
- * everything else has consumed compute against them and must be frozen.
- */
-export function shouldBeLocked(status: string, progressPct: number): boolean {
-  if (status === 'draft' || status === 'awaiting_budget') return false;
-  return progressPct > 0 || status !== 'draft';
-}

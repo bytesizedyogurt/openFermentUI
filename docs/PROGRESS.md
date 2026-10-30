@@ -12,17 +12,19 @@ checkpoint. A fresh session continues from this file and `git log` alone.
    - `cd core && uv sync --all-extras`
    - From stage 2 on: `pnpm db:up` (or a local PostgreSQL with pgvector), then `pnpm db:migrate`.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: 1.4** — the rest of section 5.6: `react-router-dom`, `recharts`,
-   `src/engine/retrieval.ts`, unused exports and unread store fields, the offline ingest timer,
-   the dead types listed under Known debts, and the stream replay the deleted service double sent
-   (`ReplayInfo`, `LiveTurn.replay`). Then 1.5 (5.7: instruction sprawl to `docs/history/`), a
-   minimal smoke over the real service, and the stage 1 gate.
+4. **Next step: 1.5** — section 5.7: `CLAUDE.md` (already at `docs/history/`), `STATE.md`,
+   `README.md`, `COMPONENTS.md`, `THIRD_PARTY.md`, `BUILD-SPEC.md`, `docs/build/`,
+   `docs/OF-COR-001.md` and `docs/DEMO.md` to `docs/history/` with 2026-10-21 in their names
+   (the licence check regenerates `THIRD_PARTY.md`). Then a minimal smoke over the real service
+   that opens every rail entry, and the stage 1 gate (typecheck, build, `test:core`, `test:sim`,
+   `test_no_seed.py`, the app starts).
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 1 — delete. 1.1 (5.3, 5.4), 1.2 (5.1, 5.2, Dominion and the retired guards of 5.6) and
-1.3 (5.5's data movement) are committed; 1.4, 1.5, the smoke and the gate remain. Stage 0 is complete except the tag push
+Stage 1 — delete. 1.1 (5.3, 5.4), 1.2 (5.1, 5.2, Dominion and the retired guards of 5.6),
+1.3 (5.5's data movement) and 1.4 (the rest of 5.6) are committed; 1.5, the smoke and the gate
+remain. Stage 0 is complete except the tag push
 (see Blockers).
 
 ## Last green runs
@@ -89,7 +91,6 @@ Stage 1 — delete. 1.1 (5.3, 5.4), 1.2 (5.1, 5.2, Dominion and the retired guar
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program | the vocabulary review at stage 3 |
 | `docs/TOOLS.md` was edited by hand to remove Dominion and the program switch | stage 6 regenerates it (A5) |
 | `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's funnel | stage 7 |
-| Dead types and fields: `Scenario.kind` `'authored'`, `LessonBlock` `'unit-playground'`, `Product.clearanceState`, `storageIds`, `scaleId`; `recharts` and `react-router-dom` imported by nothing under `src/` | 1.4 |
 | Dead service paths the deletions left: the storage machinery (`kinetics.py`'s N and Q states, `fermos._no_broth_product`'s store-in-cells branch, `proforma.fit_info`'s store branch), `proforma._strain_labels`' program map, `proforma.basis_inputs`' `cap` and the yield cap in `_specs`; `fermos.NAMED_NOTE` still says "program" (its text is hashed into every simulation's basis) | stage 4, with the adapter |
 | Catalogues that left with the seed are empty in production and supplied by fixtures in tests: held scenarios, the strain catalogue and its aliases, the proposer's products and hosts. Until a project's records carry them, every pureOS proposal is refused for want of a host on file | stage 2 |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | stage 4 |
@@ -158,3 +159,9 @@ Stage 1 — delete. 1.1 (5.3, 5.4), 1.2 (5.1, 5.2, Dominion and the retired guar
   `openferment-data` branch and its `data-sync.sh`, `data-prepare.sh`, `decisions-push.sh` and
   `scripts/host/sync_decisions.sh` (`deploy.sh --keep-decisions` with it), and their tests.
   `session-start.sh` no longer pulls or prepares data. The stores stay for stage 2 (Departures).
+- 1.4 The rest of section 5.6: `react-router-dom` and `recharts` (`check:figures` now refuses any
+  recharts import), `src/engine/retrieval.ts`, the offline ingest timer and the job clock it ran
+  on (`ingestPaperScripted`, `tickJobs`, `ui.simSpeed`, `Job.real`), the unread store fields
+  (`ui.bannerDismissed`, `checkpointAnswers`, `collections` with BioRepo's collection filter),
+  the stream replay the deleted service double sent, the clearance, collection and authored
+  scenario types, and every client export nothing referenced.

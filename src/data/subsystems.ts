@@ -329,10 +329,6 @@ export const SUBSYSTEMS: Subsystem[] = [
   { id: 'guild.powers', owner: 'Guild', label: 'Powers', status: 'stub', state: UNBUILT },
 ];
 
-export function subsystemsFor(owner: SubsystemOwner): Subsystem[] {
-  return SUBSYSTEMS.filter((s) => s.owner === owner);
-}
-
 /**
  * The unbuilt ones, which are what a reference shelf is for.
  *
@@ -344,8 +340,4 @@ export function subsystemsFor(owner: SubsystemOwner): Subsystem[] {
  */
 export function stubsFor(owner: SubsystemOwner): Subsystem[] {
   return SUBSYSTEMS.filter((s) => s.owner === owner && s.status === 'stub');
-}
-
-export function subsystemById(id: string): Subsystem | null {
-  return SUBSYSTEMS.find((s) => s.id === id) ?? null;
 }

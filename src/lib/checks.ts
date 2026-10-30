@@ -68,5 +68,3 @@ export function whyNot(e: unknown): string {
   if (e instanceof IntakeDown) return e.message;
   return String(e);
 }
-
-export const OPEN_STATES: Check['state'][] = ['proposed', 'scheduled'];

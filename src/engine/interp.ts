@@ -70,22 +70,3 @@ export function interpolate(grid: Grid, point: Record<string, number>): number {
   }
   return acc;
 }
-
-/** 1-D slice of the grid along `axisKey`, other dims held at `point`. */
-export function sweepLine(
-  grid: Grid,
-  axisKey: string,
-  point: Record<string, number>,
-  samples = 60,
-): { x: number; y: number }[] {
-  const dim = grid.dims.find((d) => d.key === axisKey);
-  if (!dim) return [];
-  const lo = dim.values[0];
-  const hi = dim.values[dim.values.length - 1];
-  const out: { x: number; y: number }[] = [];
-  for (let i = 0; i <= samples; i++) {
-    const x = lo + ((hi - lo) * i) / samples;
-    out.push({ x, y: interpolate(grid, { ...point, [axisKey]: x }) });
-  }
-  return out;
-}

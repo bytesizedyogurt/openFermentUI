@@ -1,13 +1,11 @@
 // Library — the faceted corpus table (OF-DES-001 §8.3). Every row is a paper
 // that arrived through Intake; the ingest queue lives on the Ingest screen.
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   AlertTriangle,
   BookMarked,
   Download,
-  Layers,
   Loader2,
-  X,
 } from 'lucide-react';
 import type { Job, Paper } from '@/data/types';
 import { useStore } from '@/store';
@@ -47,7 +45,6 @@ interface LibRow {
   extractions: number;
   goldCount: number;
   verifiedCount: number;
-  collections: string[];
   prov: ProvKind;
   ingestKey: 'complete' | 'catalogued' | 'ingesting' | 'failed';
 }
@@ -114,12 +111,9 @@ function TagList({ items, max = 2 }: { items: string[]; max?: number }) {
 export default function BioRepo() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
-  const collections = useStore((s) => s.collections);
   const jobs = useStore((s) => s.jobs);
   const density = useStore((s) => s.ui.density);
-  const toast = useStore((s) => s.toast);
 
-  const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
 
   const allRows = useMemo<LibRow[]>(() => {
     const byPaper = new Map<string, { total: number; gold: number; verified: number }>();
@@ -158,18 +152,13 @@ export default function BioRepo() {
           extractions: agg.total,
           goldCount: agg.gold,
           verifiedCount: agg.verified,
-          collections: collections.filter((c) => c.paperIds.includes(paper.id)).map((c) => c.name),
           prov,
           ingestKey,
         };
       });
-  }, [papers, records, collections]);
+  }, [papers, records]);
 
-  const activeCollection = collections.find((c) => c.id === collectionFilter) ?? null;
-  const rows = useMemo(
-    () => (activeCollection ? allRows.filter((r) => activeCollection.paperIds.includes(r.paper.id)) : allRows),
-    [allRows, activeCollection],
-  );
+  const rows = allRows;
 
   const pinned = allRows.filter((r) => r.ingestKey === 'ingesting');
   const brokenRows = allRows.filter((r) => r.ingestKey === 'failed');
@@ -191,7 +180,6 @@ export default function BioRepo() {
         'Extractions',
         'Gold records',
         'Ingest status',
-        'Collections',
       ],
       selected.map((r) => [
         r.paper.id,
@@ -204,7 +192,6 @@ export default function BioRepo() {
         r.extractions,
         r.goldCount,
         r.paper.ingest,
-        r.collections.join('; '),
       ]),
     );
   };
@@ -378,7 +365,6 @@ export default function BioRepo() {
       valuesOf: (r) => [r.goldCount > 0 ? 'yes' : 'no'],
       labelOf: (v) => GOLD_FACET_LABEL[v] ?? v,
     },
-    { key: 'collection', label: 'Collection', valuesOf: (r) => r.collections },
   ];
 
   // ── header actions ───────────────────────────────────────────────────
@@ -511,27 +497,8 @@ export default function BioRepo() {
         }
         exportName="openferment-library"
         exportNote="CSV exports carry the provenance disclosure header — the citations are real, and a per-class note says what each provenance value is worth."
-        emptyTitle={activeCollection ? 'This collection is empty' : 'No papers match'}
-        emptyBody={
-          activeCollection
-            ? `${activeCollection.name} has no papers in it.`
-            : 'Nothing in the corpus matches the current filters.'
-        }
-        toolbar={
-          activeCollection ? (
-            <button
-              className="chip chip-active"
-              onClick={() => setCollectionFilter(null)}
-              title="Remove the collection filter"
-            >
-              <Layers size={12} /> {activeCollection.name}
-              <span className="font-num text-caption text-ink-soft">
-                {activeCollection.paperIds.length}
-              </span>
-              <X size={11} />
-            </button>
-          ) : undefined
-        }
+        emptyTitle="No papers match"
+        emptyBody="Nothing in the corpus matches the current filters."
         bulkActions={(selected, clear) => (
           <>
             <Button size="sm" onClick={() => exportSelected(selected)}>

@@ -69,16 +69,3 @@ export function materialsChecklist(version: ProtocolVersion, scale: number, titl
   }
   return lines.join('\n');
 }
-
-/** Inoculation-density helper: volume of seed at measured OD to hit target OD. */
-export function inoculumVolume(
-  targetOD: number,
-  cultureVolumeML: number,
-  seedOD: number,
-): number | null {
-  if (seedOD <= targetOD || seedOD <= 0) return null;
-  // V_seed = V_final * targetOD / (seedOD - targetOD) approximated for small V:
-  // exact: V_seed * seedOD = targetOD * (V_final); assume V_final includes seed.
-  const v = (targetOD * cultureVolumeML) / seedOD;
-  return roundToPrecision(v, 0.1);
-}

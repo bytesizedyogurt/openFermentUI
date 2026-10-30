@@ -14,7 +14,6 @@ import { ServiceDown, ServiceRefused, call } from './http';
 export { ServiceDown as ThermoDown, ServiceRefused as ThermoRefused };
 
 export const BEER = 'beer-at-titre-of';
-export const AZEOTROPE = 'ethanol-water-azeotrope';
 export const TITRE_FIELD = 'ethanol_titre';
 
 const query = (q: ThermoPropsRequest) =>

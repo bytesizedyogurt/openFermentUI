@@ -586,10 +586,10 @@ export interface ScenarioAssumption {
 
 export interface Scenario {
   id: string;
-  /** An authored cost model's id (S1–S3), or a BioSTEAM flowsheet's (§8.4). */
+  /** The BioSTEAM flowsheet the scenario runs (§8.4). */
   modelId: string;
-  /** 'authored': a cost surface written by hand; 'biosteam': a flowsheet the service simulates. */
-  kind: 'authored' | 'biosteam';
+  /** A flowsheet the service simulates; the authored cost surfaces left with the seed (ADR-010). */
+  kind: 'biosteam';
   name: string;
   description: string;
   product: string;
@@ -620,11 +620,6 @@ export interface Scenario {
    */
   vessel?: string;
   trainRun?: string;
-}
-
-export interface GridPointResult {
-  msp: number;
-  costLines: Record<CostLine, number>;
 }
 
 export interface SensitivityRow {
@@ -671,19 +666,6 @@ export interface ChatToolCall {
   retrieval?: ChatRetrievalHit[];
 }
 
-export interface ChatFlow {
-  id: string;
-  triggers: string[];
-  plan: string[];
-  toolCalls: ChatToolCall[];
-  answerMd: string; // chips as [[ex-0112]] / [[SP-004]]
-  followups: string[]; // may be "flow:F2|label"
-  clarify?: {
-    question: string;
-    options: { label: string; flowId: string }[];
-  };
-}
-
 export type ChatMessage =
   | { kind: 'user'; id: string; text: string }
   | { kind: 'plan'; id: string; steps: string[]; done: number; collapsed: boolean }
@@ -691,21 +673,6 @@ export type ChatMessage =
   | { kind: 'answer'; id: string; md: string; streaming: boolean; flowId?: string; followups: string[] }
   | { kind: 'clarify'; id: string; question: string; options: { label: string; flowId: string }[] }
   | { kind: 'system'; id: string; text: string; retry?: boolean };
-
-export interface ChatSession {
-  id: string;
-  title: string;
-  startedAt: string;
-  scope?: { kind: 'paper' | 'collection'; id: string; label: string };
-  messages: ChatMessage[];
-  pinned: ChatRetrievalHit[];
-}
-
-export interface Collection {
-  id: string;
-  name: string;
-  paperIds: string[];
-}
 
 export interface CheckpointQuestion {
   id: string;
@@ -740,7 +707,6 @@ export type LessonBlock =
       embed:
         | 'chip-demo'
         | 'record-card'
-        | 'unit-playground'
         | 'mini-queue'
         | 'metrics-tiles'
         | 'strip-plot'
@@ -789,12 +755,6 @@ export interface Job {
   failReason?: string;
   href?: string;
   startedAt: number;
-  /**
-   * A job whose progress is set by a real request rather than by the clock
-   * (OF-BLD-012 §5.4). `tickJobs` leaves these alone; the fetch that started
-   * one completes or fails it.
-   */
-  real?: boolean;
 }
 
 // ── OF-BLD-005 · molecules, vocabulary and runbooks ────────────────────
@@ -855,28 +815,6 @@ export type GeneticElementKind =
   | 'sequence_design'
   | 'dosage';
 
-export interface GeneticElement {
-  id: string;
-  label: string;
-  kind: GeneticElementKind;
-  /**
-   * Hosts the element is described for, as vocabulary labels — NOT `Strain`
-   * ids. The construct vocabulary predates the host catalogue and names
-   * organisms at a coarser grain ('e-coli-bl21' covers every BL21 derivative),
-   * so these must never be resolved against STRAINS.
-   */
-  hostFit?: string[];
-  induction?: string;
-  strength?: string;
-  purification?: string;
-  /** `true` needs a protease; 'autocatalytic' cleaves itself and costs nothing. */
-  cleavable?: boolean | 'autocatalytic';
-  stability?: string;
-  copy?: string;
-  tool?: string;
-  note?: string;
-}
-
 export interface Pathway {
   id: string;
   label: string;
@@ -888,56 +826,7 @@ export interface Pathway {
 
 export type CostBand = 'low' | 'moderate' | 'high';
 
-export interface StorageFormat {
-  id: string;
-  label: string;
-  tempC: number;
-  shelfLife: string;
-  /** What shipping this format actually requires — the cold-chain question. */
-  logistics: string;
-  cost: CostBand;
-  note?: string;
-}
-
 export type RegulatoryBurden = 'low' | 'low-moderate' | 'moderate' | 'high' | 'very high';
-
-export interface RegulatoryPathway {
-  id: string;
-  label: string;
-  burden: RegulatoryBurden;
-  note?: string;
-}
-
-export interface ProcessScale {
-  id: string;
-  label: string;
-  volumeL: string;
-  role: string;
-}
-
-/**
- * Patent clearance is an ambient property of every molecule, never a separate
- * mode (OF-BLD-005 §8). Six states, each with the action it implies. None of
- * them is a legal opinion — every clearance surface carries the counsel
- * callout alongside.
- */
-export type ClearanceStateId =
-  | 'clear-expired'
-  | 'clear-none'
-  | 'watch-variant'
-  | 'watch-process'
-  | 'blocked'
-  | 'unknown';
-
-export type ClearanceRisk = 'low' | 'low-moderate' | 'moderate' | 'high' | 'unknown';
-
-export interface ClearanceState {
-  id: ClearanceStateId;
-  label: string;
-  risk: ClearanceRisk;
-  /** What a team should do next, in the platform's voice — not counsel's. */
-  action: string;
-}
 
 /**
  * A carbon source a value can be measured on (OF-BLD-014 §2.1): a name and
@@ -962,9 +851,7 @@ export type ProductCategory =
   | 'terpene'
   | 'glycoside'
   | 'industrial_enzyme'
-  | 'therapeutic_protein'
-  /** Polymers a cell stores, PHA first (OF-BLD-014 §2.2). */
-  | 'biopolymer';
+  | 'therapeutic_protein';
 
 /**
  * Value per kilogram, banded rather than priced. A band is defensible from
@@ -984,10 +871,7 @@ export interface Product {
   defaultStrainId: string;
   /** Ordered fermenter to vial. This array, not stage order, is the train. */
   unitOperationIds: string[];
-  storageIds: string[];
   regulatoryIds: string[];
-  clearanceState: ClearanceStateId;
-  scaleId: string;
   pathwayIds: string[];
   tags: string[];
   valueDensityBand: ValueDensityBand;
@@ -1561,8 +1445,6 @@ export interface LiveTurn {
   error: { message: string; remedy: string } | null;
   /** `running` until the plan or the failure arrives. A turn a reload cut short reads `interrupted`. */
   status: 'running' | 'answered' | 'failed' | 'stopped' | 'interrupted';
-  /** Set when the stream replayed a recording rather than running (OF-BLD-014 §10.3). */
-  replay?: { recordedAt: string; standIn: boolean } | null;
 }
 
 /** A Live-mode conversation: its turns, oldest first. Durable. */

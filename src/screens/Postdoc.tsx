@@ -53,16 +53,6 @@ function LiveTurnView({
   const steps = turn.plan?.trace ?? turn.steps;
   return (
     <article className="space-y-3" data-testid="live-turn">
-      {turn.replay && (
-        <div className="rounded-input border border-signal-warn/50 px-3 py-2 text-caption text-signal-warn" data-testid="replay-label">
-          {/* §10.R: a stand-in recording's date is fixed to keep the fixture
-              stable, so it claims none; a real recording names its day. */}
-          {turn.replay.standIn
-            ? 'Replay of a recorded test run, made with a scripted stand-in in place of the model.'
-            : `Replay of a run on ${turn.replay.recordedAt.slice(0, 10)}.`}{' '}
-          Nothing is being asked now.
-        </div>
-      )}
       <div className="flex items-baseline gap-2">
         <span className="text-caption uppercase tracking-wide text-ink-soft shrink-0">Asked</span>
         <p className="text-reading text-ink flex-1">{turn.question}</p>
@@ -282,7 +272,6 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
       plan: null,
       error: null,
       status: 'running',
-      replay: null,
     });
     setActiveId(convId);
     if (route.path !== `/postdoc/${convId}` || route.query.has('q')) navigate(`/postdoc/${convId}`, { replace: true });
@@ -300,7 +289,6 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
         {
           signal: ac.signal,
           history,
-          onReplay: (replay) => patch(convId, turnId, { replay }),
         },
       );
       setReached(true);

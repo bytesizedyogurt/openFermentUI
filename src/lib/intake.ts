@@ -14,7 +14,6 @@ import type {
   ExtractResponse,
   FetchResult,
   FetchSource,
-  IntakeStatus,
   Overlay,
   ReviewDecision,
 } from '@/data/types';
@@ -192,18 +191,6 @@ export async function extractPaper(
   }
   if (!response.ok) await explain(response, opts.signal);
   return (await response.json()) as ExtractResponse;
-}
-
-/** Every paper the service has a cached fetch for, success or failure. */
-export async function intakeStatus(signal?: AbortSignal): Promise<Record<string, IntakeStatus>> {
-  let response: Response;
-  try {
-    response = await fetch('/api/intake/status', { signal });
-  } catch {
-    throw new IntakeDown('Intake service not running.');
-  }
-  if (!response.ok) await explain(response, signal);
-  return (await response.json()) as Record<string, IntakeStatus>;
 }
 
 /**

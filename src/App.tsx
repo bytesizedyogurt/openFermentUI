@@ -11,7 +11,6 @@ import {
   Moon,
   Rows3,
   Rows4,
-  X,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -39,7 +38,6 @@ import BenchCheck from '@/screens/BenchCheck';
 import Witness from '@/screens/Witness';
 import BioRepoArtifacts from '@/screens/BioRepoArtifacts';
 import BioRepoSearch from '@/screens/BioRepoSearch';
-import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
 import Runbooks from '@/screens/Runbooks';
 import RunbookDetail from '@/screens/RunbookDetail';
@@ -310,7 +308,6 @@ export default function App() {
   const setUI = useStore((s) => s.setUI);
   const jobs = useStore((s) => s.jobs);
   const activeRunId = useStore((s) => s.activeRunId);
-  const tickJobs = useStore((s) => s.tickJobs);
   const tickTimers = useStore((s) => s.tickTimers);
   const hydrateDurable = useStore((s) => s.hydrateDurable);
   const hydrateOverlay = useStore((s) => s.hydrateOverlay);
@@ -342,21 +339,20 @@ export default function App() {
     document.documentElement.dataset.reducedMotion = String(ui.reducedMotion);
   }, [ui.theme, ui.density, ui.reducedMotion]);
 
-  // Single animation loop drives job stages and run timers.
+  // Single animation loop drives the run timers.
   useEffect(() => {
     let raf = 0;
     const loop = (now: number) => {
       const dt = now - lastFrame.current;
       lastFrame.current = now;
       if (dt > 0 && dt < 2000) {
-        if (useStore.getState().jobs.some((j) => j.status === 'running')) tickJobs(dt);
         tickTimers(dt);
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [tickJobs, tickTimers]);
+  }, [tickTimers]);
 
   // Warn before losing an active run (§21 no-persistence confusion).
   useEffect(() => {

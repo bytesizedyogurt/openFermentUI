@@ -16,7 +16,7 @@ import type { CheckpointQuestion } from '@/data/types';
 import { statusOf } from '@/engine/competence';
 import { ActingAs, useGuild } from '@/components/GuildBits';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
-import { parseQuantity, quantityEquals, fmt } from '@/engine/units';
+import { parseQuantity, quantityEquals } from '@/engine/units';
 import { Button, Card, EmptyState, cx, Callout } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
 import { CitationChip } from '@/components/Chip';
@@ -160,7 +160,6 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
   const modules = useStore((s) => s.modules);
   const progress = useStore((s) => s.learnProgress);
   const completeLesson = useStore((s) => s.completeLesson);
-  const recordCheckpoint = useStore((s) => s.recordCheckpoint);
   const recordLesson = useStore((s) => s.recordLessonForGuild);
   const toast = useStore((s) => s.toast);
   const ctx = useGuild();
@@ -222,7 +221,6 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
   };
 
   const onResult = (q: CheckpointQuestion, correct: boolean) => {
-    recordCheckpoint(q.id, correct);
     const nextR = { ...results, [q.id]: correct };
     setResults(nextR);
     if (correct && lesson.checkpoint.every((x) => nextR[x.id])) finish();

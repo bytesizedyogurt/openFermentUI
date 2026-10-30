@@ -2,17 +2,15 @@
 // provenance-affecting changes fan out to derived views in one place.
 // No localStorage/sessionStorage anywhere — session-only by design (§9.5);
 // what must survive a reload goes to the Durable tier (src/lib/durable.ts).
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import type {
   InputAssumption,
   Override,
   RunbookDraft,
   AuditEvent,
-  Candidate,
   ReviewDecision,
   ActivityEvent,
-  Collection,
   LiveConversation,
   LiveTurn,
   TraceStep,
@@ -286,7 +284,6 @@ export interface OFState {
   measuredEvidence: MeasuredEvidence[];
   protocols: Protocol[];
   scenarios: Scenario[];
-  collections: Collection[];
   modules: LearnModule[];
   /** A lab's skills (stage 2 serves them); none ship with the app. */
   skills: Skill[];
@@ -364,16 +361,13 @@ export interface OFState {
   trainsMade: Record<string, TrainMade>;
   /** Save a train built in the Builder under a reviewer name, replacing the one saved by its id. */
   saveTrain: (train: TrainSpec, by: string) => void;
-  checkpointAnswers: Record<string, boolean>;
   exports: { name: string; at: string; rows: number }[];
 
   ui: {
     theme: Theme;
     density: Density;
-    simSpeed: number; // 1, 4, or Infinity (instant)
     reducedMotion: boolean;
     unitMode: UnitMode;
-    bannerDismissed: boolean;
     paletteOpen: boolean;
     jobsOpen: boolean;
     sessionsOpen: boolean;
@@ -403,7 +397,6 @@ export interface OFState {
 
   // jobs
   startJob: (job: Omit<Job, 'id' | 'stageIndex' | 'stageProgress' | 'status' | 'startedAt'>) => string;
-  tickJobs: (dtMs: number) => void;
   failJob: (id: string, reason: string) => void;
   clearJobs: () => void;
 
@@ -495,7 +488,6 @@ export interface OFState {
 
   // learn
   completeLesson: (lessonId: string) => void;
-  recordCheckpoint: (qid: string, correct: boolean) => void;
 
   // deposition (OF-BLD-006 §4)
   /**
@@ -579,8 +571,6 @@ export interface OFState {
   hydrateOverlay: () => Promise<void>;
   /** Live fetch through the service. Called by `ingestPaper` when the service is up. */
   ingestPaperLive: (paperId: string, force?: boolean) => Promise<void>;
-  /** The timer simulation. Called by `ingestPaper` when the service is down; labelled as such. */
-  ingestPaperScripted: (paperId: string) => void;
   /** One structured model response over a fetched paper, through the service (§6.3); then the overlay again. */
   extractPaperLive: (paperId: string) => Promise<void>;
   completeJob: (id: string) => void;
@@ -702,7 +692,6 @@ export interface OFState {
   // misc
   logActivity: (e: ActivityEvent) => void;
   logExport: (name: string, rows: number) => void;
-  addCollectionPapers: (collectionId: string, paperIds: string[]) => void;
   /** Settings → Clear this browser's data: the Durable tier, and the copies in memory it restores. */
   clearBrowserData: () => void;
 }
@@ -743,9 +732,8 @@ const seedState = () => ({
   measuredEvidence: [] as MeasuredEvidence[],
   protocols: [] as Protocol[],
   scenarios: [] as Scenario[],
-  // Collections and activity start empty: what lands in them is what a
-  // person did in this browser, never an authored history (OF-BLD-016 §3.1).
-  collections: [] as Collection[],
+  // Activity starts empty: what lands in it is what a person did in this
+  // browser, never an authored history (OF-BLD-016 §3.1).
   modules: [] as LearnModule[],
   activity: [] as ActivityEvent[],
   liveConversations: [] as LiveConversation[],
@@ -765,7 +753,6 @@ const seedState = () => ({
   trainsMade: {} as Record<string, TrainMade>,
   adoptedRunbookIds: [] as string[],
   createdScenarioIds: [] as string[],
-  checkpointAnswers: {} as Record<string, boolean>,
   exports: [] as { name: string; at: string; rows: number }[],
 });
 
@@ -793,10 +780,8 @@ export const useStore = create<OFState>()((set, get) => ({
   ui: {
     theme: initialTheme(),
     density: 'comfortable',
-    simSpeed: 1,
     reducedMotion: false,
     unitMode: 'published',
-    bannerDismissed: false,
     paletteOpen: false,
     jobsOpen: false,
     sessionsOpen: true,
@@ -1094,52 +1079,6 @@ export const useStore = create<OFState>()((set, get) => ({
     return id;
   },
 
-  tickJobs: (dtMs) => {
-    const speed = get().ui.simSpeed;
-    const dt = speed === Infinity ? 1e9 : dtMs * speed;
-    const finishedJobs: Job[] = [];
-    set((s) => ({
-      jobs: s.jobs.map((j) => {
-        // A real job's progress is set by the fetch that owns it, never by
-        // the clock — at simSpeed ∞ a timed job completes on the next tick,
-        // which would mark a paper 'complete' while its fetch was still out.
-        if (j.status !== 'running' || j.real) return j;
-        let { stageIndex, stageProgress } = j;
-        let budget = dt;
-        while (budget > 0 && stageIndex < j.stages.length) {
-          const stage = j.stages[stageIndex];
-          const remaining = stage.ms * (1 - stageProgress);
-          if (budget >= remaining) {
-            budget -= remaining;
-            stageIndex += 1;
-            stageProgress = 0;
-          } else {
-            stageProgress += budget / stage.ms;
-            budget = 0;
-          }
-        }
-        if (stageIndex >= j.stages.length) {
-          const done: Job = { ...j, stageIndex: j.stages.length, stageProgress: 1, status: 'done' };
-          finishedJobs.push(done);
-          return done;
-        }
-        return { ...j, stageIndex, stageProgress };
-      }),
-    }));
-    for (const j of finishedJobs) {
-      get().toast({
-        text: `${j.title} — complete`,
-        kind: 'success',
-        href: j.href,
-        hrefLabel: j.href ? 'View' : undefined,
-      });
-      if (j.kind === 'ingest') {
-        const paperId = j.href?.split('/').pop() ?? '';
-        if (paperId) get().setPaperIngest(paperId, 'complete');
-      }
-    }
-  },
-
   failJob: (id, reason) =>
     set((s) => ({
       jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: 'failed', failReason: reason } : j)),
@@ -1156,13 +1095,10 @@ export const useStore = create<OFState>()((set, get) => ({
 
   // ── ingest ───────────────────────────────────────────────────────────
   //
-  // TWO PATHS, AND THE STORE SAYS WHICH ONE RAN (OF-BLD-012 §5.4). When
-  // openferment-core answers /api/health the paper is fetched for real from
-  // Europe PMC and its own text replaces the curation note. When it does not,
-  // the five-stage timer simulation runs as it always has and halts at Fetch
-  // with a reason that names the missing service. The offline path is kept as
-  // a fallback for the board, not for the corpus: nothing it does changes a
-  // paper's text, and the board labels it as a simulation.
+  // When openferment-core answers /api/health the paper is fetched for real
+  // from Europe PMC and its own text replaces the curation note (OF-BLD-012
+  // §5.4). When it does not, nothing is fetched, and the toast names the
+  // missing service and the command that starts it.
   ingestPaper: (paperId, opts) => {
     if (!get().papers.some((p) => p.id === paperId)) return;
     void (async () => {
@@ -1176,7 +1112,11 @@ export const useStore = create<OFState>()((set, get) => ({
         set({ serviceUp: up });
       }
       if (up) await get().ingestPaperLive(paperId, opts?.force);
-      else get().ingestPaperScripted(paperId);
+      else
+        get().toast({
+          text: `${paperId} was not fetched: the Intake service is not running. Start it with \`uv run uvicorn openferment_core.api:app\` from \`core/\`.`,
+          kind: 'error',
+        });
     })();
   },
 
@@ -1184,7 +1124,6 @@ export const useStore = create<OFState>()((set, get) => ({
     const id = get().startJob({
       title: `Extract ${paperId}`,
       kind: 'ingest',
-      real: true,
       stages: [{ label: 'Extract', ms: 30000 }],
       href: `#/biorepo/witness`,
     });
@@ -1228,7 +1167,6 @@ export const useStore = create<OFState>()((set, get) => ({
     const id = get().startJob({
       title: `Fetch ${paperId}`,
       kind: 'ingest',
-      real: true,
       stages: [
         { label: 'Fetch', ms: 20000 },
         { label: 'Parse', ms: 2000 },
@@ -1311,54 +1249,6 @@ export const useStore = create<OFState>()((set, get) => ({
       kind: 'error',
       href: '#/intake/ingest',
       hrefLabel: 'Open the board',
-    });
-  },
-
-  ingestPaperScripted: (paperId) => {
-    const paper = get().papers.find((p) => p.id === paperId);
-    if (!paper) return;
-    // The timer path halts at Fetch every time: with no service there is
-    // nothing to fetch with, and the pipeline says so rather than pretending
-    // to parse something it never got.
-    const fails = true;
-    get().setPaperIngest(paperId, 'stage:fetch');
-    const id = get().startJob({
-      title: `Ingest ${paperId}`,
-      kind: 'ingest',
-      stages: [
-        { label: 'Fetch', ms: 900 },
-        { label: 'Parse', ms: 1400 },
-        { label: 'Chunk', ms: 700 },
-        { label: 'Embed', ms: 1100 },
-        { label: 'Extract', ms: 1800 },
-      ],
-      href: `#/biorepo/paper/${paperId}`,
-    });
-    if (fails) {
-      // Scripted failure path (§8.5): halts at Parse with a specific reason.
-      const speed = get().ui.simSpeed;
-      const wait = speed === Infinity ? 50 : 900 / speed;
-      const reason = paper.openAccess
-        ? `Source not retrieved — ${paper.doi ? `DOI ${paper.doi}` : paper.pmcid ?? 'the record'} is open access, but the Intake service is not running, so no request was made. Start it with \`uv run uvicorn openferment_core.api:app --reload\` from \`core/\` and retry.`
-        : 'Source not retrieved — publisher requires institutional access, and the Intake service is not running. Fetch this one manually and re-run.';
-      setTimeout(() => {
-        get().failJob(id, reason);
-        get().setPaperIngest(paperId, 'failed:fetch');
-        get().toast({
-          text: `Ingest ${paperId} halted at Fetch`,
-          kind: 'error',
-          href: '#/intake/ingest',
-          // Not 'Review' — that word now names a screen this does not go to.
-          hrefLabel: 'Open the board',
-        });
-      }, wait);
-    }
-    get().logActivity({
-      at: stamp(),
-      icon: 'download',
-      text: `Ingest started for ${paperId}`,
-      href: `#/intake/ingest`,
-      provenance: 'demo',
     });
   },
 
@@ -1581,10 +1471,10 @@ export const useStore = create<OFState>()((set, get) => ({
       status: 'draft',
       stages: [
         {
-          name: 'Clearance sweep',
+          name: 'Research findings',
           status: 'done',
           detail: carried || `Carried from ${source.id}`,
-          value: product?.clearanceState ?? null,
+          value: null,
         },
         {
           name: 'Host & construct selection',
@@ -2263,23 +2153,11 @@ export const useStore = create<OFState>()((set, get) => ({
       return { proformaFits: { ...s.proformaFits, [scenarioId]: kept } };
     }),
 
-  recordCheckpoint: (qid, correct) =>
-    set((s) => ({ checkpointAnswers: { ...s.checkpointAnswers, [qid]: correct } })),
-
   // ── misc ─────────────────────────────────────────────────────────────
   logActivity: (e) => set((s) => ({ activity: [e, ...s.activity].slice(0, 40) })),
 
   logExport: (name, rows) =>
     set((s) => ({ exports: [{ name, at: stamp(), rows }, ...s.exports].slice(0, 30) })),
-
-  addCollectionPapers: (collectionId, paperIds) =>
-    set((s) => ({
-      collections: s.collections.map((c) =>
-        c.id === collectionId
-          ? { ...c, paperIds: Array.from(new Set([...c.paperIds, ...paperIds])) }
-          : c,
-      ),
-    })),
 
   reconcileDeposition: (depositionId, outcome, note) => {
     const s = get();
@@ -2897,7 +2775,6 @@ export const useStore = create<OFState>()((set, get) => ({
         },
       };
     }),
-
 
   practiceClosed: async (session) => {
     if (!session.closedAt) return;
@@ -3614,15 +3491,3 @@ export const tickClass = (p: Provenance | 'rejected'): string =>
     demo: 'tick tick-demo',
     rejected: 'tick tick-rejected',
   })[p];
-
-export const PROVENANCE_LABEL: Record<Provenance, string> = {
-  measured: 'Measured · first-party',
-  gold: 'Curated · gold set',
-  verified: 'Verified against source',
-  curated: 'Curated · pending source check',
-  computed: 'Computed · basis attached',
-  unverified: 'Extracted · unverified',
-  user: 'User-entered',
-  'industry-estimate': 'Industry estimate · not evidence',
-  demo: 'Modeled · not measured',
-};

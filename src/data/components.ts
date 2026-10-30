@@ -331,16 +331,7 @@ export const FULL_NAME: Partial<Record<ComponentName, string>> = {
   Guild: 'Guild of Applied Life',
 };
 
-export const COMPONENTS_BY_NAME: Record<string, ComponentDef> = Object.fromEntries(
-  COMPONENTS.map((c) => [c.name, c]),
-);
-
 export const isBuilt = (c: ComponentDef): boolean => c.livesIn.length > 0;
-
-/** Everything one of the eleven owns, including itself. */
-export function componentsOwnedBy(owner: Eleven): ComponentDef[] {
-  return COMPONENTS.filter((c) => c.owner === owner);
-}
 
 export function componentsInLayer(layer: ComponentLayer): ComponentDef[] {
   return COMPONENTS.filter((c) => c.layer === layer);

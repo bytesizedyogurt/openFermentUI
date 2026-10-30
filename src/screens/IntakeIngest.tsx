@@ -197,7 +197,7 @@ export default function IntakeIngest() {
       // with a job — a fetch that happened before this page load is still a
       // thing that happened.
       if (!job && !ingesting && !failed && !fetched) continue;
-      const real = fetched || Boolean(job?.real) || (!job && failed && Boolean(paper.ingestReason));
+      const real = fetched || Boolean(job) || (failed && Boolean(paper.ingestReason));
 
       const seededIndex = Math.max(
         0,

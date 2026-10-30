@@ -168,59 +168,18 @@ accepted licence strings, and every package a person accepted, are in
 
 | Package | Version | Licence | Used by | Passes as |
 |---|---|---|---|---|
-| @babel/runtime | 7.29.7 | MIT | through recharts, which no file under src/ imports | allowed |
 | @fontsource/ibm-plex-mono | 5.3.0 | OFL-1.1 | browser app | allowed |
 | @fontsource/ibm-plex-sans | 5.3.0 | OFL-1.1 | browser app | allowed |
 | @fontsource/spectral | 5.3.0 | OFL-1.1 | browser app | allowed |
-| @remix-run/router | 1.23.3 | MIT | through react-router-dom, which no file under src/ imports | allowed |
-| @types/d3-array | 3.2.2 | MIT | through recharts, which no file under src/ imports | allowed |
-| @types/d3-color | 3.1.3 | MIT | through recharts, which no file under src/ imports | allowed |
-| @types/d3-ease | 3.0.2 | MIT | through recharts, which no file under src/ imports | allowed |
-| @types/d3-interpolate | 3.0.4 | MIT | through recharts, which no file under src/ imports | allowed |
-| @types/d3-path | 3.1.1 | MIT | through recharts, which no file under src/ imports | allowed |
-| @types/d3-scale | 4.0.9 | MIT | through recharts, which no file under src/ imports | allowed |
-| @types/d3-shape | 3.1.8 | MIT | through recharts, which no file under src/ imports | allowed |
-| @types/d3-time | 3.0.4 | MIT | through recharts, which no file under src/ imports | allowed |
-| @types/d3-timer | 3.0.2 | MIT | through recharts, which no file under src/ imports | allowed |
 | @types/prop-types | 15.7.15 | MIT | browser app, through zustand | allowed |
 | @types/react | 18.3.31 | MIT | browser app, through zustand | allowed |
-| clsx | 2.1.1 | MIT | through recharts, which no file under src/ imports | allowed |
 | csstype | 3.2.3 | MIT | browser app, through zustand | allowed |
-| d3-array | 3.2.4 | ISC | through recharts, which no file under src/ imports | allowed |
-| d3-color | 3.1.0 | ISC | through recharts, which no file under src/ imports | allowed |
-| d3-ease | 3.0.1 | BSD-3-Clause | through recharts, which no file under src/ imports | allowed |
-| d3-format | 3.1.2 | ISC | through recharts, which no file under src/ imports | allowed |
-| d3-interpolate | 3.0.1 | ISC | through recharts, which no file under src/ imports | allowed |
-| d3-path | 3.1.0 | ISC | through recharts, which no file under src/ imports | allowed |
-| d3-scale | 4.0.2 | ISC | through recharts, which no file under src/ imports | allowed |
-| d3-shape | 3.2.0 | ISC | through recharts, which no file under src/ imports | allowed |
-| d3-time | 3.1.0 | ISC | through recharts, which no file under src/ imports | allowed |
-| d3-time-format | 4.1.0 | ISC | through recharts, which no file under src/ imports | allowed |
-| d3-timer | 3.0.1 | ISC | through recharts, which no file under src/ imports | allowed |
-| decimal.js-light | 2.5.1 | MIT | through recharts, which no file under src/ imports | allowed |
-| dom-helpers | 5.2.1 | MIT | through recharts, which no file under src/ imports | allowed |
-| eventemitter3 | 4.0.7 | MIT | through recharts, which no file under src/ imports | allowed |
-| fast-equals | 5.4.1 | MIT | through recharts, which no file under src/ imports | allowed |
-| internmap | 2.0.3 | ISC | through recharts, which no file under src/ imports | allowed |
 | js-tokens | 4.0.0 | MIT | browser app, through lucide-react | allowed |
-| lodash | 4.18.1 | MIT | through recharts, which no file under src/ imports | allowed |
 | loose-envify | 1.4.0 | MIT | browser app, through lucide-react, react-dom | allowed |
 | lucide-react | 0.462.0 | ISC | browser app | allowed |
-| object-assign | 4.1.1 | MIT | through recharts, which no file under src/ imports | allowed |
-| prop-types | 15.8.1 | MIT | through recharts, which no file under src/ imports | allowed |
 | react | 18.3.1 | MIT | browser app | allowed |
 | react-dom | 18.3.1 | MIT | browser app | allowed |
-| react-is | 16.13.1 | MIT | through recharts, which no file under src/ imports | allowed |
-| react-is | 18.3.1 | MIT | through recharts, which no file under src/ imports | allowed |
-| react-router | 6.30.4 | MIT | through react-router-dom, which no file under src/ imports | allowed |
-| react-router-dom | 6.30.4 | MIT | listed in package.json; no file under src/ imports it | allowed |
-| react-smooth | 4.0.4 | MIT | through recharts, which no file under src/ imports | allowed |
-| react-transition-group | 4.4.5 | BSD-3-Clause | through recharts, which no file under src/ imports | allowed |
-| recharts | 2.15.4 | MIT | listed in package.json; no file under src/ imports it | allowed |
-| recharts-scale | 0.4.5 | MIT | through recharts, which no file under src/ imports | allowed |
 | scheduler | 0.23.2 | MIT | browser app, through react-dom | allowed |
-| tiny-invariant | 1.3.3 | MIT | through recharts, which no file under src/ imports | allowed |
-| victory-vendor | 36.9.2 | MIT AND ISC | through recharts, which no file under src/ imports | allowed |
 | zustand | 5.0.14 | MIT | browser app | allowed |
 
 ## Accepted by a person

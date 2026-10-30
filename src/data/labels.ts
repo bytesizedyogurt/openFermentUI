@@ -15,7 +15,6 @@ export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   glycoside: 'Glycoside',
   industrial_enzyme: 'Industrial enzyme',
   therapeutic_protein: 'Therapeutic protein',
-  biopolymer: 'Biopolymer',
 };
 
 export const RUNBOOK_STATUS_ORDER: RunbookStatus[] = [
