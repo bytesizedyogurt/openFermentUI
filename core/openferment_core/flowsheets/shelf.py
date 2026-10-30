@@ -324,6 +324,15 @@ def package_regression(flowsheet_id: str) -> PackageRegression | None:
     if entry is None or not entry.packageTest:
         return None
     file, _, test = entry.packageTest.partition("::")
+    return regression_of(file, test)
+
+
+def regression_of(file: str, test: str) -> PackageRegression | None:
+    """The values one test of the installed biorefineries asserts (`file`
+    relative to the distribution, `test` a function in it), read as
+    `package_regression` reads them; None when the file or the test is not
+    found here. The library plant runner (engine/library.py) names a plant's
+    test this way."""
     path = _installed_file(file)
     if path is None:
         return None

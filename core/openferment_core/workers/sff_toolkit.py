@@ -27,6 +27,8 @@ import hashlib
 import json
 import sys
 from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -36,6 +38,8 @@ if str(VENDOR) not in sys.path:
     sys.path.insert(0, str(VENDOR))
 
 import pisces_sff  # noqa: E402  (after the path above)
+import thermosteam as tmo  # noqa: E402  (BioSTEAM's property engine, which the toolkit imports)
+from pisces_sff.export import _export as _exporter  # noqa: E402
 
 # The schema the toolkit validates against, read from its own schema file.
 SCHEMA_VERSION: str = pisces_sff.__version__
@@ -110,14 +114,52 @@ def checked(path: str | Path) -> dict[str, Any]:
     }
 
 
+# What the toolkit's JSON writer is taught while openFerment exports: a
+# reaction in thermosteam's own words, a stream by its id (`_writes_objects`).
+REACTIONS = (tmo.Reaction, tmo.ReactionSet, tmo.ReactionItem)
+
+
+@contextmanager
+def _writes_objects() -> Iterator[None]:
+    """The toolkit's JSON writer (`export/_export.py`, `_json_default`) fails
+    closed on a design input whose value is a thermosteam object, and its
+    design-spec registry names some: NRELEthanolFermentation's
+    `fermentation_reaction` and `cell_growth_reaction`, MassBalance's
+    stream lists (measured at e236e32 on the sugarcane, lipidcane, oilcane
+    and cane plants, whose exports it refused). While openFerment exports,
+    such a value is written in words, a reaction as thermosteam writes it
+    (its equation, reactant, conversion and basis) and a stream as its id;
+    anything else still fails closed. The vendored files are unchanged; the
+    toolkit's own writer is put back after. To be offered upstream."""
+    original = _exporter._json_default
+
+    def default(value: Any) -> Any:
+        try:
+            return original(value)
+        except TypeError:
+            if isinstance(value, tmo.Stream):
+                return value.ID
+            if isinstance(value, REACTIONS):
+                return repr(value)
+            raise
+
+    _exporter._json_default = default
+    try:
+        yield
+    finally:
+        _exporter._json_default = original
+
+
 def export_checked(system: Any, tea: Any, path: str | Path, *, metadata: dict[str, Any] | None = None,
                    process_title: str | None = None) -> dict[str, Any]:
     """Write the system's present state as an SFF file at `path` (the
-    toolkit's exporter for the schema it ships), add openFerment's block to
-    the file's `metadata` when one is given, and check the file as written."""
+    toolkit's exporter for the schema it ships, its writer taught to write
+    a reaction and a stream in words), add openFerment's block to the file's
+    `metadata` when one is given, and check the file as written."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    pisces_sff.export_biosteam_flowsheet(system, str(p), SCHEMA_VERSION, tea=tea, process_title=process_title)
+    with _writes_objects():
+        pisces_sff.export_biosteam_flowsheet(system, str(p), SCHEMA_VERSION, tea=tea, process_title=process_title)
     if metadata:
         doc = json.loads(p.read_text(encoding="utf-8"))
         doc["metadata"][OPENFERMENT_KEY] = metadata
@@ -125,6 +167,13 @@ def export_checked(system: Any, tea: Any, path: str | Path, *, metadata: dict[st
     out = checked(p)
     out["simulator"] = f"BioSTEAM {version('biosteam')}"
     return out
+
+
+def design_spec_registry() -> dict[str, Any]:
+    """The toolkit's design-spec registry (`export/design_specs/biosteam.yaml`):
+    each BioSTEAM unit class's design inputs and the accessors that read them.
+    The library plant runner reads a unit's parameters through it."""
+    return pisces_sff.load_design_spec_registry()
 
 
 def _path(args: dict[str, Any]) -> Path:

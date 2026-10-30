@@ -78,6 +78,18 @@ openFerment's own replay check (re-run within tolerance) is the verification tha
 - What stage 4 still owes here: every run writes its SFF file when runs move to the `runs` table
   (4.4); the flowsheet modules' recipe directories (4.3); the UI's graph view is stage 7's.
 
+### 4.2 (2026-10-30)
+
+- The toolkit's design-spec registry names design inputs whose values are thermosteam objects
+  (`NRELEthanolFermentation`'s two reactions, `MassBalance`'s stream lists), and its JSON writer
+  fails closed on them, so it could not write the sugarcane, lipidcane, oilcane and cane plants.
+  `workers/sff_toolkit.py` teaches the writer, for openFerment's exports alone, to write a reaction
+  as thermosteam writes it and a stream by its id, and puts the toolkit's own writer back after;
+  the vendored files are unchanged. With it, all nine buildable library plants export valid files
+  (completeness 0.74 to 0.81). To be offered upstream.
+- A library run exports through `sff_export` with `library` (the plant rebuilt and set as its run
+  set it).
+
 ## Revisit condition
 
 The toolkit ships an importer or packaging; the schema reaches 1.0.

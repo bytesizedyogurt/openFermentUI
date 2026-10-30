@@ -89,6 +89,10 @@ from .models import (
     PracticeTurnRequest,
     Project,
     ProjectCreate,
+    LibraryParameters,
+    LibraryRunRequest,
+    LibraryShelf,
+    PackageRegression,
     ReplayResult,
     ReviewDecision,
     SFFExportRequest,
@@ -100,6 +104,7 @@ from .models import (
     Usage,
 )
 from . import llm, spend
+from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
 from .postdoc import PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
@@ -746,9 +751,9 @@ def flowsheets_export(request: SFFExportRequest) -> SFFFlowsheet:
     except artifacts.ArtifactNotFound as e:
         raise HTTPException(status_code=404, detail=f"the project holds no run {request.artifactId}") from e
     try:
-        plant = proforma.plant_of(art)
+        plant = _library.plant_of(art) if art.tool == _library.LIBRARY_RUN else proforma.plant_of(art)
         return sff.export(plant, project_id=projects.current(), run_artifact_id=art.id, by=request.by)
-    except (proforma.ScenarioRefused, sff.SFFRefused) as e:
+    except (proforma.ScenarioRefused, sff.SFFRefused, _library.LibraryRefused) as e:
         raise _sff_refused(e) from e
     except WorkerError as e:
         raise HTTPException(status_code=409, detail=f"the run's base case could not be exported: {e}") from e
@@ -780,6 +785,60 @@ def flowsheets_file(record_id: str):
         raise HTTPException(status_code=404, detail=f"the project holds no flowsheet {record_id}") from e
     return Response(content=text.encode("utf-8"), media_type="application/json",
                     headers={"Content-Disposition": f'attachment; filename="{record_id}.sff.json"'})
+
+
+# ── Library plants (alpha 2.0, ADR-004; engine/library.py) ──────────────
+
+
+@app.get("/api/library", response_model=LibraryShelf)
+def library_shelf() -> LibraryShelf:
+    """Every subpackage of the installed biorefineries as discovery read it:
+    each plant's entry point, configurations, package tests, the changes it
+    needs to build here, and whether each configuration built. A read: it
+    starts no simulator."""
+    return _library.shelf()
+
+
+def _library_plant(plant: str) -> None:
+    try:
+        _library.plant(plant)
+    except _library.PlantNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+
+
+@app.get("/api/library/{plant}/parameters", response_model=LibraryParameters)
+def library_parameters(plant: str, configuration: str | None = None) -> LibraryParameters:
+    """A plant's parameters as the package builds it, each read back from a
+    fresh build in the worker with origin `library-default`."""
+    _library_plant(plant)
+    try:
+        return _library.parameters(plant, configuration)
+    except _library.LibraryRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not build {plant}: {e}") from e
+
+
+@app.get("/api/library/{plant}/regression", response_model=PackageRegression | None)
+def library_regression(plant: str, configuration: str | None = None) -> PackageRegression | None:
+    """The values the package's own test for this plant asserts, read from
+    the installed file; null when it has none. A read."""
+    _library_plant(plant)
+    return _library.regression(plant, configuration)
+
+
+@app.post("/api/library/{plant}/run", response_model=Artifact)
+def library_run(plant: str, request: LibraryRunRequest) -> Artifact:
+    """One run of a library plant, built afresh with a person's values set,
+    priced and read back, kept as one `library.run` artifact (a basis
+    already run returns its stored artifact)."""
+    _library_plant(plant)
+    try:
+        return _library.run(plant, request.configuration, request.overrides)
+    except _library.LibraryRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {plant}: {e}") from e
 
 
 @app.get("/api/proforma/scenarios")

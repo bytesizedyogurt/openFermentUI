@@ -77,9 +77,18 @@ A run's export carries one extra block in `metadata`, which the schema admits
 ```
 
 The export writes the run's base case: a reference biorefinery built afresh inside
-`package_defaults()` as its reference run builds it, or a shelf flowsheet's warm plant set to
-the run's base values (with the price the run solved on its product). It does not write the
-grid or the samples. A file openFerment imports is kept as it came; nothing is added to it.
+`package_defaults()` as its reference run builds it, a shelf flowsheet's warm plant set to the
+run's base values (with the price the run solved on its product), or a library plant built afresh
+and set as its run set it. It does not write the grid or the samples. A file openFerment imports
+is kept as it came; nothing is added to it.
+
+One adaptation, for openFerment's exports alone: the toolkit's design-spec registry names design
+inputs whose values are thermosteam objects (`NRELEthanolFermentation`'s `fermentation_reaction`
+and `cell_growth_reaction`, `MassBalance`'s stream lists), and its JSON writer refuses them, so at
+`e236e32` it could not write the sugarcane, lipidcane, oilcane and cane plants. While openFerment
+exports, the writer also writes a reaction as thermosteam writes it (equation, reactant,
+conversion and basis) and a stream by its id; anything else still fails closed, and the vendored
+files are unchanged (`workers/sff_toolkit.py`, `_writes_objects`). To be offered upstream.
 
 ## The reference flowsheets
 

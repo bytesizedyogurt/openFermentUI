@@ -31,12 +31,12 @@ out  {"id": 1, "ok": false, "error": "Refused: there is no flowsheet x; there ar
 
 | Worker | Module | Imports | Ops |
 |---|---|---|---|
-| `proforma` | `workers/proforma_worker.py` (with `flowsheets/`, `workers/sff_toolkit.py`, `vendor/pisces_sff`) | biosteam, thermosteam, biorefineries, the SFF toolkit | `benchmark`, `evaluate`, `grid`, `montecarlo`, `run`, `reference`, `thermo_props`, `volatility`, `vessel_specs`, `vessel_design`, `catalogue_specs`, `catalogue_unit_check`, `train_specs`, `flowsheet_unit_values`, `train_run`, `sff_export`, `sff_validate`, `sff_score` |
+| `proforma` | `workers/proforma_worker.py` (with `flowsheets/`, `workers/library_plants.py`, `workers/sff_toolkit.py`, `vendor/pisces_sff`) | biosteam, thermosteam, biorefineries, the SFF toolkit | `benchmark`, `evaluate`, `grid`, `montecarlo`, `run`, `reference`, `thermo_props`, `volatility`, `vessel_specs`, `vessel_design`, `catalogue_specs`, `catalogue_unit_check`, `train_specs`, `flowsheet_unit_values`, `train_run`, `sff_export`, `sff_validate`, `sff_score`, `library_discover`, `library_parameters`, `library_run` |
 | `geneos` | `workers/geneos_worker.py` | cobra | `describe`, `ceiling`, `frontier`, `mix` |
 | `echo` | `workers/echo_worker.py` | nothing heavy | the protocol's own tests |
 
-Each module's docstring describes its ops; this page gives the SFF ops' requests and results in
-full. The other ops' request and result schemas are written here as stage 4 reshapes them
+Each module's docstring describes its ops; this page gives the SFF and library ops' requests and
+results in full. The other ops' request and result schemas are written here as stage 4 reshapes them
 (`docs/PROGRESS.md`, Known debts).
 
 ## SFF ops (Proforma worker; ADR-003, `docs/api/sff.md`)
@@ -58,11 +58,14 @@ Request:
 | `structure` | object | a structured flowsheet (`custom_train_v1`): what it is built from |
 | `metadata` | object | written as `metadata.openferment` in the file |
 | `title` | string or null | written as `metadata.process_title` |
+| `library` | string | in place of `flowsheet` for a library run: the `biorefineries` plant, with `configuration` and `overrides` as `library_run` takes them |
 
 A reference biorefinery (a flowsheet module with `load`) is built afresh inside
 `package_defaults()`; any other is the worker's warm plant set to `base` and simulated, its
-solved price on the product while the file is written. Result: `checked` (below) plus
-`"simulator": "BioSTEAM <version>"`.
+solved price on the product while the file is written; a library plant is built afresh and
+set as its run set it. The toolkit's JSON writer is taught, for the export alone, to write a
+thermosteam reaction in its own words and a stream by its id (`docs/api/sff.md`). Result:
+`checked` (below) plus `"simulator": "BioSTEAM <version>"`.
 
 ### `sff_validate`
 
@@ -96,3 +99,42 @@ Request `{"path"}`. Result:
 
 What `sff_export` returns beside `simulator`: `{"path", "sha256", "bytes", "validation"
 (as sff_validate's, without path and sha256), "completeness", "tags", "toolkit": "pisces_sff 0.2.4"}`.
+
+## Library ops (Proforma worker; ADR-004, `engine/library.py`)
+
+A plant is a subpackage of the installed `biorefineries`; `configuration` is one of the names the
+package gives it (null for a plant built in one configuration, its own). Every build is fresh,
+inside `package_defaults()`. A refusal (a plant that is not one, a configuration it does not
+name, a build the package itself cannot finish under the pinned BioSTEAM, a parameter it does not
+read back, a value of the wrong kind) is an error beginning `Refused: `.
+
+### `library_discover`
+
+Request `{"builds": bool}`. Result: `{"package", "simulator", "thermosteam", "testFile",
+"testTables", "plants": [plant, …]}`, each plant `{"id", "module", "kind": "plant" | "subsystems" |
+"none" | "unimportable", "title", "readme", "entry", "parameters", "processModel", "scenario",
+"requiresConfiguration", "configurations", "configurationsFrom", "takesCache", "tests",
+"testNames", "compat": [{"change", "why"}], "factories", "error"}` and, when `builds` is true,
+`"builds": [{"configuration", "ok", "units", "priced", "error"}]`. `engine/library_shelf.json` is
+this result with builds (`pnpm library:discover`).
+
+### `library_parameters`
+
+Request `{"plant", "configuration"}`. Result `{"plant", "configuration", "found": {part: how it
+was found}, "parameters": [{"key", "label", "group", "unit", "value", "note", "kind": "number" |
+"text"}], "simulator", "package"}`. Keys: `stream.<id>.F_mass`, `stream.<id>.price`,
+`tea.<attribute>`, `utility.CEPCI`, `utility.electricity_price`, `utility.<agent>.<price>`,
+`unit.<id>.<design input>` (as the SFF toolkit's design-spec registry names a unit's inputs). A
+`text` parameter is read back and never set.
+
+### `library_run`
+
+Request `{"plant", "configuration", "overrides": {key: number}, "digits": 1–17}`. Result, every
+float rounded to `digits` significant digits: `{"plant", "configuration", "simulator",
+"package", "found", "price": {"priced", "teaClass", "IRR", "sales", "material_cost",
+"utility_cost", "installed_equipment_cost", "TCI", "FCI", "FOC", "VOC", "NPV", "product",
+"packagePrice", "solvedPrice", "feedstock", "feedstockKgPerH"}, "measured": {the package test's
+expressions}, "parameters" (read back after the values were set), "libraryDefaults": {key:
+value as built}, "overrides"}` and the run's tables (`tablesSource`, `tea`, `streams`, `units`,
+`utilities`, `diagramNote`, `unitOrder`, `tableUnits`). A plant whose TEA BioSTEAM cannot break
+down (an agile system) has `"tea": null` and a `teaNote` saying why.

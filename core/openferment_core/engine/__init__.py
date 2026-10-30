@@ -6,9 +6,17 @@ adapter, and SFF as the flowsheet record.
     sff         SFF flowsheet records: a run's export, an imported file, the
                 toolkit's reference flowsheets fetched and hashed; each with
                 its validation, completeness report, tags and graph
+    library     the library plant runner: every plant the installed
+                `biorefineries` exposes, on a shelf regenerated from
+                discovery; its parameters read back as library defaults; a
+                run with a person's values, priced, kept, held to the
+                package's own test
 
-The engine imports `db`, `models`, the `workers` client, `params` and
-`binding`; BioSTEAM and the vendored SFF toolkit run in the worker alone
-(workers/proforma_worker.py, workers/sff_toolkit.py, flowsheets/). Importing
+The engine imports what §7.2 lists (`db`, `models`, the `workers` client,
+`params`, `binding`), and two more until they move into it: the shelf's
+package-test reader (`flowsheets/shelf.py`, no BioSTEAM) and the artifact
+store a run is kept in (`artifacts`, imported where a run is kept). BioSTEAM
+and the vendored SFF toolkit run in the worker alone (workers/proforma_worker.py,
+workers/library_plants.py, workers/sff_toolkit.py, flowsheets/). Importing
 this package imports none of its modules.
 """

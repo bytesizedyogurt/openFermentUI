@@ -1,0 +1,1101 @@
+{
+ "package": "biorefineries 2.35.1",
+ "simulator": "biosteam 2.54.0",
+ "thermosteam": "thermosteam 0.54.2",
+ "testFile": "biorefineries/tests/test_biorefineries.py",
+ "testTables": {
+  "file": "biorefineries/tests/test_biorefineries.py",
+  "feedstocks_by_module": {
+   "corn": "corn",
+   "lipidcane": "lipidcane",
+   "cornstover": "cornstover",
+   "sugarcane": "sugarcane",
+   "oilcane": "feedstock"
+  },
+  "products_by_module": {
+   "corn": "ethanol",
+   "lipidcane": "ethanol",
+   "cornstover": "ethanol",
+   "sugarcane": "ethanol",
+   "oilcane": "ethanol",
+   "O6": "biodiesel",
+   "O7": "biodiesel",
+   "O8": "biodiesel",
+   "O9": "biodiesel"
+  },
+  "must_load": [
+   "corn",
+   "cornstover",
+   "lipidcane",
+   "oilcane",
+   "sugarcane"
+  ],
+  "configurations": {
+   "HP": [
+    "cellulosic",
+    "sugarcane"
+   ],
+   "oilcane": [
+    "S1",
+    "S2",
+    "O1",
+    "O2",
+    "O3",
+    "O4",
+    "S1*",
+    "S2*",
+    "O1*",
+    "O2*",
+    "O6",
+    "O8",
+    "O9"
+   ]
+  }
+ },
+ "plants": [
+  {
+   "id": "biodiesel",
+   "module": "biorefineries.biodiesel",
+   "kind": "subsystems",
+   "title": null,
+   "readme": null,
+   "entry": null,
+   "parameters": [],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [],
+   "testNames": null,
+   "compat": [],
+   "factories": [
+    "create_lipid_pretreatment_system",
+    "create_lipid_wash_system",
+    "create_transesterification_and_biodiesel_separation_system"
+   ],
+   "error": null,
+   "builds": []
+  },
+  {
+   "id": "cane",
+   "module": "biorefineries.cane",
+   "kind": "plant",
+   "title": "Cane Biorefineries and Benchmarks",
+   "readme": "biorefineries/cane/README.md",
+   "entry": "Biorefinery",
+   "parameters": [
+    {
+     "name": "name",
+     "kind": "positional_or_keyword",
+     "required": true,
+     "default": null
+    },
+    {
+     "name": "chemicals",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "avoid_natural_gas",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": true
+    },
+    {
+     "name": "conversion_performance_distribution",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "year",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "cache",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": "{}"
+    },
+    {
+     "name": "prices_correleted_to_crude_oil",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "WWT_kwargs",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "oil_content_range",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "remove_biodiesel_production",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "update_feedstock_price",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "simulate",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": true
+    }
+   ],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": true,
+   "configurations": [
+    "S1",
+    "O1",
+    "S2",
+    "O2",
+    "S1*",
+    "O1*",
+    "S2*",
+    "O2*",
+    "O3",
+    "O4"
+   ],
+   "configurationsFrom": "biorefineries.cane.evaluation.configuration_names",
+   "takesCache": true,
+   "tests": [],
+   "testNames": null,
+   "compat": [],
+   "factories": [
+    "create_acTAG_separation_system",
+    "create_bagasse_drying_system",
+    "create_bagasse_pelleting_system",
+    "create_feedstock_handling_system",
+    "create_juicing_and_lipid_extraction_system",
+    "create_juicing_system",
+    "create_lipid_extraction_system",
+    "create_lipidcane_to_biodiesel_and_conventional_ethanol_system",
+    "create_post_fermentation_oil_separation_system",
+    "create_sucrose_fermentation_system",
+    "create_sucrose_to_ethanol_system",
+    "create_sugar_crystallization_system",
+    "create_sugarcane_to_ethanol_system",
+    "create_sugarcane_to_sugar_and_ethanol_system",
+    "create_sugarcane_to_sugar_and_molasses_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": "S1",
+     "ok": true,
+     "units": 56,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O1",
+     "ok": true,
+     "units": 130,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "S2",
+     "ok": true,
+     "units": 94,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O2",
+     "ok": true,
+     "units": 166,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "S1*",
+     "ok": true,
+     "units": 56,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O1*",
+     "ok": true,
+     "units": 130,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "S2*",
+     "ok": true,
+     "units": 94,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O2*",
+     "ok": true,
+     "units": 166,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O3",
+     "ok": true,
+     "units": 65,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O4",
+     "ok": true,
+     "units": 102,
+     "priced": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "id": "cellulosic",
+   "module": "biorefineries.cellulosic",
+   "kind": "plant",
+   "title": null,
+   "readme": null,
+   "entry": "Biorefinery",
+   "parameters": [
+    {
+     "name": "args",
+     "kind": "var_positional",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "feedstock_kwargs",
+     "kind": "keyword_only",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "prices",
+     "kind": "keyword_only",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "GWP_CFs",
+     "kind": "keyword_only",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "kwargs",
+     "kind": "var_keyword",
+     "required": false,
+     "default": null
+    }
+   ],
+   "processModel": true,
+   "scenario": [
+    {
+     "name": "feedstock",
+     "type": "str",
+     "default": "cornstover"
+    },
+    {
+     "name": "product",
+     "type": "str",
+     "default": "ethanol"
+    },
+    {
+     "name": "include_blowdown_recycle",
+     "type": "bool",
+     "default": false
+    }
+   ],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [],
+   "testNames": null,
+   "compat": [],
+   "factories": [
+    "create_alkaline_pretreatment_system",
+    "create_ammonia_fiber_expansion_pretreatment_system",
+    "create_cellulosic_ethanol_system",
+    "create_cellulosic_fermentation_system",
+    "create_cofermentation_system",
+    "create_dilute_acid_pretreatment_system",
+    "create_hot_water_pretreatment_system",
+    "create_integrated_bioprocess_saccharification_and_cofermentation_system",
+    "create_saccharification_system",
+    "create_simultaneous_saccharification_and_cofermentation_system",
+    "create_titer_controlled_fermentation_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": true,
+     "units": 68,
+     "priced": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "id": "corn",
+   "module": "biorefineries.corn",
+   "kind": "plant",
+   "title": "corn: Conventional dry grind process",
+   "readme": "biorefineries/corn/README.md",
+   "entry": "load",
+   "parameters": [
+    {
+     "name": "args",
+     "kind": "var_positional",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "kwargs",
+     "kind": "var_keyword",
+     "required": false,
+     "default": null
+    }
+   ],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": true,
+   "tests": [
+    "test_corn"
+   ],
+   "testNames": {
+    "feedstock": "corn",
+    "product": "ethanol",
+    "products": {}
+   },
+   "compat": [
+    {
+     "change": "SimultaneousSaccharificationFermentation takes its two inlets",
+     "why": "biorefineries 2.35.1's SimultaneousSaccharificationFermentation passes two inlets to bst.BatchBioreactor, which declares one fixed inlet in biosteam 2.54.0, so corn.load() stops before it builds; the unit is let take its inlets, as biosteam's own NRELEthanolFermentation declares; no value of the package's changes"
+    }
+   ],
+   "factories": [
+    "create_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": true,
+     "units": 71,
+     "priced": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "id": "cornstover",
+   "module": "biorefineries.cornstover",
+   "kind": "plant",
+   "title": "cornstover: 2nd Generation Ethanol Production from Corn Stover",
+   "readme": "biorefineries/cornstover/README.rst",
+   "entry": "load",
+   "parameters": [],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [
+    "test_cornstover"
+   ],
+   "testNames": {
+    "feedstock": "cornstover",
+    "product": "ethanol",
+    "products": {}
+   },
+   "compat": [],
+   "factories": [
+    "create_alkaline_pretreatment_system",
+    "create_ammonia_fiber_expansion_pretreatment_system",
+    "create_cellulosic_ethanol_system",
+    "create_cellulosic_fermentation_system",
+    "create_cofermentation_system",
+    "create_dilute_acid_pretreatment_system",
+    "create_hot_water_pretreatment_system",
+    "create_integrated_bioprocess_saccharification_and_cofermentation_system",
+    "create_saccharification_system",
+    "create_simultaneous_saccharification_and_cofermentation_system",
+    "create_system",
+    "create_titer_controlled_fermentation_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": true,
+     "units": 68,
+     "priced": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "id": "ethanol",
+   "module": "biorefineries.ethanol",
+   "kind": "subsystems",
+   "title": null,
+   "readme": null,
+   "entry": null,
+   "parameters": [],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [],
+   "testNames": null,
+   "compat": [],
+   "factories": [
+    "create_beer_distillation_system",
+    "create_ethanol_purification_system"
+   ],
+   "error": null,
+   "builds": []
+  },
+  {
+   "id": "fattyalcohols",
+   "module": "biorefineries.fattyalcohols",
+   "kind": "plant",
+   "title": "fattyalcohols: Production of fatty alcohols by fermentation of sugars",
+   "readme": "biorefineries/fattyalcohols/README.rst",
+   "entry": "create_system",
+   "parameters": [
+    {
+     "name": "ID",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": "fattyalcohol_sys"
+    }
+   ],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [],
+   "testNames": null,
+   "compat": [],
+   "factories": [
+    "create_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": false,
+     "units": null,
+     "priced": null,
+     "error": "biorefineries.fattyalcohols could not be built under biosteam 2.54.0: UndefinedChemicalAlias: 'CSL'"
+    }
+   ]
+  },
+  {
+   "id": "gas_fermentation",
+   "module": "biorefineries.gas_fermentation",
+   "kind": "plant",
+   "title": "Acetate as a Platform Chemical for Carbon-Negative Oleochemical Production",
+   "readme": "biorefineries/gas_fermentation/README.md",
+   "entry": "Biorefinery",
+   "parameters": [
+    {
+     "name": "scenario",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "simulate",
+     "kind": "keyword_only",
+     "required": false,
+     "default": true
+    },
+    {
+     "name": "load",
+     "kind": "keyword_only",
+     "required": false,
+     "default": true
+    },
+    {
+     "name": "save",
+     "kind": "keyword_only",
+     "required": false,
+     "default": true
+    },
+    {
+     "name": "kwargs",
+     "kind": "var_keyword",
+     "required": false,
+     "default": null
+    }
+   ],
+   "processModel": true,
+   "scenario": [
+    {
+     "name": "name",
+     "type": "str",
+     "default": "acetate/glucose-seed"
+    },
+    {
+     "name": "product",
+     "type": "str",
+     "default": "Dodecanol"
+    },
+    {
+     "name": "carbon_capture",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "dewatering",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "name": "glucose_growth",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "name": "carbon_source",
+     "type": "str",
+     "default": "BFG"
+    },
+    {
+     "name": "biomass",
+     "type": "str",
+     "default": "cornstover"
+    },
+    {
+     "name": "hydrogen_price",
+     "type": "str",
+     "default": "all"
+    },
+    {
+     "name": "fermentation_performance",
+     "type": "str",
+     "default": "all"
+    }
+   ],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [],
+   "testNames": null,
+   "compat": [],
+   "factories": [
+    "create_acetic_acid_separation_system",
+    "create_hydrogen_oleochemical_system",
+    "create_substrate_oleochemical_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": false,
+     "units": null,
+     "priced": null,
+     "error": "biorefineries.gas_fermentation could not be built under biosteam 2.54.0: ValueError: ID must be a string, not a <class 'int'> object"
+    }
+   ]
+  },
+  {
+   "id": "lactic",
+   "module": "biorefineries.lactic",
+   "kind": "plant",
+   "title": "lactic: Production of Lactic Acid from Lignocellulosic Biomass",
+   "readme": "biorefineries/lactic/README.rst",
+   "entry": "load",
+   "parameters": [
+    {
+     "name": "kind",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": "SSCF"
+    },
+    {
+     "name": "print_results",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": true
+    },
+    {
+     "name": "sys_kwdct",
+     "kind": "var_keyword",
+     "required": false,
+     "default": null
+    }
+   ],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [
+    "test_lactic"
+   ],
+   "testNames": null,
+   "compat": [],
+   "factories": [
+    "create_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": false,
+     "units": null,
+     "priced": null,
+     "error": "biorefineries.lactic could not be built under biosteam 2.54.0: IndexError: list assignment index out of range"
+    }
+   ]
+  },
+  {
+   "id": "LAOs",
+   "module": "biorefineries.LAOs",
+   "kind": "plant",
+   "title": "LAOs: Production of Linear-Alpha Olefins from Renewable Fatty Alcohols",
+   "readme": "biorefineries/LAOs/README.rst",
+   "entry": "load",
+   "parameters": [],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [],
+   "testNames": null,
+   "compat": [],
+   "factories": [
+    "create_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": false,
+     "units": null,
+     "priced": null,
+     "error": "biorefineries.LAOs could not be built under biosteam 2.54.0: TypeError: NRELAnaerobicBatchBioreactor._init() got an unexpected keyword argument 'V'"
+    }
+   ]
+  },
+  {
+   "id": "lipidcane",
+   "module": "biorefineries.lipidcane",
+   "kind": "plant",
+   "title": "lipidcane: Co-production of Ethanol and Biodiesel from Lipid-cane",
+   "readme": "biorefineries/lipidcane/README.rst",
+   "entry": "load",
+   "parameters": [],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [
+    "test_lipidcane"
+   ],
+   "testNames": {
+    "feedstock": "lipidcane",
+    "product": "ethanol",
+    "products": {}
+   },
+   "compat": [],
+   "factories": [
+    "create_acTAG_separation_system",
+    "create_bagasse_drying_system",
+    "create_bagasse_pelleting_system",
+    "create_feedstock_handling_system",
+    "create_juicing_and_lipid_extraction_system",
+    "create_juicing_system",
+    "create_lipid_extraction_system",
+    "create_lipidcane_to_biodiesel_and_conventional_ethanol_system",
+    "create_post_fermentation_oil_separation_system",
+    "create_sucrose_fermentation_system",
+    "create_sucrose_to_ethanol_system",
+    "create_sugar_crystallization_system",
+    "create_sugarcane_to_ethanol_system",
+    "create_sugarcane_to_sugar_and_ethanol_system",
+    "create_sugarcane_to_sugar_and_molasses_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": true,
+     "units": 100,
+     "priced": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "id": "milk",
+   "module": "biorefineries.milk",
+   "kind": "plant",
+   "title": "ARPA-E",
+   "readme": "biorefineries/milk/README.md",
+   "entry": "Biorefinery",
+   "parameters": [
+    {
+     "name": "scenario",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "simulate",
+     "kind": "keyword_only",
+     "required": false,
+     "default": true
+    },
+    {
+     "name": "load",
+     "kind": "keyword_only",
+     "required": false,
+     "default": true
+    },
+    {
+     "name": "save",
+     "kind": "keyword_only",
+     "required": false,
+     "default": true
+    },
+    {
+     "name": "kwargs",
+     "kind": "var_keyword",
+     "required": false,
+     "default": null
+    }
+   ],
+   "processModel": true,
+   "scenario": [
+    {
+     "name": "feed",
+     "type": "str",
+     "default": "AcidWhey"
+    },
+    {
+     "name": "product",
+     "type": "str",
+     "default": "Dodecanol"
+    }
+   ],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [],
+   "testNames": null,
+   "compat": [],
+   "factories": [
+    "create_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": true,
+     "units": 29,
+     "priced": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "id": "oilcane",
+   "module": "biorefineries.oilcane",
+   "kind": "plant",
+   "title": "oilcane: Oilcane Biorefineries and Benchmarks",
+   "readme": "biorefineries/oilcane/README.md",
+   "entry": "load",
+   "parameters": [
+    {
+     "name": "args",
+     "kind": "var_positional",
+     "required": false,
+     "default": null
+    },
+    {
+     "name": "kwargs",
+     "kind": "var_keyword",
+     "required": false,
+     "default": null
+    }
+   ],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": true,
+   "configurations": [
+    "S1",
+    "S2",
+    "O1",
+    "O2",
+    "O3",
+    "O4",
+    "S1*",
+    "S2*",
+    "O1*",
+    "O2*",
+    "O6",
+    "O8",
+    "O9"
+   ],
+   "configurationsFrom": "biorefineries/tests/test_biorefineries.py, configurations",
+   "takesCache": true,
+   "tests": [
+    "test_oilcane_S1",
+    "test_oilcane_S2",
+    "test_oilcane_O1",
+    "test_oilcane_O2",
+    "test_oilcane_O3",
+    "test_oilcane_O4",
+    "test_oilcane_S1_agile",
+    "test_oilcane_S2_agile",
+    "test_oilcane_O1_agile",
+    "test_oilcane_O2_agile",
+    "test_oilcane_O6",
+    "test_oilcane_O8",
+    "test_oilcane_O9"
+   ],
+   "testNames": {
+    "feedstock": "feedstock",
+    "product": "ethanol",
+    "products": {
+     "O6": "biodiesel",
+     "O8": "biodiesel",
+     "O9": "biodiesel"
+    }
+   },
+   "compat": [],
+   "factories": [
+    "create_acTAG_separation_system",
+    "create_bagasse_drying_system",
+    "create_bagasse_pelleting_system",
+    "create_feedstock_handling_system",
+    "create_juicing_and_lipid_extraction_system",
+    "create_juicing_system",
+    "create_lipid_extraction_system",
+    "create_lipidcane_to_biodiesel_and_conventional_ethanol_system",
+    "create_post_fermentation_oil_separation_system",
+    "create_sucrose_fermentation_system",
+    "create_sucrose_to_ethanol_system",
+    "create_sugar_crystallization_system",
+    "create_sugarcane_to_ethanol_system",
+    "create_sugarcane_to_sugar_and_ethanol_system",
+    "create_sugarcane_to_sugar_and_molasses_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": "S1",
+     "ok": true,
+     "units": 56,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "S2",
+     "ok": true,
+     "units": 94,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O1",
+     "ok": true,
+     "units": 130,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O2",
+     "ok": true,
+     "units": 166,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O3",
+     "ok": true,
+     "units": 65,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O4",
+     "ok": true,
+     "units": 102,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "S1*",
+     "ok": true,
+     "units": 112,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "S2*",
+     "ok": true,
+     "units": 188,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O1*",
+     "ok": true,
+     "units": 260,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O2*",
+     "ok": true,
+     "units": 332,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O6",
+     "ok": true,
+     "units": 149,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O8",
+     "ok": true,
+     "units": 145,
+     "priced": true,
+     "error": null
+    },
+    {
+     "configuration": "O9",
+     "ok": true,
+     "units": 146,
+     "priced": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "id": "sugarcane",
+   "module": "biorefineries.sugarcane",
+   "kind": "plant",
+   "title": "sugarcane: Ethanol production from Sugarcane",
+   "readme": "biorefineries/sugarcane/README.rst",
+   "entry": "load",
+   "parameters": [
+    {
+     "name": "pellet_bagasse",
+     "kind": "positional_or_keyword",
+     "required": false,
+     "default": null
+    }
+   ],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [
+    "test_sugarcane"
+   ],
+   "testNames": {
+    "feedstock": "sugarcane",
+    "product": "ethanol",
+    "products": {}
+   },
+   "compat": [],
+   "factories": [
+    "create_acTAG_separation_system",
+    "create_bagasse_drying_system",
+    "create_bagasse_pelleting_system",
+    "create_feedstock_handling_system",
+    "create_juicing_and_lipid_extraction_system",
+    "create_juicing_system",
+    "create_lipid_extraction_system",
+    "create_lipidcane_to_biodiesel_and_conventional_ethanol_system",
+    "create_post_fermentation_oil_separation_system",
+    "create_sucrose_fermentation_system",
+    "create_sucrose_to_ethanol_system",
+    "create_sugar_crystallization_system",
+    "create_sugarcane_to_ethanol_system",
+    "create_sugarcane_to_sugar_and_ethanol_system",
+    "create_sugarcane_to_sugar_and_molasses_system"
+   ],
+   "error": null,
+   "builds": [
+    {
+     "configuration": null,
+     "ok": true,
+     "units": 54,
+     "priced": true,
+     "error": null
+    }
+   ]
+  },
+  {
+   "id": "tea",
+   "module": "biorefineries.tea",
+   "kind": "none",
+   "title": null,
+   "readme": null,
+   "entry": null,
+   "parameters": [],
+   "processModel": false,
+   "scenario": [],
+   "requiresConfiguration": false,
+   "configurations": [],
+   "configurationsFrom": null,
+   "takesCache": false,
+   "tests": [],
+   "testNames": null,
+   "compat": [],
+   "factories": [],
+   "error": null,
+   "builds": []
+  }
+ ]
+}

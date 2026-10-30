@@ -115,10 +115,14 @@ ALLOWED = {
     # in functions that import BioSTEAM inside themselves and run in the worker
     # (its module imports none at the top: held below), and the in-house units
     # subclass `bst.Unit`, so the worker alone imports them (held below).
-    "biosteam": {"workers/proforma_worker.py", "pureos/catalogue.py", "pureos/inhouse.py"},
+    "biosteam": {"workers/proforma_worker.py", "pureos/catalogue.py", "pureos/inhouse.py",
+                 # alpha 2.0 (ADR-004): the library plant runner, in the Proforma worker.
+                 "workers/library_plants.py"},
     # OF-BLD-019 §4.2: BioSTEAM's property engine, which the service reaches
     # through the Proforma worker's `thermo_props` op and nowhere else.
-    "thermosteam": {"workers/proforma_worker.py", "pureos/inhouse.py"},
+    "thermosteam": {"workers/proforma_worker.py", "pureos/inhouse.py",
+                    # alpha 2.0 (ADR-003): the SFF toolkit's writer is taught thermosteam's reactions and streams.
+                    "workers/sff_toolkit.py"},
     # OF-BLD-020 E.3‴: scipy in fermOS's kinetics and fits alone among the
     # service's modules. The workers and the flowsheets they run may use it
     # (worker side).
