@@ -4,9 +4,10 @@
 import type { GuildPerson, Proposal, ProposalAction } from '@/data/types';
 import { mayQueue } from '@/engine/checks';
 import type { StatusMap } from '@/engine/competence';
+import { apiFetch } from './project';
 
 export async function listProposals(signal?: AbortSignal): Promise<Proposal[]> {
-  const response = await fetch('/api/proposals?state=proposed', { signal });
+  const response = await apiFetch('/api/proposals?state=proposed', { signal });
   if (!response.ok) throw new Error(`GET /api/proposals → ${response.status}`);
   return (await response.json()) as Proposal[];
 }
@@ -35,7 +36,7 @@ export const needsActing = (p: Pick<Proposal, 'module' | 'action'>): boolean =>
   p.module === 'guild' && p.action === 'propose_check';
 
 async function act(id: string, verb: 'carry-out' | 'dismiss', body: ProposalAction): Promise<Proposal> {
-  const response = await fetch(`/api/proposals/${encodeURIComponent(id)}/${verb}`, {
+  const response = await apiFetch(`/api/proposals/${encodeURIComponent(id)}/${verb}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

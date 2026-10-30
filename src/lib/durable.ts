@@ -322,3 +322,29 @@ export async function clearDurable(): Promise<void> {
     /* nothing to do — the caller cannot act on this either */
   }
 }
+
+// ── The last-open project (alpha 2.0, ADR-005) ─────────────────────────
+//
+// One id, the project this browser last opened. It is read synchronously at
+// load, so the first call to the service already names it, which is why it
+// lives in localStorage beside the IndexedDB snapshot. Like everything here,
+// a failure reads as none.
+const PROJECT_KEY = 'openferment.project';
+
+export function lastProject(): string | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage.getItem(PROJECT_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberProject(id: string | null): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (id) localStorage.setItem(PROJECT_KEY, id);
+    else localStorage.removeItem(PROJECT_KEY);
+  } catch {
+    /* the open project is then this page's alone */
+  }
+}

@@ -27,7 +27,6 @@ STANDIN_PERSON = "Stand-In Person"
 def marked(store, worker, monkeypatch):  # noqa: F811
     """The audit log and the proposals in the test's store, and the model the
     writes are marked with."""
-    monkeypatch.setattr(audit, "PATH", store / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", store / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")

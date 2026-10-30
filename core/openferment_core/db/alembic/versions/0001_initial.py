@@ -29,7 +29,7 @@ def upgrade() -> None:
     sa.Column('description', sa.Text(), server_default='', nullable=False),
     sa.Column('settings', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_projects')),
     schema='openferment'
     )
@@ -41,7 +41,7 @@ def upgrade() -> None:
     sa.Column('output_hash', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_artifacts_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_artifacts')),
     schema='openferment'
@@ -57,7 +57,7 @@ def upgrade() -> None:
     sa.Column('state', sa.Text(), nullable=False),
     sa.Column('target', sa.Text(), nullable=True),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_audit_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('seq', name=op.f('pk_audit')),
     schema='openferment'
@@ -69,8 +69,8 @@ def upgrade() -> None:
     sa.Column('source', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_candidates_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'document_id', 'source', name=op.f('pk_candidates')),
     schema='openferment'
@@ -80,7 +80,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_comparisons_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_comparisons')),
     schema='openferment'
@@ -91,8 +91,8 @@ def upgrade() -> None:
     sa.Column('title', sa.Text(), server_default='', nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_conversations_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_conversations')),
     schema='openferment'
@@ -103,7 +103,7 @@ def upgrade() -> None:
     sa.Column('record_id', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_decisions_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('seq', name=op.f('pk_decisions')),
     schema='openferment'
@@ -116,7 +116,7 @@ def upgrade() -> None:
     sa.Column('runbook_id', sa.Text(), nullable=True),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_depositions_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_depositions')),
     schema='openferment'
@@ -127,7 +127,7 @@ def upgrade() -> None:
     sa.Column('document_id', sa.Text(), nullable=False),
     sa.Column('selection', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_documents_link_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'document_id', name=op.f('pk_documents_link')),
     schema='openferment'
@@ -137,7 +137,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_fits_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_fits')),
     schema='openferment'
@@ -149,7 +149,7 @@ def upgrade() -> None:
     sa.Column('recipe', sa.Text(), nullable=True),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_flowsheets_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_flowsheets')),
     schema='openferment'
@@ -160,8 +160,8 @@ def upgrade() -> None:
     sa.Column('state', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_guild_checks_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_guild_checks')),
     schema='openferment'
@@ -173,8 +173,8 @@ def upgrade() -> None:
     sa.Column('skill_id', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_guild_evidence_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_guild_evidence')),
     schema='openferment'
@@ -185,8 +185,8 @@ def upgrade() -> None:
     sa.Column('id', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_guild_people_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_guild_people')),
     schema='openferment'
@@ -198,8 +198,8 @@ def upgrade() -> None:
     sa.Column('state', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_jobs_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_jobs')),
     schema='openferment'
@@ -209,7 +209,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_measured_evidence_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_measured_evidence')),
     schema='openferment'
@@ -220,7 +220,7 @@ def upgrade() -> None:
     sa.Column('key', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_overrides_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'scope', 'key', name=op.f('pk_overrides')),
     schema='openferment'
@@ -230,7 +230,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_practice_scenarios_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_practice_scenarios')),
     schema='openferment'
@@ -240,8 +240,8 @@ def upgrade() -> None:
     sa.Column('id', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_practice_sessions_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_practice_sessions')),
     schema='openferment'
@@ -250,7 +250,7 @@ def upgrade() -> None:
     sa.Column('project_id', sa.Text(), nullable=False),
     sa.Column('person', sa.Text(), nullable=False),
     sa.Column('role', sa.Text(), server_default='member', nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_project_members_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'person', name=op.f('pk_project_members')),
     schema='openferment'
@@ -261,8 +261,8 @@ def upgrade() -> None:
     sa.Column('state', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_proposals_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_proposals')),
     schema='openferment'
@@ -283,7 +283,7 @@ def upgrade() -> None:
     sa.Column('provenance', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_records_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', 'version', name=op.f('pk_records')),
     schema='openferment'
@@ -296,7 +296,7 @@ def upgrade() -> None:
     sa.Column('lock_hash', sa.Text(), nullable=False),
     sa.Column('locked_at', postgresql.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_runbook_locks_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'runbook_id', name=op.f('pk_runbook_locks')),
     schema='openferment'
@@ -306,8 +306,8 @@ def upgrade() -> None:
     sa.Column('id', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_runbooks_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_runbooks')),
     schema='openferment'
@@ -320,7 +320,7 @@ def upgrade() -> None:
     sa.Column('status', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_runs_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_runs')),
     schema='openferment'
@@ -332,8 +332,8 @@ def upgrade() -> None:
     sa.Column('pinned', sa.Boolean(), server_default='false', nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_scenarios_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_scenarios')),
     schema='openferment'
@@ -346,7 +346,7 @@ def upgrade() -> None:
     sa.Column('state', sa.Text(), nullable=False),
     sa.Column('reservation', sa.Text(), nullable=True),
     sa.Column('project_id', sa.Text(), nullable=True),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.Column('expires_at', postgresql.TIMESTAMP(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_spend_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('seq', name=op.f('pk_spend')),
@@ -362,7 +362,7 @@ def upgrade() -> None:
     sa.Column('input', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('result', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_tool_calls_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('seq', name=op.f('pk_tool_calls')),
     schema='openferment'
@@ -374,8 +374,8 @@ def upgrade() -> None:
     sa.Column('kind', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_trains_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_trains')),
     schema='openferment'
@@ -388,8 +388,8 @@ def upgrade() -> None:
     sa.Column('status', sa.Text(), nullable=False),
     sa.Column('body', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_by', sa.Text(), nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['project_id', 'conversation_id'], ['openferment.conversations.project_id', 'openferment.conversations.id'], name=op.f('fk_turns_project_id_conversation_id'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['project_id'], ['openferment.projects.id'], name=op.f('fk_turns_project_id'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('project_id', 'id', name=op.f('pk_turns')),

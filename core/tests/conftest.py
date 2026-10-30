@@ -123,14 +123,43 @@ def test_database():
     held.close()
 
 
-@pytest.fixture(autouse=True)
-def _database(test_database):
-    """Every session of this test: a savepoint on one rolled-back transaction."""
-    from openferment_core import db
+# Every test acts in one project, as every request names one (ADR-005): the
+# test's own thread through `projects.using`, a thread it starts through
+# OPENFERMENT_PROJECT, and every TestClient it makes through the header, the
+# way the browser sends it. The project's row is written in the test's
+# transaction when the database is first touched.
+TEST_PROJECT = "test-project"
 
-    binding = db.Binding(test_database.engine_now)
+
+async def _test_project_row(connection) -> None:
+    from sqlalchemy import insert
+
+    from openferment_core.db import models as t
+
+    await connection.execute(insert(t.projects).values(id=TEST_PROJECT, name="Test project", created_by="test"))
+
+
+@pytest.fixture(autouse=True)
+def _database(test_database, monkeypatch):
+    """Every session of this test: a savepoint on one rolled-back transaction,
+    in the test project."""
+    from fastapi.testclient import TestClient
+
+    from openferment_core import db, projects
+
+    made = TestClient.__init__
+
+    def naming_the_project(self, *args, headers=None, **kwargs):
+        made(self, *args, headers={projects.HEADER: TEST_PROJECT, **(headers or {})}, **kwargs)
+
+    monkeypatch.setattr(TestClient, "__init__", naming_the_project)
+    # A thread a test starts begins outside the test's context, like a
+    # command's, and finds the project where a command does.
+    monkeypatch.setenv(projects.ENV, TEST_PROJECT)
+    binding = db.Binding(test_database.engine_now, prepare=_test_project_row)
     previous = db.bind(binding)
-    yield binding
+    with projects.using(TEST_PROJECT):
+        yield binding
     db.bind(previous)
     if binding.connection is not None:
         db.run(binding.close())

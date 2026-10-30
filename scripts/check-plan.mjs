@@ -68,6 +68,9 @@ const PAIRS = [
   ['ModuleRow', 'ModuleRow'],
   // OF-BLD-015 §7.3, §7.4 — the audit log and the proposals.
   ['AuditEntry', 'AuditEntry'],
+  // alpha 2.0, ADR-005 — projects.
+  ['Project', 'Project'],
+  ['ProjectCreate', 'ProjectCreate'],
   ['Proposal', 'Proposal'],
   ['ProposalAction', 'ProposalAction'],
   // OF-BLD-012 §2.5 — Intake. The service's FetchedSection is the browser's

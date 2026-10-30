@@ -7,11 +7,16 @@
  * entry of RAIL (src/data/nav.ts) in Chromium. An entry fails on a console
  * error, an uncaught exception, the screen boundary's card, the not-found page,
  * a near-empty render, or a 500 from the service. The service writes into a
- * fresh temporary data directory, so a smoke run never touches core/data/.
+ * fresh temporary data directory and a database of the smoke's own, made on
+ * the server OPENFERMENT_TEST_DATABASE_URL names (the tests' server) and
+ * dropped at the end, so a smoke run never touches core/data/ or another
+ * database. A project is made through the API first, and every screen must
+ * open inside it.
  *
  *   pnpm build && pnpm smoke
  */
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -28,6 +33,9 @@ const HOST = '127.0.0.1';
 const IGNORE = [/Download the React DevTools/i, /favicon/i];
 /** Fewer characters than this on a screen means it drew nothing. */
 const MIN_TEXT = 60;
+/** The server the smoke makes its database on: the tests' (core/tests/conftest.py). */
+const SERVER = process.env.OPENFERMENT_TEST_DATABASE_URL?.trim() || 'postgresql://openferment:openferment@127.0.0.1:5432/openferment_test';
+const PROJECT = { name: 'Smoke', by: 'Smoke Test' };
 
 function freePort(): Promise<number> {
   return new Promise((done, fail) => {
@@ -41,17 +49,39 @@ function freePort(): Promise<number> {
 }
 
 /**
- * Start the service. The project's environment is called directly when it
- * exists: `uv run` would sync it first, and that re-points the editable
+ * The project's Python, with `args`. Its environment is called directly when
+ * it exists: `uv run` would sync it first, and that re-points the editable
  * install when the environment is shared with another checkout.
  */
-function startService(port: number, dataDir: string, log: string[]): ChildProcess {
-  const python = join(CORE, '.venv', 'bin', 'python');
-  const args = ['-m', 'uvicorn', 'openferment_core.api:app', '--host', HOST, '--port', String(port), '--log-level', 'warning'];
-  const [command, argv] = existsSync(python) ? [python, args] : ['uv', ['run', '--all-extras', 'python', ...args]];
+function python(args: string[]): [string, string[]] {
+  const own = join(CORE, '.venv', 'bin', 'python');
+  return existsSync(own) ? [own, args] : ['uv', ['run', '--all-extras', 'python', ...args]];
+}
+
+/** `address` naming database `name` on the same server. */
+function onServer(address: string, name: string): string {
+  const url = new URL(address);
+  url.pathname = `/${name}`;
+  return url.toString();
+}
+
+/** Run one database command (core/openferment_core/db/__main__.py) against SERVER. */
+function dbCommand(args: string[]): void {
+  const [command, argv] = python(['-m', 'openferment_core.db', ...args]);
+  const done = spawnSync(command, argv, { cwd: CORE, env: { ...process.env, OPENFERMENT_DATABASE_URL: SERVER }, encoding: 'utf8' });
+  if (done.status !== 0) throw new Error(`db ${args.join(' ')} failed: ${(done.stderr || done.stdout).trim()}`);
+}
+
+function startService(port: number, dataDir: string, database: string, log: string[]): ChildProcess {
+  const [command, argv] = python(['-m', 'uvicorn', 'openferment_core.api:app', '--host', HOST, '--port', String(port), '--log-level', 'warning']);
   const child = spawn(command, argv, {
     cwd: CORE,
-    env: { ...process.env, OPENFERMENT_DIST_DIR: DIST, OPENFERMENT_DATA_DIR: dataDir },
+    env: {
+      ...process.env,
+      OPENFERMENT_DIST_DIR: DIST,
+      OPENFERMENT_DATA_DIR: dataDir,
+      OPENFERMENT_DATABASE_URL: onServer(SERVER, database),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout?.on('data', (b: Buffer) => log.push(b.toString()));
@@ -82,13 +112,28 @@ async function main(): Promise<number> {
   const port = await freePort();
   const origin = `http://${HOST}:${port}`;
   const dataDir = mkdtempSync(join(tmpdir(), 'openferment-smoke-'));
+  const database = `openferment_smoke_${randomBytes(4).toString('hex')}`;
+  try {
+    dbCommand(['reset', database]);
+  } catch (e) {
+    console.error(`✗ ${String(e)}\n  Start PostgreSQL (\`pnpm db:up\`), or set OPENFERMENT_TEST_DATABASE_URL.`);
+    rmSync(dataDir, { recursive: true, force: true });
+    return 1;
+  }
   const serviceLog: string[] = [];
-  const service = startService(port, dataDir, serviceLog);
+  const service = startService(port, dataDir, database, serviceLog);
   const failures: string[] = [];
 
   try {
     await waitForHealth(origin, service);
-    console.log(`✓ the service answers at ${origin}, serving dist/`);
+    console.log(`✓ the service answers at ${origin}, serving dist/, on database ${database}`);
+    const made = await fetch(`${origin}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(PROJECT),
+    });
+    if (made.status !== 201) throw new Error(`making the project answered ${made.status}: ${await made.text()}`);
+    console.log(`✓ project ${((await made.json()) as { id: string }).id} made through the API`);
 
     // The environment's installed Chromium, when the repository's Playwright
     // expects a different build of it.
@@ -114,6 +159,10 @@ async function main(): Promise<number> {
           }
           const text = (await page.locator('#of-main').innerText().catch(() => '')).trim();
           if (text.length < MIN_TEXT) problems.push(`the main region drew ${text.length} characters`);
+          // The one project the service holds opens by itself, and the top bar names it.
+          if (await page.locator('[data-testid="project-needed"]').count()) problems.push('no project is open');
+          const open = (await page.locator('[data-testid="project-switch"]').innerText().catch(() => '')).trim();
+          if (open !== PROJECT.name) problems.push(`the top bar names the project ${JSON.stringify(open)}, not ${PROJECT.name}`);
           if (/Route not found/i.test(text)) problems.push('the path opened the not-found page');
           if (problems.length) {
             failures.push(label);
@@ -137,8 +186,17 @@ async function main(): Promise<number> {
     const tail = serviceLog.join('').trim().split('\n').slice(-20).join('\n');
     if (tail) console.log(`  the service said:\n${tail}`);
   } finally {
-    service.kill('SIGTERM');
+    if (service.exitCode === null && service.signalCode === null) {
+      const exited = new Promise((r) => service.once('exit', r));
+      service.kill('SIGTERM');
+      await exited;
+    }
     rmSync(dataDir, { recursive: true, force: true });
+    try {
+      dbCommand(['drop', database]);
+    } catch (e) {
+      console.log(`  (the smoke's database ${database} was left behind: ${String(e)})`);
+    }
   }
 
   console.log(failures.length ? `\n${failures.length} failed of ${RAIL.length} rail entries` : `\nall ${RAIL.length} rail entries open`);

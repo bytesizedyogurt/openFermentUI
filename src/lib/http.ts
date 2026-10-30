@@ -7,6 +7,7 @@
 // the retired passage-search client (lib/rag.ts) when Sci RAG Kit became the
 // literature layer (alpha 2.0, ADR-002); every service client shares it.
 import { START_COMMAND, postdocHealth } from './postdoc';
+import { apiFetch } from './project';
 
 export class ServiceDown extends Error {
   constructor(
@@ -32,7 +33,7 @@ export class ServiceRefused extends Error {
 export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, init);
+    response = await apiFetch(path, init);
   } catch {
     throw new ServiceDown('The service is not running.');
   }

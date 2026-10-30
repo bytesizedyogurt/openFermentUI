@@ -78,9 +78,11 @@ nothing else is.
 from __future__ import annotations
 
 import ast
+import atexit
 import importlib
 import os
 import re
+import secrets
 import sys
 import tempfile
 import types
@@ -93,12 +95,35 @@ os.environ["OPENFERMENT_DATA_DIR"] = tempfile.mkdtemp(prefix="check-tools-")
 os.environ.setdefault("OPENFERMENT_MODEL", "claude-haiku-5-5")
 os.environ.setdefault("OPENFERMENT_FIXTURES", "1")
 
+# The audit log lives in PostgreSQL (alpha 2.0, ADR-001): the gated writes
+# below run against a database of this check's own, made on the tests'
+# server (OPENFERMENT_TEST_DATABASE_URL) and dropped on the way out, in a
+# project of its own.
+from openferment_core.db import migrate  # noqa: E402
+
+SERVER = os.environ.get("OPENFERMENT_TEST_DATABASE_URL", "").strip() or \
+    "postgresql://openferment:openferment@127.0.0.1:5432/openferment_test"
+DATABASE = f"check_tools_{os.getpid()}_{secrets.token_hex(3)}"
 try:
-    from openferment_core import audit, intake, module_stores, proposals, tools  # noqa: E402
+    _url = migrate.create(DATABASE, SERVER)
+except Exception as e:  # noqa: BLE001 (the server's own words go to the reader)
+    print(f"✗ check:tools  PostgreSQL did not answer ({type(e).__name__}: {e}). Start it with `pnpm db:up`, "
+          "or set OPENFERMENT_TEST_DATABASE_URL.")
+    sys.exit(1)
+atexit.register(migrate.drop, DATABASE, SERVER)
+migrate.upgrade(_url)
+os.environ["OPENFERMENT_DATABASE_URL"] = _url.render_as_string(hide_password=False)
+os.environ["OPENFERMENT_PROJECT"] = "check-tools"
+
+try:
+    from openferment_core import audit, intake, module_stores, projects, proposals, tools  # noqa: E402
     from openferment_core.tools import gates, writes  # noqa: E402
 except Exception as e:  # a module with no tool, or a tool outside WHITELIST, fails the registry's import
     print(f"✗ check:tools  the registry did not load: {type(e).__name__}: {e}")
     sys.exit(1)
+from openferment_core.models import ProjectCreate  # noqa: E402
+
+projects.create(ProjectCreate(id="check-tools", name="check:tools", by="check:tools"))
 
 # The write functions a write tool may call: each module's own, where its
 # rules live. A new free write adds its function here and in docs/TOOLS.md.
@@ -623,7 +648,7 @@ for gate in gates.GATES:
             fail(f"{module}_write {action} did not come back proposed at gate {gate.id}: {r.error or r.summary}")
             continue
         after = {p.name for p in data.iterdir()}
-        extra = after - before - {"proposals.json", "proposals.json.lock", "audit.jsonl", "audit.jsonl.lock"}
+        extra = after - before - {"proposals.json", "proposals.json.lock"}
         if extra:
             fail(f"{module}_write {action} wrote {sorted(extra)} besides the proposal")
         pid = r.summary["proposalId"]
@@ -692,7 +717,8 @@ for name in tools.WHITELIST:
         fail(f"{name}'s input schema holds a numeric field at {where}: a fermOS or pureOS tool takes ids and words, "
              "a model's parameter is a source and never a value (E.4‴)")
 
-lines = audit.read()
+# The gated writes' rows; the first row is the check's project being made.
+lines = [a for a in audit.read() if a.action != "create_project"]
 if any(a.agent == "person" for a in lines):
     fail("a person's line entered the audit log with no person's name")
 if not lines or any(a.agent != "model" or not a.askId for a in lines):

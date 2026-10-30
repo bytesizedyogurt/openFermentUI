@@ -1305,6 +1305,28 @@ export interface ModuleRow {
   detail: Record<string, unknown>;
 }
 
+/**
+ * A project (alpha 2.0, ADR-005): what scopes a lab's documents, records,
+ * flowsheets, runs, artifacts, runbooks, depositions, conversations and Guild
+ * entries. Every row the service keeps belongs to one.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+/** POST /api/projects. `id` is made from the name when left out. */
+export interface ProjectCreate {
+  name: string;
+  description?: string;
+  id?: string | null;
+  /** The person creating it, as the reviewer name they sign with. */
+  by: string;
+}
+
 /** One line of the audit log (OF-BLD-015 §7.3). */
 export interface AuditEntry {
   at: string;

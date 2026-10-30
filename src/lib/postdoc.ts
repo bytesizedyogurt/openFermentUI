@@ -11,6 +11,7 @@
 // not running. The scripted flows still exist; they are fixtures now, not a
 // safety net (§9).
 import type { AnswerPlan, AnswerPlanUsage, AskRequest, LiveTurn, PriorTurn, TraceStep } from '@/data/types';
+import { apiFetch } from './project';
 
 /** Exactly what to type, so the message is actionable rather than sympathetic. */
 export const START_COMMAND = 'uv run uvicorn openferment_core.api:app --reload';
@@ -75,7 +76,7 @@ async function post(
   };
   let response: Response;
   try {
-    response = await fetch(path, {
+    response = await apiFetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

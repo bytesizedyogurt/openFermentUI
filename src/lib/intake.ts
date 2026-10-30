@@ -18,6 +18,7 @@ import type {
   ReviewDecision,
 } from '@/data/types';
 import { START_COMMAND, postdocHealth } from './postdoc';
+import { apiFetch } from './project';
 
 /** Who served a fetched text, in the words the reader is shown. */
 const SOURCE_NAMES: Record<FetchSource, string> = {
@@ -95,7 +96,7 @@ export class DecisionRefused extends Error {
 export async function postDecision(decision: ReviewDecision, signal?: AbortSignal): Promise<ReviewDecision> {
   let response: Response;
   try {
-    response = await fetch('/api/biorepo/decisions', {
+    response = await apiFetch('/api/biorepo/decisions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(decision),
@@ -130,7 +131,7 @@ export async function postDecision(decision: ReviewDecision, signal?: AbortSigna
 export async function checkDecision(decision: ReviewDecision, signal?: AbortSignal): Promise<DecisionCheck> {
   let response: Response;
   try {
-    response = await fetch('/api/biorepo/check', {
+    response = await apiFetch('/api/biorepo/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(decision),
@@ -157,7 +158,7 @@ export async function fetchPaper(
 ): Promise<FetchResult> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await apiFetch(
       `/api/intake/${encodeURIComponent(paperId)}/fetch${opts.force ? '?force=true' : ''}`,
       { method: 'POST', signal: opts.signal },
     );
@@ -181,7 +182,7 @@ export async function extractPaper(
 ): Promise<ExtractResponse> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await apiFetch(
       `/api/intake/${encodeURIComponent(paperId)}/extract${opts.force ? '?force=true' : ''}`,
       { method: 'POST', signal: opts.signal },
     );
@@ -205,7 +206,7 @@ export async function loadOverlay(signal?: AbortSignal): Promise<Overlay | null>
   try {
     const health = await postdocHealth(signal);
     if (!health.ok) return null;
-    const response = await fetch('/api/biorepo/overlay', { signal });
+    const response = await apiFetch('/api/biorepo/overlay', { signal });
     if (!response.ok) return null;
     return (await response.json()) as Overlay;
   } catch {

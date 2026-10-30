@@ -20,6 +20,7 @@ import { cx, Popover, Toasts, Sheet } from '@/components/ui';
 import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
 import { GuidedTour } from '@/components/GuidedTour';
+import { ProjectNeeded, ProjectSwitch } from '@/components/ProjectSwitch';
 import { SHORTCUTS } from '@/data/shortcuts';
 import { RAIL, redirectFor } from '@/data/nav';
 
@@ -311,6 +312,7 @@ export default function App() {
   const tickTimers = useStore((s) => s.tickTimers);
   const hydrateDurable = useStore((s) => s.hydrateDurable);
   const hydrateOverlay = useStore((s) => s.hydrateOverlay);
+  const loadProjects = useStore((s) => s.loadProjects);
   const route = useRoute();
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
@@ -327,10 +329,11 @@ export default function App() {
   // memory and Settings says so, rather than blocking the screen on storage.
   useEffect(() => {
     void hydrateDurable();
-    // OF-BLD-012 §2.1 — the service's overlay, applied over the seed when the
-    // service answers. Silent when it does not: the app is then the seed.
-    void hydrateOverlay();
-  }, [hydrateDurable, hydrateOverlay]);
+    // alpha 2.0 (ADR-005) — the projects first, so every later call to the
+    // service names the open one; then the service's overlay, applied when
+    // the service answers and silent when it does not.
+    void loadProjects().then(() => hydrateOverlay());
+  }, [hydrateDurable, hydrateOverlay, loadProjects]);
 
   // Theme / density / motion applied at the document root.
   useEffect(() => {
@@ -607,11 +610,13 @@ export default function App() {
             >
               {ui.theme === 'bench' ? <Sun size={14} /> : <Moon size={14} />}
             </button>
+            <ProjectSwitch />
             <SignedIn />
           </header>
 
           <main id="of-main" className="flex-1 overflow-y-auto of-grid">
             <div className="p-5 max-w-[1600px]">
+              <ProjectNeeded />
               <ScreenBoundary key={route.segments[0] ?? 'home'}>
                 <Screen />
               </ScreenBoundary>

@@ -14,17 +14,26 @@ signs.
 `.mcp.json` at the repository root starts it:
 
     uv run --project core --all-extras python -m openferment_core.mcp_server
+
+It acts in one project, the one OPENFERMENT_PROJECT names, and reaches the
+database at OPENFERMENT_DATABASE_URL (ADR-005, ADR-001). Each is read from the
+environment, or from core/.env when the environment lacks it; nothing else is
+read from that file here.
 """
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import Any
+
+from dotenv import dotenv_values
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase
 from pydantic import ConfigDict
 
-from . import tools
+from . import db, projects, tools
 
 NAME = "openferment"
 EXTRA = ("ask_postdoc", "get_artifact")
@@ -83,7 +92,17 @@ def build() -> MCPServer:
     return server
 
 
+def _settings() -> None:
+    """The database address and the project, from core/.env when the
+    environment does not set them: these two names alone."""
+    held = dotenv_values(Path(__file__).parent.parent / ".env")
+    for name in (db.URL_SETTING, projects.ENV):
+        if held.get(name) and not os.environ.get(name):
+            os.environ[name] = str(held[name])
+
+
 def main() -> None:
+    _settings()
     build().run("stdio")
 
 

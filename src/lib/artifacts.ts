@@ -6,6 +6,7 @@
 // the service's place (E.2).
 import type { Artifact, ReplayResult } from '@/data/types';
 import { START_COMMAND, postdocHealth } from './postdoc';
+import { apiFetch } from './project';
 
 export class ArtifactsDown extends Error {
   constructor(
@@ -31,7 +32,7 @@ export class ArtifactRefused extends Error {
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, init);
+    response = await apiFetch(path, init);
   } catch {
     throw new ArtifactsDown('The service is not running.');
   }

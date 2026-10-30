@@ -3335,6 +3335,36 @@ class TrainProposal(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+# ── Projects (alpha 2.0, ADR-005) ─────────────────────────────────────────
+
+# A project's id: lower case, digits and dashes, as it appears in an address.
+PROJECT_ID = r"^[a-z0-9][a-z0-9-]{0,62}$"
+
+
+class Project(BaseModel):
+    """What scopes a lab's documents, records, flowsheets, runs, artifacts,
+    runbooks, depositions, conversations and Guild entries: every row the
+    service keeps belongs to one."""
+
+    id: str
+    name: str
+    description: str = ""
+    createdBy: str
+    createdAt: str
+
+
+class ProjectCreate(BaseModel):
+    """POST /api/projects. `id` is made from the name when left out."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=2000)
+    id: str | None = Field(default=None, pattern=PROJECT_ID)
+    # The person creating it, as the reviewer name they sign with.
+    by: str = Field(min_length=1, max_length=120)
+
+
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()

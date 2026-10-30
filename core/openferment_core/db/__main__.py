@@ -3,6 +3,7 @@
     migrate        bring the configured database to the newest schema (pnpm db:migrate)
     reset NAME     drop database NAME, make it again and migrate it (pnpm db:reset NAME);
                    refuses the production database, `openferment`
+    drop NAME      drop database NAME; refuses the production database
     revision       print the revision the configured database is at
 
 The address is OPENFERMENT_DATABASE_URL, from the environment or core/.env.
@@ -30,6 +31,10 @@ def main(argv: list[str]) -> int:
         if command == "reset" and len(rest) == 1:
             url = migrate.reset(rest[0])
             print(f"{url.render_as_string(hide_password=True)} was made again at revision {migrate.revision(url)}")
+            return 0
+        if command == "drop" and len(rest) == 1:
+            migrate.drop(rest[0])
+            print(f"{rest[0]} dropped")
             return 0
         if command == "revision" and not rest:
             print(migrate.revision() or "none: the database has not been migrated")

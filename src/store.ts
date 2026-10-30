@@ -5,6 +5,7 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
 import type {
+  Project,
   InputAssumption,
   Override,
   RunbookDraft,
@@ -73,6 +74,8 @@ import {
 import { DecisionRefused, IntakeDown, extractPaper, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
 import { blocks, carryOverSpan, isNewCandidate, spanChangesNumber, writeRefusal, type ReviewAction } from '@/lib/review';
 import { postdocHealth } from '@/lib/postdoc';
+import { call } from '@/lib/http';
+import { openProjectId, setOpenProjectId } from '@/lib/project';
 import {
   EMPTY_GUILD,
   GuildRefused,
@@ -550,6 +553,25 @@ export interface OFState {
   reviewer: string;
   setReviewerName: (name: string) => void;
   /**
+   * The projects the service holds (alpha 2.0, ADR-005), oldest first; null
+   * until asked. Every record the service keeps belongs to one of them.
+   */
+  projects: Project[] | null;
+  /** Why the projects could not be listed, in words; null when they were. */
+  projectsProblem: string | null;
+  /** The project this page acts in, named on every call to the service. */
+  projectId: string | null;
+  /**
+   * Ask the service for its projects. The project remembered here stays open
+   * while the service holds it; with none open and exactly one held, that one
+   * opens.
+   */
+  loadProjects: () => Promise<void>;
+  /** Open another project. The page reloads, so nothing of the last one is left showing. */
+  openProject: (id: string) => void;
+  /** Make a project, signed with the reviewer name, and open it. */
+  createProject: (asked: { name: string; description?: string }) => Promise<Project>;
+  /**
    * The review decisions the Durable tier restored, with the snapshot's
    * savedAt — kept so a server decision for the same record can be compared
    * against them: the later of the two wins (OF-BLD-012 §7.3).
@@ -795,6 +817,44 @@ export const useStore = create<OFState>()((set, get) => ({
 
   reviewer: '',
   setReviewerName: (name) => set({ reviewer: name }),
+
+  projects: null,
+  projectsProblem: null,
+  projectId: openProjectId(),
+
+  loadProjects: async () => {
+    let listed: Project[];
+    try {
+      listed = await call<Project[]>('/api/projects');
+    } catch (e) {
+      set({ projectsProblem: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    const open = get().projectId;
+    const keep = open && listed.some((p) => p.id === open) ? open : listed.length === 1 ? listed[0].id : null;
+    if (keep !== open) setOpenProjectId(keep);
+    set({ projects: listed, projectsProblem: null, projectId: keep });
+  },
+
+  openProject: (id) => {
+    if (id === get().projectId) return;
+    setOpenProjectId(id);
+    set({ projectId: id });
+    window.location.reload();
+  },
+
+  createProject: async (asked) => {
+    const by = reviewerName();
+    if (!by) throw new Error('Set your reviewer name in Settings first: a project is made in a person\'s name.');
+    const made = await call<Project>('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: asked.name, description: asked.description ?? '', by }),
+    });
+    set((s) => ({ projects: [...(s.projects ?? []), made] }));
+    get().openProject(made.id);
+    return made;
+  },
 
   // Outside seedState: a reset discards the session's work, not what the
   // person chose to see.

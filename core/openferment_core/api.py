@@ -16,6 +16,7 @@ The browser never sees a key and never renders model prose. It renders a plan.
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import os
@@ -30,7 +31,9 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, tools, witness
+from sqlalchemy.exc import InterfaceError, OperationalError
+
+from . import artifacts, biorepo, checks, db, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, projects, tools, witness
 from .corpus import load_corpus
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
@@ -77,6 +80,8 @@ from .models import (
     PracticeScenario,
     PracticeSession,
     PracticeTurnRequest,
+    Project,
+    ProjectCreate,
     ReplayResult,
     ReviewDecision,
     ToolInfo,
@@ -96,6 +101,65 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 log = logging.getLogger("openferment.api")
 
 app = FastAPI(title="openferment-core", version="0.1.0")
+
+
+# What acts in no project: health, and the projects themselves. A page that
+# remembers a project the database no longer holds can still ask these.
+UNSCOPED = ("/api/health", "/api/projects")
+
+
+# Starlette runs the middleware added last first, so this one, added before
+# the guard below, runs after it: a refused request never reaches the database.
+@app.middleware("http")
+async def act_in_the_named_project(request: Request, call_next):
+    """Every /api request acts in the project it names (ADR-005), in the
+    `X-OpenFerment-Project` header or `?project=`. A request that names one the
+    database does not hold stops here with a 404; one that names none goes on
+    in no project, and a store call it makes is refused with a 422."""
+    if not request.url.path.startswith("/api/"):
+        return await call_next(request)
+    named = request.headers.get(projects.HEADER) or request.query_params.get(projects.QUERY)
+    if named is None or request.url.path.startswith(UNSCOPED):
+        with projects.using(None):
+            return await call_next(request)
+    named = named.strip()
+    if not projects.valid_id(named):
+        return JSONResponse(status_code=422, content={"detail": f"{named!r} is not a project id"})
+    try:
+        known = await db.arun(projects.held(named))
+    except Exception as e:  # the database is down or unset: say so, never 500
+        return JSONResponse(status_code=503, content={"detail": _database_down(e)})
+    if not known:
+        return JSONResponse(status_code=404, content={"detail": f"no project named {named!r}"})
+    with projects.using(named):
+        return await call_next(request)
+
+
+def _database_down(e: Exception) -> str:
+    if isinstance(e, db.DatabaseUnavailable):
+        return str(e)
+    return (
+        f"The database did not answer ({e.__class__.__name__}). Start PostgreSQL (`pnpm db:up`) "
+        f"or check {db.URL_SETTING} in core/.env."
+    )
+
+
+@app.exception_handler(projects.ProjectRequired)
+async def _no_project(request: Request, e: projects.ProjectRequired) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": str(e)})
+
+
+@app.exception_handler(db.DatabaseUnavailable)
+async def _no_database(request: Request, e: db.DatabaseUnavailable) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(e)})
+
+
+@app.exception_handler(OperationalError)
+@app.exception_handler(InterfaceError)
+@app.exception_handler(ConnectionRefusedError)
+async def _database_unreachable(request: Request, e: Exception) -> JSONResponse:
+    log.warning("the database did not answer %s %s: %s", request.method, request.url.path, e)
+    return JSONResponse(status_code=503, content={"detail": _database_down(e)})
 
 
 @app.middleware("http")
@@ -264,7 +328,8 @@ def _stream_events(request: AskRequest):
         finally:
             events.put(None)
 
-    threading.Thread(target=work, name="ask-stream", daemon=True).start()
+    # The loop runs on a thread of its own, in this request's project.
+    threading.Thread(target=contextvars.copy_context().run, args=(work,), name="ask-stream", daemon=True).start()
     try:
         while (item := events.get()) is not None:
             yield _sse(*item)
@@ -1611,9 +1676,36 @@ def proposals_dismiss(proposal_id: str, action: ProposalAction) -> Proposal:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+# ── Projects (alpha 2.0, ADR-005) ─────────────────────────────────────────
+
+
+@app.get("/api/projects", response_model=list[Project])
+def projects_list() -> list[Project]:
+    """Every project, oldest first. Needs no project of its own."""
+    return projects.listed()
+
+
+@app.post("/api/projects", response_model=Project, status_code=201)
+def projects_create(asked: ProjectCreate) -> Project:
+    """Make a project; its id is made from the name unless one is given. A
+    taken id is a 409 that says so."""
+    try:
+        return projects.create(asked)
+    except projects.ProjectRefused as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+
+
+@app.get("/api/projects/{project_id}", response_model=Project)
+def projects_get(project_id: str) -> Project:
+    found = projects.get(project_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail=f"no project named {project_id!r}")
+    return found
+
+
 @app.get("/api/audit", response_model=list[AuditEntry])
 def audit_read(limit: int = 200) -> list[AuditEntry]:
-    """The newest lines of the audit log, newest last."""
+    """The newest rows of the project's audit log, newest last."""
     from . import audit
 
     return audit.read(max(1, min(limit, audit.MAX_READ)))

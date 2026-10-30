@@ -17,6 +17,7 @@ import type {
   Runbook,
 } from '@/data/types';
 import { IntakeDown } from './intake';
+import { apiFetch } from './project';
 
 /** The service refused what the model wrote, or the request, and said which rule held. */
 export class PracticeRefused extends Error {
@@ -32,7 +33,7 @@ export class PracticeRefused extends Error {
 async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await apiFetch(
       path,
       body === undefined
         ? { signal }

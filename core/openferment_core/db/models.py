@@ -46,7 +46,9 @@ metadata = MetaData(
 
 
 def _when(name: str = "created_at") -> Column:
-    return Column(name, TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
+    # The moment the row is written: now() would give every row of one
+    # transaction its start.
+    return Column(name, TIMESTAMP(timezone=True), nullable=False, server_default=func.clock_timestamp())
 
 
 def _project(primary: bool = False) -> Column:

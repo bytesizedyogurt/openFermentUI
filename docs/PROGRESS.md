@@ -16,17 +16,18 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 2, step 2.2** — projects: the `projects/` package (`current()`, `using()`,
-   create, get, list), `/api/projects`, every request naming its project (`X-OpenFerment-Project`
-   or `?project=`, set by a middleware, a 422 in words when a store call names none), the test
-   project the per-test binding prepares, and the client sending the header and choosing a
-   project (the last-open project in `durable.ts`).
+4. **Next step: stage 2, step 2.3** — the stores the service keeps alone move to their tables,
+   function names kept: `spend` (the day's cap across projects), `artifacts`, BioRepo's decisions
+   and the extraction candidates (with the import of `core/data/biorepo.json` by migration), then
+   Guild, checks, Practice, proposals and pureOS's kept trains. Each test that pointed a store at
+   a temporary file runs on the rolled-back database instead.
 5. Files in flight: none.
 
 ## Current stage
 
 Stage 2 — PostgreSQL and the record stores. 2.1 (the `db/` package, migrations, commands and the
-test database) is committed; 2.2 (projects) is next, then the stores one by one. Stage 1 is
+test database) and 2.2 (projects, request scoping, the audit log in its table) are committed;
+the stores follow one by one. Stage 1 is
 complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Blockers).
 
 ## Last green runs
@@ -42,6 +43,8 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | 2026-10-30 05:43 | `test:core` with 1.3 | 1888 passed, 2 skipped, 128 deselected | 4 min 12 s | 1.3 |
 | 2026-10-30 06:10 | Stage 1 gate in a clean worktree: `typecheck`, `build`, `test:core` | 1888 passed, 2 skipped, 128 deselected | 4 min 7 s | 1.6 |
 | 2026-10-30 06:10 | Stage 1 gate: `test_no_seed.py`, `test:sim`, `pnpm smoke` | 45 passed; 102 passed, 1916 deselected; 11 of 11 rail entries open | 4 s; 3 min 59 s; 22 s | 1.6 |
+| 2026-10-30 06:25 | `test:core` with 2.1 | 1905 passed, 2 skipped, 128 deselected | 4 min 33 s | 2.1 |
+| 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
 
@@ -204,3 +207,18 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
   `alembic` (greenlet's `MIT AND PSF-2.0` joins the allowed licence strings). `check:secrets`
   refuses a database address in the browser and a database password in a tracked file for a host
   off loopback.
+- 2.2 Projects (ADR-005, Implementation): the `projects` package (`current()`, `using()`, create,
+  get, list; ids made from names), `/api/projects`, and a middleware that sets each request's
+  project from `X-OpenFerment-Project` or `?project=` (404 for one the database does not hold,
+  422 for a malformed one, 503 in words when the database does not answer; health and the
+  project routes act in none). The audit log is the `audit` table (`audit.append` and `read`
+  keep their names, scoped to the current project); making a project is audited. The MCP server
+  reads `OPENFERMENT_PROJECT` and the database address from the environment or `core/.env` by
+  name. The client remembers the last-open project, names it on every call, opens the only one
+  held, and shows a chooser in the top bar and a notice above every screen while none is open.
+  `pnpm smoke` now makes a database of its own, makes a project through the API, checks every
+  screen opens inside it, and drops the database; `check:tools` runs its gated writes on a
+  database and project of its own. Threads take their project with them (the ask stream copies
+  its request's context; a thread a test starts finds `OPENFERMENT_PROJECT`). `test_projects.py`
+  holds the scoping rules. Migration 0001 was edited before any instance ran it: rows are timed
+  by `clock_timestamp()`, so the rows of one transaction keep their order.

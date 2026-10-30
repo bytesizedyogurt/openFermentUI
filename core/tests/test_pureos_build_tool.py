@@ -69,10 +69,10 @@ def worker(monkeypatch):
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch, worker):
-    """A throwaway data directory with the audit log and the proposals in it,
-    the stand-in pool as the run's, and the model the writes are marked with."""
+    """A throwaway data directory with the proposals in it (the audit log is
+    the test's own rolled-back database), the stand-in pool as the run's, and
+    the model the writes are marked with."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())
     monkeypatch.setenv("OPENFERMENT_MODEL", MODEL)
@@ -641,7 +641,6 @@ def real(monkeypatch, tmp_path):
     proforma.start(background=False)
     assert proforma.status()["status"] == "ready", proforma.status()
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(train_spec, "_SPECS", {})
     monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())

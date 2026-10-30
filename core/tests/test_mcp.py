@@ -110,7 +110,6 @@ def test_the_server_counts_every_module_tool_with_its_marks_and_gates():
 def test_a_gated_write_through_the_server_is_a_proposal_not_a_write(store, monkeypatch):
     from openferment_core import audit, proposals
 
-    monkeypatch.setattr(audit, "PATH", store / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", store / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     server = mcp_server.build()

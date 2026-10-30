@@ -40,7 +40,6 @@ def typed(family=BATCH, by=BY, **values):
 @pytest.fixture()
 def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(fermos, "_load_pool", lambda *a, **k: EMPTY)
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")

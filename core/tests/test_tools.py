@@ -371,7 +371,6 @@ def proforma_store(tmp_path, monkeypatch):
     import standins
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
@@ -506,7 +505,6 @@ def fermos_store(tmp_path, monkeypatch):
     from test_fermos_bind import STANDIN, pool_of, rec
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")

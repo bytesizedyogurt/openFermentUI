@@ -20,11 +20,11 @@ WRITES = [f"{m}_write" for m in module_stores.MODULES]
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch, pool):  # noqa: F811
-    """Every store the writes reach, under tmp_path."""
+    """Every file store the writes reach, under tmp_path; the audit log is
+    the test's rolled-back database."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
@@ -381,12 +381,11 @@ def test_the_endpoint_runs_a_write_tool_like_the_loop(pool, store, client):  # n
     assert [p.askId for p in proposals.open_ones()] == [None]
 
 
-def test_the_log_survives_a_damaged_line(store):
-    audit.append(agent="model", who="m", module="home", action="note", state="proposed")
-    with audit.PATH.open("a") as f:
-        f.write("{not json\n")
-    audit.append(agent="person", who="Ada", module="home", action="note", state="done")
-    assert [a.who for a in audit.read()] == ["m", "Ada"]
+def test_the_log_reads_its_newest_rows_newest_last(store):
+    for who in ("m", "Ada", "Grace"):
+        audit.append(agent="person", who=who, module="home", action="note", state="done")
+    assert [a.who for a in audit.read()] == ["m", "Ada", "Grace"]
+    assert [a.who for a in audit.read(limit=2)] == ["Ada", "Grace"]
 
 
 def test_the_audit_names_the_model_that_answered_not_the_chains_first(pool, store, monkeypatch):  # noqa: F811

@@ -7,6 +7,7 @@
 // reaches the service.
 import type { Check, CheckDismiss, CheckRecord, CheckRequest, Checks, CheckSchedule } from '@/data/types';
 import { IntakeDown } from './intake';
+import { apiFetch } from './project';
 
 export class CheckRefused extends Error {
   constructor(
@@ -21,7 +22,7 @@ export class CheckRefused extends Error {
 async function call<T>(path: string, body?: unknown): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await apiFetch(
       path,
       body === undefined ? undefined : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     );

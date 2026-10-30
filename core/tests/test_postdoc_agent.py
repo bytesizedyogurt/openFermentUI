@@ -529,7 +529,6 @@ def train_inlet(tmp_path, monkeypatch):
     for mod, name in ((catalogue, "_SPECS"), (train_spec, "_SPECS"), (train_spec, "_UNITS")):
         monkeypatch.setattr(mod, name, {})
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())
     run = pureos.run_train(spec_of())
