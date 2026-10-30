@@ -10,7 +10,8 @@ that stand.
 
 `write` refuses a decision when any of these hold, and says which:
 
-  record     recordId resolves to nothing in the seed or the candidates
+  record     recordId names no candidate the extractor produced in this
+             project, or kept with a decision
   reviewer   reviewer is empty, shorter than two characters, or one of the
              placeholders nobody is called ('you', 'me', 'reviewer', 'user',
              'test') — the decisions record who decided what
@@ -22,9 +23,8 @@ that stand.
              its own or the record's, because gold means "this sentence in
              this paper says this number" and a gold record without a
              sentence is a curated record wearing a badge
-  paper      the record's paper is neither a document the project holds nor
-             a corpus paper carrying a PMCID, DOI or PMID — a decision stands
-             on a text a reader can look up (§7.4)
+  paper      the record's paper is not a document the project holds — a
+             decision stands on a text a reader can look up (§7.4)
   unit       a typed value — corrected or gold — is not a number, or its unit
              does not convert into the field's canonical unit: §2.4 rule 4,
              applied to what a reviewer typed as well as to what the model
@@ -52,7 +52,6 @@ from sqlalchemy import insert, select
 from . import db, extract, projects
 from .basis import EstimateRefused, refuse_estimates
 from .literature import kit
-from .corpus import load_corpus
 from .db import models as t
 from .models import BioRepo, Candidate, Quantity, ReviewDecision
 from .units import UnitError, field as ontology_field, to_canonical
@@ -168,22 +167,18 @@ _HAND_ID = re.compile(rf"^{extract.MODEL_PREFIX}-(?P<paper>[A-Za-z0-9_]+)-[0-9]{
 
 def _held(paper_id: str) -> bool:
     """Whether a reader can look the paper up: a document the project holds
-    in its literature (the kit keeps its text and its citation), or a corpus
-    paper with a PMCID, DOI or PMID."""
-    paper = load_corpus().paper(paper_id) or {}
-    if paper.get("pmcid") or paper.get("doi") or paper.get("pmid"):
-        return True
+    in its literature, whose text and citation the kit keeps."""
     return db.run(kit.linked(projects.current(), paper_id)) is not None
 
 
-def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
+def _resolve(record_id: str) -> Candidate | None:
     """What this id names: the extractor's current candidate under it first —
     a decision is about what the extractor says NOW, and the copy kept with a
     decision is refreshed on write — then the copy kept with its standing
-    decision, then the seed record.
+    decision.
 
-    A candidate id names its paper ('cl1-T5-276fbb61'), so one paper's row is
-    read; a record id ('r-T5-1') names none, and no candidates are read."""
+    A candidate id names its paper ('cl1-T5-276fbb61'), so that paper's row
+    alone is read; an id that names no paper reads no candidates."""
     m = _CANDIDATE_ID.match(record_id)
     hand = _HAND_ID.match(record_id)
     response = extract.cached(m.group("paper")) if m else extract.hand(hand.group("paper")) if hand else None
@@ -193,14 +188,7 @@ def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
     for c in records():
         if c.id == record_id:
             return c
-    seed = load_corpus().record(record_id)
-    if seed is not None and seed.get("source", "seed") == "seed":
-        return seed
     return None
-
-
-def _field(rec: dict[str, Any] | Candidate, name: str) -> Any:
-    return rec.get(name) if isinstance(rec, dict) else getattr(rec, name, None)
 
 
 def _is_promotion(d: ReviewDecision) -> bool:
@@ -252,14 +240,14 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
     rec = _resolve(decision.recordId)
     if rec is None:
         raise WriteRefused(
-            "record", f"{decision.recordId} is not a seed record and not a candidate anyone extracted"
+            "record", f"{decision.recordId} is no candidate anyone extracted in this project"
         )
-    paper_id = _field(rec, "paperId")
+    paper_id = rec.paperId
     if not _held(paper_id):
         raise WriteRefused(
             "paper",
-            f"{decision.recordId} is on {paper_id}, which is neither a document this project holds nor a "
-            "paper carrying a PMCID, DOI or PMID; a decision stands on a text a reader can look up (§7.4)",
+            f"{decision.recordId} is on {paper_id}, which is not a document this project holds; a decision "
+            "stands on a text a reader can look up (§7.4)",
         )
     if _is_gold(decision) and decision.status != "verified":
         raise WriteRefused("status", f"a gold decision is a verified one; this one says {decision.status!r}")
@@ -267,10 +255,8 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
     # What a reviewer typed is held to §2.4 rule 4 like what the model
     # emitted — whatever the record's status, and BOTH typed values when a
     # decision carries a gold value and a correction: a number, in a unit
-    # that converts into the field's canonical unit. A correction on an
-    # unverified seed record still reaches corpus.json (an unverified
-    # candidate is not a record, and is not appended).
-    field_id = _field(rec, "field")
+    # that converts into the field's canonical unit.
+    field_id = rec.field
     categorical = bool((ontology_field(field_id) or {}).get("categorical"))
     for what, typed in (("gold", decision.gold), ("corrected", decision.corrected)):
         if typed is None or categorical:
@@ -304,35 +290,35 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
 
         # The quote a decision stands on: the decision's if it brought one,
         # else the record's own whenever there is a NUMBER to place — gold,
-        # or a correction, which becomes the record's value in corpus.json
-        # and has to sit in a sentence the paper wrote like any other (§6.9).
-        # Accept without a quote and without a typed value proceeds (§7.3).
+        # or a correction, which becomes the record's value and has to sit
+        # in a sentence the paper wrote like any other (§6.9). Accept
+        # without a quote and without a typed value proceeds (§7.3).
         quote = decision.quote
-        section_id = decision.sectionId or _field(rec, "sectionId")
+        section_id = decision.sectionId or rec.sectionId
         if quote is None and (_is_gold(decision) or typed):
-            quote = _field(rec, "quote")
+            quote = rec.quote
         if quote is not None:
             # Every value the promoted record will carry has to sit in the
             # quote: the correction (which becomes the record's value) and
             # the gold value, or the record's own when neither was typed.
             typed_values = [q for q in (decision.corrected, decision.gold) if q is not None]
             to_anchor: list[Quantity] = typed_values or [
-                Quantity(value=_field(rec, "value"), unit=_field(rec, "unit"))
+                Quantity(value=rec.value, unit=rec.unit)
             ]
             for value_unit in to_anchor:
                 raw = {
                     "sectionId": section_id,
-                    "field": _field(rec, "field"),
+                    "field": rec.field,
                     "value": value_unit.value,
                     "unit": value_unit.unit,
                     "quote": quote,
-                    "method": _field(rec, "method"),
+                    "method": rec.method,
                     # What the curators recorded about the value (F1.3). A
                     # gold decision on a record whose source states a range
                     # anchors on that range, with no reviewer edit; one on a
                     # recorded absence reads its zero out of the sentence.
-                    "range": _field(rec, "range"),
-                    "negativeResult": _field(rec, "negativeResult"),
+                    "range": rec.range,
+                    "negativeResult": rec.negativeResult,
                 }
                 _, rule, detail = anchor_candidate(
                     raw, sections, paper_id=paper_id, candidate_id=decision.recordId
@@ -348,7 +334,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
     if dry_run:
         return stored
     # The candidate the decision is about, kept with the decision.
-    db.run(_keep(projects.current(), stored, rec if isinstance(rec, Candidate) else None, undo=False))
+    db.run(_keep(projects.current(), stored, rec, undo=False))
     log.info(
         "biorepo: %s → %s%s by %s",
         decision.recordId,

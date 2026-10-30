@@ -1,13 +1,15 @@
-"""biorepo.write — one write function, four refusals (OF-BLD-012 §2.3, §7.1–7.2).
+"""biorepo.write — one write function and its refusals (OF-BLD-012 §2.3, §7.1–7.2).
 
 Every rule that keeps a bad decision out of the project's decisions has a
 test that presents that decision and reads the refusal's rule. Then the paths a
 good decision takes: a candidate a reviewer accepted or rejected is copied
-beside the decision, a rejection reaches Witness as a false positive, an
-accepted record survives a checkout that never ran the extractor, and a
-rejected record stops being retrieved. Offline: the papers and records are
-the fictional test corpus (fixtures/test-corpus.json), the structural JATS
-fixture stands in for T5's text, and the model call is stubbed.
+beside the decision, a rejection reaches Witness as a false positive, and an
+accepted record survives a later extraction run that drops it. Offline: the
+papers are fictional documents linked to the test's project, the candidates
+the rules are tried on are planted in the project's extraction rows with the
+structure anchoring reads (a range the source states, a recorded absence),
+the structural JATS fixture stands in for T5's text, and the model call is
+stubbed.
 """
 from __future__ import annotations
 
@@ -21,21 +23,24 @@ from sqlalchemy import delete, func, select
 from openferment_core import biorepo, db, extract, projects, witness
 from openferment_core.db import models as t
 from openferment_core.api import app
-from openferment_core.corpus import load_corpus
+from openferment_core.literature import kit
+from openferment_core.units import to_si
 
 from conftest import structural_passages
 from openferment_core.models import (
     BioRepo,
+    Candidate,
+    ExtractResponse,
     FetchedSection,
     Overlay,
     Quantity,
     ReviewDecision,
+    Usage,
 )
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 
-# The extractor found a titre in T5's table — a field the corpus has no T5
-# record for, so it is a new candidate.
+# The extractor found a titre in T5's table, a new candidate.
 NEW_TITRE = {
     "candidates": [
         {
@@ -46,15 +51,61 @@ NEW_TITRE = {
 }
 
 
+# The candidates the rules are tried on, by paper, each with what anchoring
+# reads: the sentence, its value and unit, and what was recorded about the
+# value. Fictional, like the papers.
+PLANTED: dict[str, list[dict]] = {
+    "T5": [
+        # The source states a range, 7-10 days; the value is its midpoint.
+        {"id": "cl1-T5-00000001", "field": "time_to_colony", "value": 8.5, "unit": "d",
+         "quote": "colonies appear on selection in 7–10 days for strain ab12", "range": {"low": 7, "high": 10}},
+        {"id": "cl1-T5-00000003", "field": "time_to_colony", "value": 17.5, "unit": "d",
+         "quote": "versus 15–20 days for strain cd34", "range": {"low": 15, "high": 20}},
+    ],
+    # 0.015 g/L, which the paper wrote as "15 mg/L".
+    "T2": [{"id": "cl1-T2-00000001", "field": "titer_secreted", "value": 0.015, "unit": "g L⁻¹",
+            "quote": "reaching a maximum of 15 mg/L"}],
+    # A recorded absence: value 0, and no digit in the sentence.
+    "T3": [{"id": "cl1-T3-00000003", "field": "secreted_fraction", "value": 0, "unit": "% of total expressed",
+            "quote": "the knockout strain hardly secreted any product at all and kept it in the cells",
+            "negativeResult": True}],
+    # A rate of 0.24 h-1 read off "0.12 h-1": arithmetic the sentence did not do.
+    "T4": [{"id": "cl1-T4-00000001", "field": "growth_rate_mu", "value": 0.24, "unit": "h⁻¹",
+            "quote": "a specific growth rate of 0.12 h-1 in the first phase"}],
+    # On a paper the project does not hold.
+    "T9": [{"id": "cl1-T9-00000001", "field": "final_biomass_density", "value": 3, "unit": "g L⁻¹",
+            "quote": "the biomass reached 3 g/L by the end of the run"}],
+}
+# The documents the project holds; T9 is not one of them.
+LINKED = ("T5", "T2", "T3", "T4")
+
 HELD: dict[str, list[dict]] = {}
 
 
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path, test_corpus, held_documents):
+def _offline(monkeypatch, tmp_path, held_documents):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
     global HELD
     HELD = held_documents
+    for paper_id in LINKED:
+        db.run(kit._link(projects.current(), paper_id, {}, "test"))
+
+
+def planted(record_id: str) -> dict:
+    """The candidate a test decides on, planted with the rest of its paper's
+    in the project's extraction row, as it was planted."""
+    paper_id = record_id.split("-")[1]
+    rows = PLANTED[paper_id]
+    if extract.cached(paper_id) is None:
+        candidates = []
+        for row in rows:
+            sv, su = to_si(row["value"], row["unit"])
+            candidates.append(Candidate(paperId=paper_id, sectionId="s1", si=Quantity(value=sv, unit=su),
+                                        confidence=0.8, **row))
+        extract._persist(ExtractResponse(paperId=paper_id, extractedAt="2026-09-14T12:00:00Z",
+                                         candidates=candidates, audit=[], usage=Usage(), calls=0))
+    return next(r for r in rows if r["id"] == record_id)
 
 
 def decision_rows() -> list[dict]:
@@ -109,24 +160,19 @@ def fetch_saying(paper_id: str, record_id: str, sentence: str) -> None:
     """A held document whose passage says this, under the passage id the
     record cites. Used where the test is about the anchoring rules and not
     about the kit."""
-    rec = load_corpus().record(record_id)
-    assert rec is not None, record_id
-    HELD[paper_id] = [FetchedSection(id=rec["sectionId"], heading="Results", text=sentence).model_dump()]
+    planted(record_id)
+    HELD[paper_id] = [FetchedSection(id="s1", heading="Results", text=sentence).model_dump()]
 
 
-def identified(paper_id: str) -> bool:
-    p = load_corpus().paper(paper_id) or {}
-    return bool(p.get("pmcid") or p.get("doi") or p.get("pmid"))
+def unfetched_record() -> str:
+    """A candidate on a document the project holds and this test has not
+    fetched the text of."""
+    return planted("cl1-T2-00000001")["id"]
 
 
-def unfetched_seed_record() -> str:
-    """A record on an identified paper nobody has fetched in this test."""
-    return next(r["id"] for r in load_corpus().records if r["paperId"] != "T5" and identified(r["paperId"]))
-
-
-def unidentified_seed_record() -> str:
-    """A record on a paper with no PMCID, DOI or PMID."""
-    return next(r["id"] for r in load_corpus().records if not identified(r["paperId"]))
+def unheld_record() -> str:
+    """A candidate on a paper the project does not hold."""
+    return planted("cl1-T9-00000001")["id"]
 
 
 # ── the file ───────────────────────────────────────────────────────────
@@ -148,7 +194,7 @@ def test_the_committed_file_is_the_model_and_starts_empty():
 
 def test_refuses_a_record_that_resolves_to_nothing():
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("r-NOPE-1", "rejected"))
+        biorepo.write(decision("cl1-T5-0000dead", "rejected"))
     assert caught.value.rule == "record"
     assert nothing_decided(), "a refusal writes nothing"
 
@@ -156,12 +202,12 @@ def test_refuses_a_record_that_resolves_to_nothing():
 @pytest.mark.parametrize("reviewer", [None, "", "   "])
 def test_refuses_an_empty_reviewer(reviewer):
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision(unfetched_seed_record(), "rejected", reviewer=reviewer))
+        biorepo.write(decision(unfetched_record(), "rejected", reviewer=reviewer))
     assert caught.value.rule == "reviewer"
 
 
 def test_refuses_a_promotion_on_a_paper_with_no_full_text():
-    rid = unfetched_seed_record()
+    rid = unfetched_record()
     with pytest.raises(biorepo.WriteRefused) as caught:
         biorepo.write(decision(rid, "verified"))
     assert caught.value.rule == "fulltext"
@@ -172,25 +218,27 @@ def test_refuses_a_promotion_on_a_paper_with_no_full_text():
 
 def test_refuses_a_promotion_whose_quote_fails_anchoring():
     fetch_t5()
+    planted("cl1-T5-00000001")
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("r-T5-1", "verified", quote="a sentence the paper never wrote"))
+        biorepo.write(decision("cl1-T5-00000001", "verified", quote="a sentence the paper never wrote"))
     assert caught.value.rule == "quote" and "rule 'quote'" in str(caught.value)
 
 
 def test_gold_needs_a_quote_that_anchors_its_own_will_not_do_here():
-    # T5's curated quote is about colonies; the structural fixture standing
-    # in for its text says nothing of the kind. Gold means "this sentence in
-    # this paper says this number", so without one, it is refused.
+    # The candidate's quote is about colonies; the structural fixture
+    # standing in for T5's text says nothing of the kind. Gold means "this
+    # sentence in this paper says this number", so without one, it is refused.
     fetch_t5()
+    planted("cl1-T5-00000001")
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("r-T5-1", "verified", provenance="gold", gold=Quantity(value=8.5, unit="d")))
+        biorepo.write(decision("cl1-T5-00000001", "verified", provenance="gold", gold=Quantity(value=8.5, unit="d")))
     assert caught.value.rule == "quote"
 
 
-def test_refuses_any_decision_on_a_paper_with_no_identifier():
-    # check:biorepo fails the build on such a decision (§7.4); the write
-    # function says so first, for a rejection as much as a promotion.
-    rid = unidentified_seed_record()
+def test_refuses_any_decision_on_a_paper_the_project_does_not_hold():
+    # A decision stands on a text a reader can look up (§7.4): for a
+    # rejection as much as a promotion.
+    rid = unheld_record()
     for status in ("rejected", "verified"):
         with pytest.raises(biorepo.WriteRefused) as caught:
             biorepo.write(decision(rid, status, rejectReason="x"))
@@ -203,18 +251,19 @@ def test_refuses_a_typed_value_whose_unit_does_not_convert():
     # or one of another family than the field's, is refused. Status does not
     # matter.
     fetch_t5()
+    planted("cl1-T5-00000001")
     for status in ("verified", "unverified"):
         with pytest.raises(biorepo.WriteRefused) as caught:
-            biorepo.write(decision("r-T5-1", status, corrected=Quantity(value=8.5, unit="furlongs")))
+            biorepo.write(decision("cl1-T5-00000001", status, corrected=Quantity(value=8.5, unit="furlongs")))
         assert caught.value.rule == "unit", status
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("r-T5-1", "verified", corrected=Quantity(value=8.5, unit="g/L")))
+        biorepo.write(decision("cl1-T5-00000001", "verified", corrected=Quantity(value=8.5, unit="g/L")))
     assert caught.value.rule == "unit"
     # In a unit of the field AND in the record's sentence (§6.9: a typed
     # number anchors like any other), it is stored — with the correction.
-    rec = load_corpus().record("r-T5-1")
-    fetch_saying("T5", "r-T5-1", f"In our hands, {rec['quote']}.")
-    stored = biorepo.write(decision("r-T5-1", "verified", corrected=Quantity(value=7, unit="d")))
+    rec = planted("cl1-T5-00000001")
+    fetch_saying("T5", "cl1-T5-00000001", f"In our hands, {rec['quote']}.")
+    stored = biorepo.write(decision("cl1-T5-00000001", "verified", corrected=Quantity(value=7, unit="d")))
     assert stored.corrected == Quantity(value=7, unit="d")
 
 
@@ -223,12 +272,13 @@ def test_both_typed_values_are_unit_checked_not_just_the_first():
     # each: a correction in the field's unit does not launder a gold in
     # another, and the other way round. The message names which one failed.
     fetch_t5()
+    planted("cl1-T5-00000001")
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("r-T5-1", "verified", provenance="gold",
+        biorepo.write(decision("cl1-T5-00000001", "verified", provenance="gold",
                                gold=Quantity(value=9, unit="furlongs"), corrected=Quantity(value=9, unit="d")))
     assert caught.value.rule == "unit" and "gold" in caught.value.why
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("r-T5-1", "verified", provenance="gold",
+        biorepo.write(decision("cl1-T5-00000001", "verified", provenance="gold",
                                gold=Quantity(value=9, unit="d"), corrected=Quantity(value=9, unit="furlongs")))
     assert caught.value.rule == "unit" and "corrected" in caught.value.why
     assert nothing_decided()
@@ -236,8 +286,9 @@ def test_both_typed_values_are_unit_checked_not_just_the_first():
 
 def test_refuses_gold_that_is_not_verified():
     fetch_t5()
+    planted("cl1-T5-00000001")
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("r-T5-1", "unverified", provenance="gold", gold=Quantity(value=8.5, unit="d")))
+        biorepo.write(decision("cl1-T5-00000001", "unverified", provenance="gold", gold=Quantity(value=8.5, unit="d")))
     assert caught.value.rule == "status"
 
 
@@ -246,10 +297,11 @@ def test_refuses_gold_that_is_not_verified():
 
 def test_accept_without_a_quote_proceeds_on_a_fetched_paper():
     fetch_t5()
-    stored = biorepo.write(decision("r-T5-1", "verified"))
+    planted("cl1-T5-00000001")
+    stored = biorepo.write(decision("cl1-T5-00000001", "verified"))
     assert stored.quote is None and stored.status == "verified"
-    assert biorepo.read().decisions["r-T5-1"] == stored
-    assert biorepo.read().records == [], "a seed record is not copied; the seed has it"
+    assert biorepo.read().decisions["cl1-T5-00000001"] == stored
+    assert [c.id for c in biorepo.read().records] == ["cl1-T5-00000001"], "the candidate is kept beside its decision"
 
 
 def test_gold_on_a_candidate_anchors_on_its_quote_and_keeps_both(monkeypatch):
@@ -295,9 +347,10 @@ def test_a_decided_candidate_outlives_its_extraction(monkeypatch):
 
 def test_a_decision_is_kept_as_sent_one_row_each_signed_by_its_reviewer():
     fetch_t5()
-    biorepo.write(decision("r-T5-1", "verified"))
+    planted("cl1-T5-00000001")
+    biorepo.write(decision("cl1-T5-00000001", "verified"))
     [row] = decision_rows()
-    assert row["recordId"] == "r-T5-1" and list(biorepo.decisions()) == ["r-T5-1"]
+    assert row["recordId"] == "cl1-T5-00000001" and list(biorepo.decisions()) == ["cl1-T5-00000001"]
     assert "quote" not in row, "None is left out, not written as null"
 
     async def signed() -> list[str]:
@@ -309,11 +362,12 @@ def test_a_decision_is_kept_as_sent_one_row_each_signed_by_its_reviewer():
 
 def test_every_decision_and_every_undo_stays_a_row_and_the_newest_holds():
     fetch_t5()
-    biorepo.write(decision("r-T5-1", "verified"))
-    biorepo.write(decision("r-T5-1", "rejected", rejectReason="on reflection"))
-    biorepo.write(decision("r-T5-1", "unverified", provenance="unverified"))
+    planted("cl1-T5-00000001")
+    biorepo.write(decision("cl1-T5-00000001", "verified"))
+    biorepo.write(decision("cl1-T5-00000001", "rejected", rejectReason="on reflection"))
+    biorepo.write(decision("cl1-T5-00000001", "unverified", provenance="unverified"))
     assert [r["status"] for r in decision_rows()] == ["verified", "rejected", "unverified"]
-    assert "r-T5-1" not in biorepo.decisions()
+    assert "cl1-T5-00000001" not in biorepo.decisions()
 
     async def count() -> int:
         async with db.session() as s:
@@ -331,36 +385,18 @@ def client():
 
 
 def test_decisions_endpoint_stores_or_refuses_with_the_rule(client):
-    rid = unfetched_seed_record()
+    rid = unfetched_record()
     ok = client.post("/api/biorepo/decisions", json=decision(rid, "rejected", rejectReason="x").model_dump())
     assert ok.status_code == 200 and ok.json()["recordId"] == rid
 
-    bad = client.post("/api/biorepo/decisions", json=decision("r-NOPE-1", "rejected").model_dump())
+    bad = client.post("/api/biorepo/decisions", json=decision("cl1-T5-0000dead", "rejected").model_dump())
     assert bad.status_code == 422 and bad.json()["detail"].startswith("record:")
 
     empty = client.post("/api/biorepo/decisions", json=decision(rid, "rejected", reviewer="").model_dump())
     assert empty.status_code == 422 and empty.json()["detail"].startswith("reviewer:")
 
 
-# ── retrieval honours a rejection (§7.4) ───────────────────────────────
-
-
-def test_a_rejected_record_is_resolvable_but_never_retrieved(tmp_path):
-    corpus = load_corpus()
-    raw = json.loads(Path(__file__).with_name("fixtures").joinpath("test-corpus.json").read_text())
-    # A record asked for in its own words is the top hit — until it is rejected.
-    target = raw["records"][0]
-    query = target["quote"]
-    assert [h["id"] for h in corpus.search(query)][0] == target["id"]
-    target["status"] = "rejected"
-    path = tmp_path / "corpus.json"
-    path.write_text(json.dumps(raw))
-    edited = load_corpus(str(path))
-    assert edited.record(target["id"]) is not None, "still resolvable — a decision may name it"
-    assert target["id"] not in [h["id"] for h in edited.search(query)]
-
-
-# ── the structure the curators recorded (OF-BLD-012.1 F1.3) ────────────
+# ── the structure recorded about a value (OF-BLD-012.1 F1.3) ───────────
 #
 # `write` builds the raw dict anchoring reads. Until F1.3 it passed the
 # value, the unit and the quote and nothing else, so a promotion on a record
@@ -368,47 +404,47 @@ def test_a_rejected_record_is_resolvable_but_never_retrieved(tmp_path):
 
 
 def test_gold_on_a_record_whose_source_states_a_range_anchors_on_that_range():
-    # r-T5-1: the curators recorded 7-10 days and wrote the midpoint down.
-    rec = load_corpus().record("r-T5-1")
+    # The source states 7-10 days, and the value is its midpoint.
+    rec = planted("cl1-T5-00000001")
     assert rec["range"] == {"low": 7, "high": 10} and rec["value"] == 8.5
-    fetch_saying("T5", "r-T5-1", f"In our hands, {rec['quote']}.")
+    fetch_saying("T5", "cl1-T5-00000001", f"In our hands, {rec['quote']}.")
     stored = biorepo.write(
-        decision("r-T5-1", "verified", provenance="gold", gold=Quantity(value=8.5, unit="d"))
+        decision("cl1-T5-00000001", "verified", provenance="gold", gold=Quantity(value=8.5, unit="d"))
     )
     assert stored.status == "verified"
-    assert biorepo.decisions()["r-T5-1"].quote == rec["quote"]
+    assert biorepo.decisions()["cl1-T5-00000001"].quote == rec["quote"]
 
 
 def test_gold_on_a_record_the_paper_wrote_in_another_unit_anchors():
-    # r-T2-1: curated 0.015 g/L; the paper wrote "a maximum of 15 mg/L".
-    rec = load_corpus().record("r-T2-1")
+    # 0.015 g/L; the paper wrote "a maximum of 15 mg/L".
+    rec = planted("cl1-T2-00000001")
     assert rec["value"] == 0.015 and rec.get("range") is None
-    fetch_saying("T2", "r-T2-1", f"Secretion improved, {rec['quote']}.")
+    fetch_saying("T2", "cl1-T2-00000001", f"Secretion improved, {rec['quote']}.")
     stored = biorepo.write(
-        decision("r-T2-1", "verified", provenance="gold", gold=Quantity(value=0.015, unit="g L\u207b\u00b9"))
+        decision("cl1-T2-00000001", "verified", provenance="gold", gold=Quantity(value=0.015, unit="g L\u207b\u00b9"))
     )
     assert stored.status == "verified"
 
 
 def test_gold_on_a_recorded_absence_reads_its_zero_from_the_sentence():
-    # r-T3-3: value 0, negativeResult, and a quote with no digit anywhere in
-    # it — the negation rule is the only thing that can anchor it.
-    rec = load_corpus().record("r-T3-3")
+    # Value 0, negativeResult, and a quote with no digit anywhere in it — the
+    # negation rule is the only thing that can anchor it.
+    rec = planted("cl1-T3-00000003")
     assert rec["value"] == 0 and rec["negativeResult"] is True
     assert not any(ch.isdigit() for ch in rec["quote"])
-    fetch_saying("T3", "r-T3-3", f"Even after prolonged incubation, {rec['quote']}.")
-    stored = biorepo.write(decision("r-T3-3", "verified", provenance="gold"))
+    fetch_saying("T3", "cl1-T3-00000003", f"Even after prolonged incubation, {rec['quote']}.")
+    stored = biorepo.write(decision("cl1-T3-00000003", "verified", provenance="gold"))
     assert stored.status == "verified"
 
 
 def test_gold_on_a_value_derived_from_the_quote_still_refuses_with_a_reason():
-    # r-T4-1: a rate of 0.24 h-1 read off "0.12 h-1". Doubling is
-    # arithmetic the sentence did not do, and no recorded structure licenses
-    # it — the reviewer is told to edit the value or record the derivation.
-    rec = load_corpus().record("r-T4-1")
-    fetch_saying("T4", "r-T4-1", f"The particle was {rec['quote']}.")
+    # A rate of 0.24 h-1 read off "0.12 h-1". Doubling is arithmetic the
+    # sentence did not do, and no recorded structure licenses it — the
+    # reviewer is told to edit the value or record the derivation.
+    rec = planted("cl1-T4-00000001")
+    fetch_saying("T4", "cl1-T4-00000001", f"The particle was {rec['quote']}.")
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("r-T4-1", "verified", provenance="gold"))
+        biorepo.write(decision("cl1-T4-00000001", "verified", provenance="gold"))
     assert caught.value.rule == "quote"
     assert "derived from the quote" in caught.value.why
 
@@ -418,25 +454,27 @@ def test_gold_on_a_value_derived_from_the_quote_still_refuses_with_a_reason():
 
 def test_a_dry_run_answers_the_same_and_writes_nothing():
     fetch_t5()
-    good = decision("r-T5-3", "verified")
+    planted("cl1-T5-00000003")
+    good = decision("cl1-T5-00000003", "verified")
     assert biorepo.write(good, dry_run=True).status == "verified"
     assert nothing_decided(), "a dry run is a question, not a decision"
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision(unfetched_seed_record(), "verified"), dry_run=True)
+        biorepo.write(decision(unfetched_record(), "verified"), dry_run=True)
     assert caught.value.rule == "fulltext"
     assert nothing_decided()
     # And the real write still stores it.
     biorepo.write(good)
-    assert "r-T5-3" in biorepo.decisions()
+    assert "cl1-T5-00000003" in biorepo.decisions()
 
 
 def test_the_check_endpoint_answers_ok_or_the_rule(client):
     fetch_t5()
-    ok = client.post("/api/biorepo/check", json=decision("r-T5-3", "verified").model_dump()).json()
+    planted("cl1-T5-00000003")
+    ok = client.post("/api/biorepo/check", json=decision("cl1-T5-00000003", "verified").model_dump()).json()
     assert ok == {"ok": True, "rule": None, "why": None}
     bad = client.post(
         "/api/biorepo/check",
-        json=decision(unfetched_seed_record(), "verified").model_dump(),
+        json=decision(unfetched_record(), "verified").model_dump(),
     )
     assert bad.status_code == 200, "a refusal is an answer, not an error"
     assert bad.json()["ok"] is False and bad.json()["rule"] == "fulltext"
@@ -449,51 +487,49 @@ def test_the_check_endpoint_answers_ok_or_the_rule(client):
 
 @pytest.mark.parametrize("name", ["you", "me", "Reviewer", "USER", "test", "x", " "])
 def test_refuses_a_reviewer_who_is_not_a_person(name):
-    # README: "a verified record is one a named reviewer promoted against a
-    # quote in the paper's own text". A corpus signed 'you' is signed by
-    # nobody, and the decisions are the record of who decided what.
+    # "A verified record is one a named reviewer promoted against a quote in
+    # the paper's own text." A record signed 'you' is signed by nobody, and
+    # the decisions are the record of who decided what.
     fetch_t5()
+    planted("cl1-T5-00000003")
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("r-T5-3", "verified", reviewer=name))
+        biorepo.write(decision("cl1-T5-00000003", "verified", reviewer=name))
     assert caught.value.rule == "reviewer"
     assert nothing_decided()
 
 
 def test_a_named_reviewer_is_stored():
     fetch_t5()
-    stored = biorepo.write(decision("r-T5-3", "verified", reviewer="Sean Creighton"))
+    planted("cl1-T5-00000003")
+    stored = biorepo.write(decision("cl1-T5-00000003", "verified", reviewer="Sean Creighton"))
     assert stored.reviewer == "Sean Creighton"
-    assert biorepo.decisions()["r-T5-3"].reviewer == "Sean Creighton"
+    assert biorepo.decisions()["cl1-T5-00000003"].reviewer == "Sean Creighton"
 
 
 # ── §6.9 — a typed number is held to the sentence like any other ────────
 
 
 def test_a_correction_with_no_quote_anchors_on_the_records_own_sentence():
-    # A decision that carried a corrected value and no quote skipped
-    # anchoring altogether, so a reviewer-typed number reached biorepo.json
-    # — and corpus.json, through the export's merge — without appearing in
-    # any sentence the paper wrote. The record's own sentence is the one it
-    # has to sit in, whatever the decision's status.
-    rec = load_corpus().record("r-T5-1")
-    fetch_saying("T5", "r-T5-1", f"In our hands, {rec['quote']}.")
+    # A decision that carried a corrected value and no quote once skipped
+    # anchoring altogether, so a reviewer-typed number was kept without
+    # appearing in any sentence the paper wrote. The record's own sentence is
+    # the one it has to sit in, whatever the decision's status.
+    rec = planted("cl1-T5-00000001")
+    fetch_saying("T5", "cl1-T5-00000001", f"In our hands, {rec['quote']}.")
     assert "9.9" not in rec["quote"]
     for status in ("verified", "unverified"):
         with pytest.raises(biorepo.WriteRefused) as caught:
-            biorepo.write(decision("r-T5-1", status, corrected=Quantity(value=9.9, unit="d")))
+            biorepo.write(decision("cl1-T5-00000001", status, corrected=Quantity(value=9.9, unit="d")))
         assert caught.value.rule == "quote", status
     # An endpoint of the range the sentence states is in the sentence.
-    stored = biorepo.write(decision("r-T5-1", "verified", corrected=Quantity(value=7, unit="d")))
+    stored = biorepo.write(decision("cl1-T5-00000001", "verified", corrected=Quantity(value=7, unit="d")))
     assert stored.corrected == Quantity(value=7, unit="d")
     assert stored.quote == rec["quote"], "the sentence the correction stands on is stored with it"
 
 
 def test_a_correction_on_an_unfetched_paper_is_refused_for_want_of_words():
-    rid = next(
-        r["id"] for r in load_corpus().records
-        if r["paperId"] != "T5" and identified(r["paperId"]) and isinstance(r["value"], (int, float))
-    )
-    rec = load_corpus().record(rid)
+    rid = unfetched_record()
+    rec = planted(rid)
     with pytest.raises(biorepo.WriteRefused) as caught:
         biorepo.write(decision(rid, "unverified", corrected=Quantity(value=rec["value"], unit=rec["unit"])))
     assert caught.value.rule == "fulltext"
@@ -527,9 +563,9 @@ def test_resolving_a_candidate_reads_its_own_papers_row_and_no_other(monkeypatch
     monkeypatch.setattr(extract, "all_cached", lambda: pytest.fail("scanned the whole cache"))
     stored = biorepo.write(decision("cl1-T5-276fbb61", "rejected", rejectReason="a placeholder row"))
     assert stored.recordId == "cl1-T5-276fbb61"
-    # A seed record never touches the extractor's cache at all.
-    fetch_saying("T5", "r-T5-3", "Selection used paromomycin.")
-    assert biorepo.write(decision("r-T5-3", "verified")).status == "verified"
+    # Another paper's candidate is read from that paper's row alone.
+    fetch_saying("T2", "cl1-T2-00000001", "Secretion improved, reaching a maximum of 15 mg/L.")
+    assert biorepo.write(decision("cl1-T2-00000001", "verified")).status == "verified"
 
 
 def test_a_candidate_id_names_a_paper_id_and_nothing_else(monkeypatch):

@@ -10396,7 +10396,7 @@
     },
     "/api/biorepo/overlay": {
       "get": {
-        "description": "What the service knows of the project's literature.\n\nPapers are the documents the project holds in the kit, with their\npassages (ADR-002); the run and the new candidates are recomputed from\nthe project's candidates against the values its reviewers typed (§6.2,\n`witness.reference_records`); the decisions come from the project's\ndecision rows (§7.2). The store applies whatever is here in one action at\nload, and nothing here changes a record's status — that path goes\nthrough `biorepo.write` alone.",
+        "description": "What the service knows of the project's literature.\n\nPapers are the documents the project holds in the kit, with their\npassages (ADR-002); the run and the new candidates are recomputed from\nthe project's candidates against the values its reviewers typed (§6.2,\n`witness.reviewed_records`); the decisions come from the project's\ndecision rows (§7.2). The store applies whatever is here in one action at\nload, and nothing here changes a record's status — that path goes\nthrough `biorepo.write` alone.",
         "operationId": "biorepo_overlay_api_biorepo_overlay_get",
         "parameters": [
           {

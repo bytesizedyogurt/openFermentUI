@@ -199,7 +199,7 @@ export interface paths {
          *     Papers are the documents the project holds in the kit, with their
          *     passages (ADR-002); the run and the new candidates are recomputed from
          *     the project's candidates against the values its reviewers typed (§6.2,
-         *     `witness.reference_records`); the decisions come from the project's
+         *     `witness.reviewed_records`); the decisions come from the project's
          *     decision rows (§7.2). The store applies whatever is here in one action at
          *     load, and nothing here changes a record's status — that path goes
          *     through `biorepo.write` alone.

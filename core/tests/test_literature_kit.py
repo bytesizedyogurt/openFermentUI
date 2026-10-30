@@ -264,7 +264,7 @@ def test_extraction_anchors_in_the_kits_passages_and_witness_scores_the_reviewer
         status="verified", provenance="curated", reviewer="A. Reader", recordId=candidate.id,
         at="2026-10-30T12:00:00Z", gold=Quantity(value=7, unit="g/L"),
     ))
-    assert witness.reference_records() == [{
+    assert witness.reviewed_records() == [{
         "id": candidate.id, "paperId": stored.document_id, "field": "titer_secreted", "value": 7.0, "unit": "g/L",
         "source": "biorepo",
     }]

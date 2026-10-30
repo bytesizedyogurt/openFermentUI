@@ -2,37 +2,34 @@
 
 `match_run` builds one RunOutput for 'claude-1' by holding every reference
 record on an extracted paper against the candidates the extractor produced
-for that paper and field. A reference record is a value a reviewer typed, a
-gold value or a correction (`reviewed_records`), or a corpus file's curated
-record where one is held; alpha 2.0 ships no corpus (ADR-010), so in a
-project the references are what its reviewers typed. The outcome vocabulary
-is the browser's, from
-`computeRunMetrics` in src/engine/metrics.ts, so Witness scores a real run
-with the same code it was written to score seeded ones:
+for that paper and field. A reference record is a value a project's reviewer
+typed, a gold value or a correction (`reviewed_records`): what a person typed
+is independent of the extractor. The outcome vocabulary is the browser's,
+from `computeRunMetrics` in src/engine/metrics.ts:
 
-  match           some candidate agrees with the seed value within 2 %, after
-                  unit conversion — `quantity_equals`, the mirror of the
+  match           some candidate agrees with the reference value within 2 %,
+                  after unit conversion — `quantity_equals`, the mirror of the
                   browser's `quantityEquals`, same tolerance
   span_error      no candidate agrees, but one that anchoring REFUSED for its
                   quote did. It never reached BioRepo; it still counts here,
                   because Witness measures the extractor and the extractor
                   produced it
   value_mismatch  a candidate in the field's unit family exists and none agrees
-  unit_error      candidates exist and none is in the seed record's unit family
+  unit_error      candidates exist and none is in the reference's unit family
   miss            no candidate for the field at all
 
 Only papers that have been extracted are scored. A fetched paper the
 extractor has not seen is not a paper it missed everything on.
 
-Candidates on an extracted paper for a field the seed has no record of are
-NEW records — the corpus growing — and they are not scored: there is nothing
-to score them against until a reviewer decides. They go to the overlay for
-Guild (§7). `RunOutput.falsePositives` lists one only after a reviewer
-rejects it; until then the screen says they are unscored.
+Candidates on an extracted paper for a field no reference covers are NEW
+records — the project's records growing — and they are not scored: there is
+nothing to score them against until a reviewer types a value. They go to the
+overlay for review (§7). `RunOutput.falsePositives` lists one only after a
+reviewer rejects it; until then the screen says they are unscored.
 
-Nothing here writes. The run is recomputed from candidates/*.json against the
-seed on every request, so a re-extraction or a review decision moves the
-numbers without a cache to invalidate.
+Nothing here writes. The run is recomputed from the project's candidates
+against its decisions on every request, so a re-extraction or a review
+decision moves the numbers without a cache to invalidate.
 """
 from __future__ import annotations
 
@@ -43,7 +40,6 @@ from collections.abc import Iterable
 from typing import Any
 
 from . import biorepo, extract
-from .corpus import load_corpus
 from .models import (
     Candidate,
     DroppedCandidate,
@@ -102,7 +98,7 @@ def _agrees(
     c_range: tuple[float, float] | None = None,
     r_range: tuple[float, float] | None = None,
 ) -> bool:
-    """Candidate against seed: strings case-insensitively, numbers within
+    """Candidate against reference: strings case-insensitively, numbers within
     tolerance after conversion. A candidate with no value agrees with nothing.
 
     When both sides record the same range, they are reporting the same
@@ -132,7 +128,7 @@ def _distance(
     c_range: tuple[float, float] | None = None,
     r_range: tuple[float, float] | None = None,
 ) -> float | None:
-    """How far a candidate is from a seed record, or None when they do not
+    """How far a candidate is from a reference, or None when they do not
     agree at all (OF-BLD-012.1 F6).
 
     Agreement is `_agrees`, which already converts and applies the tolerance;
@@ -166,16 +162,16 @@ def _quantity(value: Any, unit: str) -> Quantity | None:
 
 def match_run(
     candidates: list[Candidate],
-    seed_records: list[dict[str, Any]],
+    references: list[dict[str, Any]],
     *,
     papers: Iterable[str],
     dropped: list[DroppedCandidate] | None = None,
     run: str = RUN,
 ) -> ExtractRun:
-    """One RunOutput over the seed records of `papers` (§6.2).
+    """One RunOutput over the reference records of `papers` (§6.2).
 
     `papers` is the set of paper ids the extractor has actually run over;
-    seed records on any other paper are left out rather than counted as
+    references on any other paper are left out rather than counted as
     misses. `dropped` supplies the span_error cases.
 
     THE ALGORITHM (OF-BLD-012.1 F6). One candidate scores one record, and the
@@ -208,13 +204,13 @@ def match_run(
         if d.rule == "quote":
             dropped_by_key[(d.paperId, d.field)].append(d)
 
-    # One candidate scores one record. Several curated records can share a
+    # One candidate scores one record. Several references can share a
     # (paper, field) — three expression figures from one paper, or one
-    # sentence curated per strain — and scoring each against every candidate
+    # sentence typed per strain — and scoring each against every candidate
     # would let one extraction match twice, or count the siblings it never
     # addressed as value mismatches. Matches are taken first, consuming the
     # candidate; what remains is judged against what remains.
-    scored_records = [rec for rec in seed_records if rec["paperId"] in scored]
+    scored_records = [rec for rec in references if rec["paperId"] in scored]
     consumed: set[int] = set()
     consumed_dropped: set[int] = set()
     outcome_for: dict[str, ExtractRunResult] = {}
@@ -283,8 +279,8 @@ def match_run(
 
     results = [outcome_for[rec["id"]] for rec in scored_records]
 
-    # falsePositives stays empty here on purpose: a candidate the seed does
-    # not cover is unscored until a reviewer rejects it (§6.2, §7.3) —
+    # falsePositives stays empty here on purpose: a candidate no reference
+    # covers is unscored until a reviewer rejects it (§6.2, §7.3) —
     # `false_positives` below reads those rejections from the decisions.
     return ExtractRun(run=run, results=results, falsePositives=[])
 
@@ -314,26 +310,19 @@ def false_positives(
 
 def new_records(
     candidates: list[Candidate],
-    seed_records: list[dict[str, Any]],
+    references: list[dict[str, Any]],
     *,
     papers: Iterable[str],
 ) -> list[Candidate]:
-    """Candidates on an extracted paper for a field the seed has no record of.
-    These are the corpus growing; they go to Guild, not to the score."""
+    """Candidates on an extracted paper for a field no reference covers.
+    These are the project's records growing; they go to review, not to the
+    score."""
     scored = set(papers)
-    covered = {(r["paperId"], r["field"]) for r in seed_records}
+    covered = {(r["paperId"], r["field"]) for r in references}
     return [c for c in candidates if c.paperId in scored and (c.paperId, c.field) not in covered]
 
 
-# ── from the cache ─────────────────────────────────────────────────────
-
-
-def seed_records() -> list[dict[str, Any]]:
-    """The curated records of a corpus file, and only those (the tests'; alpha
-    2.0 ships none, ADR-010). Accepted candidates join the corpus (§7.4) with
-    `source: 'biorepo'`; a run scored against them would match the extractor
-    against itself, and a field they cover would stop looking new."""
-    return [r for r in load_corpus().records if r.get("source", "seed") == "seed"]
+# ── from the project's candidates and decisions ────────────────────────
 
 
 def reviewed_records(repo: Any | None = None) -> list[dict[str, Any]]:
@@ -356,15 +345,6 @@ def reviewed_records(repo: Any | None = None) -> list[dict[str, Any]]:
             "value": typed.value, "unit": typed.unit, "source": "biorepo",
         })
     return out
-
-
-def reference_records(repo: Any | None = None) -> list[dict[str, Any]]:
-    """What a run is scored against: the records reviewers typed a value for
-    (`reviewed_records`), and a corpus file's curated records where one is
-    held, a reviewed record first where both name one id."""
-    reviewed = reviewed_records(repo)
-    named = {r["id"] for r in reviewed}
-    return reviewed + [r for r in seed_records() if r["id"] not in named]
 
 
 @dataclass
@@ -419,8 +399,8 @@ def _gather() -> Gathered:
     return out
 
 
-def _run(g: Gathered, seed: list[dict[str, Any]]) -> ExtractRun:
-    run = match_run(g.current, seed, papers=g.papers, dropped=g.dropped)
+def _run(g: Gathered, references: list[dict[str, Any]]) -> ExtractRun:
+    run = match_run(g.current, references, papers=g.papers, dropped=g.dropped)
     # A rejected hand-written candidate is the model's mistake, not the extractor's.
     run.falsePositives = false_positives(
         [c for c in g.candidates if c.paperId in g.papers and not extract.by_hand(c.id)], g.decisions
@@ -435,7 +415,7 @@ def _run(g: Gathered, seed: list[dict[str, Any]]) -> ExtractRun:
         len(g.papers),
         len(run.results),
         ", ".join(f"{k}={v}" for k, v in sorted(outcomes.items())) or "nothing",
-        len(new_records(g.candidates, seed, papers=g.papers)),
+        len(new_records(g.candidates, references, papers=g.papers)),
         len(run.falsePositives),
     )
     return run
@@ -443,44 +423,29 @@ def _run(g: Gathered, seed: list[dict[str, Any]]) -> ExtractRun:
 
 def runs() -> list[ExtractRun]:
     """GET /api/witness/runs — recomputed from every paper's candidates against
-    the seed, with the reviewers' rejections from the decisions as the false
-    positives. Empty when nothing has been extracted: no run, no number."""
+    the values reviewers typed, with the reviewers' rejections from the
+    decisions as the false positives. Empty when nothing has been extracted:
+    no run, no number."""
     g = _gather()
     if not g.papers:
         return []
-    return [_run(g, reference_records())]
+    return [_run(g, reviewed_records())]
 
 
 def new_candidates() -> list[Candidate]:
-    """The candidates the seed has no record for (§6.2): the undecided ones
-    from the candidates, and every one a reviewer has decided, from the
-    decisions, so an accepted record is still a record where the extraction
-    is gone."""
+    """The candidates no reference covers (§6.2): the undecided ones from the
+    candidates, and every one a reviewer has decided, from the decisions, so
+    an accepted record is still a record where the extraction is gone."""
     g = _gather()
     decided = {c.id for c in biorepo.records()}
-    fresh = new_records(g.candidates, reference_records(), papers=g.papers) if g.papers else []
+    fresh = new_records(g.candidates, reviewed_records(), papers=g.papers) if g.papers else []
     return [c for c in fresh if c.id not in decided] + biorepo.records()
-
-
-def overlay_candidates() -> list[Candidate]:
-    """`overlay.candidates` (§2.1, §7.3): EVERY candidate, not only the new
-    ones. A candidate that matches a seed record's field is not a record —
-    the seed has one — but it is what the review card shows beside that
-    record: the extractor's reading of the same paper, and the span a
-    promotion carries when the curated quote is not in the fetched text. The
-    browser sorts new from matching with the seed in hand; the decisions
-    travel in `overlay.records`."""
-    return _gather().candidates
 
 
 def overlay_bundle() -> tuple[list[ExtractRun], list[Candidate], dict[str, ReviewDecision]]:
     """Runs, candidates and decisions for the overlay, from ONE read of the
     candidates and the decisions — the store asks on every page load and after
-    every extraction. A missing corpus.json costs the run, not the rest."""
+    every extraction."""
     g = _gather()
-    try:
-        runs_ = [_run(g, reference_records())] if g.papers else []
-    except FileNotFoundError as e:
-        log.warning("overlay without runs — %s", e)
-        runs_ = []
+    runs_ = [_run(g, reviewed_records())] if g.papers else []
     return runs_, g.candidates, g.decisions
