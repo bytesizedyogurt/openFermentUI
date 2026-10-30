@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from openferment_core import intake
+from openferment_core.literature import collectors
 from openferment_core.intake import (
     NetworkRefused,
     cached,
@@ -625,7 +626,7 @@ def test_a_5xx_from_the_lookup_is_transient_too(monkeypatch):
     import httpx
 
     request = httpx.Request("GET", "https://www.ebi.ac.uk/europepmc/search")
-    monkeypatch.setattr(intake, "_get", lambda *a, **k: httpx.Response(503, request=request))
+    monkeypatch.setattr(collectors, "_get", lambda *a, **k: httpx.Response(503, request=request))
     with pytest.raises(intake.Transient):
         intake.resolve_pmcid({"id": "X4", "doi": "10.1/x"})
     r = fetch_paper({"id": "X4", "doi": "10.1/x"})

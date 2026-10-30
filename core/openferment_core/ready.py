@@ -14,8 +14,9 @@ check is one search. The key itself is never printed, in whole or in part.
 
 The last line is the lane (OF-BLD-014 A.4), what this machine can run:
 `full` with a key the Models API accepted and Europe PMC answering,
-`model-only` with that key alone, `none` otherwise. The `huggingface` row is optional: a
-blocked host is a warning, and it never changes the exit code. Nor does the
+`model-only` with that key alone, `none` otherwise. The `huggingface` row is a
+warning at most, and it never changes the exit code: FastEmbed's model file
+comes from there once (the `embedder` row). Nor does the
 `graphviz` row (OF-BLD-019 D8): without `dot`, Proforma lists a flowsheet's
 units where its diagram would be.
 """
@@ -45,8 +46,7 @@ MARKS = {"ok": "✓", "warn": "!", "fail": "✗", "skip": "·"}
 PLACEHOLDER_KEY = "sk-ant-..."
 # A paper with a PMCID in the seed: B5's, the one the offline demo replays.
 PROBE_PMCID = "PMC8471596"
-# Where the meaning-match search lanes download their one model file from
-# (OF-BLD-014 §4.2).
+# Where FastEmbed fetches its model file from, once (ADR-002).
 HUGGINGFACE = "https://huggingface.co"
 LANES = ("full", "model-only", "none")
 # Where api.py mounts the build from, worked out the same way and kept equal to
@@ -149,6 +149,102 @@ def check_intake() -> Check:
     if complete == 0:
         return Check("intake", "warn", f"{summary}. Fetch now: scripts/host/nightly.sh (or pnpm intake:fetch --all)")
     return Check("intake", "ok", summary)
+
+
+# ── the literature layer (ADR-002) ─────────────────────────────────────
+
+
+def check_literature() -> Check:
+    """Sci RAG Kit's side of the database, as its own `sci-rag doctor` sees it:
+    the vector extension, the kit's schema at its newest revision, a vector
+    column of FastEmbed's dimension, its domain profile, and every chunk
+    embedded by the model the service embeds with now."""
+    import asyncio
+
+    from sqlalchemy import pool, text
+
+    from . import migrations
+    from .literature import DOMAIN_DIR, EMBEDDING_DIM, kit
+
+    try:
+        url = db.database_url()
+    except db.DatabaseUnavailable as e:
+        return Check("literature", "fail", str(e))
+
+    async def ask() -> tuple[str | None, int | None, int, int, dict[str, int]]:
+        engine = db.make_engine(url, search_path=kit.SEARCH_PATH, poolclass=pool.NullPool)
+        try:
+            async with engine.connect() as c:
+                vector = (await c.execute(text("SELECT extversion FROM pg_extension WHERE extname = 'vector'"))).scalar()
+                if vector is None:
+                    return None, None, 0, 0, {}
+                width = (await c.execute(text(
+                    "SELECT atttypmod FROM pg_attribute WHERE attrelid = to_regclass('sci_rag.chunks') "
+                    "AND attname = 'embedding'"
+                ))).scalar()
+                if width is None:
+                    return vector, None, 0, 0, {}
+                documents = (await c.execute(text("SELECT count(*) FROM sci_rag.documents"))).scalar_one()
+                versions = dict((await c.execute(text(
+                    "SELECT coalesce(embedding_version, 'none'), count(*) FROM sci_rag.chunks GROUP BY 1"
+                ))).all())
+                return vector, width, documents, sum(versions.values()), versions
+        finally:
+            await engine.dispose()
+
+    try:
+        vector, width, documents, chunks, versions = asyncio.run(ask())
+        at, head = migrations.at_head(url)[kit.SCHEMA]
+    except Exception as e:  # the server's own words are the row's answer
+        return Check("literature", "fail", f"the kit's schema could not be read ({type(e).__name__}: {e})")
+    if vector is None:
+        return Check("literature", "fail", "the database has no vector extension. As its owner or a superuser, run "
+                     "CREATE EXTENSION vector; (pgvector: brew install pgvector, or the pgvector/pgvector image), "
+                     "then pnpm db:migrate")
+    if at != head or width is None:
+        return Check("literature", "fail", f"Sci RAG Kit's schema is at revision {at or 'none'} of {head}. Run: pnpm db:migrate")
+    if width != EMBEDDING_DIM:
+        return Check("literature", "fail", f"the kit's vector column holds {width} dimensions and FastEmbed gives "
+                     f"{EMBEDDING_DIM}: the schema was made for another embedder")
+    try:
+        from sci_rag.domain import load_domain
+
+        load_domain(DOMAIN_DIR)
+    except Exception as e:  # a broken profile is the row's answer, in words
+        return Check("literature", "fail", f"the domain profile in {DOMAIN_DIR} does not load: {e}")
+    summary = f"pgvector {vector}, revision {head}, {documents} documents, {chunks} chunks"
+    current = kit.FastEmbedProvider(kit.EMBEDDING_MODEL, dim=EMBEDDING_DIM).version
+    stale = {v: n for v, n in versions.items() if v != current}
+    if stale:
+        return Check("literature", "warn", f"{summary}; {sum(stale.values())} chunks embedded by "
+                     f"{', '.join(sorted(stale))}, not {current}: they rank against other vectors until re-embedded")
+    return Check("literature", "ok", summary)
+
+
+def check_embedder() -> Check:
+    """FastEmbed's model file: every document collected is embedded with it,
+    on this machine. Loaded from the cache alone, so this row needs no
+    network; a model not cached yet is fetched by the first collection."""
+    from .literature import EMBEDDING_CACHE, EMBEDDING_MODEL
+
+    try:
+        from fastembed import TextEmbedding
+
+        TextEmbedding(model_name=EMBEDDING_MODEL, cache_dir=str(EMBEDDING_CACHE), local_files_only=True)
+    except Exception:
+        return Check("embedder", "warn", f"{EMBEDDING_MODEL} is not in {EMBEDDING_CACHE} yet: the first document "
+                     "collected fetches it from huggingface.co (the huggingface row says whether that host answers)")
+    return Check("embedder", "ok", f"{EMBEDDING_MODEL}, from {EMBEDDING_CACHE}")
+
+
+def check_rag() -> Check:
+    """The kit's REST app at /rag asks every client for a key (ADR-002)."""
+    from .literature import kit
+
+    if os.environ.get(kit.RAG_KEY, "").strip():
+        return Check("rag", "ok", f"/rag answers a client that sends the key in {kit.RAG_KEY}")
+    return Check("rag", "warn", f"/rag refuses every request: no {kit.RAG_KEY} in core/.env. Set one to search "
+                 "the literature from another program; the app itself does not need it")
 
 
 # ── what this document added (OF-BLD-014 §10.2) ───────────────────────
@@ -341,11 +437,11 @@ def check_europe_pmc() -> Check:
 
 
 def check_huggingface() -> Check:
-    """Optional, so a warning at most: the two hybrid search lanes need one
-    model download from here, and the other lanes work without it."""
+    """A warning at most: FastEmbed's model file comes from here the first
+    time (the embedder row says whether it is cached), and nothing else does."""
     if intake.fixtures_only():
         return Check("huggingface", "skip", "OPENFERMENT_FIXTURES is set")
-    gap = "so the two hybrid search lanes will report themselves unavailable"
+    gap = "so a document cannot be collected until FastEmbed's model file is cached"
     try:
         r = httpx.head(HUGGINGFACE, timeout=10, follow_redirects=True)
     except httpx.HTTPError as e:
@@ -432,7 +528,8 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True)
     checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
     # §10.R: one damaged file must not stop the report; a row that cannot be
     # checked says why and the rest still run.
-    for name, row in (("models", check_models), ("artifacts", check_artifacts),
+    for name, row in (("literature", check_literature), ("embedder", check_embedder), ("rag", check_rag),
+                      ("models", check_models), ("artifacts", check_artifacts),
                       ("spend", check_spend), ("workers", lambda: check_workers(workers)), ("graphviz", check_graphviz)):
         try:
             checks.append(row())

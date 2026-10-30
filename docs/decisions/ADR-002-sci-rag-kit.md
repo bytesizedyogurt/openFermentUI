@@ -48,6 +48,70 @@ Two adaptations, both offered upstream:
 - `SCI_RAG_EMBEDDING_DIM` is fixed to the FastEmbed model's dimension before the first migration.
 - BioRepo → Search, PaperReader and the retrieval report read the kit.
 
+## Implementation (stage 3, 2026-10-30)
+
+- **Where the kit lives.** `core/openferment_core/literature/`: `kit.py` builds the kit's objects
+  once per process; `collectors.py` turns what openFerment fetches or is given into the kit's
+  corpus entries; `fastembed.py` is the embedder; `domain/` is openFerment's domain profile with
+  the kit's fifteen prompts; `kit_alembic/` holds the kit's six migrations from the pinned commit
+  with its licence, and an `env.py` of ours. They sit in the package beside `kit.py` rather than
+  under `core/vendor/`, so the deployed tree finds them where the code is.
+- **Settings.** Importing `openferment_core` writes the kit's `SCI_RAG_EMBEDDING_*` and
+  `SCI_RAG_DOMAIN_DIR` into the environment first, because `sci_rag.db.models` sizes its vector
+  column when first imported; `kit.py` refuses to load if the kit was imported with another
+  dimension. The `Settings` object openFerment hands the kit reads only the values given and the
+  kit's defaults: neither `SCI_RAG_*` names in the environment nor a `.env` in the working
+  directory reach it.
+- **Embedder and model.** FastEmbed with `BAAI/bge-small-en-v1.5` (384 dimensions), version
+  `fastembed:BAAI/bge-small-en-v1.5@384`, its model file cached in `FASTEMBED_CACHE_PATH` or
+  `~/.cache/fastembed`. Every kit object is handed it; `sci_rag.embed.get_embedder` and
+  `sci_rag.llm.get_llm` (and the names the kit's modules imported) answer with openFerment's
+  embedder and model client for any kit path that asks them. The model client is
+  `llm.kit_client`, installed by the composition root (`api.py`, `literature_mcp.py`): every
+  generation the kit makes (answers, HyDE, a document's graph) is a call through `llm.call`, under
+  the day's cap, with the key read in one place. The kit's `extraction` role is our `index` role;
+  `answer` and `judge` are `answer`. A model key of a caller's own (the kit's `byo_llm`) is
+  refused everywhere.
+- **The project is the scope.** A document is stored once (the kit's content hash) with source
+  `project:<id>:<collector>`; `documents_link` holds a row per project that holds it, with the
+  selection (collector, identifier, licence as stated, reason, who). `kit.ProjectService`, the
+  kit's `RagService` with every read narrowed to the current project, serves the in-process
+  calls, `/rag` and the MCP server alike: the sources of the project's documents go to the kit
+  as its `sources` allowlist and the other documents of those sources as
+  `exclude_document_ids`, so a shared document is visible to each project that linked it and to
+  no other. Which documents a project holds is read through openFerment's own session, the one
+  a test's transaction binds. The concept graph's entities and communities are the instance's;
+  the community layer is off for every scoped request, as the kit makes it.
+- **Engines.** asyncpg ties a connection to its loop. The calls openFerment makes run on the
+  database loop through a pooled engine whose connections put `sci_rag, public` on the search
+  path; it is installed as the kit's own engine, so `ingest_entries` uses it. `/rag` and the MCP
+  server use an engine that keeps no connection between sessions.
+- **Migrations.** `python -m openferment_core.migrations` (`pnpm db:migrate`, `pnpm db:reset`)
+  runs our history and then the kit's, each version table in its own schema. The kit's `env.py`
+  makes the `vector` extension in `public` first; a database whose owner may not make it gets it
+  from its template or from a superuser (`pnpm ready` says which).
+- **Collectors.** Europe PMC (a PMCID, a DOI or `PMID:<id>`; JATS split by section, a table as a
+  pipe table so the kit keeps it as one block), OSTI (`OSTI:<id>` or an osti.gov address; the PDF
+  a page a section, the record for the citation), SGD (a yeastgenome.org address), an upload (PDF,
+  JATS XML, Markdown, HTML, text) and pasted text. A bare number is refused, since a PMID and an
+  OSTI id look alike. The licence the source states maps to the kit's classes and fails closed
+  (`collectors.licence_class`); for an upload or a paste the person chooses the class.
+- **Surfaces.** `POST /api/intake/collect`, `/api/intake/upload`, `/api/intake/paste`, `GET
+  /api/literature/documents`, `/api/literature/stats`; the Intake screen's "Add to this project"
+  card. The kit's REST app is mounted at `/rag` with its key check on: the key is
+  `OPENFERMENT_RAG_KEY` in `core/.env`, and with none set a key made in memory and never shown
+  stands in, so `/rag` refuses every request rather than running open as the kit does with no
+  keys. Its CORS origins are empty, a `/rag` request names its project as an `/api` request does,
+  and the kit's `/mcp` endpoint is left out of the mount. The MCP server runs over stdio
+  (`.mcp.json`: `sci-rag`, `python -m openferment_core.literature_mcp`), reading the database
+  address and the project from `core/.env` as openFerment's own MCP server does.
+- **Tests.** Outside the `lit` marker the kit embeds with its deterministic local embedder, so
+  test:core needs no model file; `pnpm test:lit` runs the tests marked `lit` with FastEmbed. CI's
+  verify gets a `pgvector/pgvector:pg17` service and the model file from a cache.
+- **`pnpm ready`** adds three rows: `literature` (the vector extension, the kit's revision, the
+  column's dimension, the domain profile, chunks embedded by another model), `embedder` (the
+  model file cached) and `rag` (whether a key is set).
+
 ## Revisit condition
 
 The kit drops async SQLAlchemy or changes its ingestion contract; a second literature engine is

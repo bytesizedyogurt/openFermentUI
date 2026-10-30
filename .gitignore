@@ -95,3 +95,4 @@ core/data/spend.json.lock
 # machine like the proposals; not on the data branch.
 core/data/pureos-trains.json
 core/data/pureos-trains.json.lock
+.cache/

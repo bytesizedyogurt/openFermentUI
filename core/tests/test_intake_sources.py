@@ -21,6 +21,7 @@ from pypdf import PdfReader, PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from openferment_core import intake
+from openferment_core.literature import collectors
 from openferment_core.intake import NetworkRefused, cached, fetch_paper, split_pdf, split_sgd, status_of
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -165,7 +166,7 @@ def fixture_root(monkeypatch, tmp_path):
     (root / "sgd").mkdir()
     (root / "osti" / "1013269.pdf").write_bytes(pdf(*REPORT))
     shutil.copy(SGD_ENTRY, root / "sgd" / "S000203483.json")
-    monkeypatch.setattr(intake, "FIXTURE_ROOT", root)
+    monkeypatch.setattr(collectors, "FIXTURE_ROOT", root)
     return root
 
 
@@ -224,26 +225,26 @@ def test_an_outage_is_not_cached_and_a_page_in_place_of_a_pdf_is(monkeypatch):
         return get
 
     paper = {"id": "Q1", "sourceUrl": OSTI_URL}
-    monkeypatch.setattr(intake, "_get", answer(httpx.Response(503, request=request)))
+    monkeypatch.setattr(collectors, "_get", answer(httpx.Response(503, request=request)))
     r = fetch_paper(paper)
     assert r.status == "failed:fetch" and "503" in (r.reason or "") and cached("Q1") is None
     assert asked[-1].get("follow_redirects") is True, "the purl's redirects are followed"
 
-    monkeypatch.setattr(intake, "_get", answer(httpx.ConnectError("down", request=request)))
+    monkeypatch.setattr(collectors, "_get", answer(httpx.ConnectError("down", request=request)))
     assert fetch_paper(paper).status == "failed:fetch" and cached("Q1") is None
 
     page = httpx.Response(200, headers={"content-type": "text/html"}, content=b"<html>sign in</html>", request=request)
-    monkeypatch.setattr(intake, "_get", answer(page))
+    monkeypatch.setattr(collectors, "_get", answer(page))
     r = fetch_paper(paper, force=True)
     assert r.status == "failed:fetch" and "not a PDF" in (r.reason or "") and cached("Q1") is not None
 
-    monkeypatch.setattr(intake, "_get", answer(httpx.Response(404, request=request)))
+    monkeypatch.setattr(collectors, "_get", answer(httpx.Response(404, request=request)))
     assert fetch_paper(paper, force=True).status == "failed:fetch" and "404" in cached("Q1").reason
 
     # Served as octet-stream, a PDF is still a PDF by its first bytes.
     data = pdf(*REPORT)
     stream = httpx.Response(200, headers={"content-type": "application/octet-stream"}, content=data, request=request)
-    monkeypatch.setattr(intake, "_get", answer(stream))
+    monkeypatch.setattr(collectors, "_get", answer(stream))
     assert fetch_paper(paper, force=True).status == "complete"
 
 

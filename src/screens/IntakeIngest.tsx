@@ -1,6 +1,8 @@
-// Ingest (OF-DES-001 §8.5, OF-BLD-012 §5.4). The queue on the left is the
-// one live input method; the pipeline board on the right shows what happened
-// to each paper that entered it.
+// Ingest (OF-DES-001 §8.5, OF-BLD-012 §5.4). The card at the top left adds a
+// document to the open project's corpus in Sci RAG Kit, by its identifier, as
+// a file or as pasted text (ADR-002; CollectCard). The queue below it and the
+// pipeline board on the right are the corpus papers' path, which extraction
+// reads until it reads the kit's text.
 //
 // TWO PATHS, LABELLED. When openferment-core is running, "Fetch" is a real
 // network request: the service asks Europe PMC for the JATS, splits it, and
@@ -29,6 +31,7 @@ import { href } from '@/router';
 import { START_COMMAND } from '@/lib/postdoc';
 import { fetchSourceName } from '@/lib/intake';
 import { OwnerTabs } from '@/components/OwnerTabs';
+import { CollectCard } from '@/components/CollectCard';
 import { INTAKE_TABS } from '@/data/tabs';
 import {
   Button,
@@ -259,22 +262,16 @@ export default function IntakeIngest() {
         title="Ingest papers"
         subtitle={
           <>
-            A paper enters the corpus here or not at all. Fetch asks Europe PMC for the open-access
-            full text and splits it into sections, so a record&rsquo;s quote can anchor to the
-            paper&rsquo;s own words rather than to a curation note.{' '}
-            {(() => {
-              const pmcid = papers.filter((p) => p.pmcid).length;
-              const doiOnly = papers.filter((p) => !p.pmcid && p.doi).length;
-              return (
-                <>
-                  Of the <span className="font-num">{papers.length}</span> entries,{' '}
-                  <span className="font-num">{pmcid}</span> carry a PMCID and are fetchable,{' '}
-                  <span className="font-num">{doiOnly}</span> carry a DOI alone and are looked up once,
-                  and <span className="font-num">{papers.length - pmcid - doiOnly}</span> carry
-                  neither.
-                </>
-              );
-            })()}
+            A document enters the open project here: a paper from Europe PMC, a report from OSTI, a
+            strain entry from the Saccharomyces Genome Database, a file or pasted text. It is split
+            into passages, embedded on this machine and kept with the licence it states, so a
+            record&rsquo;s quote can anchor to the document&rsquo;s own words.
+            {papers.length > 0 && (
+              <>
+                {' '}Of the <span className="font-num">{papers.length}</span> corpus entries below,{' '}
+                <span className="font-num">{papers.filter((p) => p.pmcid).length}</span> carry a PMCID.
+              </>
+            )}
           </>
         }
         actions={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
@@ -294,10 +291,10 @@ export default function IntakeIngest() {
       )}
       {live && (
         <div className="mb-4">
-          <Callout kind="info" title="Live — fetching through openferment-core">
-            Fetch makes a real request to Europe PMC and the paper&rsquo;s own sections replace the
-            curation note. Chunk, Embed and Extract are not built and the board says so rather than
-            ticking them off.
+          <Callout kind="info" title="Live — collecting through openferment-core">
+            Add to this project fetches what an identifier names, or takes a file or pasted text,
+            and stores it in the project&rsquo;s corpus. The ingest queue and the pipeline follow
+            the corpus papers, whose text extraction reads.
           </Callout>
         </div>
       )}
@@ -305,6 +302,7 @@ export default function IntakeIngest() {
       <div className="grid grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)] gap-5 items-start">
         {/* ── LEFT: input methods ───────────────────────────────────── */}
         <div className="space-y-4">
+          <CollectCard />
           <Card className="p-3">
             <SectionTitle
               right={

@@ -1,0 +1,78 @@
+# openFerment's domain profile for Sci RAG Kit (ADR-002).
+#
+# What the kit's graph extractor looks for, and how HyDE writes its
+# hypothetical passage, in the language of bioprocess development. The
+# prompts/ folder beside this file is the kit's own (BSD-3-Clause,
+# LICENSE-sci-rag-kit); this file is openFerment's. It names kinds of things
+# and how they relate; it holds no value of any kind.
+
+name: "openFerment bioprocess literature"
+description: >
+  Organisms, constructs, cultivation and downstream processing, and the
+  measured outcomes reported for them: what a project reads to design,
+  run and cost a fermentation.
+
+entity_types:
+  - name: Organism
+    description: "A host or production organism, a strain or a cell line (Saccharomyces cerevisiae CEN.PK, E. coli BL21)"
+  - name: Construct
+    description: "A genetic change or construct: a gene, promoter, deletion, plasmid or integration"
+  - name: Product
+    description: "What the process makes: a protein, a small molecule, a polymer, biomass"
+  - name: Substrate
+    description: "A carbon or nitrogen source, a feedstock or a medium component"
+  - name: Process
+    description: "A cultivation or recovery step: batch, fed-batch or continuous culture, centrifugation, chromatography"
+  - name: Condition
+    description: "An operating condition: temperature, pH, aeration, feed profile, scale"
+  - name: Measure
+    description: "A measured quantity: titre, yield, productivity, growth rate, purity, recovery"
+  - name: Equipment
+    description: "A vessel, reactor, column or instrument"
+  - name: Organization
+    description: "A lab, company or facility"
+
+relation_types:
+  - name: PRODUCES
+    description: "An organism or process makes a product"
+  - name: CARRIES
+    description: "An organism carries a construct"
+  - name: GROWN_ON
+    description: "An organism is grown on a substrate"
+  - name: RUN_UNDER
+    description: "A process is run under a condition"
+  - name: MEASURED_AS
+    description: "An organism, process or product has a reported measure"
+  - name: RECOVERED_BY
+    description: "A product is recovered by a downstream step"
+  - name: REQUIRES
+    description: "A step needs an input, a condition or equipment"
+  - name: AFFECTS
+    description: "A change, a condition or a construct influences an outcome"
+
+# HyDE writes a hypothetical passage in the register of the section that
+# would answer the question; keywords are matched against the question.
+query_classes:
+  - name: strain
+    keywords: [strain, host, organism, gene, construct, deletion, overexpression, promoter, plasmid, pathway]
+    hyde_instruction: >
+      Write as a strain construction section would: name the host, the genetic
+      changes and how they were made, and what each change was for.
+  - name: cultivation
+    keywords: [fermentation, cultivation, batch, fed-batch, continuous, medium, feed, aeration, temperature, ph, bioreactor]
+    hyde_instruction: >
+      Write as a methods and results section on cultivation would: name the
+      organism, the medium and feed, the operating conditions and the scale,
+      and report the outcomes with their units.
+  - name: performance
+    keywords: [titre, titer, yield, productivity, rate, growth, conversion, concentration]
+    hyde_instruction: >
+      Write as a results section reporting process performance would: name
+      what was measured, under which conditions, with units and the basis of
+      each value.
+  - name: downstream
+    keywords: [purification, recovery, harvest, centrifugation, filtration, chromatography, extraction, lysis, purity]
+    hyde_instruction: >
+      Write as a downstream processing section would: name each unit
+      operation in order, its inputs and conditions, and the recovery and
+      purity reported for it.

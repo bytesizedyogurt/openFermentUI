@@ -113,12 +113,14 @@ async def arun(coro: Coroutine[Any, Any, T]) -> T:
 # ── The engine ────────────────────────────────────────────────────────────
 
 
-def make_engine(url: URL | str, **kw: Any) -> AsyncEngine:
-    """An engine for `url` whose connections put `public` alone on the search
-    path. Our tables are always named with their schema; the pinned path keeps
-    reflection honest, because a role named `openferment` would otherwise find
-    its own schema first (`"$user"`) and reflection would call it the default."""
-    return create_async_engine(as_async(url), connect_args={"server_settings": {"search_path": "public"}}, **kw)
+def make_engine(url: URL | str, *, search_path: str = "public", **kw: Any) -> AsyncEngine:
+    """An engine for `url` whose connections put `search_path` on their search
+    path, `public` alone unless told otherwise. Our tables are always named
+    with their schema; the pinned path keeps reflection honest, because a role
+    named `openferment` would otherwise find its own schema first (`"$user"`)
+    and reflection would call it the default. Sci RAG Kit's engine names its
+    own schema first (literature/kit.py)."""
+    return create_async_engine(as_async(url), connect_args={"server_settings": {"search_path": search_path}}, **kw)
 
 
 _ENGINE: AsyncEngine | None = None

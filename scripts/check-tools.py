@@ -102,6 +102,7 @@ os.environ.setdefault("OPENFERMENT_FIXTURES", "1")
 # below run against a database of this check's own, made on the tests'
 # server (OPENFERMENT_TEST_DATABASE_URL) and dropped on the way out, in a
 # project of its own.
+from openferment_core import migrations  # noqa: E402
 from openferment_core.db import migrate  # noqa: E402
 
 SERVER = os.environ.get("OPENFERMENT_TEST_DATABASE_URL", "").strip() or \
@@ -114,7 +115,7 @@ except Exception as e:  # noqa: BLE001 (the server's own words go to the reader)
           "or set OPENFERMENT_TEST_DATABASE_URL.")
     sys.exit(1)
 atexit.register(migrate.drop, DATABASE, SERVER)
-migrate.upgrade(_url)
+migrations.upgrade(_url)
 os.environ["OPENFERMENT_DATABASE_URL"] = _url.render_as_string(hide_password=False)
 os.environ["OPENFERMENT_PROJECT"] = "check-tools"
 

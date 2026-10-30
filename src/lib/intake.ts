@@ -51,7 +51,7 @@ export class IntakeDown extends Error {
  * and 422 are statuses our own service produces (unknown paper; bad body) and
  * mean it is up; anything else is ambiguous, so ask health which it was.
  */
-async function explain(response: Response, signal?: AbortSignal): Promise<never> {
+export async function explain(response: Response, signal?: AbortSignal): Promise<never> {
   if (response.status !== 404 && response.status !== 422) {
     try {
       await postdocHealth(signal);

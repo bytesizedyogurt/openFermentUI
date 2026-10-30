@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,6 +34,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import InterfaceError, OperationalError
 
 from . import artifacts, biorepo, checks, db, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, projects, tools, witness
+from .literature import kit
 from .corpus import load_corpus
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
@@ -54,6 +55,8 @@ from .models import (
     ExtractRun,
     FermosFitRequest,
     FermosFitResponse,
+    CollectOutcome,
+    CollectRequest,
     FetchResult,
     ForecastRequest,
     ParamResolveRequest,
@@ -74,7 +77,9 @@ from .models import (
     GuildPolicy,
     GuildWithdrawal,
     IntakeStatus,
+    LiteratureDocument,
     Overlay,
+    PasteRequest,
     Practice,
     PracticeDraftRequest,
     PracticeScenario,
@@ -112,11 +117,11 @@ UNSCOPED = ("/api/health", "/api/projects")
 # the guard below, runs after it: a refused request never reaches the database.
 @app.middleware("http")
 async def act_in_the_named_project(request: Request, call_next):
-    """Every /api request acts in the project it names (ADR-005), in the
-    `X-OpenFerment-Project` header or `?project=`. A request that names one the
-    database does not hold stops here with a 404; one that names none goes on
-    in no project, and a store call it makes is refused with a 422."""
-    if not request.url.path.startswith("/api/"):
+    """Every /api and /rag request acts in the project it names (ADR-005), in
+    the `X-OpenFerment-Project` header or `?project=`. A request that names one
+    the database does not hold stops here with a 404; one that names none goes
+    on in no project, and a store call it makes is refused with a 422."""
+    if not request.url.path.startswith(("/api/", "/rag/")):
         return await call_next(request)
     named = request.headers.get(projects.HEADER) or request.query_params.get(projects.QUERY)
     if named is None or request.url.path.startswith(UNSCOPED):
@@ -1125,6 +1130,102 @@ def intake_extract(paper_id: str, force: bool = False) -> ExtractResponse:
         paper_id, len(result.candidates), result.rejected, result.usage.costUsd,
     )
     return result
+
+
+# ── the literature layer: collection into Sci RAG Kit (ADR-002) ─────────
+
+# The kit generates through llm.py: its answers, HyDE's passages and a
+# document's graph are model calls like any other, under the day's cap.
+kit.install_model(llm.kit_client)
+
+#: The largest file Intake takes, in bytes.
+MAX_UPLOAD = 50 * 1024 * 1024
+
+
+def _collected(outcome: CollectOutcome) -> CollectOutcome:
+    log.info(
+        "intake: %s %s → %s%s", outcome.collector, outcome.identifier, outcome.status,
+        f" ({outcome.reason})" if outcome.reason else "",
+    )
+    return outcome
+
+
+@app.post("/api/intake/collect", response_model=CollectOutcome)
+def intake_collect(request: CollectRequest) -> CollectOutcome:
+    """A paper, a report or a strain entry by its identifier, fetched by the
+    collector that serves it, stored in the kit and linked to the project.
+
+    Not collected is HTTP 200 with `status: failed` and the reason: the
+    Intake board renders it, and a 5xx would render as nothing."""
+    return _collected(intake.collect(request.identifier, project_id=projects.current(), by=request.by,
+                                     reason=request.reason))
+
+
+@app.post("/api/intake/upload", response_model=CollectOutcome)
+def intake_upload(
+    file: UploadFile = File(...),
+    by: str = Form(..., min_length=1, max_length=200),
+    title: str = Form("", max_length=500),
+    licenceClass: str = Form("unknown", max_length=40),
+    licence: str = Form("", max_length=2000),
+    reason: str = Form("", max_length=2000),
+) -> CollectOutcome:
+    """A file a person uploads (PDF, JATS XML, Markdown, HTML or text),
+    stored in the kit and linked to the project. 413 past MAX_UPLOAD."""
+    project_id = projects.current()
+    data = file.file.read(MAX_UPLOAD + 1)
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(status_code=413, detail=f"{file.filename} is larger than {MAX_UPLOAD // (1024 * 1024)} MB")
+    return _collected(intake.upload(file.filename or "", data, project_id=project_id, by=by, title=title,
+                                    licence_class=licenceClass, licence=licence, reason=reason))
+
+
+@app.post("/api/intake/paste", response_model=CollectOutcome)
+def intake_paste(request: PasteRequest) -> CollectOutcome:
+    """Text a person pastes, under its title, stored in the kit and linked to the project."""
+    return _collected(intake.paste(request.title, request.text, project_id=projects.current(), by=request.by,
+                                   url=request.url, licence_class=request.licenceClass, licence=request.licence,
+                                   reason=request.reason))
+
+
+@app.get("/api/literature/documents", response_model=list[LiteratureDocument])
+def literature_documents() -> list[LiteratureDocument]:
+    """Every document the project holds, newest first, with the selection
+    that brought each in."""
+    return [
+        LiteratureDocument(
+            documentId=d.id, title=d.title, authors=list(d.authors or []), year=d.publication_year, doi=d.doi,
+            journal=d.journal, citation=d.formatted_citation, source=d.source, sourceRef=d.source_ref,
+            licenceClass=d.license_class, chunks=d.chunk_count, collector=(link["selection"] or {}).get("collector"),
+            selection=link["selection"] or {}, linkedBy=link["created_by"], linkedAt=link["created_at"].isoformat(),
+        )
+        for d, link in kit.documents(projects.current())
+    ]
+
+
+@app.get("/api/literature/stats")
+def literature_stats() -> dict[str, Any]:
+    """The project's documents and chunks in the kit, by source, licence class
+    and embedding version; the concept graph's size is the instance's."""
+    return kit.stats(projects.current())
+
+
+class _KitREST:
+    """The kit's REST app at /rag (ADR-002), built on its first request and
+    again whenever the kit is pointed at another database, so it always
+    serves the engine the kit holds now."""
+
+    def __init__(self) -> None:
+        self._built: tuple[int, Any] | None = None
+
+    async def __call__(self, scope, receive, send) -> None:
+        generation = kit.generation()
+        if self._built is None or self._built[0] != generation:
+            self._built = (generation, kit.rest_app())
+        await self._built[1](scope, receive, send)
+
+
+app.mount("/rag", _KitREST(), name="rag")
 
 
 # ── the overlay (OF-BLD-012 §2.1) ───────────────────────────────────────

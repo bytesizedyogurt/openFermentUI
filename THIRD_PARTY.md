@@ -22,14 +22,14 @@ accepted licence strings, and every package a person accepted, are in
 | appdirs | 1.4.4 | MIT | the geneOS worker, through cobra | allowed |
 | asttokens | 3.0.2 | Apache 2.0 | the geneOS worker, through biorefineries, biosteam | allowed |
 | asyncpg | 0.32.0 | Apache-2.0 | service | allowed |
-| attrs | 26.1.0 | MIT | extra agent, through mcp | allowed |
+| attrs | 26.1.0 | MIT | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | biopython | 1.88 | LicenseRef-Biopython-License-Agreement | service | allowed |
 | biorefineries | 2.35.1 | MIT | the geneOS worker | allowed |
 | biosteam | 2.54.0 | MIT | the geneOS worker | allowed |
 | certifi | 2026.7.22 | MPL-2.0 | service, through httpx | accepted by Sean Creighton on 2026-10-14 |
-| cffi | 2.1.1 | MIT-0 | extra agent, through mcp | allowed |
+| cffi | 2.1.1 | MIT-0 | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | chaospy | 4.3.21 | MIT license | the geneOS worker, through biorefineries, biosteam | allowed |
-| charset-normalizer | 3.5.2 | MIT | extra rag, through fastembed | allowed |
+| charset-normalizer | 3.5.2 | MIT | extra lit, through fastembed, sci-rag-kit | allowed |
 | chemicals | 1.5.2 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | click | 8.4.2 | BSD-3-Clause | service, through uvicorn | allowed |
 | cloudpickle | 3.1.2 | BSD-3-Clause | the geneOS worker, through biorefineries | allowed |
@@ -38,35 +38,38 @@ accepted licence strings, and every package a person accepted, are in
 | colorpalette | 0.3.3 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | contourpy | 1.4.0 | BSD-3-Clause | the geneOS worker, through biorefineries, biosteam | allowed |
 | CoolProp | 8.0.0 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
-| cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause | extra agent, through mcp | allowed |
+| cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | cycler | 0.12.1 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | depinfo | 2.2.0 | Apache-2.0 | the geneOS worker, through cobra | allowed |
 | dill | 0.4.1 | BSD-3-Clause | the geneOS worker, through biorefineries | allowed |
+| distro | 1.9.0 | License :: OSI Approved :: Apache Software License | extra lit, through sci-rag-kit | allowed |
 | docstring_parser | 0.18.0 | MIT | service, through anthropic | allowed |
 | et_xmlfile | 2.0.0 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | executing | 2.3.0 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | fastapi | 0.141.1 | MIT | service | allowed |
-| fastembed | 0.9.0 | Apache-2.0 | extra rag | allowed |
-| filelock | 4.2.0 | MIT | extra rag, through fastembed | allowed |
-| flatbuffers | 25.12.19 | Apache 2.0 | extra rag, through fastembed | allowed |
+| fastembed | 0.9.0 | Apache-2.0 | extra lit | allowed |
+| filelock | 4.2.0 | MIT | extra lit, through fastembed | allowed |
+| flatbuffers | 25.12.19 | Apache 2.0 | extra lit, through fastembed | allowed |
 | flexcache | 0.3 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | flexparser | 0.4 | BSD-3-Clause | the geneOS worker, through biorefineries, biosteam | allowed |
 | flexsolve | 0.5.10 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | fluids | 1.3.1 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | fonttools | 4.67.0 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
-| fsspec | 2026.9.0 | BSD-3-Clause | extra rag, through fastembed | allowed |
+| fsspec | 2026.9.0 | BSD-3-Clause | extra lit, through fastembed | allowed |
 | future | 1.0.0 | MIT | the geneOS worker, through cobra | allowed |
+| google-auth | 2.62.0 | Apache 2.0 | extra lit, through sci-rag-kit | allowed |
+| google-genai | 2.34.0 | Apache-2.0 | extra lit, through sci-rag-kit | allowed |
 | graphviz | 0.21 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | greenlet | 3.5.6 | MIT AND PSF-2.0 | service, through sqlalchemy | allowed |
 | h11 | 0.16.0 | MIT | service, through anthropic, httpx, uvicorn | allowed |
 | hensmith | 0.1.2 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
-| hf-xet | 1.7.0 | Apache-2.0 | extra rag, through fastembed | allowed |
+| hf-xet | 1.7.0 | Apache-2.0 | extra lit, through fastembed | allowed |
 | httpcore | 1.0.9 | BSD-3-Clause | service, through httpx | allowed |
 | httpcore2 | 2.12.0 | BSD-3-Clause | service, through anthropic | allowed |
 | httptools | 0.8.0 | MIT | service, through uvicorn | allowed |
 | httpx | 0.28.1 | BSD-3-Clause | service | allowed |
 | httpx2 | 2.12.0 | BSD-3-Clause | service, through anthropic | allowed |
-| huggingface_hub | 1.33.0 | Apache-2.0 | extra rag, through fastembed | allowed |
+| huggingface_hub | 1.33.0 | Apache-2.0 | extra lit, through fastembed | allowed |
 | idna | 3.19 | BSD-3-Clause | service, through anthropic, fastapi, httpx, uvicorn | allowed |
 | ImageIO | 2.38.1 | BSD-2-Clause | the geneOS worker, through biorefineries, biosteam | allowed |
 | importlib_metadata | 9.0.1 | Apache-2.0 | the geneOS worker, through biorefineries, biosteam | allowed |
@@ -76,94 +79,104 @@ accepted licence strings, and every package a person accepted, are in
 | jedi | 0.20.1 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | jiter | 0.16.0 | MIT | service, through anthropic | allowed |
 | joblib | 1.6.0 | BSD-3-Clause | the geneOS worker, through biorefineries | allowed |
-| jsonschema | 4.26.0 | MIT | extra agent, through mcp | allowed |
-| jsonschema-specifications | 2025.9.1 | MIT | extra agent, through mcp | allowed |
+| jsonschema | 4.26.0 | MIT | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
+| jsonschema-specifications | 2025.9.1 | MIT | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | kiwisolver | 1.5.1 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | llvmlite | 0.50.0 | BSD-2-Clause AND Apache-2.0 WITH LLVM-exception | the geneOS worker, through biorefineries, biosteam | allowed |
-| loguru | 0.7.3 | License :: OSI Approved :: MIT License | extra rag, through fastembed | allowed |
+| loguru | 0.7.3 | License :: OSI Approved :: MIT License | extra lit, through fastembed | allowed |
 | Mako | 1.4.3 | MIT | service, through alembic | allowed |
-| markdown-it-py | 4.2.0 | License :: OSI Approved :: MIT License | the geneOS worker, through cobra | allowed |
+| markdown-it-py | 4.2.0 | License :: OSI Approved :: MIT License | extra lit, through sci-rag-kit; the geneOS worker, through cobra | allowed |
 | MarkupSafe | 3.0.4 | BSD-3-Clause | service, through alembic | allowed |
 | matplotlib | 3.11.2 | License :: OSI Approved :: Python Software Foundation License | the geneOS worker, through biorefineries, biosteam | allowed |
 | matplotlib-inline | 0.2.2 | BSD-3-Clause | the geneOS worker, through biorefineries, biosteam | allowed |
-| mcp | 2.3.0 | MIT | extra agent | allowed |
-| mcp-types | 2.3.0 | MIT | extra agent, through mcp | allowed |
-| mdurl | 0.1.2 | License :: OSI Approved :: MIT License | the geneOS worker, through cobra | allowed |
-| mmh3 | 5.3.1 | License :: OSI Approved :: MIT License | extra rag, through fastembed | allowed |
+| mcp | 2.3.0 | MIT | extra agent; extra lit, through sci-rag-kit | allowed |
+| mcp-types | 2.3.0 | MIT | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
+| mdurl | 0.1.2 | License :: OSI Approved :: MIT License | extra lit, through sci-rag-kit; the geneOS worker, through cobra | allowed |
+| mmh3 | 5.3.1 | License :: OSI Approved :: MIT License | extra lit, through fastembed | allowed |
 | mpmath | 1.3.0 | License :: OSI Approved :: BSD License | the geneOS worker, through cobra | allowed |
 | multiprocess | 0.70.19 | BSD-3-Clause | the geneOS worker, through biorefineries | allowed |
 | narwhals | 2.27.1 | MIT | the geneOS worker, through biorefineries | allowed |
 | numba | 0.68.0 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | numpoly | 1.3.9 | BSD-2-Clause | the geneOS worker, through biorefineries, biosteam | allowed |
 | numpy | 2.5.2 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | service, through biopython, rank-bm25 | allowed |
-| onnxruntime | 1.31.0 | MIT License | extra rag, through fastembed | allowed |
+| onnxruntime | 1.31.0 | MIT License | extra lit, through fastembed | allowed |
 | openpyxl | 3.1.5 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
-| opentelemetry-api | 1.45.1 | Apache-2.0 | extra agent, through mcp | allowed |
+| opentelemetry-api | 1.45.1 | Apache-2.0 | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | optlang | 1.9.1 | Apache-2.0 | the geneOS worker, through cobra | allowed |
-| packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | tests, through pytest; extra rag, through fastembed; the geneOS worker, through biorefineries, biosteam | allowed |
+| packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | tests, through pytest; extra lit, through fastembed; the geneOS worker, through biorefineries, biosteam | allowed |
 | pandas | 2.3.3 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam, cobra | allowed |
 | parso | 0.8.7 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | pexpect | 4.9.0 | ISC license | the geneOS worker, through biorefineries, biosteam | allowed |
-| pillow | 12.3.0 | MIT-CMU | extra rag, through fastembed; the geneOS worker, through biorefineries, biosteam | allowed |
+| pgvector | 0.5.1 | MIT | extra lit, through sci-rag-kit | allowed |
+| pillow | 12.3.0 | MIT-CMU | extra lit, through fastembed; the geneOS worker, through biorefineries, biosteam | allowed |
 | Pint | 0.26.1 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | platformdirs | 4.13.0 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | pluggy | 1.6.0 | MIT | tests, through pytest | allowed |
-| prompt_toolkit | 3.0.53 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
-| protobuf | 7.36.2 | 3-Clause BSD License | extra rag, through fastembed | allowed |
+| prompt_toolkit | 3.0.53 | License :: OSI Approved :: BSD License | extra lit, through sci-rag-kit; the geneOS worker, through biorefineries, biosteam | allowed |
+| protobuf | 7.36.2 | 3-Clause BSD License | extra lit, through fastembed | allowed |
 | psutil | 7.2.2 | BSD-3-Clause | the geneOS worker, through biorefineries, biosteam | allowed |
 | ptyprocess | 0.7.0 | License :: OSI Approved :: ISC License (ISCL) | the geneOS worker, through biorefineries, biosteam | allowed |
 | pure_eval | 0.2.4 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
-| py_rust_stemmers | 0.1.8 | no licence metadata | extra rag, through fastembed | accepted by Sean Creighton on 2026-10-15 |
-| pycparser | 3.11 | BSD-3-Clause | extra agent, through mcp | allowed |
+| py_rust_stemmers | 0.1.8 | no licence metadata | extra lit, through fastembed | accepted by Sean Creighton on 2026-10-15 |
+| pyasn1 | 0.6.5 | BSD-2-Clause | extra lit, through sci-rag-kit | allowed |
+| pyasn1_modules | 0.4.2 | License :: OSI Approved :: BSD License | extra lit, through sci-rag-kit | allowed |
+| pycparser | 3.11 | BSD-3-Clause | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | pydantic | 2.13.4 | MIT | service | allowed |
 | pydantic_core | 2.46.4 | MIT | service, through anthropic, fastapi, pydantic | allowed |
+| pydantic-settings | 2.16.2 | MIT | extra lit, through sci-rag-kit | allowed |
 | pydot | 4.0.1 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | pyglet | 2.1.19 | no licence metadata | the geneOS worker, through biorefineries, biosteam | accepted by Sean Creighton on 2026-10-15 |
-| Pygments | 2.21.0 | BSD-2-Clause | tests, through pytest; the geneOS worker, through biorefineries, biosteam, cobra | allowed |
-| PyJWT | 2.15.1 | MIT | extra agent, through mcp | allowed |
+| Pygments | 2.21.0 | BSD-2-Clause | tests, through pytest; extra lit, through sci-rag-kit; the geneOS worker, through biorefineries, biosteam, cobra | allowed |
+| PyJWT | 2.15.1 | MIT | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | pyparsing | 3.3.3 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | pypdf | 6.21.1 | BSD-3-Clause | service | allowed |
 | pytest | 9.1.1 | MIT | tests | allowed |
 | python-dateutil | 2.9.0.post0 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam, cobra | allowed |
 | python-dotenv | 1.2.3 | BSD-3-Clause | service | allowed |
 | python-libsbml | 5.21.2 | LGPL | the geneOS worker, through cobra | accepted by Sean Creighton on 2026-10-15 |
-| python-multipart | 0.0.32 | Apache-2.0 | extra agent, through mcp | allowed |
+| python-multipart | 0.0.32 | Apache-2.0 | service | allowed |
 | pytz | 2026.5 | MIT | the geneOS worker, through biorefineries, biosteam, cobra | allowed |
 | PyYAML | 6.0.3 | MIT | service | allowed |
+| questionary | 2.1.1 | MIT | extra lit, through sci-rag-kit | allowed |
 | rank-bm25 | 0.2.2 | Apache2.0 | service | allowed |
-| referencing | 0.37.0 | MIT | extra agent, through mcp | allowed |
-| requests | 2.34.2 | Apache-2.0 | extra rag, through fastembed | allowed |
-| rich | 15.0.0 | MIT | the geneOS worker, through cobra | allowed |
-| rpds-py | 2026.9.1 | MIT | extra agent, through mcp | allowed |
+| referencing | 0.37.0 | MIT | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
+| requests | 2.34.2 | Apache-2.0 | extra lit, through fastembed, sci-rag-kit | allowed |
+| rich | 15.0.0 | MIT | extra lit, through sci-rag-kit; the geneOS worker, through cobra | allowed |
+| rpds-py | 2026.9.1 | MIT | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | ruamel.yaml | 0.19.1 | MIT | the geneOS worker, through cobra | allowed |
 | SALib | 1.6.0 | MIT | the geneOS worker, through biorefineries | allowed |
+| sci-rag-kit | 0.5.0 | BSD-3-Clause | extra lit | allowed |
 | scikit-learn | 1.9.1 | BSD-3-Clause | the geneOS worker, through biorefineries | allowed |
 | scipy | 1.18.1 | License :: OSI Approved :: BSD License | the geneOS worker | allowed |
 | seaborn | 0.13.2 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries | allowed |
 | setuptools | 84.0.0 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
+| shellingham | 1.5.4 | License :: OSI Approved :: ISC License (ISCL) | extra lit, through sci-rag-kit | allowed |
 | six | 1.17.0 | MIT | the geneOS worker, through biorefineries, biosteam, cobra | allowed |
 | sniffio | 1.3.1 | MIT OR Apache-2.0 | service, through anthropic | allowed |
 | SQLAlchemy | 2.1.6 | MIT | service | allowed |
-| sse-starlette | 3.5.0 | BSD-3-Clause | extra agent, through mcp | allowed |
+| sse-starlette | 3.5.0 | BSD-3-Clause | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | stack-data | 0.6.3 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | starlette | 1.6.0 | BSD-3-Clause | service, through fastapi | allowed |
+| structlog | 26.1.0 | MIT OR Apache-2.0 | extra lit, through sci-rag-kit | allowed |
 | swiglpk | 5.0.13 | GPL v3 | the geneOS worker, through cobra | accepted by Sean Creighton on 2026-10-15 |
 | sympy | 1.14.0 | License :: OSI Approved :: BSD License | the geneOS worker, through cobra | allowed |
+| tenacity | 9.1.4 | Apache 2.0 | extra lit, through sci-rag-kit | allowed |
 | thermo | 0.6.1 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | thermosteam | 0.54.2 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
 | threadpoolctl | 3.7.0 | BSD-3-Clause | the geneOS worker, through biorefineries | allowed |
-| tokenizers | 0.23.3 | License :: OSI Approved :: Apache Software License | extra rag, through fastembed | allowed |
-| tqdm | 4.70.1 | MPL-2.0 AND MIT | extra rag, through fastembed | accepted by Sean Creighton on 2026-10-15 |
+| tokenizers | 0.23.3 | License :: OSI Approved :: Apache Software License | extra lit, through fastembed | allowed |
+| tqdm | 4.70.1 | MPL-2.0 AND MIT | extra lit, through fastembed | accepted by Sean Creighton on 2026-10-15 |
 | traitlets | 5.16.1 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | truststore | 0.10.4 | MIT | service, through anthropic | allowed |
+| typer | 0.27.3 | MIT | extra lit, through sci-rag-kit | allowed |
 | typing_extensions | 4.16.0 | PSF-2.0 | service, through alembic, anthropic, fastapi, httpx, pydantic, sqlalchemy, uvicorn | allowed |
 | typing-inspection | 0.4.4 | MIT | service, through anthropic, fastapi, pydantic | allowed |
 | tzdata | 2026.5 | Apache-2.0 | the geneOS worker, through biorefineries, biosteam, cobra | allowed |
-| urllib3 | 2.8.0 | MIT | extra rag, through fastembed | allowed |
+| urllib3 | 2.8.0 | MIT | extra lit, through fastembed, sci-rag-kit | allowed |
 | uvicorn | 0.52.4 | BSD-3-Clause | service | allowed |
 | uvloop | 0.22.1 | MIT License | service, through uvicorn | allowed |
 | watchfiles | 1.2.0 | MIT | service, through uvicorn | allowed |
-| wcwidth | 0.9.2 | License :: OSI Approved :: MIT License | the geneOS worker, through biorefineries, biosteam | allowed |
+| wcwidth | 0.9.2 | License :: OSI Approved :: MIT License | extra lit, through sci-rag-kit; the geneOS worker, through biorefineries, biosteam | allowed |
 | websockets | 17.0.1 | BSD-3-Clause | service, through uvicorn | allowed |
 | xlrd | 2.0.2 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam | allowed |
 | zipp | 4.1.1 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |

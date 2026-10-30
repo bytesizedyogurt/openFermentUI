@@ -48,7 +48,7 @@ pnpm install --frozen-lockfile
 (cd core && uv sync --frozen --all-extras)
 
 say "Bringing the database to the newest schema"
-(cd core && .venv/bin/python -m openferment_core.db migrate) ||
+(cd core && .venv/bin/python -m openferment_core.migrations migrate) ||
   die "the migration did not run; the lines above say why. Is PostgreSQL running, and does core/.env name it (OPENFERMENT_DATABASE_URL)?"
 
 if [ "$VERIFY" = 1 ]; then

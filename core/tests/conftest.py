@@ -9,12 +9,16 @@ charged to the machine's real database, the one core/.env names.
 from __future__ import annotations
 
 import asyncio
+import functools
 import os
 import secrets
 import threading
 from pathlib import Path
 
 import pytest
+
+# Sci RAG Kit's settings, before any test module imports the kit (openferment_core/__init__.py).
+import openferment_core  # noqa: F401, E402
 
 
 @pytest.fixture(autouse=True)
@@ -96,9 +100,12 @@ class TestDatabase:
         self._lock = threading.Lock()
 
     def open(self):
-        """Make, migrate and connect the database once; its engine."""
+        """Make, migrate and connect the database once; its engine. Both
+        schemas are migrated, and Sci RAG Kit is pointed at the database."""
+        from openferment_core import migrations
         from openferment_core.db import migrate
         from openferment_core.db.engine import make_engine
+        from openferment_core.literature import kit
 
         with self._lock:
             if self.engine is None:
@@ -110,7 +117,8 @@ class TestDatabase:
                         f"({e.__class__.__name__}: {e}). Start it with `pnpm db:up`, or set {TEST_DATABASE_SETTING}."
                     ) from e
                 self.url = url
-                migrate.upgrade(url)
+                migrations.upgrade(url)
+                kit.use_database(url)
                 self.engine = make_engine(url, pool_size=2, max_overflow=2)
             return self.engine
 
@@ -124,8 +132,33 @@ class TestDatabase:
         from openferment_core.db import migrate
 
         if self.engine is not None:
+            from openferment_core.literature import kit
+
+            kit.use_database(None)
             db.run(self.engine.dispose())
             migrate.drop(self.name, self.server)
+
+
+@pytest.fixture(autouse=True)
+def _kit_embedder(request):
+    """Sci RAG Kit embeds with FastEmbed in a test marked `lit`, as the
+    service does. Every other test embeds with the kit's deterministic local
+    embedder, which needs no model file, so test:core stays offline; the two
+    kinds of test store texts of their own, so neither reads the other's
+    vectors."""
+    from openferment_core.literature import kit
+
+    kit.use_embedder(None if request.node.get_closest_marker("lit") else _local_embedder())
+    yield
+
+
+@functools.cache
+def _local_embedder():
+    from sci_rag.embed import LocalHashEmbedder
+
+    from openferment_core.literature import EMBEDDING_DIM
+
+    return LocalHashEmbedder(EMBEDDING_DIM)
 
 
 @pytest.fixture(scope="session")
@@ -133,6 +166,15 @@ def test_database():
     held = TestDatabase()
     yield held
     held.close()
+
+
+@pytest.fixture
+def kit_database(test_database):
+    """The session's database, made now: Sci RAG Kit is pointed at it when it
+    is made, and a test that reaches the kit before anything else touched the
+    database would find no address."""
+    test_database.open()
+    return test_database
 
 
 # Every test acts in one project, as every request names one (ADR-005): the

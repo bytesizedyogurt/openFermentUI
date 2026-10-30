@@ -182,7 +182,8 @@ class ModelRefused(RuntimeError):
 @dataclass
 class Result:
     """What one call produced. `data` is the parsed JSON, or None when the
-    response stopped at max_tokens or held no parseable JSON."""
+    response stopped at max_tokens or held no parseable JSON; `text` is the
+    response's words as written, for a call that asked for prose."""
 
     data: dict[str, Any] | None
     model: str
@@ -190,6 +191,7 @@ class Result:
     stop_reason: str | None = None
     fell_back: bool = False
     tried: list[str] = field(default_factory=list)
+    text: str = ""
 
     @property
     def truncated(self) -> bool:
@@ -360,6 +362,10 @@ def strict_schema(schema: dict[str, Any], *, keep_maps: bool = False) -> dict[st
     return out
 
 
+def _text_of(response: Any) -> str:
+    return "".join(_get(b, "text") or "" for b in (_get(response, "content") or []) if _get(b, "type") == "text")
+
+
 def _text_json(response: Any) -> dict[str, Any] | None:
     for block in _get(response, "content") or []:
         if _get(block, "type") == "text":
@@ -410,22 +416,27 @@ def call(
     *,
     system: str,
     user: str,
-    schema: dict[str, Any],
+    schema: dict[str, Any] | None,
     max_tokens: int,
     client_factory: Callable[[], Any] | None = None,
     label: str = "",
     role: str = "answer",
 ) -> Result:
-    """One question, answered as JSON matching `schema`, by the first model in
-    the role's chain that will. Raises ModelRefused or ModelUnavailable
-    (BudgetExhausted among them) otherwise."""
+    """One question, answered as JSON matching `schema` (or in words when
+    `schema` is None), by the first model in the role's chain that will.
+    Raises ModelRefused or ModelUnavailable (BudgetExhausted among them)
+    otherwise."""
     client = (client_factory or _default_client)()
-    request = {
+    output: dict[str, Any] = {"effort": effort()}
+    if schema is not None:
+        output["format"] = {"type": "json_schema", "schema": strict_schema(schema)}
+    request: dict[str, Any] = {
         "max_tokens": max_tokens,
-        "system": system,
         "messages": [{"role": "user", "content": user}],
-        "output_config": {"effort": effort(), "format": {"type": "json_schema", "schema": strict_schema(schema)}},
+        "output_config": output,
     }
+    if system:
+        request["system"] = system
     models = chain(role)
     spent = Usage()
     tried: list[str] = []
@@ -480,12 +491,13 @@ def call(
                 continue
             served = str(_get(response, "model") or model)
             return Result(
-                data=None if stop == "max_tokens" else _text_json(response),
+                data=None if stop == "max_tokens" or schema is None else _text_json(response),
                 model=served,
                 usage=spent,
                 stop_reason=stop,
                 fell_back=i > 0,
                 tried=tried,
+                text=_text_of(response),
             )
         finally:
             spend.settle(held, role, cost)
@@ -625,3 +637,42 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
         why = f"{model} answered {status}" if status and status != 200 else f"{model} stream failed ({_error_type(e)})"
         raise ModelUnavailable(f"{why}: {getattr(e, 'message', e)}") from e
     return response
+
+
+# ── the literature layer's model client (ADR-002) ──────────────────────────
+
+
+#: The kit's roles, as ours: its high-volume extraction (a document's graph,
+#: HyDE's passage) is an index chore; its answers and its judge answer.
+KIT_ROLES = {"answer": "answer", "extraction": "index", "judge": "answer"}
+
+
+def kit_client(kit_role: str = "answer") -> Any:
+    """The model client Sci RAG Kit generates with, for one of its roles:
+    answers with citations, HyDE's hypothetical passage, a document's graph.
+    Every call goes through `call` here, so the kit's calls are capped by the
+    day's spend, read the key in this one place, and fall back along the
+    role's chain like any other. Built on demand: the kit is the `lit` extra."""
+    import asyncio
+
+    from sci_rag.llm.client import LLMClient
+
+    role = KIT_ROLES[kit_role]
+
+    class KitLLM(LLMClient):
+        model = chain(role)[0]
+
+        async def generate(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
+                           max_tokens: int = 2048, json_mode: bool = False) -> str:
+            result = await asyncio.to_thread(
+                call, system=system or "", user=prompt, schema=None, max_tokens=max_tokens,
+                role=role, label="sci-rag-kit: ",
+            )
+            return result.text
+
+        async def stream(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
+                         max_tokens: int = 2048):  # type: ignore[override]
+            yield await self.generate(prompt, system=system, temperature=temperature, max_tokens=max_tokens)
+
+    return KitLLM()
+

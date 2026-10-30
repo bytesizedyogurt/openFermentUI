@@ -14,7 +14,7 @@ from openferment_core import db
 from openferment_core.db import migrate
 from openferment_core.db.engine import make_engine
 from openferment_core.db import models as t
-from openferment_core.db.__main__ import main as db_command
+from openferment_core.migrations import main as db_command
 
 
 async def _project_ids() -> list[str]:
@@ -49,10 +49,13 @@ def test_a_database_migrated_to_head_differs_from_the_table_models_in_nothing(te
     assert db.run(diff()) == []
 
 
-def test_the_session_database_is_at_the_newest_revision(test_database):
+def test_the_session_database_is_at_the_newest_revision_of_both_schemas(test_database):
+    from openferment_core import migrations
+
     test_database.open()
     assert migrate.head() == "0001"
-    assert migrate.revision(test_database.url) == migrate.head()
+    assert migrations.kit_head() == "0006"
+    assert migrations.at_head(test_database.url) == {"openferment": ("0001", "0001"), "sci_rag": ("0006", "0006")}
 
 
 def test_rollback_1_a_row_a_test_writes_is_there_for_the_rest_of_that_test():
@@ -158,7 +161,7 @@ def test_the_command_says_why_it_refuses(capsys, monkeypatch):
 
 
 def test_the_command_names_the_setting_when_no_address_is_set(capsys, monkeypatch):
-    monkeypatch.setattr("openferment_core.db.__main__.load_dotenv", lambda *a, **k: None)
+    monkeypatch.setattr("openferment_core.migrations.load_dotenv", lambda *a, **k: None)
     monkeypatch.delenv(db.URL_SETTING, raising=False)
     assert db_command(["migrate"]) == 2
     assert db.URL_SETTING in capsys.readouterr().err

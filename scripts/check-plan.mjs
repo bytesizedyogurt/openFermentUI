@@ -78,6 +78,11 @@ const PAIRS = [
   ['FetchedSection', 'PaperSection'],
   ['FetchLicense', 'FetchLicense'],
   ['FetchResult', 'FetchResult'],
+  // alpha 2.0, ADR-002 — collection into Sci RAG Kit.
+  ['CollectOutcome', 'CollectOutcome'],
+  ['CollectRequest', 'CollectRequest'],
+  ['PasteRequest', 'PasteRequest'],
+  ['LiteratureDocument', 'LiteratureDocument'],
   ['IntakeStatus', 'IntakeStatus'],
   ['OverlayPaper', 'OverlayPaper'],
   ['Overlay', 'Overlay'],

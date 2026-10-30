@@ -29,12 +29,15 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.30",
     "asyncpg>=0.29",
     "alembic>=1.13",
+    # alpha 2.0 (ADR-002) — Intake takes an uploaded file (FastAPI's forms).
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3"]
-# OF-BLD-014 §4.2 — the meaning lane: passage vectors, computed on this machine.
-rag = ["fastembed==0.9.0"]
+# alpha 2.0 (ADR-002) — the literature layer: Sci RAG Kit as a library, with
+# passage vectors computed on this machine by FastEmbed.
+lit = ["sci-rag-kit==0.5.0", "fastembed==0.9.0"]
 # OF-BLD-014 §6.2 — flux balance analysis, in the geneOS worker alone; scipy
 # also serves fermOS's fits (§7.2).
 # OF-BLD-014 §10.1 — the MCP server that opens the tool registry to outside assistants.
@@ -61,4 +64,8 @@ markers = [
     "sim: starts the BioSTEAM worker (the sim extra)",
     # §8.6 — the published benchmark and other runs too long for verify.
     "slow: a simulation run too long for verify (pnpm test:slow)",
+    # alpha 2.0 (ADR-002) — Sci RAG Kit with FastEmbed's model, as the service
+    # runs it: the model file comes from Hugging Face the first time and is
+    # cached after. `pnpm test:lit` runs these in verify; test:core leaves them out.
+    "lit: embeds with FastEmbed's model (the lit extra; the model file cached once)",
 ]

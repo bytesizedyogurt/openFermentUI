@@ -1519,6 +1519,66 @@ export interface FetchResult {
   source?: FetchSource;
 }
 
+/**
+ * What Intake did with one document (ADR-002): `ingested`, stored in the kit
+ * for the first time; `linked`, the kit held the same text already and the
+ * project now holds it too; `held`, the project held it before; `failed`,
+ * nothing stored, and `reason` says why. `transient` marks a failure that was
+ * the network's condition, worth asking again. Mirrors models.py
+ * `CollectOutcome`.
+ */
+export interface CollectOutcome {
+  status: 'ingested' | 'linked' | 'held' | 'failed';
+  documentId: string | null;
+  collector: string;
+  identifier: string;
+  title: string;
+  licenceClass: string;
+  licence: FetchLicense | null;
+  sections: number;
+  tables: number;
+  chunks: number;
+  reason: string | null;
+  transient: boolean;
+}
+
+/** POST /api/intake/collect. Mirrors models.py `CollectRequest`. */
+export interface CollectRequest {
+  identifier: string;
+  by: string;
+  reason?: string;
+}
+
+/** POST /api/intake/paste. Mirrors models.py `PasteRequest`. */
+export interface PasteRequest {
+  title: string;
+  text: string;
+  by: string;
+  url?: string;
+  licenceClass?: string;
+  licence?: string;
+  reason?: string;
+}
+
+/** One document a project holds (GET /api/literature/documents). Mirrors models.py `LiteratureDocument`. */
+export interface LiteratureDocument {
+  documentId: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  doi: string | null;
+  journal: string | null;
+  citation: string | null;
+  source: string;
+  sourceRef: string | null;
+  licenceClass: string;
+  chunks: number;
+  collector: string | null;
+  selection: Record<string, unknown>;
+  linkedBy: string;
+  linkedAt: string;
+}
+
 /** One row of GET /api/intake/status. */
 export interface IntakeStatus {
   paperId: string;

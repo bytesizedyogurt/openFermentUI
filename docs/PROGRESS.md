@@ -16,19 +16,21 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 3, step 3.1** — Sci RAG Kit as the literature layer: the `lit` extra
-   (`sci-rag-kit==0.5.0` with `fastembed`), the kit's role (`sci_rag`, search path `sci_rag,
-   public`) and its vendored migrations in `db:migrate`, `literature/kit.py` (settings bridge,
-   one `RagService` with a local FastEmbed embedder injected, generation through `llm.py`),
-   the collectors, Intake wired, the kit's REST at `/rag` and its MCP in `.mcp.json`.
+4. **Next step: stage 3, step 3.2** — extraction and anchoring over the kit's text: `extract.py`
+   reads a document's passages from the kit (`kit.document`), candidates anchor to the kit's
+   text, decisions and records stay in PostgreSQL, `Witness.tsx` scores them; the full-text cache
+   (`core/data/fulltext/`, `intake.fetch_paper` and the corpus-paper routes) goes. Then 3.3:
+   BioRepo → Search and PaperReader over the kit, the retrieval report, the stage 3 gate
+   (`pnpm test:lit` over the demo corpus `core/tests/fixtures/kit-demo/`).
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 3 — Sci RAG Kit — is next. Stage 2 is complete: 2.1 to 2.4 put every store on PostgreSQL,
-scope every request to a project, move the browser's scientific state to the service, and passed
-the gate in a clean worktree. Stages 0 and 1 are complete (the tag push waits on the owner). Stage 1 is
-complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Blockers).
+Stage 3 — Sci RAG Kit — is under way: 3.1 (the kit wired in, the collectors, Intake, `/rag`, the
+kit's MCP server) is done; 3.2 is next. Stage 2 is complete: 2.1 to 2.4 put every store on
+PostgreSQL, scope every request to a project, move the browser's scientific state to the service,
+and passed the gate in a clean worktree. Stages 0 and 1 are complete (the tag push waits on the
+owner; see Blockers).
 
 ## Last green runs
 
@@ -74,6 +76,10 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | §10 stage 8.1 | The old `CLAUDE.md` moved to `docs/history/CLAUDE-2026-10-21.md` at stage 0, with a short interim `CLAUDE.md` | Claude Code injects `CLAUDE.md` into every new session as binding instructions; the old file (96,858 bytes) would direct a resuming session against this build. Stage 8 still writes the final file |
 | §3.4 | Eighteen reference SFF files (`SF_BST_01` to `SF_BST_18`) at `e236e32`, where the prompt counted thirteen | Measured in the pinned tree (ADR-003) |
 | §8.2 | The kit's alembic migrations are vendored from commit `26b3990` | The PyPI wheel carries `src/sci_rag` alone (ADR-002) |
+| §8.2, ADR-002 | The kit's migrations live in `core/openferment_core/literature/kit_alembic/` (with its licence), where ADR-002's consequences said `core/vendor/sci_rag_migrations/`; `pnpm db:migrate` runs them through `python -m openferment_core.migrations`, which replaces `python -m openferment_core.db` | In the package beside `kit.py`, the deployed tree finds them where the code is; `db` may import nothing of the service (§7.2), so the command that runs both histories lives outside it |
+| §8.2 | `/rag` serves the kit's REST routes without its `/mcp` endpoint; the kit's MCP server runs over stdio from `.mcp.json` (`sci-rag`) | Starlette does not run a mounted app's lifespan, which the kit's streamable HTTP endpoint needs; stdio is how `.mcp.json` starts a server |
+| §8.2 | `/rag` asks for `OPENFERMENT_RAG_KEY` (`core/.env`), and with none set refuses every request | The kit runs open when given no keys; a key the owner sets is how a program outside the app reaches it |
+| §8.2, stage 3.1 | Intake keeps the corpus-paper fetch (`intake.fetch_paper`, `/api/intake/{paperId}/fetch`) and the full-text cache beside collection into the kit for one step | Extraction reads the cache until 3.2 moves it onto the kit's text, and every commit stays green |
 | §10 stage 1.1 | Section 5 runs in the order 5.4 + 5.3 (one commit), 5.1, 5.2, 5.5, 5.6, 5.7 | `demo.py`, `retrieve.py` and `rageval.py` were the heaviest users of the program machinery and build their fixtures through each other; deleting them first spares edits to files deleted one step later, and a commit between 5.4 and 5.3 could not be green |
 | §5.3 | `demo.py`'s stand-in evaluator and stand-in records moved to `core/tests/standins.py` (test-only) | Thirteen kept test files (Proforma, fermOS, params, pureOS, tools) test binding, override, ceiling and run-contract rules on them. Stage 4 replaces them with fixtures read from library plants (debt recorded below) |
 | §5.4 | `search_passages` stays registered, with one seam (`tools/passages.py: search`) that answers "no literature index exists yet" | Postdoc's quote validation and its tests keep the passage contract; stage 3 fills the seam with Sci RAG Kit. The whole-sentence rule moved to `quotes.py` |
@@ -116,7 +122,8 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | `pnpm smoke` opens the rail entries and checks nothing more; alpha 1.0's smoke also walked review, deposition, the runs and the redirects against the service double | stage 7 extends it over the real service |
 | `test_biorepo.py::test_the_committed_file_is_the_model_and_starts_empty` holds the shape of a tracked file nothing reads | when `core/data/biorepo.json` leaves git (owner action above) |
 | The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run only as `bash -n` here: this container is not a Mac | the owner's first install on the Mini |
-| `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run: this container has no Docker daemon, so stage 2 runs on the distribution's PostgreSQL 16 | CI, or the owner's machine |
+| `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run: this container has no Docker daemon, so stages 2 and 3 run on the distribution's PostgreSQL 16 with pgvector 0.6.0. CI's verify runs the same image as a service from 3.1 on (the workflow had no database through stage 2, so verify failed in CI on the stage 2 pushes) | the first CI run of 3.1, or the owner's machine |
+| The kit's MCP server (`literature_mcp.py`) has run only as an import here: the session's MCP clients start from `.mcp.json` at session start | the next session, or the owner's Claude Code |
 | `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7 |
 
 ## Owner questions (execution prompt §13) and the defaults taken
@@ -129,7 +136,7 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | 4 | Delete Dominion, return condition recorded | yes | no |
 | 5 | Rename `demo` → `assumed` | yes | no |
 | 6 | Python pin 3.12 if the kit fails on 3.13 | no pin: the kit's suite passed on 3.13.17 (1584 passed, 31 skipped) | measured |
-| 7 | Kit REST under `/rag` on the same port | yes | no |
+| 7 | Kit REST under `/rag` on the same port | yes, behind `OPENFERMENT_RAG_KEY` | no |
 | 8 | Licence | none added | no |
 | 9 | Accounts: tables and a membership stub only | yes | no |
 
@@ -261,3 +268,27 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
   still in `core/data/biorepo.json` to the import; `nightly.sh` reads the database and the
   project, and extraction waits when no project is named. `session-start.sh` names the
   development database when PostgreSQL answers, and migrates.
+
+### Stage 3 — 2026-10-30
+
+- 3.1 Sci RAG Kit wired in (ADR-002, Implementation). The `lit` extra (`sci-rag-kit==0.5.0`,
+  `fastembed==0.9.0`; the old `rag` extra goes) and `python-multipart` for uploads.
+  `literature/`: `kit.py` (settings from openFerment's values alone, the kit's factories answering
+  with FastEmbed and `llm.kit_client`, a pooled engine on the database loop installed as the
+  kit's own, an engine without a pool for `/rag` and MCP, `ProjectService` narrowing every read
+  to the current project, `ingest`, `retrieve`, `document`, `documents`, `stats`, `rest_app`),
+  `collectors.py` (the fetchers and splitters moved out of `intake.py`, plus JATS citation
+  metadata, Markdown with tables as pipe tables, licence classes failing closed, OSTI records,
+  `by_identifier`, uploads and pasted text), `fastembed.py` (a lasting model cache),
+  `domain/` and `kit_alembic/env.py`. `migrations.py` runs both histories behind `pnpm
+  db:migrate` and `db:reset`. Intake: `POST /api/intake/collect`, `/upload`, `/paste`, `GET
+  /api/literature/documents`, `/stats`, and the "Add to this project" card on the Intake screen.
+  The kit's REST app at `/rag` behind `OPENFERMENT_RAG_KEY` and the project header; its MCP server
+  in `.mcp.json` (`sci-rag`). `pnpm ready` gains `literature`, `embedder` and `rag` rows. The
+  `lit` marker and `pnpm test:lit` (in verify); outside it the kit embeds with its local
+  deterministic embedder. Tests: `test_collectors.py`, `test_literature_kit.py` (stored once,
+  held by each project that collects it; scoped retrieval, documents, stats, answers; settings
+  and factories; `/rag` with and without its key and project), `test_fastembed.py` (`lit`: the
+  kit's embedding contract), the Intake API tests. CI: a `pgvector/pgvector:pg17` service and the
+  FastEmbed model cache.
+

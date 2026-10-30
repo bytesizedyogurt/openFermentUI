@@ -401,6 +401,73 @@ class IntakeStatus(BaseModel):
     source: FetchSource = "europepmc"
 
 
+CollectStatus = Literal["ingested", "linked", "held", "failed"]
+
+
+class CollectOutcome(BaseModel):
+    """What Intake did with one document (ADR-002): `ingested`, stored in the
+    kit for the first time; `linked`, the kit held the same text already and
+    the project now holds it too; `held`, the project held it before;
+    `failed`, nothing stored, and `reason` says why. `transient` marks a
+    failure that was the network's condition, worth asking again."""
+
+    status: CollectStatus
+    documentId: str | None = None
+    collector: str
+    identifier: str
+    title: str
+    licenceClass: str
+    licence: FetchLicense | None = None
+    sections: int = 0
+    tables: int = 0
+    chunks: int = 0
+    reason: str | None = None
+    transient: bool = False
+
+
+class CollectRequest(BaseModel):
+    """POST /api/intake/collect: a paper, a report or a strain entry by its
+    identifier (a PMCID, a DOI, `PMID:<id>`, `OSTI:<id>`, an osti.gov or a
+    yeastgenome.org address), who asked, and why."""
+
+    identifier: str = Field(min_length=1, max_length=500)
+    by: str = Field(min_length=1, max_length=200)
+    reason: str = Field(default="", max_length=2000)
+
+
+class PasteRequest(BaseModel):
+    """POST /api/intake/paste: text a person pasted, its title, where it came
+    from, the licence class they chose and what they say of the licence."""
+
+    title: str = Field(min_length=1, max_length=500)
+    text: str = Field(min_length=1, max_length=2_000_000)
+    by: str = Field(min_length=1, max_length=200)
+    url: str = Field(default="", max_length=2000)
+    licenceClass: str = Field(default="unknown", max_length=40)
+    licence: str = Field(default="", max_length=2000)
+    reason: str = Field(default="", max_length=2000)
+
+
+class LiteratureDocument(BaseModel):
+    """One document a project holds (GET /api/literature/documents)."""
+
+    documentId: str
+    title: str
+    authors: list[str] = Field(default_factory=list)
+    year: int | None = None
+    doi: str | None = None
+    journal: str | None = None
+    citation: str | None = None
+    source: str
+    sourceRef: str | None = None
+    licenceClass: str
+    chunks: int
+    collector: str | None = None
+    selection: dict[str, Any] = Field(default_factory=dict)
+    linkedBy: str
+    linkedAt: str
+
+
 class OverlayPaper(BaseModel):
     """What the overlay says about one paper (§2.1): its fetch state and, when
     the fetch succeeded, the paper's own sections in place of the seed's
