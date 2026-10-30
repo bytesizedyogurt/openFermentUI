@@ -44,6 +44,7 @@ NEVER: dict[str, set[str]] = {
     "engine": SIMULATION | {"sci_rag", "openferment_core.llm"},
     "db": SIMULATION | {"sci_rag", "openferment_core.llm"},
     "projects": SIMULATION | {"sci_rag", "openferment_core.llm"},
+    "studies": SIMULATION | {"openferment_core.llm"},
 }
 # The engine reaches the worker through its client, never a module of the
 # worker itself (which imports BioSTEAM).

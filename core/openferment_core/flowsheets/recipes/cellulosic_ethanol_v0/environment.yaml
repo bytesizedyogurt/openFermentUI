@@ -13,7 +13,7 @@ name: sff-openferment-cellulosic-ethanol-v0
 channels:
   - defaults
 dependencies:
-  - python=3.13
+  - python=3.12
   - pip
   - pip:
       - ansicolors==1.1.8

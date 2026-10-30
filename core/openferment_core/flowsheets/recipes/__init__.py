@@ -17,6 +17,7 @@ and a test holds each to the lock. Nothing here imports BioSTEAM.
 """
 from __future__ import annotations
 
+import re
 import sys
 import tomllib
 from pathlib import Path
@@ -26,8 +27,22 @@ LOCK = HERE.parents[2] / "uv.lock"
 # What a recipe's environment installs: the simulator, the package of plants,
 # the property engine, and what the SFF toolkit's runner itself imports.
 ROOTS = ("biosteam", "biorefineries", "thermosteam", "jsonschema", "pyyaml")
-# The Python the project runs (core/.venv); conda pins the minor version.
-PYTHON = f"{sys.version_info.major}.{sys.version_info.minor}"
+
+
+def lowest_python(lock: Path = LOCK) -> str:
+    """The lowest minor version of Python core/uv.lock resolves for (its
+    `requires-python`), which a recipe's environment pins and its markers are
+    read for: every machine that writes the file writes the same one,
+    whichever Python it runs."""
+    said = tomllib.loads(lock.read_text(encoding="utf-8")).get("requires-python", "")
+    found = re.match(r"\s*>=\s*(\d+)\.(\d+)", said)
+    if found is None:
+        raise ValueError(f"core/uv.lock's requires-python ({said!r}) names no lowest version")
+    return f"{found.group(1)}.{found.group(2)}"
+
+
+# The Python a recipe's environment pins (conda takes the minor version).
+PYTHON = lowest_python()
 
 
 def recipes() -> list[Path]:

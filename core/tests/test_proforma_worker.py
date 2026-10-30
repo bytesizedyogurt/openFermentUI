@@ -64,6 +64,19 @@ def test_the_status_endpoint(warm):
     assert r["status"] == "ready" and r["error"] is None
 
 
+def _digits(value, n: int = 12):
+    """Every float of a JSON value to `n` significant digits: one machine's
+    sum ends 56.00000000000001 where another's ends 56.0 (CI measured it), and
+    a fixture holds what the worker computes, to the digits that mean it."""
+    if isinstance(value, float):
+        return float(f"{value:.{n}g}")
+    if isinstance(value, dict):
+        return {k: _digits(v, n) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_digits(v, n) for v in value]
+    return value
+
+
 def test_the_committed_toy_fixtures_are_what_the_worker_makes(warm):
     # §8.1: the fixtures that need BioSTEAM are regenerated here, where the
     # real worker runs; write `standins.sim_fixtures()` over the file to refresh it.
@@ -71,4 +84,5 @@ def test_the_committed_toy_fixtures_are_what_the_worker_makes(warm):
 
     import standins
     committed = json.loads(standins.SIM_FIXTURES.read_text(encoding="utf-8"))
-    assert standins.sim_fixtures() == committed, "tests/fixtures/sim/toy.json no longer matches the worker: write standins.sim_fixtures() over it"
+    assert _digits(standins.sim_fixtures()) == _digits(committed), \
+        "tests/fixtures/sim/toy.json no longer matches the worker: write standins.sim_fixtures() over it"
