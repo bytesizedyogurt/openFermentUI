@@ -24,6 +24,7 @@
 // A runbook is made here from the run's numbers: each output chosen becomes a
 // prediction in the run's unit, measured at harvest (POST /api/studies/runbooks),
 // and opens on the runbook's page, where it is locked.
+import { SffGraph } from '@/components/SffGraph';
 import { useEffect, useState } from 'react';
 import { BookOpen, Download, ListChecks } from 'lucide-react';
 import type { ParamScope, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
@@ -207,9 +208,17 @@ function FlowsheetCard({ report }: { report: EngineRunReport }) {
         {earned.length > 0 && <> Tags it earns: {earned.join(', ')}.</>}
       </p>
       <p className="text-caption text-ink-soft mt-1">
-        Record <span className="font-num">{f.id}</span>, sha256 <span className="font-num">{f.sha256.slice(0, 16)}…</span>, written {stamp(f.createdAt)}.
+        Record <span className="font-num">{f.id}</span>, sha256 <span className="font-num">{f.sha256.slice(0, 16)}…</span>, written {stamp(f.createdAt)}.{' '}
+        <a className="text-accent hover:underline" href={href(`/flowsheets/${f.id}`)}>
+          Its page
+        </a>
       </p>
       {problem && <p className="text-caption text-signal-warn mt-1">{problem}</p>}
+      {f.graph && (
+        <div className="mt-3">
+          <SffGraph graph={f.graph} title="The plant the run built" />
+        </div>
+      )}
     </Card>
   );
 }

@@ -16,26 +16,23 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 6, step 6.4** — the evaluation set as a table (questions over the proof
-   project, scored on tool choice, citations, labelled estimates and the absence of bare numbers;
-   offline with the stand-in, live with a key), then `scripts/prove.py` step 6 offline and the
-   stage 6 gate (proof step 6 offline, `test_postdoc_agent` extended, `check:tools` green;
-   execution prompt §10 stage 6). Step 6.3 is done: `llm.ROUTES` with `provider:model` specs and
-   the final turn kept back from the ask budget; the per-request key override and other providers'
-   keys wait for the owner (owner question 10, §11.1). Steps 6.1 and 6.2 are done: conversations, turns and tool calls on the server (migration 0005)
-   and the event stream (`docs/api/postdoc.md`); typed values in claims and quantities in tool
-   inputs (ADR-006, Implementation 6.2); the engine, study and literature tools, `docs/TOOLS.md`
-   written by `pnpm gen:tools`, and the MCP server in one project (ADR-008, Implementation 6.2).
-   Stage 5 is complete: `studies/`, the studies screens and `pnpm prove` (steps 1, 2, 4, 5, 7, 8;
-   34 checks).
+4. **Next step: stage 8** — guidance reconciliation and closing (execution prompt §10 stage 8): the
+   new `CLAUDE.md` (under 250 lines, every line labelled), `README.md` (two screens),
+   `COMPONENTS.md` from the package map, proof step 3 (the kit's demo corpus ingested, searched,
+   a candidate anchored and accepted, the record in BioRepo), the full `pnpm verify` and
+   `pnpm prove`, then the pull request with the completion report (§12). Stages 0 to 7 are
+   complete: stage 7 gave the UI the generated API (`pnpm gen:api`), project addresses, Home and
+   the project home, the live trace cards, the SFF graph and the walk (`scripts/walk.ts`, proof
+   step 9, run in CI). The per-request key override waits for the owner (owner question 10).
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 6 — Postdoc: server memory, typed values, routes, tools — is under way: step 6.1 put
-Postdoc's conversations on the server and opened the project's event stream; step 6.2 typed the
-numbers of claims and tool inputs, added the engine, study and literature tools, generated the
-tool reference and scoped the MCP server to a project. Stages 0 to 5 are
+Stage 8 — guidance reconciliation and closing — is next. Stages 0 to 7 are complete. Stage 6 put
+Postdoc's conversations on the server with the project's event stream, typed the numbers of
+claims and tool inputs, added the engine, study and literature tools, routed models by family
+and scored an evaluation set; stage 7 wired the UI to it: project addresses, Home and the
+project home, the live trace cards, the SFF graph, the generated API and the walk. Stages 0 to 5 are
 complete (the tag push waits on the owner; see Blockers). Stage 5 built the studies package:
 scenarios on a plant with each value's origin, run as engine runs; comparisons as artifacts over
 the runs'; runbooks made from a run's outputs and locked on the service under the browser's
@@ -91,6 +88,10 @@ installation).
 | 2026-10-30 16:52 | `test:core` with 6.3 (the routing table, the final turn kept back); secrets | 2231 passed, 2 skipped, 168 deselected; passed | 5 min 21 s | 6.3 |
 | 2026-10-30 17:00 | `pnpm prove --steps 6` (steps 1, 2, 6), the real worker | 14 of 14 checks hold | 1 min 18 s | 6.4 |
 | 2026-10-30 17:06 | `test:core` with 6.4 (the evaluation set) | 2234 passed, 2 skipped, 168 deselected | 5 min 27 s | 6.4 |
+| 2026-10-30 17:24 | Stage 6 gate in a clean worktree at `9663dc3`: `test:core`; `test:lit`; `test:sim` | 2234 passed, 2 skipped, 168 deselected; 10 passed; 132 passed | 5 min 58 s; 12 s; 7 min 2 s | 6.4 (gate) |
+| 2026-10-30 17:24 | Stage 6 gate, the same worktree: secrets, typecheck, plan, licences, tools, `gen:tools --check`, guild, state, figures, build, `pnpm smoke`, reconcile, `pnpm prove` (steps 1, 2, 4, 5, 6, 7, 8); the worktree left clean | all passed; 43 of 43 checks hold | 2 min 38 s (prove) | 6.4 (gate) |
+| 2026-10-30 17:39 | `pnpm prove --steps 9` (steps 1, 2, 5, 6, 9), the walk in Chromium through the built app | 33 of 33 checks hold | 2 min 3 s | 7.2 |
+| 2026-10-30 17:45 | `test:core` with stage 7; typecheck, plan, secrets, `gen:api --check`, `gen:tools --check`, `pnpm smoke` | 2236 passed, 2 skipped, 168 deselected; all passed; 12 of 12 screens | 5 min 28 s | 7.2 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -115,6 +116,8 @@ installation).
 
 | Where | Departure | Why |
 |---|---|---|
+| §5.5, A3, stage 7.1 | The Durable snapshot keeps the writes the service has not acknowledged (review decisions, Guild entries, project rows), beside the preferences; a record the service holds is never kept there (ADR-014) | Without the queue, a reviewer's decision made while the service is away is lost on the next reload |
+| §4.8, §11.1, stage 6.3 | The per-request key override and a route's non-Anthropic model are not built; each would change how a key is read, which the owner decides (owner question 10; ADR-008, Implementation 6.3) | §11.1 asks the owner before a change to how keys are stored or read |
 | §10 stage 8.1 | The old `CLAUDE.md` moved to `docs/history/CLAUDE-2026-10-21.md` at stage 0, with a short interim `CLAUDE.md` | Claude Code injects `CLAUDE.md` into every new session as binding instructions; the old file (96,858 bytes) would direct a resuming session against this build. Stage 8 still writes the final file |
 | §3.4 | Eighteen reference SFF files (`SF_BST_01` to `SF_BST_18`) at `e236e32`, where the prompt counted thirteen | Measured in the pinned tree (ADR-003) |
 | §8.2 | The kit's alembic migrations are vendored from commit `26b3990` | The PyPI wheel carries `src/sci_rag` alone (ADR-002) |
@@ -168,7 +171,9 @@ installation).
 | The vessel's organism check reads the yeast program's species from a strain catalogue that is empty; its test supplies one | stage 3 (strains with a project's records) or stage 4 |
 | `test_proforma_slow.py` and `flowsheets/cornstover_benchmark.py` still state the benchmark price this build once measured (1.968 USD per gallon); the browser no longer shows it | stage 4: the adapter holds a library plant to its package's own test values |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program | the vocabulary review at stage 3 |
-| `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's funnel | stage 7 |
+| `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's funnel | after alpha 2.0 (stage 7 left the module screens as they were, now views inside a project) |
+| `src/data/types.ts` is still hand-kept beside the generated `src/api/types.gen.ts`, held to the service by `check:plan`'s pairs; the screens read the hand-kept types | the screens move to the generated types one by one, after alpha 2.0 |
+| Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, §9.3) are not built; the walk and the smoke run against the real service | after alpha 2.0 |
 | Dead service paths the deletions left: the storage machinery (`kinetics.py`'s N and Q states, `fermos._no_broth_product`'s store-in-cells branch, `proforma.fit_info`'s store branch), `proforma._strain_labels`' program map, `proforma.basis_inputs`' `cap` and the yield cap in `_specs`; `fermos.NAMED_NOTE` still says "program" (its text is hashed into every simulation's basis) | stage 4, with the adapter |
 | Catalogues that left with the seed are empty in production and supplied by fixtures in tests: held scenarios, the strain catalogue and its aliases, the proposer's products and hosts. Until a project's records carry them, every pureOS proposal is refused for want of a host on file. Stage 2 gave each project its tables; what fills them is the literature | stage 3 (records), stage 5 (scenarios) |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | stage 4 |
@@ -603,3 +608,23 @@ installation).
   path; its follow-up reads its history from the service and drops a bare number on purpose.
   `scripts/prove.py` step 6 runs it against the proof's project. ADR-008, Implementation 6.4.
   `test_evaluate.py`.
+
+- 6.4 (gate run) In a clean worktree at `9663dc3`: `test:core` 2234 passed, 2 skipped; `test:lit`
+  10 passed; `test:sim` 132 passed; every check, the build and `pnpm smoke` passed; `pnpm prove`
+  (steps 1, 2, 4, 5, 6, 7, 8) held 43 of 43 checks; the worktree stayed clean. Stage 6 is complete.
+
+### Stage 7 — 2026-10-30
+
+- 7.1 (the generated API) `pnpm gen:api` writes `docs/api/openapi.json`, every route's project
+  scope on it (A5; `test_openapi.py`), and `src/api/types.gen.ts` by openapi-typescript (a dev
+  dependency, MIT); verify runs `gen:api --check`. `src/data/types.ts` and `check:plan`'s pairs
+  stay until the screens read the generated types (a debt below).
+- 7.1 (screens) Projects have addresses (`/p/:project`, its views below it); Home opens on the
+  projects, a form to make one, the ask box, the recent conversations and the running jobs as live
+  cards; the project home is the conversation beside the live trace. The trace cards render the
+  event stream at once, each linking to its record. The SFF graph draws in the run report and on a
+  flowsheet's page. ADR-009, Implementation 7.1.
+- 7.1 (Durable) The snapshot keeps preferences and the writes the service has not acknowledged;
+  a record the service holds is never kept there (ADR-014, a departure from §5.5 and A3).
+- 7.2 (the walk) `scripts/walk.ts` walks the built app in Chromium against a real service; it is
+  the proof's step 9, run in CI after verify. ADR-009, Implementation 7.2.

@@ -1,6 +1,6 @@
 """The proof (execution prompt §9.1): an end-to-end path with nothing seeded.
 
-    pnpm prove                    every step this build holds: 1, 2, 4, 5, 6, 7, 8
+    pnpm prove                    every step this build holds: 1, 2, 4, 5, 6, 7, 8, 9
     pnpm prove --steps 5,8        the steps named, after the steps they stand on
     pnpm prove --keep             leave the service running at the end, and say where
 
@@ -34,6 +34,9 @@ when it cannot start.
     7  one of the toolkit's reference SFF files imported as a flowsheet record; it draws
     8  the service stopped and started again: everything from 2 to 7 reloads from PostgreSQL,
        and the flowsheet's artifact replays within its tolerance
+    9  the UI walk (scripts/walk.ts, Chromium): Home, the project at its own address with its
+       live trace, a document pasted in and searched, the flowsheet run's report and its SFF
+       graph, the conversation of step 6 with its estimate marked, the runbook of step 5
 """
 from __future__ import annotations
 
@@ -77,7 +80,7 @@ DEPARTURES = {
 }
 DIGITS = 10
 # A step, and the steps it stands on.
-STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,)}
+STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,), 9: (5, 6)}
 TITLES = {
     1: "a fresh database, migrated; ready green",
     2: "a project made through the API",
@@ -87,6 +90,7 @@ TITLES = {
        "reads its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
+    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a conversation, a runbook",
 }
 RUN_TIMEOUT_S = 1800.0
 
@@ -442,6 +446,23 @@ def step_6(proof: Proof) -> None:
                 f"the follow-up's tool calls kept with its turn: {', '.join(c['tool'] for c in calls)}")
     proof.check(report["mean"] == {"tools": 1.0, "citations": 1.0, "estimates": 1.0, "bareNumbers": 0.5},
                 f"each question scored and kept: {report['mean']}")
+    proof.made["conversation"] = dearer["conversationId"]
+
+
+def step_9(proof: Proof) -> None:
+    if not (ROOT / "dist" / "index.html").exists():
+        raise Stop("dist/ holds no built app: run `pnpm build` before the proof, since the service mounts the app "
+                   "it finds when it starts")
+    runbook = proof.made.get("runbook")
+    env = {**os.environ, "WALK_ORIGIN": proof.origin, "WALK_PROJECT": proof.project, "WALK_RUN": proof.made["flowsheet"],
+           "WALK_CONVERSATION": proof.made["conversation"], "WALK_RUNBOOK": runbook[0] if runbook else ""}
+    walked = subprocess.run(["npx", "tsx", "scripts/walk.ts"], cwd=ROOT, text=True, capture_output=True, env=env,
+                            timeout=900)
+    lines = [line.strip() for line in walked.stdout.splitlines() if line.strip().startswith(("✓", "✗"))]
+    for line in lines:
+        proof.check(line.startswith("✓"), line[1:].strip())
+    proof.check(walked.returncode == 0 and bool(lines), "the walk ended clean" if walked.returncode == 0 else
+                f"the walk exited {walked.returncode}: {(walked.stderr or '').strip()[-300:]}")
 
 
 def step_7(proof: Proof) -> None:
@@ -500,7 +521,7 @@ def step_8(proof: Proof) -> None:
 
 
 RUNNERS: dict[int, Callable[[Proof], None]] = {1: step_1, 2: step_2, 4: step_4, 5: step_5, 6: step_6, 7: step_7,
-                                               8: step_8}
+                                               8: step_8, 9: step_9}
 
 
 def order(asked: list[int]) -> list[int]:

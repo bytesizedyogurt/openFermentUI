@@ -143,6 +143,35 @@ app = FastAPI(title="openferment-core", version="0.1.0")
 UNSCOPED = ("/api/health", "/api/projects")
 
 
+def _scoped_openapi() -> dict[str, Any]:
+    """The OpenAPI document (docs/api/openapi.json, `pnpm gen:api`) with every
+    route's project scope written on it (ADR-005; acceptance A5): a route that
+    acts in a project says so (`x-openferment-scope: project`) and takes the
+    project's id in the X-OpenFerment-Project header, or `?project=` where a
+    header cannot be sent (an EventSource); the routes that act in none say
+    `none`."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    from fastapi.openapi.utils import get_openapi
+
+    schema = get_openapi(title=app.title, version=app.version, description=app.description, routes=app.routes)
+    for path, item in schema.get("paths", {}).items():
+        scoped = not path.startswith(UNSCOPED)
+        for method, operation in item.items():
+            if method not in ("get", "post", "put", "patch", "delete"):
+                continue
+            operation["x-openferment-scope"] = "project" if scoped else "none"
+            if scoped:
+                operation.setdefault("parameters", []).append({
+                    "name": projects.HEADER, "in": "header", "required": False, "schema": {"type": "string"},
+                    "description": f"The project the request acts in; ?{projects.QUERY}= in its place."})
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _scoped_openapi  # type: ignore[method-assign]
+
+
 # Starlette runs the middleware added last first, so this one, added before
 # the guard below, runs after it: a refused request never reaches the database.
 @app.middleware("http")
@@ -293,6 +322,7 @@ def _answer(request: AskRequest, *, on_step=None, cancelled=None, on_turn=None, 
         kept = _conversations.called(tid, name, args, res, by=who)
         artifacts.extend(a for a in kept if a not in artifacts)
         event_stream.publish("tool.result", {**ids, "tool": name, "ok": res.error is None, "error": res.error,
+                                             "hits": len(res.recordIds) + len(res.passages) + len(res.evidence) + len(res.rows),
                                              "evidenceIds": [e.id for e in res.evidence], "artifactIds": kept})
 
     try:

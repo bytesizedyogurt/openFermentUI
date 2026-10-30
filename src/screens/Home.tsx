@@ -1,5 +1,6 @@
 // Home (OF-DES-001 §8.1) — orient any persona in five seconds: what is in the
 // corpus, where you left off, and what to do next. Three bands plus a rail.
+import { HomeStart } from '@/components/HomeStart';
 import React, { useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
@@ -439,6 +440,8 @@ export default function Home() {
           title="Bioprocess literature you can operate on"
           subtitle="Ask Postdoc against a curated corpus, verify every extracted number against the span it came from, turn verified parameters into runnable protocols, and model what they cost at scale."
         />
+
+        <HomeStart />
 
         {/* ── Band 1 · Corpus vitals ─────────────────────────────────── */}
         <section aria-labelledby="home-vitals" className="mb-7">

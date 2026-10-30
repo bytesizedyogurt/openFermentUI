@@ -99,7 +99,7 @@ score as JSON:
 | `artifact.kept` | A computed artifact is kept (`artifacts.compute`) | `{id, tool, toolVersion, provenance, durationMs}` |
 | `turn.started` | A question is kept as a turn | `{conversationId, turnId, seq, question, by}` |
 | `tool.call` | The loop calls a tool | `{conversationId, turnId, tool, input}` |
-| `tool.result` | The tool answered, and the call is kept | `{conversationId, turnId, tool, ok, error, evidenceIds, artifactIds}` |
+| `tool.result` | The tool answered, and the call is kept | `{conversationId, turnId, tool, ok, error, hits, evidenceIds, artifactIds}`, `hits` the records, passages, evidence and rows it returned |
 | `turn.delta` | A step of the loop completes | `{conversationId, turnId, step}` (a `TraceStep`) |
 | `turn.plan`, `turn.decline` | The validated plan, or the plan that declines | `{conversationId, turnId, plan}` |
 

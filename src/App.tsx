@@ -1,5 +1,7 @@
 // App shell (OF-DES-001 §7.1): left rail + top utility bar + content region,
 // with the reviewer line, jobs tray, palette, and global shortcuts.
+import { ProjectHome } from '@/screens/ProjectHome';
+import { FlowsheetPage } from '@/screens/FlowsheetPage';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlaskConical,
@@ -129,6 +131,13 @@ class ScreenBoundary extends Component<{ children: ReactNode }, { error: Error |
 function Screen() {
   const route = useRoute();
   const [a, b, c, d, e] = route.segments;
+  const projectId = useStore((s) => s.projectId);
+  const openProject = useStore((s) => s.openProject);
+
+  // A project's address opens the project (§8.5): the page reloads in it.
+  useEffect(() => {
+    if (route.project && route.project !== projectId) openProject(route.project);
+  }, [route.project, projectId, openProject]);
 
   // §8 — an old path lands on the new screen rather than the not-found page.
   // Replace rather than push, so Back does not bounce the reader between the
@@ -152,7 +161,16 @@ function Screen() {
   // Sub-views are paths UNDER their owner, so a URL says where a thing lives:
   // /geneos/hosts/cw15 rather than /organisms/cw15. Nothing was deleted —
   // every screen below is the same file it was, mounted somewhere else.
+  if (route.project && route.project !== projectId) {
+    return (
+      <div className="p-8 text-ink-soft text-body" data-testid="opening-project">
+        Opening project <span className="font-num text-ink">{route.project}</span>…
+      </div>
+    );
+  }
+  if (route.project && !a) return <ProjectHome project={route.project} />;
   if (!a) return <Home />;
+  if (a === 'flowsheets' && b) return <FlowsheetPage recordId={b} />;
   switch (a) {
     case 'intake':
       if (b === 'ingest') return <IntakeIngest />;

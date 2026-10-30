@@ -77,3 +77,9 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - run: pnpm verify
+
+      # The UI walk against a real service (execution prompt §10 stage 7 gate,
+      # §9.1 step 9): the proof's steps it stands on, then Chromium through the
+      # built app.
+      - name: The UI walk
+        run: pnpm prove --steps 9
