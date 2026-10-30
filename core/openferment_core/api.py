@@ -93,6 +93,9 @@ from .models import (
     LibraryRunRequest,
     RunReport,
     EngineRun,
+    ScenarioCreate,
+    StudyRequest,
+    StudyScenario,
     LibraryShelf,
     PackageRegression,
     ReplayResult,
@@ -108,6 +111,7 @@ from .models import (
 from . import llm, spend
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
 from .engine import runs as _runs
+from .studies import scenarios as _scenarios
 from .postdoc import PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
@@ -860,6 +864,50 @@ def runs_report(run_id: str) -> RunReport:
         return _runs.report(run_id)
     except _runs.RunNotFound as e:
         raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+
+
+# ── studies (stage 5; studies/) ─────────────────────────────────────────
+
+
+@app.get("/api/studies/scenarios")
+def study_scenarios() -> list[StudyScenario]:
+    """The project's study scenarios, newest first."""
+    return _scenarios.listed()
+
+
+@app.post("/api/studies/scenarios")
+def study_scenario_make(asked: ScenarioCreate) -> StudyScenario:
+    """A scenario on a library plant or an openFerment flowsheet, checked
+    against the plant's parameters and kept; each value a person's
+    assumption or a model's estimate (ADR-006)."""
+    try:
+        return _scenarios.make(asked)
+    except _scenarios.ScenarioRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not read {asked.plant}: {e}") from e
+
+
+@app.get("/api/studies/scenarios/{scenario_id}")
+def study_scenario(scenario_id: str) -> StudyScenario:
+    try:
+        return _scenarios.get(scenario_id)
+    except _scenarios.ScenarioNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+
+
+@app.post("/api/studies/scenarios/{scenario_id}/run")
+def study_scenario_run(scenario_id: str, asked: StudyRequest) -> RunReport:
+    """The scenario run as an engine run (its report); values the plant
+    refuses are kept as a receipt with the scenario and answered 422."""
+    try:
+        return _scenarios.run(scenario_id, by=asked.by)
+    except _scenarios.ScenarioNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+    except _library.LibraryRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {scenario_id}: {e}") from e
 
 
 @app.get("/api/proforma/scenarios")

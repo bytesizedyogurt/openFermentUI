@@ -35,8 +35,10 @@ MAY: dict[str, set[str]] = {
     "projects": {"db", "models"},
     "literature": {"db", "models", "units"},
     "engine": {"db", "models", "workers", "params", "binding"},
-    "studies": {"engine", "literature", "db"},
-    "postdoc": {"tools", "llm", "spend", "db"},
+    # models.py is the schema of every row and request (ADR-007): the rows
+    # that leave it out read it too.
+    "studies": {"engine", "literature", "db", "models"},
+    "postdoc": {"tools", "llm", "spend", "db", "models"},
 }
 # Libraries and modules each package must never import.
 NEVER: dict[str, set[str]] = {
@@ -58,6 +60,7 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
     ("engine", "flowsheets"): "the package-test reader in flowsheets/shelf.py, which imports no BioSTEAM (§8.4: "
                               "the regression check reads the package's own test by ast)",
     ("engine", "projects"): "a run and a flowsheet record belong to the current project (ADR-005)",
+    ("studies", "projects"): "a scenario, a comparison and a runbook belong to the current project (ADR-005)",
 }
 
 

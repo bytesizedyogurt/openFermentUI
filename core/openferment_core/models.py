@@ -13,6 +13,7 @@ structurally incapable of originating a quantity (§5).
 """
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
@@ -3912,6 +3913,8 @@ class EngineRun(BaseModel):
     sffRefused: str | None = None
     # The plant's own words, for a refused run.
     refused: str | None = None
+    # The study scenario that asked for it first (studies/scenarios.py).
+    scenarioId: str | None = None
     by: str
     at: str
     durationMs: int | None = None
@@ -3923,3 +3926,63 @@ class RunReport(BaseModel):
     run: EngineRun
     artifact: Artifact | None = None
     flowsheet: SFFFlowsheet | None = None
+
+
+# ── studies (execution prompt §7.2, §9.1 step 5; studies/) ──────────────
+
+
+class ScenarioValue(BaseModel):
+    """One value a scenario sets on its plant: the parameter's key, and the
+    value as a quantity whose origin is a named person's assumption or a
+    model's estimate (ADR-006)."""
+
+    key: str
+    quantity: Quantity
+
+    @model_validator(mode="after")
+    def _a_value_set_for_a_run(self) -> "ScenarioValue":
+        q = self.quantity
+        if q.origin is None or q.origin.kind not in ("person-assumption", "model-estimate"):
+            raise ValueError(f"{self.key}: a scenario's value is a person's assumption or a model's estimate, and "
+                             "names which (quantity.origin)")
+        if not (q.origin.at or "").strip():
+            raise ValueError(f"{self.key}: a scenario's value says when it was set (quantity.origin.at)")
+        if isinstance(q.value, bool) or not isinstance(q.value, (int, float)) or not math.isfinite(float(q.value)):
+            raise ValueError(f"{self.key}: a scenario's value is a finite number")
+        if q.low is not None or q.high is not None:
+            raise ValueError(f"{self.key}: an engine run sets one value per parameter; a range is for sampling")
+        return self
+
+
+class ScenarioCreate(BaseModel):
+    """POST /api/studies/scenarios."""
+
+    title: str = Field(min_length=1, max_length=200)
+    plant: str
+    configuration: str | None = Field(default=None, max_length=40)
+    values: list[ScenarioValue] = Field(default_factory=list)
+    note: str | None = Field(default=None, max_length=2000)
+    by: str = Field(default="", max_length=200)
+
+
+class StudyScenario(BaseModel):
+    """A study's scenario (GET /api/studies/scenarios/{id}): a plant, its
+    configuration and the values it sets, and the engine runs made of it."""
+
+    id: str
+    kind: Literal["engine"] = "engine"
+    title: str
+    plant: str
+    configuration: str | None = None
+    values: list[ScenarioValue]
+    note: str | None = None
+    # The engine runs made of it, oldest first (engine/runs.py ids).
+    runIds: list[str] = Field(default_factory=list)
+    by: str
+    at: str
+
+
+class StudyRequest(BaseModel):
+    """Who asks: a run of a scenario, a lock."""
+
+    by: str = Field(default="", max_length=200)

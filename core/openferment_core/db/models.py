@@ -208,7 +208,12 @@ artifacts = _scoped(
     Index(None, "project_id", "tool"),
 )
 
-scenarios = _scoped("scenarios", Column("pinned", Boolean, nullable=False, server_default="false"), updated=True)
+# Two kinds of scenario share the table (migration 0004): `proforma`, the
+# rows the Proforma screens keep (project_state.py), and `engine`, a study's
+# scenario on a library plant or an openFerment flowsheet (studies/).
+scenarios = _scoped("scenarios", Column("pinned", Boolean, nullable=False, server_default="false"),
+                    Column("kind", Text, nullable=False, server_default="proforma"),
+                    Index(None, "project_id", "kind"), updated=True)
 
 comparisons = _scoped("comparisons")
 

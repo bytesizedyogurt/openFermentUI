@@ -54,6 +54,14 @@ class RunNotFound(KeyError):
     pass
 
 
+class RunRefused(library.LibraryRefused):
+    """A plant's refusal of a run's values, kept as the receipt `run_id`."""
+
+    def __init__(self, words: str, run_id: str):
+        super().__init__(words)
+        self.run_id = run_id
+
+
 def _inputs(inputs: list[BasisInput]) -> list[RunInput]:
     return [RunInput(name=i.name, quantity=Quantity(value=i.value, unit=i.unit, origin=origin_of(i.source)))
             for i in inputs]
@@ -93,9 +101,10 @@ def _now() -> str:
 
 
 async def _put(project_id: str, run: EngineRun, by: str) -> None:
+    columns = {"scenario_id": run.scenarioId} if run.scenarioId else {}
     async with db.session() as s:
         await rows.put(s, t.runs, project_id, run.id, run.model_dump(mode="json"), by=by,
-                       flowsheet_id=run.sff.recordId if run.sff else None, status=run.status)
+                       flowsheet_id=run.sff.recordId if run.sff else None, status=run.status, **columns)
 
 
 async def _get(project_id: str, run_id: str) -> EngineRun | None:
@@ -132,11 +141,12 @@ def report(run_id: str) -> RunReport:
 
 
 def run(plant_id: str, configuration: str | None = None, overrides: list[Override] | None = None, *,
-        by: str = "") -> RunReport:
+        by: str = "", scenario_id: str | None = None) -> RunReport:
     """Run a library plant or an openFerment flowsheet, write its SFF file
     and keep the run; a run of the same basis kept already is answered from
     its row. A plant that refuses the values is kept as a receipt and
-    refused (`library.LibraryRefused`, the plant's words)."""
+    refused (`RunRefused`, the plant's words and the receipt's id). A run a
+    study's scenario asks for names it (`scenario_id`)."""
     who = (by or "").strip() or "this browser"
     inputs = library.run_inputs(plant_id, configuration, list(overrides or []))
     project_id = projects.current()
@@ -144,18 +154,18 @@ def run(plant_id: str, configuration: str | None = None, overrides: list[Overrid
     run_id = artifacts.artifact_id(library.LIBRARY_RUN, version, inputs)
     held = db.run(_get(project_id, run_id))
     if held is not None and held.status == "refused":
-        raise library.LibraryRefused(held.refused or "the plant refused these values")
+        raise RunRefused(held.refused or "the plant refused these values", held.id)
     if held is not None and (held.sff is not None or held.sffRefused is not None):
         return report(run_id)
     named = _named(inputs, "configuration")
     base = dict(id=run_id, plant=plant_id, configuration=str(named) if named is not None else None,
                 tool=library.LIBRARY_RUN, toolVersion=version, inputs=_inputs(inputs), versions=_versions(inputs),
-                by=who, at=_now())
+                by=who, at=_now(), scenarioId=scenario_id)
     try:
         art = artifacts.compute(library.LIBRARY_RUN, inputs)
     except library.LibraryRefused as e:
         db.run(_put(project_id, EngineRun(**base, status="refused", refused=str(e)), who))
-        raise
+        raise RunRefused(str(e), run_id) from None
     flowsheet, refused = None, None
     try:
         flowsheet = sff.export(library.plant_of(art), project_id=project_id, run_artifact_id=art.id, by=who)
