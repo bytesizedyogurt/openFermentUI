@@ -56,5 +56,6 @@ file with the final version.
 
 - `pnpm install --frozen-lockfile` and `cd core && uv sync --all-extras`.
 - `pnpm test:core` (offline, about 4 to 6 minutes); `pnpm test:sim` (starts the BioSTEAM worker,
-  about 3 minutes); `pnpm typecheck`; `pnpm build`.
+  about 3 minutes); `pnpm typecheck`; `pnpm build`; `pnpm smoke` (opens every rail entry against
+  the real service; needs a build).
 - Database commands (`pnpm db:up`, `pnpm db:migrate`) arrive with stage 2.

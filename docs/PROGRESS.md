@@ -12,17 +12,18 @@ checkpoint. A fresh session continues from this file and `git log` alone.
    - `cd core && uv sync --all-extras`
    - From stage 2 on: `pnpm db:up` (or a local PostgreSQL with pgvector), then `pnpm db:migrate`.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: the stage 1 gate** — a minimal smoke over the real service that starts it and
-   opens every rail entry (`scripts/smoke.mjs`, `pnpm smoke`), then typecheck, build,
-   `test:core`, `test:sim` and `test_no_seed.py` in a clean worktree, and push. Stage 2 follows.
+4. **Next step: stage 2, step 2.1** — the `db/` package (the async engine over asyncpg, sessions,
+   the table models of §7.4), `compose.yaml`, alembic `0001_initial`, `pnpm db:up`, `db:migrate`
+   and `db:reset`, and the test database fixture (`OPENFERMENT_TEST_DATABASE_URL`, created per
+   session, rolled back per test).
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 1 — delete. 1.1 (5.3, 5.4), 1.2 (5.1, 5.2, Dominion and the retired guards of 5.6),
-1.3 (5.5's data movement), 1.4 (the rest of 5.6) and 1.5 (5.7) are committed; the smoke and the
-gate remain. Stage 0 is complete except the tag push
-(see Blockers).
+Stage 1 — delete — is complete: 1.1 to 1.5 delete section 5, and 1.6 passed the gate in a clean
+worktree (the smoke, typecheck, build, `test:core`, `test_no_seed.py`, `test:sim`). Stage 2 —
+PostgreSQL and the record stores — is next. Stage 0 is complete except the tag push (see
+Blockers).
 
 ## Last green runs
 
@@ -35,6 +36,8 @@ gate remain. Stage 0 is complete except the tag push
 | 2026-10-30 05:39 | `typecheck`, `build`, `test:core` in a clean worktree | 1929 passed, 2 skipped, 128 deselected | 4 min 28 s | `b24e997` (1.2) |
 | 2026-10-30 05:44 | `test:sim` in a clean worktree | 102 passed, 1957 deselected | 4 min 9 s | `b24e997` (1.2) |
 | 2026-10-30 05:43 | `test:core` with 1.3 | 1888 passed, 2 skipped, 128 deselected | 4 min 12 s | 1.3 |
+| 2026-10-30 06:10 | Stage 1 gate in a clean worktree: `typecheck`, `build`, `test:core` | 1888 passed, 2 skipped, 128 deselected | 4 min 7 s | 1.6 |
+| 2026-10-30 06:10 | Stage 1 gate: `test_no_seed.py`, `test:sim`, `pnpm smoke` | 45 passed; 102 passed, 1916 deselected; 11 of 11 rail entries open | 4 s; 3 min 59 s; 22 s | 1.6 |
 
 ## Decisions
 
@@ -93,7 +96,8 @@ gate remain. Stage 0 is complete except the tag push
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | stage 4 |
 | `test_proforma.py` holds the package's own regression values and this build's benchmark price to test the parser | stage 4 (A4 review) |
 | `core/tests/standins.py` keeps a closed-form ethanol evaluator, stand-in yeast records and `STANDIN_THEORETICAL` | stage 4 (with the row above on stand-ins) |
-| No smoke test while the double is gone | end of stage 1: a minimal smoke over the real service; stage 7 extends it |
+| `pnpm smoke` opens the rail entries and checks nothing more; alpha 1.0's smoke also walked review, deposition, the runs and the redirects against the service double | stage 7 extends it over the real service |
+| `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7 |
 
 ## Owner questions (execution prompt §13) and the defaults taken
 
@@ -167,3 +171,12 @@ gate remain. Stage 0 is complete except the tag push
   `docs/build/`, `docs/OF-COR-001.md` and `docs/DEMO.md` moved to `docs/history/` with 2026-10-21
   in their names, beside `CLAUDE-2026-10-21.md` from stage 0. An interim `README.md` points at
   this file, the decisions and `CLAUDE.md` until stage 8 writes the replacements.
+- 1.6 The stage 1 gate. `scripts/smoke.ts` (`pnpm smoke`, in `verify` after the build) starts the
+  real service on loopback with `dist/` mounted and a temporary data directory, opens each of
+  the eleven rail entries in Chromium, and fails on a console error, an uncaught exception, the
+  screen boundary's card, the not-found page, a near-empty main region or a 500 from the
+  service. It calls the project's Python directly when `core/.venv` exists (from a second
+  worktree, `uv run` would re-point the shared editable install) and launches the installed
+  Chromium when the repository's Playwright expects another build. The gate ran in a clean
+  worktree of the commit's tree: all green (Last green runs). Sections 10.1.3 (the thread Q list)
+  and 10.1.4 (the kit's suite, the Python pin) were done at 1.2 and stage 0.
