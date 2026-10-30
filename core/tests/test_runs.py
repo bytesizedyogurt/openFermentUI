@@ -16,7 +16,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts
+from openferment_core import artifacts, llm
 from openferment_core.api import app
 from openferment_core.engine import library, runs, sff, simulator
 from openferment_core.models import BasisInput, BasisSource, ReplayTolerance
@@ -24,7 +24,8 @@ from openferment_core.models import BasisInput, BasisSource, ReplayTolerance
 from test_library import StandInWorker, over
 from test_sff import StandInToolkit
 
-MODEL = "claude-opus-5-5"
+# The model the service calls first: the one whose estimates these are.
+MODEL = llm.DEFAULT_PRIMARY
 
 
 class StandIn:

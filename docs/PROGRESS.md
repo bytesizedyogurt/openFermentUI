@@ -502,3 +502,9 @@ precision, the package rules of §7.2 as a test, the worker op reference, and tw
   Once a lock is kept the store refuses a runbook row whose predictions or measures differ, from
   either side. `test_runbook_lock.py`, `test_runbooks.py`; the `sim` study locks a runbook on the
   scenario's selling price.
+- 5.1 (exports) The export package: one zip of `study.json` (runs with their inputs' origins,
+  scenarios, comparisons, runbooks and the artifacts behind them), `study.md`, each run's SFF file
+  byte for byte, `versions.json` and a manifest of sha256s, which the standard library opens
+  alone (`python -I -S`). `GET /api/studies/export` and `python -m
+  openferment_core.studies.exports`. The tests written in this build name the estimating model
+  through `llm.DEFAULT_PRIMARY`. `test_exports.py`; the `sim` study exports its two runs.

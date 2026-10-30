@@ -6,23 +6,28 @@ model's estimate, run as engine runs and compared: the comparison holds the
 price and the flowsheet's outputs in their units with the scenario's change
 from the base, each value the scenario set with its origin beside the
 library's default, and it is `assumed`. A runbook made from the scenario's
-run predicts its selling price and locks under the browser's digest.
+run predicts its selling price and locks under the browser's digest, and the
+export package holds each run's SFF file as the project holds it.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+
 import pytest
 
-from openferment_core import proforma
+from openferment_core import llm, proforma
 from openferment_core.engine import runs
 from openferment_core.models import (ComparisonCreate, Origin, PredictedOutput, Quantity, RunbookCreate, ScenarioCreate,
                                      ScenarioValue)
 from openferment_core.runbook_lock import lock_hash
-from openferment_core.studies import comparisons, runbooks, scenarios
+from openferment_core.studies import comparisons, exports, runbooks, scenarios
 
 pytestmark = pytest.mark.sim
 
 FLOWSHEET = "cellulosic_ethanol_v0"
-MODEL = "claude-opus-5-5"
+# The model the service calls first: the one whose estimates these are.
+MODEL = llm.DEFAULT_PRIMARY
 
 
 @pytest.fixture(scope="module")
@@ -68,3 +73,10 @@ def test_a_scenario_on_the_flowsheet_runs_assumed_and_compares_with_its_base(war
     assert locked.lockedAt and locked.lockHash == lock_hash(
         [p.model_dump(exclude_unset=True) for p in locked.predictions],
         [m.model_dump(exclude_unset=True) for m in locked.measurementSchema])
+    package = exports.files(by="Ada Moreno")
+    for run in (base, rep.run):
+        held = hashlib.sha256(package[f"sff/{run.id}.sff.json"]).hexdigest()
+        assert held == runs.report(run.id).flowsheet.sha256
+    exported = json.loads(package["study.json"])
+    assert [r["id"] for r in exported["runs"]] == [base.id, rep.run.id]
+    assert exported["runbooks"][0]["lockHash"] == locked.lockHash

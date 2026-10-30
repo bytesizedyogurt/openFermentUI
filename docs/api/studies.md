@@ -85,3 +85,26 @@ leaves out stays out, because the digest reads an absent field and a null one di
 | `POST /api/studies/runbooks` | `{title, runId, predict: [{output, label}], by}`: made and kept as a draft |
 | `GET /api/studies/runbooks/{id}` | Any runbook of the project, a lock the row does not carry laid on; 404 for one it does not hold |
 | `POST /api/studies/runbooks/{id}/lock` | `{by}`: locked; 422 when locked already or empty, 404 for an unknown runbook |
+
+## Exports
+
+The project's studies as one zip that opens with nothing of openFerment's: the standard library
+reads all of it (`tests/test_exports.py` opens it in `python -I -S`, which leaves every installed
+package off the path). The code is `core/openferment_core/studies/exports.py`.
+
+| File | What it holds |
+|---|---|
+| `study.json` | Every engine run (its inputs as quantities with their origins, its outputs, versions and SFF record), every study scenario, comparison and runbook (as kept), and, whole, the artifacts that computed the runs and the comparisons |
+| `study.md` | The same in words and tables: each run's inputs with their origins, its price in BioSTEAM's TEA units and a flowsheet's outputs in theirs, each scenario's values, each comparison's rows and changes, each runbook's predictions and lock, and the versions |
+| `sff/<run>.sff.json` | Each run's flowsheet, byte for byte as the project holds it (its sha256 is the record's) |
+| `versions.json` | openFerment's own version and Python's; each run's tool with its simulator, property engine and package; each SFF file's toolkit and schema; each comparison's version; the lock digest's algorithm |
+| `manifest.json` | The project, when the package was taken and by whom, and every other file's size and sha256 |
+
+The same study gives the same `study.json`, `study.md`, `versions.json` and SFF files, byte for
+byte, and the zip stamps every member alike; the manifest alone says when. A run its plant refused
+is there as its receipt, with no artifact and no SFF file.
+
+| Route or command | What it does |
+|---|---|
+| `GET /api/studies/export?by=` | The package, `application/zip`, named `<project>-studies.zip` |
+| `python -m openferment_core.studies.exports OUT.zip` | The same for the project `OPENFERMENT_PROJECT` names, reading that name and the database address alone from `core/.env` when the environment does not set them (ADR-005) |

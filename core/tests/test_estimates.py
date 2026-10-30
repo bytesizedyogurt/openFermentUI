@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import api, basis, binding, biorepo, extract, project_state
+from openferment_core import api, basis, binding, biorepo, extract, llm, project_state
 from openferment_core.engine import library
 from openferment_core.models import (
     BasisInput,
@@ -28,7 +28,8 @@ from openferment_core.models import (
     Usage,
 )
 
-MODEL = "claude-opus-5-5"
+# The model the service calls first: the one whose estimates these are.
+MODEL = llm.DEFAULT_PRIMARY
 AT = "2026-10-30T12:00:00Z"
 ESTIMATE = Origin(kind="model-estimate", by=MODEL, at=AT, note="a typical titre for this host")
 

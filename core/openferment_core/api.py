@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -117,6 +117,7 @@ from . import llm, spend
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
 from .engine import runs as _runs
 from .studies import comparisons as _comparisons  # noqa: F401  (registers study.comparison for compute and replay)
+from .studies import exports as _exports
 from .studies import runbooks as _runbooks
 from .studies import scenarios as _scenarios
 from .postdoc import PostdocUnavailable, ask_model
@@ -985,6 +986,19 @@ def study_runbook_lock(runbook_id: str, asked: StudyRequest) -> Runbook:
         raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
     except _runbooks.RunbookRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/studies/export", response_class=Response)
+def study_export(by: str = "") -> Response:
+    """The project's studies as one zip that opens without the service:
+    study.json, study.md, each run's SFF file, versions.json and a manifest
+    of each file's sha256 (studies/exports.py)."""
+    try:
+        data = _exports.package(by=by)
+    except _exports.ExportRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    return Response(content=data, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{_exports.filename()}"'})
 
 
 @app.get("/api/proforma/scenarios")

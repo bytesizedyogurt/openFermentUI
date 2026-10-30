@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from openferment_core import artifacts, audit, biorepo, db, extract, guild, import_alpha1, projects, proposals
+from openferment_core import artifacts, audit, biorepo, db, extract, guild, import_alpha1, llm, projects, proposals
 from openferment_core.models import (
     AuditEntry,
     BioRepo,
@@ -32,8 +32,8 @@ LEAD = GuildPerson(id="p-ada", name="Ada Moreno", role="lead", joinedAt="2026-10
 ENTRY = GuildEvidence(id="e-0001", personId="p-ada", skillId="SK-OD", kind="independent", at="2026-10-02",
                       source=EvidenceSource(kind="lead", ref="a placeholder training record"), raw="a placeholder entry", observerId=None)
 PROPOSAL = Proposal(id="pr-1", at="2026-10-03T00:00:00Z", module="runbooks", action="lock", gate="lock",
-                    title="Runbooks: lock — rb-1", why="w", how="h", by="claude-opus-5-5", target="rb-1")
-LINES = [AuditEntry(at="2026-10-03T00:00:00Z", agent="model", who="claude-opus-5-5", module="runbooks",
+                    title="Runbooks: lock — rb-1", why="w", how="h", by=llm.DEFAULT_PRIMARY, target="rb-1")
+LINES = [AuditEntry(at="2026-10-03T00:00:00Z", agent="model", who=llm.DEFAULT_PRIMARY, module="runbooks",
                     action="lock", state="proposed", target="rb-1", askId="ask-1")]
 
 

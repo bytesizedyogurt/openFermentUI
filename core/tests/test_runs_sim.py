@@ -13,14 +13,15 @@ from __future__ import annotations
 
 import pytest
 
-from openferment_core import artifacts, proforma
+from openferment_core import artifacts, llm, proforma
 from openferment_core.engine import library, runs
 from openferment_core.models import Override
 
 pytestmark = pytest.mark.sim
 
 FLOWSHEET = "cellulosic_ethanol_v0"
-MODEL = "claude-opus-5-5"
+# The model the service calls first: the one whose estimates these are.
+MODEL = llm.DEFAULT_PRIMARY
 
 
 @pytest.fixture(scope="module")

@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from openferment_core import project_state
+from openferment_core import llm, project_state
 from openferment_core.api import app
 from openferment_core.engine import library, runs, simulator
 from openferment_core.models import Origin, Quantity, ScenarioCreate, ScenarioValue
@@ -23,7 +23,8 @@ from openferment_core.workers import WorkerError
 
 from test_runs import StandIn
 
-MODEL = "claude-opus-5-5"
+# The model the service calls first: the one whose estimates these are.
+MODEL = llm.DEFAULT_PRIMARY
 
 
 @pytest.fixture
