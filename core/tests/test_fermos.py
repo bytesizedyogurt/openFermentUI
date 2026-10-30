@@ -329,7 +329,7 @@ def test_a_simulation_is_kept_with_every_parameter_and_override_named(store):
     art = artifacts.get(r.artifactId)
     assert art.tool == fermos.SIMULATION and set(art.output) == OUTPUT_KEYS
     assert art.toolVersion == f"kinetics {BATCH} {fermos.SIMULATION_RUN} · scipy {kinetics.versions()['scipy']}"
-    # An override is a named person's assumption, so the simulation is demo.
+    # An override is a named person's assumption, so the simulation is standins.
     assert r.provenance == "demo" == art.provenance
     by_name = {i.name: i for i in art.inputs}
     for key in STANDIN_TYPED:
@@ -381,9 +381,8 @@ def test_a_waiting_parameter_refuses_the_simulation_naming_it_and_its_field(stor
 
 
 def test_yps_is_set_beside_the_newest_stored_ceiling_and_flagged_above_it(store):
-    from openferment_core import demo
-
-    demo.standin_ceiling("Yeast9", "ethanol", "glucose", STANDIN_TYPED["yps"] * 0.9)
+    import standins
+    standins.standin_ceiling("Yeast9", "ethanol", "glucose", STANDIN_TYPED["yps"] * 0.9)
     req = SimulationRequest(family=BATCH, strain="s-cerevisiae-cenpk113-7d", product="ethanol", sugar="glucose",
                             overrides=typed(**STANDIN_TYPED))
     r = fermos.simulate(req)

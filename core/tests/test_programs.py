@@ -154,7 +154,7 @@ from types import SimpleNamespace  # noqa: E402
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from openferment_core import evidence_pool, module_stores, passages, retrieve, tools  # noqa: E402
+from openferment_core import evidence_pool, module_stores, tools  # noqa: E402
 from openferment_core.models import AnswerPlan, Candidate, Passage, Quantity, ReviewDecision  # noqa: E402
 from openferment_core.validate import find_number  # noqa: E402
 
@@ -288,66 +288,6 @@ def test_an_artifact_belongs_to_the_program_of_what_it_was_computed_from():
     assert programs.program_of_artifact(art(("model", "m", "model", "e_coli_core"), ("product", "phb", "convention", None))) == "pha"
     assert programs.program_of_artifact(art(("record value", "1", "record", "r-B5-3"))) == "casein"
     assert programs.program_of_artifact(art(("model", "m", "model", "biorefineries.cornstover@2.35.1"))) is None
-
-
-def test_with_the_switch_off_retrieval_leaves_archived_passages_out(monkeypatch):
-    def cut(pid: str) -> passages.Cut:
-        paper = pid.split(":")[0]
-        return passages.Cut(Passage(id=pid, paperId=paper, sectionId="s1", heading="Results", kind="prose",
-                                    text=f"Ethanol from glucose in the stand-in {paper}.", start=0, end=40), STAND_IN)
-
-    def other(n: int) -> passages.Cut:
-        return passages.Cut(Passage(id=f"Z9:s1:{n}", paperId="Z9", sectionId="s1", heading="Methods", kind="prose",
-                                    text=f"Unrelated stand-in words, part {n}.", start=0, end=30), STAND_IN)
-
-    corpus = load_corpus()
-    ids = [f"{_first(corpus, x)}:s1:0" for x in ("P", "Q", "H")]
-    index = passages.Bm25Index([cut(i) for i in ids] + [other(n) for n in range(4)])
-    monkeypatch.setattr(passages, "bm25_index", lambda: index)
-    off = retrieve.search_detail("ethanol glucose", k=8, lane="bm25")
-    on = retrieve.search_detail("ethanol glucose", k=8, lane="bm25", include_archived=True)
-    assert [h.passage.id for h in off.hits] == [ids[1]] and off.hidden == 2
-    assert sorted(h.passage.id for h in on.hits) == sorted(ids) and on.hidden == 0
-
-
-def test_the_api_passes_the_switch_through_and_no_tool_input_carries_it(monkeypatch):
-    from openferment_core import api, postdoc_agent
-
-    asked: list[bool] = []
-    ran: list[bool] = []
-    searched: list[bool] = []
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: SimpleNamespace(records=[]))
-
-    def ask(question, *, ctx, **kw):
-        asked.append(ctx.include_archived)
-        return AnswerPlan(question=question)
-
-    def run(name, raw, ctx=None):
-        ran.append(ctx.include_archived)
-        return tools.ToolResult()
-
-    def search_detail(question, k=8, lane=None, include_archived=False, **kw):
-        searched.append(include_archived)
-        return retrieve.Detail(hits=[], lane="bm25")
-
-    monkeypatch.setattr(postdoc_agent, "ask", ask)
-    monkeypatch.setattr(tools, "run", run)
-    monkeypatch.setattr(retrieve, "search_detail", search_detail)
-    client = TestClient(api.app, base_url="http://127.0.0.1")
-    for body in ({"question": "q"}, {"question": "q", "includeArchived": True}, {"question": "q", "includeArchived": False}):
-        assert client.post("/api/ask", json=body).status_code == 200
-        assert client.post("/api/ask/stream", json=body).status_code == 200
-        assert client.post("/api/rag/search", json=body).status_code == 200
-    assert asked == [False, False, True, True, False, False]
-    assert searched == [False, True, False]
-    read = {"ids": [], "words": "", "kind": "", "state": "", "limit": 5}
-    client.post("/api/tools/geneos_read", json=read)
-    client.post("/api/tools/geneos_read?includeArchived=true", json=read)
-    assert ran == [False, True]
-    monkeypatch.undo()
-    # The switch is never a field a model can type into a tool's input.
-    refused = tools.run("geneos_read", read | {"includeArchived": True})
-    assert refused.error and "includeArchived" in refused.error
 
 
 def test_the_mcp_server_takes_the_switch_from_its_environment_and_never_from_a_client(monkeypatch):

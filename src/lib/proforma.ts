@@ -34,9 +34,9 @@ import type {
   VesselSummary,
 } from '@/data/types';
 import { useStore } from '@/store';
-import { RagDown, RagRefused, call } from './rag';
+import { ServiceDown, ServiceRefused, call } from './http';
 
-export { RagDown as ProformaDown, RagRefused as ProformaRefused };
+export { ServiceDown as ProformaDown, ServiceRefused as ProformaRefused };
 
 export interface SimulatorStatus {
   status: 'cold' | 'starting' | 'ready' | 'failed';
@@ -90,8 +90,8 @@ export const referencePath = (id: string) => `/proforma/reference/${encodeURICom
  * holds (a 404 with no JSON body), or the service double's 404.
  */
 const noEndpoint = (e: unknown) =>
-  (e instanceof RagRefused && (e.status === 405 || (e.status === 404 && /^(Not Found|not part of the smoke double)$/.test(e.message)))) ||
-  (e instanceof RagDown && /answered 40[45]\./.test(e.message));
+  (e instanceof ServiceRefused && (e.status === 405 || (e.status === 404 && /^(Not Found|not part of the smoke double)$/.test(e.message)))) ||
+  (e instanceof ServiceDown && /answered 40[45]\./.test(e.message));
 
 /**
  * The newest stored run of a reference flowsheet, its shelf entry and its
@@ -145,7 +145,7 @@ export async function runProformaReference(id: string, signal?: AbortSignal): Pr
   } catch (e) {
     if (!noEndpoint(e)) throw e;
     if (id === BENCHMARK_FLOWSHEET) return runProformaBenchmark(signal);
-    throw new RagRefused(404, `This service cannot run ${id} yet: it has no reference endpoint.`);
+    throw new ServiceRefused(404, `This service cannot run ${id} yet: it has no reference endpoint.`);
   }
 }
 
@@ -392,7 +392,7 @@ export async function proformaBind(flowsheet: string, ask: BindAsk, signal?: Abo
     return await call<ProformaScenarioInfo>(`/api/proforma/bind?${bindQuery(ask, { flowsheet })}`, { signal });
   } catch (e) {
     if (!noEndpoint(e)) throw e;
-    throw new RagRefused(404, 'This service has no bind endpoint, so it cannot bind the inputs of a scenario made here yet.');
+    throw new ServiceRefused(404, 'This service has no bind endpoint, so it cannot bind the inputs of a scenario made here yet.');
   }
 }
 
@@ -492,7 +492,7 @@ export async function fermosFits(flowsheet: string, includeArchived: boolean, si
     );
   } catch (e) {
     if (!noEndpoint(e)) throw e;
-    throw new RagRefused(404, 'This service has no fermOS fit list, so it cannot offer a fit to this scenario yet.');
+    throw new ServiceRefused(404, 'This service has no fermOS fit list, so it cannot offer a fit to this scenario yet.');
   }
 }
 
@@ -538,7 +538,7 @@ export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promi
     return await call<CeilingCheck>(`/api/proforma/ceiling-check?${q.toString()}`, { signal });
   } catch (e) {
     if (!noEndpoint(e)) throw e;
-    throw new RagRefused(404, 'This service has no ceiling check, so it cannot read this scenario\u2019s yield against a geneOS ceiling yet.');
+    throw new ServiceRefused(404, 'This service has no ceiling check, so it cannot read this scenario\u2019s yield against a geneOS ceiling yet.');
   }
 }
 

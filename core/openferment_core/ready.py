@@ -124,28 +124,6 @@ def check_intake() -> Check:
 # ── what this document added (OF-BLD-014 §10.2) ───────────────────────
 
 
-def _fetched_complete() -> int:
-    n = 0
-    for path in intake.FULLTEXT_DIR.glob("*.json"):
-        try:
-            hit = intake.cached(path.stem)
-        except ValueError:
-            continue
-        n += hit is not None and hit.status == "complete"
-    return n
-
-
-def check_index() -> Check:
-    from . import passages
-
-    st = passages.status()
-    fetched = _fetched_complete()
-    detail = f"{st.papersIndexed} papers indexed of {fetched} fetched, {st.passages} passages; lane {st.chosenLane}"
-    if st.papersIndexed < fetched:
-        return Check("index", "warn", f"{detail}. Rebuild: pnpm index:build")
-    return Check("index", "ok", detail)
-
-
 def check_workers(ping: bool = True) -> Check:
     """Each simulation worker answering ping. BioSTEAM takes most of a
     minute to import, so this row is slow on a cold machine."""
@@ -426,7 +404,7 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True)
     checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
     # §10.R: one damaged file must not stop the report; a row that cannot be
     # checked says why and the rest still run.
-    for name, row in (("index", check_index), ("models", check_models), ("artifacts", check_artifacts),
+    for name, row in (("models", check_models), ("artifacts", check_artifacts),
                       ("spend", check_spend), ("workers", lambda: check_workers(workers)), ("graphviz", check_graphviz)):
         try:
             checks.append(row())

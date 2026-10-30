@@ -391,21 +391,9 @@ def test_the_new_rows_are_listed_and_change_no_lane(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     checks = ready.run(no_network=True, port=1)
     names = [c.name for c in checks]
-    for n in ("index", "models", "artifacts", "spend", "workers", "graphviz"):
+    for n in ("models", "artifacts", "spend", "workers", "graphviz"):
         assert n in names
     assert ready.lane(checks) == "none"
-
-
-def test_index_warns_when_fewer_papers_are_indexed_than_fetched(monkeypatch):
-    from openferment_core import passages
-    from openferment_core.models import RagStatus
-
-    monkeypatch.setattr(passages, "status", lambda: RagStatus(papersIndexed=3, passages=40, lanes=[], chosenLane="bm25"))
-    monkeypatch.setattr(ready, "_fetched_complete", lambda: 5)
-    c = ready.check_index()
-    assert c.mark == "warn" and "3 papers indexed of 5 fetched" in c.detail and "lane bm25" in c.detail
-    monkeypatch.setattr(ready, "_fetched_complete", lambda: 3)
-    assert ready.check_index().mark == "ok"
 
 
 def test_a_model_file_that_is_missing_or_changed_is_named(monkeypatch):
@@ -461,15 +449,13 @@ def test_a_worker_that_does_not_answer_is_said(monkeypatch):
 
 
 def test_r2_a_row_that_crashes_reads_as_a_warning_and_the_rest_still_run(monkeypatch):
-    from openferment_core import passages
-
     def broken():
         raise AttributeError("'list' object has no attribute 'get'")
 
-    monkeypatch.setattr(passages, "status", broken)
+    monkeypatch.setattr(ready, "check_models", broken)
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     checks = ready.run(no_network=True, port=1)
-    row = next(c for c in checks if c.name == "index")
+    row = next(c for c in checks if c.name == "models")
     assert row.mark == "warn" and "could not be checked" in row.detail and checks[-1].name == "service"
 
 

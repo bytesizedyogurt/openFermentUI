@@ -34,7 +34,8 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, composite, demo, intake, proforma, pureos, vessel
+from openferment_core import artifacts, composite, intake, proforma, pureos, vessel
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
 from openferment_core.models import Override, ProformaRunRequest, VesselRequest
 from openferment_core.pureos import catalogue, train_spec
@@ -78,7 +79,7 @@ class Worker:
             return self.vessel(op, args)
         if op in ("catalogue_specs", "train_specs", "flowsheet_unit_values", "train_run"):
             return self.train(op, args)
-        return demo._standin_call(op, args)
+        return standins._standin_call(op, args)
 
 
 @pytest.fixture()

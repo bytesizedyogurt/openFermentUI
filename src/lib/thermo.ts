@@ -9,9 +9,9 @@
 // and reads; it computes no property. With the service down it says so, and
 // nothing stands in for an answer (E.2). Shares lib/rag.ts's call.
 import type { Artifact, ThermoProps, ThermoPropsRequest, Train } from '@/data/types';
-import { RagDown, RagRefused, call } from './rag';
+import { ServiceDown, ServiceRefused, call } from './http';
 
-export { RagDown as ThermoDown, RagRefused as ThermoRefused };
+export { ServiceDown as ThermoDown, ServiceRefused as ThermoRefused };
 
 export const BEER = 'beer-at-titre-of';
 export const AZEOTROPE = 'ethanol-water-azeotrope';

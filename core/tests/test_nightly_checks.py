@@ -47,9 +47,7 @@ def test_a_tool_this_process_does_not_know_is_a_problem(store):
     assert len(problems) == 1 and art.id in problems[0] and "could not be replayed" in problems[0]
 
 
-def test_the_nightly_job_rebuilds_the_index_scores_on_change_and_checks():
+def test_the_nightly_job_checks_after_extraction():
     sh = (REPO / "scripts" / "host" / "nightly.sh").read_text()
     intake_at = sh.index("openferment_core.extract --all")
-    for step in ("openferment_core.passages", "openferment_core.rageval eval", "openferment_core.nightly_checks"):
-        assert sh.index(step) > intake_at, f"{step} runs after extraction"
-    assert 'if [ "$before" != "$after" ]' in sh, "the scorecard runs only when the index changed"
+    assert sh.index("openferment_core.nightly_checks") > intake_at, "the checks run after extraction"

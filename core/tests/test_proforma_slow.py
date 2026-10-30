@@ -240,13 +240,13 @@ def test_a_dearer_glucose_raises_the_ethanol_price(eth):
 def test_a_whole_yeast_run_through_the_worker(store):
     from types import SimpleNamespace
 
-    from openferment_core import demo
+    import standins
     from openferment_core.models import InputAssumption, ProformaRunRequest
 
-    rs = demo._standin_yeast_records()
+    rs = standins._standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-20")
-         for k, v, lo, hi in demo.YEAST_STANDIN_ASSUMED]
+         for k, v, lo, hi in standins.YEAST_STANDIN_ASSUMED]
     out = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=a, seed=3), pool=pool)
     assert out.samples == 500 and out.feasible + sum(out.infeasible.values()) == 500 and out.baseInfeasible is None
     assert set(out.infeasible) <= {"yield", "concentration", "convergence"}

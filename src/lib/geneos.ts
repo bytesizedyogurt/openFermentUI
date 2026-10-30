@@ -7,9 +7,9 @@
 import type { ExtractionRecord, FieldId, GeneosModelInfo, GeneosResult, ParameterDef } from '@/data/types';
 import { ONTOLOGY_BY_ID } from '@/data/ontology';
 import { carbonSourceId } from '@/data/vocabulary';
-import { RagDown, RagRefused, call } from './rag';
+import { ServiceDown, ServiceRefused, call } from './http';
 
-export { RagDown as GeneosDown, RagRefused as GeneosRefused };
+export { ServiceDown as GeneosDown, ServiceRefused as GeneosRefused };
 
 const post = <T>(path: string, body: unknown, signal?: AbortSignal) =>
   call<T>(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });

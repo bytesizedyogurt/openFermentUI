@@ -15,7 +15,8 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, demo, intake, proforma
+from openferment_core import artifacts, intake, proforma
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.models import InputAssumption, ProformaRunRequest
 
 ETHANOL = "ethanol_glucose_v0"
@@ -26,9 +27,9 @@ MADE_HERE = "sc-k3x9q-1"  # an id as the browser's createScenario makes them
 @pytest.fixture()
 def standin(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
     monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records() + demo._standin_yeast_records()
+    rs = standins._standin_records() + standins._standin_yeast_records()
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
 
 

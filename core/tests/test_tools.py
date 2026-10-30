@@ -255,13 +255,15 @@ def test_selling_price_refuses_with_no_run_and_names_what_waits(monkeypatch, tmp
 def test_selling_price_cites_the_latest_run_a_person_produced(monkeypatch, tmp_path):
     from types import SimpleNamespace
 
-    from openferment_core import demo, intake, proforma
+    from openferment_core import intake, proforma
+
+    import standins
     from openferment_core.models import InputAssumption, ProformaRunRequest
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
     monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records()
+    rs = standins._standin_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     a = [InputAssumption(key=k, value=v, low=v, high=v, by="Sean Creighton", at="2026-10-15")
          for k, v in (("recovery", 0.95), ("sugarPrice", 0.4), ("sugarFeed", 1000.0))]
@@ -278,9 +280,8 @@ def _yeast_pool(drop=()):
     a test drops."""
     from types import SimpleNamespace
 
-    from openferment_core import demo
-
-    rs = [r for r in demo._standin_yeast_records() if r["field"] not in drop]
+    import standins
+    rs = [r for r in standins._standin_yeast_records() if r["field"] not in drop]
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
 
 
@@ -404,16 +405,18 @@ def proforma_store(tmp_path, monkeypatch):
     as the offline Proforma tests run."""
     from types import SimpleNamespace
 
-    from openferment_core import audit, demo, proforma, proposals
+    from openferment_core import audit, proforma, proposals
+
+    import standins
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
     monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
     monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records()
+    rs = standins._standin_records()
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}, path=tmp_path)
 
 

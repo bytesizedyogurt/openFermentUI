@@ -22,7 +22,8 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, basis, demo, intake, params, proforma
+from openferment_core import artifacts, basis, intake, params, proforma
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.models import InputAssumption, Override, ParamResolveRequest, ProformaRunRequest
 
 ETHANOL = "ethanol_glucose_v0"
@@ -35,9 +36,9 @@ SCOPE = "proforma:sc-yeast-1"
 @pytest.fixture()
 def standin(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
     monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records() + demo._standin_yeast_records()
+    rs = standins._standin_records() + standins._standin_yeast_records()
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
 
 
@@ -223,7 +224,7 @@ def test_the_panel_binds_as_the_run_binds_and_both_refuse_in_the_same_words(stan
     without the person's values, so its refusal said titre binds records;
     it binds with them now, as the run does, and both refuse in the same
     words, which say the titre is the person's and the remedy that applies."""
-    _, fc = demo._bridge_fits()
+    _, fc = standins._bridge_fits()
     every = {k: fc for k in proforma.FIT_KEYS}
     typed = [*ECONOMICS, over("titre", 50.0)]
     with pytest.raises(params.ParamRefused) as panel:

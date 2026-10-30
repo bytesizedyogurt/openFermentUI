@@ -121,9 +121,8 @@ ALLOWED = {
     "thermosteam": {"workers/proforma_worker.py", "pureos/inhouse.py"},
     # OF-BLD-020 E.3‴: scipy in fermOS's kinetics and fits alone among the
     # service's modules. The workers and the flowsheets they run may use it
-    # (worker side), and demo.py, the fixture builder no route imports,
-    # samples its stand-in evaluator with scipy's qmc.
-    "scipy": {"kinetics.py", "fermos.py", "demo.py"},
+    # (worker side).
+    "scipy": {"kinetics.py", "fermos.py"},
 }
 # What runs in a worker's process, not the service's.
 WORKER_SIDE = ("workers/", "flowsheets/")

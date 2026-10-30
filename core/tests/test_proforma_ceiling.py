@@ -1,7 +1,7 @@
 """A scenario's yield read against the geneOS ceiling (OF-BLD-019 §5.2, D11),
 with no simulator and no flux balance analysis.
 
-Every ceiling here is a STAND-IN artifact written by demo.standin_ceiling
+Every ceiling here is a STAND-IN artifact written by standins.standin_ceiling
 into a scratch store, at a value chosen in the test beside the stand-in
 records' yields; every record and assumption is a FIXTURE. None is a
 measurement and no number here is a result. The binding, the fits and the
@@ -14,13 +14,14 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, demo, fermos, geneos_models, intake, proforma
+from openferment_core import artifacts, fermos, geneos_models, intake, proforma
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.models import FermosPoint, FermosSeries, InputAssumption, ProformaRunRequest
 
 ETHANOL = "ethanol_glucose_v0"
 BY = "openFerment test fixture"
 MADE_HERE = "sc-k3x9q-1"  # an id as the browser's createScenario makes them
-# demo._standin_yeast_records' ethanol yields, in g g-1: 0.4, 0.45, 0.48.
+# standins._standin_yeast_records' ethanol yields, in g g-1: 0.4, 0.45, 0.48.
 LOWEST, MEDIAN, HIGHEST = 0.4, 0.45, 0.48
 # Stand-in ceilings, chosen here around those yields.
 OVER_ALL, BETWEEN, UNDER_ALL = 0.5, 0.46, 0.3
@@ -42,9 +43,9 @@ def store(monkeypatch, tmp_path):
 
 @pytest.fixture()
 def pool(monkeypatch, store):
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
     monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records() + demo._standin_yeast_records()
+    rs = standins._standin_records() + standins._standin_yeast_records()
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
 
 
@@ -56,8 +57,8 @@ def client(monkeypatch, pool):
     return TestClient(api.app, base_url="http://127.0.0.1")
 
 
-def ceiling(g, model="Yeast9", product="ethanol", substrate="glucose", at=demo.AT, version="STAND-IN ceiling 1"):
-    return demo.standin_ceiling(model, product, substrate, g, at=at, version=version)
+def ceiling(g, model="Yeast9", product="ethanol", substrate="glucose", at=standins.AT, version="STAND-IN ceiling 1"):
+    return standins.standin_ceiling(model, product, substrate, g, at=at, version=version)
 
 
 def check(pool, scenario="sc-yeast-1", flowsheet=None, **kw):

@@ -138,16 +138,15 @@ def test_a_run_stored_before_the_tables_still_reads():
 def test_the_stand_in_run_carries_every_table_and_says_it_is_the_stand_in(store, monkeypatch):
     # The double's fixture (demo.py --prototype) comes from this path: the real
     # binding and artifact code over the closed-form STAND-IN evaluator.
-    from openferment_core import demo
-
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    import standins
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
     monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records()
+    rs = standins._standin_records()
     a = [InputAssumption(key=k, value=v, low=lo, high=hi, by=FIXTURE_BY, at="2026-10-20")
          for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
     run = proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", assumptions=a, samples=50),
                        pool=SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
-    assert run.samples == 50 and run.flowsheet == "pha_sugar_v0" and run.tablesSource == demo.PROFORMA_STANDIN
+    assert run.samples == 50 and run.flowsheet == "pha_sugar_v0" and run.tablesSource == standins.PROFORMA_STANDIN
     assert [u.id for u in run.units] == run.unitOrder == ["R1", "C1", "D1"] and len(run.streams) == 6
     assert run.tea is not None and sum(line.perUnit for line in run.tea.lines) == pytest.approx(run.basePrice, rel=1e-12)
     assert run.utilities.heatingUnit == "GJ/hr" and run.tableUnits == shelf.TABLE_UNITS

@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, passages, postdoc_agent, practice, programs, rageval, retrieve, tools, witness
+from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, programs, tools, witness
 from .corpus import load_corpus
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
@@ -77,10 +77,6 @@ from .models import (
     PracticeScenario,
     PracticeSession,
     PracticeTurnRequest,
-    RagReport,
-    RagSearchRequest,
-    RagSearchResponse,
-    RagStatus,
     ReplayResult,
     ReviewDecision,
     ToolInfo,
@@ -1668,51 +1664,6 @@ def tools_run(name: str, body: dict[str, Any], includeArchived: bool = False) ->
     if name not in tools.REGISTRY:
         raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
     return tools.run(name, body, tools.ToolContext(include_archived=includeArchived))
-
-
-# ── Passage retrieval (OF-BLD-014 Phase 4) ───────────────────────────────
-
-
-@app.get("/api/rag/status", response_model=RagStatus)
-def rag_status() -> RagStatus:
-    """Papers indexed, passages, the lanes and whether each can run, and the
-    lane searches use when none is named."""
-    return passages.status()
-
-
-@app.post("/api/rag/search", response_model=RagSearchResponse)
-def rag_search(request: RagSearchRequest) -> RagSearchResponse:
-    """Passages for a question, on the lane named or the chosen one. A lane
-    that cannot run here is a 409 that says why; a paid lane's helper calls
-    are held to the daily cap like every model call."""
-    try:
-        detail = retrieve.search_detail(request.question, k=max(1, min(request.k, 20)), lane=request.lane,
-                                        include_archived=request.includeArchived)
-    except retrieve.LaneUnavailable as e:
-        raise HTTPException(status_code=409, detail=str(e)) from None
-    except (llm.ModelUnavailable, llm.ModelRefused, spend.BudgetSettingInvalid) as e:
-        # A key refused, a budget spent or set wrong, a request declined:
-        # the service is up and says why (§4.R).
-        raise HTTPException(status_code=503, detail=str(e)) from None
-    return RagSearchResponse(
-        lane=detail.lane,
-        hits=detail.hits,
-        phrasings=detail.phrasings,
-        unverifiedSentences=detail.unverifiedSentences,
-        costUsd=detail.usage.costUsd,
-        note=detail.note,
-    )
-
-
-@app.get("/api/rag/report", response_model=RagReport)
-def rag_report() -> RagReport:
-    """The last scorecard of every lane; 404 until `pnpm rag:eval` has run."""
-    report = rageval.read_report()
-    if report is None:
-        raise HTTPException(status_code=404, detail="no retrieval scorecard yet: run pnpm rag:eval")
-    # The rule's choice and the lane in use can differ: a person may hold the
-    # lane apart (OF-BLD-016 §4.1), and the screen names both.
-    return report.model_copy(update={"laneInUse": passages.chosen_lane()})
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

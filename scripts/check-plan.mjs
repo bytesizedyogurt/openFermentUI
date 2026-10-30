@@ -145,17 +145,6 @@ const PAIRS = [
   ['RunbookDraft', 'RunbookDraft'],
   // OF-BLD-014 §4.1 — passages.
   ['Passage', 'Passage'],
-  ['RagLane', 'RagLane'],
-  ['RagStatus', 'RagStatus'],
-  ['PassageHit', 'PassageHit'],
-  // OF-BLD-014 §4.3 — the retrieval scorecard.
-  ['RagMetrics', 'RagMetrics'],
-  ['RagLaneReport', 'RagLaneReport'],
-  ['RagSetInfo', 'RagSetInfo'],
-  ['RagReport', 'RagReport'],
-  // OF-BLD-014 §4.4 — search from the browser.
-  ['RagSearchRequest', 'RagSearchRequest'],
-  ['RagSearchResponse', 'RagSearchResponse'],
   // OF-BLD-014 §5.1 — a plan cites sentences and computed values.
   ['PassageRef', 'PassageRef'],
   // OF-BLD-014 §6.3 — geneOS's shelf and its results.

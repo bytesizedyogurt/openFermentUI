@@ -351,7 +351,7 @@ class SeenSet:
 
 
 def _whole_sentences(quote: str, passage: Any) -> bool:
-    from .rerank import is_whole_sentence  # rerank imports this module
+    from .quotes import is_whole_sentence  # quotes imports this module
 
     return is_whole_sentence(quote, passage)
 

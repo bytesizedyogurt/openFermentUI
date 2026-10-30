@@ -10,8 +10,9 @@ import json
 
 import pytest
 
-from openferment_core import llm, postdoc_agent, retrieve, tools
-from openferment_core.models import Passage, PassageHit, PriorTurn, Usage
+from openferment_core import llm, postdoc_agent, tools
+from openferment_core.models import Passage, PriorTurn, Usage
+from openferment_core.tools import passages as passages_tool
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 from test_tools import _a_person_kept_assumptions, proforma_store  # noqa: F401  (OF-BLD-019 §6.1's stand-in run)
 from test_tools import fermos_store  # noqa: F401  (OF-BLD-020 §3.4's stand-in pool)
@@ -29,11 +30,11 @@ def passages_found(monkeypatch):
     """`search_passages` finds the one stand-in passage for any question."""
     calls: list[str] = []
 
-    def search_detail(question, k=8, lane=None, ask=None, include_archived=False):
+    def search(question, k):
         calls.append(question)
-        return retrieve.Detail(hits=[PassageHit(passage=PASSAGE, score=1 / 61, lanes={"bm25": 1})], lane="bm25")
+        return passages_tool.Found(passages=[PASSAGE], engine="stand-in")
 
-    monkeypatch.setattr(retrieve, "search_detail", search_detail)
+    monkeypatch.setattr(passages_tool, "search", search)
     return calls
 
 

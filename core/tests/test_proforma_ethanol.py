@@ -16,7 +16,8 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, basis, demo, intake, proforma, units
+from openferment_core import artifacts, basis, intake, proforma, units
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
 from openferment_core.models import BasisInput, BasisSource, ComputedBasis, InputAssumption, ProformaRunRequest
 
@@ -37,9 +38,9 @@ def store(monkeypatch, tmp_path):
 def standin(monkeypatch, store):
     """The STAND-IN evaluator in place of the worker, over the stand-in
     records of both flowsheets, as the double's fixtures are made."""
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
     monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records() + demo._standin_yeast_records()
+    rs = standins._standin_records() + standins._standin_yeast_records()
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
 
 
@@ -306,7 +307,7 @@ def test_a_run_with_no_sample_the_flowsheet_holds_says_why_and_names_its_run(sta
     # §2.R, review 3: every case asks a yield above the theoretical, so no
     # sample runs; the 422 says why and names the run it kept, which was
     # stored before the refusal and was found nowhere on the screen.
-    above = demo.STANDIN_THEORETICAL * 1.2
+    above = standins.STANDIN_THEORETICAL * 1.2
     every = [assume("feed_glucose_conc", 100.0), assume("titre", 45.0), assume("yield", above),
              assume("productivity", 2.0), *ASSUMED]
     host = "nobody"  # no record binds: every input is a named person's assumption

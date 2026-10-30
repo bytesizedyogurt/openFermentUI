@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from openferment_core import llm, postdoc_agent, retrieve, tools
-from openferment_core.models import Passage, PassageHit, PriorTurn, ToolResult, Usage
+from openferment_core import llm, postdoc_agent, tools
+from openferment_core.tools import passages as passages_tool
+from openferment_core.models import Passage, PriorTurn, ToolResult, Usage
 from openferment_core.validate import SeenSet, validate_plan
 from test_postdoc_agent import SENTENCE, Script, claim, papers, passages_found, plan, records, two_models  # noqa: F401
 from test_tools import pool  # noqa: F401
@@ -61,10 +62,10 @@ def test_an_oversized_summary_keeps_no_ids(pool, monkeypatch):  # noqa: F811
 
 # R3 — what a search lane spends counts against the question.
 def test_a_searchs_model_spend_is_the_questions(pool, monkeypatch):  # noqa: F811
-    hit = PassageHit(passage=Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
-                                     text=SENTENCE, start=0, end=len(SENTENCE)), score=1.0, lanes={"bm25": 1})
-    monkeypatch.setattr(retrieve, "search_detail", lambda q, k=8, lane=None, ask=None, include_archived=False: retrieve.Detail(
-        hits=[hit], lane="bm25+rerank", usage=Usage(costUsd=0.05, models=["claude-haiku-5-5"])))
+    hit = Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
+                                     text=SENTENCE, start=0, end=len(SENTENCE))
+    monkeypatch.setattr(passages_tool, "search", lambda q, k: passages_tool.Found(
+        passages=[hit], engine="stand-in", usage=Usage(costUsd=0.05, models=["claude-haiku-5-5"])))
     monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.04")
     script = Script([papers()], [papers("again")], plan())
     out = postdoc_agent.ask("q?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
@@ -74,10 +75,10 @@ def test_a_searchs_model_spend_is_the_questions(pool, monkeypatch):  # noqa: F81
 
 
 def test_a_cached_search_is_not_charged_twice(pool, monkeypatch):  # noqa: F811
-    hit = PassageHit(passage=Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
-                                     text=SENTENCE, start=0, end=len(SENTENCE)), score=1.0, lanes={"bm25": 1})
-    monkeypatch.setattr(retrieve, "search_detail", lambda q, k=8, lane=None, ask=None, include_archived=False: retrieve.Detail(
-        hits=[hit], lane="bm25+rerank", usage=Usage(costUsd=0.01)))
+    hit = Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
+                                     text=SENTENCE, start=0, end=len(SENTENCE))
+    monkeypatch.setattr(passages_tool, "search", lambda q, k: passages_tool.Found(
+        passages=[hit], engine="stand-in", usage=Usage(costUsd=0.01)))
     script = Script([papers()], [papers()], plan())
     out = postdoc_agent.ask("q?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
     assert out.usage.costUsd == pytest.approx(0.01 + 0.001 * 3)

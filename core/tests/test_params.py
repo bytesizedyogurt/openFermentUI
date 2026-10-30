@@ -15,7 +15,8 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from openferment_core import basis, demo, intake, params, proforma
+from openferment_core import basis, intake, params, proforma
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
 from openferment_core.models import (
     BasisSource,
@@ -73,7 +74,7 @@ def standin(monkeypatch, store):
     monkeypatch.setattr(proforma, "call", no_worker)
     monkeypatch.setattr(artifacts, "compute", no_compute)
     monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records() + demo._standin_yeast_records()
+    rs = standins._standin_records() + standins._standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: pool)
     return pool

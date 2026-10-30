@@ -53,12 +53,23 @@ Stage 0 — baseline, tag, decisions: complete except the tag push (see Blockers
 | §10 stage 8.1 | The old `CLAUDE.md` moved to `docs/history/CLAUDE-2026-10-21.md` at stage 0, with a short interim `CLAUDE.md` | Claude Code injects `CLAUDE.md` into every new session as binding instructions; the old file (96,858 bytes) would direct a resuming session against this build. Stage 8 still writes the final file |
 | §3.4 | Eighteen reference SFF files (`SF_BST_01` to `SF_BST_18`) at `e236e32`, where the prompt counted thirteen | Measured in the pinned tree (ADR-003) |
 | §8.2 | The kit's alembic migrations are vendored from commit `26b3990` | The PyPI wheel carries `src/sci_rag` alone (ADR-002) |
+| §10 stage 1.1 | Section 5 runs in the order 5.4 + 5.3 (one commit), 5.1, 5.2, 5.5, 5.6, 5.7 | `demo.py`, `retrieve.py` and `rageval.py` were the heaviest users of the program machinery and build their fixtures through each other; deleting them first spares edits to files deleted one step later, and a commit between 5.4 and 5.3 could not be green |
+| §5.3 | `demo.py`'s stand-in evaluator and stand-in records moved to `core/tests/standins.py` (test-only) | Thirteen kept test files (Proforma, fermOS, params, pureOS, tools) test binding, override, ceiling and run-contract rules on them. Stage 4 replaces them with fixtures read from library plants (debt recorded below) |
+| §5.4 | `search_passages` stays registered, with one seam (`tools/passages.py: search`) that answers "no literature index exists yet" | Postdoc's quote validation and its tests keep the passage contract; stage 3 fills the seam with Sci RAG Kit. The whole-sentence rule moved to `quotes.py` |
 
 ## Blockers
 
 | Since | Blocker | Next command |
 |---|---|---|
 | 2026-10-30 | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0` ends with "unexpected disconnect while reading sideband packet", lightweight and annotated alike. The tag exists in this container only. Commit `d19224f` stays reachable as an ancestor of `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git push origin alpha-1.0` |
+
+## Known debts (each names the stage that pays it)
+
+| Debt | Paid at |
+|---|---|
+| `core/tests/standins.py` carries invented stand-in records (on real strain ids) and a closed-form evaluator for rule tests | stage 4: fixtures from `biorefineries` library plants |
+| `pnpm verify` is red between stage 1 commits for guards that section 5.6 retires (`check:seed`, `check:store`, …) | stage 1, commit for 5.6 |
+| No smoke test while the double is gone | end of stage 1: a minimal smoke over the real service; stage 7 extends it |
 
 ## Owner questions (execution prompt §13) and the defaults taken
 
@@ -69,7 +80,7 @@ Stage 0 — baseline, tag, decisions: complete except the tag push (see Blockers
 | 3 | Delete thread Q's TypeScript list, keep `docs/corpus/ethanol-sources.txt` | yes | no |
 | 4 | Delete Dominion, return condition recorded | yes | no |
 | 5 | Rename `demo` → `assumed` | yes | no |
-| 6 | Python pin 3.12 if the kit fails on 3.13 | yes (only if it fails) | no |
+| 6 | Python pin 3.12 if the kit fails on 3.13 | no pin: the kit's suite passed on 3.13.17 (1584 passed, 31 skipped) | measured |
 | 7 | Kit REST under `/rag` on the same port | yes | no |
 | 8 | Licence | none added | no |
 | 9 | Accounts: tables and a membership stub only | yes | no |

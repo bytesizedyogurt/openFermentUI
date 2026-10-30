@@ -15,7 +15,8 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, binding, demo, evidence_pool, fermos, intake, kinetics, proforma, units
+from openferment_core import artifacts, binding, evidence_pool, fermos, intake, kinetics, proforma, units
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.models import InputAssumption, Override, SimulationRequest
 
 BY = "openFerment test fixture"
@@ -133,7 +134,7 @@ def test_proformas_artifact_ids_for_sc_yeast_1_are_unchanged_by_the_move(monkeyp
                                high=value if high is None else high, by=BY, at="2026-10-20", note="a STAND-IN for a test")
 
     economics = [a("plant_scale", 100000.0), a("glucose_price", 0.4, 0.3, 0.5)]
-    rs = demo._standin_yeast_records()
+    rs = standins._standin_yeast_records()
     assert _would_be(pool_of(*rs), economics) == "f78dc92272889efd"
     branches = [dict(r, value=1.5) if r["field"] == "ethanol_productivity" else r for r in rs
                 if not (r["field"] == "ethanol_titre" and not r["id"].endswith("-0"))

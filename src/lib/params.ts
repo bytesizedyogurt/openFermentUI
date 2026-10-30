@@ -18,14 +18,14 @@
 // worker; a `fermos:vessel:` scope reads BioSTEAM's defaults through the
 // Proforma worker, once per process, so its first read on a cold service
 // starts that worker and waits for it. With the
-// service down these say so (RagDown), and a refusal comes back in the
-// service's words (RagRefused); nothing stands in for an answer (E.2). The
+// service down these say so (ServiceDown), and a refusal comes back in the
+// service's words (ServiceRefused); nothing stands in for an answer (E.2). The
 // overrides themselves live in the store's Durable tier
 // (`parameterOverrides`); the service keeps none.
 import type { Override, ParamResolveRequest, ParamResolveResult, ParamScope, TrainSpec } from '@/data/types';
-import { RagDown, RagRefused, call } from './rag';
+import { ServiceDown, ServiceRefused, call } from './http';
 
-export { RagDown as ParamsDown, RagRefused as ParamsRefused };
+export { ServiceDown as ParamsDown, ServiceRefused as ParamsRefused };
 
 /** What a scope is asked with besides its name: a Proforma scenario made here names its flowsheet; host and fits bind as Proforma's binding does; a vessel scope names the vessel type its design is (OF-BLD-020 §4.2); a family scope binds as a simulation binds (§3.3). */
 export interface ParamAsk {

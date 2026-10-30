@@ -66,10 +66,9 @@ def test_the_status_endpoint(warm):
 
 def test_the_committed_toy_fixtures_are_what_the_worker_makes(warm):
     # §8.1: the fixtures that need BioSTEAM are regenerated here, where the
-    # real worker runs; `python -m openferment_core.demo --sim` rewrites them.
+    # real worker runs; write `standins.sim_fixtures()` over the file to refresh it.
     import json
 
-    from openferment_core import demo
-
-    committed = json.loads(demo.SIM_FIXTURES.read_text(encoding="utf-8"))
-    assert demo.sim_fixtures() == committed, "tests/fixtures/sim/toy.json no longer matches the worker: run python -m openferment_core.demo --sim"
+    import standins
+    committed = json.loads(standins.SIM_FIXTURES.read_text(encoding="utf-8"))
+    assert standins.sim_fixtures() == committed, "tests/fixtures/sim/toy.json no longer matches the worker: write standins.sim_fixtures() over it"

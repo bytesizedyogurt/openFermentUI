@@ -29,20 +29,6 @@ else
   echo "full text: Europe PMC does not answer here, so nothing is fetched (pnpm ready says why)"
 fi
 
-# §4.1 — the passage index over whatever full text is here. Local work, no
-# network: it cuts only the papers whose text changed since the last build.
-echo "passage index: building"
-pnpm --silent index:build || status=1
-
-# §4.2 — the passage vectors, for the hybrid lanes. They travel on the data
-# branch; built here only when they are missing or belong to an older index,
-# and only where huggingface.co answers (the embedding model comes from it).
-if reaches huggingface; then
-  pnpm --silent index:build --dense-if-stale || status=1
-else
-  echo "dense vectors: huggingface.co does not answer here, so they are not built (pnpm ready says why)"
-fi
-
 # §6.2 — the published reconstructions geneOS fetches, each checked against
 # its hash: C. necator (RehMBEL1391) and yeast (Yeast9) at their pinned
 # commits from GitHub, which answers on every lane, and yeast iMM904 from

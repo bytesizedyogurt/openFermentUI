@@ -32,9 +32,9 @@ import type {
 } from '@/data/types';
 import { seriesOf } from '@/engine/series';
 import type { TimeCourseProps, TrajectorySeries } from '@/components/figures';
-import { RagDown, RagRefused, call } from './rag';
+import { ServiceDown, ServiceRefused, call } from './http';
 
-export { RagDown as FermosDown, RagRefused as FermosRefused };
+export { ServiceDown as FermosDown, ServiceRefused as FermosRefused };
 
 const post = <T>(path: string, body: unknown, signal?: AbortSignal) =>
   call<T>(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });

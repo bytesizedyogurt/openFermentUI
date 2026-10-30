@@ -38,19 +38,6 @@ EOF
 status=0
 "$PY" -m openferment_core.intake --all || status=$?
 "$PY" -m openferment_core.extract --all || status=$?
-# OF-BLD-014 §10.2 — the index follows what was fetched. The cut is
-# incremental: a paper already cut at this chunker version is kept. The
-# retrieval scorecard runs again only when the index changed, because each
-# run of it may call a model.
-before=$("$PY" -c "from openferment_core import passages; print(passages.manifest_hash())" 2>/dev/null || echo none)
-"$PY" -m openferment_core.passages || status=$?
-after=$("$PY" -c "from openferment_core import passages; print(passages.manifest_hash())" 2>/dev/null || echo none)
-if [ "$before" != "$after" ]; then
-  echo "the index changed ($before → $after); scoring the search lanes again"
-  "$PY" -m openferment_core.rageval eval || status=$?
-else
-  echo "the index is unchanged; the scorecard stands"
-fi
 # Every fetched model file against its pinned hash, and the ten newest
 # artifacts recomputed and compared with what was kept. A difference is
 # reported and fails the night; nothing is rewritten.

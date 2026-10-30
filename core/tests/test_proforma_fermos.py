@@ -17,7 +17,8 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, basis, demo, fermos, intake, proforma
+from openferment_core import artifacts, basis, fermos, intake, proforma
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.models import (
     ComputedBasis,
     FermosPoint,
@@ -71,9 +72,9 @@ def store(monkeypatch, tmp_path):
 
 @pytest.fixture()
 def standin(monkeypatch, store):
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
     monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records() + demo._standin_yeast_records()
+    rs = standins._standin_records() + standins._standin_yeast_records()
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
 
 
@@ -195,7 +196,7 @@ def test_a_chosen_fit_binds_titre_yield_and_productivity_and_the_run_names_it(st
     assert {s.key: s.sourceKind for s in run.sensitivity}.get("titre") == "artifact"
     # The fit's provenance enters through basis_provenance: alone, the fit's
     # inputs make the value computed (the fit rests on a deposition's
-    # measured readings); the assumptions make the whole run demo.
+    # measured readings); the assumptions make the whole run standins.
     fit_inputs = [i for i in art.inputs if i.source.kind == "artifact"]
     alone = ComputedBasis(tool="t", toolVersion="v", inputs=fit_inputs, artifactId="x", at="now")
     assert basis.basis_provenance(alone, {}, {fc.artifactId: artifacts.get(fc.artifactId)}) == "computed"

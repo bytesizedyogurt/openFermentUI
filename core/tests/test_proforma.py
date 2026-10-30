@@ -259,9 +259,10 @@ def test_a_reference_run_is_one_artifact_with_its_basis_and_the_package_values(s
     # The run goes through the real code (the basis, the artifact store, the
     # package test parsed from the installed file) with demo.py's STAND-IN
     # answering for the worker, as the double's fixture is made.
-    from openferment_core import api, artifacts, demo
+    from openferment_core import api, artifacts
+    import standins
 
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
     art = proforma.run_reference("corn_drygrind")
     assert art.tool == proforma.REFERENCE and art.toolVersion.startswith(proforma.REFERENCE_VERSION)
     assert art.provenance == "computed" and {i.source.kind for i in art.inputs} == {"model", "convention"}
@@ -275,7 +276,7 @@ def test_a_reference_run_is_one_artifact_with_its_basis_and_the_package_values(s
     assert [c["expression"] for c in o["checks"]] == [e for e, _ in TEST_CORN]
     assert o["regression"]["test"] == "test_corn" and o[_shelf.SHELF["corn_drygrind"].priceOutput] is not None
     t = proforma.tables_of(art)  # the one reader reads a reference run as it reads a scenario run
-    assert t.flowsheet == "corn_drygrind" and t.tablesSource == demo.PROFORMA_STANDIN and t.units and t.streams
+    assert t.flowsheet == "corn_drygrind" and t.tablesSource == standins.PROFORMA_STANDIN and t.units and t.streams
     assert proforma.stored_reference("corn_drygrind").id == art.id and proforma.stored_reference("cornstover_benchmark") is None
     c = TestClient(api.app, base_url="http://127.0.0.1")
     assert c.get("/api/proforma/reference/corn_drygrind").json()["artifact"]["id"] == art.id

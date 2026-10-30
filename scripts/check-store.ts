@@ -555,15 +555,6 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('Intake → Ingest states no written count of the catalogue', !/Twenty-seven|of the 132 entries/.test(ingest));
 }
 
-// OF-BLD-016 §2.R — BioRepo → Search's status line counts the whole index,
-// which holds every program's passages; with archived programs hidden it
-// says so, since a search returns only what shows.
-{
-  const search = readFileSync(new URL('../src/screens/BioRepoSearch.tsx', import.meta.url), 'utf8');
-  check('BioRepo → Search does not present the whole index as what a search reaches',
-    !/\{status\.passages\.toLocaleString\(\)\} passages from \{status\.papersIndexed\} papers\.\{' '\}/.test(search) && /every program/.test(search));
-}
-
 // OF-BLD-016 §2.R — pureOS counts the molecules that show, as Dominion and
 // Home do: it never counts the seed's product list straight.
 {
