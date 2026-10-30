@@ -14,7 +14,7 @@ added `fermos_simulate`, §4.2 `fermos_vessel`, §5.4 `pureos_build` and §7.2
 `pureos_propose`); `test_tools.NAMES` is the one literal list of them in the
 tests, and every other count there is derived from `WHITELIST`.
 
-The names below are the registry's. The build document writes `dominion.read`;
+The names below are the registry's. The build document writes `runbooks.read`;
 the Messages API refuses a dot in a tool name, so the registry uses an
 underscore.
 
@@ -27,7 +27,7 @@ underscore.
 | `search_passages` | words, k | up to six passages, each citable by a whole sentence |
 | `yield_ceiling` | a model on geneOS's shelf, a product, a sugar | one evidence id, or a finding in words |
 | `growth_forecast` | a kept kinetic fit's artifact id | one evidence id and the final values as intervals |
-| `selling_price` | a seed BioSTEAM scenario's id the switch shows (`sc-yeast-1`; `sc-pha-1` too with it on), or `proforma_benchmark` | the newest kept run's price as one evidence id (the run's artifact id), with what its flowsheet leaves out; with no run on file, which inputs wait for a source as the service binds them and how a run is made; never runs a scenario |
+| `selling_price` | a seed BioSTEAM scenario's id (none since alpha 2.0 deleted the seed; stage 5 keeps scenarios), or `proforma_benchmark` | the newest kept run's price as one evidence id (the run's artifact id), with what its flowsheet leaves out; with no run on file, which inputs wait for a source as the service binds them and how a run is made; never runs a scenario |
 | `draft_runbook` | a title, a product, a strain, items by evidence or field, measures | a draft whose numbers the service wrote |
 
 ## Proforma's two (OF-BLD-019 §6.1)
@@ -46,8 +46,7 @@ The service holds no person's assumption (they are typed into Proforma's
 parameter panel and kept in the browser's Durable tier; *A person's value*,
 below), so the model never supplies one: an input no record binds waits, and
 the call refuses naming it. A scenario made with New
-scenario lives in the browser that made it and is refused in words, as is an
-authored cost surface and, with the switch off, an archived scenario. The run
+scenario lives in the browser that made it and is refused in words. The run
 is `tools/writes.py`'s `run_scenario`, the same function `proforma_write`'s
 `run` calls, so `check:tools` reads the one call to `proforma.run` there; its
 rule 2b fails when any other tool file reaches what keeps a Proforma run or
@@ -71,8 +70,8 @@ that made it, and a reference biorefinery's run is read through
 `proforma_read` and `stream_table`; each is refused in words that say so.
 
 `stream_table` reads through `proforma.tables_of`, so a scenario's run and a
-reference biorefinery's (§2.2) read alike; anything else is refused in words,
-as is an archived run with the switch off. Each summary row names the stream,
+reference biorefinery's (§2.2) read alike; anything else is refused in words.
+Each summary row names the stream,
 the unit it leaves and the unit it enters (none for a feed or a product), its
 phase, T, P, mass flow, price and largest components, to four significant
 digits; `data` holds every number as the run kept it.
@@ -89,7 +88,7 @@ id.
 
 | Tool | In | Out |
 |---|---|---|
-| `fermos_simulate` | a model family's id (`batch_v1`, `fedbatch_v1`, `chemostat_v1`; `storage_v1` with the switch on; `light_v1` refuses in words), a strain, a product and a sugar by their ids (each may be empty), `recordsByParam` (a parameter's key to the record ids that bind it, exactly those records), a kept kinetic fit's or forecast's artifact id (`fitArtifact`), `startFrom` (`records`, `fit` or `simulation:<artifact id>`) and `durationPreset` (`until-sugar-runs-out` or `fit-length`) | runs `fermos.simulate` as the service binds the family's parameters, keeps one `fermos.simulation` artifact and returns its evidence id (the artifact id; its value the product's titre at harvest), what bound each parameter in words and counts (never the value, which the artifact holds), the end state, the ceiling rows beside Yp/s in words, and the flags (a value outside its bounds by its key alone, the value and its bounds left to the artifact; a long flag cut at a sentence or clause and said to be cut; each ending at a full stop, OF-BLD-020 §3.R); or refuses with `fermos.simulate`'s own words (the 422's) naming each parameter that waits and the field that would bind it, and, with the switch off, a start from a kept simulation, a fit or a forecast of an archived program (a storage_v1 simulation is PHA's, as is one built on it) |
+| `fermos_simulate` | a model family's id (`batch_v1`, `fedbatch_v1`, `chemostat_v1`; `light_v1` refuses in words), a strain, a product and a sugar by their ids (each may be empty), `recordsByParam` (a parameter's key to the record ids that bind it, exactly those records), a kept kinetic fit's or forecast's artifact id (`fitArtifact`), `startFrom` (`records`, `fit` or `simulation:<artifact id>`) and `durationPreset` (`until-sugar-runs-out` or `fit-length`) | runs `fermos.simulate` as the service binds the family's parameters, keeps one `fermos.simulation` artifact and returns its evidence id (the artifact id; its value the product's titre at harvest), what bound each parameter in words and counts (never the value, which the artifact holds), the end state, the ceiling rows beside Yp/s in words, and the flags (a value outside its bounds by its key alone, the value and its bounds left to the artifact; a long flag cut at a sentence or clause and said to be cut; each ending at a full stop, OF-BLD-020 §3.R); or refuses with `fermos.simulate`'s own words (the 422's) naming each parameter that waits and the field that would bind it |
 
 Offered loose, as the module tools are. Ids and words only (D13): a JSON
 number anywhere refuses the call, as for every tool, and no field of its
@@ -115,9 +114,7 @@ from. It is audited like every module write,
 fermos`, `action: simulate`, the family as target and the tool's name in
 `detail`. The service holds no person's assumption (they are typed in fermOS →
 Simulate and kept in the browser's Durable tier), so the model never supplies
-one: a parameter nothing binds waits, and the call refuses naming it. With the
-switch off an archived family (`storage_v1`, PHA's), strain or product is
-refused with *archived (hidden)* and names Settings → Programs. The run is
+one: a parameter nothing binds waits, and the call refuses naming it. The run is
 `tools/writes.py`'s `run_simulation`, the same function `fermos_write`'s
 `simulate` calls, so `check:tools` reads the one call to `fermos.simulate`
 there.
@@ -178,8 +175,7 @@ says a vessel's numbers are read from its artifact, never stated.
 
 The `Evidence`'s value is the number of vessels BioSTEAM sized; every other
 number stays in the artifact, which the MCP server's `get_artifact` reads
-whole. With the program switch off, a simulation of an archived program is
-refused like any other archived target. The design itself is BioSTEAM's, made in the Proforma
+whole. The design itself is BioSTEAM's, made in the Proforma
 worker, and spends no model money; what it computes, and where BioSTEAM
 overruled the build document, are in README.md (*fermOS sizes the vessel on
 BioSTEAM*).
@@ -238,8 +234,8 @@ model`, `madeBy` the model id, `effort`, `askId`, `at`, `updatedAt`),
 gitignored, on this machine alone and not on the data branch, written through
 `pureos.kept.keep_train` alone: every read-modify-write under the store's
 thread lock and file lock, through `atomic.write_text`.
-`GET /api/pureos/trains-kept?includeArchived=` lists them, the most recently
-changed first, the switch honoured by the train's program. pureOS's index
+`GET /api/pureos/trains-kept` lists them, the most recently changed first.
+pureOS's index
 lists them under *Made by Postdoc* (name, product, units, the model, when,
 and the newest run joined by its `trainId`), and **Open a copy** opens one in
 the Builder as a new train of that browser (`/pureos/build/new?copy=<id>`):
@@ -304,8 +300,7 @@ harvested, digested, washed and dried (`drying-drum`). The class is the
 products seed's `category`, or, for a product the seed holds no entry for,
 thermosteam's normal boiling point; whether a product is secreted is the
 entry's `location`, which no entry carries yet, so a protein says it is
-missing, as it says a sequence is. With the switch off a product or host of
-an archived program is refused like any archived target. `POST
+missing, as it says a sequence is. `POST
 /api/pureos/propose` answers the same, and pureOS's **Propose a train** shows
 it with each unit's reason beside it and keeps it under a new train id, which
 the Builder opens.
@@ -347,7 +342,7 @@ table below).
 
 ## The read tools (OF-BLD-015 §7.2)
 
-One a module: `dominion_read`, `runbooks_read`, `geneos_read`, `fermos_read`,
+One a module: `runbooks_read`, `geneos_read`, `fermos_read`,
 `pureos_read`, `proforma_read`, `biorepo_read`, `guild_read`, `primer_read`,
 `intake_read`, `home_read`. One input for all: `ids` (ids or refs), `words`,
 `kind` (one of the module's kinds, or empty), `state` (one of the enum, or
@@ -414,8 +409,8 @@ word and never by a model:
 
 | State | Means | Computed from |
 |---|---|---|
-| `open` | free to use, read or make | a clearance of `clear-expired` or `clear-none`; a draft or running runbook; a host, pathway, model or unit operation in the catalogue; an artifact, a kept simulation, and a train or a unit of one read from a run; a train a model built, and a run of one; an active person; a scheduled check |
-| `fenced` | held back | a clearance of `watch-*`, `blocked` or `unknown` (Dominion's action for it is to run clearance first); a runbook `blocked_unverified`; a fetch that failed; a model not fetched |
+| `open` | free to use, read or make | a draft or running runbook; a host, pathway, model or unit operation in the catalogue; an artifact, a kept simulation, and a train or a unit of one read from a run; a train a model built, and a run of one; an active person; a scheduled check |
+| `fenced` | held back | a runbook `blocked_unverified`; a fetch that failed; a model not fetched |
 | `approved` | a person or a source stands behind it | a record `measured`, `gold`, `verified` or `curated`; a protocol's current version; a lesson; a paper fetched with full text |
 | `locked` | frozen for a test | a runbook with `lockedAt`; a check run |
 | `proposed` | waits for a person | a candidate `unverified`; a runbook `needs_review` or `awaiting_budget`; a check proposed; a proposal at a gate; a paper waiting to be fetched |
@@ -457,69 +452,14 @@ with provenance from `basis_provenance`: `computed` for the azeotrope, the
 weakest of that and the record's or the run's otherwise (`demo` for a run
 resting on an assumption). Each property is its own `Evidence`, id
 `<artifact id>:<property>`, which `SeenSet` keeps and a claim cites like any
-computed value. With the switch off, a run of an archived program is refused
-as its train is hidden. `POST /api/thermo/props` asks and
+computed value. `POST /api/thermo/props` asks and
 `GET /api/thermo/props` reads the stored answer to the same question (or
 `{"artifact": null}`), starting no simulator; pureOS → Train and fermOS show
 it in a **Properties** card.
 
-## The program switch (OF-BLD-016 §2.3, §3.3)
-
-Casein (threads A–O) and PHA (thread P) are archived programs; yeast ethanol
-(thread Q) is active (`src/data/programs.ts`, `programs.py`). Whether a run
-sees the archived two is not a tool input, and no model sets it. It rides in
-`ToolContext.include_archived`, set by whatever started the run:
-
-| Caller | Where the switch comes from |
-|---|---|
-| Postdoc's loop | `AskRequest.includeArchived` on `/api/ask` and `/api/ask/stream`; the browser sends Settings → Programs' switch with every question |
-| `POST /api/tools/{name}` | the query parameter `?includeArchived=true`; the body is the tool's input, and no input carries the switch |
-| the MCP server | `OPENFERMENT_INCLUDE_ARCHIVED` in its environment (unset: off), never a client |
-
-Off is the default everywhere. A tool input that names `includeArchived`
-(`geneos_read` sent it, say) is refused like any field the tool does not
-take. With the switch off:
-
-- `search_records` reads an evidence pool with every record and candidate
-  on a thread A–P paper left out, counted in `EvidencePool.hidden`.
-- `search_passages` drops archived passages from each ranking before
-  fusion, reading past `DEPTH` so a ranking still holds `DEPTH`.
-- Every read tool's rows are tagged in the store with the program they
-  belong to (`module_stores.Row.program`, as the browser's `programOf`
-  resolves it; an artifact by what its inputs name: a record's paper, a
-  model's host, a product), and archived rows are left out. A row asked for
-  by id says which archived program holds it. A Proforma run (a scenario's
-  or a reference biorefinery's) belongs to its scenario's program, its
-  flowsheet's on the shelf and what its basis names, an archived one winning
-  (`module_stores.artifact_program`, which asks `pureos.program_of`; §6.R).
-  It is one rule for every reader of a run: `proforma_read`, `biorepo_read`,
-  `GET /api/biorepo/artifacts`, pureOS's trains, `stream_table` and
-  `thermo_props` (the last two refuse it by id through
-  `module_stores.hidden_run_refusal`), so a PHA run that bound no record is
-  PHA's everywhere. The MCP server's own `get_artifact` is outside the rule:
-  it reads any kept artifact by its id, whatever the switch says.
-- The coverage pass before round one fills `CoverageMap.archived` when the
-  question names something archived; the trace reads *found in archived
-  program PHA (hidden)*, no hidden row's ref reaches the model, and the
-  code writes a gap naming the switch.
-- With the switch off, `yield_ceiling`, `selling_price`, `run_flowsheet`,
-  `stream_table` and `draft_runbook` refuse an archived model, product,
-  scenario, run or strain with *archived (hidden)* and name Settings →
-  Programs, and no tool's description or schema
-  names an archived model, product or scenario (`programs.archived_target`,
-  `offered`; §2.R). `growth_forecast` reads the browser's run and the write
-  tools are filtered by nothing beyond the pool they read.
-
-**Examples.** A seed runbook, protocol, scenario or lesson that describes a
-run nobody made carries `example: true` in its row's `detail`. The browser
-hides examples with the archived programs, and so do the read tools: with the
-switch off no read returns an example row (§4.R); with it on, a read returns
-them marked, so it can say a runbook is an example. The coverage pass does not
-count an example as an archived program's row.
-
 ## The write tools (OF-BLD-015 §7.3)
 
-The pair of each read: `dominion_write` … `home_write`. One input for all:
+The pair of each read: `runbooks_write` … `home_write`. One input for all:
 `action`, `target` (an id), `fields` (names to words), `note` (why). A write
 tool never touches a store: each action calls the module's own write
 function, where the module's rules live, and `check:tools` fails when this
@@ -555,7 +495,7 @@ audited as `finding`.
 | `runbooks_write` | `revise_protocol` | refused: protocols are seed, revised in the browser | — |
 | `guild_write` | `record_check` | refused: an assessor runs a check at the bench, criterion by criterion | — |
 | `guild_write`, `home_write`, `runbooks_write` | gated actions | a proposal (below) | `proposals.propose` |
-| `dominion_write`, `primer_write` | any | refused: curated seed, no write function | — |
+| `primer_write` | any | refused: no write function | — |
 | `pureos_write` | any other | refused: the unit operations and the unit catalogue are curated (`src/data/vocabulary.ts`, `pureos/catalogue.py`), no write function | — |
 
 A refusal is a result Postdoc reports in `gaps`.
@@ -570,7 +510,7 @@ places.
 
 | Gate | Covers | Actions | The button |
 |---|---|---|---|
-| `publish` | publish to the commons | `biorepo publish`, `dominion publish`, `runbooks publish` | takes the person to the module to publish in their name |
+| `publish` | publish to the commons | `biorepo publish`, `runbooks publish` | takes the person to the module to publish in their name |
 | `spend` | spend past the ask or the daily budget | `intake extract` when the budget refuses | the server extracts when the budget allows |
 | `lock` | lock a prediction a person will test | `runbooks lock` | takes the person to the runbook to press Lock predictions |
 | `sign` | sign a Guild entry | `guild evidence`, `guild person`, `guild policy` | takes the person to Guild to record it in their name |

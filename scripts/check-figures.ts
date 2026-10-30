@@ -50,7 +50,6 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { ExtractionRecord, Provenance } from '../src/data/types';
-import samples from '../src/data/figureSamples.json';
 import { ENCODING, NEVER_EVIDENCE, pointKey } from '../src/components/figures/encoding';
 import { stripPoints, toTable as stripTable } from '../src/components/figures/EvidenceStrip';
 import { toTable as ceilingTable } from '../src/components/figures/CeilingGap';
@@ -125,17 +124,62 @@ for (const p of Object.keys(ENCODING) as Provenance[]) {
 ok.push('industry-estimate and demo are dashed, and no class of evidence is');
 
 // 3 — a table row per mark.
-const records = samples.strip.records as unknown as ExtractionRecord[];
-const strip = { title: 't', records, unit: samples.strip.unit, quantity: samples.strip.quantity, groupBy: 'organism' as const };
+// A test sample of placeholder values: each class of evidence the grammar
+// draws, two organisms, and two ceilings (the authored sample left with the
+// seed, ADR-010).
+const SAMPLE: [Provenance, ExtractionRecord['status'], string][] = [
+  ['measured', 'unverified', 'A'],
+  ['curated', 'verified', 'B'],
+  ['curated', 'verified', 'A'],
+  ['curated', 'unverified', 'B'],
+  ['unverified', 'unverified', 'A'],
+  ['computed', 'unverified', 'B'],
+  ['user', 'unverified', 'A'],
+  ['industry-estimate', 'unverified', 'B'],
+  ['demo', 'unverified', 'A'],
+  ['curated', 'unverified', 'B'],
+];
+const records = SAMPLE.map(
+  ([provenance, status, organism], i) =>
+    ({
+      id: `test-${i + 1}`,
+      paperId: 'test',
+      sectionId: 'test',
+      quote: 'TEST: a placeholder record that draws one mark of the figure grammar.',
+      field: 'ethanol_yield_substrate',
+      value: i + 1,
+      unit: 'g g-1',
+      si: { value: i + 1, unit: 'g g-1' },
+      confidence: 1,
+      status,
+      provenance,
+      organism: `Test organism ${organism}`,
+      carbonSource: 'test sugar',
+      isPrimary: true,
+      audit: [],
+      // The second is gold: a reviewer flagged its value as stated.
+      ...(i === 1 ? { gold: { value: i + 1, unit: 'g g-1' } } : {}),
+    }) as unknown as ExtractionRecord,
+);
+const strip = { title: 't', records, unit: 'g g-1', quantity: 'a quantity', groupBy: 'organism' as const };
 const drawn = stripPoints(strip).points.length;
 if (drawn !== records.length) problems.push(`the sample's strip draws ${drawn} of its ${records.length} records`);
 const stripRows = stripTable(strip).rows.length;
 // Counted from the sample itself, never from the function the table is built on.
 if (stripRows !== records.length) problems.push(`EvidenceStrip's table has ${stripRows} rows for the sample's ${records.length} records`);
-const ceilings = samples.strip.rules.map((r) => ({ value: r.value, model: r.label }));
+const ceilings = [
+  { value: 4.5, model: 'test model A' },
+  { value: 8.5, model: 'test model B' },
+];
 const ceilingRows = ceilingTable({ title: 't', records, unit: strip.unit, quantity: strip.quantity, ceilings }).rows.length;
 if (ceilingRows !== records.length + ceilings.length) problems.push(`CeilingGap's table has ${ceilingRows} rows for ${records.length + ceilings.length} marks`);
-const f = samples.frontier;
+const f = {
+  growthUnit: 'u',
+  productUnit: 'u',
+  productLabel: 'a quantity',
+  model: 'a test model',
+  points: [0, 1, 2, 3, 4].map((i) => ({ growth: i, product: 4 - i })),
+};
 const frontierRows = frontierTable({ title: 't', points: f.points, growthUnit: f.growthUnit, productUnit: f.productUnit, productLabel: f.productLabel, model: f.model }).rows.length;
 if (frontierRows !== f.points.length) problems.push(`Frontier's table has ${frontierRows} rows for ${f.points.length} points`);
 const provs = new Set(stripPoints(strip).points.map((p) => p.provenance));
@@ -181,14 +225,15 @@ const demoPoint = stripPoints(strip).points.find((p) => p.provenance === 'demo')
 if (!demoPoint?.heldOut) problems.push('a modeled (demo) mark enters the median');
 const demoRule = ceilingTable({ title: 't', records: [], unit: 'g g-1', quantity: 'q', ceilings: [{ value: 0.5, model: 'stand-in', provenance: 'demo' }] }).rows;
 if (demoRule[0]?.[4] !== 'demo') problems.push(`a demo ceiling's rule draws as ${demoRule[0]?.[4]}, not demo`);
-const mk = (id: string, carbonSource?: string) => ({ ...records[0], id, field: 'pha_yield_substrate', carbonSource }) as unknown as ExtractionRecord;
+const mk = (id: string, carbonSource?: string) => ({ ...records[0], id, carbonSource }) as unknown as ExtractionRecord;
 const sorted = yieldsOnSugar([mk('a', 'glucose'), mk('b', 'glycerol'), mk('c'), mk('d', 'D-glucose syrup')], 'glucose');
 if (sorted.on.map((r) => r.id).join() !== 'a,d' || sorted.elsewhere !== 2) problems.push(`yieldsOnSugar kept ${sorted.on.map((r) => r.id).join()} for glucose`);
-// A ceiling meets only its own product's yields: a PHA yield never stands
-// beside an ethanol ceiling, and a product whose field the ontology lacks
-// draws nothing.
+// A ceiling meets only its own product's yields: a record of another field
+// never stands beside an ethanol ceiling, and a product whose field the
+// ontology lacks draws nothing.
+const other = { ...mk('a', 'glucose'), field: 'biomass_yield_substrate' } as unknown as ExtractionRecord;
 const etoh = { ...mk('e', 'glucose'), field: YIELD_FIELD.ethanol } as unknown as ExtractionRecord;
-const onEthanol = yieldsOnSugar([mk('a', 'glucose'), etoh], 'glucose', 'ethanol');
+const onEthanol = yieldsOnSugar([other, etoh], 'glucose', 'ethanol');
 const wantEthanol = yieldFieldKnown('ethanol') ? 'e' : '';
 if (onEthanol.on.map((r) => r.id).join() !== wantEthanol) problems.push(`an ethanol ceiling meets ${onEthanol.on.map((r) => r.id).join() || 'nothing'}, not ${wantEthanol || 'nothing'}`);
 const unknown = yieldsOnSugar([mk('a', 'glucose')], 'glucose', 'no-such-product');

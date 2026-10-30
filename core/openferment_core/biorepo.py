@@ -22,10 +22,10 @@ write is a file whose history nobody can explain.
   paper      the record's paper carries no PMCID, DOI or PMID — the rule
              `check:biorepo` enforces on the committed file (§7.4), enforced
              here first so a decision the build would reject is never stored
-  range      a promotion's value — corrected or gold — is outside the field's
-             range in canonical units, or its unit does not normalise: §2.4
-             rule 5, applied to what a reviewer typed as well as to what the
-             model emitted
+  unit       a typed value — corrected or gold — is not a number, or its unit
+             does not convert into the field's canonical unit: §2.4 rule 4,
+             applied to what a reviewer typed as well as to what the model
+             emitted
   status     a gold decision that is not a verified one: gold is a promotion,
              and a promotion with another status would be stored and never
              merged
@@ -50,7 +50,7 @@ from typing import Any
 from . import atomic, extract, intake
 from .corpus import load_corpus
 from .models import BioRepo, Candidate, Quantity, ReviewDecision
-from .units import UnitError, field as ontology_field, in_range, to_canonical
+from .units import UnitError, field as ontology_field, to_canonical
 from .validate import anchor_candidate
 
 log = logging.getLogger("openferment.biorepo")
@@ -64,7 +64,7 @@ PATH = intake.DATA_DIR / "biorepo.json"
 # the only process that writes this file, so a lock inside it is enough.
 _WRITE_LOCK = threading.Lock()
 
-RULES = ("record", "reviewer", "fulltext", "quote", "paper", "range", "status")
+RULES = ("record", "reviewer", "fulltext", "quote", "paper", "unit", "status")
 
 # Names that are not a person (OF-BLD-012.1 F2). The README says a verified
 # record is one a NAMED reviewer promoted; a file signed 'you' is signed by
@@ -73,6 +73,19 @@ RULES = ("record", "reviewer", "fulltext", "quote", "paper", "range", "status")
 # test.
 PLACEHOLDER_REVIEWERS = frozenset({"you", "me", "reviewer", "user", "test"})
 MIN_REVIEWER_CHARS = 2
+
+
+def reviewer_refusal(name: str) -> str | None:
+    """The reviewer-name rule `write` applies, for any caller that records a
+    person's name (an override, an assumption): None when the name passes."""
+    if any(ch.isspace() and ch != " " for ch in (name or "")) or any(not ch.isprintable() for ch in (name or "")):
+        return "a name is one line of plain text"
+    name = (name or "").strip()
+    if not name:
+        return "an approval needs a name; an empty name is nobody approving"
+    if len(name) < MIN_REVIEWER_CHARS or name.lower() in PLACEHOLDER_REVIEWERS:
+        return f"{name!r} is a placeholder, not a person"
+    return None
 
 
 class WriteRefused(ValueError):
@@ -127,8 +140,8 @@ def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
     refreshed on write — then the copy biorepo.json keeps (the only one on a
     checkout that never ran the extractor), then the seed record.
 
-    A candidate id names its paper ('cl1-B5-a07dd73c'), so there is one file
-    to open; a seed id ('r-B5-1') names none, and the cache is not read at
+    A candidate id names its paper ('cl1-T5-276fbb61'), so there is one file
+    to open; a record id ('r-T5-1') names none, and the cache is not read at
     all. Guild asks `/check` twice per card, and each ask used to read and
     validate every candidates/*.json on disk."""
     m = _CANDIDATE_ID.match(record_id)
@@ -207,10 +220,10 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
     if _is_gold(decision) and decision.status != "verified":
         raise WriteRefused("status", f"a gold decision is a verified one; this one says {decision.status!r}")
 
-    # What a reviewer typed is held to §2.4 rule 5 like what the model
+    # What a reviewer typed is held to §2.4 rule 4 like what the model
     # emitted — whatever the record's status, and BOTH typed values when a
-    # decision carries a gold value and a correction: the value, in
-    # canonical units, inside the field's range. A correction on an
+    # decision carries a gold value and a correction: a number, in a unit
+    # that converts into the field's canonical unit. A correction on an
     # unverified seed record still reaches corpus.json (an unverified
     # candidate is not a record, and is not appended).
     field_id = _field(rec, "field")
@@ -219,16 +232,11 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
         if typed is None or categorical:
             continue
         if isinstance(typed.value, str) or isinstance(typed.value, bool):
-            raise WriteRefused("range", f"the {what} value {typed.value!r} for {field_id} is not a number")
+            raise WriteRefused("unit", f"the {what} value {typed.value!r} for {field_id} is not a number")
         try:
-            canonical = to_canonical(float(typed.value), typed.unit, field_id)
+            to_canonical(float(typed.value), typed.unit, field_id)
         except (TypeError, ValueError, UnitError) as e:
-            raise WriteRefused("range", f"the {what} value {typed.value!r} {typed.unit!r} for {field_id}: {e}") from e
-        if not in_range(canonical, field_id):
-            raise WriteRefused(
-                "range",
-                f"the {what} value {typed.value!r} {typed.unit!r} is outside the range of {field_id} in canonical units",
-            )
+            raise WriteRefused("unit", f"the {what} value {typed.value!r} {typed.unit!r} for {field_id}: {e}") from e
 
     stored = decision.model_copy()
     typed = decision.corrected is not None or decision.gold is not None

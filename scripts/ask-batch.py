@@ -119,7 +119,7 @@ def main(argv: list[str]) -> int:
         return 2
     pool = pool_or_none()
     if pool is None:
-        print("ask:batch needs the corpus: run pnpm export:corpus first. Nothing was asked.", file=sys.stderr)
+        print("ask:batch could not read the corpus; the service's log names why. Nothing was asked.", file=sys.stderr)
         return 2
     questions = read_questions(_path(args.file))
     ctx = tools.ToolContext(pool_factory=lambda: pool)

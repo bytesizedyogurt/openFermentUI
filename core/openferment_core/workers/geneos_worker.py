@@ -13,7 +13,7 @@ applies the add-on route where a model lacks one, and answers five ops:
     frontier   the production envelope over twelve growth rates
     mix        the ceiling across eleven mixtures of two sugars at equal carbon
 
-The product is the flux through a demand on its metabolite (PHB, added here
+The product is the flux through a demand on its metabolite (added here
 where the file lacks one) or out through the exchange it is secreted by
 (ethanol). A substrate the model has no uptake reaction for, or a product it
 has no route to, is a finding, said in words, with no number. Every number
@@ -48,22 +48,19 @@ class Refused(ValueError):
 
 def build_toy() -> Model:
     """The toy network the offline tests and fixtures run on. STAND-IN, not a
-    published model: four metabolites and six reactions, worked by hand.
+    published model: three metabolites and five reactions, worked by hand.
 
         EX_glc__D_e   glc__D_e <=>               (the feed)
         SPLIT         glc__D_e --> 2 a_c
         GROWTH        a_c -->                    (the objective)
-        PHAC          a_c --> phb_c
         FERM          a_c --> etoh_e
         EX_etoh_e     etoh_e -->                 (the secreted product)
 
-    The worker adds the demand on phb_c. From glucose at 10, the most of
-    either product is 20: 2 mol per mol, and 2 × 86.09 / 180.156 g per g of
-    PHB, 2 × 46.069 / 180.156 of ethanol."""
+    From glucose at 10, the most ethanol is 20: 2 mol per mol, and
+    2 × 46.069 / 180.156 g per g."""
     m = Model("toy")
     glc = Metabolite("glc__D_e", formula="C6H12O6", compartment="e", name="glucose")
     a = Metabolite("a_c", formula="C3H6O3", compartment="c", name="toy intermediate")
-    phb = Metabolite("phb_c", formula="C4H6O2", compartment="c", name="PHB repeat unit")
     etoh = Metabolite("etoh_e", formula="C2H6O", compartment="e", name="ethanol")
     ex = Reaction("EX_glc__D_e", lower_bound=-10.0, upper_bound=1000.0)
     ex.add_metabolites({glc: -1})
@@ -71,13 +68,11 @@ def build_toy() -> Model:
     split.add_metabolites({glc: -1, a: 2})
     growth = Reaction("GROWTH", lower_bound=0.0, upper_bound=1000.0)
     growth.add_metabolites({a: -1})
-    phac = Reaction("PHAC", lower_bound=0.0, upper_bound=1000.0)
-    phac.add_metabolites({a: -1, phb: 1})
     ferm = Reaction("FERM", lower_bound=0.0, upper_bound=1000.0)
     ferm.add_metabolites({a: -1, etoh: 1})
     ex_etoh = Reaction("EX_etoh_e", lower_bound=0.0, upper_bound=1000.0)
     ex_etoh.add_metabolites({etoh: -1})
-    m.add_reactions([ex, split, growth, phac, ferm, ex_etoh])
+    m.add_reactions([ex, split, growth, ferm, ex_etoh])
     m.objective = "GROWTH"
     return m
 
@@ -136,8 +131,7 @@ def load(model_id: str, path: str | None = None) -> Model:
         if entry.addon:
             added += apply_addon(m, shelf.ADDONS[entry.addon])
     # The demand on each product defined by a metabolite is added here, once,
-    # where the file lacks it. RehMBEL1391 exports PHB through PHBt and
-    # carries no DM_phb_c. A product secreted through an exchange needs none.
+    # where the file lacks it. A product secreted through an exchange needs none.
     for prod in shelf.PRODUCTS.values():
         if "metabolite" not in prod:
             continue

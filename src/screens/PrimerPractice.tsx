@@ -14,9 +14,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { MessageCircleQuestion, Send, Sparkles } from 'lucide-react';
 import type { PracticeScenario, PracticeSession, PracticeStepRef, PracticeValue } from '@/data/types';
-import { useProgramFilter, useStore } from '@/store';
-import { SKILLS, SKILL_BY_ID } from '@/data/skills';
-import { PROTOCOLS } from '@/data/protocols';
+import { useSkillById, useSkills, useStore } from '@/store';
 import { PRIMER_TABS } from '@/data/tabs';
 import { statusOf } from '@/engine/competence';
 import { fmt } from '@/engine/units';
@@ -89,10 +87,13 @@ function Frame({ title = 'Practice', subtitle, children }: { title?: string; sub
 // ── the list ───────────────────────────────────────────────────────────
 
 function PracticeList({ asked }: { asked: boolean }) {
+  const SKILLS = useSkills();
+  const SKILL_BY_ID = useSkillById();
   const ctx = useGuild();
   const practice = useStore((s) => s.practice);
   const depositions = useStore((s) => s.depositions);
   const runbooks = useStore((s) => s.runbooks);
+  const protocols = useStore((s) => s.protocols);
   const merge = useStore((s) => s.mergePractice);
   const route = useRoute();
   const focus = route.query.get('skill');
@@ -103,14 +104,10 @@ function PracticeList({ asked }: { asked: boolean }) {
   // Who the service knows this learner as.
   const named = learner?.id ?? null;
   // Every skill a protocol step needs: a scenario is drafted from those steps.
-  // An archived program's protocol offers nothing while the switch is off.
-  const shows = useProgramFilter();
   const tagged = useMemo(() => {
-    const needed = new Set(
-      PROTOCOLS.filter((p) => shows('protocol', p.id)).flatMap((p) => p.versions.flatMap((v) => v.steps.flatMap((st) => st.skills ?? []))),
-    );
+    const needed = new Set(protocols.flatMap((p) => p.versions.flatMap((v) => v.steps.flatMap((st) => st.skills ?? []))));
     return SKILLS.filter((sk) => needed.has(sk.id));
-  }, [shows]);
+  }, [protocols, SKILLS]);
   const skills = useMemo(() => {
     const open = (id: string) => (learner ? statusOf(ctx.status, learner.id, id).effective < 3 : true);
     return [...tagged].sort(
@@ -127,8 +124,8 @@ function PracticeList({ asked }: { asked: boolean }) {
     try {
       const scenario = await draftScenario({
         skillId,
-        depositions: depositions.filter((d) => shows('deposition', d.id)).map((d) => forDrafting(d, runbooks)),
-      }, useStore.getState().showArchived);
+        depositions: depositions.map((d) => forDrafting(d, runbooks)),
+      });
       merge({ scenario });
       navigate(`/primer/practice/${scenario.id}`);
     } catch (e) {
@@ -256,6 +253,7 @@ const MOVE: Record<string, string> = {
 };
 
 function Player({ scenario, opened }: { scenario: PracticeScenario; opened: PracticeSession | null }) {
+  const SKILL_BY_ID = useSkillById();
   const ctx = useGuild();
   const practice = useStore((s) => s.practice);
   const merge = useStore((s) => s.mergePractice);

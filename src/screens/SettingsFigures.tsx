@@ -4,14 +4,12 @@
 // OF-BLD-016 §3.2: the page draws over real results or not at all. When the
 // service keeps a computed ceiling or frontier (BioRepo → Artifacts), the
 // latest of each is drawn here beside the records it is held against; with
-// none kept, or no service, the legend stands alone. `demo.py --prototype`
-// still writes src/data/figureSamples.json for check:figures, and nothing on
-// this page reads it.
+// none kept, or no service, the legend stands alone.
 import { useEffect, useMemo, useState } from 'react';
 import type { Artifact, ExtractionRecord } from '@/data/types';
-import { useProgramFilter, useProgramLookup, useStore } from '@/store';
+import { useStore } from '@/store';
 import { href } from '@/router';
-import { listArtifacts, visibleArtifacts } from '@/lib/artifacts';
+import { listArtifacts } from '@/lib/artifacts';
 import { productOfBasis, productWords, yieldsOnSugar, type FrontierPointOut } from '@/lib/geneos';
 import { CeilingGap, EncodingLegend, Frontier } from '@/components/figures';
 
@@ -27,27 +25,18 @@ const latest = (all: Artifact[], tool: string): Artifact | null =>
   all.filter((a) => a.tool === tool).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0] ?? null;
 
 export function FiguresSection() {
-  // Under the program switch (OF-BLD-016 §2): the newest ceiling and frontier
-  // are chosen among the artifacts that show, and drawn beside the records
-  // that show, so an archived program's PHB ceiling is never the sample.
-  const shows = useProgramFilter();
-  const showArchived = useStore((s) => s.showArchived);
-  const lookup = useProgramLookup();
-  const allRecords = useStore((s) => s.records);
-  const records = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
-  const [fetched, setArtifacts] = useState<Artifact[] | null>(null);
-  const artifacts = useMemo(
-    () => (fetched ? visibleArtifacts(fetched, { ...lookup, showArchived }) : null),
-    [fetched, lookup, showArchived],
-  );
+  // The newest ceiling and frontier the service keeps, drawn beside the
+  // records they are held against.
+  const records = useStore((s) => s.records);
+  const [artifacts, setArtifacts] = useState<Artifact[] | null>(null);
   useEffect(() => {
     const ctrl = new AbortController();
-    listArtifacts(ctrl.signal, showArchived).then(
+    listArtifacts(ctrl.signal).then(
       (all) => setArtifacts(Array.isArray(all) ? all : []),
       () => !ctrl.signal.aborted && setArtifacts([]),
     );
     return () => ctrl.abort();
-  }, [showArchived]);
+  }, []);
 
   const ceiling = artifacts ? latest(artifacts, 'geneos.ceiling') : null;
   const frontier = artifacts ? latest(artifacts, 'geneos.frontier') : null;

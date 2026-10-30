@@ -239,7 +239,7 @@ GOOD = {
 
 
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path):
+def _offline(monkeypatch, tmp_path, test_corpus):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
@@ -260,23 +260,23 @@ def test_runs_are_empty_until_something_is_extracted(client):
 
 def test_runs_recompute_from_the_cache_against_the_seed(client, monkeypatch):
     monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    assert client.post("/api/intake/B5/fetch").json()["status"] == "complete"
+    assert client.post("/api/intake/T5/fetch").json()["status"] == "complete"
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
-    assert client.post("/api/intake/B5/extract").status_code == 200
+    assert client.post("/api/intake/T5/extract").status_code == 200
 
     runs = [ExtractRun.model_validate(r) for r in client.get("/api/witness/runs").json()]
     assert [r.run for r in runs] == ["claude-1"]
-    # B5's three seed records are time_to_colony; the extractor produced a
+    # T5's three records are time_to_colony; the extractor produced a
     # titre for it and a paraphrased colony time that anchoring refused with
     # a value the seed does not hold — so three misses, honestly.
-    assert outcomes(runs[0]) == {"r-B5-1": "miss", "r-B5-2": "miss", "r-B5-3": "miss"}
+    assert outcomes(runs[0]) == {"r-T5-1": "miss", "r-T5-2": "miss", "r-T5-3": "miss"}
 
     overlay = Overlay.model_validate(client.get("/api/biorepo/overlay").json())
     assert [r.run for r in overlay.runs] == ["claude-1"]
-    # The titre is new to B5 — the corpus growing — and it is in the overlay
+    # The titre is new to T5 — the corpus growing — and it is in the overlay
     # for Guild, not in the score.
     assert [c.field for c in overlay.candidates] == ["titer_secreted"]
-    assert overlay.candidates[0].id == "cl1-B5-a07dd73c"
+    assert overlay.candidates[0].id == "cl1-T5-276fbb61"
     assert runs[0].falsePositives == []
 
 
@@ -287,29 +287,29 @@ def test_a_decision_stays_with_its_content_across_a_re_extraction(client, monkey
     # copy, no longer a false positive the extractor produces), and the new
     # candidate arrives undecided under its own id.
     monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    client.post("/api/intake/B5/fetch")
+    client.post("/api/intake/T5/fetch")
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
-    client.post("/api/intake/B5/extract")
+    client.post("/api/intake/T5/extract")
     biorepo.write(ReviewDecision(status="rejected", provenance="unverified", reviewer="sean",
-                                 recordId="cl1-B5-a07dd73c", at="2026-09-15T00:00:00Z",
+                                 recordId="cl1-T5-276fbb61", at="2026-09-15T00:00:00Z",
                                  rejectReason="a placeholder row"))
-    assert [fp.id for fp in witness.runs()[0].falsePositives] == ["cl1-B5-a07dd73c"]
+    assert [fp.id for fp in witness.runs()[0].falsePositives] == ["cl1-T5-276fbb61"]
 
     other = {"candidates": [{
         "sectionId": "t1", "field": "titer_secreted", "value": 9, "unit": "mg L-1",
         "quote": "Placeholder B | 9 | mg L-1", "isPrimary": True, "confidence": 0.7,
     }]}
     monkeypatch.setattr(extract, "call_model", lambda *_: (other, extract.Usage()))
-    assert client.post("/api/intake/B5/extract?force=true").status_code == 200
+    assert client.post("/api/intake/T5/extract?force=true").status_code == 200
 
     runs_, candidates, decisions = witness.overlay_bundle()
-    assert [(c.id, c.value) for c in candidates] == [("cl1-B5-93a4e8a2", 9), ("cl1-B5-a07dd73c", 7)]
-    assert "cl1-B5-a07dd73c" in decisions and "cl1-B5-93a4e8a2" not in decisions
+    assert [(c.id, c.value) for c in candidates] == [("cl1-T5-da48b780", 9), ("cl1-T5-276fbb61", 7)]
+    assert "cl1-T5-276fbb61" in decisions and "cl1-T5-da48b780" not in decisions
     # The rejected 7 is still a false positive of the run: the file keeps it
     # and Witness measures what the extractor produced, then and now.
-    assert [fp.id for fp in runs_[0].falsePositives] == ["cl1-B5-a07dd73c"]
+    assert [fp.id for fp in runs_[0].falsePositives] == ["cl1-T5-276fbb61"]
     stored = biorepo.write(ReviewDecision(status="verified", provenance="unverified", reviewer="sean",
-                                          recordId="cl1-B5-93a4e8a2", at="2026-09-15T01:00:00Z"))
+                                          recordId="cl1-T5-da48b780", at="2026-09-15T01:00:00Z"))
     assert stored.status == "verified"
     assert sorted(c.value for c in biorepo.records()) == [7, 9]
 
@@ -321,11 +321,11 @@ def test_a_candidate_written_by_hand_is_shown_and_never_scored(client, monkeypat
     the extractor's match, and a rejection of it is not the extractor's
     false positive."""
     monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    assert client.post("/api/intake/B5/fetch").json()["status"] == "complete"
+    assert client.post("/api/intake/T5/fetch").json()["status"] == "complete"
     monkeypatch.setattr(witness, "seed_records", lambda: [
-        {"id": "r-B5-9", "paperId": "B5", "field": "titer_secreted", "value": 9, "unit": "mg L-1"},
+        {"id": "r-T5-9", "paperId": "T5", "field": "titer_secreted", "value": 9, "unit": "mg L-1"},
     ])
-    made, _, detail = extract.add_candidate("B5", {"sectionId": "t1", "field": "titer_secreted", "value": "9", "unit": "mg L-1",
+    made, _, detail = extract.add_candidate("T5", {"sectionId": "t1", "field": "titer_secreted", "value": "9", "unit": "mg L-1",
                                                    "quote": "Placeholder B | 9 | mg L-1"}, who="claude-haiku-5-5")
     assert made is not None, detail
     assert client.get("/api/witness/runs").json() == []
@@ -335,11 +335,11 @@ def test_a_candidate_written_by_hand_is_shown_and_never_scored(client, monkeypat
     asked = []
 
     def model(*_):
-        asked.append("B5")
+        asked.append("T5")
         return GOOD, extract.Usage()
 
     monkeypatch.setattr(extract, "call_model", model)
-    assert client.post("/api/intake/B5/extract").status_code == 200 and asked == ["B5"]
+    assert client.post("/api/intake/T5/extract").status_code == 200 and asked == ["T5"]
     # A rejection of the hand-written one, as biorepo.json would keep it.
     repo = biorepo.read()
     repo.decisions[made.id] = ReviewDecision(status="rejected", provenance="unverified", reviewer="Sean Creighton",
@@ -349,9 +349,9 @@ def test_a_candidate_written_by_hand_is_shown_and_never_scored(client, monkeypat
 
     [run] = witness.runs()
     # The extractor's 7 is the reading scored; the hand-written 9 would have matched.
-    assert outcomes(run) == {"r-B5-9": "value_mismatch"} and run.falsePositives == []
+    assert outcomes(run) == {"r-T5-9": "value_mismatch"} and run.falsePositives == []
     _, candidates, decisions = witness.overlay_bundle()
-    assert sorted(c.id for c in candidates) == sorted(["cl1-B5-a07dd73c", made.id]) and made.id in decisions
+    assert sorted(c.id for c in candidates) == sorted(["cl1-T5-276fbb61", made.id]) and made.id in decisions
 
 
 def test_a_range_candidate_matches_a_range_record_on_its_endpoints():
@@ -413,16 +413,16 @@ def test_a_run_names_the_models_that_answered(client, monkeypatch):
     # Witness shows which model a run used, read from each paper's
     # usage.models, never typed into the screen (live test, 2026-10-16).
     monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    client.post("/api/intake/B5/fetch")
+    client.post("/api/intake/T5/fetch")
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage(models=["claude-haiku-5-5"])))
-    client.post("/api/intake/B5/extract")
+    client.post("/api/intake/T5/extract")
     runs = [ExtractRun.model_validate(r) for r in client.get("/api/witness/runs").json()]
     assert runs[0].models == ["claude-haiku-5-5"]
 
 
 def test_a_run_with_no_recorded_model_says_none(client, monkeypatch):
     monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    client.post("/api/intake/B5/fetch")
+    client.post("/api/intake/T5/fetch")
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
-    client.post("/api/intake/B5/extract")
+    client.post("/api/intake/T5/extract")
     assert witness.runs()[0].models == []

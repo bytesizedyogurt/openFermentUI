@@ -124,10 +124,15 @@ def test_a_model_file_names_its_source_revision_hash_and_who_accepted_it(tmp_pat
 
 
 def test_the_model_files_are_listed_with_their_hash():
+    from openferment_core import geneos_models
+
     committed = lic.load_policy()
     by_id = {d.id: d for d in committed.data}
-    assert by_id["RehMBEL1391"].sha256 == "85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89"
-    assert "| RehMBEL1391 | GPL-3.0 |" in lic.render([], [], committed)
+    fetched = [m for m in geneos_models.SHELF.values() if m.fetched]
+    assert fetched, "the shelf fetches at least one model file"
+    for m in fetched:
+        assert by_id[m.id].sha256 == m.fetched.sha256, m.id
+        assert f"| {m.id} | {by_id[m.id].licence} |" in lic.render([], [], committed)
 
 
 def test_the_committed_ledger_reads_and_every_acceptance_is_signed():

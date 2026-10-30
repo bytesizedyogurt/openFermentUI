@@ -19,8 +19,7 @@ import {
 } from 'lucide-react';
 import type { Candidate, DecisionCheck, ExtractionRecord, Paper } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, useProgramFilter, useStore, provenanceOf, reviewerName } from '@/store';
+import { useStore, provenanceOf, reviewerName } from '@/store';
 import {
   bestCandidate,
   blocks,
@@ -36,7 +35,6 @@ import {
 } from '@/lib/review';
 import { useRoute, href } from '@/router';
 import { checkDecision } from '@/lib/intake';
-import { rejoinQueue } from '@/lib/programShows';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { ProvenanceBadge, Tick, type ProvKind } from '@/components/Provenance';
@@ -55,7 +53,6 @@ import {
 import { DISCLOSURE, exportText } from '@/lib/csv';
 import { SubsystemShelf } from '@/components/ReferenceView';
 import { GuildTabs } from '@/components/GuildBits';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
 
 // ── reject reasons (numbered so they are one keystroke away) ────────────
 
@@ -161,25 +158,6 @@ const NO_CANDIDATES: Candidate[] = [];
 
 // ── screen ─────────────────────────────────────────────────────────────
 
-/**
- * The records the program filter hid the last time this screen looked, and
- * the review session that was open then (its start time), kept across visits
- * for this page's life: the switch lives in Settings, so it moves while Guild
- * is not mounted, and an open queue learns what came back by comparing
- * against this on return. A session started since (from Extract, or seeded
- * afresh) was built from the filter as it stands, and compares with nothing
- * (OF-BLD-016 §2.2).
- */
-let lastSeen: { hidden: Set<string>; session: number } | null = null;
-
-/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
-function archivedNames(paperIds: string[]): string {
-  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
-  return PROGRAMS.filter((p) => hit.has(p.id))
-    .map((p) => p.name)
-    .join(' and ');
-}
-
 export default function Guild() {
   const records = useStore((s) => s.records);
   const papers = useStore((s) => s.papers);
@@ -202,9 +180,6 @@ export default function Guild() {
   // with ?record=<id>, and the card it names must be the one on screen.
   const route = useRoute();
   const focusId = route.query.get('record');
-  // OF-BLD-016 §2.2 — Extract, scoped by a link to one paper of an archived
-  // program, sends its review session here with ?paper=<id>.
-  const scopePaperId = route.query.get('paper');
 
   const [origin, setOrigin] = useState<'extract' | 'session'>('extract');
   const [usedKeyboard, setUsedKeyboard] = useState(false);
@@ -219,9 +194,9 @@ export default function Guild() {
   const lastAt = useRef(Date.now());
   const timings = useRef<number[]>([]);
 
-  // OF-BLD-012.1 F9 — 73 of the 132 seed papers carry no PMCID, DOI or PMID,
-  // and `biorepo.write` refuses every decision about them, so 52 unverified
-  // records can be reviewed here and never reach the committed file. A
+  // OF-BLD-012.1 F9 — `biorepo.write` refuses every decision about a record on
+  // a paper with no PMCID, DOI or PMID, so such a record can be reviewed here
+  // and never reach the committed file. A
   // reviewer working towards that file should not be shown them: with the
   // service up this filter is ON, and the strip says how many it is hiding
   // and why. Off, the queue is everything, and those records are still
@@ -240,29 +215,7 @@ export default function Guild() {
     [papers],
   );
 
-  // OF-BLD-016 §2.2 — the queue holds only records whose program shows: it
-  // seeds from them, and a record that reaches an open queue some other way
-  // (a candidate the overlay joins to it, or the switch in Settings hiding a
-  // program while a queue is open) leaves it in the effect below. A link is
-  // the exception: `?record=` names one record and `?paper=` one paper's
-  // records, and those stay, under the banner that names their program.
-  const shows = useProgramFilter();
-  const linked = useCallback(
-    (r: ExtractionRecord) => r.id === focusId || (scopePaperId !== null && r.paperId === scopePaperId),
-    [focusId, scopePaperId],
-  );
-  const queueable = useCallback(
-    (r: ExtractionRecord) => linked(r) || shows('record', r.id),
-    [linked, shows],
-  );
-  const waiting = useMemo(
-    () => records.filter((r) => r.status === 'unverified' && queueable(r)),
-    [records, queueable],
-  );
-  const hiddenWaiting = useMemo(
-    () => records.filter((r) => r.status === 'unverified' && !queueable(r)),
-    [records, queueable],
-  );
+  const waiting = useMemo(() => records.filter((r) => r.status === 'unverified'), [records]);
   const hiddenByFilter = useMemo(
     () => (keepableOnly ? waiting.filter((r) => !keepable(r)).length : 0),
     [keepableOnly, waiting, keepable],
@@ -291,13 +244,13 @@ export default function Guild() {
       setFilterChoice(only);
       const ids = useStore
         .getState()
-        .records.filter((r) => r.status === 'unverified' && queueable(r))
+        .records.filter((r) => r.status === 'unverified')
         .filter((r) => !only || keepable(r))
         .map((r) => r.id);
       startReview(ids);
       setOrigin('session');
     },
-    [keepable, queueable, startReview],
+    [keepable, startReview],
   );
 
   // Declared after the seeding effect above so it runs after it in the same
@@ -311,57 +264,6 @@ export default function Guild() {
     focused.current = focusId;
     focusReview(focusId);
   }, [focusId, focusReview, queue.length]);
-
-  // OF-BLD-016 §2.2 — keep an open queue to the records whose program shows.
-  // Declared after the focus effect, so a deep link has put its record in
-  // front before this looks. A record the program filter hides leaves the
-  // queue, and the card under review is followed the way the overlay follows
-  // it (store.ts): the same record if it stays, else the next one that does.
-  // Records the switch brings back, still undecided, take their seed places
-  // while no card of the session has been passed (the order a session begun
-  // with the switch on would have), and after that join after everything
-  // already queued, as new candidates do (an empty queue seeds afresh above,
-  // in the seed's order). Nothing is decided or reset: the session's counters
-  // and the records themselves are untouched.
-  const hiddenIds = useMemo(
-    () => new Set(records.filter((r) => !queueable(r)).map((r) => r.id)),
-    [records, queueable],
-  );
-  useEffect(() => {
-    const s = useStore.getState();
-    const session = s.reviewStats.startedAt;
-    const before = lastSeen && lastSeen.session === session ? lastSeen.hidden : hiddenIds;
-    lastSeen = { hidden: hiddenIds, session };
-    if (s.reviewQueue.length === 0) return;
-    const stays = (id: string) => !hiddenIds.has(id);
-    const kept = s.reviewQueue.filter(stays);
-    const queued = new Set(kept);
-    const joining = s.records
-      .filter(
-        (r) =>
-          before.has(r.id) &&
-          !hiddenIds.has(r.id) &&
-          r.status === 'unverified' &&
-          !r.gold &&
-          !queued.has(r.id) &&
-          (!keepableOnly || keepable(r)),
-      )
-      .map((r) => r.id);
-    if (kept.length === s.reviewQueue.length && joining.length === 0) return;
-    // Before any card is passed, returning records take their seed places.
-    const untouched = s.reviewIndex === 0;
-    const reviewQueue = rejoinQueue(kept, joining, s.records.map((r) => r.id), untouched);
-    const under = s.reviewQueue[s.reviewIndex];
-    const reviewIndex = untouched
-      ? 0
-      : under !== undefined && stays(under)
-        ? reviewQueue.indexOf(under)
-        : Math.min(s.reviewQueue.slice(0, s.reviewIndex).filter(stays).length, reviewQueue.length);
-    useStore.setState({ reviewQueue, reviewIndex });
-    // `queue` too: a deep link to a decided record rebuilds the queue from
-    // every unverified record (focusReview), and the overlay joins arriving
-    // candidates to it, each without asking the program filter.
-  }, [hiddenIds, keepable, keepableOnly, queue]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
@@ -659,22 +561,7 @@ export default function Guild() {
           <EmptyState
             icon={<ClipboardCheck size={22} />}
             title="Nothing waiting for review"
-            body={
-              hiddenWaiting.length > 0 ? (
-                <>
-                  Nothing in the programs showing is waiting. {hiddenWaiting.length} unverified record
-                  {hiddenWaiting.length === 1 ? '' : 's'} on papers in{' '}
-                  {archivedNames(hiddenWaiting.map((r) => r.paperId))}{' '}
-                  {hiddenWaiting.length === 1 ? 'is' : 'are'} hidden, because archived programs are.{' '}
-                  <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
-                    Settings → Programs
-                  </a>{' '}
-                  shows them.
-                </>
-              ) : (
-                'Every extraction in this session has already been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue.'
-              )
-            }
+            body="Every extraction in this session has already been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue."
             action={
               <div className="flex gap-2">
                 <LinkButton to="/intake" variant="primary">
@@ -1016,9 +903,6 @@ export default function Guild() {
 
       {topStrip}
 
-      {/* OF-BLD-016 §2.2 — a link opened a record the program filter hides. */}
-      {!shows('record', record.id) && <ArchivedBanner kind="record" id={record.id} />}
-
       <p className="sr-only" aria-live="polite">
         {`Record ${index + 1} of ${queue.length}. ${fieldName(record.field)}, ${fmt(record.value)} ${
           record.unit
@@ -1039,11 +923,7 @@ export default function Guild() {
           <h2 className="font-serif text-section-title font-semibold">{def.name}</h2>
           <p className="text-body text-ink-soft mt-1 max-w-2xl">{def.definition}</p>
           <p className="text-caption text-ink-soft mt-1">
-            Ontology range{' '}
-            <span className="font-num">
-              {def.range[0]}–{def.range[1]} {def.canonicalUnit || '(dimensionless)'}
-            </span>
-            {def.notes ? ` · ${def.notes}` : ''}
+            Canonical unit <span className="font-num">{def.canonicalUnit || '(dimensionless)'}</span>
           </p>
 
           {/* value block */}

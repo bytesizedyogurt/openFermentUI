@@ -13,9 +13,8 @@
 //   POST /api/proforma/reference/{id}  Run or Rerun (a basis already run
 //                                      returns its stored artifact).
 //
-// The header names the source package and version, the program, the
-// provenance as the artifact computes it, and the package test the run is
-// held to. The price is the output the shelf names (`priceOutput`). Below it,
+// The header names the source package and version, the provenance as the
+// artifact computes it, and the package test the run is held to. The price is the output the shelf names (`priceOutput`). Below it,
 // "Held to its package's own test" sets each regression value of the package
 // beside what this run measured, the relative difference and whether it is
 // within the package's tolerance, every number from the artifact's `checks`
@@ -32,15 +31,12 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, Play } from 'lucide-react';
 import type { Artifact, FlowsheetInfo, PackageRegression, RegressionCheck } from '@/data/types';
-import { PROGRAM_BY_ID } from '@/data/programs';
 import { href } from '@/router';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
 import { PageHeader, Card, Button, Callout, LinkButton, cx } from '@/components/ui';
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
 import {
-  BENCHMARK_EXPECTED,
-  BENCHMARK_FLOWSHEET,
   LEGACY_BENCHMARK_TOOL,
   ProformaDown,
   REFERENCE_TOOL,
@@ -296,7 +292,6 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
   const regression = state?.regression ?? (art?.output?.regression as PackageRegression | undefined) ?? null;
   const checks = referenceChecks(art);
   const price = art ? referencePrice(info, art) : null;
-  const program = info?.program ? PROGRAM_BY_ID[info.program as keyof typeof PROGRAM_BY_ID] : null;
   const compat = basisInput(art, 'compatibility');
   const simulator = basisInput(art, 'simulator');
   const thermo = basisInput(art, 'thermodynamics');
@@ -304,8 +299,6 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
   const o = (art?.output ?? {}) as Record<string, unknown>;
   const refs = Array.isArray(o.references) ? (o.references as unknown[]).filter((r): r is string => typeof r === 'string') : [];
   const irr = num(o.IRR) ?? num(view?.tables.tea?.IRR);
-  const isBenchmark = flowsheetId === BENCHMARK_FLOWSHEET;
-  const mespGal = num(o.mespUsdPerGal);
   const title = info?.title ?? flowsheetId;
   // The benchmark kept before reference runs held their tables (OF-BLD-014
   // §8.2): shown, price only, with the note that says so; Run makes the full
@@ -364,9 +357,6 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
             )}
           </span>
         )}
-        <span>
-          · Program: <span className="text-ink">{program ? program.name : 'none (general)'}</span>
-        </span>
         {info?.packageTest && (
           <span data-testid="reference-package-test">
             · Held to <span className="font-num text-ink">{info.packageTest}</span>
@@ -424,14 +414,6 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
                 </Tick>
               ) : (
                 <p className="text-body text-ink-soft">The run holds no price the shelf names for this flowsheet.</p>
-              )}
-              {isBenchmark && mespGal != null && (
-                <p className="text-caption text-ink-soft mt-2" data-testid="benchmark-expected">
-                  Expected <span className="font-num">{BENCHMARK_EXPECTED.usdPerGal} USD per gallon</span> within{' '}
-                  <span className="font-num">{BENCHMARK_EXPECTED.tolerance * 100} %</span> for <span className="font-num">{BENCHMARK_EXPECTED.package}</span>,
-                  measured when Proforma was first built on BioSTEAM; this run is{' '}
-                  <span className="font-num">{fmt(((mespGal - BENCHMARK_EXPECTED.usdPerGal) / BENCHMARK_EXPECTED.usdPerGal) * 100, 2)} %</span> from it.
-                </p>
               )}
               <p className="text-caption text-ink-soft mt-2">
                 Run{' '}

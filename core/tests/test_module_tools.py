@@ -1,8 +1,9 @@
 """One read tool per module (OF-BLD-015 §7.2), through `tools.run`.
 
-The seeded modules come from the real `modules.json`; the service's stores
-are stand-ins, so nothing here reads a key, the network or this machine's
-data.
+The module rows come from a small projection written here (alpha 2.0 deleted
+the seed modules.json was projected from, ADR-010): fictional runbooks, a
+host and a lesson. The service's stores are stand-ins, so nothing here reads
+a key, the network or this machine's data.
 """
 from __future__ import annotations
 
@@ -13,22 +14,41 @@ import pytest
 from openferment_core import module_stores, postdoc_agent, tools
 from openferment_core.models import Checks, Guild, GuildPerson
 from openferment_core.validate import SeenSet, validate_plan
-from test_postdoc_agent import Script, claim, plan
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 
 STATES = {"open", "fenced", "approved", "locked", "proposed", "retired"}
 
 
-def ctx_for(pool_, include_archived=True, **over):  # noqa: F811
-    """The seed with archived programs shown, as the tools read it before
-    the program switch (OF-BLD-016 §2.3), unless the test turns it off."""
+# Fictional rows, chosen to be found by whole words and heads and by nothing else.
+PROJECTION = {
+    "runbooks": {
+        "runbooks": [{"id": "rb-zeta", "title": "Zetase — pilot process", "kind": "research", "status": "needs_review",
+                      "lockedAt": None, "productId": None, "strainId": None, "predictions": []},
+                     {"id": "rb-omega", "title": "Omegase — bench trial", "kind": "research", "status": "ready",
+                      "lockedAt": "2026-10-01T00:00:00Z", "productId": None, "strainId": None, "predictions": []}],
+        "protocols": [],
+    },
+    "geneos": {"hosts": [{"id": "h-zeta", "name": "Zetamyces testii Z1", "badges": [], "bsl": 1},
+                         {"id": "s-cerevisiae-cenpk113-7d", "name": "Saccharomyces cerevisiae CEN.PK113-7D",
+                          "badges": [], "bsl": 1}],
+               "pathways": []},
+    "proforma": {"scenarios": []},
+    "primer": {"lessons": [{"id": "l-ster", "title": "Sterilising and releasing a vessel",
+                            "moduleTitle": "Why extraction comes first", "blurb": "", "skills": []}]},
+}
+
+
+def ctx_for(pool_, **over):  # noqa: F811
+    """The service's sources over the fictional projection, with the test's
+    stand-ins laid on."""
     def make():
         src = module_stores.seed_sources(lambda: pool_)
+        src.projection = lambda: json.loads(json.dumps(PROJECTION))
         for k, v in over.items():
             setattr(src, k, v)
-        return module_stores.Stores(src, include_archived=include_archived)
+        return module_stores.Stores(src)
 
-    return tools.ToolContext(pool_factory=lambda: pool_, stores_factory=make, include_archived=include_archived)
+    return tools.ToolContext(pool_factory=lambda: pool_, stores_factory=make)
 
 
 def read(module, ctx, ids=(), words="", kind="", state="", limit=20):
@@ -51,30 +71,19 @@ def test_each_read_returns_typed_rows_inside_the_summary_cap(pool, module):  # n
     assert ("partial" in r.summary) == (module in module_stores.PARTIAL)
 
 
-def test_dominion_reads_open_and_fenced_with_their_marks(pool):  # noqa: F811
-    ctx = ctx_for(pool)
-    opened = read("dominion", ctx, kind="molecule", state="open")
-    fenced = read("dominion", ctx, kind="molecule", state="fenced")
-    seeded = module_stores._projection()["dominion"]["molecules"]
-    assert opened.summary["count"] + fenced.summary["count"] == len(seeded)
-    assert all(row.provenance == "demo" and row.status in ("clear-expired", "clear-none") for row in opened.rows)
-    taq = read("dominion", ctx, ids=["hot-start-taq"]).rows
-    assert [(r.id, r.state, r.status) for r in taq] == [("hot-start-taq", "fenced", "watch-variant")]
-
-
 def test_words_and_refs_both_find_a_row(pool):  # noqa: F811
     ctx = ctx_for(pool)
-    assert read("runbooks", ctx, words="brazzein pilot").rows[0].id == "rb-brazzein"
-    assert read("runbooks", ctx, ids=["runbooks/runbook/rb-brazzein"]).rows[0].state == "locked"
-    assert read("geneos", ctx, words="necator").rows[0].id == "c-necator-h16"
+    assert read("runbooks", ctx, words="omegase bench").rows[0].id == "rb-omega"
+    assert read("runbooks", ctx, ids=["runbooks/runbook/rb-omega"]).rows[0].state == "locked"
+    assert read("geneos", ctx, words="zetamyces").rows[0].id == "h-zeta"
 
 
 def test_a_number_a_wrong_kind_and_a_wrong_state_are_refused_in_words(pool):  # noqa: F811
     ctx = ctx_for(pool)
-    assert "a number was typed" in tools.run("dominion_read", {"ids": [], "words": "", "kind": "", "state": "",
+    assert "a number was typed" in tools.run("runbooks_read", {"ids": [], "words": "", "kind": "", "state": "",
                                                                "limit": 5, "ids_extra": 3}, ctx).error
     assert "not a kind" in read("pureos", ctx, kind="molecule").error
-    assert "refused its input" in read("dominion", ctx, state="free").error
+    assert "refused its input" in read("runbooks", ctx, state="free").error
 
 
 def test_guild_is_reduced_to_what_the_ledger_shows(pool):  # noqa: F811
@@ -96,36 +105,16 @@ def test_a_module_that_cannot_be_read_is_refused_in_words(pool):  # noqa: F811
 def test_a_claim_may_cite_a_row_its_run_returned_and_no_other(pool):  # noqa: F811
     ctx = ctx_for(pool)
     seen = SeenSet()
-    seen.add(read("dominion", ctx, ids=["hot-start-taq"]))
-    cited = {"id": "c1", "text": "Hot-start Taq is fenced.", "recordIds": [], "support": "direct", "passages": [],
-             "evidenceIds": [], "moduleRefs": ["dominion/molecule/hot-start-taq"]}
-    ghost = dict(cited, id="c2", moduleRefs=["dominion/molecule/brazzein"])
+    seen.add(read("runbooks", ctx, ids=["rb-omega"]))
+    cited = {"id": "c1", "text": "The Omegase runbook is locked.", "recordIds": [], "support": "direct", "passages": [],
+             "evidenceIds": [], "moduleRefs": ["runbooks/runbook/rb-omega"]}
+    ghost = dict(cited, id="c2", moduleRefs=["runbooks/runbook/rb-zeta"])
     out = validate_plan([cited, ghost], seen, pool)
-    assert [c.id for c in out.claims] == ["c1"] and out.claims[0].provenance == "demo"
+    assert [c.id for c in out.claims] == ["c1"] and out.claims[0].provenance == "unverified", "a runbook row carries no mark of its own"
     assert out.rejected == 1 and "no tool returned" in out.reasons[0]
     refused = SeenSet()
     refused.add(read("pureos", ctx, kind="molecule"))
     assert not refused.rows
-
-
-def test_what_is_open_in_dominion_is_answered_from_dominion_read(pool):  # noqa: F811
-    ctx = ctx_for(pool)
-    question = "What is open in Dominion?"
-    script = Script(
-        [("dominion_read", {"ids": [], "words": "", "kind": "molecule", "state": "open", "limit": 5})],
-        plan(dict(claim(text="Pfu polymerase is open to make: its foundational patents ran out."),
-                  moduleRefs=["dominion/molecule/pfu-polymerase"])),
-    )
-    out = postdoc_agent.ask(question, converse=script, ctx=ctx)
-    assert [s.kind for s in out.trace] == ["coverage", "tool", "final"]
-    assert out.trace[1].summary.startswith("Read Dominion for molecule · open · ")
-    [c] = out.claims
-    assert c.moduleRefs == ["dominion/molecule/pfu-polymerase"] and c.provenance == "demo"
-    assert [r.ref for r in out.rows] == ["dominion/molecule/pfu-polymerase"] and out.rows[0].state == "open"
-    assert module_stores.footer(out.coverage).startswith("searched eleven, found in")
-    assert next(m for m in out.coverage.modules if m.module == "dominion").count > 0
-    # The tool the model was offered is the registry's, by the API's name rule.
-    assert "dominion_read" in [t["name"] for t in script.calls[0]["tools"]]
 
 
 def _unions(node, path=""):
@@ -165,7 +154,7 @@ def test_the_module_tools_go_out_loose_and_the_rest_strict():
     # OF-BLD-019's thermo_props (§4.2), run_flowsheet and stream_table (§6.1).
     assert {t["name"] for t in sent if not t["strict"]} == set(tools.WHITELIST[7:])
     assert {f"{m}_{w}" for m in module_stores.MODULES for w in ("read", "write")} <= set(tools.WHITELIST[7:])
-    assert "refused its input" in tools.run("dominion_read", {"ids": "hot-start-taq", "words": "", "kind": "", "state": "",
+    assert "refused its input" in tools.run("runbooks_read", {"ids": "rb-omega", "words": "", "kind": "", "state": "",
                                                               "limit": 5}).error
 
 
@@ -177,9 +166,9 @@ def test_a_word_finds_a_row_by_its_head(pool):  # noqa: F811
     would have read "Depositing" as a match: a query word of four letters or
     more matches the head of a row's word, and the module's blurb counts."""
     ctx = ctx_for(pool)
-    assert [r.id for r in read("primer", ctx, words="steril").rows] == ["l6-3"]  # "Sterilising and releasing a vessel"
+    assert [r.id for r in read("primer", ctx, words="steril").rows] == ["l-ster"]  # "Sterilising and releasing a vessel"
     assert read("primer", ctx, words="ste").summary["count"] == 0  # three letters is too short a head
-    assert read("primer", ctx, words="extract").summary["count"] >= 1  # "Why extraction", and the module's blurb
+    assert read("primer", ctx, words="extract").summary["count"] >= 1  # the module's title, "Why extraction comes first"
 
 
 def test_an_artifact_row_carries_its_headline_values(pool):  # noqa: F811
@@ -200,15 +189,6 @@ def test_an_artifact_row_carries_its_headline_values(pool):  # noqa: F811
     assert row.detail["output"] == {"mespUsdPerGal": 1.9677, "package": "biorefineries.cornstover@2.35.1"}
     assert row.detail["inputs"] == ["package=biorefineries.cornstover@2.35.1"]
     assert read("proforma", ctx_for(pool, artifacts=lambda: [art]), words="cornstover").summary["count"] == 1
-
-
-def test_a_molecule_row_names_its_train_and_pathways(pool):  # noqa: F811
-    """The seams to pureOS and geneOS: the unit operations and pathways a
-    molecule declares are on its row, so a read of Dominion hands the next
-    read its ids."""
-    [row] = read("dominion", ctx_for(pool), ids=["taq-dna-polymerase"]).rows
-    assert row.detail["processCode"] == "P9" and "heat-step" in row.detail["unitOperationIds"]
-    assert read("dominion", ctx_for(pool), words="heat-step").summary["count"] >= 1
 
 
 def test_an_artifact_row_is_worth_what_its_inputs_are_worth_now(pool):  # noqa: F811
@@ -258,40 +238,9 @@ def test_an_artifact_row_is_worth_what_its_inputs_are_worth_now(pool):  # noqa: 
 # ── the program switch (OF-BLD-016 §2.3) ──────────────────────────────────
 
 
-def test_with_the_switch_off_a_read_leaves_archived_rows_out_and_says_so(pool):  # noqa: F811
-    from openferment_core import programs
-
-    off = ctx_for(pool, include_archived=False)
-    asked = read("geneos", off, ids=["c-necator-h16"])
-    assert asked.error is None and asked.rows == [] and asked.summary["count"] == 0
-    assert "PHA" in asked.summary["hidden"] and "Settings → Programs" in asked.summary["hidden"]
-    hosts = read("geneos", off, kind="host")
-    assert hosts.rows and not [r.id for r in hosts.rows if programs.is_archived(programs.program_of("strain", r.id))]
-    # A listing, or a read by words, says nothing of what is hidden.
-    assert "hidden" not in hosts.summary
-    assert "hidden" not in read("geneos", off, words="necator").summary
-    # With the switch on, the row is read as before, and nothing is said hidden.
-    on = read("geneos", ctx_for(pool), ids=["c-necator-h16"])
-    assert [r.id for r in on.rows] == ["c-necator-h16"] and "hidden" not in on.summary
-
-
-def test_with_the_switch_on_every_module_counts_what_it_did_before(pool):  # noqa: F811
-    on, off = ctx_for(pool), ctx_for(pool, include_archived=False)
-    for module in module_stores.MODULES:
-        every = len(on.stores.all_rows(module))
-        assert read(module, on, limit=1).summary["count"] == every, module
-        hidden = off.stores.hidden(module)
-        # Examples (§3.3) leave with the archive too, without being an
-        # archived program's rows (OF-BLD-016 §4.R).
-        hidden_ids = {r.id for r in hidden}
-        examples = [r for r in on.stores.all_rows(module) if r.detail.get("example") and r.id not in hidden_ids]
-        assert read(module, off, limit=1).summary["count"] == every - len(hidden) - len(examples), module
-    assert read("dominion", off, limit=1).summary["count"] < read("dominion", on, limit=1).summary["count"]
-
-
 def test_the_switch_is_not_a_tool_input(pool):  # noqa: F811
     refused = tools.run("geneos_read", {"ids": [], "words": "", "kind": "", "state": "", "limit": 5,
-                                        "includeArchived": True}, ctx_for(pool, include_archived=False))
+                                        "includeArchived": True}, ctx_for(pool))
     assert refused.error and "includeArchived" in refused.error
 
 
@@ -383,11 +332,10 @@ def test_a_loose_tool_keeps_its_maps_and_a_strict_one_stays_closed():
     assert not any(maps(t["input_schema"]) for t in sent.values() if t["strict"])
 
 
-def test_pureos_reads_a_train_a_model_built_as_kind_train_hidden_with_its_program(pool):  # noqa: F811
+def test_pureos_reads_a_train_a_model_built_as_kind_train(pool):  # noqa: F811
     """OF-BLD-020 §5.4: a train a model built is kept on the service and read
     as kind train, its ref `pureos/train/<train id>`, a detail of ids and words
-    alone; with the switch off, one of an archived program hides and says so.
-    The train is a STAND-IN written here."""
+    alone. The train is a STAND-IN written here."""
     from openferment_core.models import KeptTrain, TrainSpec
 
     spec = TrainSpec.model_validate({
@@ -405,7 +353,3 @@ def test_pureos_reads_a_train_a_model_built_as_kind_train_hidden_with_its_progra
     seen = SeenSet()
     seen.add(r)
     assert row.ref in seen.rows and not seen.runs, "a train is data: its runs are the kept runs"
-    archived = k.model_copy(update={"spec": spec.model_copy(update={"program": "pha"})})
-    off = read("pureos", ctx_for(pool, include_archived=False, kept_trains=lambda: [archived]), ids=[spec.id])
-    assert off.rows == [] and "PHA" in off.summary["hidden"]
-    assert read("pureos", ctx_for(pool, kept_trains=lambda: [archived]), ids=[spec.id]).rows[0].id == spec.id

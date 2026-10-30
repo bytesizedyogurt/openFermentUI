@@ -9,7 +9,6 @@ the network.
 """
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -24,7 +23,6 @@ from openferment_core.validate import SeenSet, validate_plan
 from openferment_core.workers import WorkerError
 
 CORE = Path(__file__).resolve().parent.parent
-PROTOTYPE = Path(__file__).parent / "fixtures" / "prototype"
 RUN_ID = "bbbbbbbbbbbbbbb1"
 STANDIN = "STAND-IN for this test: invented numbers in the worker's shape"
 
@@ -249,7 +247,7 @@ def test_each_property_is_its_own_evidence_with_the_artifacts_basis(store, worke
 
 def _tool(**fields):
     raw = {"artifactId": "", "streamId": "", "preset": "", "recordId": "", **fields}
-    return tools.run("thermo_props", raw, tools.ToolContext(pool_factory=lambda: _titres(TITRE), include_archived=True))
+    return tools.run("thermo_props", raw, tools.ToolContext(pool_factory=lambda: _titres(TITRE)))
 
 
 def test_the_tool_is_a_loose_read_in_the_closed_registry():
@@ -283,17 +281,6 @@ def test_a_claim_may_cite_the_answer_like_any_computed_value(store, worker):
     out = validate_plan(raw, seen, SimpleNamespace(record=lambda _id: None))
     assert [c.id for c in out.claims] == ["c1"] and out.claims[0].provenance == "unverified"
     assert out.rejected == 1 and "cites what no tool returned" in out.reasons[0]
-
-
-def test_the_tool_refuses_an_archived_programs_run_with_the_switch_off(store, worker):
-    kept = json.loads((PROTOTYPE / "artifacts.json").read_text(encoding="utf-8"))["response"]
-    pha = Artifact.model_validate(next(a for a in kept if a["tool"] == "proforma.run"))
-    _keep(pha)
-    raw = {"artifactId": pha.id, "streamId": "sugar", "preset": "", "recordId": ""}
-    off = tools.run("thermo_props", raw, tools.ToolContext(include_archived=False))
-    assert "archived (hidden)" in off.error and "PHA" in off.error and worker.calls == []
-    on = tools.run("thermo_props", raw, tools.ToolContext(include_archived=True))
-    assert on.error is None and on.evidence
 
 
 # ── the endpoints ────────────────────────────────────────────────────────
@@ -353,19 +340,6 @@ def test_a_damaged_file_is_a_409_in_words_never_a_500(store, worker, client):
         assert r.status_code == 409 and f"{answer} is damaged on disk" in r.json()["detail"], r.text
     assert worker.calls == [], "nothing is asked of thermosteam over a damaged answer"
 
-
-# ── the double's answers ─────────────────────────────────────────────────
-
-
-def test_the_doubles_answers_are_the_stand_in_runs_streams_and_say_what_they_are():
-    entries = json.loads((PROTOTYPE / "thermo-props.json").read_text(encoding="utf-8"))["response"]["entries"]
-    train = json.loads((PROTOTYPE / "pureos-train.json").read_text(encoding="utf-8"))["response"]
-    by = {(e["request"].get("artifactId"), e["request"].get("streamId")): e for e in entries}
-    for s in train["streams"]:
-        assert (train["artifactId"], s["id"]) in by, f"the double cannot answer for stream {s['id']} of the train"
-    assert by[(train["artifactId"], "broth")]["status"] == 422 and "PHB" in by[(train["artifactId"], "broth")]["body"]["detail"]
-    answered = [e["body"] for e in entries if e["status"] == 200]
-    assert answered and all("STAND-IN" in ThermoProps.model_validate(a["output"]).library for a in answered)
 
 
 def test_the_service_never_imports_thermosteam():

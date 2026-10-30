@@ -94,7 +94,11 @@ def test_outside_a_loop_the_tool_refuses(pool):  # noqa: F811
     assert "inside Postdoc's loop" in r.error
 
 
-def test_the_loop_puts_the_draft_on_the_plan(pool):  # noqa: F811
+def test_the_loop_puts_the_draft_on_the_plan(pool, monkeypatch):  # noqa: F811
+    # The catalogues a draft may name come from a project's records; here, the test's own.
+    from openferment_core.tools import runbook as runbook_tool
+
+    monkeypatch.setattr(runbook_tool, "_ids", lambda: (frozenset({PRODUCT}), frozenset({STRAIN})))
     draft_call = ("draft_runbook", {"title": "Secreted titre on xylose", "productId": PRODUCT, "strainId": STRAIN,
                                     "items": [{"label": "Secreted titre", "evidenceId": "", "field": "titer_secreted",
                                                "recordIds": ["cl1-X1-0000000a"]}],

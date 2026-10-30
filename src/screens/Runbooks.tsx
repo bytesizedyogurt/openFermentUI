@@ -9,35 +9,15 @@
 // A runbook is not a job. The jobs tray shows the progress bar for whatever is
 // in flight; this board shows the records, including the ones that are not
 // running at all and will not be until somebody acts.
-//
-// PROGRAMS (OF-BLD-016 §2.2). The board, its columns and every count above
-// them read through the store's program filter: a runbook belongs to its own
-// program, else the molecule's, else the host's, and one in an archived
-// program leaves the board while the switch is off. A handoff link from an
-// archived molecule still opens its panel, under the banner that names the
-// program.
 import { useMemo } from 'react';
-import { ArrowRight, Boxes, GitBranch, Sparkles } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import type { Runbook, RunbookStatus } from '@/data/types';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { isExample, programOf, useProgramFilter, useStore } from '@/store';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
-import { href, navigate, useRoute } from '@/router';
-import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE, RUNBOOK_STATUS_ORDER } from '@/data/runbooks';
-import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
-import { ClearanceChip, CounselCallout } from '@/components/Clearance';
+import { useStore } from '@/store';
+import { href } from '@/router';
+import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE, RUNBOOK_STATUS_ORDER } from '@/data/labels';
+import { PRODUCT_CATEGORY_LABEL } from '@/data/labels';
 import { RunbookStatusIcon, StageDot } from '@/components/RunbookBits';
-import {
-  Bar,
-  Button,
-  Card,
-  EmptyState,
-  Explain,
-  LinkButton,
-  PageHeader,
-  SectionTitle,
-  cx,
-} from '@/components/ui';
+import { Bar, Card, EmptyState, Explain, LinkButton, PageHeader, SectionTitle, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { RUNBOOK_TABS } from '@/data/tabs';
 
@@ -113,99 +93,12 @@ function RunbookCard({ r }: { r: Runbook }) {
           {halted.name}: {halted.detail ?? 'waiting on a person'}
         </div>
       )}
-
-      {product && (
-        <div className="mt-2">
-          <ClearanceChip state={product.clearanceState} compact />
-        </div>
-      )}
     </a>
   );
 }
 
-/** §8 — the blocked → research handoff, offered before anything is created. */
-function HandoffPanel({ productId }: { productId: string }) {
-  const products = useStore((s) => s.products);
-  const handoff = useStore((s) => s.handoffToResearchRunbook);
-  const product = products.find((p) => p.id === productId);
-  if (!product) return null;
-
-  const blocked = product.clearanceState === 'blocked';
-  const unknown = product.clearanceState === 'unknown';
-
-  return (
-    <Card className="p-4 mb-5 border-accent/40">
-      <div className="flex items-start gap-3">
-        <span className="w-9 h-9 rounded-btn bg-accent/10 border border-accent/25 grid place-items-center shrink-0">
-          <Sparkles size={17} className="text-accent" aria-hidden />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-caption uppercase tracking-wide text-ink-soft">
-            Handoff from the molecule catalogue
-          </div>
-          <h2 className="font-serif text-section-title font-semibold leading-snug mt-0.5">
-            {blocked
-              ? `${product.name} is fenced. Ask the question the fence does not cover.`
-              : unknown
-                ? `${product.name} has never been assessed.`
-                : `Open a research runbook on ${product.name}?`}
-          </h2>
-          <p className="text-body text-ink-soft mt-1 max-w-3xl">
-            {blocked
-              ? 'Blocking claims stop the industrial route, not the enquiry. A research runbook reads what the claims actually recite: if they name sequences, it enumerates the genus around them and ranks what falls outside. If they name a function, it will tell you that instead — and save you the compute rather than spending it to rediscover that molecular diversity does not escape a functional claim.'
-              : unknown
-                ? 'Nothing has been assessed here, so every process below it describes work that may or may not be yours to run. A clearance sweep classifies the claims before anything else is worth scheduling.'
-                : 'This molecule is not fenced, so there is nothing to enumerate around. Opening a runbook here will say so and stop, which is a cheap answer worth having on the record.'}
-          </p>
-          <p className="text-caption text-ink-soft mt-1 max-w-3xl">
-            Nothing runs behind a research runbook yet: it opens as a draft, with no estimate of time or cost.
-          </p>
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            <ClearanceChip state={product.clearanceState} />
-            <Button
-              variant="primary"
-              onClick={() => {
-                const id = handoff(product.id);
-                if (id) navigate(`/runbooks/${id}`);
-              }}
-            >
-              <Sparkles size={14} /> Draft the research runbook
-            </Button>
-            <Button onClick={() => navigate('/runbooks')}>Not now</Button>
-            <a
-              href={href(`/dominion/molecules/${product.id}`)}
-              className="text-caption text-accent hover:underline ml-1"
-            >
-              Back to {product.name}
-            </a>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 export default function Runbooks() {
-  const allRunbooks = useStore((s) => s.runbooks);
-  const allProducts = useStore((s) => s.products);
-  const shows = useProgramFilter();
-  const runbooks = useMemo(() => allRunbooks.filter((r) => shows('runbook', r.id)), [allRunbooks, shows]);
-  const products = useMemo(() => allProducts.filter((p) => shows('product', p.id)), [allProducts, shows]);
-  const hiddenPrograms = useMemo(() => {
-    const ids = new Set(
-      allRunbooks.filter((r) => !shows('runbook', r.id)).map((r) => programOf('runbook', r.id, { runbooks: allRunbooks })),
-    );
-    return PROGRAMS.filter((p) => ids.has(p.id));
-  }, [allRunbooks, shows]);
-  // The examples the filter hid (OF-BLD-016 §3.3, D3): seed runbooks that
-  // describe a run nobody made. Counted so an empty board says why it is empty.
-  const hiddenExamples = useMemo(
-    () => allRunbooks.filter((r) => !shows('runbook', r.id) && isExample('runbook', r.id, { runbooks: allRunbooks })).length,
-    [allRunbooks, shows],
-  );
-  const route = useRoute();
-
-  const handoffId = route.query.get('handoff');
+  const runbooks = useStore((s) => s.runbooks);
 
   const columns = useMemo(() => {
     const by = new Map<RunbookStatus, Runbook[]>();
@@ -237,24 +130,8 @@ export default function Runbooks() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Module 6 · Runbooks"
-        title="Runbooks"
-        subtitle={subtitle}
-        actions={
-          <a href={href('/dominion/molecules')} className="btn">
-            <Boxes size={14} /> Molecules
-          </a>
-        }
-      />
+      <PageHeader eyebrow="Module 6 · Runbooks" title="Runbooks" subtitle={subtitle} />
       <OwnerTabs tabs={RUNBOOK_TABS} />
-
-      {handoffId && (
-        <>
-          <ArchivedBanner kind="product" id={handoffId} />
-          <HandoffPanel productId={handoffId} />
-        </>
-      )}
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">
         <span className="inline-flex items-center gap-1.5">
@@ -284,8 +161,7 @@ export default function Runbooks() {
             not a quotation and not a process cost. It is here because enumeration compute is the
             one input a person authorises before it is spent, which is why{' '}
             <span className="font-medium">awaiting budget</span> is a state on this board rather
-            than a footnote. The cache-hit runbook is the argument for artifact caching: near-zero
-            cost for an answer a previous run already paid for.
+            than a footnote.
           </Explain>
         </span>
       </div>
@@ -313,64 +189,16 @@ export default function Runbooks() {
         ))}
       </div>
 
-      {runbooks.length === 0 && (hiddenPrograms.length > 0 || hiddenExamples > 0) && (
+      {runbooks.length === 0 && (
         <Card data-testid="runbooks-empty">
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}
-            title="No runbook here describes a run someone made"
-            body={
-              <span data-testid="hidden-by-archive">
-                {hiddenExamples > 0 && (
-                  <>
-                    {hiddenExamples === 1 ? 'The one seed runbook is an example' : `The ${hiddenExamples} seed runbooks are examples`}: each
-                    describes a run nobody made, so the board hides {hiddenExamples === 1 ? 'it' : 'them'}.{' '}
-                  </>
-                )}
-                {hiddenPrograms.length > 0 && (
-                  <>
-                    Runbooks in {hiddenPrograms.map((p) => p.name).join(' and ')} are hidden too,{' '}
-                    {hiddenPrograms.length === 1 ? 'an archived program' : 'archived programs'}.{' '}
-                  </>
-                )}
-                Next step: ask Postdoc to draft a runbook from the evidence, then press Turn into a runbook; it lands
-                here. Settings → Programs shows archived programs and examples again.
-              </span>
-            }
-            action={
-              <div className="flex flex-wrap gap-2 justify-center">
-                <LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>
-                <LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>
-              </div>
-            }
-          />
-        </Card>
-      )}
-
-      {runbooks.length === 0 && hiddenPrograms.length === 0 && hiddenExamples === 0 && (
-        <Card>
-          <EmptyState
-            icon={<GitBranch size={22} aria-hidden />}
             title="No runbooks in this session"
-            body="Runbooks are synthesised against a molecule. Open the catalogue and start one — a blocked molecule is usually the most interesting place to begin."
-            action={
-              <a href={href('/dominion/molecules')} className="btn btn-primary">
-                Open the catalogue <ArrowRight size={14} />
-              </a>
-            }
+            body="A runbook starts as a draft in Postdoc: ask it to draft one from the evidence, then press Turn into a runbook, and it lands here."
+            action={<LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>}
           />
         </Card>
       )}
-
-      <div className="mt-5">
-        <CounselCallout scope="every clearance stage on this board" />
-      </div>
-
-      <p className="text-caption text-ink-soft mt-3 max-w-3xl">
-        Runbooks carry the modeled provenance of everything they are built from:{' '}
-        <span className="font-num">{products.length}</span> catalogued molecules, a facet
-        vocabulary, and a claim reading. None of it was measured, and a stage that reports a number
-        reports where the number came from or refuses to pass it on.
-      </p>
     </>
   );
 }

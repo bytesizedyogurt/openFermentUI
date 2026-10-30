@@ -14,7 +14,7 @@ from openferment_core import llm, postdoc_agent, tools
 from openferment_core.models import Passage, PriorTurn, Usage
 from openferment_core.tools import passages as passages_tool
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
-from test_tools import _a_person_kept_assumptions, proforma_store  # noqa: F401  (OF-BLD-019 §6.1's stand-in run)
+from test_tools import proforma_store  # noqa: F401  (OF-BLD-019 §6.1's stand-in run)
 from test_tools import fermos_store  # noqa: F401  (OF-BLD-020 §3.4's stand-in pool)
 
 SENTENCE = "Polyhydroxybutyrate accumulated in cells fed xylose hydrolysate."
@@ -423,64 +423,31 @@ def test_one_run_sweeps_first_offers_every_tool_and_opens_with_the_earlier_turns
 ARCHIVED_QUESTION = "What PHB yield did Cupriavidus necator H16 reach on glucose?"
 
 
-def test_with_the_switch_off_an_archived_name_gets_the_line_and_a_gap_naming_the_switch(pool):  # noqa: F811
-    script = Script(plan(claim(support="unsupported")))
-    out = postdoc_agent.ask(ARCHIVED_QUESTION, converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
-    assert out.coverage is not None and out.coverage.includeArchived is False
-    assert [a.name for a in out.coverage.archived] == ["PHA"]
-    # The coverage line, in the trace and in the map round one carries.
-    assert out.trace[0].summary.endswith("found in archived program PHA (hidden)")
-    assert out.trace[0].input["modules"][-1] == "PHA · found in archived program PHA (hidden)"
-    _, cmap = script.calls[0]["messages"][0]["content"]
-    assert "found in archived program PHA (hidden)" in cmap["text"]
-    # A gap, written by code, names the program and the switch.
-    switch = [g for g in out.gaps if "Settings → Programs" in g]
-    assert len(switch) == 1 and "PHA is an archived program" in switch[0]
-
-
-def test_with_the_switch_on_the_same_question_is_swept_as_before(pool):  # noqa: F811
-    script = Script(plan(claim(support="unsupported")))
-    out = postdoc_agent.ask(ARCHIVED_QUESTION, converse=script,
-                            ctx=tools.ToolContext(pool_factory=lambda: pool, include_archived=True))
-    assert out.coverage is not None and out.coverage.includeArchived is True and out.coverage.archived == []
-    assert "archived" not in out.trace[0].summary
-    assert not [g for g in out.gaps if "Settings → Programs" in g]
-    assert "c-necator-h16" in [h.id for m in out.coverage.modules for h in m.hits]
-
-
-def test_a_question_naming_nothing_archived_gets_no_line_and_no_gap(pool):  # noqa: F811
-    out = postdoc_agent.ask("How much ethanol from glucose?", converse=Script(plan(claim(support="unsupported"))),
-                            ctx=tools.ToolContext(pool_factory=lambda: pool))
-    assert out.coverage is not None and out.coverage.archived == [] and out.gaps == []
-
-
 # ── a flowsheet run is cited like any computed value (OF-BLD-019 §6.1) ──
 
 
-def test_a_claim_citing_the_run_the_loops_run_flowsheet_returned_is_kept_and_one_never_returned_is_dropped(
-        proforma_store, monkeypatch):  # noqa: F811
+def test_a_claim_citing_the_run_the_loops_stream_table_returned_is_kept_and_one_never_returned_is_dropped(
+        proforma_store):  # noqa: F811
     from openferment_core import proforma
-    from openferment_core.models import ProformaRunRequest
 
-    _a_person_kept_assumptions(monkeypatch)
-    # The run's artifact id is fixed by its basis, so it is known before the
-    # loop asks for it; a reference run is kept too, and no tool returns it.
-    aid = proforma.run(ProformaRunRequest(scenarioId="sc-pha-1"), pool=proforma_store).artifactId
-    other = proforma.run_reference("corn_drygrind").id
-    price = "The draft flowsheet's run gives a minimum selling price for dried cell mass rich in polymer."
+    # Two reference runs are kept; the loop reads one of them, and no tool returns the other.
+    aid = proforma.run_reference("corn_drygrind").id
+    other = proforma.run_reference("cornstover_benchmark").id
     script = Script(
-        [("run_flowsheet", {"scenarioId": "sc-pha-1"})],
-        plan(claim("c1", text=price, evidence=[aid]),
-             claim("c2", text="The reference corn plant prices its ethanol on the package's own defaults.", evidence=[other])),
+        [("stream_table", {"artifactId": aid})],
+        plan(claim("c1", text="The reference corn plant's run prices its ethanol on the package's own defaults.",
+                   evidence=[aid]),
+             claim("c2", text="The reference stover plant prices its ethanol on the package's own defaults.",
+                   evidence=[other])),
     )
-    out = postdoc_agent.ask("What does the PHA draft flowsheet's run price its product at?", converse=script,
-                            ctx=tools.ToolContext(pool_factory=lambda: proforma_store, include_archived=True))
+    out = postdoc_agent.ask("What does the reference corn plant's run price its ethanol at?", converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: proforma_store))
     [kept] = out.claims
-    assert kept.id == "c1" and kept.evidenceIds == [aid] and kept.provenance == "demo"
+    assert kept.id == "c1" and kept.evidenceIds == [aid]
     assert out.rejected == 1 and any(r.startswith("c2: cites what no tool returned") and other in r for r in out.rejectionReasons)
     assert [e.id for e in out.evidence] == [aid]
-    step = next(s for s in out.trace if s.tool == "run_flowsheet")
-    assert step.ok and step.summary == f"Ran the flowsheet of sc-pha-1 · kept run {aid}"
+    step = next(s for s in out.trace if s.tool == "stream_table")
+    assert step.ok
 
 
 def test_a_claim_citing_a_run_stream_table_read_is_kept(proforma_store, monkeypatch):  # noqa: F811

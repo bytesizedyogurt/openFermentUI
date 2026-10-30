@@ -24,8 +24,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { Job, Paper } from '@/data/types';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, useProgramFilter, useStore } from '@/store';
+import { useStore } from '@/store';
 import { href } from '@/router';
 import { START_COMMAND } from '@/lib/postdoc';
 import { fetchSourceName } from '@/lib/intake';
@@ -164,29 +163,6 @@ const CELL_BORDER: Record<CellState, string> = {
   notrun: 'border-line border-dashed',
 };
 
-/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
-function archivedNames(paperIds: string[]): string {
-  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
-  return PROGRAMS.filter((p) => hit.has(p.id))
-    .map((p) => p.name)
-    .join(' and ');
-}
-
-/** "N papers in Casein are hidden … Settings → Programs shows them." */
-function HiddenLine({ paperIds, one, many }: { paperIds: string[]; one: string; many: string }) {
-  const single = paperIds.length === 1;
-  return (
-    <>
-      {paperIds.length} {single ? one : many} in {archivedNames(paperIds)} {single ? 'is' : 'are'} hidden,
-      because archived programs are.{' '}
-      <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
-        Settings → Programs
-      </a>{' '}
-      shows them.
-    </>
-  );
-}
-
 export default function IntakeIngest() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
@@ -198,12 +174,6 @@ export default function IntakeIngest() {
   const serviceUp = useStore((s) => s.serviceUp);
   const live = serviceUp === true;
 
-  // OF-BLD-016 §2.2: the queue and the board hold only papers whose program
-  // shows; with archived programs hidden (the default) a casein or PHA paper
-  // is neither offered nor on the board, and each list says how many it
-  // holds back.
-  const shows = useProgramFilter();
-
   // The demo shelf is gone with the synthetic corpus. What sits here now is
   // the real ingest queue: tranche-1 entries whose full text has not been
   // parsed yet (OF-COR-001 §22.6).
@@ -211,18 +181,13 @@ export default function IntakeIngest() {
     () => papers.filter((p) => p.tranche === 1 && p.textSource === 'curation-note'),
     [papers],
   );
-  const shelf = useMemo(() => tranche.filter((p) => shows('paper', p.id)), [tranche, shows]);
-  const shelfHidden = useMemo(
-    () => tranche.filter((p) => !shows('paper', p.id)).map((p) => p.id),
-    [tranche, shows],
-  );
+  const shelf = tranche;
 
-  const board = useMemo<{ rows: BoardRow[]; hidden: string[] }>(() => {
+  const rows = useMemo<BoardRow[]>(() => {
     const counts = new Map<string, number>();
     for (const r of records) counts.set(r.paperId, (counts.get(r.paperId) ?? 0) + 1);
 
     const out: BoardRow[] = [];
-    const hidden: string[] = [];
     for (const paper of papers) {
       const job = ingestJobFor(jobs, paper.id);
       const ingesting = paper.ingest.startsWith('stage:');
@@ -232,10 +197,6 @@ export default function IntakeIngest() {
       // with a job — a fetch that happened before this page load is still a
       // thing that happened.
       if (!job && !ingesting && !failed && !fetched) continue;
-      if (!shows('paper', paper.id)) {
-        hidden.push(paper.id);
-        continue;
-      }
       const real = fetched || Boolean(job?.real) || (!job && failed && Boolean(paper.ingestReason));
 
       const seededIndex = Math.max(
@@ -268,14 +229,8 @@ export default function IntakeIngest() {
 
       out.push({ paper, job, state, stageIndex, extractions: counts.get(paper.id) ?? 0, real });
     }
-    return {
-      rows: out.sort(
-        (a, b) => ROW_ORDER[a.state] - ROW_ORDER[b.state] || a.paper.id.localeCompare(b.paper.id),
-      ),
-      hidden,
-    };
-  }, [papers, jobs, records, shows]);
-  const { rows, hidden: boardHidden } = board;
+    return out.sort((a, b) => ROW_ORDER[a.state] - ROW_ORDER[b.state] || a.paper.id.localeCompare(b.paper.id));
+  }, [papers, jobs, records]);
 
   const addFromShelf = (paper: Paper) => {
     ingestPaper(paper.id);
@@ -308,16 +263,14 @@ export default function IntakeIngest() {
             full text and splits it into sections, so a record&rsquo;s quote can anchor to the
             paper&rsquo;s own words rather than to a curation note.{' '}
             {(() => {
-              // Counted from the entries that show under the program switch.
-              const showing = papers.filter((p) => shows('paper', p.id));
-              const pmcid = showing.filter((p) => p.pmcid).length;
-              const doiOnly = showing.filter((p) => !p.pmcid && p.doi).length;
+              const pmcid = papers.filter((p) => p.pmcid).length;
+              const doiOnly = papers.filter((p) => !p.pmcid && p.doi).length;
               return (
                 <>
-                  Of the <span className="font-num">{showing.length}</span> entries showing,{' '}
+                  Of the <span className="font-num">{papers.length}</span> entries,{' '}
                   <span className="font-num">{pmcid}</span> carry a PMCID and are fetchable,{' '}
                   <span className="font-num">{doiOnly}</span> carry a DOI alone and are looked up once,
-                  and <span className="font-num">{showing.length - pmcid - doiOnly}</span> carry
+                  and <span className="font-num">{papers.length - pmcid - doiOnly}</span> carry
                   neither.
                 </>
               );
@@ -366,23 +319,13 @@ export default function IntakeIngest() {
                 : 'With the service down, Add runs the timed simulation and halts at Fetch.'}
             </p>
 
-            {shelf.length === 0 && shelfHidden.length > 0 ? (
-              <EmptyState
-                title="Nothing to fetch in the programs showing"
-                body={<HiddenLine paperIds={shelfHidden} one="tranche-1 entry waiting for full text" many="tranche-1 entries waiting for full text" />}
-              />
-            ) : shelf.length === 0 ? (
+            {shelf.length === 0 ? (
               <EmptyState
                 title="The shelf is empty"
-                body="Every tranche-1 entry already has parsed full text. A new paper enters through a thread's propose-and-approve rule, below."
+                body="No tranche-1 entry is waiting for full text. How a paper enters is below."
               />
             ) : (
               <div>
-                {shelfHidden.length > 0 && (
-                  <p className="text-caption text-ink-soft mb-1" data-testid="archived-hidden">
-                    <HiddenLine paperIds={shelfHidden} one="tranche-1 entry waiting for full text" many="tranche-1 entries waiting for full text" />
-                  </p>
-                )}
                 {shelf.map((p) => (
                   <div
                     key={p.id}
@@ -418,10 +361,8 @@ export default function IntakeIngest() {
           <Card className="p-3" data-testid="how-a-paper-enters">
             <h2 className="font-serif text-section-title font-semibold mb-1">How a paper enters</h2>
             <p className="text-body text-ink-soft">
-              Through a thread&rsquo;s propose-and-approve rule: <code className="font-num">pnpm thread:propose</code> asks
-              Europe PMC with the thread&rsquo;s fixed rule, a person approves the rows to keep,{' '}
-              <code className="font-num">pnpm thread:apply</code> writes them into the corpus under that person&rsquo;s name, and
-              Fetch in the queue above brings in each paper&rsquo;s text.
+              Documents arrive through Intake into the literature layer, which lands with alpha 2.0&rsquo;s stage 3.
+              Until then, Fetch in the queue above brings in the open-access text of a paper the service already lists.
             </p>
           </Card>
         </div>
@@ -457,20 +398,7 @@ export default function IntakeIngest() {
                 : 'With the service down, stage times are timed in this browser and are not measured throughput.'}
             </span>
           </div>
-          {rows.length > 0 && boardHidden.length > 0 && (
-            <p className="text-caption text-ink-soft mb-3" data-testid="archived-hidden">
-              <HiddenLine paperIds={boardHidden} one="paper on the board" many="papers on the board" />
-            </p>
-          )}
-
-          {rows.length === 0 && boardHidden.length > 0 ? (
-            <Card>
-              <EmptyState
-                title="Nothing in the pipeline for the programs showing"
-                body={<HiddenLine paperIds={boardHidden} one="paper on the board" many="papers on the board" />}
-              />
-            </Card>
-          ) : rows.length === 0 ? (
+          {rows.length === 0 ? (
             <Card>
               <EmptyState
                 title="Nothing in the pipeline"

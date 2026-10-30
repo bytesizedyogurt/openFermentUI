@@ -1,8 +1,8 @@
 """One write tool per module, the pair of its read tool (OF-BLD-015 §7.3).
 
-`dominion_write`, `runbooks_write`, `geneos_write`, `fermos_write`,
-`pureos_write`, `proforma_write`, `biorepo_write`, `guild_write`,
-`primer_write`, `intake_write`, `home_write`.
+`runbooks_write`, `geneos_write`, `fermos_write`, `pureos_write`,
+`proforma_write`, `biorepo_write`, `guild_write`, `primer_write`,
+`intake_write`, `home_write`.
 
 THE RULE. A write tool never touches a store. Each action calls the
 module's own write function, where the module's rules already live:
@@ -10,8 +10,8 @@ module's own write function, where the module's rules already live:
 `extract.add_candidate` (anchoring, §2.4), `intake.fetch_paper`,
 `extract.extract_paper`, and `checks.request` in a person's name. A module
 with no write function on the service refuses in words with the reason
-(Dominion and Primer are curated seed, as pureOS's vocabulary and unit
-catalogue are; protocols and depositions are written in the browser), and
+(Primer is curated, as pureOS's vocabulary and unit catalogue are;
+protocols and depositions are written in the browser), and
 that refusal is a result Postdoc reports
 in `gaps`. `check:tools` greps this file for a store write and fails on one.
 
@@ -64,9 +64,6 @@ from . import gates
 # action → (what it does, the fields it takes). An action in gates.GATES is
 # listed too: the model sees it, and the registry turns it into a proposal.
 ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
-    "dominion": {
-        "publish": ("publish a clearance finding to the commons (gated)", ("productId", "jurisdictionId")),
-    },
     "runbooks": {
         "draft": ("draft a runbook: use the draft_runbook tool, which writes the numbers from the evidence", ()),
         "lock": ("lock a runbook's predictions before a run (gated)", ()),
@@ -141,9 +138,6 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
 }
 
 NO_WRITE = {
-    "dominion": "Dominion's molecules and clearance findings are curated seed (src/data/products.ts, "
-                "src/data/clearanceFindings.ts); the service has no write function for them, and a finding is written by a "
-                "person in a commit",
     "primer": "Primer's lessons are curated seed (src/data/learn.ts); the service has no write function for them",
 }
 # What a module that writes some things keeps as seed beside them, said when an
@@ -309,8 +303,7 @@ def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_me
         return ToolResult(error=f"{tool} refused: a vessel type is {' or '.join(vessel.VESSEL_TYPES)}; {kind!r} is neither")
     try:
         d = vessel.design(VesselRequest(simulation=sim or None, fit=fitted or None, vesselType=kind,
-                                        klaMethod=(kla_method or "").strip() or None,
-                                        includeArchived=ctx.include_archived))
+                                        klaMethod=(kla_method or "").strip() or None))
     except vessel.VesselRefused as e:
         waits = f" {VESSEL_WAITS}" if "plant_scale" in str(e) else ""
         return ToolResult(error=f"{tool} refused: {e}.{waits}")
@@ -379,19 +372,13 @@ def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> To
     assumption (they live in the browser's Durable tier), so none is passed:
     an input with no record waits, and the refusal is proforma.run's own
     words (what `POST /api/proforma/run` answers with a 422)."""
-    from .. import programs, proforma, pureos
+    from .. import proforma, pureos
     from ..models import ProformaRunRequest
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 
     sid = (scenario_id or "").strip()
     if not sid:
         return ToolResult(error=f"{tool} refused: name the scenario to run by its id (proforma_read lists them)")
-    try:
-        refused = programs.archived_refusal(tool, [("scenario", sid)], ctx.include_archived)
-    except FileNotFoundError:  # no projection here: nothing is known to be archived
-        refused = None
-    if refused:
-        return ToolResult(error=refused)
     seed = {s["id"]: s for s in pureos.seed_scenarios()}
     if seed and sid not in seed:
         held = ", ".join(sorted(k for k, s in seed.items() if s.get("kind") == "biosteam"))
@@ -535,29 +522,12 @@ def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResu
     assumption (they live in the browser's Durable tier), so none is passed:
     a parameter nothing binds waits, and the refusal is fermos.simulate's own
     words (what `POST /api/fermos/simulate` answers with a 422)."""
-    from .. import fermos, kinetics, programs
+    from .. import fermos, kinetics
 
     family = (req.family or "").strip()
     if not family:
         return ToolResult(error=f"{tool} refused: name the model family to simulate by its id ({', '.join(kinetics.FAMILIES)})")
-    fam = kinetics.FAMILIES.get(family)
-    if fam is not None and not ctx.include_archived:
-        try:
-            hidden = programs.hides(fam.program, False)
-        except FileNotFoundError:  # no projection here: nothing is known to be archived
-            hidden = False
-        if hidden:
-            p = programs.program_by_id(fam.program)
-            return ToolResult(error=f"{tool} refused: {family} belongs to {p.name if p else fam.program}, archived "
-                                    f"(hidden). {programs.SWITCH}")
-    try:
-        refused = programs.archived_refusal(tool, [("strain", req.strain or ""), ("product", req.product or "")],
-                                            ctx.include_archived)
-    except FileNotFoundError:
-        refused = None
-    if refused:
-        return ToolResult(error=refused)
-    req = req.model_copy(update={"family": family, "includeArchived": ctx.include_archived, "overrides": []})
+    req = req.model_copy(update={"family": family, "overrides": []})
     try:
         r = fermos.simulate(req, by_pool=ctx.pool)
     except fermos.SimulationRefused as e:
@@ -654,7 +624,7 @@ def _kept_result(tool: str, action: str, k: Any, note: str, ctx: ToolContext, sa
     from ..pureos import build
 
     _audit(ctx, "pureos", action, "open", k.spec.id, {"tool": tool, "note": note, **(said or {})})
-    return ToolResult(summary={"state": "open", **build.described(k, ctx.include_archived), **(said or {}),
+    return ToolResult(summary={"state": "open", **build.described(k), **(said or {}),
                                "meaning": KEPT_MEANING})
 
 
@@ -669,7 +639,7 @@ def new_train(tool: str, product: str, inlet_ref: str, note: str, ctx: ToolConte
     from ..pureos import build, kept
 
     try:
-        spec, said = build.new_spec(product, inlet_ref, ctx.include_archived)
+        spec, said = build.new_spec(product, inlet_ref)
     except build.BuildRefused as e:
         return _train_refused(tool, e)
     model, effort = _who(ctx)
@@ -728,7 +698,7 @@ def set_from_record(tool: str, train_id: str, unit_id: str, records_by_param: di
 
     try:
         base = build.kept_or_refuse(train_id).spec
-        spec, bound = build.with_records(base, unit_id, records_by_param, ctx.pool, ctx.include_archived)
+        spec, bound = build.with_records(base, unit_id, records_by_param, ctx.pool)
     except build.BuildRefused as e:
         return _train_refused(tool, e)
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
@@ -765,7 +735,7 @@ def run_train(tool: str, train_id: str, note: str, ctx: ToolContext) -> ToolResu
     except build.BuildRefused as e:
         return _train_refused(tool, e)
     try:
-        r = train_spec.run_train(k.spec, None, None, ctx.include_archived)
+        r = train_spec.run_train(k.spec, None, None)
     except train_spec.TrainRefused as e:
         waits = f" {TRAIN_WAITS}" if " waits" in str(e) else ""
         return ToolResult(error=f"{tool} refused: {str(e).rstrip('.')}.{waits}")
@@ -806,7 +776,7 @@ def propose_train(tool: str, product: str, host: str, inlet_ref: str, note: str,
     product made in a host, kept as the model's under an id of its own
     (pureos_build propose). A proposal that proposes nothing is refused in
     the words naming each missing property; the proposer's own refusals
-    (an unknown product or host, an archived program with the switch off, a
+    (an unknown product or host, a
     bad inlet) come back in its words."""
     from .. import artifacts
     from ..pureos import build, kept
@@ -815,8 +785,7 @@ def propose_train(tool: str, product: str, host: str, inlet_ref: str, note: str,
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 
     try:
-        got = proposer((product or "").strip(), (host or "").strip(), (inlet_ref or "").strip() or None,
-                       include_archived=ctx.include_archived)
+        got = proposer((product or "").strip(), (host or "").strip(), (inlet_ref or "").strip() or None)
     except (ProposeUnknown, ProposeRefused, artifacts.ArtifactDamaged) as e:
         return _train_refused(tool, e)
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:

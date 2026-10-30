@@ -24,7 +24,6 @@
 // check; the highest checks are proposed first. A pair an open check already
 // covers is not proposed again.
 import type { Check, CheckReason, Guild, GuildPerson, Skill } from '@/data/types';
-import { SKILLS } from '@/data/skills';
 import { competenceOf, daysBetween, isAssessor, policyOf, readyForCheck, statusOf, type StatusMap } from './competence';
 
 export const LAPSING_DAYS = 21;
@@ -155,8 +154,14 @@ export function shownTo(checks: Check[], actingId: string | null): Check[] {
   return checks.filter((c) => c.personId !== actingId || c.state === 'done');
 }
 
-/** The queue is for the lead and for anyone holding Assessor on a skill. */
+/** The queue is for the lead and for anyone holding Assessor on a skill (any skill the status map holds for them). */
 export function mayQueue(acting: GuildPerson | null, status: StatusMap): boolean {
   if (!acting || !acting.active) return false;
-  return acting.role === 'lead' || (acting.role === 'member' && SKILLS.some((sk) => isAssessor(status, acting.id, sk.id)));
+  if (acting.role === 'lead') return true;
+  if (acting.role !== 'member') return false;
+  for (const k of status.keys()) {
+    const [personId, skillId] = k.split('|');
+    if (personId === acting.id && isAssessor(status, personId, skillId)) return true;
+  }
+  return false;
 }

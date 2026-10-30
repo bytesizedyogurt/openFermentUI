@@ -43,7 +43,6 @@ export interface ParamAsk {
   fit?: string | null;
   startFrom?: string | null;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
-  includeArchived?: boolean;
   /** A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the vessel design and the train run it is built from. */
   vessel?: string | null;
   trainRun?: string | null;
@@ -71,7 +70,6 @@ const askQuery = (ask: ParamAsk) => {
     const v = ask[k];
     if (v) q.set(k, v);
   }
-  if (ask.includeArchived) q.set('includeArchived', 'true');
   if (ask.vessel) q.set('vessel', ask.vessel);
   if (ask.trainRun) q.set('trainRun', ask.trainRun);
   if (ask.unitType) q.set('unitType', ask.unitType);
@@ -93,7 +91,6 @@ export function resolveRequest(overrides: Override[], ask: ParamAsk = {}): Param
     ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
     ...(ask.vesselType ? { vesselType: ask.vesselType } : {}),
     ...Object.fromEntries(FERMOS_ASK.filter((k) => ask[k]).map((k) => [k, ask[k]])),
-    ...(ask.includeArchived ? { includeArchived: true } : {}),
     ...(ask.vessel ? { vessel: ask.vessel } : {}),
     ...(ask.trainRun ? { trainRun: ask.trainRun } : {}),
     ...(ask.unitType ? { unitType: ask.unitType } : {}),

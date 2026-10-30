@@ -3,10 +3,9 @@
 Offline: the shelf is data the service serves without BioSTEAM, it never
 holds the toy, and a run stored before the tables still reads. Marked `sim`
 (`pnpm test:sim`, the real worker): the toy flowsheet's run artifact carries
-every table; the PHA draft's TEA breakdown is read from the TEA object and
-its lines sum to the price; with Graphviz's `dot` on the path the diagram is
-the SVG it drew. Every input value below is a PLACEHOLDER chosen to exercise
-a flowsheet; none is a measurement and no price here is a result.
+every table; with Graphviz's `dot` on the path the diagram is the SVG it
+drew. Every input value below is a PLACEHOLDER chosen to exercise a
+flowsheet; none is a measurement and no price here is a result.
 """
 from __future__ import annotations
 
@@ -25,6 +24,8 @@ from openferment_core.models import Artifact, BasisInput, BasisSource, InputAssu
 
 CORE = Path(__file__).resolve().parent.parent
 FIXTURE_BY = "openFerment test fixture"
+ETHANOL = "ethanol_glucose_v0"
+MADE_HERE = "sc-k3x9q-1"  # an id as the browser's createScenario makes them
 
 
 @pytest.fixture()
@@ -43,7 +44,7 @@ def assume(key, value, low=None, high=None):
 
 def test_the_shelf_and_the_service_read_it_without_biosteam():
     code = ("import sys; from openferment_core import proforma; from openferment_core.flowsheets import shelf; "
-            "proforma.shelf(True); assert 'biosteam' not in sys.modules and 'thermosteam' not in sys.modules, "
+            "proforma.shelf(); assert 'biosteam' not in sys.modules and 'thermosteam' not in sys.modules, "
             "sorted(m for m in sys.modules if 'steam' in m)")
     r = subprocess.run([sys.executable, "-c", code], cwd=CORE, capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stderr[-2000:]
@@ -51,16 +52,14 @@ def test_the_shelf_and_the_service_read_it_without_biosteam():
 
 def test_the_shelf_holds_the_flowsheets_that_exist_and_never_the_toy():
     # OF-BLD-020 §6.1: a vessel and a train, priced (test_custom_train holds it).
-    assert set(shelf.SHELF) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "pha_sugar_v0",
-                                "custom_train_v1"}
-    assert set(KNOWN) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "pha_sugar_v0",
-                          "custom_train_v1", "toy"}
+    assert set(shelf.SHELF) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "custom_train_v1"}
+    assert set(KNOWN) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "custom_train_v1", "toy"}
     for fid in KNOWN:
         assert (CORE / "openferment_core" / "flowsheets" / f"{fid}.py").is_file(), f"{fid} has no module"
-    cs, pha = shelf.SHELF["cornstover_benchmark"], shelf.SHELF["pha_sugar_v0"]
-    assert cs.reference and cs.program is None and cs.inputs == [] and cs.source.startswith("biorefineries ")
+    cs, eth = shelf.SHELF["cornstover_benchmark"], shelf.SHELF[ETHANOL]
+    assert cs.reference and cs.inputs == [] and cs.source.startswith("biorefineries ")
     assert cs.source.endswith(", cornstover")
-    assert not pha.reference and pha.program == "pha" and pha.source == "this repository"
+    assert not eth.reference and eth.source == "this repository"
     with pytest.raises(shelf.NotOnShelf, match="STAND-IN for tests and is not on the shelf"):
         shelf.info("toy")
     with pytest.raises(shelf.NotOnShelf, match="there is no flowsheet nowhere"):
@@ -68,51 +67,24 @@ def test_the_shelf_holds_the_flowsheets_that_exist_and_never_the_toy():
     assert shelf.info("toy", allow_toy=True).id == "toy"
 
 
-def test_the_pha_entry_is_the_binding_proforma_does():
-    pha = shelf.SHELF["pha_sugar_v0"]
-    by_key = {i.key: i for i in pha.inputs}
-    assert list(by_key) == list(proforma.KEYS)
-    for key, (label, unit, field_id, _canonical, _scale) in proforma.BOUND.items():
-        assert by_key[key].fields == [field_id] and by_key[key].name == label and by_key[key].unit == unit
-    for key, (label, unit) in proforma.ASSUMED.items():
-        assert by_key[key].fields == [] and by_key[key].name == label and by_key[key].unit == unit
-    assert pha.priceBasis == proforma.PRICE_BASIS and pha.leavesOut == proforma.LEAVES_OUT
-    assert tuple(pha.gridInputs) == proforma.GRID_KEYS and pha.priceOutput == "pricePerKgPha"
-    assert {i.kind for i in pha.inputs} == {"process", "economic"}
-
-
-def test_every_program_on_the_shelf_is_a_program():
-    from openferment_core import programs
-
-    ids = {p.id for p in programs.programs()}
-    for f in shelf.SHELF.values():
-        assert f.program is None or f.program in ids, f"{f.id} names program {f.program}"
-
-
-def test_the_shelf_endpoint_leaves_an_archived_program_out_unless_asked():
+def test_the_shelf_endpoint_serves_every_flowsheet_on_the_shelf():
     from openferment_core import api
 
     c = TestClient(api.app, base_url="http://127.0.0.1")
-    off = [f["id"] for f in c.get("/api/proforma/shelf").json()]
-    on = c.get("/api/proforma/shelf?includeArchived=true").json()
-    # PHA is archived (OF-BLD-016); the corn plant (§2.2), glucose to ethanol (§2.3) and a vessel and a train
-    # (OF-BLD-020 §6.1) are the yeast program's.
-    assert off == ["cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "custom_train_v1"]
-    assert [f["id"] for f in on] == ["cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "pha_sugar_v0",
-                                     "custom_train_v1"]
-    assert all("toy" != f["id"] for f in on)
-    pha = next(f for f in on if f["id"] == "pha_sugar_v0")
-    assert set(pha) >= {"id", "title", "description", "source", "program", "reference", "inputs", "outputs",
-                        "packageTest"}
-    assert set(pha["inputs"][0]) == {"key", "name", "dimension", "unit", "fields", "kind", "note"}
+    served = c.get("/api/proforma/shelf").json()
+    assert [f["id"] for f in served] == ["cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "custom_train_v1"]
+    assert all("toy" != f["id"] for f in served)
+    eth = next(f for f in served if f["id"] == ETHANOL)
+    assert set(eth) >= {"id", "title", "description", "source", "reference", "inputs", "outputs", "packageTest"}
+    assert set(eth["inputs"][0]) == {"key", "name", "dimension", "unit", "fields", "kind", "note"}
 
 
 def test_a_run_asks_for_a_sample_count_within_its_cap(store):
-    assert ProformaRunRequest(scenarioId="sc-pha-1").samples == proforma.SAMPLES
+    assert ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL).samples == proforma.SAMPLES
     pool = SimpleNamespace(records=[], records_by_id={})
     for n in (0, proforma.MAX_SAMPLES + 1):
         with pytest.raises(proforma.ScenarioRefused, match=f"between 1 and {proforma.MAX_SAMPLES} samples"):
-            proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", samples=n), pool=pool)
+            proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, samples=n), pool=pool)
 
 
 def test_run_flowsheet_refuses_the_toy_a_reference_and_what_waits(store):
@@ -127,27 +99,25 @@ def test_run_flowsheet_refuses_the_toy_a_reference_and_what_waits(store):
 
 
 def test_a_run_stored_before_the_tables_still_reads():
-    inputs = [BasisInput(name="flowsheet", value="pha_sugar_v0", unit="", source=BasisSource(kind="convention"))]
-    old = Artifact(id="0" * 16, tool=proforma.RUN, toolVersion="pha_sugar_v0 · biosteam 2.54.0 · biorefineries 2.35.1",
+    inputs = [BasisInput(name="flowsheet", value=ETHANOL, unit="", source=BasisSource(kind="convention"))]
+    old = Artifact(id="0" * 16, tool=proforma.RUN, toolVersion=f"{ETHANOL} · biosteam 2.54.0 · biorefineries 2.35.1",
                    inputs=inputs, output={"quantiles": {}, "basePrice": None}, outputHash="", provenance="demo",
                    createdAt="2026-10-15T00:00:00Z", durationMs=0)
     t = proforma.tables_of(old)
-    assert t.flowsheet == "pha_sugar_v0" and t.tea is None and t.streams == [] and t.units == [] and t.diagram is None
+    assert t.flowsheet == ETHANOL and t.tea is None and t.streams == [] and t.units == [] and t.diagram is None
 
 
 def test_the_stand_in_run_carries_every_table_and_says_it_is_the_stand_in(store, monkeypatch):
-    # The double's fixture (demo.py --prototype) comes from this path: the real
-    # binding and artifact code over the closed-form STAND-IN evaluator.
+    # The real binding and artifact code over the closed-form STAND-IN evaluator.
     import standins
     monkeypatch.setattr(proforma, "call", standins._standin_call)
-    monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = standins._standin_records()
+    rs = standins._standin_yeast_records()
     a = [InputAssumption(key=k, value=v, low=lo, high=hi, by=FIXTURE_BY, at="2026-10-20")
-         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
-    run = proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", assumptions=a, samples=50),
+         for k, v, lo, hi in (("plant_scale", 100000.0, 100000.0, 100000.0), ("glucose_price", 0.4, 0.3, 0.5))]
+    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=a, samples=50),
                        pool=SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
-    assert run.samples == 50 and run.flowsheet == "pha_sugar_v0" and run.tablesSource == standins.PROFORMA_STANDIN
-    assert [u.id for u in run.units] == run.unitOrder == ["R1", "C1", "D1"] and len(run.streams) == 6
+    assert run.samples == 50 and run.flowsheet == ETHANOL and run.tablesSource == standins.PROFORMA_STANDIN
+    assert [u.id for u in run.units] == run.unitOrder == ["R1", "D302", "U301"] and len(run.streams) == 7
     assert run.tea is not None and sum(line.perUnit for line in run.tea.lines) == pytest.approx(run.basePrice, rel=1e-12)
     assert run.utilities.heatingUnit == "GJ/hr" and run.tableUnits == shelf.TABLE_UNITS
     art = artifacts.get(run.artifactId)
@@ -212,32 +182,6 @@ def test_the_worker_refuses_a_reference_case_by_case(warm):
 
     with pytest.raises(WorkerError, match="reference biorefinery"):
         warm.call("evaluate", {"flowsheet": "cornstover_benchmark", "values": {}})
-
-
-PHA = {"titre": 50.0, "yield": 0.3, "content": 0.7, "productivity": 1.0, "recovery": 0.95, "sugarPrice": 0.4,
-       "sugarFeed": 10000.0}
-
-
-@pytest.mark.sim
-def test_the_pha_tea_breakdown_is_the_tea_objects_and_sums_to_the_price(warm):
-    r = warm.call("run", {"flowsheet": "pha_sugar_v0", "base": PHA, "specs": {}, "samples": 0, "seed": 0})
-    assert r["baseInfeasible"] is None and r["montecarlo"]["samples"] == [] and r["grid"] is None
-    t, price = r["tables"], r["base"]["pricePerKgPha"]
-    tea = t["tea"]
-    assert tea["teaClass"] == "CellulosicEthanolTEA" and tea["product"] == "product" and tea["feedstock"] == "sugar"
-    assert sum(line["perUnit"] for line in tea["lines"]) == pytest.approx(price, rel=1e-9)
-    hours = tea["operatingHours"]
-    assert tea["feedstockCost"] == pytest.approx(PHA["sugarPrice"] * PHA["sugarFeed"] * hours, rel=1e-9)
-    assert tea["materialCost"] == pytest.approx(tea["feedstockCost"] + tea["otherMaterialCost"], rel=1e-12)
-    assert tea["basisFlow"] == pytest.approx(PHA["sugarFeed"] * PHA["yield"] * PHA["recovery"], rel=1e-6)
-    assert tea["sales"] - tea["coproductCredits"] == pytest.approx(price * tea["basisFlow"] * hours, rel=1e-9)
-    assert tea["FCI"] >= tea["installedEquipmentCost"] > 0 and tea["laborCost"] > 0 and tea["IRR"] is not None
-    assert [u["id"] for u in t["units"]] == ["M1", "R1", "C1", "D1"] and t["units"][1]["unitClass"] == "AeratedBioreactor"
-    assert t["units"][1]["coolingDuty"] > 0 and t["units"][1]["power"] > 0 and t["units"][0]["heatingDuty"] is None
-    assert sum(u["installedCost"] for u in t["units"]) == pytest.approx(tea["installedEquipmentCost"], rel=1e-9)
-    ids = [s["id"] for s in t["streams"]]
-    assert len(ids) == len(set(ids)) and {"sugar", "broth", "product"} <= set(ids)
-    assert t["utilities"]["cooling"] > 0 and t["utilities"]["coolingUnit"] == "GJ/hr"
 
 
 @pytest.mark.sim

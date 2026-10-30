@@ -348,7 +348,7 @@ def fit_inputs(art: Artifact) -> dict[str, Any]:
     }
 
 
-def _source_of(aid: str, include_archived: bool = True) -> tuple[Artifact, dict[str, Any]]:
+def _source_of(aid: str) -> tuple[Artifact, dict[str, Any]]:
     from . import artifacts
 
     try:
@@ -356,16 +356,6 @@ def _source_of(aid: str, include_archived: bool = True) -> tuple[Artifact, dict[
     except artifacts.ArtifactNotFound:
         raise VesselNotFound(f"no artifact {aid!r} is on file here: a vessel is designed for a fermOS simulation "
                              "(fermOS → Simulate keeps one) or, anaerobic, a kinetic fit or forecast") from None
-    if not include_archived:
-        from . import module_stores, programs
-
-        try:
-            program = module_stores.artifact_program(art)
-            if programs.hides(program, False):
-                raise VesselRefused(f"artifact {aid} belongs to the archived program {program}; turn on Show archived "
-                                    "programs and examples in Settings → Programs to design for it")
-        except FileNotFoundError:
-            pass
     if art.tool == SIMULATION:
         return art, simulation_inputs(art)
     if art.tool in FIT_TOOLS:
@@ -710,14 +700,14 @@ def _kla_method(kind: str, design: str | None, ws: dict[str, Any], kla_method: s
     return kla_method
 
 
-def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True, overrides: Iterable[Override] = (),
+def provided(aid: str, vessel_type: str | None, overrides: Iterable[Override] = (),
              kla_method: str | None = None) -> tuple[params.Provided, dict]:
     """The scope's specs and the candidates for each, and what was read.
     The vessel type is the request's `vesselType` or a person's override
     of `design` (they must agree); `kla_method` is a request's named kLa
     correlation, a convention of that request."""
     overrides = list(overrides)
-    art, src = _source_of(aid, include_archived)
+    art, src = _source_of(aid)
     kind = AEROBIC if src["aerobic"] else ANAEROBIC
     ws = worker_specs(kind)
     vessel_type, design_from = _chosen_type(vessel_type, overrides)
@@ -844,7 +834,7 @@ def basis_inputs(req: VesselRequest) -> tuple[list[BasisInput], list[ParameterSp
     if len(named) != 1:
         raise VesselRefused("a vessel is designed for one simulation or one fit: name exactly one")
     aid = named[0]
-    got, read = provided(aid, req.vesselType, include_archived=req.includeArchived, overrides=req.overrides,
+    got, read = provided(aid, req.vesselType, overrides=req.overrides,
                          kla_method=req.klaMethod)
     art, kind = read["artifact"], read["kind"]
     if req.fit and art.tool == SIMULATION:
@@ -1155,25 +1145,12 @@ def summary(a: Artifact) -> VesselSummary:
         installed=(o.get("cost") or {}).get("installed"))
 
 
-def designs(include_archived: bool = False) -> list[VesselSummary]:
+def designs() -> list[VesselSummary]:
     """GET /api/fermos/vessels: every kept vessel design, newest first; a
-    read, which starts no simulator. A design for an archived program's
-    simulation (`module_stores.artifact_program`, which follows the
-    simulation it rests on) is left out unless asked (§8.R, finding 3)."""
-    from . import artifacts, module_stores, programs
+    read, which starts no simulator."""
+    from . import artifacts
 
-    out = []
-    for a in artifacts.all_artifacts():
-        if a.tool != TOOL:
-            continue
-        if not include_archived:
-            try:
-                if programs.hides(module_stores.artifact_program(a), False):
-                    continue
-            except FileNotFoundError:
-                pass
-        out.append(summary(a))
-    return out
+    return [summary(a) for a in artifacts.all_artifacts() if a.tool == TOOL]
 
 
 # ── what a design cites (OF-BLD-020 §4.2, D13) ─────────────────────────

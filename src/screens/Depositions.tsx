@@ -10,16 +10,8 @@
 // fresh session has none. An empty list here means nobody has run anything in
 // this browser, not that the feature is missing, and the two read very
 // differently if the screen does not say which.
-//
-// PROGRAMS (OF-BLD-016 §2.2). The list and its count read through the store's
-// program filter: a deposition belongs to the program of the runbook it tests,
-// else of the protocol it ran, and one in an archived program leaves the list
-// while the switch is off. When that empties the list, the screen says so,
-// because "nobody ran anything" and "what was run is hidden" are different.
-import { useMemo } from 'react';
 import { ClipboardList } from 'lucide-react';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { programOf, useProgramFilter, useStore } from '@/store';
+import { useStore } from '@/store';
 import { href } from '@/router';
 import { Card, EmptyState, LinkButton, PageHeader, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -33,19 +25,9 @@ const STATE_TONE: Record<string, string> = {
 };
 
 export default function Depositions() {
-  const allDepositions = useStore((s) => s.depositions);
+  const depositions = useStore((s) => s.depositions);
   const runbooks = useStore((s) => s.runbooks);
   const protocols = useStore((s) => s.protocols);
-  const shows = useProgramFilter();
-  const depositions = useMemo(() => allDepositions.filter((d) => shows('deposition', d.id)), [allDepositions, shows]);
-  const hiddenPrograms = useMemo(() => {
-    const ids = new Set(
-      allDepositions
-        .filter((d) => !shows('deposition', d.id))
-        .map((d) => programOf('deposition', d.id, { depositions: allDepositions, runbooks })),
-    );
-    return PROGRAMS.filter((p) => ids.has(p.id));
-  }, [allDepositions, runbooks, shows]);
 
   const runbookTitle = (id: string | null | undefined) =>
     runbooks.find((r) => r.id === id)?.title ?? null;
@@ -61,28 +43,12 @@ export default function Depositions() {
       />
       <OwnerTabs tabs={RUNBOOK_TABS} />
 
-      {depositions.length === 0 && hiddenPrograms.length > 0 ? (
-        <Card>
-          <EmptyState
-            icon={<ClipboardList size={22} />}
-            title="Every deposition here is in an archived program"
-            body={
-              <span data-testid="hidden-by-archive">
-                The depositions in this browser belong to {hiddenPrograms.map((p) => p.name).join(' and ')}, through the
-                runbook each tests or the protocol it ran, and{' '}
-                {hiddenPrograms.length === 1 ? 'that program is archived' : 'those programs are archived'}, so the list
-                hides them. Settings → Programs shows archived programs again.
-              </span>
-            }
-            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
-          />
-        </Card>
-      ) : depositions.length === 0 ? (
+      {depositions.length === 0 ? (
         <Card>
           <EmptyState
             icon={<ClipboardList size={22} />}
             title="No depositions in this browser"
-            body="Depositions are written at the bench and kept in the durable tier, so they survive a reload — but they start empty. Open a runbook and stage a run against one of its protocols, and the record appears here. The seed runbooks are examples of runs nobody made and are hidden with the archive, so the next step on a fresh board is to ask Postdoc to draft a runbook and turn it into one."
+            body="Depositions are written at the bench and kept in the durable tier, so they survive a reload, and a fresh browser has none. Open a runbook and stage a run against one of its protocols, and the record appears here. With no runbook on the board yet, ask Postdoc to draft one and turn it into a runbook."
             action={
               <div className="flex flex-wrap gap-2 justify-center">
                 <LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>

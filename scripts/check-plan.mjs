@@ -64,7 +64,6 @@ const PAIRS = [
   ['CoverageHit', 'CoverageHit'],
   ['ModuleCoverage', 'ModuleCoverage'],
   ['CoverageMap', 'CoverageMap'],
-  ['ArchivedCoverage', 'ArchivedCoverage'],
   // OF-BLD-015 §7.2 — what a module's read tool returns.
   ['ModuleRow', 'ModuleRow'],
   // OF-BLD-015 §7.3, §7.4 — the audit log and the proposals.
@@ -198,7 +197,6 @@ const PAIRS = [
   ['PriorTurn', 'PriorTurn'],
   ['AskRequest', 'AskRequest'],
   // OF-BLD-016 §2.1 — a program is data.
-  ['Program', 'Program'],
   // OF-BLD-019 §4.1 — pureOS reads the train from the run Proforma priced.
   ['TrainUnit', 'TrainUnit'],
   ['Train', 'Train'],

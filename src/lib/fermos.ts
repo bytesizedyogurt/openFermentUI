@@ -73,7 +73,6 @@ export interface SimulateAsk {
   /** 'records', 'fit', or 'simulation:<artifact id>'. */
   startFrom: string;
   durationPreset: typeof UNTIL_RUN_OUT | typeof FIT_LENGTH;
-  includeArchived: boolean;
 }
 
 /** The parameter panel's ask for the same binding (GET /api/params/fermos:family:<id>). */
@@ -84,19 +83,16 @@ export const paramAskOf = (ask: SimulateAsk) => ({
   fit: ask.fitArtifact,
   startFrom: ask.startFrom,
   durationPreset: ask.durationPreset,
-  includeArchived: ask.includeArchived,
 });
 
-/** Every model family, a family of an archived program left out unless the switch is on. */
-export const fermosFamilies = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<FamilyInfo[]>(`/api/fermos/families${includeArchived ? '?includeArchived=true' : ''}`, { signal });
+/** Every model family. */
+export const fermosFamilies = (signal?: AbortSignal) => call<FamilyInfo[]>('/api/fermos/families', { signal });
 
 /** What binds and what waits, with the person's overrides laid on, as Simulate would bind it. */
 export function fermosBind(ask: SimulateAsk, overrides: Override[], signal?: AbortSignal): Promise<FermosBinding> {
   const q = new URLSearchParams({ family: ask.family, startFrom: ask.startFrom, durationPreset: ask.durationPreset });
   for (const k of ['strain', 'product', 'sugar'] as const) if (ask[k]) q.set(k, ask[k] as string);
   if (ask.fitArtifact) q.set('fit', ask.fitArtifact);
-  if (ask.includeArchived) q.set('includeArchived', 'true');
   if (overrides.length > 0) q.set('overrides', JSON.stringify(overrides));
   return call<FermosBinding>(`/api/fermos/bind?${q.toString()}`, { signal });
 }
@@ -105,9 +101,8 @@ export function fermosBind(ask: SimulateAsk, overrides: Override[], signal?: Abo
 export const fermosSimulate = (ask: SimulateAsk, overrides: Override[], signal?: AbortSignal) =>
   post<SimulationResult>('/api/fermos/simulate', { ...ask, overrides }, signal);
 
-/** The kept simulations, newest first (`GET /api/fermos/simulations`); an archived program's left out unless the switch shows it. Simulate and Vessel both read it. */
-export const fermosSimulations = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<SimulationSummary[]>(`/api/fermos/simulations${includeArchived ? '?includeArchived=true' : ''}`, { signal });
+/** The kept simulations, newest first (`GET /api/fermos/simulations`). Simulate and Vessel both read it. */
+export const fermosSimulations = (signal?: AbortSignal) => call<SimulationSummary[]>('/api/fermos/simulations', { signal });
 
 /**
  * OF-BLD-020 §6.2 (D10) — a kept simulation's broth at an hour, read by the
@@ -116,10 +111,9 @@ export const fermosSimulations = (includeArchived: boolean, signal?: AbortSignal
  * holds; a model never sends one). Nothing is integrated again or kept, and
  * the browser computes nothing of it: it shows each state with its unit.
  */
-export function fermosHarvest(simulationId: string, hour: number | null, includeArchived: boolean, signal?: AbortSignal) {
+export function fermosHarvest(simulationId: string, hour: number | null, signal?: AbortSignal) {
   const q = new URLSearchParams({ simulation: simulationId });
   if (hour != null) q.set('hour', String(hour));
-  if (includeArchived) q.set('includeArchived', 'true');
   return call<FermosHarvest>(`/api/fermos/harvest?${q.toString()}`, { signal });
 }
 
@@ -319,13 +313,12 @@ export function vesselTypeOf(overrides: Override[]): VesselType | null {
 }
 
 /** The design request: the source, the vessel type the person chose, and every override of the scope as typed. */
-export function vesselRequest(source: { simulation?: string | null; fit?: string | null }, overrides: Override[], includeArchived: boolean): VesselRequest {
+export function vesselRequest(source: { simulation?: string | null; fit?: string | null }, overrides: Override[]): VesselRequest {
   return {
     simulation: source.simulation ?? null,
     fit: source.fit ?? null,
     vesselType: vesselTypeOf(overrides),
     overrides,
-    includeArchived,
   };
 }
 

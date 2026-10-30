@@ -41,7 +41,6 @@ export type SubsystemOwner =
   | 'fermOS'
   | 'pureOS'
   | 'Proforma'
-  | 'Dominion'
   | 'Guild';
 
 /**
@@ -315,10 +314,9 @@ export const SUBSYSTEMS: Subsystem[] = [
     state:
       'Runs a BioSTEAM flowsheet over 500 seeded Latin-hypercube samples of inputs bound to records or to a named ' +
       'person\u2019s assumption, and shows the price as a distribution, what moves it, and the infeasible share by ' +
-      'reason. Two flowsheets a scenario runs: glucose to ethanol for the yeast program, and the archived PHA draft.',
+      'reason. A scenario runs the glucose-to-ethanol flowsheet, or a vessel and a train priced together.',
     implementedIn: [
       'core/openferment_core/proforma.py',
-      'core/openferment_core/flowsheets/pha_sugar_v0.py',
       'core/openferment_core/flowsheets/ethanol_glucose_v0.py',
       'core/openferment_core/workers/proforma_worker.py',
       'src/screens/ProformaBiosteam.tsx',
@@ -328,10 +326,6 @@ export const SUBSYSTEMS: Subsystem[] = [
   },
 
   // ── the rest, unchanged by this increment ────────────────────────────
-  { id: 'dominion.claims', owner: 'Dominion', label: 'Claim Workbench', status: 'stub', state: UNBUILT },
-  { id: 'dominion.priority', owner: 'Dominion', label: 'Priority Engine', status: 'stub', state: UNBUILT },
-  { id: 'dominion.enablement', owner: 'Dominion', label: 'Enablement', status: 'stub', state: UNBUILT },
-  { id: 'dominion.notary', owner: 'Dominion', label: 'Notary', status: 'stub', state: UNBUILT },
   { id: 'guild.powers', owner: 'Guild', label: 'Powers', status: 'stub', state: UNBUILT },
 ];
 

@@ -286,7 +286,7 @@ export type ReviewAction = 'accept' | 'reject' | 'gold';
  * two mean the action cannot be taken at all until something changes.
  */
 /** The rules `biorepo.write` refuses under (§2.3). The service names one; the fallback below can only see three of them. */
-export type RefusalRule = 'record' | 'reviewer' | 'fulltext' | 'quote' | 'paper' | 'range' | 'status';
+export type RefusalRule = 'record' | 'reviewer' | 'fulltext' | 'quote' | 'paper' | 'unit' | 'status';
 
 export interface Refusal {
   rule: RefusalRule;

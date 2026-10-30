@@ -16,15 +16,14 @@
 import { useEffect, useState } from 'react';
 import { Inbox } from 'lucide-react';
 import type { Proposal } from '@/data/types';
-import { useStore, reviewerName, useProgramFilter } from '@/store';
-import { proposalShows } from '@/lib/programShows';
+import { useStore, reviewerName } from '@/store';
 import { navigate } from '@/router';
 import { carryOut, dismiss, listProposals, needsActing, shownProposals } from '@/lib/proposals';
 import { useGuild } from './GuildBits';
 import { Button, Card } from './ui';
 
 const MODULE_LABEL: Record<string, string> = {
-  dominion: 'Dominion', runbooks: 'Runbooks', geneos: 'geneOS', fermos: 'fermOS', pureos: 'pureOS',
+  runbooks: 'Runbooks', geneos: 'geneOS', fermos: 'fermOS', pureos: 'pureOS',
   proforma: 'Proforma', biorepo: 'BioRepo', guild: 'Guild', primer: 'Primer', intake: 'Intake', home: 'Home',
 };
 
@@ -45,9 +44,7 @@ export function ProposalsCard() {
     return () => ctrl.abort();
   }, [serviceUp]);
 
-  // A proposal whose target is in an archived program hides with it.
-  const showsProgram = useProgramFilter();
-  const shown = shownProposals(items, guild.acting, guild.status).filter((p) => proposalShows(p, showsProgram));
+  const shown = shownProposals(items, guild.acting, guild.status);
   if (!serviceUp || shown.length === 0) return null;
 
   const run = async (p: Proposal, verb: 'carry-out' | 'dismiss') => {

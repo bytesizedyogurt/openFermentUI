@@ -19,11 +19,10 @@ in words why a pair cannot stand, writes what the worker builds
 (`structure`) and what the run's basis names, and declares the TEA's
 financial parameters for the parameter panel.
 
-    parts_of(vessel, train_run, include_archived=False)   the two artifacts,
+    parts_of(vessel, train_run)   the two artifacts,
         read and held to the rules: both named, both on file, each of its
-        own tool, neither damaged, neither of an archived program with the
-        switch off, the train of a program with a chemical set, the vessel of
-        no other program than the train's, a vessel designed at a plant scale
+        own tool, neither damaged, the train built on the chemical set pureOS
+        holds (`program`, the set's key), a vessel designed at a plant scale
         (one vessel's batch volume sizes no plant: §6.R, main-4/22), no unit
         id of the train that the fermenter or its feed mixer takes, and no
         unit of the train fed a side inlet (its flow is the run's own, not
@@ -100,7 +99,7 @@ def _refused(words: str) -> Exception:
 
 
 class Parts(NamedTuple):
-    """The two artifacts a composite is built from, and its program."""
+    """The two artifacts a composite is built from, and the chemical set its train was built on."""
 
     vessel: Artifact
     train: Artifact
@@ -121,29 +120,9 @@ def _artifact(aid: str, tool: str, what: str, how: str) -> Artifact:
     return art
 
 
-def _hidden(program: str | None, include_archived: bool) -> bool:
-    from . import programs
-
-    try:
-        return bool(program) and programs.hides(program, include_archived)
-    except FileNotFoundError:  # no corpus exported here: nothing is known to be archived
-        return False
-
-
-def _program_name(program: str | None) -> str:
-    from . import programs
-
-    try:
-        p = programs.program_by_id(program)
-    except FileNotFoundError:
-        p = None
-    return p.name if p else str(program)
-
-
-def parts_of(vessel: str | None, train_run: str | None, *, include_archived: bool = False) -> Parts:
+def parts_of(vessel: str | None, train_run: str | None) -> Parts:
     """The vessel design and the train run a composite scenario names, held
     to the rules (the module's docstring lists them), or the refusal."""
-    from . import module_stores, programs
     from .pureos import train_spec
 
     missing = [w for w, x in (("vessel design (vessel)", vessel), ("train run (trainRun)", train_run)) if not x]
@@ -157,20 +136,11 @@ def parts_of(vessel: str | None, train_run: str | None, *, include_archived: boo
         tp = train_spec.program_of_run(t)
     except FileNotFoundError:
         tp = None
-    try:
-        vp = module_stores.artifact_program(v)
-    except FileNotFoundError:
-        vp = None
-    for what, p, aid in (("train run", tp, t.id), ("vessel design", vp, v.id)):
-        if _hidden(p, include_archived):
-            raise _refused(f"{what} {aid} belongs to {_program_name(p)}, archived (hidden). {programs.SWITCH}")
     if tp not in train_spec.PROGRAM_CHEMICALS:
-        raise _refused(f"train run {t.id} is of program {_program_name(tp)}, which has no chemical set here: "
-                       f"{FLOWSHEET} is built on {', '.join(train_spec.PROGRAM_CHEMICALS.values())}, so the composite "
-                       f"of {_program_name(tp)} waits for its program's chemicals")
-    if vp and vp != tp:
-        raise _refused(f"vessel design {v.id} is of {_program_name(vp)} and train run {t.id} of {_program_name(tp)}: "
-                       "a composite is one program's vessel and train")
+        said = (f"is built on the chemical set {tp}, which pureOS does not hold" if tp
+                else "names no chemical set it was built on")
+        raise _refused(f"train run {t.id} {said}: {FLOWSHEET} is built on "
+                       f"{', '.join(train_spec.PROGRAM_CHEMICALS.values())}, so it takes a train run of that set alone")
     one = _batch_volume(v)
     if one is not None:
         raise _refused(one)

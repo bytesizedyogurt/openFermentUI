@@ -36,10 +36,6 @@ STANDIN_CHEMOSTAT = dict(STANDIN_KINETICS, feed_conc=20.0, dilution_rate=0.1)
 STANDIN_CHEMOSTAT_START = {"X": 0.5, "S": 10.0, "P": 0.0}
 STANDIN_CHEMOSTAT_RUN_H = 400.0
 STANDIN_WASHOUT_MARGIN = 0.05
-STANDIN_STORAGE = dict(mu_max=0.30, ks=0.5, kd=0.0, yxs=0.45, yps=0.35, maintenance=0.01, ki_substrate=None,
-                       k_n=0.01, yxn=8.0, q_storage_max=0.15, q_max=0.8, yxo=None, mo=0.0)
-STANDIN_STORAGE_START = {"X": 0.5, "S": 30.0, "N": 0.5}
-STANDIN_STORAGE_RICH = {"X": 0.5, "S": 200.0, "N": 0.5}
 STANDIN_PMAX = dict(mu_max=0.40, ks=0.20, kd=0.0, yxs=0.15, alpha=2.0, beta=0.5, yps=0.45, maintenance=0.0,
                     p_max=20.0, n_inhibition=1.0, ki_substrate=None, yxo=None, mo=0.0)
 STANDIN_PMAX_START = {"X": 0.2, "S": 150.0, "P": 0.0}
@@ -91,8 +87,6 @@ D5 = {
                     "F = μ_set·X·V/(Yxs·(Sf − S))) | `steps` (a table), dilution terms on every state"],
     "chemostat_v1": ["dilution D on every state, feed Sf, steady state solved and the dynamic path integrated; washout "
                      "reported when D ≥ μmax·Sf/(Ks + Sf)"],
-    "storage_v1": ["a second substrate N with its own Monod term limiting growth, a storage product Q accumulating "
-                   "when N is exhausted at rate qQ,max·S/(Ks+S)·(1 − Q/Qmax)"],
     "light_v1": ["declared with its parameters (incident irradiance, path length, attenuation coefficient, "
                  "photoinhibition constant) and no `rhs`: a socket that refuses to run in words"],
     "oxygen": ["qO2 = μ/Yxo + mo", "OUR(t) = qO2·X"],
@@ -103,10 +97,6 @@ APPENDIX_KEYS = {
     "batch_v1": BATCH_KEYS,
     "fedbatch_v1": BATCH_KEYS | {"feed_profile", "feed_rate", "mu_set", "feed_conc", "feed_start_h", "feed_end_h"},
     "chemostat_v1": BATCH_KEYS | {"dilution_rate", "feed_conc"},
-    # As built (8): the store is the product, so α, β, Pmax, n and P0 are not
-    # this family's.
-    "storage_v1": (BATCH_KEYS - {"alpha", "beta", "p_max", "n_inhibition", "p0"})
-    | {"n_initial", "k_n", "yxn", "q_storage_max", "q_max"},
     "light_v1": {"irradiance", "path_length", "attenuation", "k_photoinhibition"},
 }
 
@@ -197,7 +187,6 @@ def runs():
         "batch_v1 aerobic": batch().simulate({**STANDIN_KINETICS, **STANDIN_AEROBIC}, STANDIN_START, None),
         "chemostat_v1": FAMILIES["chemostat_v1"].simulate(STANDIN_CHEMOSTAT, STANDIN_CHEMOSTAT_START,
                                                           STANDIN_CHEMOSTAT_RUN_H),
-        "storage_v1": FAMILIES["storage_v1"].simulate(STANDIN_STORAGE, STANDIN_STORAGE_START, None),
     }
     for name, p in STANDIN_FED.items():
         out[f"fedbatch_v1 {name}"] = FAMILIES["fedbatch_v1"].simulate(p, STANDIN_FED_START, STANDIN_FED_RUN_H[name])
@@ -303,7 +292,7 @@ def test_our_is_qo2_times_x_and_zero_when_anaerobic():
     assert not any(K.oxygen(STANDIN_KINETICS, anaerobic)) and K.oxygen_peak(STANDIN_KINETICS, anaerobic) == (0.0, None)
 
 
-# ── fed-batch, chemostat, storage ──────────────────────────────────────
+# ── fed-batch and chemostat ────────────────────────────────────────────
 
 
 def test_a_feed_brings_what_it_names_between_its_start_and_end():
@@ -391,19 +380,6 @@ def test_a_chemostat_with_no_dilution_is_refused_in_words():
             call()
     spec = next(s for s in ch.specs() if s.key == "dilution_rate")
     assert "above zero" in spec.boundsReason
-
-
-def test_the_store_forms_only_after_the_second_nutrient_is_exhausted():
-    st = FAMILIES["storage_v1"]
-    tr = st.simulate(STANDIN_STORAGE, STANDIN_STORAGE_START, None)
-    times, Y = dense(tr)
-    assert tr.n_exhausted_h is not None and tr.n_exhausted_h < tr.runout_h
-    before = times < tr.n_exhausted_h
-    assert Y[IX["Q"]][before].max() == 0.0 and Y[IX["Q"]][~before].max() > 0.0
-    rich = st.simulate(STANDIN_STORAGE, STANDIN_STORAGE_RICH, 300.0)
-    _, Y = dense(rich)
-    share = Y[IX["Q"]] / (Y[IX["X"]] + Y[IX["Q"]])
-    assert share.max() <= STANDIN_STORAGE["q_max"] * (1 + 1e-6)
 
 
 def test_harvest_reads_the_hour_the_sugar_runs_out_or_an_hour_named():

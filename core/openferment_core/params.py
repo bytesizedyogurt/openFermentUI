@@ -357,7 +357,7 @@ def _takes_no_person(spec: ParameterSpec) -> str:
 def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
     """An override that can stand, with the person named and its interval
     as `held` reads it, or the refusal."""
-    from .threadp import reviewer_refusal
+    from .biorepo import reviewer_refusal
 
     if "assumption" not in spec.sourceRule:
         raise ParamRefused(_takes_no_person(spec))
@@ -491,45 +491,17 @@ def basis_inputs(specs: list[ParameterSpec], values: Iterable[ParameterValue]) -
 _GROUPS = {"process": "Process", "economic": "Economics", "convention": "Conventions"}
 
 
-def _ontology(field_id: str) -> dict[str, Any] | None:
-    from . import units
-
-    try:
-        return units.field(field_id)
-    except (FileNotFoundError, ValueError):  # no corpus exported here: no range is known
-        return None
-
-
 def _bounds(info: FlowsheetInfo, fi: FlowsheetInput, convention: Any) -> tuple[float | None, float | None, str]:
-    """A flowsheet input's bounds and their reason (D4): the ontology's
-    plausibility range of its first record field, converted into its unit,
-    where it has one; else a physical limit."""
-    from . import units
-
+    """A flowsheet input's bounds and their reason (D4): a physical limit. A
+    record field carries no range (alpha 2.0, ADR-010)."""
     if info.reference:
         return None, None, ("the package's own default, read back after the run: a reference biorefinery runs whole on "
                             "its package's defaults and takes no value here, so no range is offered")
     if fi.kind == "convention" and convention is not None and not _is_number(convention):
         return None, None, "a convention stated in words: it takes no number, so it has no bounds"
-    why_not = ""
-    if fi.fields:
-        f = _ontology(fi.fields[0])
-        if f is None:
-            why_not = f" (the ontology's range for {fi.fields[0]} is not exported here)"
-        else:
-            lo, hi = f["range"]
-            try:
-                low, high = units.convert(float(lo), f["canonicalUnit"], fi.unit), units.convert(float(hi), f["canonicalUnit"], fi.unit)
-            except (TypeError, ValueError):
-                why_not = (f" (the ontology's range for {fi.fields[0]} is in {f['canonicalUnit']}, which does not "
-                           f"convert into {fi.unit or 'a share'})")
-            else:
-                return low, high, (f"the ontology's plausibility range for {fi.fields[0]} ({f['name']}), "
-                                   f"{_num(lo)} to {_num(hi)} {f['canonicalUnit']}, in {fi.unit}: the validation range "
-                                   "that refuses an implausible extraction, not a result")
     if fi.dimension == "fraction":
-        return 0.0, 1.0, "a physical limit: a share lies between none and the whole" + why_not
-    return 0.0, None, f"a physical limit: no negative {fi.name}" + why_not
+        return 0.0, 1.0, "a physical limit: a share lies between none and the whole"
+    return 0.0, None, f"a physical limit: no negative {fi.name}"
 
 
 def _stated(flowsheet: str) -> dict[str, Any]:
@@ -632,14 +604,11 @@ def _input_sources(inp, pool, feed: str) -> dict[str, ParameterValue | None]:
 
 def feed_words(flowsheet: str) -> str:
     """The feed a flowsheet's records must name, as its left-out line says it
-    (§2.R, finding 15): the ethanol flowsheet's glucose (FEED_CARBON); the
-    PHA draft's rule admits a sugar or a hydrolysate (`proforma.SUGARS`)."""
+    (§2.R, finding 15): the ethanol flowsheet's glucose (FEED_CARBON)."""
     from . import proforma
 
     if flowsheet in proforma.FEED_CARBON:
         return " or ".join(sorted(proforma.FEED_CARBON[flowsheet]))
-    if flowsheet == proforma.FLOWSHEET:
-        return "a sugar or a hydrolysate"
     return "a fermentable sugar"
 
 
@@ -649,8 +618,8 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
 
     (scenario_id,) = ids
     seeds = {s["id"]: s for s in proforma.seed_scenarios()}
-    if scenario_id not in seeds and not req.flowsheet and proforma._unrunnable_seed(scenario_id) is None:
-        raise ScopeUnknown(f"there is no scenario {scenario_id}: the seed's BioSTEAM scenarios are "
+    if scenario_id not in seeds and not req.flowsheet:
+        raise ScopeUnknown(f"there is no scenario {scenario_id}: the scenarios the service holds are "
                            f"{', '.join(seeds) or 'none'}, and a scenario made in a browser names the shelf flowsheet "
                            "it runs (?flowsheet=)")
     from . import composite
@@ -675,12 +644,10 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         if finance and not read and any(k in mine for k in given):
             read = proforma.READ_WORDS[(True, False)]
         proforma._check_keys(info, typed)
-        # A scope names its scenario by id, so its records bind whatever the
-        # program switch says, as a run's do (OF-BLD-016).
-        pool = evidence_pool.load(include_archived=True)
+        pool = evidence_pool.load()
         bound = proforma.bound(flowsheet, scenario_id=scenario_id, name=seeds.get(scenario_id, {}).get("name") or "",
                                host=req.host, assumptions=typed, pool=pool, fits=req.fits, vessel=req.vessel,
-                               train_run=req.trainRun, include_archived=req.includeArchived)
+                               train_run=req.trainRun)
     except proforma.ScenarioRefused as e:
         raise ParamRefused(str(e)) from None
     feed = feed_words(flowsheet)
@@ -696,8 +663,8 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
     name = seeds.get(scenario_id, {}).get("name")
     title = f"{name} ({info.title})" if name else info.title
     notes = [
-        f"Bound as a run of {flowsheet} binds it: each process input to the records of its fields on its program's "
-        "papers that pass the aggregate gate" + (f" and name {feed} as their carbon source" if flowsheet in proforma.FEED_CARBON else "")
+        f"Bound as a run of {flowsheet} binds it: each process input to the records of its fields in the evidence "
+        "pool that pass the aggregate gate" + (f" and name {feed} as their carbon source" if flowsheet in proforma.FEED_CARBON else "")
         + ", converted into the input's unit; a fermOS fit a person chose replaces them for titre, yield and productivity.",
         "A person's override wins over the records and any fit for its input, here and in the run, which carries the "
         "overrides and names the person in its basis (OF-BLD-020 D3).",

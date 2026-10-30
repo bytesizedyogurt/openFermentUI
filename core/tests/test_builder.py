@@ -182,7 +182,7 @@ def _tea(basis_flow=48.0):
 
 
 def _keep(aid=RUN_ID, *, tool="proforma.run", flowsheet="ethanol_glucose_v0", streams=STREAMS, units=UNITS,
-          tea="default", scenario="sc-yeast-1") -> Artifact:
+          tea="default", scenario="sc-k3x9q-1") -> Artifact:
     """A run written by hand into this test's store, as the service keeps one."""
     out = {"flowsheet": flowsheet, "tablesSource": "tables written for this test",
            "tea": _tea() if tea == "default" else tea, "streams": streams, "units": units, "utilities": None,
@@ -261,24 +261,14 @@ def test_a_run_no_train_is_read_from_is_refused_in_words(store, monkeypatch):
     _keep("ddddddddddddddd2", units=[dict(u, unitClass="StandIn") for u in UNITS])
     with pytest.raises(pureos.TrainRefused, match="no unit of run ddddddddddddddd2 that its product passes through"):
         pureos.from_run("ddddddddddddddd2")
-    phb = [dict(s, massFlows={("PHB" if k == "Ethanol" else k): v for k, v in s["massFlows"].items()}) for s in STREAMS]
-    _keep("ddddddddddddddd3", streams=phb, tea=_tea())
-    with pytest.raises(pureos.TrainRefused, match="traces PHB, which no product a train traces here is"):
+    elsewhere = [dict(s, massFlows={("Unobtainium" if k == "Ethanol" else k): v for k, v in s["massFlows"].items()})
+                 for s in STREAMS]
+    _keep("ddddddddddddddd3", streams=elsewhere, tea=_tea())
+    with pytest.raises(pureos.TrainRefused, match="traces Unobtainium, which no product a train traces here is"):
         pureos.from_run("ddddddddddddddd3")
     other = _keep("ddddddddddddddd4", tool="convert_units")
     with pytest.raises(pureos.TrainRefused, match="is a convert_units artifact"):
         pureos.from_run(other.id)
-
-
-def test_an_archived_programs_run_is_refused_with_the_switch_off(store, monkeypatch):
-    from openferment_core import programs
-
-    _keep()
-    monkeypatch.setattr(programs, "hides", lambda program, include_archived: program == "yeast" and not include_archived)
-    monkeypatch.setattr(programs, "program_by_id", lambda pid, path=None: None)
-    with pytest.raises(pureos.TrainRefused, match="belongs to yeast, archived"):
-        pureos.from_run(RUN_ID)
-    assert pureos.from_run(RUN_ID, include_archived=True).train.program == "yeast"
 
 
 def test_the_from_run_endpoint_answers_200_404_and_422_and_starts_no_simulator(client, store, monkeypatch):

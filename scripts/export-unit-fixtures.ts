@@ -24,6 +24,11 @@
  * `validate.py` mirrors the whole-word rule both use, and
  * tests/test_validate.py asserts it answers the same, case by case. Same
  * arrangement, same reason, same exporter.
+ *
+ * And core/tests/fixtures/fields.json (alpha 2.0): the record fields as
+ * src/data/ontology.ts holds them and the vocabulary as src/data/vocabulary.ts
+ * holds it, which tests/test_schema.py holds equal to
+ * core/openferment_core/schema/fields.yaml and vocabulary.yaml.
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import {
@@ -34,11 +39,12 @@ import {
   toSI,
   unitFamily,
 } from '../src/engine/units';
-import { normalizeStrain } from '../src/data/strains';
-import { carbonSourceId } from '../src/data/vocabulary';
+import { CARBON_SOURCES, UNIT_OPERATIONS, carbonSourceId, matchWholeWord } from '../src/data/vocabulary';
+import { FAMILY_LABEL, ONTOLOGY } from '../src/data/ontology';
 
 const OUT = 'core/tests/fixtures/units.json';
 const OUT_RESOLVERS = 'core/tests/fixtures/resolvers.json';
+const OUT_FIELDS = 'core/tests/fixtures/fields.json';
 
 // ── normalise: raw notation → table key, and its family ────────────────
 const NORMALIZE_INPUTS = [
@@ -232,46 +238,33 @@ mkdirSync('core/tests/fixtures', { recursive: true });
 writeFileSync(OUT, JSON.stringify(fixture, null, 2) + '\n');
 
 // ── resolvers: a paper's wording → strain id or carbon source (§2.1) ───
-// The exact alias, the whole-word rule, and the cases it must refuse: a
-// species alone, an alias glued to other letters, two different ids in one
-// wording, a key that is only a property of every JavaScript object.
+// The whole-word rule over a test alias table (fictional strain names: the
+// strain catalogue left with the seed, alpha 2.0 ADR-010). The exact alias,
+// one found as a whole word, the cases it must refuse: a species alone, an
+// alias glued to other letters, two different ids in one wording, a key that
+// is only a property of every JavaScript object.
+const TEST_STRAIN_ALIASES: Record<string, string> = {
+  ab12: 'strain-ab12',
+  'ab12-3': 'strain-ab12',
+  cd34: 'strain-cd34',
+  ef5: 'strain-ef5',
+  'x. testus ef5': 'strain-ef5',
+  'gh.6-7k': 'strain-gh67k',
+};
 const STRAIN_INPUTS = [
-  'cw15', // exact
-  '  CW15  ', // exact, after trimming and lower-casing
-  'Chlamydomonas reinhardtii UVM4', // a designation inside the wording
-  'C. reinhardtii cc124 grown mixotrophically',
-  'Chlamydomonas  reinhardtii   cw15-302', // runs of whitespace collapse
-  'Escherichia coli BL21(DE3)', // bl21 as a whole word
-  'E. coli', // exact, punctuation inside the alias
-  'Pichia pastoris GS115',
-  'Chlamydomonas reinhardtii', // the species alone: no alias
-  'Cupriavidus necator', // no alias at all
-  'uvm40', // glued to a digit: not uvm4
-  'xuvm4', // glued to a letter: not uvm4
-  'cw15 and UVM4 crossed', // two ids → null
-  'E. coli expressing bovine beta-casein', // two ids → null
-  'CC-137c', // two aliases (cc-137c, 137c), one id
+  'ab12', // exact
+  '  AB12  ', // exact, after trimming and lower-casing
+  'Genus species CD34', // a designation inside the wording
+  'Genus  species   ab12-3', // runs of whitespace collapse; two aliases, one id
+  'X. testus EF5 grown on sugar',
+  'GH.6-7K', // punctuation inside the alias
+  'X. testus', // the species alone: no alias
+  'Genus species', // no alias at all
+  'cd340', // glued to a digit: not cd34
+  'xcd34', // glued to a letter: not cd34
+  'ab12 and cd34 crossed', // two ids → null
   '',
   'constructor', // not an alias, whatever Object.prototype holds
-  // Thread Q yeasts: designation-bearing spellings resolve …
-  'S288C',
-  'S. cerevisiae S288C',
-  'Saccharomyces cerevisiae S288C',
-  'Saccharomyces  cerevisiae   S288C grown on glucose', // a designation inside the wording
-  'CEN.PK113-7D',
-  'CEN.PK 113-7D',
-  'CEN.PK113-7D MATa',
-  'S. cerevisiae CEN.PK113-7D',
-  'Saccharomyces cerevisiae CEN.PK113-7D',
-  // … and the species, the bare family and its other members do not.
-  'Saccharomyces cerevisiae',
-  'S. cerevisiae',
-  'CEN.PK',
-  'cen.pk',
-  'CEN.PK2-1C',
-  'CEN.PK113-5D',
-  'BY4741',
-  'S288C and CEN.PK113-7D compared', // two ids → null
 ];
 const CARBON_INPUTS = [
   'glucose',
@@ -289,10 +282,28 @@ const CARBON_INPUTS = [
 ];
 const resolvers = {
   generatedBy: 'scripts/export-unit-fixtures.ts — do not edit; regenerate with pnpm export:unit-fixtures',
-  strains: STRAIN_INPUTS.map((text) => ({ text, id: normalizeStrain(text) })),
+  strainAliases: TEST_STRAIN_ALIASES,
+  strains: STRAIN_INPUTS.map((text) => ({ text, id: matchWholeWord(text, TEST_STRAIN_ALIASES) })),
   carbon: CARBON_INPUTS.map((text) => ({ text, id: carbonSourceId(text) })),
 };
 writeFileSync(OUT_RESOLVERS, JSON.stringify(resolvers, null, 2) + '\n');
+
+// ── fields: the TypeScript mirror of schema/fields.yaml ────────────────
+const fields = {
+  generatedBy: 'scripts/export-unit-fixtures.ts — do not edit; regenerate with pnpm export:unit-fixtures',
+  families: FAMILY_LABEL,
+  fields: ONTOLOGY,
+  // …and the vocabulary schema/vocabulary.yaml holds, as the browser holds it.
+  carbonSources: CARBON_SOURCES.map((c) => ({ id: c.id, label: c.label, spellings: c.spellings })),
+  unitOperations: UNIT_OPERATIONS.map((u) => ({
+    id: u.id,
+    label: u.label,
+    stage: u.stage,
+    note: u.note ?? null,
+    biosteamClasses: u.biosteamClasses ?? [],
+  })),
+};
+writeFileSync(OUT_FIELDS, JSON.stringify(fields, null, 2) + '\n');
 
 const pairs = normalize.length + conversions.length + si.length + refusals.length + equals.length;
 console.log('\nopenFerment unit fixtures');

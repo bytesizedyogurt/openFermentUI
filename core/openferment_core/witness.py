@@ -325,10 +325,10 @@ def new_records(
 
 
 def seed_records() -> list[dict[str, Any]]:
-    """The curated records, and only those. `pnpm export:corpus` appends
-    accepted candidates to corpus.json (§7.4) with `source: 'biorepo'`; a run
-    scored against them would match the extractor against itself, and a
-    field they cover would stop looking new. The seed is what is scored."""
+    """The curated records, and only those. Accepted candidates join the
+    corpus (§7.4) with `source: 'biorepo'`; a run scored against them would
+    match the extractor against itself, and a field they cover would stop
+    looking new. The curated records are what is scored."""
     return [r for r in load_corpus().records if r.get("source", "seed") == "seed"]
 
 

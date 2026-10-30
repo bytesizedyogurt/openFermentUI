@@ -34,7 +34,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from . import atomic, guild, intake, llm, programs
+from . import atomic, guild, intake, llm
 from .models import (
     EvidenceSource,
     GuildEvidence,
@@ -146,18 +146,13 @@ def step_needs(protocol_id: str, step_id: str) -> list[str] | None:
     return None
 
 
-def sources_for(skill_id: str, depositions: list[PracticeDeposition],
-                include_archived: bool = False) -> dict[str, dict[str, Any]]:
+def sources_for(skill_id: str, depositions: list[PracticeDeposition]) -> dict[str, dict[str, Any]]:
     """Everything the model may cite for this skill, keyed by the ref it cites
     it by: the steps that need the skill and their protocols' materials, then
-    what was recorded at those steps in the newest runs shown. With the switch
-    off (the default) an archived program's protocol is no source, and runs
-    of it are not used (OF-BLD-016 §2.R)."""
+    what was recorded at those steps in the newest runs shown."""
     out: dict[str, dict[str, Any]] = {}
     needing: dict[str, set[str]] = {}
     for p in _protocols():
-        if programs.hides(programs.program_of("protocol", p["protocolId"]), include_archived):
-            continue
         steps = [st for st in p["steps"] if skill_id in st["skills"]]
         if not steps:
             continue
@@ -434,10 +429,10 @@ def _call(ask: Ask | None, *, system: str, user: str, schema: dict[str, Any], ma
         raise PracticeUnavailable(str(e), e.usage) from e
 
 
-def draft(request: PracticeDraftRequest, *, ask: Ask | None = None, include_archived: bool = False) -> PracticeScenario:
+def draft(request: PracticeDraftRequest, *, ask: Ask | None = None) -> PracticeScenario:
     """One call: a scenario for one skill, validated and kept, or refused."""
     skill = _skill(request.skillId)
-    sources = sources_for(request.skillId, request.depositions, include_archived)
+    sources = sources_for(request.skillId, request.depositions)
     if not any(s["kind"] == "step" for s in sources.values()):
         raise PracticeRefused("steps", f"no protocol step needs {request.skillId} yet, so there is nothing to build on")
     payload = {

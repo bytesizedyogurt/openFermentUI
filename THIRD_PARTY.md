@@ -124,7 +124,7 @@ accepted licence strings, and every package a person accepted, are in
 | python-libsbml | 5.21.2 | LGPL | the geneOS worker, through cobra | accepted by Sean Creighton on 2026-10-15 |
 | python-multipart | 0.0.32 | Apache-2.0 | extra agent, through mcp | allowed |
 | pytz | 2026.5 | MIT | the geneOS worker, through biorefineries, biosteam, cobra | allowed |
-| PyYAML | 6.0.3 | MIT | service, through uvicorn | allowed |
+| PyYAML | 6.0.3 | MIT | service | allowed |
 | rank-bm25 | 0.2.2 | Apache2.0 | service | allowed |
 | referencing | 0.37.0 | MIT | extra agent, through mcp | allowed |
 | requests | 2.34.2 | Apache-2.0 | extra rag, through fastembed | allowed |
@@ -168,59 +168,59 @@ accepted licence strings, and every package a person accepted, are in
 
 | Package | Version | Licence | Used by | Passes as |
 |---|---|---|---|---|
-| @babel/runtime | 7.29.7 | MIT | browser app, through recharts | allowed |
+| @babel/runtime | 7.29.7 | MIT | through recharts, which no file under src/ imports | allowed |
 | @fontsource/ibm-plex-mono | 5.3.0 | OFL-1.1 | browser app | allowed |
 | @fontsource/ibm-plex-sans | 5.3.0 | OFL-1.1 | browser app | allowed |
 | @fontsource/spectral | 5.3.0 | OFL-1.1 | browser app | allowed |
 | @remix-run/router | 1.23.3 | MIT | through react-router-dom, which no file under src/ imports | allowed |
-| @types/d3-array | 3.2.2 | MIT | browser app, through recharts | allowed |
-| @types/d3-color | 3.1.3 | MIT | browser app, through recharts | allowed |
-| @types/d3-ease | 3.0.2 | MIT | browser app, through recharts | allowed |
-| @types/d3-interpolate | 3.0.4 | MIT | browser app, through recharts | allowed |
-| @types/d3-path | 3.1.1 | MIT | browser app, through recharts | allowed |
-| @types/d3-scale | 4.0.9 | MIT | browser app, through recharts | allowed |
-| @types/d3-shape | 3.1.8 | MIT | browser app, through recharts | allowed |
-| @types/d3-time | 3.0.4 | MIT | browser app, through recharts | allowed |
-| @types/d3-timer | 3.0.2 | MIT | browser app, through recharts | allowed |
+| @types/d3-array | 3.2.2 | MIT | through recharts, which no file under src/ imports | allowed |
+| @types/d3-color | 3.1.3 | MIT | through recharts, which no file under src/ imports | allowed |
+| @types/d3-ease | 3.0.2 | MIT | through recharts, which no file under src/ imports | allowed |
+| @types/d3-interpolate | 3.0.4 | MIT | through recharts, which no file under src/ imports | allowed |
+| @types/d3-path | 3.1.1 | MIT | through recharts, which no file under src/ imports | allowed |
+| @types/d3-scale | 4.0.9 | MIT | through recharts, which no file under src/ imports | allowed |
+| @types/d3-shape | 3.1.8 | MIT | through recharts, which no file under src/ imports | allowed |
+| @types/d3-time | 3.0.4 | MIT | through recharts, which no file under src/ imports | allowed |
+| @types/d3-timer | 3.0.2 | MIT | through recharts, which no file under src/ imports | allowed |
 | @types/prop-types | 15.7.15 | MIT | browser app, through zustand | allowed |
 | @types/react | 18.3.31 | MIT | browser app, through zustand | allowed |
-| clsx | 2.1.1 | MIT | browser app, through recharts | allowed |
-| csstype | 3.2.3 | MIT | browser app, through recharts, zustand | allowed |
-| d3-array | 3.2.4 | ISC | browser app, through recharts | allowed |
-| d3-color | 3.1.0 | ISC | browser app, through recharts | allowed |
-| d3-ease | 3.0.1 | BSD-3-Clause | browser app, through recharts | allowed |
-| d3-format | 3.1.2 | ISC | browser app, through recharts | allowed |
-| d3-interpolate | 3.0.1 | ISC | browser app, through recharts | allowed |
-| d3-path | 3.1.0 | ISC | browser app, through recharts | allowed |
-| d3-scale | 4.0.2 | ISC | browser app, through recharts | allowed |
-| d3-shape | 3.2.0 | ISC | browser app, through recharts | allowed |
-| d3-time | 3.1.0 | ISC | browser app, through recharts | allowed |
-| d3-time-format | 4.1.0 | ISC | browser app, through recharts | allowed |
-| d3-timer | 3.0.1 | ISC | browser app, through recharts | allowed |
-| decimal.js-light | 2.5.1 | MIT | browser app, through recharts | allowed |
-| dom-helpers | 5.2.1 | MIT | browser app, through recharts | allowed |
-| eventemitter3 | 4.0.7 | MIT | browser app, through recharts | allowed |
-| fast-equals | 5.4.1 | MIT | browser app, through recharts | allowed |
-| internmap | 2.0.3 | ISC | browser app, through recharts | allowed |
+| clsx | 2.1.1 | MIT | through recharts, which no file under src/ imports | allowed |
+| csstype | 3.2.3 | MIT | browser app, through zustand | allowed |
+| d3-array | 3.2.4 | ISC | through recharts, which no file under src/ imports | allowed |
+| d3-color | 3.1.0 | ISC | through recharts, which no file under src/ imports | allowed |
+| d3-ease | 3.0.1 | BSD-3-Clause | through recharts, which no file under src/ imports | allowed |
+| d3-format | 3.1.2 | ISC | through recharts, which no file under src/ imports | allowed |
+| d3-interpolate | 3.0.1 | ISC | through recharts, which no file under src/ imports | allowed |
+| d3-path | 3.1.0 | ISC | through recharts, which no file under src/ imports | allowed |
+| d3-scale | 4.0.2 | ISC | through recharts, which no file under src/ imports | allowed |
+| d3-shape | 3.2.0 | ISC | through recharts, which no file under src/ imports | allowed |
+| d3-time | 3.1.0 | ISC | through recharts, which no file under src/ imports | allowed |
+| d3-time-format | 4.1.0 | ISC | through recharts, which no file under src/ imports | allowed |
+| d3-timer | 3.0.1 | ISC | through recharts, which no file under src/ imports | allowed |
+| decimal.js-light | 2.5.1 | MIT | through recharts, which no file under src/ imports | allowed |
+| dom-helpers | 5.2.1 | MIT | through recharts, which no file under src/ imports | allowed |
+| eventemitter3 | 4.0.7 | MIT | through recharts, which no file under src/ imports | allowed |
+| fast-equals | 5.4.1 | MIT | through recharts, which no file under src/ imports | allowed |
+| internmap | 2.0.3 | ISC | through recharts, which no file under src/ imports | allowed |
 | js-tokens | 4.0.0 | MIT | browser app, through lucide-react | allowed |
-| lodash | 4.18.1 | MIT | browser app, through recharts | allowed |
-| loose-envify | 1.4.0 | MIT | browser app, through lucide-react, react-dom, recharts | allowed |
+| lodash | 4.18.1 | MIT | through recharts, which no file under src/ imports | allowed |
+| loose-envify | 1.4.0 | MIT | browser app, through lucide-react, react-dom | allowed |
 | lucide-react | 0.462.0 | ISC | browser app | allowed |
-| object-assign | 4.1.1 | MIT | browser app, through recharts | allowed |
-| prop-types | 15.8.1 | MIT | browser app, through recharts | allowed |
+| object-assign | 4.1.1 | MIT | through recharts, which no file under src/ imports | allowed |
+| prop-types | 15.8.1 | MIT | through recharts, which no file under src/ imports | allowed |
 | react | 18.3.1 | MIT | browser app | allowed |
 | react-dom | 18.3.1 | MIT | browser app | allowed |
-| react-is | 16.13.1 | MIT | browser app, through recharts | allowed |
-| react-is | 18.3.1 | MIT | browser app, through recharts | allowed |
+| react-is | 16.13.1 | MIT | through recharts, which no file under src/ imports | allowed |
+| react-is | 18.3.1 | MIT | through recharts, which no file under src/ imports | allowed |
 | react-router | 6.30.4 | MIT | through react-router-dom, which no file under src/ imports | allowed |
 | react-router-dom | 6.30.4 | MIT | listed in package.json; no file under src/ imports it | allowed |
-| react-smooth | 4.0.4 | MIT | browser app, through recharts | allowed |
-| react-transition-group | 4.4.5 | BSD-3-Clause | browser app, through recharts | allowed |
-| recharts | 2.15.4 | MIT | browser app | allowed |
-| recharts-scale | 0.4.5 | MIT | browser app, through recharts | allowed |
+| react-smooth | 4.0.4 | MIT | through recharts, which no file under src/ imports | allowed |
+| react-transition-group | 4.4.5 | BSD-3-Clause | through recharts, which no file under src/ imports | allowed |
+| recharts | 2.15.4 | MIT | listed in package.json; no file under src/ imports it | allowed |
+| recharts-scale | 0.4.5 | MIT | through recharts, which no file under src/ imports | allowed |
 | scheduler | 0.23.2 | MIT | browser app, through react-dom | allowed |
-| tiny-invariant | 1.3.3 | MIT | browser app, through recharts | allowed |
-| victory-vendor | 36.9.2 | MIT AND ISC | browser app, through recharts | allowed |
+| tiny-invariant | 1.3.3 | MIT | through recharts, which no file under src/ imports | allowed |
+| victory-vendor | 36.9.2 | MIT AND ISC | through recharts, which no file under src/ imports | allowed |
 | zustand | 5.0.14 | MIT | browser app | allowed |
 
 ## Accepted by a person
@@ -242,8 +242,5 @@ geneOS worker alone (OF-BLD-014 E.9).
 
 | File | Licence | Source | Revision | sha256 | Accepted by | Date | Why |
 |---|---|---|---|---|---|---|---|
-| RehMBEL1391 | GPL-3.0 | github.com/m-jahn/genome-scale-models, Ralstonia_eutropha/sbml/RehMBEL1391_sbml_L3V1.xml | 00c70c5 | 85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89 | Sean Creighton | 2026-10-15 | The genome-scale reconstruction of Cupriavidus necator H16, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker; accepted under D4 for this research prototype. |
 | Yeast9 | CC-BY-4.0 | github.com/SysBioChalmers/yeast-GEM, model/yeast-GEM.xml (release v9.1.1) | 2d594ae1c4a2d550ccef120d96a58c7bbf586255 | 30842b15eefb0ef7e36cbdea86a9efddfacf69a871c8b054165faa9af9f6c8eb | Sean Creighton | 2026-10-20 | Yeast9, the consensus genome-scale reconstruction of Saccharomyces cerevisiae (Zhang et al., Molecular Systems Biology 2024, doi:10.1038/s44320-024-00060-7), fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker for an ethanol ceiling. Sean named it in his instruction of 2026-10-20 for the yeast-ethanol demo. The repository's LICENSE.md is CC-BY-4.0, read 2026-10-20: a use credits Zhang et al. and the yeast-GEM community, which the shelf's notes and every result's basis do. |
-| e_coli_core | as BiGG publishes it; ships inside cobra 0.32.1 | BiGG Models, bundled with cobra as textbook | cobra 0.32.1 | inside the cobra package | Sean Creighton | 2026-10-15 | The 95-reaction E. coli core model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use. |
-| iJO1366 | as BiGG publishes it; ships inside cobra 0.32.1 | BiGG Models, bundled with cobra as iJO1366 | cobra 0.32.1 | inside the cobra package | Sean Creighton | 2026-10-15 | The genome-scale E. coli K-12 MG1655 model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use. |
 | iMM904 | BiGG Models terms: educational, research and non-profit use; commercial use by agreement with UC San Diego | bigg.ucsd.edu/static/models/iMM904.xml (BiGG Models; Mo, Palsson and Herrgård, BMC Systems Biology 2009, PMID 19321003) | ETag "017c86841952cc365f20a8b466292b31", Last-Modified 2019-11-01 | a4bcff4f8f2228a5b1553264c3bcb1e8a8093907754446007f3f3b529d29d3e1 | Sean Creighton | 2026-10-20 | The genome-scale reconstruction of Saccharomyces cerevisiae S288C as BiGG Models serves it, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker for an ethanol ceiling. Sean named it in his instruction of 2026-10-20 for the yeast-ethanol demo. BiGG's terms (bigg.ucsd.edu/license, read 2026-10-20) permit educational, research and non-profit use without fee, require the copyright notice and the paragraphs after it to travel with every copy, and leave commercial use to an agreement with UC San Diego's Technology Transfer and Intellectual Property Services. Not a permissive licence: the file is not committed, and data-sync carries no model file, so no copy leaves the machine that fetched it. Commercial use is a question for Sean before any such use. |

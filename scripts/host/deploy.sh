@@ -54,9 +54,6 @@ pnpm install --frozen-lockfile
 # sync is exact, so naming one extra would remove the others.
 (cd core && uv sync --frozen --all-extras)
 
-say "Projecting the seed for the service"
-pnpm export:corpus
-
 if [ "$VERIFY" = 1 ]; then
   say "Running the offline gate (includes the build)"
   # The browser checks drive a Chromium; this fetches it the first time only.

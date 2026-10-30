@@ -50,7 +50,7 @@ def a_person_typed_a_scale(monkeypatch):
 
 
 def ctx(archived=True):
-    c = tools.ToolContext(include_archived=archived)
+    c = tools.ToolContext()
     c.ask_id, c.model = "ask-42", "claude-haiku-5-5"
     return c
 

@@ -10,7 +10,6 @@ and their artifact ids are what they were (test_fermos_bind holds them).
                                computed value, a value the paper cites from
                                another), or None; `aggregateExclusion` in
                                Python
-    in_program(paper, program) whether a paper is on a program's papers
     statistic(values)          what a set of bound values gives: their median
                                with their range from three distinct values on,
                                a pair's middle with both ends, one value held
@@ -40,15 +39,6 @@ def exclusion(r: dict) -> str | None:
     if r.get("primary") is False:
         return "not-primary"
     return None
-
-
-def in_program(paper_id: str, program: str | None) -> bool:
-    from . import programs
-
-    try:
-        return program is not None and programs.program_of_paper(paper_id or "") == program
-    except FileNotFoundError:  # no corpus exported here: no paper is known to be the program's
-        return False
 
 
 class Statistic(NamedTuple):

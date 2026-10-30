@@ -43,7 +43,7 @@ EMPTY = SimpleNamespace(records=[], records_by_id={}, hidden={})
 @pytest.fixture()
 def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(fermos, "_load_pool", lambda include_archived: EMPTY)
+    monkeypatch.setattr(fermos, "_load_pool", lambda *a, **k: EMPTY)
     return tmp_path
 
 

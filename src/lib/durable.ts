@@ -99,11 +99,6 @@ export interface DurableSnapshot {
    */
   reviewerName: string;
   /**
-   * Whether archived programs show (OF-BLD-016 §2.1). Optional, so a
-   * snapshot written before programs existed still loads, and reads as off.
-   */
-  showArchived?: boolean;
-  /**
    * Guild's ledger as this browser last held it, what it still owes the
    * service, and who was signing (OF-BLD-013 §1.3). Optional, so snapshots
    * written before Guild held people still load: their depositions are not

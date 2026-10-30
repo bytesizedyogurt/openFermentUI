@@ -35,9 +35,12 @@ from types import SimpleNamespace  # noqa: E402
 from openferment_core.models import InputAssumption, ProformaRunRequest  # noqa: E402
 
 
-def rec(rid, field, value, unit, *, paper="P6", carbon="glucose", strain="c-necator-h16", **kw):
+ETHANOL = proforma.ETHANOL
+
+
+def rec(rid, field, value, unit, *, paper="T1", carbon="glucose", strain="strain-ab12", **kw):
     return {"id": rid, "paperId": paper, "field": field, "value": value, "unit": unit, "carbonSource": carbon,
-            "strainId": strain, "organismText": "Ralstonia eutropha", "provenance": "unverified", "status": "unverified",
+            "strainId": strain, "organismText": "Test organism", "provenance": "unverified", "status": "unverified",
             "primary": True, **kw}
 
 
@@ -49,102 +52,43 @@ def by_key(inputs):
     return {i.key: i for i in inputs}
 
 
-def test_three_records_give_their_median_and_range_and_sample_triangular():
-    rs = [rec(f"t{i}", "pha_titre", v, "g/L") for i, v in enumerate([10.0, 40.0, 25.0])]
-    t = by_key(proforma.bind(rs))["titre"]
-    assert (t.value, t.low, t.high, t.sampling, t.binding) == (25.0, 10.0, 40.0, "triangular", "records")
-    assert t.recordIds == ["t0", "t1", "t2"]
-
-
 def test_two_records_are_a_pair_and_one_is_held_fixed_and_flagged():
-    two = by_key(proforma.bind([rec("a", "pha_titre", 10.0, "g/L"), rec("b", "pha_titre", 20.0, "g/L")]))["titre"]
+    two = by_key(proforma.bind_inputs(ETHANOL, [rec("a", "ethanol_titre", 10.0, "g/L"), rec("b", "ethanol_titre", 20.0, "g/L")]))["titre"]
     assert (two.low, two.high, two.sampling) == (10.0, 20.0, "uniform")
-    one = by_key(proforma.bind([rec("a", "pha_titre", 10.0, "g/L")]))["titre"]
+    one = by_key(proforma.bind_inputs(ETHANOL, [rec("a", "ethanol_titre", 10.0, "g/L")]))["titre"]
     assert one.sampling == "fixed" and proforma.SINGLE in one.flags
-
-
-def test_the_gate_and_the_carbon_source_decide_what_binds():
-    rs = [
-        rec("ok", "pha_titre", 10.0, "g/L", carbon="sunflower stalk hydrolysate"),
-        rec("nocarbon", "pha_titre", 11.0, "g/L", carbon=None),
-        rec("oil", "pha_titre", 12.0, "g/L", carbon="glycerol"),
-        rec("estimate", "pha_titre", 13.0, "g/L", provenance="industry-estimate"),
-        rec("computed", "pha_titre", 13.0, "g/L", provenance="computed"),
-        rec("cites", "pha_titre", 14.0, "g/L", primary=False),
-        rec("rejected", "pha_titre", 15.0, "g/L", status="rejected"),
-        rec("caseins", "pha_titre", 16.0, "g/L", paper="B5"),
-    ]
-    t = by_key(proforma.bind(rs))["titre"]
-    assert t.recordIds == ["ok"] and t.leftOutNoCarbon == 1 and t.leftOutOtherCarbon == 1
-
-
-def test_content_in_percent_of_dry_mass_becomes_a_share():
-    c = by_key(proforma.bind([rec("c", "pha_content_cdw", 60.0, "% CDW")]))["content"]
-    assert c.value == pytest.approx(0.6)
-
-
-def test_a_host_filter_narrows_the_binding():
-    rs = [rec("h", "pha_titre", 10.0, "g/L"), rec("k", "pha_titre", 20.0, "g/L", strain="p-putida-kt2440")]
-    assert by_key(proforma.bind(rs, host="p-putida-kt2440"))["titre"].recordIds == ["k"]
-
-
-def test_a_yield_above_the_ceiling_is_clipped_and_said():
-    rs = [rec("y1", "pha_yield_substrate", 0.3, "g g-1"), rec("y2", "pha_yield_substrate", 0.7, "g g-1")]
-    y = by_key(proforma.bind(rs, cap=(0.48, "ceilingid")))["yield"]
-    assert y.high == pytest.approx(0.48) and any("clipped" in f for f in y.flags)
-
-
-def test_a_refused_conversion_stops_the_binding_with_the_engines_reason():
-    y = by_key(proforma.bind([rec("bad", "pha_titre", 1.0, "% CDW")]))["titre"]
-    assert y.binding == "waiting" and "binding stopped" in y.flags[0]
 
 
 def test_an_assumption_needs_a_named_person_and_its_own_range():
     with pytest.raises(proforma.ScenarioRefused, match="placeholder"):
-        proforma.bind([], assumptions=[assume("recovery", 0.9, 0.8, 0.95, by="me")])
+        proforma.bind_inputs(ETHANOL, [], assumptions=[assume("glucose_price", 0.4, 0.3, 0.5, by="me")])
     with pytest.raises(proforma.ScenarioRefused, match="within its own low and high"):
-        proforma.bind([], assumptions=[assume("recovery", 0.99, 0.8, 0.95)])
-    r = by_key(proforma.bind([], assumptions=[assume("recovery", 0.9, 0.8, 0.95)]))["recovery"]
+        proforma.bind_inputs(ETHANOL, [], assumptions=[assume("glucose_price", 0.6, 0.3, 0.5)])
+    r = by_key(proforma.bind_inputs(ETHANOL, [], assumptions=[assume("glucose_price", 0.4, 0.3, 0.5)]))["glucose_price"]
     assert r.binding == "assumption" and r.source.by == "Sean Creighton" and r.sampling == "uniform"
 
 
 def test_a_run_with_inputs_waiting_is_refused_listing_every_one(store):
-    pool = SimpleNamespace(records=[rec("t", "pha_titre", 10.0, "g/L")], records_by_id={})
+    pool = SimpleNamespace(records=[rec("t", "ethanol_titre", 10.0, "g/L")], records_by_id={})
     with pytest.raises(proforma.ScenarioRefused) as e:
-        proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", assumptions=[assume("sugarFeed", 1000, 1000, 1000)]), pool=pool)
-    for key in ("yield", "content", "productivity", "recovery", "sugarPrice"):
+        proforma.run(ProformaRunRequest(scenarioId="sc-k3x9q-1", flowsheet=ETHANOL,
+                                        assumptions=[assume("plant_scale", 1000, 1000, 1000)]), pool=pool)
+    for key in ("feed_glucose_conc", "yield", "productivity", "glucose_price"):
         assert key in str(e.value)
-    assert "titre" not in str(e.value).split(":")[1] and "sugarFeed" not in str(e.value)
+    assert "titre" not in str(e.value).split(":")[1] and "plant_scale" not in str(e.value)
 
 
 def test_the_basis_comes_back_as_the_same_sampling(store):
-    rs = [rec(f"t{i}", "pha_titre", v, "g/L") for i, v in enumerate([10.0, 40.0, 25.0])]
-    rs += [rec("y1", "pha_yield_substrate", 0.3, "g g-1"), rec("y2", "pha_yield_substrate", 0.7, "g g-1")]
-    rs += [rec("c", "pha_content_cdw", 60.0, "% CDW")]
-    inputs = proforma.bind(rs, assumptions=[assume("sugarPrice", 0.4, 0.3, 0.5)], cap=(0.48, "cap"))
-    specs, base, kinds = proforma._specs(proforma.basis_inputs(inputs, (0.48, "cap")))
+    rs = [rec(f"t{i}", "ethanol_titre", v, "g/L") for i, v in enumerate([10.0, 40.0, 25.0])]
+    rs += [rec("p1", "ethanol_productivity", 1.0, "g L-1 h-1"), rec("p2", "ethanol_productivity", 3.0, "g L-1 h-1")]
+    rs += [rec("y", "ethanol_yield_substrate", 0.4, "g g-1")]
+    inputs = proforma.bind_inputs(ETHANOL, rs, assumptions=[assume("glucose_price", 0.4, 0.3, 0.5)])
+    specs, base, kinds = proforma._specs(proforma.basis_inputs(inputs, None, ETHANOL))
     assert specs["titre"] == {"kind": "triangular", "low": 10.0, "mode": 25.0, "high": 40.0}
-    assert specs["yield"] == {"kind": "uniform", "low": 0.3, "high": 0.48}
-    assert specs["content"] == {"kind": "fixed", "value": pytest.approx(0.6)}
-    assert specs["sugarPrice"] == {"kind": "uniform", "low": 0.3, "high": 0.5} and base["sugarPrice"] == 0.4
-    assert kinds == {"titre": "record", "yield": "record", "content": "record", "sugarPrice": "assumption"}
-
-
-def test_the_scenario_endpoints(store, monkeypatch):
-    from openferment_core import api, evidence_pool
-
-    rs = [rec("t", "pha_titre", 10.0, "g/L"), rec("k", "pha_titre", 20.0, "g/L", strain="p-putida-kt2440")]
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
-    c = TestClient(api.app, base_url="http://127.0.0.1")
-    # PHA is archived (OF-BLD-016): its scenario is served with the switch on (OF-BLD-019 §2.3).
-    [sc] = [x for x in c.get("/api/proforma/scenarios?includeArchived=true").json() if x["id"] == "sc-pha-1"]
-    assert sc["id"] == "sc-pha-1" and sc["hosts"] == ["c-necator-h16", "p-putida-kt2440"]
-    assert set(sc["waiting"]) == {"yield", "content", "productivity", "recovery", "sugarPrice", "sugarFeed"}
-    narrowed = c.get("/api/proforma/scenarios?includeArchived=true&host=p-putida-kt2440").json()
-    assert next(x for x in narrowed if x["id"] == "sc-pha-1")["inputs"][0]["recordIds"] == ["k"]
-    r = c.post("/api/proforma/run", json={"scenarioId": "sc-pha-1"})
-    assert r.status_code == 422 and "wait for a source" in r.json()["detail"]
-    assert c.post("/api/proforma/run", json={"scenarioId": "sc-pha-1"}, headers={"Origin": "https://evil.example"}).status_code == 403
+    assert specs["productivity"] == {"kind": "uniform", "low": 1.0, "high": 3.0}
+    assert specs["yield"] == {"kind": "fixed", "value": pytest.approx(0.4)}
+    assert specs["glucose_price"] == {"kind": "uniform", "low": 0.3, "high": 0.5} and base["glucose_price"] == 0.4
+    assert kinds == {"titre": "record", "productivity": "record", "yield": "record", "glucose_price": "assumption"}
 
 
 # ── §8.R ───────────────────────────────────────────────────────────────
@@ -155,15 +99,10 @@ def test_r1_a_constant_input_has_no_rank_correlation():
 
     flat, rising = proforma._ranks(np.full(50, 0.3)), proforma._ranks(np.arange(50.0))
     assert proforma._spearman(flat, rising) is None
-    two_same = [rec("a", "pha_titre", 10.0, "g/L"), rec("b", "pha_titre", 10.0, "g/L")]
-    assert by_key(proforma.bind(two_same))["titre"].sampling == "fixed"
-    specs, _, _ = proforma._specs(proforma.basis_inputs(proforma.bind(two_same), None))
+    two_same = [rec("a", "ethanol_titre", 10.0, "g/L"), rec("b", "ethanol_titre", 10.0, "g/L")]
+    assert by_key(proforma.bind_inputs(ETHANOL, two_same))["titre"].sampling == "fixed"
+    specs, _, _ = proforma._specs(proforma.basis_inputs(proforma.bind_inputs(ETHANOL, two_same), None, ETHANOL))
     assert specs["titre"]["kind"] == "fixed"
-
-
-def test_r2_an_assumption_fills_an_input_whose_binding_stopped():
-    t = by_key(proforma.bind([rec("bad", "pha_titre", 1.0, "% CDW")], assumptions=[assume("titre", 50, 40, 60)]))["titre"]
-    assert t.binding == "assumption" and any("binding stopped" in f for f in t.flags)
 
 
 def test_r3_a_run_with_no_feasible_sample_makes_no_evidence():
@@ -219,7 +158,7 @@ def test_the_package_test_values_are_read_from_the_installed_file():
     assert {v.rtol for v in reg.values} == {0.05}
     assert all(v.label != v.expression and v.unit is not None for v in reg.values)
     assert [v.expression for v in _shelf.package_regression("cornstover_benchmark").values] == [e for e, _ in TEST_CORN]
-    assert _shelf.package_regression("pha_sugar_v0") is None and _shelf.package_regression("nowhere") is None
+    assert _shelf.package_regression(ETHANOL) is None and _shelf.package_regression("nowhere") is None
 
 
 def test_a_check_holds_as_numpy_allclose_holds_it():
@@ -247,7 +186,7 @@ def test_a_reference_not_yet_run_reads_as_none_and_starts_nothing(store):
     assert r["artifact"] is None and r["simulator"]["status"] == before
     assert r["flowsheet"]["id"] == "corn_drygrind" and r["regression"]["test"] == "test_corn"
     assert c.get("/api/proforma/reference/cornstover_benchmark").json()["regression"]["test"] == "test_cornstover"
-    for bad, said in (("pha_sugar_v0", "not a reference biorefinery"), ("toy", "STAND-IN for tests"),
+    for bad, said in ((ETHANOL, "not a reference biorefinery"), ("toy", "STAND-IN for tests"),
                       ("nowhere", "no flowsheet nowhere")):
         for r in (c.get(f"/api/proforma/reference/{bad}"), c.post(f"/api/proforma/reference/{bad}")):
             assert r.status_code == 404 and said in r.json()["detail"]
@@ -295,9 +234,7 @@ def test_the_corn_plant_runs_in_the_worker_and_reads_back_every_input(store):
     # once BioSTEAM is loaded); test_proforma_slow holds its numbers to the
     # package's test.
     proforma.start(background=False)
-    pha = {"titre": 50.0, "yield": 0.3, "content": 0.7, "productivity": 1.0, "recovery": 0.95, "sugarPrice": 0.4,
-           "sugarFeed": 10000.0}  # PLACEHOLDER inputs to exercise the PHA draft; no price here is a result
-    before = proforma.call("run", {"flowsheet": "pha_sugar_v0", "base": pha, "specs": {}, "samples": 0, "seed": 0})
+    before = proforma.call(*ETHANOL_RUN)
     art = proforma.run_reference("corn_drygrind")
     o = art.output
     corn = _shelf.SHELF["corn_drygrind"]
@@ -317,8 +254,8 @@ def test_the_corn_plant_runs_in_the_worker_and_reads_back_every_input(store):
     assert _shelf.TEST_QUANTITIES["units.get_cooling_duty()"][1] == t.utilities.coolingUnit
     assert _shelf.TEST_QUANTITIES["units.get_electricity_consumption()"][1] == t.utilities.electricityConsumptionUnit
     assert _shelf.TEST_QUANTITIES["units.get_electricity_production()"][1] == t.utilities.electricityProductionUnit
-    # The worker put back what it held: the PHA draft, built before, prices as it did.
-    after = proforma.call("run", {"flowsheet": "pha_sugar_v0", "base": pha, "specs": {}, "samples": 0, "seed": 0})
+    # The worker put back what it held: the ethanol flowsheet, built before, prices as it did.
+    after = proforma.call(*ETHANOL_RUN)
     assert after["base"] == before["base"] and after["tables"]["tea"] == before["tables"]["tea"]
 
 
@@ -358,11 +295,11 @@ def test_the_ethanol_flowsheet_converges_on_stand_in_assumptions(warm, store):
     from openferment_core import artifacts
 
     a = [assume(k, v, v, v, by="openFerment test fixture") for k, v in ETHANOL_STANDIN.items()]
-    art = proforma.run_flowsheet("ethanol_glucose_v0", a, samples=8, seed=1, scenario_id="sc-yeast-1")
+    art = proforma.run_flowsheet("ethanol_glucose_v0", a, samples=8, seed=1, scenario_id="sc-k3x9q-1")
     o = art.output
     assert art.provenance == "demo" and o["baseInfeasible"] is None and o["feasible"] == o["samples"] == 8
     assert o["basePrice"] > 0 and o["flowsheet"] == "ethanol_glucose_v0"
-    assert [i.value for i in art.inputs if i.name == "scenario"] == ["sc-yeast-1"]
+    assert [i.value for i in art.inputs if i.name == "scenario"] == ["sc-k3x9q-1"]
     t = proforma.tables_of(art)
     assert t.tea.teaClass == "ConventionalEthanolTEA" and t.tea.product == "ethanol" and t.tea.feedstock == "glucose"
     assert sum(line.perUnit for line in t.tea.lines) == pytest.approx(o["basePrice"], rel=1e-9)
@@ -405,10 +342,7 @@ def test_a_yield_above_the_theoretical_cannot_run_and_says_why(warm):
 # worker started for it alone gives, within the replay tolerance the tests
 # use (`replays_to_the_last_digits`).
 
-PHA_STANDIN = {"titre": 50.0, "yield": 0.3, "content": 0.7, "productivity": 1.0, "recovery": 0.95, "sugarPrice": 0.4,
-               "sugarFeed": 10000.0}  # PLACEHOLDER inputs to exercise the PHA draft; no price here is a result
 ETHANOL_RUN = ("run", {"flowsheet": "ethanol_glucose_v0", "base": ETHANOL_STANDIN, "specs": {}, "samples": 0, "seed": 0})
-PHA_RUN = ("run", {"flowsheet": "pha_sugar_v0", "base": PHA_STANDIN, "specs": {}, "samples": 0, "seed": 0})
 BENCHMARK_RUN = ("benchmark", {})
 CORN_RUN = ("reference", {"flowsheet": "corn_drygrind", "digits": proforma.REFERENCE_DIGITS})
 
@@ -431,10 +365,10 @@ def test_the_warm_worker_keeps_no_plants_settings():
 
     with ThreadPoolExecutor(3) as ex:
         ordered = ex.submit(in_a_worker_of_its_own, [ETHANOL_RUN, BENCHMARK_RUN, CORN_RUN, ETHANOL_RUN, BENCHMARK_RUN])
-        benchmark_first = ex.submit(in_a_worker_of_its_own, [BENCHMARK_RUN, PHA_RUN, ETHANOL_RUN])
+        benchmark_first = ex.submit(in_a_worker_of_its_own, [BENCHMARK_RUN, ETHANOL_RUN])
         corn_first = ex.submit(in_a_worker_of_its_own, [CORN_RUN, BENCHMARK_RUN, ETHANOL_RUN])
         ethanol, benchmark, corn, ethanol_again, benchmark_again = ordered.result()
-        fresh_benchmark, _pha, ethanol_built_last = benchmark_first.result()
+        fresh_benchmark, ethanol_built_last = benchmark_first.result()
         fresh_corn, benchmark_after_corn, ethanol_after_corn = corn_first.result()
     tol = {"rel": 1e-9, "abs": 1e-12}
     price = lambda r: r["base"]["pricePerKgEthanol"]  # noqa: E731
@@ -442,7 +376,7 @@ def test_the_warm_worker_keeps_no_plants_settings():
             "benchmark after the corn plant": benchmark_again["mespUsdPerGal"],
             "benchmark after the corn plant first": benchmark_after_corn["mespUsdPerGal"],
             "ethanol first": price(ethanol), "ethanol after the benchmark and corn": price(ethanol_again),
-            "ethanol built after the benchmark and PHA": price(ethanol_built_last)}
+            "ethanol built after the benchmark": price(ethanol_built_last)}
     # The benchmark, after the ethanol flowsheet built corn's chemicals, and
     # again after the corn plant ran, gives what a worker that ran nothing
     # before gives (finding 10; the corn plant's run reached it through the
@@ -457,8 +391,8 @@ def test_the_warm_worker_keeps_no_plants_settings():
     for expression, value in fresh_corn["measured"].items():
         assert corn["measured"][expression] == pytest.approx(value, **tol), expression
     # The ethanol flowsheet prices as it did first, once the benchmark and the
-    # corn plant ran (finding 0), and when built after them and PHA; its
-    # utility and capital lines with it.
+    # corn plant ran (finding 0), and when built after the benchmark alone;
+    # its utility and capital lines with it.
     assert price(ethanol_again) == pytest.approx(price(ethanol), **tol), seen
     assert price(ethanol_built_last) == pytest.approx(price(ethanol), **tol), seen
     assert price(ethanol_after_corn) == pytest.approx(price(ethanol), **tol), seen

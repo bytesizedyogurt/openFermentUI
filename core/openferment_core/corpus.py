@@ -56,13 +56,12 @@ class Corpus:
     records: list[dict[str, Any]]
     papers_by_id: dict[str, dict[str, Any]]
     records_by_id: dict[str, dict[str, Any]]
-    _bm25: BM25Okapi
+    _bm25: BM25Okapi | None
     _order: list[str]
     _tokens: dict[str, frozenset[str]]
-    # The programs (OF-BLD-016 §2.1, E.2′) as corpus.json carries them: id,
-    # name, thread letters, status and one line. `programs.py` resolves a
-    # paper's or a record's program from these; empty for a hand-built corpus.
-    programs: tuple[dict[str, Any], ...] = ()
+    # The product and strain catalogues a record may name.
+    products: tuple[dict[str, Any], ...] = ()
+    strains: tuple[dict[str, Any], ...] = ()
 
     def search(self, question: str, limit: int = 30) -> list[dict[str, Any]]:
         """The `limit` best-scoring records for a question, or nothing.
@@ -84,7 +83,7 @@ class Corpus:
         mean something: a two-word question legitimately matches on one term.
         """
         tokens = tokenize(question)
-        if not tokens:
+        if not tokens or self._bm25 is None:
             return []
         unique = set(tokens)
         scores = self._bm25.get_scores(tokens)
@@ -148,23 +147,22 @@ def _document(record: dict[str, Any], papers_by_id: dict[str, Any]) -> str:
 
 @lru_cache(maxsize=1)
 def load_corpus(path: str | None = None) -> Corpus:
-    """Load and index. Cached — the index is built once per process.
+    """Load and index.
 
-    Raises rather than returning an empty corpus when the file is missing. A
-    service that answers questions from nothing is worse than one that refuses
-    to start: the first is a wrong answer, the second is a message telling you
-    to run `pnpm export:corpus`.
+    alpha 2.0 deleted the TypeScript seed this file was projected from
+    (ADR-010): with no file the corpus is empty, and records arrive through
+    Intake, extraction and review (PostgreSQL from stage 2). A path, or a file
+    at DATA, is still read: tests write one.
     """
     target = Path(path) if path else DATA
-    if not target.exists():
-        raise FileNotFoundError(
-            f"{target} not found. Generate it with `pnpm export:corpus` from the "
-            "repository root — the corpus lives in TypeScript and this is a "
-            "projection of it."
-        )
-    raw = json.loads(target.read_text())
-    papers = raw["papers"]
-    records = raw["records"]
+    raw = json.loads(target.read_text()) if target.exists() else {}
+    return build_corpus(raw.get("papers") or [], raw.get("records") or [],
+                        products=raw.get("products") or [], strains=raw.get("strains") or [])
+
+
+def build_corpus(papers: list[dict[str, Any]], records: list[dict[str, Any]], *,
+                 products: list[dict[str, Any]] = (), strains: list[dict[str, Any]] = ()) -> Corpus:
+    """A corpus over these papers and records, indexed for search."""
     papers_by_id = {p["id"]: p for p in papers}
     records_by_id = {r["id"]: r for r in records}
 
@@ -176,12 +174,13 @@ def load_corpus(path: str | None = None) -> Corpus:
     order = [r["id"] for r in retrievable]
     docs = [tokenize(_document(r, papers_by_id)) for r in retrievable]
     return Corpus(
-        papers=papers,
-        records=records,
+        papers=list(papers),
+        records=list(records),
         papers_by_id=papers_by_id,
         records_by_id=records_by_id,
-        _bm25=BM25Okapi(docs),
+        _bm25=BM25Okapi(docs) if docs else None,
         _order=order,
         _tokens={rid: frozenset(doc) for rid, doc in zip(order, docs)},
-        programs=tuple(raw.get("programs") or ()),
+        products=tuple(products),
+        strains=tuple(strains),
     )

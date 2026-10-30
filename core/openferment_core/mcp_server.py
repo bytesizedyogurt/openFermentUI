@@ -11,10 +11,6 @@ is refused, and a refusal comes back as the tool's error.
 No tool here writes to BioRepo, to Guild's ledger or to any store a person
 signs.
 
-THE PROGRAM SWITCH (OF-BLD-016 §2.3). A client here is a model, and no model
-sets the switch: it is the server's, read from `OPENFERMENT_INCLUDE_ARCHIVED`
-(`1` or `true` shows archived programs; unset, the default, hides them) when
-the server is built, and every call runs with it in its tool context.
 `.mcp.json` at the repository root starts it:
 
     uv run --project core --all-extras python -m openferment_core.mcp_server
@@ -22,7 +18,6 @@ the server is built, and every call runs with it in its tool context.
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
@@ -33,12 +28,6 @@ from . import tools
 
 NAME = "openferment"
 EXTRA = ("ask_postdoc", "get_artifact")
-SWITCH_ENV = "OPENFERMENT_INCLUDE_ARCHIVED"
-
-
-def include_archived_from_env() -> bool:
-    """The server's program switch: off unless the environment turns it on."""
-    return os.environ.get(SWITCH_ENV, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 class _Raw(ArgModelBase):
@@ -50,11 +39,11 @@ class _Raw(ArgModelBase):
         return dict(self.model_extra or {})
 
 
-def _register(server: MCPServer, name: str, include_archived: bool = False) -> None:
+def _register(server: MCPServer, name: str) -> None:
     tool = tools.REGISTRY[name]
 
     def call(**arguments: Any) -> str:
-        result = tools.run(name, arguments, tools.ToolContext(include_archived=include_archived))
+        result = tools.run(name, arguments, tools.ToolContext())
         return result.model_dump_json(exclude_none=True)
 
     server.add_tool(call, name=name, description=tool.description, structured_output=False)
@@ -63,11 +52,10 @@ def _register(server: MCPServer, name: str, include_archived: bool = False) -> N
     registered.fn_metadata.arg_model = _Raw
 
 
-def build(include_archived: bool | None = None) -> MCPServer:
-    archived = include_archived_from_env() if include_archived is None else include_archived
+def build() -> MCPServer:
     server = MCPServer(NAME)
     for info in tools.infos():
-        _register(server, info.name, archived)
+        _register(server, info.name)
 
     @server.tool(name="ask_postdoc", description=(
         "Ask Postdoc a question. It runs its bounded loop over openFerment's tools and returns the plan: claims "
@@ -79,7 +67,7 @@ def build(include_archived: bool | None = None) -> MCPServer:
         # §10.R: a loop that cannot run declines in words, as over HTTP,
         # rather than surfacing as a protocol error.
         try:
-            return postdoc_agent.ask(question, ctx=tools.ToolContext(include_archived=archived)).model_dump_json()
+            return postdoc_agent.ask(question, ctx=tools.ToolContext()).model_dump_json()
         except Exception as e:
             return AnswerPlan(question=question, declined=f"Postdoc could not run: {e}").model_dump_json()
 

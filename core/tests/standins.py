@@ -9,9 +9,6 @@ then the tests that need a binding pool and a fast evaluator import this file.
 """
 from __future__ import annotations
 
-import itertools
-import json
-import math
 from pathlib import Path
 from typing import Any
 
@@ -84,45 +81,24 @@ def _bridge_fits() -> tuple[str, str]:
 PROFORMA_STANDIN = "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
 
 
-def _standin_records() -> list[dict[str, Any]]:
-    rows = [("pha_titre", "g L-1", (20.0, 45.0, 70.0)), ("pha_yield_substrate", "g g-1", (0.22, 0.3, 0.36)),
-            ("pha_content_cdw", "% CDW", (65.0, 80.0)), ("pha_productivity", "g L-1 h-1", (0.6, 1.4, 2.0))]
-    out = []
-    for field, unit, values in rows:
-        for n, v in enumerate(values):
-            out.append({"id": f"standin-{field}-{n}", "paperId": "P999", "field": field, "value": v, "unit": unit,
-                        "carbonSource": "glucose", "strainId": "c-necator-h16", "organismText": "STAND-IN organism",
-                        "provenance": "unverified", "status": "unverified", "primary": True})
-    return out
-
-
 def _standin_call(op: str, args: dict[str, Any]) -> Any:
     import itertools
 
     from scipy.stats import qmc
 
-    # OF-BLD-019 §2.3: the glucose-to-ethanol flowsheet has a closed form of
-    # its own; every other call is the PHA draft's, as before.
-    flowsheet = args.get("flowsheet") or "pha_sugar_v0"
-    # OF-BLD-020 §6.1: a vessel and a train, priced, answers as the ethanol
-    # flowsheet's closed form does, under its own output names (the stand-in
+    # OF-BLD-019 §2.3: every call names its flowsheet. The glucose-to-ethanol
+    # flowsheet has a closed form; a vessel and a train, priced (OF-BLD-020
+    # §6.1), answers as it does under its own output names (the stand-in
     # reads no structure: it builds nothing).
+    flowsheet = args["flowsheet"]
     composite = flowsheet == "custom_train_v1"
-    ethanol = flowsheet == "ethanol_glucose_v0" or composite
 
     def evaluate(v: dict[str, float]) -> dict[str, Any]:
         if composite:
             out = _standin_ethanol_evaluate(v)
             return {"pricePerKgProduct": out["pricePerKgEthanol"], "productKgPerH": out["ethanolKgPerH"],
                     "costLines": out["costLines"], "readBack": out["readBack"]}
-        if ethanol:
-            return _standin_ethanol_evaluate(v)
-        if v["yield"] / v["content"] > 0.5:
-            raise ValueError("carbon")
-        lines = {"media": v["sugarPrice"] / v["yield"] / v["recovery"], "utilities": 0.3 / v["productivity"],
-                 "labor": 0.1, "downstream": 2.0 / v["titre"], "other": 0.12, "capex": 4.0 / v["titre"] + 0.05}
-        return {"pricePerKgPha": sum(lines.values()), "phaKgPerH": v["sugarFeed"] * v["yield"] * v["recovery"],
-                "costLines": lines, "readBack": {"standIn": 1.0}}
+        return _standin_ethanol_evaluate(v)
 
     def attempt(v):
         try:
@@ -154,10 +130,10 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
                 if args.get("axes") else None)
         mc = _standin_call("montecarlo", {"flowsheet": flowsheet, "specs": args["specs"], "n": args["samples"],
                                           "seed": args["seed"], "base": args["base"]})
-        tables = _standin_ethanol_tables if ethanol else _standin_tables
         shaped = ({**base_out, "ethanolKgPerH": base_out["productKgPerH"]} if composite and base_out else base_out)
         return {"base": base_out, "baseInfeasible": base_infeasible,
-                "tables": tables(args["base"], shaped) if base_out else None, "grid": grid, "montecarlo": mc}
+                "tables": _standin_ethanol_tables(args["base"], shaped) if base_out else None, "grid": grid,
+                "montecarlo": mc}
     if op == "grid":
         keys = list(args["axes"])
         cells = []
@@ -174,84 +150,12 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
     return {"n": args["n"], "seed": args["seed"], "samples": samples}
 
 
-# The tables of a run (OF-BLD-019 §2.1) in the shape the worker writes, from
-# a closed form over the stand-in's inputs and cost lines: three units, six
-# streams, a TEA breakdown whose lines sum to the stand-in price. Every
-# number is invented and the tables say so in `tablesSource`.
+# The stand-in's operating hours a year, which its tables and its ethanol
+# closed form share. Invented, as every number here is; the tables say so in
+# `tablesSource`.
 STANDIN_HOURS = 8000.0
 
 
-def _standin_tables(v: dict[str, float], out: dict[str, Any]) -> dict[str, Any]:
-    from openferment_core.flowsheets.shelf import TABLE_UNITS
-
-    sugar, pha = v["sugarFeed"], v["sugarFeed"] * v["yield"]
-    water = pha / v["titre"] * 1000.0
-    cells = pha * (1 - v["content"]) / v["content"]
-    product = (pha + cells) * v["recovery"]
-    broth = sugar + water
-
-    def stream(sid, source, sink, flows, price=None):
-        return {"id": sid, "source": source, "sink": sink, "phase": "l", "T": 298.15, "P": 101325.0,
-                "massFlow": sum(flows.values()), "massFlows": flows, "price": price}
-
-    streams = [
-        stream("sugar", None, "R1", {"Glucose": sugar}, v["sugarPrice"]),
-        stream("process_water", None, "R1", {"Water": water}),
-        stream("broth", "R1", "C1", {"Water": water, "Glucose": sugar - pha - cells, "PHB": pha, "Cells": cells}),
-        stream("spent_medium", "C1", None, {"Water": water, "Glucose": sugar - pha - cells, "PHB": pha * (1 - v["recovery"]),
-                                            "Cells": cells * (1 - v["recovery"])}),
-        stream("wet_solids", "C1", "D1", {"PHB": pha * v["recovery"], "Cells": cells * v["recovery"]}),
-        stream("product", "D1", None, {"PHB": pha * v["recovery"], "Cells": cells * v["recovery"]}),
-    ]
-    lines_in = out["costLines"]
-    per = pha * v["recovery"] * STANDIN_HOURS
-    capital = lines_in["capex"] * per
-    units = []
-    for n, (uid, share, heat, cool, kw) in enumerate((("R1", 0.7, None, 9.0e6, 400.0), ("C1", 0.2, None, None, 90.0),
-                                                       ("D1", 0.1, 4.0e6, None, 170.0))):
-        installed = capital * 3.0 * share
-        units.append({"id": uid, "unitClass": "StandIn", "line": "STAND-IN unit", "order": n,
-                      "ins": [s["id"] for s in streams if s["sink"] == uid], "outs": [s["id"] for s in streams if s["source"] == uid],
-                      "installedCost": installed, "purchaseCost": installed / 2.0,
-                      "heatingDuty": heat, "coolingDuty": cool, "power": kw})
-    annual = {"feedstock": lines_in["media"] * per, "otherMaterials": 0.0,
-              "utilities": (lines_in["utilities"] + lines_in["downstream"]) * per,
-              "fixedOperating": (lines_in["labor"] + lines_in["other"]) * per, "capitalRecovery": capital}
-    words = {"feedstock": "Main feedstock", "otherMaterials": "Other materials", "utilities": "Utilities",
-             "fixedOperating": "Fixed operating, labour included", "capitalRecovery": "Capital recovery"}
-    sales = sum(annual.values())
-    installed_total = sum(u["installedCost"] for u in units)
-    tea = {
-        "teaClass": "StandIn", "product": "product", "feedstock": "sugar",
-        "productPrice": sales / (product * STANDIN_HOURS), "basisFlow": pha * v["recovery"],
-        "basis": "kg of PHA contained in dried cell mass", "operatingHours": STANDIN_HOURS, "sales": sales,
-        "materialCost": annual["feedstock"], "feedstockCost": annual["feedstock"], "otherMaterialCost": 0.0,
-        "utilityCost": annual["utilities"], "purchaseCost": installed_total / 2.0, "installedEquipmentCost": installed_total,
-        "FCI": installed_total, "TCI": installed_total, "FOC": annual["fixedOperating"], "laborCost": lines_in["labor"] * per,
-        "capitalRecovery": capital, "coproductCredits": 0.0, "IRR": None, "incomeTax": None,
-        "lines": [{"key": k, "label": words[k], "usdPerYear": a, "perUnit": a / per, "reads": PROFORMA_STANDIN}
-                  for k, a in annual.items()],
-    }
-    heating = sum(u["heatingDuty"] or 0.0 for u in units) / 1e6
-    cooling = sum(u["coolingDuty"] or 0.0 for u in units) / 1e6
-    power = sum(u["power"] or 0.0 for u in units) / 1e3
-    return {
-        "tablesSource": PROFORMA_STANDIN, "tea": tea, "streams": streams, "units": units,
-        "utilities": {"group": "STAND-IN units", "heating": heating, "heatingUnit": "GJ/hr", "cooling": cooling,
-                      "coolingUnit": "GJ/hr", "electricityConsumption": power, "electricityConsumptionUnit": "MW",
-                      "electricityProduction": 0.0, "electricityProductionUnit": "MW"},
-        "diagram": None,
-        "diagramNote": "STAND-IN: no flowsheet was simulated, so there is no diagram; the units are listed in order.",
-        "unitOrder": [u["id"] for u in units], "tableUnits": TABLE_UNITS,
-    }
-
-
-# A reference biorefinery's run (OF-BLD-019 §2.2) in the shape the worker's
-# `reference` op writes, from a closed form: three units, five streams, a
-# TEA whose lines sum to the stand-in price, the package test's quantities
-# read from those, and every default the shelf lists. Every number is
-# invented and the run says so in `simulator` and `tablesSource`; the
-# package test's values beside it are the installed file's, as a real run's.
 def _standin_reference(flowsheet: str) -> dict[str, Any]:
     from openferment_core.flowsheets import shelf as _shelf
     from openferment_core.flowsheets.shelf import TABLE_UNITS

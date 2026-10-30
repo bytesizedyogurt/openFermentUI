@@ -16,9 +16,9 @@
 // artifact through `runViewOfReference`, one case and no samples.
 import { useMemo, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
-import type { CostLine, FlowsheetInfo, ScenarioInput } from '@/data/types';
+import type { CostLine, FlowsheetInfo, ResultGrid, ScenarioInput } from '@/data/types';
 import { href } from '@/router';
-import { evaluateGrid, COST_LINES } from '@/engine/grids';
+import { clampPoint, interpolate, type Grid } from '@/engine/interp';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
 import { Card } from '@/components/ui';
@@ -289,7 +289,22 @@ export const SLIDER_LINE_LABEL: Record<CostLine, string> = {
   other: 'Other fixed operating cost',
 };
 
-/** Three inputs moved over the run's grid, with the interpolation the authored scenarios use. */
+/** The grid's cost lines, in the order the label table lists them. */
+const SLIDER_LINES = Object.keys(SLIDER_LINE_LABEL) as CostLine[];
+
+/**
+ * One point of the run's grid: each cost line interpolated between the cases
+ * the service simulated, and the price their sum, so the two never disagree.
+ * A line touching a case that could not run is NaN, and so is the price.
+ */
+function atPoint(grid: ResultGrid, point: Record<string, number>): { msp: number; costLines: Record<CostLine, number> } {
+  const [p] = clampPoint(grid.dims, point);
+  const asGrid = (data: Float64Array): Grid => ({ dims: grid.dims, data });
+  const costLines = Object.fromEntries(SLIDER_LINES.map((l) => [l, interpolate(asGrid(grid.costLines[l]), p)])) as Record<CostLine, number>;
+  return { msp: SLIDER_LINES.reduce((sum, l) => sum + costLines[l], 0), costLines };
+}
+
+/** Three inputs moved over the run's grid, interpolated between its cases (engine/interp). */
 export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunView; labels: Record<string, string>; priceBasis: string; scenarioId: string }) {
   const g = view.grid;
   const grid = useMemo(() => (g ? asResultGrid(scenarioId, g) : null), [g, scenarioId]);
@@ -297,7 +312,7 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
     Object.fromEntries((g?.dims ?? []).map((d) => [d.key, d.values[Math.floor(d.values.length / 2)]])),
   );
   if (!g || !grid) return null;
-  const r = evaluateGrid(grid, point);
+  const r = atPoint(grid, point);
   return (
     <Card className="p-4" data-testid="proforma-sliders">
       <h2 className="font-serif text-section-title font-semibold mb-1">Move three inputs over the run's grid</h2>
@@ -333,7 +348,7 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
       {Number.isFinite(r.msp) && (
         <table className="w-full text-caption mt-2">
           <tbody>
-            {COST_LINES.map((l) => (
+            {SLIDER_LINES.map((l) => (
               <tr key={l} className="border-t border-line/50">
                 <td className="py-0.5">{SLIDER_LINE_LABEL[l]}</td>
                 <td className="py-0.5 text-right font-num">{fmt(r.costLines[l], 3)}</td>

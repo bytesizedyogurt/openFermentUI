@@ -68,10 +68,7 @@ export async function loadPractice(signal?: AbortSignal): Promise<Practice | nul
   }
 }
 
-/** With the switch off (the default) the service drafts from no archived
- *  program's protocol; `includeArchived` sends the switch (OF-BLD-016 §2.R). */
-export const draftScenario = (r: PracticeDraftRequest, includeArchived = false) =>
-  call<PracticeScenario>(`/api/practice/draft${includeArchived ? '?includeArchived=true' : ''}`, r);
+export const draftScenario = (r: PracticeDraftRequest) => call<PracticeScenario>('/api/practice/draft', r);
 export const takeTurn = (r: PracticeTurnRequest) => call<PracticeSession>('/api/practice/turn', r);
 /** Ask the ledger again for a closed session it holds no entry for. */
 export const recordSession = (sessionId: string) => call<PracticeSession>('/api/practice/record', { sessionId });

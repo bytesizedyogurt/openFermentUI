@@ -98,7 +98,7 @@ def test_the_stream_cancels_its_question_when_the_reader_goes(monkeypatch):
 
     seen = {}
 
-    def fake(question, on_step=None, cancelled=None, history=None, include_archived=False):
+    def fake(question, on_step=None, cancelled=None, history=None):
         seen["cancelled"] = cancelled
         seen["history"] = history
         on_step(postdoc_agent.TraceStep(n=1, kind="tool", tool="t", input={}, summary="s", ms=0, ok=True))
@@ -155,8 +155,8 @@ def test_ask_batch_rounds_are_tool_rounds_of_the_answering_conversation(pool, tm
 def test_ask_batch_says_so_when_there_is_no_corpus(monkeypatch, capsys):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-stand-in")
     monkeypatch.setattr(ask_batch, "pool_or_none", lambda: None)
-    assert ask_batch.main(["docs/build/questions-pha.txt"]) == 2
-    assert "export:corpus" in capsys.readouterr().err
+    assert ask_batch.main(["questions.txt"]) == 2
+    assert "could not read the corpus" in capsys.readouterr().err
 
 
 # R9 — a gap is held to Rule 1 like a claim.

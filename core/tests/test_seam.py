@@ -160,13 +160,10 @@ def test_a_simulation_with_no_product_series_refuses_to_be_an_inlet_naming_what_
     assert "it keeps X, S, so its broth is no train's inlet" in words
     with pytest.raises(pureos.TrainRefused, match=r"the inlet: simulation c{16} keeps no product series \(P"):
         pureos.inlet_stream(sim_inlet(bare.id))
-    # A family whose product is a store inside the cells says so.
-    store_ = keep_copy(art, "d" * 16, family="storage_v1",
-                       series={"t": series["t"], "X": series["X"], "S": series["S"], "N": series["S"],
-                               "Q": series["X"]})
-    with pytest.raises(fermos.SimulationRefused, match=r"storage_v1 keeps its product as a store inside the cells "
-                                                        r"\(Q\), not in the broth; it keeps X, S, N, Q"):
-        fermos.harvest(store_.id)
+    # A family fermOS does not have says so, and names what the artifact keeps.
+    other = keep_copy(art, "d" * 16, family="nowhere_v1", series=series)
+    with pytest.raises(fermos.SimulationRefused, match=r"its family nowhere_v1 is none fermOS has; it keeps S, X, so"):
+        fermos.harvest(other.id)
 
 
 def test_a_series_that_cannot_be_read_and_another_artifact_are_refused_in_words(store):
@@ -242,8 +239,8 @@ def test_a_scenario_inlet_reads_its_newest_runs_broth_as_its_flowsheet_names_it(
     older_file = artifacts.folder() / f"{older.id}.json"
     older_file.write_text(older.model_copy(update={"createdAt": "2026-10-20T10:00:00Z"}).model_dump_json(),
                           encoding="utf-8")
-    newest = _keep()  # 2026-10-21, sc-yeast-1, ethanol_glucose_v0
-    spec = spec_of(inlet={"kind": "run-stream", "ref": "sc-yeast-1"})
+    newest = _keep()  # 2026-10-21, sc-k3x9q-1, ethanol_glucose_v0
+    spec = spec_of(inlet={"kind": "run-stream", "ref": "sc-k3x9q-1"})
     assert pureos.validate(spec) == []
     inlet = pureos.inlet_stream(spec)
     beer = next(s for s in STREAMS if s["id"] == shelf.SHELF["ethanol_glucose_v0"].brothStream)
@@ -253,19 +250,19 @@ def test_a_scenario_inlet_reads_its_newest_runs_broth_as_its_flowsheet_names_it(
     assert b["inlet"].source.id == newest.id and b["inlet stream"].value == "beer"
     assert b["inlet source"].value == "a scenario's newest run"
     assert ("the stream ethanol_glucose_v0 names as its broth, read from its shelf entry" in
-            b["inlet source"].source.note and f"the newest run of scenario sc-yeast-1" in b["inlet source"].source.note)
+            b["inlet source"].source.note and f"the newest run of scenario sc-k3x9q-1" in b["inlet source"].source.note)
     assert train_spec.chemicals_of(spec) == sorted(c for c, m in beer["massFlows"].items() if m > 0)
     # A stream the train names is taken instead, from the same newest run.
-    named = pureos.inlet_stream(spec_of(inlet={"kind": "run-stream", "ref": "sc-yeast-1", "streamId": "s1"}))
+    named = pureos.inlet_stream(spec_of(inlet={"kind": "run-stream", "ref": "sc-k3x9q-1", "streamId": "s1"}))
     assert named.read.streamId == "s1" and "as the train names it" in by_name(named.basis)["inlet source"].source.note
     # The run keeps what it read: the run, the stream and the source.
-    spec = spec_of(inlet={"kind": "run-stream", "ref": "sc-yeast-1"}, units=[
+    spec = spec_of(inlet={"kind": "run-stream", "ref": "sc-k3x9q-1"}, units=[
         {"id": "C1", "type": "centrifugation", "params": {"split.Ethanol": typed(0.05)}},
         {"id": "F1", "type": "flash", "params": {"P": typed(101325.0), "V": typed(0.1)},
          "outlets": {"vapour": "waste", "liquid": "onward"}}])
     run = pureos.run_train(spec)
     assert (run.inlet.ref, run.inlet.streamId, run.inlet.refTool) == (newest.id, "beer", "proforma.run")
-    assert run.spec.inlet.ref == "sc-yeast-1" and any("names as its broth" in n for n in run.inlet.notes)
+    assert run.spec.inlet.ref == "sc-k3x9q-1" and any("names as its broth" in n for n in run.inlet.notes)
     assert artifacts.replay(run.artifactId).identical
 
 

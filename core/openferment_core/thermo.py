@@ -324,8 +324,8 @@ _register_lazy()
 
 def props(req: ThermoPropsRequest, pool: Any = None) -> Artifact:
     """Answer the question, or return the answer stored for it. The pool
-    resolves a record id (the endpoint's reads archived programs too, since a
-    person names the record; a tool passes its own)."""
+    resolves a record id (the endpoint reads the whole pool, since a person
+    names the record; a tool passes its own)."""
     from . import artifacts
 
     inputs, records = basis_inputs(req, pool)

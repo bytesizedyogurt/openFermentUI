@@ -73,10 +73,10 @@ def check_key() -> Check:
 def check_corpus() -> Check:
     try:
         corpus = load_corpus()
-    except FileNotFoundError:
-        return Check("corpus", "fail", "the service has no corpus to answer from. Run: pnpm export:corpus")
-    except (ValueError, KeyError):
-        return Check("corpus", "fail", "the corpus projection is damaged. Run: pnpm export:corpus")
+    except (ValueError, KeyError) as e:
+        return Check("corpus", "fail", f"the corpus could not be read: {e}")
+    if not corpus.papers:
+        return Check("corpus", "ok", "empty: documents arrive through Intake")
     return Check("corpus", "ok", f"{len(corpus.records)} records on {len(corpus.papers)} papers")
 
 

@@ -126,8 +126,8 @@ class Usage(BaseModel):
 # in `module_stores.py` from the module's own word (a clearance state, a
 # runbook's status and lock, a check's state), never chosen by a model.
 ModuleState = Literal["open", "fenced", "approved", "locked", "proposed", "retired"]
-ModuleName = Literal["dominion", "runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild",
-                     "primer", "intake", "home"]
+ModuleName = Literal["runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild", "primer", "intake",
+                     "home"]
 
 
 class CoverageHit(BaseModel):
@@ -245,22 +245,6 @@ class ProposalAction(BaseModel):
     actingId: str | None = None
 
 
-class ArchivedCoverage(BaseModel):
-    """What the question names in one archived program, left out of the
-    sweep while archived programs are hidden (OF-BLD-016 §2.3, E.2′): the
-    trace says "found in archived program PHA (hidden)" and the plan carries a
-    gap naming the switch."""
-
-    # The program's id and its name, as src/data/programs.ts declares them.
-    program: str
-    name: str
-    # The question's own words that named it.
-    entities: list[str] = Field(default_factory=list)
-    # How many hidden rows the question names, and the modules they sit in.
-    count: int = 0
-    modules: list[ModuleName] = Field(default_factory=list)
-
-
 class CoverageMap(BaseModel):
     """The sweep, module by module, in the order the rail lists them."""
 
@@ -269,10 +253,6 @@ class CoverageMap(BaseModel):
     searched: int = 0
     found: int = 0
     modules: list[ModuleCoverage] = Field(default_factory=list)
-    # OF-BLD-016 §2.3: whether archived programs were swept (the browser's
-    # switch), and, when they were not, what the question names in them.
-    includeArchived: bool = False
-    archived: list[ArchivedCoverage] = Field(default_factory=list)
 
 
 class AnswerPlan(BaseModel):
@@ -352,29 +332,6 @@ class AskRequest(BaseModel):
     # The earlier turns of the same conversation, oldest first. The agent
     # reads the last few as context; `single` mode ignores them.
     history: list[PriorTurn] = Field(default_factory=list)
-    # OF-BLD-016 §2.3: the browser's "show archived programs" switch. Off,
-    # the evidence pool, the passages, the coverage pass and every read tool
-    # leave archived programs out. It rides in the tools' context from this
-    # request; no tool input carries it.
-    includeArchived: bool = False
-
-
-# ── Programs (OF-BLD-016 §2.1, E.1′, E.2′) ──────────────────────────────
-#
-# A program is data: the corpus threads that are its papers, a name, and
-# whether it is active or archived. Declared in src/data/programs.ts and
-# written into corpus.json and modules.json by `pnpm export:corpus`;
-# `programs.py` reads them. Mirrors `Program` in src/data/types.ts.
-
-ProgramStatus = Literal["active", "archived"]
-
-
-class Program(BaseModel):
-    id: str
-    name: str
-    letters: list[str]
-    status: ProgramStatus
-    summary: str
 
 
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
@@ -1523,10 +1480,6 @@ class ProformaRunRequest(BaseModel):
     # not on file, is another tool's, is damaged, or is of another program.
     vessel: str | None = None
     trainRun: str | None = None
-    # The program switch, for the parts a run names (§6.1): a vessel design
-    # or a train run of an archived program is refused unless it is on. A
-    # run's records bind whatever it says (a person opened the scenario).
-    includeArchived: bool = False
 
 
 class HistogramBin(BaseModel):
@@ -2446,7 +2399,6 @@ class ParamResolveRequest(BaseModel):
     fit: str | None = None
     startFrom: str | None = None
     durationPreset: Literal["until-sugar-runs-out", "fit-length"] | None = None
-    includeArchived: bool = False
     # pureOS's unit scope (OF-BLD-020 §5.1): the catalogue id of the unit's
     # type, when no train is sent; with a train it must agree with the unit's.
     unitType: str | None = None
@@ -2506,7 +2458,6 @@ class VesselRequest(BaseModel):
     # A person's changes, each a named assumption (D3), scope
     # `fermos:vessel:<simulation or fit id>`.
     overrides: list[Override] = Field(default_factory=list)
-    includeArchived: bool = False
 
 
 class VesselDesignRow(BaseModel):
@@ -2688,9 +2639,6 @@ class FamilyInfo(BaseModel):
     specs: list[ParameterSpec]
     # The panel's groups this family's specs fall into, in order.
     groups: list[str]
-    # The program the family is archived with (storage_v1: PHA), or None for
-    # a general one.
-    program: str | None = None
 
 
 class SimulationRequest(BaseModel):
@@ -2706,7 +2654,6 @@ class SimulationRequest(BaseModel):
     # `records`, `fit`, or `simulation:<artifact id>`.
     startFrom: str = "records"
     durationPreset: Literal["until-sugar-runs-out", "fit-length"] = "until-sugar-runs-out"
-    includeArchived: bool = False
     # A parameter bound to exactly these records of the evidence pool, by
     # spec key (OF-BLD-020 §3.4, D13): each must be in the pool, carry a
     # field the parameter binds from, pass the aggregate gate and convert
@@ -3148,7 +3095,6 @@ class TrainRunRequest(BaseModel):
     overrides: list[Override] = Field(default_factory=list)
     # The person an override that names nobody is by.
     by: str | None = None
-    includeArchived: bool = False
 
 
 class StreamImpurity(BaseModel):
@@ -3268,7 +3214,6 @@ class TrainFromRunRequest(BaseModel):
     artifactId: str
     # The id the train takes; by default `from-<artifact id>`.
     trainId: str | None = None
-    includeArchived: bool = False
 
 
 class TrainUnmapped(BaseModel):
@@ -3346,7 +3291,6 @@ class ProposeRequest(BaseModel):
     # A kept fermOS simulation's artifact id, or a kept run's id and one of its
     # streams as `<artifact id>/<stream id>`; none, and the inlet is typed.
     inletRef: str | None = None
-    includeArchived: bool = False
 
 
 class ProposalReason(BaseModel):

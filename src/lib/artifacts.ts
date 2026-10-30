@@ -6,9 +6,6 @@
 // the service's place (E.2).
 import type { Artifact, ReplayResult } from '@/data/types';
 import { START_COMMAND, postdocHealth } from './postdoc';
-import { isArchived, programOfPaperId } from '@/data/programs';
-import type { ProgramId } from '@/data/types';
-import { programOf, type ProgramLookup } from '@/store';
 
 export class ArtifactsDown extends Error {
   constructor(
@@ -60,50 +57,8 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   );
 }
 
-/**
- * What the service kept. It leaves out an artifact computed from an archived
- * program's inputs unless the program switch asks for them (OF-BLD-016 §2.R),
- * so the switch rides along; the browser filters again with `visibleArtifacts`.
- */
-export const listArtifacts = (signal?: AbortSignal, includeArchived = false) =>
-  call<Artifact[]>(`/api/biorepo/artifacts${includeArchived ? '?includeArchived=true' : ''}`, { signal });
-
-// A paper id inside a record's or a candidate's id: `r-B5-3`, `cl1-P12-…`.
-const PAPER_IN_ID = /(?:^|-)([A-Z]\d+)(?=-|$)/;
-
-/**
- * A computed artifact's program, from what its basis names: a record (by the
- * paper it cites, or the paper id a candidate's id carries), a product or a
- * strain (by their own field). An archived program among them wins, so a
- * value computed from casein or PHA inputs hides with them; anything else is
- * general (a benchmark, a fit of a deposition). The rule
- * `programs.program_of_artifact` applies in the service, read from the
- * browser's own lists.
- */
-export function programOfArtifact(a: Artifact, s: ProgramLookup = {}): ProgramId | null {
-  const found: ProgramId[] = [];
-  for (const i of a.inputs ?? []) {
-    if (i.source?.kind === 'record' && i.source.id) {
-      const m = PAPER_IN_ID.exec(i.source.id);
-      const p = programOf('record', i.source.id, s) ?? (m ? programOfPaperId(m[1]) : null);
-      if (p) found.push(p);
-    }
-    if (typeof i.value === 'string' && (i.name === 'product' || i.name === 'productId')) {
-      const p = programOf('product', i.value, s);
-      if (p) found.push(p);
-    }
-    if (typeof i.value === 'string' && (i.name === 'strain' || i.name === 'strainId' || i.name === 'host')) {
-      const p = programOf('strain', i.value, s);
-      if (p) found.push(p);
-    }
-  }
-  return found.find((p) => isArchived(p)) ?? found[0] ?? null;
-}
-
-/** The artifacts that show under the program switch. */
-export function visibleArtifacts(all: Artifact[], s: ProgramLookup & { showArchived: boolean }): Artifact[] {
-  return s.showArchived ? all : all.filter((a) => !isArchived(programOfArtifact(a, s)));
-}
+/** What the service kept. */
+export const listArtifacts = (signal?: AbortSignal) => call<Artifact[]>('/api/biorepo/artifacts', { signal });
 
 export const getArtifact = (id: string, signal?: AbortSignal) =>
   call<Artifact>(`/api/biorepo/artifacts/${encodeURIComponent(id)}`, { signal });

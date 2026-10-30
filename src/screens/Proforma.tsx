@@ -14,34 +14,24 @@
 //                   published biorefinery.
 //   Flowsheets      every other flowsheet on the shelf, with the inputs it
 //                   takes and New scenario from this.
-//   Scenarios       the programs' scenarios: the price of the newest run
+//   Scenarios       every BioSTEAM scenario: the price of the newest run
 //                   (read from its artifact) or "not run yet", how its
 //                   inputs stand, and pin.
 //
 // New scenario opens a chooser over the shelf (components/NewScenarioDialog)
 // and makes a `biosteam` scenario that opens on its page. NOTHING here is
 // disabled because a list is empty: an empty row says why and what fills it.
-//
-// PROGRAMS (OF-BLD-016 §2.2). The shelf is asked with the program switch
-// (`includeArchived`), and the scenarios, the pinned count and every card
-// read through the store's program filter: a scenario in an archived
-// program leaves the index while the switch is off, the index says whose,
-// and its link still opens it under the banner.
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, FlaskConical, GitCompare, LineChart, Pin, PinOff, Play, Plus } from 'lucide-react';
 import type { Artifact, FlowsheetInfo, ProformaScenarioInfo, Scenario } from '@/data/types';
-import { PROGRAMS, PROGRAM_BY_ID } from '@/data/programs';
-import { overridesFor, programOf, proformaScope, useProgramFilter, useStore } from '@/store';
+import { overridesFor, proformaScope, useStore } from '@/store';
 import { href } from '@/router';
-import { evaluateGrid } from '@/engine/grids';
 import { fmt } from '@/engine/units';
 import { PageHeader, Card, Button, LinkButton, cx, EmptyState } from '@/components/ui';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
-import { SubsystemReference, SubsystemShelf } from '@/components/ReferenceView';
-import { HiddenByArchive } from '@/components/HiddenByArchive';
+import { SubsystemShelf } from '@/components/ReferenceView';
 import { NewScenarioDialog, NoFlowsheetLine, inputSourceWords } from '@/components/NewScenarioDialog';
 import {
-  BENCHMARK_EXPECTED,
   BENCHMARK_FLOWSHEET,
   LEGACY_BENCHMARK_TOOL,
   ProformaDown,
@@ -69,8 +59,6 @@ const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e
 
 /** When an artifact was computed, as a date and a minute, in UTC as the service writes it (§3.R, finding 4). */
 const when = stamp;
-
-const programName = (id: string | null | undefined) => (id ? (PROGRAM_BY_ID[id as keyof typeof PROGRAM_BY_ID]?.name ?? id) : null);
 
 function Price({ price, provenance, testid }: { price: PriceRead; provenance: Artifact['provenance']; testid?: string }) {
   return (
@@ -136,7 +124,6 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
       </a>
       <p className="text-caption text-ink-soft mb-2">
         From <span className="font-num">{info.source}</span>
-        {info.program && <> · {programName(info.program)}</>}
         {info.packageTest && (
           <>
             {' '}
@@ -149,14 +136,6 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
       {state && !art && (
         <p className="text-body mb-2" data-testid="reference-not-run">
           Not run on this service yet.{' '}
-          {isBenchmark && (
-            <>
-              Expected: <span className="font-num">{BENCHMARK_EXPECTED.usdPerGal} USD per gallon</span> within{' '}
-              <span className="font-num">{BENCHMARK_EXPECTED.tolerance * 100} %</span> for{' '}
-              <span className="font-num">{BENCHMARK_EXPECTED.package}</span>, the price its package gives on its own
-              defaults.
-            </>
-          )}
           {state.note && <span className="block text-caption text-ink-soft mt-1">{state.note}</span>}
         </p>
       )}
@@ -176,16 +155,6 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
             <p className="text-caption font-num" data-testid="reference-within">
               {within} of {checks.length} values of <span className="font-num">{info.packageTest?.split('::').pop() ?? 'its package’s test'}</span> within
               the package&rsquo;s tolerance on this run.
-            </p>
-          )}
-          {bench && typeof bench.mespUsdPerGal === 'number' && (
-            <p className="text-caption text-ink-soft">
-              Expected <span className="font-num">{BENCHMARK_EXPECTED.usdPerGal}</span>, as this build measured it when Proforma was first built
-              on BioSTEAM; this run is{' '}
-              <span className="font-num">
-                {fmt(((bench.mespUsdPerGal - BENCHMARK_EXPECTED.usdPerGal) / BENCHMARK_EXPECTED.usdPerGal) * 100, 2)} %
-              </span>{' '}
-              from it.
             </p>
           )}
           <p className="text-caption text-ink-soft flex flex-wrap items-center gap-1.5">
@@ -242,7 +211,6 @@ function FlowsheetCard({ info, onNew }: { info: FlowsheetInfo; onNew: () => void
     <Card className="p-4 flex flex-col" data-testid="flowsheet-card" data-flowsheet={info.id}>
       <div className="flex items-start justify-between gap-2 mb-1">
         <span className="chip font-num">{info.id}</span>
-        {info.program && <span className="chip">{programName(info.program)}</span>}
       </div>
       <h3 className="font-serif text-section-title font-semibold leading-snug">{info.title}</h3>
       <p className="text-caption text-ink-soft mb-2">
@@ -297,7 +265,6 @@ function BiosteamCard({
   const overrides = useStore(overridesFor(proformaScope(scenario.id)));
   const fits = useStore((s) => s.proformaFits[scenario.id]);
   const madeHere = useStore((s) => s.createdScenarioIds.includes(scenario.id));
-  const showArchived = useStore((s) => s.showArchived);
   const [art, setArt] = useState<Artifact | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // The service's newest run of this scenario, made in any browser, by the
@@ -328,13 +295,13 @@ function BiosteamCard({
     // OF-BLD-020 §6.1: a scenario on custom_train_v1 binds with the vessel design and train run it names.
     proformaBind(
       flowsheetId,
-      { host: null, includeArchived: showArchived, fits: chosen, vessel: scenario.vessel ?? null, trainRun: scenario.trainRun ?? null },
+      { host: null, fits: chosen, vessel: scenario.vessel ?? null, trainRun: scenario.trainRun ?? null },
       ctrl.signal,
     )
       .then((b) => setMade({ info: b }))
       .catch(() => !ctrl.signal.aborted && setMade({ info: null }));
     return () => ctrl.abort();
-  }, [madeHere, info, flowsheetId, showArchived, fitsKey, scenario.vessel, scenario.trainRun]);
+  }, [madeHere, info, flowsheetId, fitsKey, scenario.vessel, scenario.trainRun]);
 
   useEffect(() => {
     setArt(null);
@@ -369,7 +336,6 @@ function BiosteamCard({
       </a>
       <p className="text-caption text-ink-soft mb-2">
         {flowsheet ? flowsheet.title : `Flowsheet ${flowsheetId}`}
-        {scenario.program && <> · {programName(scenario.program)}</>}
         {scenario.createdAt && (
           <>
             {' '}
@@ -411,63 +377,14 @@ function BiosteamCard({
   );
 }
 
-function AuthoredCard({ scenario }: { scenario: Scenario }) {
-  const grids = useStore((s) => s.grids);
-  const grid = grids[scenario.modelId];
-  const result = grid ? evaluateGrid(grid, scenario.point) : null;
-  const linked = scenario.assumptions.filter((a) => a.recordId).length;
-  return (
-    <Card className="p-4 flex flex-col">
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="chip font-num">{scenario.modelId}</span>
-        <PinButton scenario={scenario} />
-      </div>
-
-      <a href={`#/proforma/scenario/${scenario.id}`} className="font-serif text-section-title font-semibold hover:text-accent leading-snug">
-        {scenario.name}
-      </a>
-      <p className="text-body text-ink-soft mt-1 mb-3 flex-1">{scenario.description}</p>
-
-      <Tick p="demo" className="mb-3">
-        <div className="text-caption uppercase tracking-wide text-ink-soft">Minimum selling price</div>
-        <div className="font-num text-display leading-none">
-          {result ? `$${fmt(result.msp, 1)}` : '—'}
-          <span className="text-body text-ink-soft ml-1">/kg</span>
-        </div>
-        <div className="text-caption text-ink-soft mt-0.5">Cost model v0 — illustrative economics, not validated</div>
-      </Tick>
-
-      <div className="text-caption text-ink-soft space-y-0.5 mb-3">
-        <div>
-          Sweep: <span className="text-ink">{scenario.dims.map((d) => d.label).join(' × ')}</span>
-        </div>
-        <div className="font-num">
-          {linked} of {scenario.assumptions.length} assumptions linked to corpus records
-        </div>
-      </div>
-
-      <LinkButton to={`/proforma/scenario/${scenario.id}`} variant="primary" className="justify-center">
-        Open scenario
-      </LinkButton>
-    </Card>
-  );
-}
-
 // ── the index ───────────────────────────────────────────────────────────
 
 export default function Proforma() {
   const allScenarios = useStore((s) => s.scenarios);
   const createdIds = useStore((s) => s.createdScenarioIds);
-  const showArchived = useStore((s) => s.showArchived);
   const dialogOpen = useStore((s) => s.ui.newScenarioOpen);
   const setUI = useStore((s) => s.setUI);
-  const shows = useProgramFilter();
-  const scenarios = useMemo(() => allScenarios.filter((sc) => shows('scenario', sc.id)), [allScenarios, shows]);
-  const hidden = useMemo(() => allScenarios.filter((sc) => !shows('scenario', sc.id)), [allScenarios, shows]);
-  const hiddenPrograms = useMemo(() => {
-    const ids = new Set(hidden.map((sc) => programOf('scenario', sc.id, { scenarios: allScenarios })));
-    return PROGRAMS.filter((p) => ids.has(p.id));
-  }, [hidden, allScenarios]);
+  const scenarios = useMemo(() => allScenarios.filter((sc) => sc.kind === 'biosteam'), [allScenarios]);
 
   const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
   const [shelfProblem, setShelfProblem] = useState<string | null>(null);
@@ -477,26 +394,26 @@ export default function Proforma() {
   useEffect(() => {
     const ctrl = new AbortController();
     setShelfProblem(null);
-    proformaShelf(showArchived, ctrl.signal)
+    proformaShelf(ctrl.signal)
       .then(setShelf)
       .catch((e: unknown) => !ctrl.signal.aborted && setShelfProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [showArchived]);
+  }, []);
 
-  // The service binds the seed scenarios the switch shows (GET
-  // /api/proforma/scenarios, OF-BLD-019 §3.2's contract (b)); asked only
-  // when one of them is on the index.
-  const needsBinding = scenarios.some((sc) => sc.kind === 'biosteam' && !createdIds.includes(sc.id));
+  // The service binds the seed scenarios (GET /api/proforma/scenarios,
+  // OF-BLD-019 §3.2's contract (b)); asked only when one of them is on the
+  // index.
+  const needsBinding = scenarios.some((sc) => !createdIds.includes(sc.id));
   useEffect(() => {
     if (!needsBinding) return;
     const ctrl = new AbortController();
-    proformaScenarios({ host: null, includeArchived: showArchived }, ctrl.signal)
+    proformaScenarios({ host: null }, ctrl.signal)
       .then(setBound)
       .catch(() => {
         /* the cards count from the shelf instead */
       });
     return () => ctrl.abort();
-  }, [needsBinding, showArchived]);
+  }, [needsBinding]);
 
   // The dialog belongs to this page: leaving the page closes it, so it does
   // not reopen on the next visit. (StrictMode's rehearsal unmount leaves the
@@ -516,14 +433,6 @@ export default function Proforma() {
   const references = (shelf ?? []).filter((f) => f.reference);
   const flowsheets = (shelf ?? []).filter((f) => !f.reference);
   const pinnedCount = scenarios.filter((s) => s.pinned).length;
-  const hiddenLine =
-    hiddenPrograms.length > 0 ? (
-      <HiddenByArchive
-        subject={`${hidden.length} scenario${hidden.length === 1 ? '' : 's'} on file`}
-        plural={hidden.length !== 1}
-        programs={hiddenPrograms}
-      />
-    ) : null;
 
   return (
     <div>
@@ -561,7 +470,7 @@ export default function Proforma() {
           this installation comes to the plant as its authors built it.
         </p>
         {shelf && references.length === 0 && (
-          <p className="text-body text-ink-soft">The shelf holds no reference biorefinery for the programs showing.</p>
+          <p className="text-body text-ink-soft">The shelf holds no reference biorefinery.</p>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {references.map((f) => (
@@ -580,7 +489,7 @@ export default function Proforma() {
         </p>
         {shelf && flowsheets.length === 0 && (
           <p className="text-body">
-            <NoFlowsheetLine showArchived={showArchived} />
+            <NoFlowsheetLine />
           </p>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -596,13 +505,8 @@ export default function Proforma() {
         </h2>
         {scenarios.length === 0 ? (
           <EmptyState
-            title="No scenario in the programs showing yet"
-            body={
-              <span>
-                A scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens
-                it, with its inputs listed.{hiddenLine && <> {hiddenLine}</>}
-              </span>
-            }
+            title="No scenario yet"
+            body="A scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens it, with its inputs listed."
             icon={<LineChart size={28} />}
             action={
               <Button variant="primary" onClick={() => openDialog(null)}>
@@ -611,25 +515,13 @@ export default function Proforma() {
             }
           />
         ) : (
-          <>
-            {hiddenLine && <p className="text-caption text-ink-soft mb-3">{hiddenLine}</p>}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {scenarios.map((sc) =>
-                sc.kind === 'biosteam' ? (
-                  <BiosteamCard key={sc.id} scenario={sc} shelf={shelf ?? []} info={bound.find((b) => b.id === sc.id) ?? null} />
-                ) : (
-                  <AuthoredCard key={sc.id} scenario={sc} />
-                ),
-              )}
-            </div>
-          </>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {scenarios.map((sc) => (
+              <BiosteamCard key={sc.id} scenario={sc} shelf={shelf ?? []} info={bound.find((b) => b.id === sc.id) ?? null} />
+            ))}
+          </div>
         )}
       </section>
-
-      {/* §8.4 — Uncertainty is live, so its reference sits on this view, below its own line. */}
-      <div className="mt-8">
-        <SubsystemReference id="proforma.uncertainty" />
-      </div>
 
       <SubsystemShelf owner="Proforma" />
 

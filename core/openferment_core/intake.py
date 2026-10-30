@@ -38,7 +38,7 @@ caching of a miss, and the same refusal in fixture mode hold for both.
 Fixture mode (`OPENFERMENT_FIXTURES=1`) reads XML from `tests/fixtures/jats/`
 (and a report from `osti/<id>.pdf`, a strain entry from `sgd/<id>.json` beside
 it) and refuses the network. It exists so the parser and the persistence can
-be tested offline, and so §8.1's demo can replay the loop with no connection.
+be tested offline.
 """
 from __future__ import annotations
 
@@ -64,10 +64,9 @@ from .models import FetchedSection, FetchLicense, FetchResult, FetchSource, Inta
 EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 # Where the service keeps what it fetched, extracted and decided (§2.2), and
 # where fixture mode reads from. Both overridable by environment, read once
-# at import, so `pnpm demo:offline` can point a whole service at
-# tests/fixtures/demo/ and a scratch data directory without touching
-# core/data/biorepo.json — the committed file — or anything anyone fetched
-# for real (§8.1).
+# at import, so a whole service can be pointed at a fixture directory and a
+# scratch data directory without touching core/data/biorepo.json — the
+# committed file — or anything anyone fetched for real (§8.1).
 _CORE = Path(__file__).parent.parent
 
 

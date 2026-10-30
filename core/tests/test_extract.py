@@ -24,7 +24,7 @@ STRUCTURAL_PMCID = "structural"
 
 
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path):
+def _offline(monkeypatch, tmp_path, test_corpus):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
@@ -191,9 +191,9 @@ def test_a_truncated_response_is_refused_and_not_cached(monkeypatch):
 def test_extract_endpoint_answers_502_on_a_truncated_response(monkeypatch):
     client = TestClient(app)
     monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
-    client.post("/api/intake/B5/fetch")
+    client.post("/api/intake/T5/fetch")
     monkeypatch.setattr(extract, "call_model", stub_call({"candidates": [], "truncated": True}))
-    r = client.post("/api/intake/B5/extract")
+    r = client.post("/api/intake/T5/extract")
     assert r.status_code == 502 and "token limit" in r.json()["detail"]
 
 
@@ -214,7 +214,7 @@ def client():
 
 
 def test_extract_endpoint_refuses_without_full_text(client):
-    r = client.post("/api/intake/B5/extract")
+    r = client.post("/api/intake/T5/extract")
     assert r.status_code == 422
     assert "no cached full text" in r.json()["detail"]
     assert client.post("/api/intake/NOPE/extract").status_code == 404
@@ -222,21 +222,21 @@ def test_extract_endpoint_refuses_without_full_text(client):
 
 def test_extract_endpoint_returns_the_anchored_candidates(client, monkeypatch):
     monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
-    assert client.post("/api/intake/B5/fetch").json()["status"] == "complete"
+    assert client.post("/api/intake/T5/fetch").json()["status"] == "complete"
     monkeypatch.setattr(extract, "call_model", stub_call(GOOD_AND_BAD))
-    r = client.post("/api/intake/B5/extract")
+    r = client.post("/api/intake/T5/extract")
     assert r.status_code == 200, r.text
     body = ExtractResponse.model_validate(r.json())
-    assert body.paperId == "B5" and len(body.candidates) == 2 and body.rejected == 4
-    assert body.candidates[0].id == "cl1-B5-a07dd73c"
+    assert body.paperId == "T5" and len(body.candidates) == 2 and body.rejected == 4
+    assert body.candidates[0].id == "cl1-T5-276fbb61"
 
 
 def test_extract_endpoint_says_when_there_is_no_key(client, monkeypatch):
     monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
-    client.post("/api/intake/B5/fetch")
+    client.post("/api/intake/T5/fetch")
     # Fixture mode with no saved response behaves like the no-key case: 503
     # with the reason, never a candidate list invented to fill the gap.
-    r = client.post("/api/intake/B5/extract")
+    r = client.post("/api/intake/T5/extract")
     assert r.status_code == 503
     assert "saved response" in r.json()["detail"]
 
@@ -313,14 +313,14 @@ def test_a_range_the_model_states_reaches_the_anchored_candidate(monkeypatch):
 
 
 def test_an_absence_the_model_states_reaches_the_anchored_candidate(monkeypatch):
-    fetch_saying("R2", "s1", "The recombinant protein was not phosphorylated.")
+    fetch_saying("R2", "s1", "No secreted product was detected in the medium.")
     emitted = {
         "candidates": [
             {
-                "sectionId": "s1", "field": "phosphorylation_degree", "value": 0,
-                "unit": "% of native sites",
-                "quote": "The recombinant protein was not phosphorylated",
-                "negativeResult": True, "method": "undetermined",
+                "sectionId": "s1", "field": "titer_secreted", "value": 0,
+                "unit": "g/L",
+                "quote": "No secreted product was detected in the medium",
+                "negativeResult": True,
                 "isPrimary": True, "confidence": 0.9,
             }
         ]
@@ -355,11 +355,8 @@ def one_per_section(section_ids: list[str]) -> dict:
 
 
 def item_variants(tool: dict) -> list[dict]:
-    """The candidate schema's variants: one for the cell-mass fraction fields,
-    one for the rest (live test, 2026-10-16); a schema with no such fields
-    has one."""
-    items = tool["input_schema"]["properties"]["candidates"]["items"]
-    return items.get("anyOf", [items])
+    """The candidate schema, as the list of its one variant."""
+    return [tool["input_schema"]["properties"]["candidates"]["items"]]
 
 
 def sections_asked(tool: dict) -> list[str]:
@@ -460,21 +457,21 @@ def test_the_prompt_is_built_once_per_call(monkeypatch):
 # (OF-BLD-014 §2.1). The section is a fixture about an imaginary run; its
 # numbers are test values, not results.
 
-PHA_SECTION = (
-    "On glucose the imaginary strain accumulated poly(3-hydroxybutyrate) to 62 wt% of "
-    "the cell dry mass. Its specific growth rate was 0.41 h-1 in the batch phase."
+CULTURE_SECTION = (
+    "On glucose the imaginary strain reached an ethanol titre of 62 g/L at harvest. "
+    "Its specific growth rate was 0.41 h-1 in the batch phase."
 )
 
 
-def _pha_candidates(**over) -> dict:
+def _culture_candidates(**over) -> dict:
     base = [
-        {  # a polymer content written as wt%
-            "sectionId": "s1", "field": "pha_content_cdw", "value": 62, "unit": "wt%",
-            "quote": "accumulated poly(3-hydroxybutyrate) to 62 wt% of the cell dry mass",
-            "method": "GC", "isPrimary": True, "confidence": 0.9,
-            "organism": "imaginary strain", "carbonSource": over.get("content_carbon", "glucose"),
+        {  # a titre
+            "sectionId": "s1", "field": "ethanol_titre", "value": 62, "unit": "g/L",
+            "quote": "the imaginary strain reached an ethanol titre of 62 g/L at harvest",
+            "isPrimary": True, "confidence": 0.9,
+            "organism": "imaginary strain", "carbonSource": over.get("titre_carbon", "glucose"),
         },
-        {  # a growth rate the old algal ceiling refused
+        {  # a growth rate
             "sectionId": "s1", "field": "growth_rate_mu", "value": 0.41, "unit": "h-1",
             "quote": "Its specific growth rate was 0.41 h-1 in the batch phase",
             "isPrimary": True, "confidence": 0.9,
@@ -484,28 +481,9 @@ def _pha_candidates(**over) -> dict:
     return {"candidates": base}
 
 
-def test_a_pha_content_written_as_wt_percent_normalises_to_percent_cdw(monkeypatch):
-    fetch_saying("P1", "s1", PHA_SECTION)
-    monkeypatch.setattr(extract, "call_model", lambda *_: (_pha_candidates(), extract.Usage()))
-    result = extract.extract_paper("P1")
-    assert result.rejected == 0, result.rejectionDetails
-    content = next(c for c in result.candidates if c.field == "pha_content_cdw")
-    assert content.unit == "% CDW" and content.value == 62 and content.method == "GC"
-    assert content.si.unit == "% CDW" and content.si.value == 62
-
-
-def test_a_growth_rate_the_old_bound_refused_now_anchors(monkeypatch):
-    fetch_saying("P2", "s1", PHA_SECTION)
-    monkeypatch.setattr(extract, "call_model", lambda *_: (_pha_candidates(), extract.Usage()))
-    result = extract.extract_paper("P2")
-    assert result.rejectionReasons["range"] == 0, result.rejectionDetails
-    rate = next(c for c in result.candidates if c.field == "growth_rate_mu")
-    assert rate.value == 0.41 and rate.unit == "h⁻¹"
-
-
 def test_a_carbon_source_that_sits_in_the_section_is_kept(monkeypatch):
-    fetch_saying("P3", "s1", PHA_SECTION)
-    monkeypatch.setattr(extract, "call_model", lambda *_: (_pha_candidates(), extract.Usage()))
+    fetch_saying("P3", "s1", CULTURE_SECTION)
+    monkeypatch.setattr(extract, "call_model", lambda *_: (_culture_candidates(), extract.Usage()))
     result = extract.extract_paper("P3")
     assert [c.carbonSource for c in result.candidates] == ["glucose", "glucose"]
     assert result.fieldDrops == {"carbonSource": 0}
@@ -515,22 +493,22 @@ def test_a_carbon_source_that_sits_in_the_section_is_kept(monkeypatch):
 
 
 def test_a_carbon_source_absent_from_the_section_is_dropped_and_its_candidate_kept(monkeypatch):
-    fetch_saying("P4", "s1", PHA_SECTION)
-    raw = _pha_candidates(content_carbon="xylose")
+    fetch_saying("P4", "s1", CULTURE_SECTION)
+    raw = _culture_candidates(titre_carbon="xylose")
     monkeypatch.setattr(extract, "call_model", lambda *_: (raw, extract.Usage()))
     result = extract.extract_paper("P4")
     assert result.rejected == 0, "a dropped field is not a rejected candidate"
     assert len(result.candidates) == 2
-    content = next(c for c in result.candidates if c.field == "pha_content_cdw")
+    titre = next(c for c in result.candidates if c.field == "ethanol_titre")
     rate = next(c for c in result.candidates if c.field == "growth_rate_mu")
-    assert content.carbonSource is None, "xylose is not in the section; the field goes"
+    assert titre.carbonSource is None, "xylose is not in the section; the field goes"
     assert rate.carbonSource == "glucose", "the other candidate's is untouched"
     assert result.fieldDrops == {"carbonSource": 1}
     assert all(v == 0 for v in result.rejectionReasons.values())
 
 
 def test_the_tool_asks_for_the_carbon_source_in_the_papers_words():
-    tool = extract.build_tool(["s1"], ["pha_content_cdw"])
+    tool = extract.build_tool(["s1"], ["ethanol_titre"])
     items = item_variants(tool)[0]
     prop = items["properties"]["carbonSource"]
     assert prop["type"] == "string"

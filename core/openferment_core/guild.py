@@ -52,8 +52,10 @@ The rules, by name:
   policy      a check rate outside none to twelve a quarter
 
 Nothing is repaired on the way through. The skills, the protocol steps that
-need them and the lessons that count toward them live in TypeScript and
-arrive as skills.json, written by `pnpm export:corpus` beside the corpus.
+need them and the lessons that count toward them are read from skills.json;
+the authored catalogue it was exported from left with the seed (alpha 2.0,
+ADR-010), so with no file there are none, and the tests read a frozen
+fixture.
 """
 from __future__ import annotations
 
@@ -130,14 +132,17 @@ class GuildRefused(ValueError):
 # ── the projection ─────────────────────────────────────────────────────
 
 
+# alpha 2.0 deleted the TypeScript skills, protocols and lessons this file was
+# projected from (ADR-010): with no file a lab has defined no skill yet, and
+# the lists are empty until stage 2 keeps them as records. Tests write one.
+EMPTY_PROJECTION: dict[str, Any] = {"skills": [], "steps": [], "lessons": [], "protocols": []}
+
+
 @lru_cache(maxsize=1)
 def _projection(path: str) -> dict[str, Any]:
     target = Path(path)
     if not target.exists():
-        raise FileNotFoundError(
-            f"{target} not found. Generate it with `pnpm export:corpus` from the repository root; "
-            "the skills live in src/data/skills.ts and this is a projection of them."
-        )
+        return json.loads(json.dumps(EMPTY_PROJECTION))
     return json.loads(target.read_text(encoding="utf-8"))
 
 

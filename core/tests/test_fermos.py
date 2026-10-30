@@ -121,8 +121,8 @@ def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
     # No record binds here: a simulation's parameters come from what each
     # test types (test_fermos_bind holds the binding from records).
-    empty = SimpleNamespace(records=[], records_by_id={}, hidden={})
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: empty)
+    empty = SimpleNamespace(records=[], records_by_id={})
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: empty)
     return tmp_path
 
 
@@ -246,6 +246,7 @@ def test_the_forecast_endpoint_and_the_tool(store):
 
 from openferment_core import artifacts, kinetics  # noqa: E402
 from openferment_core.models import Override, SimulationRequest  # noqa: E402
+from test_fermos_bind import catalogue  # noqa: E402, F401  (the test strain catalogue fixture)
 
 BY = "openFerment test fixture"
 BATCH = "batch_v1"
@@ -380,7 +381,8 @@ def test_a_waiting_parameter_refuses_the_simulation_naming_it_and_its_field(stor
     assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
 
 
-def test_yps_is_set_beside_the_newest_stored_ceiling_and_flagged_above_it(store):
+def test_yps_is_set_beside_the_newest_stored_ceiling_and_flagged_above_it(store, catalogue):  # noqa: F811
+    # The strain's species is read from the test's own strain catalogue.
     import standins
     standins.standin_ceiling("Yeast9", "ethanol", "glucose", STANDIN_TYPED["yps"] * 0.9)
     req = SimulationRequest(family=BATCH, strain="s-cerevisiae-cenpk113-7d", product="ethanol", sugar="glucose",
@@ -408,11 +410,9 @@ def test_the_family_endpoints_and_the_simulation_endpoints(store):
     listed = c.get("/api/fermos/families")
     assert listed.status_code == 200
     ids = [f["id"] for f in listed.json()]
-    assert ids == ["batch_v1", "fedbatch_v1", "chemostat_v1", "light_v1"], "storage_v1 is archived with PHA"
-    assert "storage_v1" in [f["id"] for f in c.get("/api/fermos/families?includeArchived=true").json()]
+    assert ids == ["batch_v1", "fedbatch_v1", "chemostat_v1", "light_v1"]
     one = c.get("/api/fermos/families/batch_v1").json()
     assert one["groups"][0] == "Growth" and "dX/dt = μ·X − kd·X" in one["equations"] and not one["socket"]
-    assert c.get("/api/fermos/families/storage_v1").json()["program"] == "pha"
     missing = c.get("/api/fermos/families/nowhere_v1")
     assert missing.status_code == 404 and "there is no model family" in missing.json()["detail"]
     scope = c.get(f"/api/params/{SCOPE}")

@@ -5,7 +5,8 @@ BioSTEAM class, or one of three in-house `bst.Unit` subclasses BioSTEAM lacks
 (pureos/inhouse.py: ultrafiltration and diafiltration, cell disruption, a
 chromatography step), with every parameter its constructor takes either
 declared as a `ParameterSpec` or named in `notOffered` with why. An entry's
-id is the vocabulary's (src/data/vocabulary.ts `UNIT_OPERATIONS`); its stage
+id is the vocabulary's (schema/vocabulary.yaml `unitOperations`, read by
+`validate.unit_operations`); its stage
 is one of `STAGES`; `insOuts` says what each inlet and outlet is, in words,
 and which outlet goes on with the product by default.
 
@@ -41,7 +42,7 @@ keys and the reflux of a column, the evaporator's pressures, the number of
 extraction stages) waits for a record of its ontology field where Appendix 2
 §B names one, or a person. The ontology fields this step adds for that are
 `step_recovery`, `product_purity`, `partition_coefficient`,
-`sieving_coefficient` and `cake_moisture` (src/data/ontology.ts). Binding a
+`sieving_coefficient` and `cake_moisture` (schema/fields.yaml). Binding a
 record to a unit of a train, by the train's product and chemicals, is §5.2's
 (`kwargs_of` and `expand` are what its builder calls); here the specs say
 where a value would come from.
@@ -85,7 +86,7 @@ from ..models import (
 STAGES = ("harvest", "disruption", "clarification", "concentration", "capture", "polish", "formulation", "drying",
           "utility")
 # The chromatography placeholder's modes, as words, and the vocabulary id each
-# stands for (src/data/vocabulary.ts): `mode` maps them.
+# stands for (schema/vocabulary.yaml): `mode` maps them.
 MODES = ("iex", "hic", "imac", "affinity", "sec", "mixed-mode")
 MODE_VOCABULARY = {"iex": "iex", "hic": "hic", "imac": "imac", "affinity": "affinity-custom", "sec": "sec",
                    "mixed-mode": "mixed-mode"}

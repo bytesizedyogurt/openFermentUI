@@ -2,10 +2,14 @@
 no simulator.
 
 Every record and assumption here is a FIXTURE written in the test, the
-records on thread Q paper ids; none is a measurement and no price here is a
-result. The runs go through the real binding and artifact code over demo.py's
-closed-form STAND-IN evaluator. The flowsheet itself runs in
+records on placeholder paper ids; none is a measurement and no price here is
+a result. The runs go through the real binding and artifact code over the
+closed-form STAND-IN evaluator (standins.py). The flowsheet itself runs in
 `test_proforma.py` (marked `sim`) and `test_proforma_slow.py`.
+
+The seed's scenarios went with the seed (alpha 2.0, ADR-010), so the service
+holds none by its id; the rules a held scenario's run keeps are tested on one
+a fixture holds (`held`).
 """
 from __future__ import annotations
 
@@ -26,6 +30,7 @@ MODULE = CORE / "openferment_core" / "flowsheets" / "ethanol_glucose_v0.py"
 ETHANOL = "ethanol_glucose_v0"
 BY = "openFerment test fixture"
 MADE_HERE = "sc-k3x9q-1"  # an id as the browser's createScenario makes them
+HELD = "sc-held-1"  # a scenario the service holds by its id, as the `held` fixture holds it
 
 
 @pytest.fixture()
@@ -39,20 +44,27 @@ def standin(monkeypatch, store):
     """The STAND-IN evaluator in place of the worker, over the stand-in
     records of both flowsheets, as the double's fixtures are made."""
     monkeypatch.setattr(proforma, "call", standins._standin_call)
-    monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = standins._standin_records() + standins._standin_yeast_records()
+    rs = standins._standin_yeast_records()
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+
+
+@pytest.fixture()
+def held(monkeypatch):
+    """One scenario the service holds by its id, on the ethanol flowsheet."""
+    row = {"id": HELD, "name": "A held test scenario", "kind": "biosteam", "modelId": ETHANOL}
+    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [row])
+    return row
 
 
 @pytest.fixture()
 def client(monkeypatch, standin):
     from openferment_core import api, evidence_pool
 
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: standin)
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: standin)
     return TestClient(api.app, base_url="http://127.0.0.1")
 
 
-def rec(rid, field, value, unit, *, paper="Q7", carbon="glucose", strain=None, **kw):
+def rec(rid, field, value, unit, *, paper="T1", carbon="glucose", strain=None, **kw):
     return {"id": rid, "paperId": paper, "field": field, "value": value, "unit": unit, "carbonSource": carbon,
             "strainId": strain, "organismText": "Saccharomyces cerevisiae", "provenance": "unverified",
             "status": "unverified", "primary": True, **kw}
@@ -114,26 +126,17 @@ def test_the_shelf_entry_is_the_flowsheets_inputs():
     assert e.gridInputs == ["titre", "yield", "glucose_price"] and set(e.gridInputs) <= set(module)
 
 
-def test_the_seed_ships_one_yeast_scenario_on_the_flowsheet():
-    seeds = {s["id"]: s for s in proforma.seed_scenarios()}
-    assert seeds["sc-yeast-1"]["modelId"] == ETHANOL and seeds["sc-yeast-1"]["program"] == "yeast"
-    assert not seeds["sc-yeast-1"].get("example")
-    for s in seeds.values():
-        assert s["modelId"] in shelf.SHELF and not shelf.SHELF[s["modelId"]].reference
-
-
 # ── the binding ────────────────────────────────────────────────────────
 
 
-def test_thread_q_records_that_name_glucose_bind_and_the_rest_are_counted():
+def test_records_that_name_glucose_bind_and_the_rest_are_counted():
     rs = [
         rec("f1", "medium_component_conc", 20.0, "g/L"), rec("f2", "medium_component_conc", 100.0, "g/L"),
         rec("f3", "medium_component_conc", 60.0, "g/L"),
         rec("nocarbon", "medium_component_conc", 30.0, "g/L", carbon=None),
         rec("sucrose", "medium_component_conc", 30.0, "g/L", carbon="sucrose"),
-        rec("pha", "medium_component_conc", 30.0, "g/L", paper="P6"),
-        rec("casein", "medium_component_conc", 30.0, "g/L", paper="B5"),
         rec("estimate", "medium_component_conc", 30.0, "g/L", provenance="industry-estimate"),
+        rec("computed", "medium_component_conc", 30.0, "g/L", provenance="computed"),
         rec("rejected", "medium_component_conc", 30.0, "g/L", status="rejected"),
         rec("cites", "medium_component_conc", 30.0, "g/L", primary=False),
         rec("t", "ethanol_titre", 90.0, "g/L"),
@@ -167,26 +170,25 @@ def test_an_assumption_needs_a_named_person_and_a_host_narrows_the_binding():
     assert proforma.bound(ETHANOL, pool=pool).hosts == ["s-cerevisiae-cenpk113-7d"]
 
 
-# ── (b) the seed's scenarios, by the switch ────────────────────────────
+# ── (b) the scenarios the service holds ──────────────────────────────────
 
 
-def test_the_scenarios_endpoint_serves_the_seed_by_the_switch(client):
-    off = client.get("/api/proforma/scenarios").json()
-    assert [s["id"] for s in off] == ["sc-yeast-1"] == [s["id"] for s in client.get("/api/proforma/scenarios?includeArchived=false").json()]
-    yeast = off[0]
-    assert yeast["flowsheet"] == ETHANOL and yeast["name"] and yeast["product"] == "ethanol"
-    assert yeast["waiting"] == ["plant_scale", "glucose_price"] and yeast["priceBasis"] == shelf.ETHANOL_PRICE_BASIS
-    on = client.get("/api/proforma/scenarios?includeArchived=true").json()
-    assert {s["id"]: s["flowsheet"] for s in on} == {"sc-pha-1": "pha_sugar_v0", "sc-yeast-1": ETHANOL}
-    nobody = client.get("/api/proforma/scenarios?includeArchived=false&host=nobody").json()[0]
+def test_the_scenarios_endpoint_serves_the_scenarios_the_service_holds(client, monkeypatch):
+    assert client.get("/api/proforma/scenarios").json() == [], "the seed's scenarios went with the seed"
+    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [{"id": HELD, "name": "A held test scenario", "kind": "biosteam",
+                                                             "modelId": ETHANOL}])
+    [held] = client.get("/api/proforma/scenarios").json()
+    assert held["id"] == HELD and held["flowsheet"] == ETHANOL and held["name"] and held["product"] == "ethanol"
+    assert held["waiting"] == ["plant_scale", "glucose_price"] and held["priceBasis"] == shelf.ETHANOL_PRICE_BASIS
+    nobody = client.get("/api/proforma/scenarios?host=nobody").json()[0]
     assert nobody["waiting"] == ["feed_glucose_conc", "titre", "yield", "productivity", "plant_scale", "glucose_price"]
 
 
 # ── (c) a flowsheet bound, as a scenario made here shows it ────────────
 
 
-def test_the_bind_endpoint_binds_a_flowsheet_and_refuses_in_words(client):
-    r = client.get(f"/api/proforma/bind?flowsheet={ETHANOL}&includeArchived=false")
+def test_the_bind_endpoint_binds_a_flowsheet_and_refuses_in_words(client, held):
+    r = client.get(f"/api/proforma/bind?flowsheet={ETHANOL}")
     assert r.status_code == 200
     b = r.json()
     assert b["id"] == "" and b["name"] == "" and b["flowsheet"] == ETHANOL and b["waiting"] == ["plant_scale", "glucose_price"]
@@ -195,10 +197,6 @@ def test_the_bind_endpoint_binds_a_flowsheet_and_refuses_in_words(client):
                        ("nowhere", "there is no flowsheet nowhere")):
         r = client.get(f"/api/proforma/bind?flowsheet={fid}")
         assert r.status_code == 422 and words in r.json()["detail"]
-    off = client.get("/api/proforma/bind?flowsheet=pha_sugar_v0")
-    assert off.status_code == 422 and "archived program PHA" in off.json()["detail"] and "Settings → Programs" in off.json()["detail"]
-    on = client.get("/api/proforma/bind?flowsheet=pha_sugar_v0&includeArchived=true").json()
-    assert on["id"] == "" and on["flowsheet"] == "pha_sugar_v0" and set(on["waiting"]) == {"recovery", "sugarPrice", "sugarFeed"}
     narrowed = client.get(f"/api/proforma/bind?flowsheet={ETHANOL}&host=nobody").json()
     assert "titre" in narrowed["waiting"]
 
@@ -206,7 +204,7 @@ def test_the_bind_endpoint_binds_a_flowsheet_and_refuses_in_words(client):
 # ── (d) a run: a seed scenario by its id, a made one by its flowsheet ──
 
 
-def test_a_scenario_made_here_runs_its_flowsheet_bound_as_bind_binds_it(standin):
+def test_a_scenario_made_here_runs_its_flowsheet_bound_as_bind_binds_it(standin, held):
     r = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, samples=20),
                      pool=standin)
     assert r.scenarioId == MADE_HERE and r.flowsheet == ETHANOL and r.provenance == "demo" and r.samples == 20
@@ -214,19 +212,19 @@ def test_a_scenario_made_here_runs_its_flowsheet_bound_as_bind_binds_it(standin)
     assert r.priceBasis == shelf.ETHANOL_PRICE_BASIS and r.leavesOut == shelf.ETHANOL_LEAVES_OUT
     assert r.tea is not None and sum(line.perUnit for line in r.tea.lines) == pytest.approx(r.basePrice, rel=1e-12)
     assert len(r.grid.msp) == 125 and r.evidence.unit == shelf.ETHANOL_PRICE_BASIS and MADE_HERE in r.evidence.label
-    seeded = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=ASSUMED, samples=20), pool=standin)
-    assert seeded.artifactId != r.artifactId and seeded.quantiles == r.quantiles  # the same case, two scenarios' runs
+    kept = proforma.run(ProformaRunRequest(scenarioId=HELD, assumptions=ASSUMED, samples=20), pool=standin)
+    assert kept.artifactId != r.artifactId and kept.quantiles == r.quantiles  # the same case, two scenarios' runs
 
 
-def test_every_other_run_is_refused_in_words(standin, client):
+def test_every_other_run_is_refused_in_words(standin, client, held):
     cases = [
         ({"scenarioId": MADE_HERE}, f"there is no seed scenario {MADE_HERE}"),
         ({"scenarioId": MADE_HERE, "flowsheet": "cornstover_benchmark"}, "reference biorefinery"),
         ({"scenarioId": MADE_HERE, "flowsheet": "toy"}, "STAND-IN for tests"),
         ({"scenarioId": MADE_HERE, "flowsheet": "nowhere"}, "there is no flowsheet nowhere"),
-        ({"scenarioId": "sc-yeast-1", "flowsheet": "pha_sugar_v0"}, "sc-yeast-1 runs ethanol_glucose_v0, not pha_sugar_v0"),
+        ({"scenarioId": HELD, "flowsheet": shelf.COMPOSITE}, f"{HELD} runs ethanol_glucose_v0, not {shelf.COMPOSITE}"),
         ({"scenarioId": " ", "flowsheet": ETHANOL}, "names the scenario it belongs to"),
-        ({"scenarioId": "sc-yeast-1"}, "wait for a source, a record or a named person's assumption: plant_scale, glucose_price"),
+        ({"scenarioId": HELD}, "wait for a source, a record or a named person's assumption: plant_scale, glucose_price"),
         ({"scenarioId": MADE_HERE, "flowsheet": ETHANOL}, "plant_scale, glucose_price"),
     ]
     for body, words in cases:
@@ -234,30 +232,26 @@ def test_every_other_run_is_refused_in_words(standin, client):
             proforma.run(ProformaRunRequest(**body), pool=standin)
         r = client.post("/api/proforma/run", json=body)
         assert r.status_code == 422 and words in r.json()["detail"], (body, r.json())
-    # A seed scenario may name its own flowsheet.
-    ok = client.post("/api/proforma/run", json={"scenarioId": "sc-yeast-1", "flowsheet": ETHANOL, "samples": 8,
+    # A held scenario may name its own flowsheet.
+    ok = client.post("/api/proforma/run", json={"scenarioId": HELD, "flowsheet": ETHANOL, "samples": 8,
                                                 "assumptions": [a.model_dump() for a in ASSUMED]})
-    assert ok.status_code == 200 and ok.json()["scenarioId"] == "sc-yeast-1"
+    assert ok.status_code == 200 and ok.json()["scenarioId"] == HELD
 
 
 # ── (e) the basis names the scenario, and leaves the provenance be ─────
 
 
-def test_every_run_names_its_scenario_in_the_basis_as_a_convention(standin):
-    for sid, req in (("sc-yeast-1", {"assumptions": ASSUMED}),
+def test_every_run_names_its_scenario_in_the_basis_as_a_convention(standin, held):
+    for sid, req in ((HELD, {"assumptions": ASSUMED}),
                      (MADE_HERE, {"flowsheet": ETHANOL, "assumptions": ASSUMED})):
         art = artifacts.get(proforma.run(ProformaRunRequest(scenarioId=sid, samples=8, **req), pool=standin).artifactId)
         named = [i for i in art.inputs if i.name == "scenario"]
         assert len(named) == 1 and named[0].value == sid and named[0].source.kind == "convention"
-    pha = [InputAssumption(key=k, value=v, low=v, high=v, by=BY, at="2026-10-20")
-           for k, v in (("recovery", 0.95), ("sugarPrice", 0.4), ("sugarFeed", 10000.0))]
-    art = artifacts.get(proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", assumptions=pha, samples=8), pool=standin).artifactId)
-    assert [i.value for i in art.inputs if i.name == "scenario"] == ["sc-pha-1"]
 
 
 def test_the_scenario_input_leaves_the_provenance_as_it_was():
     record = BasisInput(name="titre record", value=1.0, unit="g L-1", source=BasisSource(kind="record", id="r1"))
-    scenario = proforma.basis_inputs([], None, ETHANOL, 8, scenario_id="sc-yeast-1")
+    scenario = proforma.basis_inputs([], None, ETHANOL, 8, scenario_id=MADE_HERE)
     [named] = [i for i in scenario if i.name == "scenario"]
     for prov in ("verified", "unverified", "gold"):
         def of(inputs):
@@ -277,12 +271,12 @@ def test_the_basis_names_the_packages_and_the_conventions():
     assert named["ethanol purity"].value == "fuel grade"
 
 
-def test_the_latest_run_and_its_evidence_follow_the_scenario(standin):
-    yeast = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=ASSUMED, samples=8), pool=standin)
-    assert proforma.latest_run("sc-pha-1") is None and proforma.latest_run(MADE_HERE) is None
-    assert proforma.latest_run("sc-yeast-1").id == yeast.artifactId
-    ev = proforma.evidence_of(artifacts.get(yeast.artifactId))
-    assert "sc-yeast-1" in ev.label and ev.unit == shelf.ETHANOL_PRICE_BASIS
+def test_the_latest_run_and_its_evidence_follow_the_scenario(standin, held):
+    kept = proforma.run(ProformaRunRequest(scenarioId=HELD, assumptions=ASSUMED, samples=8), pool=standin)
+    assert proforma.latest_run("sc-nowhere") is None and proforma.latest_run(MADE_HERE) is None
+    assert proforma.latest_run(HELD).id == kept.artifactId
+    ev = proforma.evidence_of(artifacts.get(kept.artifactId))
+    assert HELD in ev.label and ev.unit == shelf.ETHANOL_PRICE_BASIS
 
 
 # ── the Phase 2 review (OF-BLD-019 §2.R), offline ──────────────────────
@@ -295,7 +289,7 @@ def test_every_run_names_the_utility_prices_and_cost_index_it_priced_on():
     # §2.R, review 1: the run's utilities and every equipment cost rest on
     # BioSTEAM's utility prices and plant cost index; the basis names them,
     # BioSTEAM's own defaults set for every case, and the run reads them back.
-    for flowsheet in (ETHANOL, "pha_sugar_v0"):
+    for flowsheet in (ETHANOL, shelf.COMPOSITE):
         named = {i.name: i for i in proforma.basis_inputs([], None, flowsheet, 8)}
         u = named["utility prices and cost index"]
         assert u.source.kind == "model" and u.source.id.startswith("biosteam@"), flowsheet
@@ -323,25 +317,13 @@ def test_a_run_with_no_sample_the_flowsheet_holds_says_why_and_names_its_run(sta
     assert r.status_code == 422 and kept.id in r.json()["detail"] and "yield: 4 of 4" in r.json()["detail"]
 
 
-def test_an_authored_seed_scenario_is_not_a_scenario_made_here(standin, client):
-    # §2.R, review 4: sc-s1 is the seed's authored casein example; a run of
-    # it on a shelf flowsheet would file an ethanol train under it.
-    for body in ({"scenarioId": "sc-s1", "flowsheet": ETHANOL}, {"scenarioId": "sc-s1"}):
-        with pytest.raises(proforma.ScenarioRefused, match="sc-s1 is an authored scenario"):
-            proforma.run(ProformaRunRequest(**body, assumptions=ASSUMED), pool=standin)
-        r = client.post("/api/proforma/run", json={**body, "assumptions": [a.model_dump() for a in ASSUMED]})
-        assert r.status_code == 422 and "sc-s1 is an authored scenario" in r.json()["detail"]
-        assert "there is no seed scenario sc-s1" not in r.json()["detail"]
-    assert not [a for a in artifacts.all_artifacts() if a.tool == proforma.RUN]
-
-
 def test_a_number_that_is_not_finite_and_a_negative_seed_are_refused_in_words(standin, client):
     # §2.R, review 5: both were a 500 (the infinite assumption reached the
     # artifact's canonical JSON; the negative seed reached the sampler).
     for field in ("value", "low", "high"):
         a = {"key": "plant_scale", "value": 100000.0, "low": 100000.0, "high": 100000.0, "by": BY, "at": "2026-10-20"}
         a[field] = "INF"
-        body = ('{"scenarioId": "sc-yeast-1", "samples": 4, "assumptions": ['
+        body = (f'{{"scenarioId": "{MADE_HERE}", "flowsheet": "{ETHANOL}", "samples": 4, "assumptions": ['
                 + ", ".join(__import__("json").dumps(x) for x in (a, ASSUMED[1].model_dump()))
                 + "]}").replace('"INF"', "Infinity")
         r = client.post("/api/proforma/run", content=body, headers={"Content-Type": "application/json"})
@@ -350,7 +332,7 @@ def test_a_number_that_is_not_finite_and_a_negative_seed_are_refused_in_words(st
     real = proforma.call
     proforma.call = lambda op, args: called.append(op) or real(op, args)
     try:
-        r = client.post("/api/proforma/run", json={"scenarioId": "sc-yeast-1", "seed": -1, "samples": 4,
+        r = client.post("/api/proforma/run", json={"scenarioId": MADE_HERE, "flowsheet": ETHANOL, "seed": -1, "samples": 4,
                                                    "assumptions": [a.model_dump() for a in ASSUMED]})
     finally:
         proforma.call = real

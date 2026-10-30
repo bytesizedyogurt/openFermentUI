@@ -29,7 +29,6 @@ export type Eleven =
   | 'pureOS'
   | 'Proforma'
   | 'Runbooks'
-  | 'Dominion'
   | 'Primer'
   | 'Guild';
 
@@ -38,7 +37,6 @@ export type ComponentLayer =
   | 'Evidence in'
   | 'Computing'
   | 'Keeping it honest'
-  | 'Patents'
   | 'People and permissions'
   | 'Assay';
 
@@ -83,10 +81,6 @@ export const LAYERS: { id: ComponentLayer; blurb: string }[] = [
   {
     id: 'Keeping it honest',
     blurb: 'The components whose job is to refuse. Nothing in this layer produces an answer; everything in it decides whether an answer may be used.',
-  },
-  {
-    id: 'Patents',
-    blurb: 'Whether you are allowed to build it, and whether somebody else already owns the idea. Research leads, never legal opinions.',
   },
   {
     id: 'People and permissions',
@@ -210,7 +204,6 @@ export const COMPONENTS: ComponentDef[] = [
       'src/screens/ProformaScenario.tsx',
       'src/screens/ProformaBiosteam.tsx',
       'src/screens/ProformaReference.tsx',
-      'src/engine/grids.ts',
       'src/engine/interp.ts',
       'core/openferment_core/proforma.py',
       'core/openferment_core/flowsheets/',
@@ -267,46 +260,6 @@ export const COMPONENTS: ComponentDef[] = [
     role: 'Timestamping and attestation',
   },
   {
-    name: 'Claim Workbench',
-    owner: 'Dominion',
-    layer: 'Patents',
-    livesIn: [],
-    surfacedAs: null,
-    role: 'Claim drafting and analysis',
-  },
-  {
-    name: 'Priority Engine',
-    owner: 'Dominion',
-    layer: 'Patents',
-    livesIn: [],
-    surfacedAs: null,
-    role: 'Priority and filing strategy',
-  },
-  {
-    name: 'Clearance',
-    owner: 'Dominion',
-    layer: 'Patents',
-    livesIn: ['src/engine/clearance.ts', 'src/data/clearanceFindings.ts', 'src/components/Clearance.tsx'],
-    surfacedAs: 'a Dominion tab, /dominion/clearance',
-    role: 'Freedom to operate, per jurisdiction',
-  },
-  {
-    name: 'Enablement',
-    owner: 'Dominion',
-    layer: 'Patents',
-    livesIn: [],
-    surfacedAs: null,
-    role: 'Enablement and written description',
-  },
-  {
-    name: 'Notary',
-    owner: 'Dominion',
-    layer: 'Patents',
-    livesIn: [],
-    surfacedAs: null,
-    role: 'Inventorship and conception records',
-  },
-  {
     name: 'Guild',
     owner: 'Guild',
     layer: 'People and permissions',
@@ -329,7 +282,7 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Runbook',
     owner: 'Runbooks',
     layer: 'Assay',
-    livesIn: ['src/screens/Runbooks.tsx', 'src/data/runbooks.ts', 'src/screens/RunbookLedger.tsx', 'src/engine/ledger.ts'],
+    livesIn: ['src/screens/Runbooks.tsx', 'src/screens/RunbookLedger.tsx', 'src/engine/ledger.ts'],
     surfacedAs: 'the rail, /runbooks',
     role: 'The outbound falsifiable claim',
   },

@@ -46,24 +46,16 @@ export type Provenance =
 
 export type ParameterFamily =
   | 'expression'
-  | 'ptm'
-  | 'functional'
   | 'cultivation'
   | 'downstream'
-  // OF-BLD-014 §2.1 — thread P's polyhydroxyalkanoates.
-  | 'polymer'
-  // The yeast-ethanol program (thread Q): growth, product and price kinetics.
   | 'kinetics';
 
 /**
- * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — the
- * polymer family OF-BLD-014 §2.1 adds, and the kinetics family the
- * yeast-ethanol program (thread Q) adds, with the oxygen and maintenance fields
- * fermOS's simulations read (OF-BLD-020 §3.2) and the downstream fields
- * pureOS's unit catalogue reads (§5.1): forty-nine fields in seven.
+ * The record fields (`core/openferment_core/schema/fields.yaml`, mirrored in
+ * data/ontology.ts): thirty-four fields in four families.
  */
 export type FieldId =
-  // Family 1 — expression performance
+  // Expression performance
   | 'expression_pct_tsp'
   | 'titer_intracellular'
   | 'titer_secreted'
@@ -71,40 +63,21 @@ export type FieldId =
   | 'fold_improvement'
   | 'transformation_efficiency'
   | 'time_to_colony'
-  // Family 2 — post-translational modification
-  | 'phosphate_count'
-  | 'phosphorylation_degree'
-  | 'phospho_site_position'
-  | 'glycan_species'
-  | 'kinase_identity'
-  // Family 3 — functional performance
-  | 'micelle_diameter'
-  | 'micellar_fraction'
-  | 'gelation_ph'
-  | 'calcium_binding'
-  | 'melt_stretch_length'
-  // Family 4 — cultivation
+  // Cultivation
   | 'growth_rate_mu'
   | 'final_biomass_density'
   | 'volumetric_productivity'
   | 'medium_component_conc'
-  // Family 5 — downstream and economics
+  // Downstream & economics
   | 'disruption_protein_yield'
   | 'disruption_energy'
   | 'minimum_selling_price'
-  // OF-BLD-020 §5.1: what pureOS's unit catalogue binds
   | 'step_recovery'
   | 'product_purity'
   | 'partition_coefficient'
   | 'sieving_coefficient'
   | 'cake_moisture'
-  // Family 6 — polymer (OF-BLD-014 §2.1)
-  | 'pha_content_cdw'
-  | 'pha_titre'
-  | 'pha_yield_substrate'
-  | 'pha_productivity'
-  | 'pha_mw'
-  // Family 7 — growth and product kinetics (thread Q)
+  // Growth and product kinetics
   | 'monod_ks'
   | 'biomass_yield_substrate'
   | 'ethanol_yield_substrate'
@@ -116,7 +89,6 @@ export type FieldId =
   | 'ethanol_lp_alpha'
   | 'ethanol_lp_beta'
   | 'ethanol_mesp'
-  // The oxygen and maintenance fields fermOS's simulations and vessels read (OF-BLD-020 §3.2)
   | 'maintenance_coefficient'
   | 'biomass_yield_oxygen'
   | 'specific_oxygen_uptake'
@@ -167,8 +139,6 @@ export interface ParameterDef {
   definition: string;
   /** '' for categorical fields (kinase_identity, glycan_species). */
   canonicalUnit: string;
-  range: [number, number];
-  notes: string;
   /** Categorical fields hold a string value, not a number. */
   categorical?: boolean;
   /** OF-COR-001 §17 Rule 1: a value without its method is not interpretable. */
@@ -205,29 +175,6 @@ export type CorpusThread =
   | 'P'
   /** Ethanol from glucose by wild-type Saccharomyces cerevisiae, program three. */
   | 'Q';
-
-// ── Programs (OF-BLD-016 §2.1, E.1′) ────────────────────────────────────
-//
-// A program is data: a set of thread letters, a name, and whether it is
-// active or archived. An archived program's papers, records, strains,
-// products, scenarios, protocols, runbooks and lessons stay in the
-// repository and leave every default view; Settings → Programs shows them
-// again. `src/data/programs.ts` declares them; `check:seed` holds every
-// thread letter to exactly one program. Mirrored by `Program` in models.py.
-
-export type ProgramId = 'casein' | 'pha' | 'yeast';
-export type ProgramStatus = 'active' | 'archived';
-
-export interface Program {
-  id: ProgramId;
-  /** As Settings lists it: "Yeast ethanol", "Casein", "PHA". */
-  name: string;
-  /** The corpus threads that are this program's papers. No letter is in two programs. */
-  letters: CorpusThread[];
-  status: ProgramStatus;
-  /** One line on what the program is, in words. */
-  summary: string;
-}
 
 export type SourceType =
   | 'journal-article'
@@ -491,11 +438,6 @@ export interface Strain {
   badges: string[];
   bsl: 1 | 2;
   notes: CuratorNote[];
-  /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
 }
 
 export type ProtocolCategory =
@@ -559,18 +501,6 @@ export interface Protocol {
   versions: ProtocolVersion[];
   currentVersion: string;
   provenanceNote: string;
-  /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
 }
 
 export interface Deviation {
@@ -667,18 +597,6 @@ export interface Scenario {
   point: Record<string, number>;
   assumptions: ScenarioAssumption[];
   pinned: boolean;
-  /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
   /**
    * The shelf flowsheet a `biosteam` scenario runs (OF-BLD-019 D2): an id
    * from `GET /api/proforma/shelf`, and nothing else about its structure.
@@ -813,18 +731,6 @@ export interface Lesson {
    * assessor's training sign-off moves them to Supervised.
    */
   skills?: string[];
-  /**
-   * The program this lesson belongs to (OF-BLD-016 §2.1). Absent, it takes
-   * its module's; a module with none is general.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
 }
 
 export type LessonBlock =
@@ -852,18 +758,6 @@ export interface LearnModule {
   blurb: string;
   lessons: Lesson[];
   outline?: string[];
-  /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
 }
 
 export interface ActivityEvent {
@@ -1110,11 +1004,6 @@ export interface Product {
    */
   economicsProvenance: Provenance;
   /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
-  /**
    * The one-letter amino-acid sequence of the product's own chain
    * (OF-BLD-020 §7.1), from which Biopython's ProtParam computes its
    * molecular weight, isoelectric point, extinction coefficients and GRAVY
@@ -1320,12 +1209,6 @@ export interface Deposition {
   sampleTimes?: Record<string, number>;
   /** What each measure's series is, by measure id, as a person assigned it. */
   seriesRoles?: Record<string, SeriesRole>;
-  /**
-   * An example deposition (OF-BLD-016 §3.3, D3): a run nobody made, hidden
-   * like an archived program's. The seed holds none; a deposition a person
-   * starts here is never one, whatever the runbook it follows.
-   */
-  example?: boolean;
 }
 
 export type SeriesRole = 'biomass' | 'product' | 'substrate';
@@ -1416,19 +1299,6 @@ export interface Runbook {
    * ISO timestamp is what this build can honestly offer.
    */
   lockHash: string | null;
-  /**
-   * The program this runbook belongs to (OF-BLD-016 §2.1). Absent on every
-   * seed runbook: a runbook takes the program of the product it names, else
-   * of the strain, and is general when neither has one.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
 }
 
 // ── AnswerPlan (OF-BLD-007 §3) ─────────────────────────────────────────
@@ -1499,7 +1369,6 @@ export interface TraceStep {
 /** The one state every module row reads as, computed by the service. */
 export type ModuleState = 'open' | 'fenced' | 'approved' | 'locked' | 'proposed' | 'retired';
 export type ModuleName =
-  | 'dominion'
   | 'runbooks'
   | 'geneos'
   | 'fermos'
@@ -1602,30 +1471,11 @@ export interface ProposalAction {
   actingId?: string | null;
 }
 
-/**
- * What the question names in one archived program, hidden from the sweep
- * while archived programs are hidden (OF-BLD-016 §2.3; models.py
- * ArchivedCoverage). The trace says "found in archived program PHA (hidden)".
- */
-export interface ArchivedCoverage {
-  /** The program's id and name, as `src/data/programs.ts` declares them. */
-  program: string;
-  name: string;
-  /** The question's own words that named it. */
-  entities: string[];
-  count: number;
-  modules: ModuleName[];
-}
-
 export interface CoverageMap {
   entities: string[];
   searched: number;
   found: number;
   modules: ModuleCoverage[];
-  /** Whether archived programs were swept: the browser's switch (OF-BLD-016 §2.3). Absent on a plan saved before it. */
-  includeArchived?: boolean;
-  /** What the question names in archived programs, left out. Absent on a plan saved before it. */
-  archived?: ArchivedCoverage[];
 }
 
 export interface AnswerPlanUsage {
@@ -1694,12 +1544,6 @@ export interface AskRequest {
   mode: 'agent' | 'single';
   /** The conversation's earlier turns, oldest first. */
   history: PriorTurn[];
-  /**
-   * The store's `showArchived` switch (OF-BLD-016 §2.3). Off, the service
-   * leaves archived programs out of the pool, the passages, the coverage pass
-   * and every read tool.
-   */
-  includeArchived: boolean;
 }
 
 /**
@@ -2778,8 +2622,6 @@ export interface ProformaRunRequest {
    */
   vessel?: string | null;
   trainRun?: string | null;
-  /** The program switch, for those parts: one of an archived program is refused unless it is on. */
-  includeArchived?: boolean;
 }
 
 /**
@@ -3464,7 +3306,6 @@ export interface ParamResolveRequest {
   fit?: string | null;
   startFrom?: string | null;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
-  includeArchived?: boolean;
   /** pureOS's unit scope (OF-BLD-020 §5.1): the unit's catalogue type, when no train is sent. */
   unitType?: string | null;
   /**
@@ -3505,7 +3346,6 @@ export interface VesselRequest {
   klaMethod?: string | null;
   /** A person's changes, each a named assumption, scope `fermos:vessel:<id>`. */
   overrides: Override[];
-  includeArchived?: boolean;
 }
 
 /** One line of the design table, read from BioSTEAM's objects. */
@@ -3644,8 +3484,6 @@ export interface FamilyInfo {
   specs: ParameterSpec[];
   /** The panel's groups this family's specs fall into, in order. */
   groups: string[];
-  /** The program the family is archived with (storage_v1: 'pha'), or null for a general one. */
-  program: string | null;
 }
 
 /** `POST /api/fermos/simulate`. */
@@ -3660,7 +3498,6 @@ export interface SimulationRequest {
   /** 'records', 'fit', or 'simulation:<artifact id>'. */
   startFrom?: string;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length';
-  includeArchived?: boolean;
   /**
    * A parameter bound to exactly these records of the evidence pool, by spec
    * key (OF-BLD-020 §3.4, D13): each must be in the pool, carry a field the
@@ -4018,7 +3855,6 @@ export interface TrainRunRequest {
   /** Overrides of `pureos:unit:<train id>:<unit id | inlet>`, each replacing the train's value of its key. */
   overrides?: Override[];
   by?: string | null;
-  includeArchived?: boolean;
 }
 
 export interface StreamImpurity {
@@ -4118,7 +3954,6 @@ export interface TrainFromRunRequest {
   artifactId: string;
   /** The id the train takes; by default `from-<artifact id>`. */
   trainId?: string | null;
-  includeArchived?: boolean;
 }
 
 /** A unit of the run the train does not take, and why. */
@@ -4170,7 +4005,6 @@ export interface ProposeRequest {
   host: string;
   /** A kept fermOS simulation's id, or `<run artifact id>/<stream id>`; none, and the inlet is typed. */
   inletRef?: string | null;
-  includeArchived?: boolean;
 }
 
 /** Why one unit of a proposal is there: its rule, the property it read and the artifact that holds it. */

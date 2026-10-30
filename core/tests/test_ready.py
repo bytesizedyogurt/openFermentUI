@@ -286,7 +286,7 @@ def test_a_damaged_corpus_is_a_failure_with_the_fix(monkeypatch):
 
     monkeypatch.setattr(ready, "load_corpus", damaged)
     check = ready.check_corpus()
-    assert check.mark == "fail" and "pnpm export:corpus" in check.detail
+    assert check.mark == "fail" and "could not be read" in check.detail and "Expecting value" in check.detail
 
 
 def test_data_reports_a_file_that_does_not_parse():
@@ -401,7 +401,7 @@ def test_a_model_file_that_is_missing_or_changed_is_named(monkeypatch):
 
     monkeypatch.setattr(shelf, "available", lambda m: f"{m.id}'s file is not on this machine: run pnpm geneos:fetch" if m.fetched else None)
     c = ready.check_models()
-    assert c.mark == "warn" and "RehMBEL1391's file is not on this machine" in c.detail and "e_coli_core bundled" in c.detail
+    assert c.mark == "warn" and "iMM904's file is not on this machine" in c.detail and "Yeast9's file" in c.detail
 
 
 def test_artifacts_are_counted(monkeypatch, tmp_path):

@@ -96,15 +96,6 @@ why = "Reads SBML model files for cobra in the geneOS worker process alone; acce
 
 # Model files are data (E.9): read by the geneOS worker, never imported.
 
-[data.RehMBEL1391]
-licence = "GPL-3.0"
-source = "github.com/m-jahn/genome-scale-models, Ralstonia_eutropha/sbml/RehMBEL1391_sbml_L3V1.xml"
-revision = "00c70c5"
-sha256 = "85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89"
-by = "Sean Creighton"
-date = 2026-10-15
-why = "The genome-scale reconstruction of Cupriavidus necator H16, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker; accepted under D4 for this research prototype."
-
 [data.Yeast9]
 licence = "CC-BY-4.0"
 source = "github.com/SysBioChalmers/yeast-GEM, model/yeast-GEM.xml (release v9.1.1)"
@@ -122,24 +113,6 @@ sha256 = "a4bcff4f8f2228a5b1553264c3bcb1e8a8093907754446007f3f3b529d29d3e1"
 by = "Sean Creighton"
 date = 2026-10-20
 why = "The genome-scale reconstruction of Saccharomyces cerevisiae S288C as BiGG Models serves it, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker for an ethanol ceiling. Sean named it in his instruction of 2026-10-20 for the yeast-ethanol demo. BiGG's terms (bigg.ucsd.edu/license, read 2026-10-20) permit educational, research and non-profit use without fee, require the copyright notice and the paragraphs after it to travel with every copy, and leave commercial use to an agreement with UC San Diego's Technology Transfer and Intellectual Property Services. Not a permissive licence: the file is not committed, and data-sync carries no model file, so no copy leaves the machine that fetched it. Commercial use is a question for Sean before any such use."
-
-[data.iJO1366]
-licence = "as BiGG publishes it; ships inside cobra 0.32.1"
-source = "BiGG Models, bundled with cobra as iJO1366"
-revision = "cobra 0.32.1"
-sha256 = "inside the cobra package"
-by = "Sean Creighton"
-date = 2026-10-15
-why = "The genome-scale E. coli K-12 MG1655 model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use."
-
-[data.e_coli_core]
-licence = "as BiGG publishes it; ships inside cobra 0.32.1"
-source = "BiGG Models, bundled with cobra as textbook"
-revision = "cobra 0.32.1"
-sha256 = "inside the cobra package"
-by = "Sean Creighton"
-date = 2026-10-15
-why = "The 95-reaction E. coli core model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use."
 
 [accepted.pyglet]
 licence = "no licence metadata"

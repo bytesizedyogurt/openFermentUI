@@ -1,7 +1,8 @@
 """What Postdoc may cite: one view over every record it can see (OF-BLD-014 §3.4).
 
-- the seed records and the verified records in `corpus.json` (what
-  `pnpm export:corpus` projected from the seed and `biorepo.json`);
+- the records in the corpus (empty since alpha 2.0 deleted the seed it was
+  projected from; a project's records arrive through Intake, extraction and
+  review, PostgreSQL from stage 2);
 - plus the extractor's current anchored candidates that no decision rejected,
   each marked `unverified`.
 
@@ -13,13 +14,6 @@ worth that much (`weakest_provenance`).
 A record a reviewer rejected is never in the pool: not a rejected seed
 record, and not a candidate whose decision rejects it. `Corpus.search`, which
 the flow test uses, is left as it was.
-
-THE PROGRAM SWITCH (OF-BLD-016 §2.3, E.2′). A record or a candidate on a
-paper of an archived program (casein, threads A–O; PHA, thread P) is left out
-unless the caller passes `include_archived=True`, which is what the browser's
-"show archived programs" switch sends. Off is the default. What was left out
-is counted by program in `EvidencePool.hidden`, never shown; the corpus's
-papers stay whole, so a paper is still found by id.
 """
 from __future__ import annotations
 
@@ -28,7 +22,7 @@ from typing import Any, Iterable
 
 from rank_bm25 import BM25Okapi
 
-from . import biorepo, extract, programs
+from . import biorepo, extract
 from .corpus import MIN_QUERY_TOKENS_FOR_COVERAGE, Corpus, _document, load_corpus, tokenize
 from .models import Candidate, ReviewDecision
 
@@ -73,9 +67,6 @@ def candidate_record(c: Candidate, labels: dict[str, str]) -> dict[str, Any]:
 class EvidencePool:
     corpus: Corpus
     records: list[dict[str, Any]]
-    # Records and candidates left out because their program is archived, by
-    # program id (OF-BLD-016 §2.3); empty when archived programs were asked for.
-    hidden: dict[str, int] = field(default_factory=dict)
     records_by_id: dict[str, dict[str, Any]] = field(init=False)
     _order: list[str] = field(init=False, repr=False)
     _bm25: BM25Okapi | None = field(init=False, repr=False)
@@ -135,19 +126,8 @@ def build(
     candidates: Iterable[Candidate],
     decisions: dict[str, ReviewDecision],
     ontology: Iterable[dict[str, Any]] | None = None,
-    include_archived: bool = False,
 ) -> EvidencePool:
-    """The pool from its parts, so a test can hand it a fixture. A record or
-    candidate on an archived program's paper is left out and counted unless
-    `include_archived` is set."""
-    hidden: dict[str, int] = {}
-
-    def shows(paper_id: str) -> bool:
-        program = programs.program_of_paper(paper_id)
-        if programs.hides(program, include_archived):
-            hidden[str(program)] = hidden.get(str(program), 0) + 1
-            return False
-        return True
+    """The pool from its parts, so a test can hand it a fixture."""
 
     # A rejection counts from either side: the projection's status, or a
     # decision made since `corpus.json` was last exported (§3.R).
@@ -156,24 +136,22 @@ def build(
     }
     kept = [r for r in corpus.records if r["id"] not in rejected_ids]
     seen = {r["id"] for r in kept}
-    records = [r for r in kept if shows(str(r.get("paperId") or ""))]
+    records = list(kept)
     labels = _field_labels(ontology)
     for c in candidates:
         if c.id in seen or c.id in rejected_ids or c.status == "rejected":
             continue
         seen.add(c.id)
-        if shows(c.paperId):
-            records.append(candidate_record(c, labels))
-    return EvidencePool(corpus=corpus, records=records, hidden=hidden)
+        records.append(candidate_record(c, labels))
+    return EvidencePool(corpus=corpus, records=records)
 
 
-def load(include_archived: bool = False) -> EvidencePool:
+def load() -> EvidencePool:
     """The pool as this checkout holds it now: `corpus.json`, the cached
-    extractions of the current run, and the committed decisions; archived
-    programs left out unless asked for."""
+    extractions of the current run, and the committed decisions."""
     from . import units
 
     corpus = load_corpus()
     ontology = list(units.tables()["ontology"].values())
     candidates = [c for r in extract.all_cached() for c in r.candidates]
-    return build(corpus, candidates, biorepo.decisions(), ontology, include_archived=include_archived)
+    return build(corpus, candidates, biorepo.decisions(), ontology)

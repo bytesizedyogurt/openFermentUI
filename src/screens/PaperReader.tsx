@@ -22,8 +22,7 @@ import {
 } from 'lucide-react';
 import type { ExtractionRecord, FieldId, Job, Paper } from '@/data/types';
 import { fieldName } from '@/data/ontology';
-import { useProgramFilter, useStore, provenanceOf, tickClass } from '@/store';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
+import { useStore, provenanceOf, tickClass } from '@/store';
 import { href, navigate } from '@/router';
 import { Quantity } from '@/components/QuantityField';
 import { ProvenanceLegend, provMeta, type ProvKind } from '@/components/Provenance';
@@ -118,9 +117,6 @@ export default function PaperReader({
 }) {
   const paper = useStore((s) => s.papers.find((p) => p.id === paperId));
   const records = useStore((s) => s.records);
-  // OF-BLD-016 §2.2: a link opens any paper, and one in an archived program
-  // opens under the banner that names it.
-  const shows = useProgramFilter();
   const jobs = useStore((s) => s.jobs);
   const unitMode = useStore((s) => s.ui.unitMode);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
@@ -375,7 +371,6 @@ export default function PaperReader({
 
   const article = (
     <article className="flex-1 min-w-0 max-w-[760px]">
-      <ArchivedBanner kind="paper" id={paper.id} />
       <div className="mb-3 flex items-center gap-2 text-caption text-ink-soft">
         <a href={href('/biorepo')} className="inline-flex items-center gap-1 hover:text-accent">
           <ArrowLeft size={12} /> Library

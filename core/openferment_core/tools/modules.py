@@ -1,8 +1,9 @@
 """One read tool per module (OF-BLD-015 §7.2).
 
-`dominion_read`, `runbooks_read`, `geneos_read`, `fermos_read`, `pureos_read`,
-`proforma_read`, `biorepo_read`, `guild_read`, `primer_read`, `intake_read`
-and `home_read`. The build document writes them `dominion.read`; the Messages
+`runbooks_read`, `geneos_read`, `fermos_read`, `pureos_read`, `proforma_read`,
+`biorepo_read`, `guild_read`, `primer_read`, `intake_read` and `home_read`
+(Dominion's pair left with Dominion, alpha 2.0 ADR-010). The build document
+wrote them `runbooks.read`; the Messages
 API refuses a tool name outside `^[a-zA-Z0-9_-]{1,128}$` (measured on
 2026-10-19 with the free token-count endpoint), so the registry, the
 endpoints and the MCP server all use the underscore.
@@ -16,13 +17,6 @@ is what lets a claim cite them (`SeenSet`).
 
 A module part of which lives only in a browser says so in `partial`, and the
 tool reads what the service has. Nothing here writes.
-
-Rows of archived programs are left out unless the request's switch shows them
-(`ToolContext.include_archived`, OF-BLD-016 §2.3); the switch is never an
-input. When a read by ids names rows that were left out, the summary says
-which archived programs hold them, and nothing more of them; a read by words
-says nothing, since words match loosely and the coverage map has already said
-what the question named.
 """
 from __future__ import annotations
 
@@ -33,7 +27,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .. import module_stores, programs
+from .. import module_stores
 from ..models import ToolResult
 from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 
@@ -42,8 +36,6 @@ MAX_ROWS = 20
 ROW_BUDGET = MAX_SUMMARY_CHARS - 1_500
 
 WHAT = {
-    "dominion": "the molecule catalogue and the clearance findings: which molecules are open to make and which are fenced, "
-                "with the headline clearance and its basis",
     "runbooks": "the runbooks (their status, lock and what they predict) and the protocols (their versions)",
     "geneos": "the hosts, the pathways, the genome-scale models on the shelf and the ceilings computed on them",
     "fermos": "the growth fits and forecasts computed from deposited runs (kind artifact), the kept simulations "
@@ -94,17 +86,6 @@ class ModuleReadInput(BaseModel):
         return v
 
 
-def _hidden_note(hidden: list[Any]) -> str:
-    names = []
-    for r in hidden:
-        p = programs.program_by_id(r.program)
-        name = p.name if p else str(r.program)
-        if name not in names:
-            names.append(name)
-    return (f"rows matching this read belong to archived programs ({', '.join(names)}) and are hidden; the switch in "
-            "Settings → Programs shows them. Do not answer about them.")
-
-
 def _summary(module: str, inp: ModuleReadInput, matched: list[Any], rows: list[dict[str, Any]], cut: bool) -> dict[str, Any]:
     states: dict[str, int] = {}
     for r in matched:
@@ -145,11 +126,6 @@ def _runner(module: str):
             picked.pop()
             cut = True
         summary = _summary(module, inp, matched, dumped, cut)
-        if not getattr(stores, "include_archived", True) and [i for i in inp.ids if i.strip()]:
-            hidden = module_stores.find(stores, module, ids=inp.ids, kind=inp.kind or None, state=inp.state or None,
-                                        hidden=True)
-            if hidden:
-                summary["hidden"] = _hidden_note(hidden)
         return ToolResult(summary=summary, rows=picked)
 
     return run

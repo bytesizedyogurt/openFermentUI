@@ -3,7 +3,7 @@
 // WHAT IT DOES. A person chooses a model family (kinetics.py's, each shown
 // with its equations in plain Unicode and one line saying what it is; the
 // light socket is listed and cannot be chosen, in its own words), the strain
-// whose records bind (or every strain of the program), the product and the
+// whose records bind (or every strain on file), the product and the
 // sugar, and where the parameters start from: the records, a fit fermOS
 // keeps, or a kept simulation. The service binds every parameter the family
 // declares (fermos.bind_parameters): a fit a person chose, the records
@@ -40,12 +40,11 @@
 // numeric control is rendered here: every parameter is the panel's (E.1‴).
 import { useEffect, useMemo, useState } from 'react';
 import type { FamilyInfo, FermosBinding, FermosFitInfo, ParameterSpec, ParameterValue, ParamScope, SimulationResult, SimulationSummary, SteadyState } from '@/data/types';
-import { activePrograms, overridesFor, useProgramFilter, useStore } from '@/store';
+import { overridesFor, useStore } from '@/store';
 import { href, useRoute } from '@/router';
 import { Button, Callout, SectionTitle } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
-import { SubsystemReference } from '@/components/ReferenceView';
 import { SourceChip, shown } from '@/components/ParameterRow';
 import { TimeCourse } from '@/components/figures';
 import { CARBON_SOURCES } from '@/data/vocabulary';
@@ -356,15 +355,13 @@ function ParamTable({ r, specs }: { r: SimulationResult; specs: ParameterSpec[] 
 
 export default function FermOSSimulate() {
   const route = useRoute();
-  const showArchived = useStore((s) => s.showArchived);
-  const strainsAll = useStore((s) => s.strains);
-  const shows = useProgramFilter();
+  const strains = useStore((s) => s.strains);
   const [families, setFamilies] = useState<FamilyInfo[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [family, setFamily] = useState<string>(route.query.get('family') ?? '');
   const [strain, setStrain] = useState<string>(route.query.get('strain') ?? '');
-  const strains = useMemo(() => strainsAll.filter((s) => s.program && shows('strain', s.id)), [strainsAll, shows]);
-  const products = useMemo(() => Object.keys(PRODUCT_WORDS).filter((p) => shows('product', p)), [shows]);
+  // The products this build has words for (lib/geneos.ts's PRODUCT_WORDS).
+  const products = useMemo(() => Object.keys(PRODUCT_WORDS), []);
   // null: nobody has chosen, so the family's own default; '': None named, chosen (OF-BLD-020 §3.R, finding 14).
   const [product, setProduct] = useState<string | null>(route.query.get('product'));
   const [sugar, setSugar] = useState<string>(route.query.get('sugar') ?? 'glucose');
@@ -384,20 +381,20 @@ export default function FermOSSimulate() {
   const [runProblem, setRunProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // The families, a family of an archived program left out with the switch off.
+  // The families.
   useEffect(() => {
     const ctrl = new AbortController();
     setProblem(null);
-    fermosFamilies(showArchived, ctrl.signal)
+    fermosFamilies(ctrl.signal)
       .then(setFamilies)
       .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [showArchived]);
+  }, []);
 
   const runnable = (families ?? []).filter((f) => !f.socket);
   const chosen = runnable.find((f) => f.id === family) ?? runnable.find((f) => f.id === 'batch_v1') ?? runnable[0] ?? null;
-  // A family whose product is a store inside the cells (storage_v1's Q) names no product by default: a store is
-  // not a product in the broth, and None named stays chosen once a person chose it.
+  // A family with no product state in the broth (P) names no product by default, and None named stays chosen
+  // once a person chose it.
   const freeProduct = !!chosen && chosen.states.includes('P');
   const productDefault = freeProduct ? (products.includes('ethanol') ? 'ethanol' : (products[0] ?? '')) : '';
   const productChosen = product === '' ? '' : product && products.includes(product) ? product : productDefault;
@@ -412,7 +409,6 @@ export default function FermOSSimulate() {
         fitArtifact: start === 'fit' && fit ? fit : null,
         startFrom: start === 'fit' && fit ? 'fit' : start === 'simulation' && kept ? `simulation:${kept}` : 'records',
         durationPreset: start === 'fit' && fit ? preset : UNTIL_RUN_OUT,
-        includeArchived: showArchived,
       }
     : null;
   const askKey = JSON.stringify(ask);
@@ -427,17 +423,17 @@ export default function FermOSSimulate() {
     setListProblem(null);
     const load =
       start === 'fit'
-        ? proformaShelf(showArchived, ctrl.signal).then((shelf) => {
+        ? proformaShelf(ctrl.signal).then((shelf) => {
             // The fits list is read for a flowsheet (what each can feed it):
-            // the first one the switch shows; the fits are the same for any.
-            const flowsheet = shelf.find((f) => !f.reference && (!f.program || showArchived || activePrograms().some((p) => p.id === f.program)));
-            if (!flowsheet) throw new FermosRefused(422, 'No flowsheet on the shelf is of an active program, so the fits list cannot be read.');
-            return fermosFits(flowsheet.id, showArchived, ctrl.signal).then((all) => setFits(all.filter((x) => x.tool !== 'fermos.simulation')));
+            // the first one a scenario can name; the fits are the same for any.
+            const flowsheet = shelf.find((f) => !f.reference);
+            if (!flowsheet) throw new FermosRefused(422, 'No flowsheet a scenario can name is on the shelf, so the fits list cannot be read.');
+            return fermosFits(flowsheet.id, ctrl.signal).then((all) => setFits(all.filter((x) => x.tool !== 'fermos.simulation')));
           })
-        : fermosSimulations(showArchived, ctrl.signal).then(setSims);
+        : fermosSimulations(ctrl.signal).then(setSims);
     load.catch((e: unknown) => !ctrl.signal.aborted && setListProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [start, showArchived]);
+  }, [start]);
 
   // The panel's scope, bound as the simulation would bind it.
   useEffect(() => {
@@ -495,7 +491,7 @@ export default function FermOSSimulate() {
   };
 
   const strainLabel = (id: string) => {
-    const s = strainsAll.find((x) => x.id === id);
+    const s = strains.find((x) => x.id === id);
     return s ? `${s.binomial} ${s.designation}`.trim() : id;
   };
 
@@ -515,7 +511,7 @@ export default function FermOSSimulate() {
           <label className="text-caption text-ink-soft">
             <span className="block mb-0.5">Strain</span>
             <select className="input" aria-label="Strain" value={strainChosen} onChange={(e) => setStrain(e.target.value)} data-testid="simulate-strain">
-              <option value="">Every strain of the program</option>
+              <option value="">Every strain on file</option>
               {strains.map((s) => (
                 <option key={s.id} value={s.id}>
                   {strainLabel(s.id)}
@@ -665,7 +661,7 @@ export default function FermOSSimulate() {
         <div className="space-y-4" data-testid="simulation-result" data-artifact={result.artifactId}>
           <BuiltFrom r={result} />
           <TimeCourse
-            title={`How does a simulated ${result.title.toLowerCase()} culture of ${result.strain ? strainLabel(result.strain) : 'the program’s strains'} run${result.product ? `, making ${productWords(result.product).short}` : ''}${result.sugar ? ` from ${result.sugar}` : ''}?`}
+            title={`How does a simulated ${result.title.toLowerCase()} culture of ${result.strain ? strainLabel(result.strain) : 'every strain on file'} run${result.product ? `, making ${productWords(result.product).short}` : ''}${result.sugar ? ` from ${result.sugar}` : ''}?`}
             {...timeCourseOf(result)}
             csvName={`simulation-${result.artifactId}`}
           />
@@ -691,11 +687,6 @@ export default function FermOSSimulate() {
           <SendToProforma artifactId={result.artifactId} tool="fermos.simulation" />
         </div>
       )}
-      {/* §8.R (finding 7): the operating modes' reference sits where the mode
-          (the family) is chosen, as transport's and scale's sit on Vessel. */}
-      <section className="mt-8" aria-label="What the field says">
-        <SubsystemReference id="fermos.mode" />
-      </section>
     </div>
   );
 }

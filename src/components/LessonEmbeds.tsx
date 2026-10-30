@@ -1,21 +1,21 @@
 // Live lesson embeds (OF-DES-001 §8.14). These are the real components, not
 // screenshots — the pedagogy is the product. A decision made in the mini-queue
 // here propagates to the strain pages and the validation metrics.
+//
+// An embed shows what the store holds and nothing typed in its place: one
+// whose lesson block names no paper, record, protocol, question or scenario
+// says so.
 import { useMemo, useState } from 'react';
 import { ArrowRight, Check, SkipForward, X } from 'lucide-react';
-import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE, useProgramFilter } from '@/store';
-import { navigate } from '@/router';
+import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE, useSkillById } from '@/store';
+import { href, navigate } from '@/router';
 import type { FieldId, LessonBlock } from '@/data/types';
-import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
+import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { computeRunMetrics } from '@/engine/metrics';
-import { evaluateGrid } from '@/engine/grids';
 import { renderStepText } from '@/engine/scale';
-import { SKILL_BY_ID } from '@/data/skills';
-import { href } from '@/router';
-import { Card, Button, cx, Callout } from './ui';
+import { Card, Button, Callout } from './ui';
 import { CitationChip } from './Chip';
-import { QuantityField } from './QuantityField';
 import { ProvDot, ProvenanceBadge, Tick } from './Provenance';
 
 type EmbedKind = Extract<LessonBlock, { kind: 'embed' }>['embed'];
@@ -109,68 +109,6 @@ function RecordCard({ recordId }: { recordId: string }) {
           “{record.quote}”
         </blockquote>
       </Tick>
-    </Frame>
-  );
-}
-
-function UnitPlayground() {
-  const [field, setField] = useState<FieldId>('growth_rate_mu');
-  const def = ONTOLOGY_BY_ID[field];
-  // Seeded the same way switching fields reseeds it, so the starting value is a
-  // point in the ontology's declared range rather than a leftover literal.
-  const [value, setValue] = useState<{ value: number; unit: string }>(() => ({
-    value: Number(((def.range[0] + def.range[1]) / 4).toPrecision(2)),
-    unit: def.canonicalUnit,
-  }));
-
-  return (
-    <Frame label="Live unit field — type into it">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px]">
-          <label className="text-caption text-ink-soft block mb-1" htmlFor="pg-field">
-            Parameter
-          </label>
-          <select
-            id="pg-field"
-            className="input"
-            value={field}
-            onChange={(e) => {
-              const next = e.target.value as FieldId;
-              setField(next);
-              const d = ONTOLOGY_BY_ID[next];
-              setValue({
-                value: Number(((d.range[0] + d.range[1]) / 4).toPrecision(2)),
-                unit: d.canonicalUnit,
-              });
-            }}
-          >
-            {ONTOLOGY.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="min-w-[220px] flex-1">
-          <label className="text-caption text-ink-soft block mb-1" htmlFor="pg-value">
-            Value with unit
-          </label>
-          <QuantityField
-            id="pg-value"
-            field={field}
-            value={value}
-            onChange={(v) => v && setValue(v)}
-          />
-        </div>
-      </div>
-      <p className="text-caption text-ink-soft mt-2">
-        Canonical unit <span className="font-num">{def.canonicalUnit || 'dimensionless'}</span>,
-        validation range{' '}
-        <span className="font-num">
-          {def.range[0]}–{def.range[1]}
-        </span>
-        . Try a per-day rate, an out-of-range value, and something dimensionally wrong.
-      </p>
     </Frame>
   );
 }
@@ -342,7 +280,7 @@ function StripPlot({ field }: { field: FieldId }) {
     );
   }
 
-  const values = points.map((p) => p.v).filter((v) => v >= def.range[0] && v <= def.range[1]);
+  const values = points.map((p) => p.v);
   const lo = Math.min(...values);
   const hi = Math.max(...values);
   const span = hi - lo || 1;
@@ -357,27 +295,25 @@ function StripPlot({ field }: { field: FieldId }) {
     <Frame label={`Live strip plot — ${def.name}`}>
       <div className="relative h-16">
         <div className="absolute left-0 right-0 top-7 h-px bg-line" />
-        {points
-          .filter((p) => p.v >= def.range[0] && p.v <= def.range[1])
-          .map((p, i) => {
-            const excl = aggregateExclusion(p.r);
-            return (
-              <button
-                key={p.r.id}
-                className="absolute -translate-x-1/2 hover:scale-150 transition-transform"
-                style={{ left: `${((p.v - lo) / span) * 96 + 2}%`, top: 22 + ((i % 5) - 2) * 6 }}
-                onClick={() => navigate(`/biorepo/paper/${p.r.paperId}?span=${p.r.id}`)}
-                title={`${fmt(p.v)} ${def.canonicalUnit} — ${p.r.paperId} · ${p.r.status}${
-                  excl ? ` · ${EXCLUSION_NOTE[excl]}` : ''
-                }`}
-                aria-label={`${fmt(p.v)} ${def.canonicalUnit} from ${p.r.paperId}${
-                  excl ? ', excluded from the statistics' : ''
-                }`}
-              >
-                <ProvDot p={provenanceOf(p.r)} size={9} />
-              </button>
-            );
-          })}
+        {points.map((p, i) => {
+          const excl = aggregateExclusion(p.r);
+          return (
+            <button
+              key={p.r.id}
+              className="absolute -translate-x-1/2 hover:scale-150 transition-transform"
+              style={{ left: `${((p.v - lo) / span) * 96 + 2}%`, top: 22 + ((i % 5) - 2) * 6 }}
+              onClick={() => navigate(`/biorepo/paper/${p.r.paperId}?span=${p.r.id}`)}
+              title={`${fmt(p.v)} ${def.canonicalUnit} — ${p.r.paperId} · ${p.r.status}${
+                excl ? ` · ${EXCLUSION_NOTE[excl]}` : ''
+              }`}
+              aria-label={`${fmt(p.v)} ${def.canonicalUnit} from ${p.r.paperId}${
+                excl ? ', excluded from the statistics' : ''
+              }`}
+            >
+              <ProvDot p={provenanceOf(p.r)} size={9} />
+            </button>
+          );
+        })}
         <span className="absolute left-0 bottom-0 text-caption font-num text-ink-soft">
           {fmt(lo)} {def.canonicalUnit}
         </span>
@@ -433,19 +369,16 @@ function ProtocolCard({ protocolId }: { protocolId: string }) {
  * The steps a skill is needed for, read live from the protocols, with what an
  * assessor watches for (OF-BLD-013 §3.1). Every number the learner sees here
  * is the protocol's own, rendered by the same code run mode uses, so a lesson
- * built on this embed carries no quantity of its own. Only protocols whose
- * program shows are read (OF-BLD-016 §2.2): a general lesson does not list
- * an archived program's steps while that program is hidden.
+ * built on this embed carries no quantity of its own.
  */
 function SkillSteps({ skillId }: { skillId: string }) {
-  const allProtocols = useStore((s) => s.protocols);
-  const shows = useProgramFilter();
-  const protocols = useMemo(() => allProtocols.filter((p) => shows('protocol', p.id)), [allProtocols, shows]);
+  const SKILL_BY_ID = useSkillById();
+  const protocols = useStore((s) => s.protocols);
   const skill = SKILL_BY_ID[skillId];
   if (!skill) {
     return (
       <Frame label="Skill">
-        <p className="text-body text-ink-soft">{skillId} is not a skill in src/data/skills.ts.</p>
+        <p className="text-body text-ink-soft">{skillId || 'This embed'} names no skill the lab holds.</p>
       </Frame>
     );
   }
@@ -505,11 +438,9 @@ function AskPrompt({ question }: { question: string }) {
   );
 }
 
+/** A scenario a lesson names, opened where the service simulates it. */
 function ScenarioWidget({ scenarioId }: { scenarioId: string }) {
   const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
-  const grids = useStore((s) => s.grids);
-  const [local, setLocal] = useState<number | null>(null);
-
   if (!scenario) {
     return (
       <Frame label="Scenario">
@@ -517,54 +448,25 @@ function ScenarioWidget({ scenarioId }: { scenarioId: string }) {
       </Frame>
     );
   }
-  const grid = grids[scenario.modelId];
-  const dim = scenario.dims[0];
-  if (!dim) {
-    return (
-      <Frame label="Scenario">
-        <p className="text-body text-ink-soft">{scenario.name} is simulated on the service; open it in Proforma.</p>
-      </Frame>
-    );
-  }
-  const value = local ?? scenario.point[dim.key];
-  const result = grid ? evaluateGrid(grid, { ...scenario.point, [dim.key]: value }) : null;
-
   return (
-    <Frame label={`Live model — ${scenario.name}`}>
-      <div className="flex flex-wrap items-end gap-5">
-        <Tick p="demo" className="min-w-[170px]">
-          <div className="text-caption uppercase tracking-wide text-ink-soft">
-            Minimum selling price
-          </div>
-          <div className="font-num text-display leading-none">
-            ${result ? fmt(result.msp, 1) : '—'}
-            <span className="text-body text-ink-soft ml-1">/kg</span>
-          </div>
-          <div className="text-caption text-ink-soft">
-            Cost model v0 — illustrative economics, not validated
-          </div>
-        </Tick>
-        <div className="flex-1 min-w-[220px]">
-          <div className="flex items-baseline justify-between mb-1">
-            <label htmlFor={`w-${dim.key}`} className="text-body">
-              {dim.label}
-            </label>
-            <span className="font-num text-body">
-              {fmt(value)} {dim.unit}
-            </span>
-          </div>
-          <input
-            id={`w-${dim.key}`}
-            type="range"
-            min={dim.values[0]}
-            max={dim.values[dim.values.length - 1]}
-            step={(dim.values[dim.values.length - 1] - dim.values[0]) / 100}
-            value={value}
-            onChange={(e) => setLocal(Number(e.target.value))}
-            aria-label={dim.label}
-          />
-        </div>
+    <Frame label={`Scenario — ${scenario.name}`}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-body text-ink-soft flex-1 min-w-[200px]">
+          {scenario.name} is simulated on the service. Its page shows every input with where it came from.
+        </p>
+        <Button variant="primary" onClick={() => navigate(`/proforma/scenario/${encodeURIComponent(scenario.id)}`)}>
+          Open in Proforma <ArrowRight size={13} />
+        </Button>
       </div>
+    </Frame>
+  );
+}
+
+/** What an embed shows when its lesson block names nothing for it to show. */
+function Unnamed({ label, what }: { label: string; what: string }) {
+  return (
+    <Frame label={label}>
+      <p className="text-body text-ink-soft">This embed names no {what}.</p>
     </Frame>
   );
 }
@@ -572,11 +474,9 @@ function ScenarioWidget({ scenarioId }: { scenarioId: string }) {
 export function LessonEmbed({ embed, arg }: { embed: EmbedKind; arg?: string }) {
   switch (embed) {
     case 'chip-demo':
-      return <ChipDemo paperId={arg ?? 'M7'} />;
+      return arg ? <ChipDemo paperId={arg} /> : <Unnamed label="Citation chip" what="paper" />;
     case 'record-card':
-      return <RecordCard recordId={arg ?? 'r-C2-1'} />;
-    case 'unit-playground':
-      return <UnitPlayground />;
+      return arg ? <RecordCard recordId={arg} /> : <Unnamed label="Extraction record" what="record" />;
     case 'mini-queue':
       return <MiniQueue />;
     case 'metrics-tiles':
@@ -584,13 +484,13 @@ export function LessonEmbed({ embed, arg }: { embed: EmbedKind; arg?: string }) 
     case 'strip-plot':
       return <StripPlot field={(arg as FieldId) ?? 'growth_rate_mu'} />;
     case 'protocol-card':
-      return <ProtocolCard protocolId={arg ?? 'PR-TAP-01'} />;
+      return arg ? <ProtocolCard protocolId={arg} /> : <Unnamed label="Protocol" what="protocol" />;
     case 'ask-prompt':
-      return <AskPrompt question={arg ?? 'What ethanol yields on glucose are reported for cenpk113-7d'} />;
+      return arg ? <AskPrompt question={arg} /> : <Unnamed label="Try it" what="question" />;
     case 'skill-steps':
       return <SkillSteps skillId={arg ?? ''} />;
     case 'scenario-widget':
-      return <ScenarioWidget scenarioId={arg ?? 'sc-s1'} />;
+      return arg ? <ScenarioWidget scenarioId={arg} /> : <Unnamed label="Scenario" what="scenario" />;
     default:
       return (
         <div className="my-4">

@@ -32,93 +32,6 @@ def test_the_benchmark_reproduces_the_published_price(store):
     replays_to_the_last_digits(art.id)
 
 
-# ── the PHA flowsheet (§8.3) ───────────────────────────────────────────
-# PLACEHOLDER inputs, chosen here to exercise the flowsheet; none is a
-# measurement and no price below is a result.
-
-CASE = {"titre": 50.0, "yield": 0.3, "content": 0.7, "productivity": 1.0, "recovery": 0.95, "sugarPrice": 0.4,
-        "sugarFeed": 10000.0}
-
-
-@pytest.fixture(scope="module")
-def pha():
-    from openferment_core.flowsheets import pha_sugar_v0
-
-    return pha_sugar_v0, pha_sugar_v0.build()
-
-
-def test_the_reactions_balance(pha):
-    f, b = pha
-    from thermosteam.reaction import Reaction
-
-    for text in (f.POLYMER, f.RESPIRATION):
-        Reaction(text, reactant="Glucose", X=1.0, check_atomic_balance=True)  # raises when unbalanced
-    st = b.cells_reaction
-    assert st["Glucose"] == pytest.approx(-1.0) and st["NH3"] < 0 and st[f.CELLS] > 0
-
-
-def test_polymer_out_is_sugar_in_times_yield_times_recovery(pha):
-    f, b = pha
-    out = f.evaluate(b, CASE)
-    assert out["phaKgPerH"] == pytest.approx(CASE["sugarFeed"] * CASE["yield"] * CASE["recovery"], rel=1e-6)
-    assert sum(out["costLines"].values()) == pytest.approx(out["pricePerKgPha"], rel=1e-12)
-    assert set(out["costLines"]) == {"capex", "media", "utilities", "labor", "downstream", "other"}
-    # The sugar is charged on sugar alone (§8.3 found the probe priced the diluted feed).
-    assert b.feed.cost == pytest.approx(CASE["sugarPrice"] * CASE["sugarFeed"], rel=1e-9)
-
-
-def test_a_resimulated_case_equals_a_fresh_build(pha):
-    f, b = pha
-    f.evaluate(b, {**CASE, "titre": 60.0, "yield": 0.32})
-    again = f.evaluate(b, CASE)["pricePerKgPha"]
-    fresh = f.evaluate(f.build(), CASE)["pricePerKgPha"]
-    assert again == pytest.approx(fresh, rel=1e-7)
-
-
-def test_a_higher_sugar_price_raises_the_price(pha):
-    f, b = pha
-    prices = [f.evaluate(b, {**CASE, "sugarPrice": p})["pricePerKgPha"] for p in (0.2, 0.3, 0.4, 0.5)]
-    assert all(a < c for a, c in zip(prices, prices[1:]))
-
-
-def test_no_sugar_left_for_respiration_is_refused_with_the_carbon_reason(pha):
-    f, b = pha
-    with pytest.raises(f.Infeasible) as e:
-        f.evaluate(b, {**CASE, "yield": 0.45, "content": 0.4})
-    assert e.value.reason == "carbon" and "no sugar for respiration" in str(e.value)
-
-
-def test_a_whole_run_through_the_worker(store):
-    from types import SimpleNamespace
-
-    from openferment_core.models import ProformaRunRequest, InputAssumption
-
-    def rec(rid, field, value, unit):
-        return {"id": rid, "paperId": "P6", "field": field, "value": value, "unit": unit, "carbonSource": "glucose",
-                "strainId": "c-necator-h16", "provenance": "unverified", "status": "unverified", "primary": True}
-
-    rs = [rec(f"t{i}", "pha_titre", v, "g/L") for i, v in enumerate((30.0, 50.0, 70.0))]
-    rs += [rec(f"y{i}", "pha_yield_substrate", v, "g g-1") for i, v in enumerate((0.25, 0.3, 0.35))]
-    rs += [rec("c0", "pha_content_cdw", 70.0, "% CDW"), rec("c1", "pha_content_cdw", 80.0, "% CDW")]
-    rs += [rec(f"p{i}", "pha_productivity", v, "g L-1 h-1") for i, v in enumerate((0.5, 1.0, 1.5))]
-    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
-    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="Sean Creighton", at="2026-10-15")
-         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000, 10000, 10000))]
-    out = proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", assumptions=a, seed=3), pool=pool)
-    assert out.samples == 500 and out.feasible + sum(out.infeasible.values()) == 500
-    assert set(out.infeasible) <= {"carbon", "oxygen", "balance"}
-    assert out.provenance == "demo" and out.evidence.figure == "distribution"
-    q = out.quantiles
-    assert q["p5"] <= q["p25"] <= q["p50"] <= q["p75"] <= q["p95"]
-    assert sum(b.count for b in out.histogram) == out.feasible
-    assert sum(out.baseCostLines.values()) == pytest.approx(out.basePrice, rel=1e-12)
-    assert {s.key for s in out.sensitivity} == {"titre", "yield", "content", "productivity", "recovery", "sugarPrice"}
-    assert len(out.grid.msp) == 125
-    again = proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", assumptions=a, seed=3), pool=pool)
-    assert again.artifactId == out.artifactId and again.quantiles == out.quantiles
-    assert artifacts.replay(out.artifactId).identical
-
-
 # ── the dry-grind corn plant (OF-BLD-019 §2.2) ─────────────────────────
 # The authority is the installed package's own test file: each value below
 # is read from biorefineries/tests/test_biorefineries.py, test_corn, by
@@ -237,17 +150,20 @@ def test_a_dearer_glucose_raises_the_ethanol_price(eth):
     assert all(a < c for a, c in zip(prices, prices[1:]))
 
 
-def test_a_whole_yeast_run_through_the_worker(store):
+def test_a_whole_yeast_run_through_the_worker(store, monkeypatch):
     from types import SimpleNamespace
 
     import standins
     from openferment_core.models import InputAssumption, ProformaRunRequest
 
+    # A scenario the service holds by its id, on the ethanol flowsheet: the seed's left with it (ADR-010).
+    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [
+        {"id": "sc-held-ethanol", "name": "A held test scenario", "kind": "biosteam", "modelId": "ethanol_glucose_v0"}])
     rs = standins._standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-20")
          for k, v, lo, hi in standins.YEAST_STANDIN_ASSUMED]
-    out = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=a, seed=3), pool=pool)
+    out = proforma.run(ProformaRunRequest(scenarioId="sc-held-ethanol", assumptions=a, seed=3), pool=pool)
     assert out.samples == 500 and out.feasible + sum(out.infeasible.values()) == 500 and out.baseInfeasible is None
     assert set(out.infeasible) <= {"yield", "concentration", "convergence"}
     assert out.provenance == "demo" and out.flowsheet == "ethanol_glucose_v0" and out.tea.teaClass == "ConventionalEthanolTEA"
@@ -255,7 +171,7 @@ def test_a_whole_yeast_run_through_the_worker(store):
     assert q["p5"] <= q["p25"] <= q["p50"] <= q["p75"] <= q["p95"]
     assert {s.key for s in out.sensitivity} <= {"feed_glucose_conc", "titre", "yield", "productivity", "glucose_price"}
     assert len(out.grid.msp) == 125 and sum(out.baseCostLines.values()) == pytest.approx(out.basePrice, rel=1e-12)
-    assert [i.value for i in artifacts.get(out.artifactId).inputs if i.name == "scenario"] == ["sc-yeast-1"]
+    assert [i.value for i in artifacts.get(out.artifactId).inputs if i.name == "scenario"] == ["sc-held-ethanol"]
     from test_proforma import replays_to_the_last_digits
 
     replays_to_the_last_digits(out.artifactId)

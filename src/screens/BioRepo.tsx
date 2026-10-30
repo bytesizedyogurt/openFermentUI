@@ -1,5 +1,5 @@
 // Library — the faceted corpus table (OF-DES-001 §8.3). Every row is a paper
-// in the OF-COR-001 catalogue; the ingest queue lives on the Ingest screen.
+// that arrived through Intake; the ingest queue lives on the Ingest screen.
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -10,8 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Job, Paper } from '@/data/types';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, useProgramFilter, useStore } from '@/store';
+import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
@@ -112,36 +111,10 @@ function TagList({ items, max = 2 }: { items: string[]; max?: number }) {
   );
 }
 
-/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
-function archivedNames(paperIds: string[]): string {
-  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
-  return PROGRAMS.filter((p) => hit.has(p.id))
-    .map((p) => p.name)
-    .join(' and ');
-}
-
 export default function BioRepo() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
-  const allCollections = useStore((s) => s.collections);
-  // OF-BLD-016 §2.2: every paper, record, collection and count on this
-  // screen passes through the one program filter. With archived programs
-  // hidden (the default) a casein or PHA paper is not listed, not counted
-  // and not offered in a collection; with the switch on, this is the whole
-  // library exactly as before.
-  const shows = useProgramFilter();
-  // A collection shows while it is empty or holds a paper that shows, and
-  // counts the papers that show.
-  const collections = useMemo(
-    () => allCollections.filter((c) => c.paperIds.length === 0 || c.paperIds.some((id) => shows('paper', id))),
-    [allCollections, shows],
-  );
-  const shownIn = (paperIds: string[]) => paperIds.filter((id) => shows('paper', id)).length;
-  const hiddenPapers = useMemo(
-    () => papers.filter((p) => p.ingest !== 'shelf' && !shows('paper', p.id)).map((p) => p.id),
-    [papers, shows],
-  );
-  const shownRecords = useMemo(() => records.filter((r) => shows('record', r.id)).length, [records, shows]);
+  const collections = useStore((s) => s.collections);
   const jobs = useStore((s) => s.jobs);
   const density = useStore((s) => s.ui.density);
   const toast = useStore((s) => s.toast);
@@ -158,7 +131,7 @@ export default function BioRepo() {
       byPaper.set(r.paperId, agg);
     }
     return papers
-      .filter((p) => p.ingest !== 'shelf' && shows('paper', p.id))
+      .filter((p) => p.ingest !== 'shelf')
       .map((paper) => {
         const agg = byPaper.get(paper.id) ?? { total: 0, gold: 0, verified: 0 };
         const ingestKey: LibRow['ingestKey'] = paper.ingest.startsWith('failed:')
@@ -190,7 +163,7 @@ export default function BioRepo() {
           ingestKey,
         };
       });
-  }, [papers, records, collections, shows]);
+  }, [papers, records, collections]);
 
   const activeCollection = collections.find((c) => c.id === collectionFilter) ?? null;
   const rows = useMemo(
@@ -424,19 +397,9 @@ export default function BioRepo() {
       title="BioRepo"
       subtitle={
         <>
-          Real literature, catalogued by hand — <span className="font-num">{allRows.length}</span> papers carrying{' '}
-          <span className="font-num">{shownRecords}</span> extraction records. Filters combine with AND
+          Papers that arrived through Intake — <span className="font-num">{allRows.length}</span> papers carrying{' '}
+          <span className="font-num">{records.length}</span> extraction records. Filters combine with AND
           across groups and OR inside a group.
-          {hiddenPapers.length > 0 && (
-            <span className="block text-caption text-ink-soft mt-0.5" data-testid="archived-hidden">
-              <span className="font-num">{hiddenPapers.length}</span> papers in {archivedNames(hiddenPapers)} are
-              hidden, because archived programs are.{' '}
-              <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
-                Settings → Programs
-              </a>{' '}
-              shows them.
-            </span>
-          )}
         </>
       }
       actions={headerActions}
@@ -445,21 +408,6 @@ export default function BioRepo() {
     </>
   );
 
-  if (allRows.length === 0 && hiddenPapers.length > 0) {
-    return (
-      <>
-        {header}
-        <Card>
-          <EmptyState
-            title="Every paper here is in an archived program"
-            body={`The ${hiddenPapers.length} papers in ${archivedNames(hiddenPapers)} are hidden, because archived programs are hidden unless you turn them on. Nothing was deleted.`}
-            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Show archived programs in Settings</LinkButton>}
-          />
-        </Card>
-      </>
-    );
-  }
-
   if (allRows.length === 0) {
     return (
       <>
@@ -467,7 +415,7 @@ export default function BioRepo() {
         <Card>
           <EmptyState
             title="No papers in the corpus yet"
-            body="Every paper is still in the ingest queue. Fetch one to see it flow through fetch, parse, chunk, embed and extract."
+            body="Documents arrive through Intake: a paper fetched there flows through fetch, parse, chunk, embed and extract, and lands here with its records."
             action={<LinkButton to="/intake/ingest">Open the ingest board</LinkButton>}
           />
         </Card>
@@ -567,9 +515,7 @@ export default function BioRepo() {
         emptyBody={
           activeCollection
             ? `${activeCollection.name} has no papers in it.`
-            : hiddenPapers.length > 0
-              ? `Nothing in the corpus matches the current filters. ${hiddenPapers.length} papers in ${archivedNames(hiddenPapers)} are not searched, because archived programs are hidden; Settings → Programs shows them.`
-              : 'Nothing in the corpus matches the current filters.'
+            : 'Nothing in the corpus matches the current filters.'
         }
         toolbar={
           activeCollection ? (
@@ -580,7 +526,7 @@ export default function BioRepo() {
             >
               <Layers size={12} /> {activeCollection.name}
               <span className="font-num text-caption text-ink-soft">
-                {shownIn(activeCollection.paperIds)}
+                {activeCollection.paperIds.length}
               </span>
               <X size={11} />
             </button>

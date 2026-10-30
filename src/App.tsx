@@ -22,7 +22,6 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
 import { GuidedTour } from '@/components/GuidedTour';
 import { SHORTCUTS } from '@/data/shortcuts';
-import { MODULES } from '@/data/learn';
 import { RAIL, redirectFor } from '@/data/nav';
 
 import Home from '@/screens/Home';
@@ -42,8 +41,6 @@ import BioRepoArtifacts from '@/screens/BioRepoArtifacts';
 import BioRepoSearch from '@/screens/BioRepoSearch';
 import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
-import Molecules from '@/screens/Molecules';
-import MoleculeDetail from '@/screens/MoleculeDetail';
 import Runbooks from '@/screens/Runbooks';
 import RunbookDetail from '@/screens/RunbookDetail';
 import Protocols from '@/screens/Protocols';
@@ -66,7 +63,6 @@ import PureOS from '@/screens/PureOS';
 import PureOSTrain from '@/screens/PureOSTrain';
 import PureOSBuilder from '@/screens/PureOSBuilder';
 import FermOS from '@/screens/FermOS';
-import Dominion from '@/screens/Dominion';
 import Depositions from '@/screens/Depositions';
 import RunbookLedger from '@/screens/RunbookLedger';
 
@@ -220,9 +216,6 @@ function Screen() {
       // OF-BLD-014 §9.3 — 'ledger' is reserved too; check:seed refuses a runbook with that id.
       if (b === 'ledger') return <RunbookLedger />;
       return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
-    case 'dominion':
-      if (b === 'molecules' && c) return <MoleculeDetail productId={c} />;
-      return <Dominion />;
     case 'primer':
       // Lesson ids are globally unique, so /primer/l0-1 addresses a lesson on
       // its own. /primer/m0/l0-1 still resolves — an old deep link should not
@@ -233,7 +226,7 @@ function Screen() {
       if (b === 'practice') return <PrimerPractice id={c} />;
       if (b && c) return <PrimerLesson moduleId={b} lessonId={c} />;
       if (b) {
-        const owner = MODULES.find((m) => m.lessons.some((l) => l.id === b));
+        const owner = useStore.getState().modules.find((m) => m.lessons.some((l) => l.id === b));
         if (owner) return <PrimerLesson moduleId={owner.id} lessonId={b} />;
       }
       return <Primer />;

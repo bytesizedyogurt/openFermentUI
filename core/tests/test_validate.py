@@ -377,7 +377,7 @@ from openferment_core.validate import (  # noqa: E402
     anchor_all,
     anchor_candidate,
     carbon_source_id,
-    strain_id,
+    match_whole_word,
 )
 
 RESOLVERS = Path(__file__).parent / "fixtures" / "resolvers.json"
@@ -397,7 +397,7 @@ RX = _resolvers()
 
 @pytest.mark.parametrize("case", RX["strains"], ids=lambda c: repr(c["text"]))
 def test_the_strain_resolver_answers_as_the_browser_does(case):
-    assert strain_id(case["text"]) == case["id"]
+    assert match_whole_word(case["text"], RX["strainAliases"]) == case["id"]
 
 
 @pytest.mark.parametrize("case", RX["carbon"], ids=lambda c: repr(c["text"]))
@@ -409,17 +409,12 @@ def test_the_resolver_fixture_covers_both_rules_and_their_refusals():
     # The cases that make the rule a rule: an exact alias, one found as a
     # whole word, one glued to other letters, and two ids in one wording.
     strains = {c["text"]: c["id"] for c in RX["strains"]}
-    assert strains["cw15"] == "cw15"
-    assert strains["Chlamydomonas reinhardtii UVM4"] == "uvm4"
-    assert strains["uvm40"] is None and strains["xuvm4"] is None
-    assert strains["cw15 and UVM4 crossed"] is None
-    # Thread Q: a designation resolves; the species, the bare CEN.PK family,
-    # its other members and an S288C derivative do not.
-    assert strains["Saccharomyces cerevisiae S288C"] == "s-cerevisiae-s288c"
-    assert strains["CEN.PK113-7D MATa"] == "s-cerevisiae-cenpk113-7d"
-    assert strains["Saccharomyces cerevisiae"] is None and strains["cen.pk"] is None
-    assert strains["CEN.PK2-1C"] is None and strains["CEN.PK113-5D"] is None
-    assert strains["BY4741"] is None
+    assert strains["ab12"] == "strain-ab12"
+    assert strains["Genus species CD34"] == "strain-cd34"
+    assert strains["cd340"] is None and strains["xcd34"] is None
+    assert strains["ab12 and cd34 crossed"] is None
+    assert strains["Genus  species   ab12-3"] == "strain-ab12"
+    assert strains["X. testus"] is None and strains["constructor"] is None
     carbon = {c["text"]: c["id"] for c in RX["carbon"]}
     assert carbon["crude glycerol"] == "glycerol"
     assert carbon["glucosamine"] is None and carbon["glucose and xylose"] is None
@@ -430,9 +425,21 @@ def test_the_resolver_fixture_covers_both_rules_and_their_refusals():
 WORDING_SECTION = [
     {
         "id": "s1",
-        "text": "In the imaginary run, Chlamydomonas reinhardtii UVM4 secreted the reporter to 15 mg L-1.",
+        "text": "In the imaginary run, Testus organismus AB12 secreted the reporter to 15 mg L-1.",
     }
 ]
+
+
+@pytest.fixture(autouse=True)
+def _test_strains(monkeypatch):
+    """A strain alias table of fictional strains: the service ships none, since
+    strains arrive with a project's records (alpha 2.0, ADR-010)."""
+    import openferment_core.validate as module
+
+    real = module.vocabulary()
+    monkeypatch.setattr(module, "vocabulary", lambda path=None: {
+        **real, "strains": {"ab12": "strain-ab12", "ab12-3": "strain-ab12", "cd34": "strain-cd34"},
+    })
 
 
 def _anchored(organism: str):
@@ -447,31 +454,31 @@ def _anchored(organism: str):
 
 
 def test_wording_that_contains_a_known_designation_resolves_to_its_strain_id():
-    c = _anchored("Chlamydomonas reinhardtii UVM4")
-    assert c.organism == "uvm4", "the strain id, which every screen matches on"
-    assert c.organismText == "Chlamydomonas reinhardtii UVM4", "the paper's wording, kept beside it"
+    c = _anchored("Testus organismus AB12")
+    assert c.organism == "strain-ab12", "the strain id, which every screen matches on"
+    assert c.organismText == "Testus organismus AB12", "the paper's wording, kept beside it"
 
 
 def test_an_exact_alias_resolves_too():
-    c = _anchored("UVM11")
-    assert c.organism == "uvm4" and c.organismText == "UVM11"
+    c = _anchored("AB12-3")
+    assert c.organism == "strain-ab12" and c.organismText == "AB12-3"
 
 
 def test_wording_that_names_the_species_alone_stays_as_written():
-    c = _anchored("Chlamydomonas reinhardtii")
-    assert c.organism == "Chlamydomonas reinhardtii"
+    c = _anchored("Testus organismus")
+    assert c.organism == "Testus organismus"
     assert c.organismText is None, "nothing was resolved, so organism already holds the wording"
 
 
 def test_wording_that_names_two_strains_is_not_resolved_to_either():
-    c = _anchored("UVM4 crossed with cw15")
-    assert c.organism == "UVM4 crossed with cw15" and c.organismText is None
+    c = _anchored("AB12 crossed with CD34")
+    assert c.organism == "AB12 crossed with CD34" and c.organismText is None
 
 
 def test_resolving_the_organism_does_not_move_the_content_id():
     # A decision keyed by content stays on its candidate when anchoring
     # learns to resolve the wording it was made about.
-    assert _anchored("Chlamydomonas reinhardtii UVM4").id == _anchored("Chlamydomonas reinhardtii").id
+    assert _anchored("Testus organismus AB12").id == _anchored("Testus organismus").id
 
 
 # ── the carbon source at anchoring ─────────────────────────────────────

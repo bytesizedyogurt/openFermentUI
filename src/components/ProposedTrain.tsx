@@ -62,7 +62,7 @@ export function ProposalReasonLine({ reason }: { reason: ProposalReason }) {
             </a>
           </>
         ) : (
-          ' from the products seed'
+          ' from the products catalogue'
         )}
       </div>
       <div className="text-body text-ink-soft" data-testid="proposal-words">

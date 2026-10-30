@@ -40,7 +40,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import fermos, kinetics, programs
+from .. import fermos, kinetics
 from ..models import SimulationRequest, ToolResult
 from . import Tool, ToolContext, register
 
@@ -93,18 +93,8 @@ SIM_NAME = "fermos_simulate"
 
 
 def _offered() -> list[str]:
-    """The families a description may name: none of an archived program
-    (storage_v1 is PHA's), and none when no projection says which are."""
-    out = []
-    for fid, fam in kinetics.FAMILIES.items():
-        try:
-            if fam.program and programs.is_archived(fam.program):
-                continue
-        except FileNotFoundError:
-            if fam.program:
-                continue
-        out.append(fid)
-    return out
+    """The families a description may name: every family kinetics.py holds."""
+    return list(kinetics.FAMILIES)
 
 
 def _bindable(families: list[str]) -> str:
@@ -133,7 +123,7 @@ class FermosSimulateInput(BaseModel):
         + "; GET /api/fermos/families and fermOS → Simulate list them with their equations."))
     strain: str = Field("", description=(
         "A strain's id from geneOS's hosts (geneos_read, kind host), or an empty string: then the records of every "
-        "strain of the program's organism bind."))
+        "strain bind."))
     product: str = Field("", description="The product's id (ethanol), or an empty string.")
     sugar: str = Field("", description="The sugar's carbon-source id (glucose), or an empty string.")
     recordsByParam: dict[str, list[str]] = Field(default_factory=dict, description=(

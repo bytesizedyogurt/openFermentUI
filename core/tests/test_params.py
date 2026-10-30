@@ -31,6 +31,8 @@ from openferment_core.models import (
 ETHANOL = "ethanol_glucose_v0"
 BY = "openFerment test fixture"
 MADE_HERE = "sc-k3x9q-1"  # an id as the browser's createScenario makes them
+HELD = "sc-held-1"  # a scenario the service holds by its id, as the `held` fixture holds it
+SCOPE = f"proforma:{HELD}"
 RULE = ["fit", "record:growth_rate_mu", "artifact", "simulation", "assumption", "convention", "library-default"]
 
 
@@ -53,6 +55,15 @@ def override(key="mu_max", value=0.3, scope="fermos:family:batch_v1", **kw) -> O
     return Override(**base)
 
 
+@pytest.fixture(autouse=True)
+def held(monkeypatch):
+    """One scenario the service holds by its id, on the ethanol flowsheet (the
+    seed's went with the seed, alpha 2.0, ADR-010)."""
+    row = {"id": HELD, "name": "A held test scenario", "kind": "biosteam", "modelId": ETHANOL}
+    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [row])
+    return row
+
+
 @pytest.fixture()
 def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
@@ -73,10 +84,9 @@ def standin(monkeypatch, store):
 
     monkeypatch.setattr(proforma, "call", no_worker)
     monkeypatch.setattr(artifacts, "compute", no_compute)
-    monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = standins._standin_records() + standins._standin_yeast_records()
+    rs = standins._standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: pool)
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: pool)
     return pool
 
 
@@ -94,10 +104,10 @@ def test_a_scope_names_one_of_four_kinds_and_anything_else_is_refused_in_words()
     assert params.parse_scope("fermos:family:batch_v1") == ("fermos-family", ("batch_v1",))
     assert params.parse_scope("fermos:vessel:0123456789abcdef") == ("fermos-vessel", ("0123456789abcdef",))
     assert params.parse_scope("pureos:unit:train-1:u2") == ("pureos-unit", ("train-1", "u2"))
-    assert params.parse_scope("proforma:sc-yeast-1") == ("proforma", ("sc-yeast-1",))
+    assert params.parse_scope(SCOPE) == ("proforma", (HELD,))
     assert params.scope_name("pureos-unit", "train-1", "u2") == "pureos:unit:train-1:u2"
     for bad in ("", "proforma:", "proforma", "proforma:sc 1", "proforma:sc/1", "fermos:vessel:a:b", "fermos:family",
-                "pureos:unit:t", "geneos:model:x", "PROFORMA:sc-yeast-1", "proforma:-x"):
+                "pureos:unit:t", "geneos:model:x", "PROFORMA:sc-held-1", "proforma:-x"):
         with pytest.raises(params.ParamRefused, match="a parameter scope is fermos:family:<family id>"):
             params.parse_scope(bad)
 
@@ -273,24 +283,19 @@ def test_a_flowsheets_inputs_are_its_specs_with_bounds_and_their_reasons():
     assert feed.sourceRule == ["record:medium_component_conc", "assumption"]
     assert titre.sourceRule == ["fit", "simulation", "record:ethanol_titre", "assumption"], \
         "a chosen fit or kept simulation (§8.R: served as a simulation) replaces the records"
-    from openferment_core import units
-
-    lo, hi = units.field("ethanol_titre")["range"]
-    assert (titre.min, titre.max) == (lo, hi) and "ontology's plausibility range for ethanol_titre" in titre.boundsReason
+    # A record field carries no range (alpha 2.0, ADR-010): a bound is a physical limit.
+    assert (titre.min, titre.max) == (0.0, None) and titre.boundsReason == "a physical limit: no negative ethanol titre at harvest"
     assert (scale.min, scale.max, scale.sourceRule) == (0.0, None, ["assumption"])
     assert scale.boundsReason == "a physical limit: no negative ethanol fermented in a year"
     assert purity.sourceRule == ["convention"] and purity.convention == "fuel grade" and purity.min is None
     assert purity.note == shelf.info(ETHANOL).inputs[-1].note
-    pha = {s.key: s for s in params.flowsheet_specs(shelf.info("pha_sugar_v0"))}
-    assert (pha["content"].min, pha["content"].max) == (0.0, 1.0) and "does not convert into g g-1" in pha["content"].boundsReason
-    assert (pha["recovery"].min, pha["recovery"].max) == (0.0, 1.0)
     corn = params.flowsheet_specs(shelf.info("corn_drygrind"))
     assert all(s.sourceRule == ["library-default"] and "package's own default" in s.boundsReason for s in corn)
 
 
 def test_the_provider_binds_what_bind_inputs_binds(standin):
     bound = {i.key: i for i in proforma.bind_inputs(ETHANOL, standin.records)}
-    for got in (params.scope("proforma:sc-yeast-1"),
+    for got in (params.scope(SCOPE),
                 params.scope(f"proforma:{MADE_HERE}", ParamResolveRequest(flowsheet=ETHANOL))):
         assert got.kind == "proforma" and [s.key for s in got.specs] == [i.key for i in shelf.info(ETHANOL).inputs]
         values = {v.key: v for v in got.values}
@@ -304,8 +309,8 @@ def test_the_provider_binds_what_bind_inputs_binds(standin):
                 assert inp.binding == "waiting" and v.origin == "waiting" and v.value is None
         assert got.waiting == [k for k, i in bound.items() if i.binding == "waiting"] == ["plant_scale", "glucose_price"]
         assert values["feed_glucose_conc"].detail.startswith("3 records of medium_component_conc, 20 to 100 g L-1, median 60")
-    assert params.scope("proforma:sc-yeast-1").title.endswith(f"({shelf.info(ETHANOL).title})")
-    narrowed = params.scope("proforma:sc-yeast-1", ParamResolveRequest(host="nobody"))
+    assert params.scope(SCOPE).title.endswith(f"({shelf.info(ETHANOL).title})")
+    narrowed = params.scope(SCOPE, ParamResolveRequest(host="nobody"))
     assert "titre" in narrowed.waiting
 
 
@@ -321,8 +326,8 @@ def test_a_fit_a_person_chose_is_the_first_source_of_titre():
 
 
 def test_an_override_of_a_proforma_input_is_an_assumption_in_the_basis(standin):
-    o = override(key="glucose_price", value=0.4, low=0.3, high=0.5, scope="proforma:sc-yeast-1")
-    r = params.resolve_scope("proforma:sc-yeast-1", ParamResolveRequest(overrides=[o]))
+    o = override(key="glucose_price", value=0.4, low=0.3, high=0.5, scope=SCOPE)
+    r = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[o]))
     values = {v.key: v for v in r.values}
     assert values["glucose_price"].origin == "assumption" and values["glucose_price"].overriddenBy == BY
     assert r.waiting == ["plant_scale"] and r.warnings == []
@@ -331,24 +336,24 @@ def test_an_override_of_a_proforma_input_is_an_assumption_in_the_basis(standin):
                                                proforma.ASSUMPTIONS_READ]
     assert all(i.unit == "USD kg-1" and i.source.kind == "assumption" and i.source.by == BY for i in r.basisInputs[:3])
     # D4: a person may type outside the bounds; it is kept and said.
-    far = params.resolve_scope("proforma:sc-yeast-1", ParamResolveRequest(overrides=[
-        override(key="titre", value=400.0, scope="proforma:sc-yeast-1")]))
+    far = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[
+        override(key="titre", value=-5.0, scope=SCOPE)]))
     titre = next(v for v in far.values if v.key == "titre")
-    assert titre.value == 400.0 and titre.origin == "assumption" and far.warnings == [titre.outOfBounds]
-    assert "ontology's plausibility range for ethanol_titre" in titre.outOfBounds
-    with pytest.raises(params.ParamRefused, match="sent to proforma:sc-yeast-1: proforma:sc-pha-1"):
-        params.resolve_scope("proforma:sc-yeast-1", ParamResolveRequest(overrides=[override(scope="proforma:sc-pha-1")]))
+    assert titre.value == -5.0 and titre.origin == "assumption" and far.warnings == [titre.outOfBounds]
+    assert "no negative ethanol titre at harvest" in titre.outOfBounds
+    with pytest.raises(params.ParamRefused, match=f"sent to {SCOPE}: proforma:sc-other-1"):
+        params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[override(scope="proforma:sc-other-1")]))
 
 
 # ── the endpoints ──────────────────────────────────────────────────────
 
 
 def test_get_serves_a_scope_and_refuses_in_words(client):
-    r = client.get("/api/params/proforma:sc-yeast-1")
+    r = client.get(f"/api/params/{SCOPE}")
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"scope", "kind", "title", "specs", "values", "waiting", "notes"}
-    assert body["scope"] == "proforma:sc-yeast-1" and body["kind"] == "proforma"
+    assert body["scope"] == SCOPE and body["kind"] == "proforma"
     assert all(s["boundsReason"].strip() for s in body["specs"]) and len(body["specs"]) == len(body["values"])
     assert set(body["values"][0]) == set(ParameterValue.model_fields)
     made = client.get(f"/api/params/proforma:{MADE_HERE}?flowsheet={ETHANOL}")
@@ -359,20 +364,19 @@ def test_get_serves_a_scope_and_refuses_in_words(client):
         ("/api/params/fermos:vessel:0123456789abcdef", 404, "no artifact '0123456789abcdef' is on file here"),
         ("/api/params/pureos:unit:t1:u1", 404, "pureOS's train units"),
         ("/api/params/nothing-at-all", 422, "a parameter scope is"),
-        ("/api/params/proforma:sc-yeast-1/resolve", 422, "a parameter scope is"),
-        ("/api/params/proforma:sc-s1", 422, "authored scenario"),
+        (f"/api/params/{SCOPE}/resolve", 422, "a parameter scope is"),
         (f"/api/params/proforma:{MADE_HERE}?flowsheet=cornstover_benchmark", 422, "reference biorefinery"),
-        ("/api/params/proforma:sc-yeast-1?flowsheet=pha_sugar_v0", 422, "sc-yeast-1 runs ethanol_glucose_v0"),
-        ("/api/params/proforma:sc-yeast-1?fits=[1]", 422, "fits is a JSON object"),
-        ("/api/params/proforma:sc-yeast-1?fits={\"recovery\":\"0123456789abcdef\"}", 422, "a fermOS fit feeds"),
+        (f"/api/params/{SCOPE}?flowsheet=custom_train_v1", 422, f"{HELD} runs ethanol_glucose_v0"),
+        (f"/api/params/{SCOPE}?fits=[1]", 422, "fits is a JSON object"),
+        (f"/api/params/{SCOPE}?fits=" + '{"plant_scale":"0123456789abcdef"}', 422, "a fermOS fit feeds"),
     ):
         r = client.get(path)
         assert r.status_code == status and words in r.json()["detail"], (path, r.status_code, r.json())
 
 
 def test_post_resolves_overrides_and_runs_nothing(client, store):
-    o = override(key="plant_scale", value=100000.0, scope="proforma:sc-yeast-1").model_dump()
-    r = client.post("/api/params/proforma:sc-yeast-1/resolve", json={"overrides": [o]})
+    o = override(key="plant_scale", value=100000.0, scope=SCOPE).model_dump()
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={"overrides": [o]})
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"scope", "values", "waiting", "basisInputs", "warnings", "notes"}
@@ -386,20 +390,20 @@ def test_post_resolves_overrides_and_runs_nothing(client, store):
     for payload, status, words in (
         ({"overrides": [{**o, "by": "me"}]}, 422, "placeholder"),
         ({"overrides": [{**o, "key": "sugarFeed"}]}, 422, "there is no parameter sugarFeed here"),
-        ({"overrides": [{**o, "scope": "proforma:sc-pha-1"}]}, 422, "names the scope it changes"),
+        ({"overrides": [{**o, "scope": "proforma:sc-other-1"}]}, 422, "names the scope it changes"),
         ({"overrides": [{**o, "value": "a lot"}]}, 422, "takes a number, not words"),
     ):
-        r = client.post("/api/params/proforma:sc-yeast-1/resolve", json=payload)
+        r = client.post(f"/api/params/{SCOPE}/resolve", json=payload)
         assert r.status_code == status and words in r.json()["detail"], (payload, r.json())
     assert client.post("/api/params/proforma:nowhere/resolve", json={}).status_code == 404
     assert client.post("/api/params/bogus/resolve", json={}).status_code == 422
 
 
 def test_the_post_is_guarded_like_every_changing_request(client):
-    r = client.post("/api/params/proforma:sc-yeast-1/resolve", json={},
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={},
                     headers={"host": "127.0.0.1:8000", "origin": "https://evil.example.com"})
     assert r.status_code == 403 and "evil.example.com" in r.json()["detail"]
-    assert client.get("/api/params/proforma:sc-yeast-1", headers={"origin": "https://evil.example.com"}).status_code == 200
+    assert client.get(f"/api/params/{SCOPE}", headers={"origin": "https://evil.example.com"}).status_code == 200
 
 
 # ── OF-BLD-020 §2.R: the review's findings, held ───────────────────────
@@ -422,7 +426,7 @@ def test_a_parameter_whose_rule_takes_no_persons_value_refuses_an_override():
 
 def test_a_json_true_or_false_is_never_read_as_a_number():
     """§2.R finding 6: pydantic read `true` as 1.0 before any check saw it."""
-    base = override(scope="proforma:sc-yeast-1", key="glucose_price").model_dump()
+    base = override(scope=SCOPE, key="glucose_price").model_dump()
     for field in ("value", "low", "high"):
         for flag in (True, False):
             with pytest.raises(ValidationError, match="true or false"):
@@ -432,20 +436,16 @@ def test_a_json_true_or_false_is_never_read_as_a_number():
 
 def test_the_left_out_words_name_the_flowsheets_own_feed(monkeypatch, standin):
     """§2.R finding 15: the left-out line a person sees is the service's; it
-    names glucose for the ethanol flowsheet and a sugar or a hydrolysate for
-    the PHA draft, whose rule admits both."""
+    names glucose for the ethanol flowsheet."""
     from openferment_core import evidence_pool
 
-    other = [{**r, "id": f"{r['id']}-other", "carbonSource": c} for r, c in (
-        (next(r for r in standin.records if r["field"] == "ethanol_titre"), "xylose"),
-        (next(r for r in standin.records if r["field"] == "pha_titre"), "glycerol"))]
+    other = [{**r, "id": f"{r['id']}-other", "carbonSource": "xylose"}
+             for r in [next(r for r in standin.records if r["field"] == "ethanol_titre")]]
     rs = standin.records + other
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: SimpleNamespace(
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: SimpleNamespace(
         records=rs, records_by_id={r["id"]: r for r in rs}))
-    yeast = next(v for v in params.scope("proforma:sc-yeast-1").values if v.key == "titre")
+    yeast = next(v for v in params.scope(SCOPE).values if v.key == "titre")
     assert "1 record left out for naming a carbon source other than glucose" in yeast.detail and "hydrolysate" not in yeast.detail
-    pha = next(v for v in params.scope("proforma:sc-pha-1").values if v.key == "titre")
-    assert "1 record left out for naming a carbon source other than a sugar or a hydrolysate" in pha.detail, pha.detail
 
 
 def test_an_artifact_damaged_on_disk_under_a_vessel_scope_is_a_409_in_words(client, store):

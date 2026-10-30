@@ -1,13 +1,11 @@
-"""The Phase 3 review's binding, program, forecast and tool findings, each
-held (OF-BLD-020 §3.R, part B: findings 4, 6, 7, 9, 10, 11, 12, 13, 14, 15,
-16, 18, 19 and 20; 21 is test_check_tools' planted files).
+"""The Phase 3 review's binding, forecast and tool findings, each held
+(OF-BLD-020 §3.R, part B: findings 4, 7, 9, 11, 13, 15, 16 and 20; 21 is
+test_check_tools' planted files). Findings 6, 10, 12, 14, 18 and 19 held the
+program switch and the storage family, which alpha 2.0 removed (ADR-010).
 
-One rule runs through most of them: a simulation takes its program from its
-family and from what it rests on, and every list, read, bind and start
-honours the program switch as every other module does (CLAUDE.md
-*Programs*). A forecast's length a person typed is that person's assumption;
-a forecast chosen as a fit gives what it holds; a fit of a family gives the
-terms it held, so a simulation from it is the model that was fitted.
+A forecast's length a person typed is that person's assumption; a forecast
+chosen as a fit gives what it holds; a fit of a family gives the terms it
+held, so a simulation from it is the model that was fitted.
 
 Every value a person "types" here is a STAND-IN chosen in the test, every
 record is a STAND-IN written in the test, and every series is SYNTHETIC;
@@ -22,19 +20,16 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, audit, fermos, intake, kinetics, module_stores, params, proforma, proposals, tools
+from openferment_core import artifacts, audit, fermos, intake, kinetics, params, proforma, proposals, tools
 from openferment_core.models import Override, ParamResolveRequest, SimulationRequest
 
 BY = "openFerment test fixture"
 OTHER = "Another test fixture"
 BATCH = "batch_v1"
-STORAGE = "storage_v1"
 ETHANOL = proforma.ETHANOL
-EMPTY = SimpleNamespace(records=[], records_by_id={}, hidden={})
+EMPTY = SimpleNamespace(records=[], records_by_id={})
 # STAND-INs a person could type, chosen here, not values of anything.
 BATCH_TYPED = dict(mu_max=0.4, ks=0.2, yxs=0.12, alpha=2.0, yps=0.45, p_max=90.0, x0=0.2, s0=50.0, p0=0.0)
-STORAGE_TYPED = dict(mu_max=0.30, ks=0.5, yxs=0.45, yps=0.35, k_n=0.01, yxn=8.0, q_storage_max=0.15, q_max=0.8,
-                     x0=0.5, s0=30.0, n_initial=0.5)
 
 
 def typed(family=BATCH, by=BY, **values):
@@ -47,7 +42,7 @@ def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
     monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
     monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
-    monkeypatch.setattr(fermos, "_load_pool", lambda include_archived: EMPTY)
+    monkeypatch.setattr(fermos, "_load_pool", lambda *a, **k: EMPTY)
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
     return tmp_path
@@ -59,90 +54,15 @@ def _api():
     return TestClient(api.app)
 
 
-def _storage(product: str | None) -> str:
-    """A storage_v1 simulation (PHA's family) kept with the switch on, every
-    parameter typed by a person: what Sean could make and leave on file
-    before turning the switch off."""
-    return fermos.simulate(SimulationRequest(family=STORAGE, product=product, sugar="glucose", includeArchived=True,
-                                             overrides=typed(STORAGE, **STORAGE_TYPED)), by_pool=EMPTY).artifactId
-
-
 def _batch(**over) -> str:
     return fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
                                              overrides=typed(**{**BATCH_TYPED, **over})), by_pool=EMPTY).artifactId
 
 
-def _ctx(archived: bool, pool=EMPTY):
-    c = tools.ToolContext(pool_factory=lambda: pool, include_archived=archived)
+def _ctx(pool=EMPTY):
+    c = tools.ToolContext(pool_factory=lambda: pool)
     c.ask_id, c.model = "ask-3r", "claude-haiku-5-5"
     return c
-
-
-# ── a simulation keeps to its program (findings 6, 10, 12, 18, 19) ─────
-
-
-@pytest.mark.parametrize("product", [None, "ethanol", "phb"])
-def test_a_storage_v1_simulation_is_phas_and_hides_with_the_switch_off_wherever_it_is_listed(store, product):
-    sid = _storage(product)
-    assert module_stores.artifact_program(artifacts.get(sid)) == "pha", "its family is PHA's (finding 19)"
-    assert sid not in [s.artifactId for s in fermos.simulations(False)]
-    assert sid in [s.artifactId for s in fermos.simulations(True)]
-    client = _api()
-    assert sid not in [s["artifactId"] for s in client.get("/api/fermos/simulations").json()]
-    # fermOS's read tool returns no row for it with the switch off, and says what it hides.
-    off = tools.run("fermos_read", {"ids": [], "words": "", "kind": "simulation", "state": "", "limit": 10}, _ctx(False))
-    assert off.error is None and not [r for r in off.rows if sid in r.ref], off.summary
-    on = tools.run("fermos_read", {"ids": [], "words": "", "kind": "simulation", "state": "", "limit": 10}, _ctx(True))
-    assert [r for r in on.rows if sid in r.ref]
-    # Proforma's "Use a fermOS fit" list on the yeast scenario's page (findings 10, 12).
-    assert sid not in [f.artifactId for f in proforma.fermos_fits(ETHANOL)]
-    assert sid in [f.artifactId for f in proforma.fermos_fits(ETHANOL, include_archived=True)]
-    listed = client.get("/api/fermos/fits", params={"flowsheet": ETHANOL}).json()
-    assert sid not in [f["artifactId"] for f in listed]
-    listed = client.get("/api/fermos/fits", params={"flowsheet": ETHANOL, "includeArchived": "true"}).json()
-    assert sid in [f["artifactId"] for f in listed]
-
-
-def test_an_archived_kept_simulation_is_refused_as_a_start_with_the_switch_off_and_binds_with_it_on(store):
-    sid = _storage("phb")
-    start = f"simulation:{sid}"
-    words = "PHA, archived (hidden)"
-    # The binding the API, the panel and the tool share (findings 6, 18).
-    with pytest.raises(fermos.SimulationRefused, match=r"PHA, archived \(hidden\)") as e:
-        fermos.bind(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", startFrom=start))
-    assert sid in str(e.value) and "Settings → Programs" in str(e.value)
-    on = fermos.bind(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", startFrom=start,
-                                       includeArchived=True))
-    assert {v.key for v in on.values if v.origin == "simulation"} >= {"mu_max", "x0", "s0"}
-    client = _api()
-    ask = {"family": BATCH, "product": "ethanol", "sugar": "glucose", "startFrom": start}
-    r = client.get("/api/fermos/bind", params=ask)
-    assert r.status_code == 422 and words in r.json()["detail"]
-    assert client.get("/api/fermos/bind", params={**ask, "includeArchived": "true"}).status_code == 200
-    r = client.post("/api/fermos/simulate", json={**ask, "overrides": [o.model_dump() for o in typed(alpha=2.0, p_max=90.0, p0=0.0)]})
-    assert r.status_code == 422 and words in r.json()["detail"]
-    r = client.get(f"/api/params/{fermos.family_scope(BATCH)}", params=ask)
-    assert r.status_code == 422 and words in r.json()["detail"]
-    # fermos_simulate: the refusal, no evidence, no artifact, no audit line.
-    before = {a.id for a in artifacts.all_artifacts()}
-    t = tools.run("fermos_simulate", {"family": BATCH, "product": "ethanol", "sugar": "glucose", "startFrom": start},
-                  _ctx(False))
-    assert t.error and words in t.error and t.error.startswith("fermos_simulate refused: kept simulation"), t.error
-    assert ".." not in t.error and t.evidence == [] and audit.read() == []
-    assert {a.id for a in artifacts.all_artifacts()} == before
-
-
-def test_a_simulation_built_on_an_archived_one_hides_with_it(store):
-    sid = _storage("phb")
-    built = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
-                                              startFrom=f"simulation:{sid}", includeArchived=True,
-                                              overrides=typed(alpha=2.0, p_max=90.0, p0=0.0)), by_pool=EMPTY)
-    assert module_stores.artifact_program(artifacts.get(built.artifactId)) == "pha"
-    assert built.artifactId not in [s.artifactId for s in fermos.simulations(False)]
-    # A simulation of the active program's family, on nothing archived, stays general and shows.
-    general = _batch()
-    assert module_stores.artifact_program(artifacts.get(general)) is None
-    assert general in [s.artifactId for s in fermos.simulations(False)]
 
 
 # ── a damaged kept simulation is a refusal in words (finding 9) ────────
@@ -259,15 +179,10 @@ def test_a_simulation_from_a_batch_fit_with_nothing_else_named_runs_the_fitted_m
         assert np.allclose(got, want, rtol=0.02, atol=0.05), (state, got, want)
 
 
-# ── a store is not a product in the broth (finding 14) ─────────────────
+# ── a batch simulation feeds a flowsheet's titre (finding 14) ──────────
 
 
-def test_a_storage_simulation_is_refused_as_a_flowsheets_titre_whatever_product_it_names(store):
-    sid = _storage("ethanol")
-    info = proforma.fit_info(artifacts.get(sid), ETHANOL)
-    assert info.refused and "a store inside the cells (Q)" in info.refused
-    assert all(f.refused and f.value is None for f in info.feeds)
-    # A batch simulation of ethanol still feeds it.
+def test_a_batch_simulation_of_ethanol_feeds_the_flowsheets_titre(store):
     ok = proforma.fit_info(artifacts.get(_batch()), ETHANOL)
     assert ok.refused is None and all(f.value is not None for f in ok.feeds)
 
@@ -294,16 +209,18 @@ def test_a_fed_batch_parameter_its_profile_does_not_read_is_not_waiting_in_the_p
 def test_fermos_simulates_flags_say_a_value_out_of_bounds_by_its_key_and_end_at_a_full_stop(store):
     from test_fermos_bind import STANDIN, pool_of, rec
 
-    pool = pool_of(*STANDIN, rec("mu-hi", "growth_rate_mu", 3.75, "h-1"))
+    # A STAND-IN yield above the physical limit of Yx/s: a gram of substrate
+    # makes at most a gram of cells.
+    pool = pool_of(*STANDIN, rec("yxs-hi", "biomass_yield_substrate", 3.75, "g g-1"))
     start = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
                                               overrides=typed(x0=0.2, p0=0.0, alpha=2.0, p_max=90.0)),
                             by_pool=pool).artifactId
     r = tools.run("fermos_simulate", {"family": BATCH, "product": "ethanol", "sugar": "glucose",
-                                      "recordsByParam": {"mu_max": ["mu-hi"]}, "startFrom": f"simulation:{start}"},
-                  _ctx(True, pool))
+                                      "recordsByParam": {"yxs": ["yxs-hi"]}, "startFrom": f"simulation:{start}"},
+                  _ctx(pool))
     assert r.error is None, r.error
     flags = r.summary["flags"]
-    assert any(f.startswith("mu_max lies outside its bounds") for f in flags), flags
+    assert any(f.startswith("yxs lies outside its bounds") for f in flags), flags
     assert all("3.75" not in f for f in flags) and all(f.endswith(".") for f in flags), flags
     # The artifact keeps the whole words, the value with them.
     assert any("3.75" in f for f in artifacts.get(r.summary["artifactId"]).output["flags"])

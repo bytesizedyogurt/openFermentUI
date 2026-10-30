@@ -11,7 +11,7 @@ values from (`readFrom`). The browser keeps a train whole and sends it with a
 run; the service keeps the runs.
 
     validate(spec)           every refusal at once, in words; runs nothing
-    inlet_stream(spec, overrides=None, by=None, include_archived=True)
+    inlet_stream(spec, overrides=None, by=None)
                              the inlet as data (D10): a kept simulation's broth
                              at harvest (cells, product and sugar in g L⁻¹ by
                              the simulation's own units, read as the program's
@@ -30,14 +30,14 @@ run; the service keeps the runs.
                              its broth (`brothStream`), refused in words naming
                              the run's streams when it names none; the basis's
                              `inlet source` says which source was read
-    run_train(spec, overrides=None, by=None, include_archived=False)
+    run_train(spec, overrides=None, by=None)
                              resolve every parameter of every unit with its
                              source, refuse what waits in words, and keep one
                              `pureos.train_run` artifact; the Proforma worker
                              builds and runs the train (op `train_run`,
                              flowsheets/train.py), and nothing here imports
                              BioSTEAM (E.3‴)
-    train_runs(include_archived)  every kept train run, newest first
+    train_runs()  every kept train run, newest first
     program_of_run(art)      a train run's program: the train's, its inlet's
                              and what its records name, an archived one winning
 
@@ -138,11 +138,28 @@ SIMULATION = "fermos.simulation"
 VESSEL = "fermos.vessel"
 # The artifacts whose stream table a run-stream inlet reads.
 STREAM_TOOLS = ("proforma.run", "proforma.reference", TRAIN_RUN)
-# The chemical set a program's trains build on, in words: the worker builds
-# every train on it (flowsheets/ethanol_glucose_v0.create_chemicals), and a
-# program with none here has no train yet.
+# The chemical sets pureOS builds a train on, by key, in words: the worker
+# builds every train on the one there is (flowsheets/ethanol_glucose_v0.
+# create_chemicals). `chemical_set` reads the one a train builds on.
 PROGRAM_CHEMICALS = {"yeast": "the yeast program's chemicals, as the ethanol flowsheet builds on them "
                               "(biorefineries.corn.create_chemicals)"}
+
+
+def chemical_set(program: str | None) -> str:
+    """The chemical set a train builds on, by its key: the program the train
+    names when pureOS holds that set; else, while pureOS holds one set, that
+    one, as `build._program` reads a run's (a train made in the browser names
+    none). `program` is the key until stage 4 reads the set from the train's
+    flowsheet."""
+    if program in PROGRAM_CHEMICALS:
+        return str(program)
+    if len(PROGRAM_CHEMICALS) == 1:
+        (only,) = PROGRAM_CHEMICALS
+        return only
+    raise TrainRefused(f"pureOS holds the chemical sets {', '.join(PROGRAM_CHEMICALS)}; a train names the one it "
+                       f"builds on, and {program!r} is none of them")
+
+
 # What a simulation's cells and sugar are read as in that set: names.
 CELLS = {"yeast": "Yeast"}
 SUGAR_CHEMICALS = {"glucose": "Glucose"}
@@ -299,7 +316,8 @@ def refusals_by_place(spec: TrainSpec) -> list[tuple[str, str]]:
     def at(place: str, words: str) -> None:
         said.append((place, words))
 
-    for word, value in (("train", spec.id), ("program", spec.program), ("product", spec.product)):
+    named = (("train", spec.id), ("product", spec.product), *((("program", spec.program),) if spec.program else ()))
+    for word, value in named:
         if not re.fullmatch(params._ID, value or ""):
             at("train", f"a {word} is named by its id (letters, digits, dots, dashes, underscores); {value!r} is not one")
     if not (spec.name or "").strip():
@@ -449,21 +467,6 @@ def _artifact(aid: str, what: str) -> Artifact:
         raise TrainRefused(f"there is no kept artifact {aid} here, which the train names as its {what}") from None
 
 
-def _shown(art: Artifact, what: str, include_archived: bool) -> None:
-    """An archived program's artifact as an inlet, refused with the switch
-    off, as fermOS refuses an archived kept simulation as a start."""
-    from .. import module_stores, programs
-
-    try:
-        program = module_stores.artifact_program(art)
-        if not programs.hides(program, include_archived):
-            return
-        p = programs.program_by_id(program)
-    except FileNotFoundError:
-        return
-    raise TrainRefused(f"{what} {art.id} belongs to {p.name if p else program}, archived (hidden). {programs.SWITCH}")
-
-
 def _spec(key: str, label: str, gloss: str, dimension: str, unit: str, rule: list[str],
           bounds: tuple[float | None, float | None, str], group: str = INLET_GROUP, symbol: str = "",
           note: str | None = None) -> ParameterSpec:
@@ -538,7 +541,7 @@ def _vessel_flow(spec: TrainSpec, sim: Artifact) -> ParameterValue:
         detail=f"read from vessel design {v.id}: working volume × vessels ÷ cycle time")
 
 
-def _scenario_run(scenario: str, stream_id: str | None, include_archived: bool) -> tuple[Artifact, str, tuple[str, str]]:
+def _scenario_run(scenario: str, stream_id: str | None) -> tuple[Artifact, str, tuple[str, str]]:
     """A scenario's newest run on file and the stream the inlet takes from
     it (OF-BLD-020 §6.2): the one the train names, else the broth its
     flowsheet names on the shelf (`brothStream`, read from the shelf entry,
@@ -552,7 +555,6 @@ def _scenario_run(scenario: str, stream_id: str | None, include_archived: bool) 
         raise TrainRefused(f"there is no kept artifact or scenario run {scenario} here, which the train names as its "
                            "inlet: a run-stream inlet names a kept run by its artifact id, or a scenario whose newest "
                            "run is read (Proforma keeps a scenario's runs when it runs)")
-    _shown(run, "run", include_archived)
     tables = proforma.tables_of(run)
     ids = [s.id for s in tables.streams]
     held = ", ".join(ids) or "none: its stream table is empty"
@@ -576,7 +578,7 @@ def _scenario_run(scenario: str, stream_id: str | None, include_archived: bool) 
                                                    "broth, read from its shelf entry")
 
 
-def _inlet_read(spec: TrainSpec, include_archived: bool = True) -> _InletRead:
+def _inlet_read(spec: TrainSpec) -> _InletRead:
     from .. import thermo
 
     inlet = spec.inlet
@@ -589,7 +591,6 @@ def _inlet_read(spec: TrainSpec, include_archived: bool = True) -> _InletRead:
         if art.tool != SIMULATION:
             raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact, not a fermOS simulation ({SIMULATION}): a "
                                "simulation inlet is a kept simulation's harvest")
-        _shown(art, "simulation", include_archived)
         o = art.output or {}
         family = kinetics.FAMILIES.get(str(o.get("family") or ""))
         if family is None or family.product_state() != "P":
@@ -600,7 +601,7 @@ def _inlet_read(spec: TrainSpec, include_archived: bool = True) -> _InletRead:
             u = state_units.get(state)
             if u is not None and u not in vessel.CONC_UNITS:
                 raise TrainRefused(f"simulation {art.id} keeps {state} in {u}; the inlet reads g L⁻¹")
-        cells = CELLS.get(spec.program)
+        cells = CELLS.get(chemical_set(spec.program))
         try:
             organism = vessel._organism_read(art.id, str(o["strain"]) if o.get("strain") else None)
         except vessel.VesselRefused as e:
@@ -665,11 +666,10 @@ def _inlet_read(spec: TrainSpec, include_archived: bool = True) -> _InletRead:
             if art.tool not in STREAM_TOOLS:
                 raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact; a run's stream is read from a "
                                    f"{', '.join(STREAM_TOOLS)} artifact")
-            _shown(art, "run", include_archived)
             stream_id = inlet.streamId
             source = ("a run's stream", f"stream {stream_id} of run {art.id}, as the train names it")
         else:
-            art, stream_id, source = _scenario_run(inlet.ref or "", inlet.streamId, include_archived)
+            art, stream_id, source = _scenario_run(inlet.ref or "", inlet.streamId)
         row = next((s for s in proforma.tables_of(art).streams if s.id == stream_id), None)
         if row is None:
             raise TrainRefused(f"run {art.id}'s stream table holds no stream {stream_id}")
@@ -732,15 +732,14 @@ def _waiting_words(where: str, values: list[ParameterValue]) -> list[str]:
     return [f"{where}: {v.key} waits ({v.detail})" for v in values if v.origin == "waiting"]
 
 
-def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None,
-                 include_archived: bool = True) -> Inlet:
+def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None) -> Inlet:
     """The inlet as data (D10), its values resolved with the train's typed
     ones and the request's overrides of `pureos:unit:<train>:inlet`, every
     source named; refused in words while a value waits."""
     from .. import fermos, kinetics
 
     scope = scope_of(spec.id, INLET)
-    got = _inlet_read(spec, include_archived)
+    got = _inlet_read(spec)
     try:
         values = params.resolve(got.provided.specs, got.provided.sources,
                                 _as_overrides(scope, spec.inlet.params, overrides or ()), by)
@@ -853,7 +852,7 @@ def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, b
     return Inlet(read, worker, basis, got.provided.specs, values, chemicals)
 
 
-def chemicals_of(spec: TrainSpec, overrides: Iterable[Override] = (), include_archived: bool = True) -> list[str]:
+def chemicals_of(spec: TrainSpec, overrides: Iterable[Override] = ()) -> list[str]:
     """The chemicals a train carries from its inlet, which its units'
     per-component keys expand over; read without resolving the inlet's
     values (a typed inlet's are the components its values name)."""
@@ -863,7 +862,7 @@ def chemicals_of(spec: TrainSpec, overrides: Iterable[Override] = (), include_ar
         typed = {k.split(catalogue.SEP, 1)[-1] for k, x in named.items()
                  if k.startswith(f"conc{catalogue.SEP}") and isinstance(x, (int, float)) and x > 0}
         return sorted({*typed, catalogue.SOLVENT})
-    got = _inlet_read(spec, include_archived)
+    got = _inlet_read(spec)
     if inlet.kind == "simulation":
         return sorted({*got.chemical_of_state.values(), catalogue.SOLVENT} - {""})
     from .. import proforma
@@ -919,15 +918,12 @@ def _number(o: Override | None) -> float | None:
 
 
 def _step_words(e: catalogue.Entry) -> list[str]:
-    from .. import module_stores
+    from ..validate import unit_operations
 
     words = {e.id.replace("-", " "), e.name.lower(), e.cls.lower(), *(m.replace("-", " ") for m in e.maps)}
-    try:
-        for op in module_stores._projection()["pureos"]["unitOperations"]:
-            if op.get("id") in (e.id, *e.maps) and op.get("label"):
-                words.add(str(op["label"]).lower())
-    except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
-        pass
+    for op in unit_operations():
+        if op.get("id") in (e.id, *e.maps) and op.get("label"):
+            words.add(str(op["label"]).lower())
     return sorted(w for w in words if w)
 
 
@@ -1009,9 +1005,6 @@ def _records_for(field: str, e: catalogue.Entry, spec: TrainSpec, pool: Any, nam
         out[why] = out.get(why, 0) + 1
 
     for r in candidates:
-        if not binding.in_program(str(r.get("paperId") or ""), spec.program):
-            leave(f"not on the {spec.program} program's papers", r)
-            continue
         gate = binding.exclusion(r)
         if gate:
             leave(f"kept out by the aggregate gate ({gate})", r)
@@ -1130,7 +1123,7 @@ def unit_scope(spec: TrainSpec, unit: TrainUnitSpec, chemicals: list[str], pool:
                 continue
         if not kept:
             sources[s.key]["waiting"] = ParameterValue(key=s.key, value=None, origin="waiting", source=None, detail=(
-                f"no record of {field} on the {spec.program} program's papers binds{left}"))
+                f"no record of {field} in the evidence pool binds{left}"))
             continue
         values = [k.value for k in kept]
         how = "each a percentage over a hundred, a share" if field in PERCENT_FIELDS else "each as the record gives it"
@@ -1141,7 +1134,7 @@ def unit_scope(spec: TrainSpec, unit: TrainUnitSpec, chemicals: list[str], pool:
         st = binding.statistic(values)
         n = len(kept)
         span = f"{st.low:.4g}" if st.low == st.high else f"{st.low:.4g}–{st.high:.4g}"
-        whose = "named for it" if named is not None else f"on the {spec.program} program's papers"
+        whose = "named for it" if named is not None else "in the evidence pool"
         detail = f"{n} record{'' if n == 1 else 's'} of {field} {whose} ({how}): {span}" + (
             f", the median {st.value:.4g}" if st.sampling == "triangular" else
             f", the middle {st.value:.4g}" if st.sampling == "uniform" else "") + left
@@ -1252,7 +1245,7 @@ def _pool() -> Any:
     from .. import evidence_pool
 
     try:
-        return evidence_pool.load(include_archived=True)
+        return evidence_pool.load()
     except FileNotFoundError:
         return None
 
@@ -1273,10 +1266,7 @@ def provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
         raise params.ParamRefused(f"this scope names train {train_id}; the train sent is {spec.id}")
     try:
         if unit_id == INLET:
-            # A scope names its train by id, so its inlet reads whatever the
-            # program switch says, as a Proforma scope's records bind
-            # (OF-BLD-016); the run honours the switch.
-            return _inlet_read(spec, True).provided
+            return _inlet_read(spec).provided
         unit = next((u for u in spec.units if u.id == unit_id), None)
         if unit is None:
             raise params.ScopeUnknown(f"train {spec.id} has no unit {unit_id}; its units are "
@@ -1287,7 +1277,7 @@ def provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
             catalogue.entry(unit.type)
         except catalogue.CatalogueUnknown as e:
             raise params.ParamRefused(str(e)) from None
-        chems = chemicals_of(spec, req.overrides, include_archived=True)
+        chems = chemicals_of(spec, req.overrides)
         # The request's overrides decide what expands with them (an
         # evaporator's effects) and what a record binds beside (passes); the
         # resolve lays them on.
@@ -1324,14 +1314,13 @@ class _Prepared(NamedTuple):
     pool: Any
 
 
-def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | None,
-             include_archived: bool) -> _Prepared:
+def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | None) -> _Prepared:
     """Resolve every value of the train with its source and write the run's
     basis; refuse in words, every refusal at once with its place, what cannot
     run (the validation's refusals, a value that waits naming what would bind
     it, a unit's needs). Runs no train: the worker is asked only what the
     scopes read (the program's chemicals, each class's defaults)."""
-    from .. import programs, proforma
+    from .. import proforma
 
     said = refusals_by_place(spec)
     if said:
@@ -1342,16 +1331,7 @@ def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | No
     if stray:
         raise TrainRefused(f"an override names the scope it changes, and these are no unit's of train {spec.id}: "
                            f"{', '.join(stray)}")
-    try:
-        if programs.hides(spec.program, include_archived):
-            p = programs.program_by_id(spec.program)
-            raise TrainRefused(f"train {spec.id} belongs to {p.name if p else spec.program}, archived (hidden). "
-                               f"{programs.SWITCH}")
-    except FileNotFoundError:
-        pass
-    if spec.program not in PROGRAM_CHEMICALS:
-        raise TrainRefused(f"pureOS builds a train on {', '.join(PROGRAM_CHEMICALS.values())}; program {spec.program} "
-                           "has no chemical set here, so its train does not run yet")
+    chosen = chemical_set(spec.program)
     chem = _product_chemical(spec.product)
     if chem is None:
         from .. import thermo
@@ -1367,17 +1347,17 @@ def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | No
     refusals: list[tuple[str, str]] = []
     inlet: Inlet | None = None
     try:
-        inlet = inlet_stream(spec, overrides, by, include_archived)
+        inlet = inlet_stream(spec, overrides, by)
         chemicals = inlet.chemicals
     except TrainRefused as e:
         refusals += [(INLET, w) for _, w in e.places]
         try:
-            chemicals = chemicals_of(spec, overrides, include_archived)
+            chemicals = chemicals_of(spec, overrides)
         except TrainRefused as again:
             _refuse([*refusals, *((INLET, w) for _, w in again.places if (INLET, w) not in refusals)])
     unknown = sorted(set(chemicals) - set(ws["chemicals"]))
     if unknown:
-        refusals.append((INLET, f"the inlet carries {', '.join(unknown)}, which {PROGRAM_CHEMICALS[spec.program]} do "
+        refusals.append((INLET, f"the inlet carries {', '.join(unknown)}, which {PROGRAM_CHEMICALS[chosen]} do "
                                 "not hold: the train cannot build its stream"))
         _refuse(refusals)
     pool = _pool()
@@ -1415,13 +1395,13 @@ def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | No
                    unit="", source=BasisSource(kind="convention", note=(
                        "the train as data (D9), as the request sent it: its inlet, its units in order, where each "
                        "outlet goes, and every value a person typed, each also named below with its source"))),
-        BasisInput(name="program", value=spec.program, unit="", source=BasisSource(kind="convention",
-                                                                                   note="the train's program")),
+        BasisInput(name="program", value=chosen, unit="", source=BasisSource(kind="convention", note=(
+            "the chemical set the train builds on: the program the train names, else the one set pureOS holds"))),
         BasisInput(name="product", value=spec.product, unit="", source=BasisSource(kind="convention",
                                                                                    note="the train's product")),
         BasisInput(name="product chemical", value=chem or "", unit="", source=BasisSource(kind="convention", note=(
             f"thermosteam's own name for {spec.product}, as thermo.CHEMICALS names it: the chemical the train traces"))),
-        BasisInput(name="chemicals", value=PROGRAM_CHEMICALS[spec.program], unit="", source=BasisSource(
+        BasisInput(name="chemicals", value=PROGRAM_CHEMICALS[chosen], unit="", source=BasisSource(
             kind="model", id=lib, note="the chemical set every unit of the train is built on")),
         *(BasisInput(name=dist, value=v, unit="", source=BasisSource(kind="model", id=f"{dist}@{v}", note=(
             f"the {dist} version the worker ran"))) for dist, v in sorted(ws["versions"].items())),
@@ -1449,26 +1429,24 @@ def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | No
     return _Prepared(basis, pool)
 
 
-def run_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None,
-              include_archived: bool = False) -> TrainRun:
+def run_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None) -> TrainRun:
     """Resolve every value of the train with its source, refuse in words what
     cannot run (the validation's refusals, a value that waits naming what
     would bind it, a unit's needs, every one at once), and keep one
     `pureos.train_run` artifact, or return the one kept for the same basis."""
     from .. import artifacts
 
-    got = _prepare(spec, overrides, by, include_archived)
+    got = _prepare(spec, overrides, by)
     art = artifacts.compute(TRAIN_RUN, got.basis, records_by_id=got.pool.records_by_id if got.pool is not None else {})
     return run_of(art)
 
 
-def check_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None,
-          include_archived: bool = False) -> TrainValidation:
+def check_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None) -> TrainValidation:
     """POST /api/pureos/train/check (OF-BLD-020 §5.3): everything a run of the
     train would refuse, at once, in the run's words, each by its place; runs
     no train and keeps nothing. The Builder holds Run on it."""
     try:
-        _prepare(spec, overrides, by, include_archived)
+        _prepare(spec, overrides, by)
     except TrainRefused as e:
         return TrainValidation(ok=False, refusals=[w for _, w in e.places], places=_placed(e.places))
     return TrainValidation(ok=True)
@@ -1797,35 +1775,14 @@ def run_of(art: Artifact) -> TrainRun:
 
 
 def program_of_run(art: Artifact, record_lookup: Any = None) -> str | None:
-    """A train run's program: the program its train names, what its basis
-    names (its records), and its inlet's (the simulation's or run's), an
-    archived program winning, so a run built on an archived program's broth
-    hides with it."""
-    from .. import artifacts, module_stores, programs
-
-    found: list[str | None] = [next((str(i.value) for i in art.inputs if i.name == "program"), None)]
-    try:
-        found.append(programs.program_of_artifact(art, record_lookup))
-    except FileNotFoundError:
-        pass
-    ref = next((i for i in art.inputs if i.name == "inlet" and i.source.kind == "artifact" and i.source.id), None)
-    if ref is not None and ref.source.id != art.id:
-        try:
-            found.append(module_stores.artifact_program(artifacts.get(str(ref.source.id)), record_lookup))
-        except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged, FileNotFoundError):
-            pass
-    kept = [p for p in found if p]
-    try:
-        archived = next((p for p in kept if programs.is_archived(p)), None)
-    except FileNotFoundError:
-        archived = None
-    return archived or (kept[0] if kept else None)
+    """A train run's chemical set: the one its train names in its basis."""
+    return next((str(i.value) for i in art.inputs if i.name == "program"), None)
 
 
-def train_runs(include_archived: bool = False, *, arts: Iterable[Artifact] | None = None) -> list[TrainSummary]:
-    """GET /api/pureos/train-runs: every kept train run, newest first; one of
-    an archived program left out unless asked. A read: no worker starts."""
-    from .. import artifacts, programs
+def train_runs(*, arts: Iterable[Artifact] | None = None) -> list[TrainSummary]:
+    """GET /api/pureos/train-runs: every kept train run, newest first. A read:
+    no worker starts."""
+    from .. import artifacts
     from . import _Marks, summary, train_of
 
     kept = list(artifacts.all_artifacts() if arts is None else arts)
@@ -1838,11 +1795,6 @@ def train_runs(include_archived: bool = False, *, arts: Iterable[Artifact] | Non
             tr = train_of(a, provenance=mark(a))
         except (KeyError, TypeError, ValueError):
             continue
-        try:
-            if programs.hides(tr.program, include_archived):
-                continue
-        except FileNotFoundError:
-            pass
         out.append(summary(tr))
     return sorted(out, key=lambda s: (s.createdAt, s.artifactId), reverse=True)
 

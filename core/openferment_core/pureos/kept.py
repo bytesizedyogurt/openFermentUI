@@ -115,18 +115,7 @@ def kept_train(train_id: str) -> KeptTrain | None:
     return next((k for k in read().trains if k.spec.id == train_id), None)
 
 
-def listed(include_archived: bool = False) -> list[KeptTrain]:
+def listed() -> list[KeptTrain]:
     """`GET /api/pureos/trains-kept`: every kept train, the most recently
-    changed first; one of an archived program left out unless asked for
-    (OF-BLD-016 §2.3), by the program the train names. A read."""
-    from .. import programs
-
-    out = []
-    for k in read().trains:
-        try:
-            if programs.hides(k.spec.program, include_archived):
-                continue
-        except FileNotFoundError:  # no projection here: nothing is known to be archived
-            pass
-        out.append(k)
-    return sorted(out, key=lambda k: (k.updatedAt, k.spec.id), reverse=True)
+    changed first. A read."""
+    return sorted(read().trains, key=lambda k: (k.updatedAt, k.spec.id), reverse=True)

@@ -2,10 +2,10 @@
 artifact, and read by every reader (OF-BLD-020 §5.2; D9, D10, E.2‴, E.3‴).
 
 Offline: `validate` names every refusal at once, in words; the inlet from a
-kept simulation is its broth at harvest, read as the program's chemicals; a
+kept simulation is its broth at harvest, read as the train's chemical set; a
 broth flow nobody gave holds the run back, naming what would bind it; a
 train's unit scope expands per component over the train's chemicals and binds
-records by the train's program, product and step; `run_train` keeps one
+records by the train's product and step; `run_train` keeps one
 `pureos.train_run` artifact on a stand-in worker, its basis naming every unit's
 type, class and id and every value's source; `train_of` reads a train run by
 pass, as it reads a Proforma run; the endpoints answer 422, 409 and 503 in
@@ -256,9 +256,9 @@ def test_the_inlet_is_held_to_its_kind():
     said = " | ".join(pureos.validate(spec_of(inlet={"kind": "run-stream", "ref": "not an id!"})))
     assert "a run-stream inlet's ref is a run's artifact id (16 hex) or a scenario's id" in said
     assert "names the stream (streamId)" not in said
-    said = " | ".join(pureos.validate(spec_of(inlet={"kind": "simulation", "ref": "sc-yeast-1"})))
-    assert "the inlet's ref is an artifact id (16 hex); 'sc-yeast-1' is not one" in said
-    assert pureos.validate(spec_of(inlet={"kind": "run-stream", "ref": "sc-yeast-1"})) == []
+    said = " | ".join(pureos.validate(spec_of(inlet={"kind": "simulation", "ref": "sc-k3x9q-1"})))
+    assert "the inlet's ref is an artifact id (16 hex); 'sc-k3x9q-1' is not one" in said
+    assert pureos.validate(spec_of(inlet={"kind": "run-stream", "ref": "sc-k3x9q-1"})) == []
 
 
 def test_a_train_refuses_extra_fields_and_a_true_or_false_value():
@@ -336,8 +336,8 @@ def test_an_inlet_that_cannot_be_read_is_refused_in_words(store, worker):
     with pytest.raises(pureos.TrainRefused, match="there is no kept artifact aaaaaaaaaaaaaaaa here"):
         pureos.inlet_stream(spec_of(inlet={"kind": "simulation", "ref": "a" * 16, "params": {"broth_flow": typed(1.0)}}))
     sim = real_simulation()
-    with pytest.raises(pureos.TrainRefused, match="makes ethanol; the train's product is phb"):
-        pureos.inlet_stream(spec_of(product="phb", inlet={"kind": "simulation", "ref": sim.artifactId}))
+    with pytest.raises(pureos.TrainRefused, match="makes ethanol; the train's product is glycerol"):
+        pureos.inlet_stream(spec_of(product="glycerol", inlet={"kind": "simulation", "ref": sim.artifactId}))
     with pytest.raises(pureos.TrainRefused, match="a typed inlet names at least one component"):
         pureos.inlet_stream(spec_of(inlet={"kind": "typed", "params": {"broth_flow": typed(1.0)}}))
 
@@ -360,7 +360,6 @@ def test_a_units_scope_expands_over_the_trains_chemicals_and_binds_the_products_
         _record("r-st-1", "step_recovery", 90.0, "%", "after centrifugation the broth kept"),
         _record("r-st-2", "step_recovery", 80.0, "%", "after centrifugation the broth kept"),
         _record("r-st-3", "step_recovery", 50.0, "%", "after the chromatography column"),
-        _record("r-st-4", "step_recovery", 70.0, "%", "after centrifugation", paper="A1"),
     )
     monkeypatch.setattr(train_spec, "_pool", lambda: pool)
     spec = spec_of()
@@ -374,7 +373,7 @@ def test_a_units_scope_expands_over_the_trains_chemicals_and_binds_the_products_
     assert eth.origin == "record" and eth.recordIds == ["r-st-1", "r-st-2"]
     assert (eth.value, eth.low, eth.high) == pytest.approx((0.15, 0.1, 0.2))
     assert "one less it: the split is to outlet cake, and the product goes on by liquid" in eth.detail
-    assert "1 naming another step or none" in eth.detail and "1 not on the yeast program's papers" in eth.detail
+    assert "1 naming another step or none" in eth.detail and "in the evidence pool" in eth.detail
     # Another component's split nobody set is left to the class, which reads it as none to outlet 0; the
     # water's is the cake moisture's (§5.R part a, finding 6).
     assert v["split.Glucose"].origin == "not-read" and "as none of it to outlet cake" in v["split.Glucose"].detail
@@ -526,7 +525,7 @@ def test_train_of_reads_a_train_run_by_pass(store, worker, no_pool):
 
 
 def test_the_endpoints_run_list_and_open_a_train(client, store, worker, no_pool):
-    body = {"train": spec_of().model_dump(mode="json"), "overrides": [], "by": None, "includeArchived": False}
+    body = {"train": spec_of().model_dump(mode="json"), "overrides": [], "by": None}
     r = client.post("/api/pureos/train/run", json=body)
     assert r.status_code == 200, r.text
     aid = r.json()["artifactId"]
@@ -563,25 +562,27 @@ def test_the_run_endpoint_answers_422_409_and_503_in_words(client, store, worker
     assert r.status_code == 503 and "could not run the train" in r.json()["detail"]
 
 
-def test_a_train_of_an_archived_program_hides_and_runs_only_with_the_switch(store, worker, no_pool, monkeypatch):
-    with pytest.raises(pureos.TrainRefused, match=r"train t1 belongs to PHA, archived \(hidden\)"):
-        pureos.run_train(spec_of(program="pha"))
-    with pytest.raises(pureos.TrainRefused, match="program pha has no chemical set here"):
-        pureos.run_train(spec_of(program="pha"), include_archived=True)
-    run = pureos.run_train(spec_of())
-    art = artifacts.get(run.artifactId)
-    from openferment_core import module_stores
-
-    assert module_stores.artifact_program(art) == "yeast"
-    # A run kept for a program archived later hides from the lists with it.
-    monkeypatch.setattr(train_spec, "program_of_run", lambda a, r=None: "pha")
-    assert pureos.train_runs() == [] and [s.artifactId for s in pureos.train_runs(True)] == [run.artifactId]
+def test_a_train_naming_no_chemical_set_or_an_unknown_one_builds_on_the_one_pureos_holds(client, store, worker,
+                                                                                          no_pool):
+    """The Builder sends a fresh train with no program: pureOS holds one
+    chemical set, and a train that names none, or one pureOS does not hold,
+    builds on it (`train_spec.chemical_set`); its basis names the set."""
+    assert train_spec.chemical_set("") == train_spec.chemical_set(None) == train_spec.chemical_set("nowhere") == "yeast"
+    for program in ("", "nowhere"):
+        spec = spec_of(program=program)
+        assert pureos.validate(spec) == []
+        checked = client.post("/api/pureos/train/check", json={"train": spec.model_dump(mode="json")})
+        assert checked.status_code == 200 and checked.json()["ok"] is True, checked.text
+        named = {i.name: i.value for i in artifacts.get(pureos.run_train(spec).artifactId).inputs}
+        assert named["program"] == "yeast" and named["chemicals"] == train_spec.PROGRAM_CHEMICALS["yeast"]
+    # A program that is no id is still refused as one, with the train's other words.
+    assert any("a program is named by its id" in w for w in pureos.validate(spec_of(program="no id!")))
 
 
 def test_a_product_with_no_library_chemical_refuses_the_train(store, worker, no_pool):
-    with pytest.raises(pureos.TrainRefused, match="product 'phb' names no chemical of thermosteam's library here.*A "
+    with pytest.raises(pureos.TrainRefused, match="product 'unobtainium' names no chemical of thermosteam's library here.*A "
                                                   "train traces its product by the library's own name for it"):
-        pureos.run_train(spec_of(product="phb"))
+        pureos.run_train(spec_of(product="unobtainium"))
 
 
 def test_a_unit_reading_a_flowsheets_own_unit_takes_its_values_first_as_the_packages(store, worker, no_pool):

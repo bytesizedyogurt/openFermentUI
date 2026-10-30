@@ -16,10 +16,10 @@ ask_batch = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ask_batch)
 
 
-def test_the_pha_questions_are_ten_and_hold_no_number():
-    questions = ask_batch.read_questions(ROOT / "docs" / "build" / "questions-pha.txt")
-    assert len(questions) == 10
-    assert not any(ch.isdigit() for q in questions for ch in q)
+def test_a_questions_file_is_read_one_question_a_line(tmp_path):
+    f = tmp_path / "questions.txt"
+    f.write_text("# a comment\nFirst question?\n\nSecond question?\n", encoding="utf-8")
+    assert ask_batch.read_questions(f) == ["First question?", "Second question?"]
 
 
 def test_each_question_is_asked_saved_and_counted(pool, tmp_path, monkeypatch):  # noqa: F811

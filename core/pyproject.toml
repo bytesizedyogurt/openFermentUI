@@ -21,6 +21,9 @@ dependencies = [
     # Biopython's ProtParam (protparam.py). Imported by the service itself,
     # not a worker.
     "biopython>=1.88",
+    # alpha 2.0 — the record fields and the vocabulary are YAML under
+    # openferment_core/schema/, read by units.py and validate.py.
+    "pyyaml>=6",
 ]
 
 [project.optional-dependencies]

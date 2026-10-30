@@ -1,12 +1,11 @@
 """The seam: a vessel and a train become a flowsheet Proforma prices, and every
 reader reads the one run (OF-BLD-020 §6.1; D11, D3, E.2‴, E.3‴).
 
-Offline: `custom_train_v1` is on the shelf, the yeast program's (the one
-program with a chemical set), built from a vessel design and a train run;
-its file holds no number but zero and one; a run, a binding and the panel
-refuse in words a part that is missing, of another tool, not on file,
-damaged, of another or an archived program, or whose unit id the fermenter
-takes; the vessel design binds the plant scale it was designed at (a
+Offline: `custom_train_v1` is on the shelf, built on the yeast chemical set
+(the one pureOS holds) from a vessel design and a train run; its file holds
+no number but zero and one; a run, a binding and the panel refuse in words a
+part that is missing, of another tool, not on file, damaged, built on another
+chemical set, or whose unit id the fermenter takes; the vessel design binds the plant scale it was designed at (a
 person's value wins); the panel serves the group Finance, each parameter the
 package's own default read from its file, a person's value their named
 assumption; a run hands the worker the fermenter as the design holds it, the
@@ -133,7 +132,7 @@ def request(parts, **kw) -> ProformaRunRequest:
 def test_the_shelf_holds_the_composite_the_yeast_programs_built_from_a_vessel_and_a_train():
     info = shelf.info(FLOWSHEET)
     assert not info.reference and info.builtFrom == ["fermos.vessel", "pureos.train_run"]
-    # Its program is its train's: a train runs only on a program with a chemical set, the yeast program's alone.
+    # Its program is the chemical set its train builds on, the one pureOS holds.
     assert set(train_spec.PROGRAM_CHEMICALS) == {info.program} == {"yeast"}
     assert [i.key for i in info.inputs] == ["feed_glucose_conc", "titre", "yield", "productivity", "plant_scale",
                                            "glucose_price"]
@@ -153,11 +152,9 @@ def test_no_process_number_in_the_composites_file():
     assert found == [], found
 
 
-def test_the_shelf_endpoint_lists_it_with_the_switch_off_and_on(client):
-    off = [f["id"] for f in client.get("/api/proforma/shelf").json()]
-    on = client.get("/api/proforma/shelf?includeArchived=true").json()
-    assert FLOWSHEET in off and next(f for f in on if f["id"] == FLOWSHEET)["builtFrom"] == ["fermos.vessel",
-                                                                                              "pureos.train_run"]
+def test_the_shelf_endpoint_lists_it(client):
+    served = client.get("/api/proforma/shelf").json()
+    assert next(f for f in served if f["id"] == FLOWSHEET)["builtFrom"] == ["fermos.vessel", "pureos.train_run"]
 
 
 # ── the parts, refused in words (offline) ──────────────────────────────
@@ -192,23 +189,14 @@ def test_a_part_of_another_tool_not_on_file_or_damaged_is_refused_in_words(parts
         composite.parts_of(parts.vessel, "b" * 16)
 
 
-def test_a_part_of_another_or_an_archived_program_is_refused(parts, monkeypatch):
-    from openferment_core import module_stores
-
-    with monkeypatch.context() as m:
-        m.setattr(train_spec, "program_of_run", lambda a, r=None: "pha")
-        with pytest.raises(proforma.ScenarioRefused, match=rf"train run {parts.train} belongs to PHA, archived \(hidden\)"):
-            composite.parts_of(parts.vessel, parts.train)
-        with pytest.raises(proforma.ScenarioRefused, match="program PHA, which has no chemical set here"):
-            composite.parts_of(parts.vessel, parts.train, include_archived=True)
-    real = module_stores.artifact_program
-    monkeypatch.setattr(module_stores, "artifact_program",
-                        lambda a, *x, **k: "casein" if a.tool == "fermos.vessel" else real(a, *x, **k))
-    with pytest.raises(proforma.ScenarioRefused, match=rf"vessel design {parts.vessel} belongs to Casein, archived"):
+def test_a_train_run_of_another_chemical_set_is_refused(parts, monkeypatch):
+    monkeypatch.setattr(train_spec, "program_of_run", lambda a, r=None: "another-set")
+    with pytest.raises(proforma.ScenarioRefused, match=rf"train run {parts.train} is built on the chemical set another-set, "
+                                                       "which pureOS does not hold"):
         composite.parts_of(parts.vessel, parts.train)
-    with pytest.raises(proforma.ScenarioRefused, match="is of Casein and train run .* of Yeast ethanol: a composite is "
-                                                       "one program's vessel and train"):
-        composite.parts_of(parts.vessel, parts.train, include_archived=True)
+    monkeypatch.setattr(train_spec, "program_of_run", lambda a, r=None: None)
+    with pytest.raises(proforma.ScenarioRefused, match=rf"train run {parts.train} names no chemical set it was built on"):
+        composite.parts_of(parts.vessel, parts.train)
 
 
 def test_a_train_unit_the_fermenter_takes_is_refused(store, worker):

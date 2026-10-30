@@ -7,16 +7,10 @@
 // The page is organised around the one thing that makes the record worth
 // keeping — measured values sit above observations, because the measurements
 // are what can be reconciled and the observations are what nobody predicted.
-//
-// PROGRAMS (OF-BLD-016 §2.2). A deposition belongs to the program of the
-// runbook it tests, else of the protocol it ran. One in an archived program
-// has left the Depositions list, but its link still opens it here, whole,
-// under the banner that names the program and the switch.
 import { useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, Eye, FlaskConical, GitBranch, Ruler, Scale as ScaleIcon } from 'lucide-react';
 import type { Deposition } from '@/data/types';
 import { useStore } from '@/store';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href } from '@/router';
 import { ComponentTag } from '@/components/ComponentTag';
 import { TimeSeriesPanel } from '@/components/TimeSeriesPanel';
@@ -266,8 +260,6 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
           )
         }
       />
-
-      <ArchivedBanner kind="deposition" id={deposition.id} />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className={cx('chip', state.tone)}>{state.label}</span>

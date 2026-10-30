@@ -1,7 +1,7 @@
 """pureOS proposes a train by rules that each name the property they read
 (OF-BLD-020 §7.2, D12, D13, E.4‴).
 
-`propose(product, host, inlet_ref=None, *, include_archived=False)` reads a
+`propose(product, host, inlet_ref=None, *)` reads a
 product's class and the properties its class's rule splits on, and answers a
 `TrainProposal`: a `TrainSpec` (pureos/train_spec.py) whose units are catalogue
 types in order (pureos/catalogue.py), each with one reason naming the rule,
@@ -21,23 +21,19 @@ proposal; nothing here runs a train.
 
 WHAT A RULE READS, AND WHERE IT IS HELD.
 
-- The product's CLASS. A products seed entry (src/data/products.ts, Dominion's
-  molecules in modules.json, written by `pnpm export:corpus`) states it as its
-  `category`, read as a word by `CLASS_OF_CATEGORY` (each protein category a
-  protein; a human milk oligosaccharide, a terpene and a glycoside a small
-  molecule; a biopolymer a polymer). A product the seed holds no entry for but
-  thermosteam's library is asked about by name (`thermo.CHEMICALS`, ethanol
-  tonight) is a small molecule when the library gives it a normal boiling point
-  (`Tb`, the `volatility` artifact's `boilingPoint`): a chemical that boils as a
-  pure compound. A class nobody states is missing, never guessed from a name.
-  The seed's `processCode` is a family code (P1 to P12) with no words of its
-  own, and its `unitOperationIds` are a curated train of their own; neither is
-  read by a rule.
-- SECRETED OR INTRACELLULAR (`location`). The products seed has no field for
-  it; `Product.location` (types.ts) is its home, and no entry carries one yet,
-  so a protein or a polymer names it missing. (The two PHA entries say
-  "intracellular granules" in their tags and phb's note, free words a rule does
-  not read as the property.)
+- The product's CLASS. A products catalogue entry (`Corpus.products`, which
+  holds none until a project's documents bring entries: alpha 2.0 deleted the
+  seed, ADR-010) states it as its `category`, read as a word by
+  `CLASS_OF_CATEGORY` (each protein category a protein; a human milk
+  oligosaccharide, a terpene and a glycoside a small molecule; a biopolymer a
+  polymer). A product the catalogue holds no entry for but thermosteam's
+  library is asked about by name (`thermo.CHEMICALS`, ethanol tonight) is a
+  small molecule when the library gives it a normal boiling point (`Tb`, the
+  `volatility` artifact's `boilingPoint`): a chemical that boils as a pure
+  compound. A class nobody states is missing, never guessed from a name. The
+  host is a strain the catalogue holds (`Corpus.strains`).
+- SECRETED OR INTRACELLULAR (`location`), as a catalogue entry states it; an
+  entry that states none leaves a protein or a polymer naming it missing.
 - VOLATILITY: thermosteam's answer, one `volatility` artifact
   (`thermo.volatility`, §7.1): which of the product and water boils first
   (`lighter`, a word read from the two normal boiling points the same answer
@@ -104,7 +100,7 @@ SIMULATION = "fermos.simulation"
 AID = re.compile(r"[0-9a-f]{16}")
 ONWARD, WASTE = "onward", "waste"
 
-# The products seed's categories, read as a class (a word a category names).
+# The products catalogue's categories, read as a class (a word a category names).
 CLASS_OF_CATEGORY = {
     "molecular_biology_enzyme": PROTEIN,
     "diagnostic": PROTEIN,
@@ -119,10 +115,10 @@ CLASS_OF_CATEGORY = {
     "glycoside": SMALL,
     "biopolymer": POLYMER,
 }
-CLASS_WHY = ("the products seed's category, read as a word: an enzyme, an antigen and a food, sweet, structural, "
+CLASS_WHY = ("the products catalogue's category, read as a word: an enzyme, an antigen and a food, sweet, structural, "
              "research or therapeutic protein is a protein; a human milk oligosaccharide, a terpene and a glycoside "
              "are small molecules; a biopolymer is a polymer")
-LIBRARY_CLASS_WHY = ("no products seed entry; thermosteam's library is asked about it by name (thermo.CHEMICALS) and "
+LIBRARY_CLASS_WHY = ("no products catalogue entry; thermosteam's library is asked about it by name (thermo.CHEMICALS) and "
                      "gives it a normal boiling point, so it is a chemical that boils as a pure compound: a small molecule")
 
 # A unit's id in a proposal: a letter-led prefix by catalogue type and a count
@@ -200,58 +196,39 @@ RULES: dict[str, Rule] = {r.id: r for r in (
 # ── what is on file ─────────────────────────────────────────────────────
 
 
-def _projection() -> dict[str, Any]:
-    from .. import module_stores
+def _catalogue() -> Any:
+    """The products and strains on file: the corpus's catalogues."""
+    from ..corpus import load_corpus
 
-    return module_stores._projection()
+    return load_corpus()
 
 
 def _molecules() -> dict[str, dict[str, Any]]:
-    return {str(m["id"]): m for m in _projection()["dominion"]["molecules"]}
+    return {str(m["id"]): m for m in _catalogue().products}
 
 
 def _hosts() -> dict[str, dict[str, Any]]:
-    return {str(h["id"]): h for h in _projection()["geneos"]["hosts"]}
+    return {str(h["id"]): h for h in _catalogue().strains}
 
 
-def _program(product: str, entry: dict[str, Any] | None, host: dict[str, Any],
-             include_archived: bool) -> tuple[str, str | None]:
-    """The train's program: the product entry's, the host's (they must agree),
-    else the one active program (and words saying so); refused with the
-    switch's words when it is archived and the switch is off. A product or a
-    host of an archived program is said to be hidden first, whatever the
-    other names (OF-BLD-020 §7.R), so with the switch off no refusal names
-    what it holds as anything but hidden."""
-    from .. import programs
+def _program(product: str, entry: dict[str, Any] | None, host: dict[str, Any]) -> tuple[str, str | None]:
+    """The chemical set the train builds on (`train_spec.chemical_set`): the
+    one the product's entry or the host names when pureOS holds it, else the
+    one pureOS holds, with words saying so."""
+    from .train_spec import TrainRefused, chemical_set
 
-    mine = entry.get("program") if entry else None
-    theirs = host.get("program")
-    for what, named, of in (("product", product, mine), ("host", host["id"], theirs)):
-        if of and programs.hides(of, include_archived):
-            p = programs.program_by_id(of)
-            raise ProposeRefused(f"{what} {named} belongs to {p.name if p else of}, archived (hidden). {programs.SWITCH}")
-    if mine and theirs and mine != theirs:
-        raise ProposeRefused(f"product {product} belongs to the {mine} program and host {host['id']} to the {theirs} "
-                             "program: a train is one program's")
-    program = mine or theirs
-    words = None
-    if not program:
-        try:
-            (only,) = programs.active_programs()
-        except ValueError:
-            raise ProposeRefused(f"neither product {product} nor host {host['id']} names a program, and there is not "
-                                 "one active program to read it from") from None
-        program = only.id
-        words = (f"Neither product {product} nor host {host['id']} names a program, so the train is the active "
-                 f"program's, {only.name}.")
-    if programs.hides(program, include_archived):
-        p = programs.program_by_id(program)
-        raise ProposeRefused(f"product {product} with host {host['id']} belongs to {p.name if p else program}, "
-                             f"archived (hidden). {programs.SWITCH}")
-    return program, words
+    named = (entry or {}).get("program") or host.get("program")
+    try:
+        program = chemical_set(named)
+    except TrainRefused as e:
+        raise ProposeRefused(str(e)) from None
+    if named == program:
+        return program, None
+    return program, (f"Neither product {product} nor host {host['id']} names a chemical set pureOS holds, so the "
+                     f"train is built on the one it holds, {program}.")
 
 
-def _inlet(product: str, inlet_ref: str | None, include_archived: bool) -> tuple[TrainInlet, str]:
+def _inlet(product: str, inlet_ref: str | None) -> tuple[TrainInlet, str]:
     """The inlet a proposal names, as `TrainInlet`, with words for the notes:
     none (typed by a person in the Builder), a kept simulation's harvest by
     its artifact id, or a kept run's stream as `<artifact id>/<stream id>`, the
@@ -276,7 +253,6 @@ def _inlet(product: str, inlet_ref: str | None, include_archived: bool) -> tuple
         if art.tool == SIMULATION:
             if sep:
                 raise ProposeRefused(f"simulation {aid}'s harvest is the inlet whole: name it by its id alone")
-            train_spec._shown(art, "simulation", include_archived)
             made = (art.output or {}).get("product") if isinstance(art.output, dict) else None
             if made and made != product:
                 raise ProposeRefused(f"simulation {aid} makes {made}; the proposal is for {product}")
@@ -285,7 +261,6 @@ def _inlet(product: str, inlet_ref: str | None, include_archived: bool) -> tuple
         if art.tool in train_spec.STREAM_TOOLS:
             if not stream:
                 raise ProposeRefused(f"run {aid} has a stream table: name the stream as {aid}{STREAM_SEP}<stream id>")
-            train_spec._shown(art, "run", include_archived)
             if not any(s.id == stream for s in proforma.tables_of(art).streams):
                 raise ProposeRefused(f"run {aid}'s stream table holds no stream {stream}")
             return TrainInlet(kind="run-stream", ref=aid, streamId=stream), (
@@ -399,35 +374,35 @@ def _protein(t: _Train, location: str, pp: Any) -> None:
 
     o = protparam.output_of(pp)
     if location == INTRACELLULAR:
-        t.add("intracellular-harvest", "location", None, "the products seed's entry says the product stays in the cells",
+        t.add("intracellular-harvest", "location", None, "the products catalogue's entry says the product stays in the cells",
               outlets={"cake": ONWARD, "liquid": WASTE})
-        t.add("intracellular-disrupt", "location", None, "the products seed's entry says the product stays in the cells")
+        t.add("intracellular-disrupt", "location", None, "the products catalogue's entry says the product stays in the cells")
         t.add("disrupted-clarify", "location", None, "the product is in the liquid once the cells are broken")
     else:
-        t.add("secreted-clarify", "location", None, "the products seed's entry says the cells secrete the product")
+        t.add("secreted-clarify", "location", None, "the products catalogue's entry says the cells secrete the product")
     t.add("protein-concentrate", "molecularWeight", pp.id, "ProtParam's molecular weight of the product's chain")
     _, why = capture_mode(o.isoelectricPoint, None)
     t.add("protein-capture", "isoelectricPoint", pp.id, f"ProtParam's isoelectric point of the product's chain; {why}")
     t.add("protein-polish", "molecularWeight", pp.id, "ProtParam's molecular weight of the product's chain")
-    t.add("protein-formulate", "class", None, "the products seed's category says the product is a protein")
+    t.add("protein-formulate", "class", None, "the products catalogue's category says the product is a protein")
 
 
 def _polymer(t: _Train) -> None:
-    said = "the products seed's entry says the polymer stays in the cells"
+    said = "the products catalogue's entry says the polymer stays in the cells"
     t.add("polymer-harvest", "location", None, said, outlets={"cake": ONWARD, "liquid": WASTE})
     t.add("polymer-digest", "location", None, said)
-    t.add("polymer-wash", "class", None, "the products seed's category says the product is a polymer, a solid",
+    t.add("polymer-wash", "class", None, "the products catalogue's category says the product is a polymer, a solid",
           outlets={"cake": ONWARD, "liquid": WASTE})
-    t.add("polymer-dry", "class", None, "the products seed's category says the product is a polymer, a solid")
+    t.add("polymer-dry", "class", None, "the products catalogue's category says the product is a polymer, a solid")
 
 
-def propose(product: str, host: str, inlet_ref: str | None = None, *, include_archived: bool = False) -> TrainProposal:
+def propose(product: str, host: str, inlet_ref: str | None = None) -> TrainProposal:
     """A train for `product` made in `host`, proposed by the written rules:
     every unit at its library defaults or waiting, each with its reason; or
     none, naming what is missing. `ProposeUnknown` for a product neither the
-    seed nor thermo.CHEMICALS holds; `ProposeRefused` in words otherwise (an
-    unknown host, an archived program with the switch off, an inlet that is
-    not one, a sequence ProtParam cannot read, a chemical the library lacks).
+    products catalogue nor thermo.CHEMICALS holds; `ProposeRefused` in words
+    otherwise (an unknown host, an inlet that is not one, a sequence ProtParam
+    cannot read, a chemical the library lacks).
     A worker that cannot answer raises its own error (the endpoint's 503)."""
     from .. import thermo
     from . import train_spec
@@ -441,15 +416,15 @@ def propose(product: str, host: str, inlet_ref: str | None = None, *, include_ar
     chemical = thermo.CHEMICALS.get(pid)
     if entry is None and chemical is None:
         named = ", ".join(sorted(thermo.CHEMICALS))
-        raise ProposeUnknown(f"there is no product {pid!r} in the products seed (Dominion's molecules) or among the "
+        raise ProposeUnknown(f"there is no product {pid!r} in the products catalogue or among the "
                              f"chemicals thermosteam's library is asked about here ({named})")
     hosts = _hosts()
     h = hosts.get(hid)
     if h is None:
-        raise ProposeRefused(f"there is no host {hid!r} among geneOS's hosts: name the strain the product is made in by "
+        raise ProposeRefused(f"there is no host {hid!r} among the strains on file: name the strain the product is made in by "
                              "its id")
-    program, program_words = _program(pid, entry, h, include_archived)
-    inlet, inlet_words = _inlet(pid, inlet_ref, include_archived)
+    program, program_words = _program(pid, entry, h)
+    inlet, inlet_words = _inlet(pid, inlet_ref)
     missing: list[ProposalMissing] = []
     notes: list[str] = [program_words] if program_words else []
     read: list[str] = []
@@ -471,7 +446,7 @@ def propose(product: str, host: str, inlet_ref: str | None = None, *, include_ar
             read.append(vol.id)
             if thermo.volatility_of(vol).boilingPoint is None:
                 missing.append(ProposalMissing(property="class", why=(
-                    f"product {pid} has no products seed entry, and thermosteam's answer ({vol.id}) holds no normal "
+                    f"product {pid} has no products catalogue entry, and thermosteam's answer ({vol.id}) holds no normal "
                     "boiling point for it, so nothing states its class")))
             else:
                 product_class = SMALL
@@ -489,7 +464,7 @@ def propose(product: str, host: str, inlet_ref: str | None = None, *, include_ar
     elif product_class in (PROTEIN, POLYMER):
         if location not in LOCATIONS:
             missing.append(ProposalMissing(property="location", why=(
-                f"product {pid}'s products seed entry does not say whether the product is secreted or stays in the "
+                f"product {pid}'s products catalogue entry does not say whether the product is secreted or stays in the "
                 "cells (its `location`), and the rules split on it: it enters the entry from a named source, never "
                 "guessed")))
         if product_class == PROTEIN:

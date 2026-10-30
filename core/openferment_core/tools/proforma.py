@@ -3,9 +3,9 @@
 
 `selling_price`: the price a person's run produced.
 
-Ids in: a scenario id, any of the seed's BioSTEAM scenarios the program
-switch shows (`proforma.seed_scenarios`: sc-yeast-1 with it off; sc-pha-1
-too with it on, OF-BLD-019 §6.R). The most recent run artifact of that
+Ids in: a scenario id, any of the BioSTEAM scenarios the service holds
+(`proforma.seed_scenarios`; none since the seed went, alpha 2.0, until
+stage 2's store holds them). The most recent run artifact of that
 scenario (`proforma.latest_run`) comes back as one `Evidence` with the hint
 `distribution`: the median price and its 5th to 95th percentile, with the
 run's provenance, which is `demo` while any input rests on an assumption;
@@ -48,7 +48,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import programs, proforma
+from .. import proforma
 from ..models import Evidence, ToolResult
 from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 
@@ -58,14 +58,11 @@ TABLE_NAME = "stream_table"
 
 
 def _priced() -> list[str]:
-    """The seed's BioSTEAM scenarios a description may name: none an
-    archived program holds and no example (OF-BLD-016 §2.R, §3.3); none when
-    the projection is missing."""
-    return programs.offered("scenario", [s["id"] for s in proforma.seed_scenarios() if not s.get("example")])
+    """The BioSTEAM scenarios the service holds, for the description; none
+    when it holds none."""
+    return [s["id"] for s in proforma.seed_scenarios()]
 
 
-# Named in the schema: an archived scenario never is; with the switch off
-# `_run` refuses it.
 _PRICED = _priced()
 
 
@@ -73,7 +70,7 @@ class SellingPriceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenarioId: str = Field(description=(
-        "A seed BioSTEAM scenario's id" + (f" ({', '.join(_PRICED)})" if _PRICED else "")
+        "The id of a BioSTEAM scenario the service holds" + (f" ({', '.join(_PRICED)})" if _PRICED else "")
         + ", whose newest kept run it reads; or "
         + f"{proforma.BENCHMARK}, the NREL 2011 corn stover ethanol design as biorefineries.cornstover builds it."))
 
@@ -104,23 +101,17 @@ def _benchmark() -> ToolResult:
 
 
 def _not_held(sid: str, ctx: ToolContext) -> str:
-    """An id that is no seed BioSTEAM scenario, refused in words: an authored
-    cost surface keeps no run; anything else lives in the browser that made
-    it, or nowhere. Names the ids it takes that the switch shows."""
-    from .. import pureos
+    """An id that is no BioSTEAM scenario the service holds, refused in
+    words: a reference biorefinery is read elsewhere; anything else lives in
+    the browser that made it, or nowhere. Names the ids it takes."""
     from ..flowsheets import shelf
 
-    authored = next((s for s in pureos.seed_scenarios() if s.get("id") == sid and s.get("kind") != "biosteam"), None)
-    if authored is not None:
-        return (f"{NAME} refused: {sid} is an authored cost surface, not a BioSTEAM scenario; no run of it is kept, and "
-                "its numbers are the cost model's own")
     reference = shelf.SHELF.get(sid)
     if reference is not None and reference.reference:
         return (f"{NAME} refused: {sid} is a reference biorefinery, not a scenario: proforma_read lists its kept runs, "
                 "and stream_table returns a run's evidence id, the price its package gives on its own defaults; the "
                 f"corn stover benchmark's stored run is read here as {proforma.BENCHMARK}")
-    held = [s["id"] for s in proforma.seed_scenarios()]
-    shown = held if ctx.include_archived else programs.offered("scenario", held)
+    shown = [s["id"] for s in proforma.seed_scenarios()]
     return (f"{NAME} refused: {sid} is not a scenario this service holds. A scenario made with New scenario lives in "
             "the browser that made it, and its runs are read on its page in Proforma; the ids it takes are "
             f"{', '.join([*shown, proforma.BENCHMARK])}")
@@ -154,18 +145,9 @@ def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
     if not sid:
         return ToolResult(error=f"{NAME} refused: name the scenario by its id (proforma_read lists them), or "
                                 f"{proforma.BENCHMARK}")
-    try:
-        refused = programs.archived_refusal(NAME, [("scenario", sid)], ctx.include_archived)
-    except FileNotFoundError:  # no projection here: nothing is known to be archived
-        refused = None
-    if refused:
-        return ToolResult(error=refused)
     seed = {s["id"]: s for s in proforma.seed_scenarios()}.get(sid)
     if seed is None:
         return ToolResult(error=_not_held(sid, ctx))
-    if seed.get("example") and not ctx.include_archived:
-        # An example hides with the archive (OF-BLD-016 §3.3), as Proforma's scenario list hides it.
-        return ToolResult(error=f"{NAME} refused: {sid} is an example, hidden with the archived programs. {programs.SWITCH}")
     art = proforma.latest_run(sid)
     if art is None:
         return ToolResult(error=_no_run(sid, seed, ctx))
@@ -173,8 +155,8 @@ def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
         ev = proforma.evidence_of(art)
     except proforma.ScenarioRefused as e:
         return ToolResult(error=f"{NAME} refused: {e}")
-    # What the run ran, read from the run; the seed's flowsheet when the run
-    # names none the shelf holds (a run is kept on its scenario's own).
+    # What the run ran, read from the run; the held scenario's flowsheet when
+    # the run names none the shelf holds (a run is kept on its scenario's own).
     flowsheet = proforma.tables_of(art).flowsheet or seed["modelId"]
     try:
         info = shelf.info(flowsheet)
@@ -224,15 +206,13 @@ TOOL = register(
 
 
 def _biosteam_scenarios() -> list[str]:
-    """The seed's BioSTEAM scenarios no archived program holds, for the
-    description; none when the projection is missing."""
+    """The BioSTEAM scenarios the service holds, for the description; none
+    when it holds none."""
     from .. import pureos
 
-    ids = [s["id"] for s in pureos.seed_scenarios() if s.get("kind") == "biosteam"]
-    return programs.offered("scenario", ids)
+    return [s["id"] for s in pureos.seed_scenarios() if s.get("kind") == "biosteam"]
 
 
-# Named in the schema: an archived scenario never is (OF-BLD-016 §2.R).
 _OFFERED = _biosteam_scenarios()
 
 
@@ -336,7 +316,7 @@ def _size(summary: dict[str, Any]) -> int:
 
 
 def _stream_table(inp: StreamTableInput, ctx: ToolContext) -> ToolResult:
-    from .. import artifacts, module_stores, pureos
+    from .. import artifacts, pureos
 
     aid = inp.artifactId.strip()
     try:
@@ -348,11 +328,6 @@ def _stream_table(inp: StreamTableInput, ctx: ToolContext) -> ToolResult:
     if art.tool not in (proforma.RUN, proforma.REFERENCE):
         return ToolResult(error=f"{TABLE_NAME} refused: {aid} is a {art.tool} artifact, not a Proforma run; it reads the "
                                 f"stream table of a {proforma.RUN} or {proforma.REFERENCE} artifact")
-    # One rule for every reader of a run (OF-BLD-019 §6.R): hidden from
-    # proforma_read, biorepo_read and pureOS's trains, refused here by id.
-    refused = module_stores.hidden_run_refusal(TABLE_NAME, art, ctx.include_archived)
-    if refused:
-        return ToolResult(error=refused)
     scenario_id = pureos.scenario_of(art, pureos.seed_scenarios())[0] if art.tool == proforma.RUN else None
     t = proforma.tables_of(art)
     if not t.streams:

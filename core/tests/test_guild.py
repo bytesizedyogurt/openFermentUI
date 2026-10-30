@@ -383,10 +383,15 @@ def lesson(eid: str, person_id: str, skill: str = "SK-OD", ref: str = "l6-1", **
     )
 
 
-def test_the_projection_says_which_lessons_count_toward_which_skills():
+def test_the_projection_says_which_lessons_count_toward_which_skills(monkeypatch):
     assert guild.lesson_skills("l6-1") == ["SK-OD", "SK-DCW"]
-    assert guild.lesson_skills("l0-1") == []
     assert guild.lesson_skills("nope") is None
+    # A lesson that counts toward no skill is a lesson all the same. The frozen
+    # projection keeps only the lessons that count, so this one is the test's.
+    held = guild.projection()
+    monkeypatch.setattr(guild, "projection",
+                        lambda: {**held, "lessons": [*held["lessons"], {"lessonId": "l-test-plain", "skills": []}]})
+    assert guild.lesson_skills("l-test-plain") == []
 
 
 def test_a_lesson_passed_is_knowledge_with_nobody_watching():

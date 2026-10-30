@@ -9,10 +9,10 @@ row, its id, a label, the module's own word for where it stands, and the one
 
 Where each module's rows come from:
 
-- the TypeScript seed, through `modules.json`, which `pnpm export:corpus`
-  writes beside `corpus.json` (Dominion's molecules and clearance findings,
-  the runbooks and protocols, geneOS's hosts and pathways, pureOS's unit
-  operations, Proforma's scenarios, Primer's lessons);
+- the module projection, `modules.json` (the runbooks and protocols,
+  geneOS's hosts and pathways, Proforma's scenarios, Primer's lessons),
+  empty since alpha 2.0 deleted the TypeScript seed it was exported from;
+- pureOS's unit operations, from `schema/vocabulary.yaml`;
 - the service's own stores (records and candidates through the evidence
   pool, artifacts, Guild's ledger and checks, Intake's fetch state, the
   geneOS shelf).
@@ -24,12 +24,8 @@ answer's footer says the module was read in part. Nothing here syncs.
 `coverage(question)` is code and calls no model: it finds the rows the
 question names, and the modules it names, before Postdoc's first turn.
 
-THE PROGRAM SWITCH (OF-BLD-016 §2.3, E.2′). Every row carries the program it
-belongs to (`programs.py`, as the browser's `programOf` resolves it), and a
-row of an archived program is left out of every module unless the store is
-built with `include_archived=True`, the browser's switch. Off is the default.
-The sweep still looks among the hidden rows for what the question names, and
-says so in one line a program: "found in archived program PHA (hidden)".
+alpha 2.0 removed the program switch and Dominion (ADR-005, ADR-010): every
+row the service holds shows, and projects scope them from stage 2 on.
 """
 from __future__ import annotations
 
@@ -39,16 +35,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from . import programs
-from .models import ArchivedCoverage, CoverageHit, CoverageMap, ModuleCoverage, ModuleRow
+from .models import CoverageHit, CoverageMap, ModuleCoverage, ModuleRow
 
 PROJECTION = Path(__file__).parent / "data" / "modules.json"
 
 # The rail's order (src/data/nav.ts), Home last because it gathers the rest.
-MODULES = ("dominion", "runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild", "primer", "intake",
-           "home")
+MODULES = ("runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild", "primer", "intake", "home")
 LABEL = {
-    "dominion": "Dominion", "runbooks": "Runbooks", "geneos": "geneOS", "fermos": "fermOS", "pureos": "pureOS",
+    "runbooks": "Runbooks", "geneos": "geneOS", "fermos": "fermOS", "pureos": "pureOS",
     "proforma": "Proforma", "biorepo": "BioRepo", "guild": "Guild", "primer": "Primer", "intake": "Intake",
     "home": "Home",
 }
@@ -65,7 +59,6 @@ PARTIAL = {
 # Words that name a module itself. Common nouns ("record", "host") are left
 # out: they would name a module in nearly every question.
 MODULE_WORDS = {
-    "dominion": ("dominion", "clearance"),
     "runbooks": ("runbooks", "runbook", "protocols"),
     "geneos": ("geneos",),
     "fermos": ("fermos",),
@@ -105,8 +98,6 @@ class Row:
     # Whether the bare id counts as a name. A paper's id ("H16") is too short
     # to tell from a strain's designation, so a source is named by its title.
     id_names: bool = True
-    # The program the row belongs to, or None when it is general (§2.3).
-    program: str | None = None
     # The species the row is of, as "genus species" in lower case: a host's
     # or a shelf model's by its label, a record's by its strain, a paper's or
     # a record's by its program when every strain of the program is one
@@ -146,14 +137,6 @@ def _short(value: Any) -> Any:
 
 
 # ── states, computed from each module's own word ──────────────────────────
-
-def clearance_state(clearance: str) -> str:
-    """A molecule or finding is open when its foundational IP is expired or no
-    blocking claim was found; every other clearance is fenced, `unknown`
-    included: Dominion's action for it is to run clearance before any
-    commitment, so nothing may be made on it yet."""
-    return "open" if clearance in ("clear-expired", "clear-none") else "fenced"
-
 
 def runbook_state(status: str, locked_at: str | None) -> str:
     if locked_at:
@@ -216,24 +199,36 @@ def _kept_trains() -> list[Any]:
     return list(kept.read().trains)
 
 
+# What a module holds that is no service record of its own (runbooks and
+# protocols, hosts and pathways, scenarios, lessons). alpha 2.0 deleted the
+# TypeScript seed that `pnpm export:corpus` projected here (ADR-010); a file
+# at PROJECTION is still read when present (tests write one), and with none
+# every list is empty until stage 2 keeps these as a project's records.
+EMPTY_PROJECTION: dict[str, Any] = {
+    "runbooks": {"runbooks": [], "protocols": []},
+    "geneos": {"hosts": [], "pathways": []},
+    "proforma": {"scenarios": []},
+    "primer": {"lessons": []},
+}
+
+
 def _projection() -> dict[str, Any]:
     if not PROJECTION.exists():
-        raise ProjectionMissing(f"{PROJECTION.name} is missing; run `pnpm export:corpus`")
+        return json.loads(json.dumps(EMPTY_PROJECTION))
     return json.loads(PROJECTION.read_text())
 
 
 def _strain_aliases() -> dict[str, str]:
-    from .validate import CORPUS_PATH
+    """Strain aliases arrive with a project's records (stage 2); none here."""
+    return {}
 
-    return json.loads(CORPUS_PATH.read_text()).get("strainAliases") or {}
 
-
-def default_sources(pool_factory: Callable[[], Any] | None = None, include_archived: bool = False) -> Sources:
+def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
     from . import artifacts, checks, evidence_pool, geneos, guild, intake, proposals, witness
 
     return Sources(
         projection=_projection,
-        pool=pool_factory or (lambda: evidence_pool.load(include_archived=include_archived)),
+        pool=pool_factory or (lambda: evidence_pool.load()),
         artifacts=artifacts.all_artifacts,
         guild=guild.read,
         checks=checks.read,
@@ -247,9 +242,11 @@ def default_sources(pool_factory: Callable[[], Any] | None = None, include_archi
 
 
 def seed_sources(pool_factory: Callable[[], Any]) -> Sources:
-    """The seed's modules and the given pool, with every store this machine
-    keeps (artifacts, the ledger, checks, fetches, the shelf) empty: what a
-    fixture sweeps, so it reads the same on every machine."""
+    """The module projection (empty since alpha 2.0 deleted the seed it was
+    exported from, unless a test hands one) and the given pool, with every
+    store this machine keeps (artifacts, the ledger, checks, fetches, the
+    shelf) empty: what a fixture sweeps, so it reads the same on every
+    machine."""
     from .models import Checks, Guild
 
     return Sources(projection=_projection, pool=pool_factory, artifacts=list, guild=Guild, checks=Checks,
@@ -281,72 +278,6 @@ RUN_TOOLS = ("proforma.run", "proforma.reference")
 FERMOS_RUNS = (SIMULATION, "fermos.vessel")
 
 
-def _fermos_program(a: Any, record_lookup: Any, seen: frozenset[str]) -> str | None:
-    """A simulation's or a vessel's program (OF-BLD-020 §3.R, finding 6, 12,
-    18, 19): what its inputs name (`programs.program_of_artifact`), its
-    model family's (`kinetics.FAMILIES[...].program`, so a storage_v1
-    simulation naming no strain or product is PHA's), and the program of
-    each kept simulation or vessel its basis rests on, an archived program
-    winning, so what is built on an archived simulation hides with it. A
-    file not on file or damaged adds nothing here; its own reader says so."""
-    from . import artifacts, kinetics
-
-    found = [programs.program_of_artifact(a, record_lookup)]
-    for i in getattr(a, "inputs", None) or []:
-        if i.name == "family" and isinstance(i.value, str) and i.value in kinetics.FAMILIES:
-            found.append(kinetics.FAMILIES[i.value].program)
-        src = i.source
-        if src.kind == "artifact" and src.id and src.id not in seen and src.id != getattr(a, "id", None):
-            try:
-                up = artifacts.get(src.id)
-            except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged):
-                continue
-            if up.tool in FERMOS_RUNS:
-                found.append(_fermos_program(up, record_lookup, seen | {getattr(a, "id", "")}))
-    found = [p for p in found if p]
-    return next((p for p in found if programs.is_archived(p)), found[0] if found else None)
-
-
-def artifact_program(a: Any, record_lookup: Any = None, scenarios: Iterable[dict[str, Any]] | None = None) -> str | None:
-    """The program a kept artifact belongs to, one rule for every reader
-    (OF-BLD-019 §6.R): proforma_read and biorepo_read here, the artifacts
-    endpoint behind BioRepo → Artifacts, pureOS's trains, stream_table and
-    thermo_props. A Proforma run's is `pureos.program_of`'s: its scenario's,
-    its flowsheet's on the shelf and what its basis names, an archived one
-    winning, so a PHA run that bound no record is PHA's everywhere. Any other
-    artifact's is `programs.program_of_artifact`'s, from what its inputs name.
-    `scenarios` are the seed's (modules.json) when not given."""
-    from . import pureos
-
-    tool = getattr(a, "tool", None)
-    if tool in FERMOS_RUNS:
-        return _fermos_program(a, record_lookup, frozenset())
-    if tool == "pureos.train_run":  # OF-BLD-020 §5.2: the train's, its inlet's, its records'
-        return pureos.program_of_run(a, record_lookup)
-    if tool not in RUN_TOOLS:
-        return programs.program_of_artifact(a, record_lookup)
-    scenarios = list(pureos.seed_scenarios() if scenarios is None else scenarios)
-    scenario_id = pureos.scenario_of(a, scenarios)[0] if tool == pureos.RUN else None
-    return pureos.program_of(a, scenario_id, scenarios, record_lookup)
-
-
-def hidden_run_refusal(tool: str, a: Any, include_archived: bool = False) -> str | None:
-    """A read by id of a Proforma run of an archived program, refused in words
-    with the switch off, as a read tool's hidden rows are named (OF-BLD-016
-    §2.R): the program and the switch. None when the read may go on, or when
-    nothing is known to be archived here (no projection)."""
-    if include_archived or getattr(a, "tool", None) not in RUN_TOOLS:
-        return None
-    try:
-        program = artifact_program(a)
-        if not programs.hides(program, include_archived):
-            return None
-    except FileNotFoundError:
-        return None
-    p = programs.program_by_id(program)
-    return f"{tool} refused: run {a.id} belongs to {p.name if p else program}, archived (hidden). {programs.SWITCH}"
-
-
 HEADLINE_VALUES = 8
 
 
@@ -370,10 +301,10 @@ def _example(row: dict[str, Any]) -> dict[str, Any]:
     return {"example": True} if row.get("example") else {}
 
 
-def _artifact_row(module: str, a: Any, provenance: str, program: str | None = None) -> Row:
+def _artifact_row(module: str, a: Any, provenance: str) -> Row:
     inputs = [f"{i.name}={i.value}" for i in a.inputs if isinstance(getattr(i, "value", None), str)][:MAX_ITEMS]
     return Row(module=module, kind="artifact", id=a.id, label=f"{a.tool} artifact", state="open", status="computed",
-               provenance=provenance, words=" ".join([a.tool, *inputs]), program=program,
+               provenance=provenance, words=" ".join([a.tool, *inputs]),
                detail={"tool": a.tool, "createdAt": a.createdAt, "inputs": inputs, "output": _headline(a.output),
                        "cite": "cite the value through get_artifact or the tool that computes it; this row names it"})
 
@@ -384,15 +315,14 @@ VESSEL_TOOL = "fermos.vessel"
 TRAIN_RUN = "pureos.train_run"
 
 
-def _vessel_row(a: Any, provenance: str, program: str | None = None) -> Row:
+def _vessel_row(a: Any, provenance: str) -> Row:
     from . import vessel
 
     v = vessel.summary(a)
     kind = f", {v.vesselType.replace('-', ' ')}" if v.vesselType else ""
     return Row(module="fermos", kind="vessel", id=a.id, label=f"Vessel design: BioSTEAM's {v.unitClass}{kind}, for "
                f"{v.sourceTool} {v.source}", state="open", status="computed", provenance=provenance,
-               words=" ".join(["vessel", "fermenter", "bioreactor", v.unitClass, v.vesselType or "", v.source]),
-               program=program, alt_ids=(v.source,) if v.source else (),
+               words=" ".join(["vessel", "fermenter", "bioreactor", v.unitClass, v.vesselType or "", v.source]), alt_ids=(v.source,) if v.source else (),
                detail={"tool": a.tool, "createdAt": a.createdAt, "unitClass": v.unitClass, "vesselType": v.vesselType,
                        "source": v.source, "sourceTool": v.sourceTool, "vessels": v.vessels, "volume": v.volume,
                        "volumeUnit": "m3", "installed": v.installed, "installedUnit": "USD",
@@ -401,19 +331,12 @@ def _vessel_row(a: Any, provenance: str, program: str | None = None) -> Row:
 
 
 class Stores:
-    """Every module's rows, loaded on first use and kept for one question.
+    """Every module's rows, loaded on first use and kept for one question."""
 
-    `rows` is what the question may see: with `include_archived` off (the
-    default) a row of an archived program is left out, and `hidden` holds it,
-    so the sweep can say the question named it."""
-
-    def __init__(self, sources: Sources | None = None, pool_factory: Callable[[], Any] | None = None,
-                 include_archived: bool = False) -> None:
-        self.sources = sources or default_sources(pool_factory, include_archived)
-        self.include_archived = include_archived
+    def __init__(self, sources: Sources | None = None, pool_factory: Callable[[], Any] | None = None) -> None:
+        self.sources = sources or default_sources(pool_factory)
         self._all: dict[str, list[Row]] = {}
         self._rows: dict[str, list[Row]] = {}
-        self._hidden: dict[str, list[Row]] = {}
         self._errors: dict[str, str] = {}
         self._cache: dict[str, Any] = {}
 
@@ -431,14 +354,13 @@ class Stores:
             self._cache.pop(name, None)
         self._all.clear()
         self._rows.clear()
-        self._hidden.clear()
         self._errors.clear()
 
     def pool(self) -> Any:
         return self._get("pool")
 
     def all_rows(self, module: str) -> list[Row]:
-        """Every row the module holds, archived programs' included."""
+        """Every row the module holds."""
         if module not in self._all:
             try:
                 self._all[module] = list(getattr(self, f"_{module}")())
@@ -450,35 +372,12 @@ class Stores:
     def rows(self, module: str) -> list[Row]:
         """The rows this question may see."""
         if module not in self._rows:
-            every = self.all_rows(module)
-            # An example (a run nobody made, §3.3) is left out with the
-            # archive, as the browser leaves it out (§4.R); it is not an
-            # archived program's row, so it is not counted in `hidden`.
-            self._rows[module] = [r for r in every if not programs.hides(r.program, self.include_archived)
-                                  and (self.include_archived or not r.detail.get("example"))]
-            self._hidden[module] = [r for r in every if programs.hides(r.program, self.include_archived)]
+            self._rows[module] = list(self.all_rows(module))
         return self._rows[module]
-
-    def hidden(self, module: str) -> list[Row]:
-        """The module's rows left out because their program is archived."""
-        self.rows(module)
-        return self._hidden[module]
 
     def _record_lookup(self, record_id: str) -> Any:
         pool = self.pool()
         return pool.record(record_id) or pool.corpus.record(record_id)
-
-    def _artifact_program(self, a: Any) -> str | None:
-        """`artifact_program`, the one rule (OF-BLD-019 §6.R), over this
-        store's own projection of the seed's scenarios."""
-        try:
-            scenarios = self._get("projection")["proforma"]["scenarios"]
-        except Exception:  # no projection here: a run's own basis names its scenario
-            scenarios = []
-        try:
-            return artifact_program(a, self._record_lookup, scenarios)
-        except Exception:  # a pool that cannot load leaves the id to speak
-            return artifact_program(a, None, scenarios)
 
     def error(self, module: str) -> str | None:
         self.rows(module)
@@ -501,51 +400,18 @@ class Stores:
     def _artifacts(self, module: str) -> Iterable[Row]:
         for a in self._get("artifacts"):
             if ARTIFACT_MODULE.get(a.tool) == module:
-                yield _artifact_row(module, a, self._artifact_mark(a), self._artifact_program(a))
+                yield _artifact_row(module, a, self._artifact_mark(a))
 
-    def _dominion(self) -> Iterable[Row]:
-        p = self._get("projection")["dominion"]
-        product_program = {m["id"]: m.get("program") for m in p["molecules"]}
-        for m in p["molecules"]:
-            yield Row("dominion", "molecule", m["id"], m["name"], clearance_state(m["clearanceState"]), m["clearanceState"],
-                      provenance=m.get("provenance"), names=tuple(m.get("aliases") or ()),
-                      words=" ".join([m["category"], m["clearanceLabel"], m.get("note") or "", m.get("processCode") or ""]
-                                     + (m.get("unitOperationIds") or []) + (m.get("pathwayIds") or [])),
-                      # The train and the pathways are the seams to pureOS and
-                      # geneOS: their ids are what pureos_read and geneos_read take.
-                      detail={"clearance": m["clearanceLabel"], "category": m["category"],
-                              "defaultStrainId": m.get("defaultStrainId"), "processCode": m.get("processCode"),
-                              "unitOperationIds": m.get("unitOperationIds") or [], "pathwayIds": m.get("pathwayIds") or [],
-                              "note": m.get("note")}, program=m.get("program"))
-        for f in p["findings"]:
-            fid = f"{f['productId']}.{f['jurisdictionId']}"
-            yield Row("dominion", "finding", fid, f"Clearance finding: {f['productId']} in {f['jurisdictionId']}",
-                      clearance_state(f["state"]), f["state"], provenance=f.get("provenance"),
-                      words=" ".join([f["productId"], f.get("summary") or ""] + [x["title"] for x in f.get("patents") or []]),
-                      detail={"productId": f["productId"], "jurisdiction": f["jurisdictionId"], "summary": f.get("summary"),
-                              "readAt": f.get("readAt"), "patents": f.get("patents") or []},
-                      program=product_program.get(f["productId"]))
-
-    def _species(self) -> tuple[dict[str, str], dict[str, str]]:
-        """Each host's species by its label, and each program's species when
-        every host the program holds is the same one."""
+    def _species(self) -> dict[str, str]:
+        """Each host's species by its label."""
         if "_species" not in self._cache:
             hosts = self._get("projection")["geneos"]["hosts"]
-            by_strain = {h["id"]: sp for h in hosts if (sp := species_of(h["name"]))}
-            by_program: dict[str, set[str]] = {}
-            for h in hosts:
-                if h.get("program"):
-                    by_program.setdefault(h["program"], set()).add(by_strain.get(h["id"], ""))
-            self._cache["_species"] = (by_strain, {pid: next(iter(sp)) for pid, sp in by_program.items()
-                                                   if len(sp) == 1 and "" not in sp})
+            self._cache["_species"] = {h["id"]: sp for h in hosts if (sp := species_of(h["name"]))}
         return self._cache["_species"]
 
-    def _species_of(self, strain_ids: Iterable[str | None], program: str | None) -> tuple[str, ...]:
-        by_strain, by_program = self._species()
-        found = {by_strain[s] for s in strain_ids if s and s in by_strain}
-        if not found and program in by_program:
-            found = {by_program[str(program)]}
-        return tuple(sorted(found))
+    def _species_of(self, strain_ids: Iterable[str | None]) -> tuple[str, ...]:
+        by_strain = self._species()
+        return tuple(sorted({by_strain[s] for s in strain_ids if s and s in by_strain}))
 
     def _runbooks(self) -> Iterable[Row]:
         p = self._get("projection")["runbooks"]
@@ -559,45 +425,33 @@ class Stores:
                       words=" ".join([r["kind"], r.get("productId") or "", r.get("strainId") or ""] + r.get("predictions", [])),
                       detail={"kind": r["kind"], "productId": r.get("productId"), "strainId": r.get("strainId"),
                               "lockedAt": r.get("lockedAt"), "predictions": r.get("predictions", []),
-                              **_example(r)},
-                      program=r.get("program"))
+                              **_example(r)})
         for x in p["protocols"]:
-            # A general protocol names the strains it was written for; with
-            # the switch off an archived program's strain is not among them,
-            # so no default read hands a casein strain id on (§2.R).
-            organisms = [o for o in x.get("organisms", [])
-                         if not programs.hides(programs.program_of("strain", o), self.include_archived)]
+            organisms = list(x.get("organisms", []))
             yield Row("runbooks", "protocol", x["id"], x["title"], "approved", f"version {x['currentVersion']} current",
                       words=" ".join([x["category"], x.get("purpose") or ""] + organisms),
                       detail={"category": x["category"], "organisms": organisms,
                               "currentVersion": x["currentVersion"], "versions": x.get("versions", []),
-                              **_example(x)},
-                      program=x.get("program"))
+                              **_example(x)})
 
     def _geneos(self) -> Iterable[Row]:
         p = self._get("projection")["geneos"]
         aliases: dict[str, list[str]] = {}
         for alias, sid in self._get("strain_aliases").items():
             aliases.setdefault(sid, []).append(alias)
-        host_program = {h["id"]: h.get("program") for h in p["hosts"]}
         for h in p["hosts"]:
             yield Row("geneos", "host", h["id"], h["name"], "open", "in the catalogue",
                       names=tuple(aliases.get(h["id"], ())), words=" ".join(h.get("badges") or []),
-                      detail={"bsl": h.get("bsl"), "badges": h.get("badges") or []}, program=h.get("program"),
-                      species=self._species_of([h["id"]], None))
+                      detail={"bsl": h.get("bsl"), "badges": h.get("badges") or []},
+                      species=self._species_of([h["id"]]))
         for x in p["pathways"]:
-            # A pathway belongs to the program of the products it makes, when
-            # one of them is a product a program holds ("PHB" → PHA, §2.R).
-            made = [programs.program_of("product", str(n).lower()) for n in x.get("products") or []]
             yield Row("geneos", "pathway", x["id"], x["label"], "open", "in the catalogue",
-                      words=" ".join(x.get("products") or []), detail={"products": x.get("products") or []},
-                      program=next((m for m in made if m), None))
+                      words=" ".join(x.get("products") or []), detail={"products": x.get("products") or []})
         for m in self._get("shelf"):
             ok = m.unavailable is None
             yield Row("geneos", "model", m.id, m.name, "open" if ok else "fenced", "on the shelf" if ok else "not fetched",
                       words=m.host or "", detail={"host": m.host, "unavailable": m.unavailable},
-                      program=host_program.get(m.host or ""),
-                      species=self._species_of([m.host], None) or tuple(x for x in [species_of(m.name)] if x))
+                      species=self._species_of([m.host]) or tuple(x for x in [species_of(m.name)] if x))
         yield from self._artifacts("geneos")
 
     def _fermos(self) -> Iterable[Row]:
@@ -607,7 +461,7 @@ class Stores:
         # sized for which simulation, read from the artifact (vessel.summary).
         for a in self._get("artifacts"):
             if a.tool == VESSEL_TOOL:
-                yield _vessel_row(a, self._artifact_mark(a), self._artifact_program(a))
+                yield _vessel_row(a, self._artifact_mark(a))
 
     def _simulations(self) -> Iterable[Row]:
         """One row a kept simulation (OF-BLD-020 §3.4), `fermos/simulation/<id>`:
@@ -629,7 +483,6 @@ class Stores:
                 if isinstance(v, dict) and v.get("key"):
                     bound.setdefault(str(v.get("origin") or "waiting"), []).append(str(v["key"]))
             ceiling = o.get("ceiling") if isinstance(o.get("ceiling"), dict) else {}
-            program = self._artifact_program(a)
             yield Row("fermos", "simulation", a.id, f"{title} ({family}) simulation of {who}", "open", "computed",
                       provenance=self._artifact_mark(a),
                       words=" ".join(str(x) for x in ("simulation", family, title, strain or "", product or "",
@@ -639,11 +492,12 @@ class Stores:
                               "aerobic": bool(o.get("aerobic")), "aboveCeiling": bool(ceiling.get("flagged")),
                               "flagged": bool(o.get("flags")),
                               "cite": "cite the row by its ref; its numbers are in the artifact, and fermos_simulate "
-                                      "returns a simulation's evidence id"},
-                      program=program, species=self._species_of([strain], program))
+                                      "returns a simulation's evidence id"}, species=self._species_of([strain]))
 
     def _pureos(self) -> Iterable[Row]:
-        ops = self._get("projection")["pureos"]["unitOperations"]
+        from .validate import unit_operations
+
+        ops = unit_operations()
         for u in ops:
             classes = u.get("biosteamClasses") or []
             yield Row("pureos", "unit-operation", u["id"], u["label"], "open", "in the vocabulary",
@@ -670,7 +524,7 @@ class Stores:
             mine = sorted(runs.get(s.id, []), key=lambda a: a.createdAt, reverse=True)
             yield Row("pureos", "train", s.id, f"{s.name} ({s.id})", "open", "built by a model", names=(s.name,),
                       words=" ".join(["train built model", s.product, s.program, *(u.type for u in s.units)]),
-                      alt_ids=tuple(a.id for a in mine), program=s.program,
+                      alt_ids=tuple(a.id for a in mine),
                       detail={"trainId": s.id, "name": s.name, "program": s.program, "product": s.product,
                               "inlet": {"kind": s.inlet.kind, "ref": s.inlet.ref, "streamId": s.inlet.streamId,
                                         "vessel": s.inlet.vessel},
@@ -701,7 +555,6 @@ class Stores:
                       alt_ids=(str(tid),) if tid else (),
                       words=" ".join(str(x) for x in ("train run recovery purity", product, o.get("product"), tid,
                                                       *(u.get("type") for u in units)) if x),
-                      program=self._artifact_program(a),
                       detail={"artifactId": a.id, "tool": a.tool, "createdAt": a.createdAt, "trainId": tid,
                               "trainName": tname, "product": product, "productChemical": o.get("product"),
                               "productStream": o.get("productStream"), "units": [u.get("id") for u in units],
@@ -735,8 +588,7 @@ class Stores:
                               "product": tr.product, "productStream": tr.productStream, "productBasis": tr.productBasis,
                               "overallRecovery": tr.overallRecovery, "units": [u.id for u in tr.units],
                               "runsOnFile": tr.runs, "tablesSource": tr.tablesSource, "note": tr.note,
-                              "cite": "cite the train or a unit of it by its ref; its numbers are read from the run artifact"},
-                      program=tr.program)
+                              "cite": "cite the train or a unit of it by its ref; its numbers are read from the run artifact"})
             for u in tr.units:
                 yield Row("pureos", "train-unit", f"{key}:{u.id}", f"{u.id} ({u.unitClass}) in the train of {name}", "open",
                           "computed", provenance=mark, id_names=False, alt_ids=(key, *ids),
@@ -746,15 +598,13 @@ class Stores:
                                   "product": tr.product, "productIn": u.productIn, "productOut": u.productOut,
                                   "productLost": u.productLost, "lostTo": u.lostTo, "recovery": u.recovery,
                                   "cumulative": u.cumulative, "massIn": u.massIn, "massOut": u.massOut, "note": u.note,
-                                  "unitOfMass": tr.tableUnits.get("massFlow")},
-                          program=tr.program)
+                                  "unitOfMass": tr.tableUnits.get("massFlow")})
 
     def _proforma(self) -> Iterable[Row]:
         for s in self._get("projection")["proforma"]["scenarios"]:
             yield Row("proforma", "scenario", s["id"], s["name"], "open", s["kind"],
                       words=" ".join([s.get("product") or "", s.get("modelId") or ""]),
-                      detail={"kind": s["kind"], "product": s.get("product"), "modelId": s.get("modelId"), **_example(s)},
-                      program=s.get("program"))
+                      detail={"kind": s["kind"], "product": s.get("product"), "modelId": s.get("modelId"), **_example(s)})
         yield from self._artifacts("proforma")
 
     def _biorepo(self) -> Iterable[Row]:
@@ -766,10 +616,9 @@ class Stores:
                       words=" ".join(str(r.get(k) or "") for k in ("field", "paperId", "strainId", "organism", "productId",
                                                                    "carbonSource")),
                       detail={"paperId": r.get("paperId"), "field": r.get("field"), "strainId": r.get("strainId")},
-                      program=programs.program_of_record(r),
-                      species=self._species_of([r.get("strainId"), r.get("organism")], programs.program_of_record(r)))
+                      species=self._species_of([r.get("strainId"), r.get("organism")]))
         for a in self._get("artifacts"):
-            yield _artifact_row("biorepo", a, self._artifact_mark(a), self._artifact_program(a))
+            yield _artifact_row("biorepo", a, self._artifact_mark(a))
         for run in self._get("witness"):
             outcomes: dict[str, int] = {}
             for x in run.results:
@@ -796,8 +645,7 @@ class Stores:
         for lesson in self._get("projection")["primer"]["lessons"]:
             yield Row("primer", "lesson", lesson["id"], lesson["title"], "approved", "published",
                       words=" ".join([lesson["moduleTitle"], lesson.get("blurb") or ""] + lesson.get("skills", [])),
-                      detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", []), **_example(lesson)},
-                      program=lesson.get("program"))
+                      detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", []), **_example(lesson)})
 
     def _intake(self) -> Iterable[Row]:
         fetched = self._get("intake")
@@ -808,14 +656,13 @@ class Stores:
                       words=str(paper.get("year") or ""),
                       detail={"textSource": status.textSource if status is not None else paper.get("textSource"),
                               "reason": status.reason if status is not None else None}, id_names=False,
-                      program=programs.program_of_paper(paper["id"]),
-                      species=self._species_of([], programs.program_of_paper(paper["id"])))
+                      species=self._species_of([]))
 
     def _home(self) -> Iterable[Row]:
         for r in self.pool().records:
             if r.get("source") == "candidate" and record_state(r.get("provenance"), r.get("status")) == "proposed":
                 yield Row("home", "review", r["id"], f"Awaiting review: {r.get('measurement') or r['id']}", "proposed",
-                          "awaiting review", detail={"paperId": r.get("paperId")}, program=programs.program_of_record(r))
+                          "awaiting review", detail={"paperId": r.get("paperId")})
         for c in self._get("checks").checks:
             if c.state in ("proposed", "scheduled"):
                 # Who a check names is never shown before it is run.
@@ -835,7 +682,6 @@ class Stores:
 # ── reading, for the read tools ───────────────────────────────────────────
 
 KINDS = {
-    "dominion": ("molecule", "finding"),
     "runbooks": ("runbook", "protocol"),
     "geneos": ("host", "pathway", "model", "artifact"),
     "fermos": ("artifact", "simulation", "vessel"),
@@ -856,12 +702,11 @@ def _tokens(text: str) -> set[str]:
 
 
 def find(stores: Stores, module: str, *, ids: Iterable[str] = (), words: str = "", kind: str | None = None,
-         state: str | None = None, hidden: bool = False) -> list[Row]:
+         state: str | None = None) -> list[Row]:
     """A module's rows by id or ref, by words, by kind and by state; every
     filter given is applied. Words rank by how many of them a row holds, its
-    label, names and words together; a row holding none is left out. With
-    `hidden`, the same search among the rows archived programs left out."""
-    rows = stores.hidden(module) if hidden else stores.rows(module)
+    label, names and words together; a row holding none is left out."""
+    rows = stores.rows(module)
     if kind:
         rows = [r for r in rows if r.kind == kind]
     if state:
@@ -964,41 +809,9 @@ def module_named(module: str, question: str) -> bool:
     return any(w in words for w in MODULE_WORDS[module])
 
 
-def _archived(question: str, stores: Stores) -> list[ArchivedCoverage]:
-    """What the question names among the rows archived programs left out,
-    one entry a program, and an archived program the question names by its
-    own name or id ("PHA", "casein"). Empty when archived programs show."""
-    if stores.include_archived:
-        return []
-    found: dict[str, ArchivedCoverage] = {}
-
-    def entry(program_id: str) -> ArchivedCoverage:
-        if program_id not in found:
-            p = programs.program_by_id(program_id)
-            found[program_id] = ArchivedCoverage(program=program_id, name=p.name if p else program_id)
-        return found[program_id]
-
-    q = f" {norm(question)} "
-    for p in programs.programs():
-        if p.status == "archived" and any(f" {n} " in q for n in {norm(p.name), norm(p.id)} if len(n) >= MIN_NAME):
-            entry(p.id).entities.append(p.name)
-    for module in MODULES:
-        for row, name in named_rows(question, stores.hidden(module)):
-            e = entry(str(row.program))
-            e.count += 1
-            if name not in e.entities:
-                e.entities.append(name)
-            if module not in e.modules:
-                e.modules.append(module)  # type: ignore[arg-type]
-    order = [p.id for p in programs.programs()]
-    return [found[k] for k in sorted(found, key=lambda k: order.index(k) if k in order else len(order))]
-
-
-def coverage(question: str, stores: Stores | None = None, include_archived: bool | None = None) -> CoverageMap:
-    """Every module swept for what the question names, in code. Archived
-    programs are left out unless the store was built with them (or, with no
-    store given, `include_archived` asks for them)."""
-    stores = stores or Stores(include_archived=bool(include_archived))
+def coverage(question: str, stores: Stores | None = None) -> CoverageMap:
+    """Every module swept for what the question names, in code."""
+    stores = stores or Stores()
     entities: list[str] = []
     out: list[ModuleCoverage] = []
     for module in MODULES:
@@ -1019,8 +832,7 @@ def coverage(question: str, stores: Stores | None = None, include_archived: bool
         out.append(ModuleCoverage(module=module, label=LABEL[module], count=len(hits),  # type: ignore[arg-type]
                                   hits=[r.hit() for r in hits[:COVERAGE_HITS]], named=named,
                                   partial=PARTIAL.get(module), error=stores.error(module)))
-    return CoverageMap(entities=entities, searched=len(out), found=sum(1 for m in out if m.count), modules=out,
-                       includeArchived=stores.include_archived, archived=_archived(question, stores))
+    return CoverageMap(entities=entities, searched=len(out), found=sum(1 for m in out if m.count), modules=out)
 
 
 NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
@@ -1030,34 +842,9 @@ def in_words(n: int) -> str:
     return NUMBER_WORDS[n] if 0 <= n < len(NUMBER_WORDS) else str(n)
 
 
-def archived_line(a: ArchivedCoverage) -> str:
-    """`found in archived program PHA (hidden)`, the words the trace says."""
-    return f"found in archived program {a.name} (hidden)"
-
-
-SWITCH = "Settings → Programs has the switch that shows archived programs; turn it on to include them."
-
-
-def archived_gap(a: ArchivedCoverage) -> str:
-    """The gap a plan carries for what an archived program hid, in words
-    written by code; the names the question used go in only when they hold
-    no number."""
-    from .validate import find_number
-
-    named = ", ".join(a.entities)
-    with_names = f"What the question names in {a.name} ({named}) is hidden: {a.name} is an archived program. {SWITCH}"
-    if named and not find_number(with_names):
-        return with_names
-    return f"What the question names in {a.name} is hidden: {a.name} is an archived program. {SWITCH}"
-
-
 def footer(cmap: CoverageMap) -> str:
-    """`searched eleven, found in three`, as the trace and the footer say it,
-    and what an archived program hid."""
-    out = f"searched {in_words(cmap.searched)}, found in {in_words(cmap.found) if cmap.found else 'none'}"
-    for a in cmap.archived:
-        out += f" · {archived_line(a)}"
-    return out
+    """`searched ten, found in three`, as the trace and the footer say it."""
+    return f"searched {in_words(cmap.searched)}, found in {in_words(cmap.found) if cmap.found else 'none'}"
 
 
 def for_model(cmap: CoverageMap, said_in: str = "question") -> str:
@@ -1084,12 +871,6 @@ def for_model(cmap: CoverageMap, said_in: str = "question") -> str:
         if m.partial:
             head += f". Read in part: {m.partial}"
         lines.append(head)
-    for a in cmap.archived:
-        lines.append(
-            f"- {archived_line(a)}: the question names {', '.join(repr(e) for e in a.entities)}, which belongs to "
-            f"{a.name}, an archived program. Its papers, records, passages and rows are hidden from this question and "
-            "no tool returns them; do not search for them or answer about them. The service adds a gap that says so "
-            "and names the switch that shows them.")
     return "\n".join(lines)
 
 
@@ -1106,6 +887,4 @@ def trace_lines(cmap: CoverageMap) -> list[str]:
         if m.partial:
             line += " · read in part"
         out.append(line)
-    for a in cmap.archived:
-        out.append(f"{a.name} · {archived_line(a)}")
     return out

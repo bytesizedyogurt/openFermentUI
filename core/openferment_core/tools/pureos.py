@@ -191,7 +191,7 @@ def _run(inp: PureosProposeInput, ctx: ToolContext) -> ToolResult:
     from .. import artifacts
 
     try:
-        p = pureos.propose(inp.product, inp.host, inp.inletRef or None, include_archived=ctx.include_archived)
+        p = pureos.propose(inp.product, inp.host, inp.inletRef or None)
         evidence = pureos.proposer.evidence(p)
     except (pureos.ProposeUnknown, pureos.ProposeRefused) as e:
         return ToolResult(error=f"{NAME} refused: {e}")

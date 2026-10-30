@@ -27,7 +27,6 @@ import type {
   ScenarioInput,
   StreamRow,
   TeaBreakdown,
-  ProgramId,
   TrainSummary,
   UnitRow,
   UtilityDuties,
@@ -57,11 +56,9 @@ export const proformaStatus = (signal?: AbortSignal) => call<SimulatorStatus>('/
 
 /**
  * The flowsheets a scenario can name, as `GET /api/proforma/shelf` serves
- * them. Archived programs' flowsheets come only when the switch is on; the
- * toy never comes.
+ * them. The toy never comes.
  */
-export const proformaShelf = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<FlowsheetInfo[]>(`/api/proforma/shelf${includeArchived ? '?includeArchived=true' : ''}`, { signal });
+export const proformaShelf = (signal?: AbortSignal) => call<FlowsheetInfo[]>('/api/proforma/shelf', { signal });
 
 // ── Reference runs (OF-BLD-019 §2.2, D3) ────────────────────────────────
 
@@ -293,25 +290,6 @@ export function inputCounts(
   return c;
 }
 
-/** The program a new scenario starts in: its flowsheet's, when that is offered, else the first offered. */
-export function defaultProgram<T extends string>(flowsheet: FlowsheetInfo | null, offered: T[]): T | null {
-  const own = flowsheet?.program as T | null | undefined;
-  if (own && offered.includes(own)) return own;
-  return offered[0] ?? null;
-}
-
-/**
- * The programs a new scenario may be filed under (OF-BLD-019 §3.R, finding
- * 3): a flowsheet that belongs to a program files its scenarios there and
- * nowhere else (a PHA flowsheet filed under Yeast ethanol would bring an
- * archived program's content into the default view); a general flowsheet
- * may go under any program offered.
- */
-export function programsFor<T extends string>(flowsheet: { program?: string | null } | null, offered: T[]): T[] {
-  const own = flowsheet?.program as T | null | undefined;
-  return own ? offered.filter((p) => p === own) : offered;
-}
-
 export interface BenchmarkResponse {
   artifact: Artifact | null;
   simulator: SimulatorStatus;
@@ -338,18 +316,14 @@ export const proformaBenchmark = (signal?: AbortSignal) => call<BenchmarkRespons
 export const runProformaBenchmark = (signal?: AbortSignal) =>
   call<BenchmarkResponse>('/api/proforma/benchmark', { method: 'POST', signal });
 
-/** B.3: the price the package's defaults give for version 2.35.1, measured when this build was written. */
-export const BENCHMARK_EXPECTED = { usdPerGal: 1.968, tolerance: 0.005, package: 'biorefineries.cornstover@2.35.1' };
-
 // ── The BioSTEAM scenario (§8.4), and the scenario run contract ─────────
 //
 // OF-BLD-019 §3.2 is the browser's side of the contract §2.3 builds in the
 // service, names included:
 //
-//   (b) GET  /api/proforma/scenarios?includeArchived=&host=  every SEED
-//       scenario of kind 'biosteam' whose program the switch shows, bound
-//       (`ProformaScenarioInfo`, carrying its `flowsheet`);
-//   (c) GET  /api/proforma/bind?flowsheet=&includeArchived=&host=  the same
+//   (b) GET  /api/proforma/scenarios?host=  every SEED scenario of kind
+//       'biosteam', bound (`ProformaScenarioInfo`, carrying its `flowsheet`);
+//   (c) GET  /api/proforma/bind?flowsheet=&host=  the same
 //       shape for a flowsheet, id and name empty: what a scenario a person
 //       made here (D6) shows as its inputs; a reference flowsheet, the toy or
 //       an unknown id is a refusal in words;
@@ -357,10 +331,9 @@ export const BENCHMARK_EXPECTED = { usdPerGal: 1.968, tolerance: 0.005, package:
 //       here by its flowsheet, bound as (c) binds it, with the request's
 //       assumptions. Inputs that still wait are a 422 listing them.
 
-/** What a binding is asked with: the host filter, and the program switch as the page applies it. */
+/** What a binding is asked with: the host filter. */
 export interface BindAsk {
   host: string | null;
-  includeArchived: boolean;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1); sent to (c) alone. */
   fits?: Record<string, string>;
   /** OF-BLD-020 §6.1: a scenario on `custom_train_v1` names the vessel design and the train run it is built from. */
@@ -370,7 +343,6 @@ export interface BindAsk {
 
 const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
   const q = new URLSearchParams(extra);
-  q.set('includeArchived', ask.includeArchived ? 'true' : 'false');
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
   if (ask.vessel) q.set('vessel', ask.vessel);
@@ -378,7 +350,7 @@ const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
   return q.toString();
 };
 
-/** (b) The seed BioSTEAM scenarios the switch shows, each bound by the service. */
+/** (b) The seed BioSTEAM scenarios, each bound by the service. */
 export const proformaScenarios = (ask: BindAsk, signal?: AbortSignal) =>
   call<ProformaScenarioInfo[]>(`/api/proforma/scenarios?${bindQuery(ask)}`, { signal });
 
@@ -413,8 +385,6 @@ export interface RunAsk {
   /** OF-BLD-020 §6.1: the vessel design and the train run a scenario on `custom_train_v1` is built from. */
   vessel?: string | null;
   trainRun?: string | null;
-  /** The program switch, for those parts (one of an archived program is refused unless it is on). */
-  includeArchived?: boolean;
 }
 
 /**
@@ -457,8 +427,8 @@ export function runBody(ask: RunAsk): ProformaRunRequest {
     seed: 0,
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
     ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
-    // OF-BLD-020 §6.1: a composite's parts, and the switch they are held to.
-    ...(ask.vessel || ask.trainRun ? { vessel: ask.vessel ?? null, trainRun: ask.trainRun ?? null, includeArchived: Boolean(ask.includeArchived) } : {}),
+    // OF-BLD-020 §6.1: a composite's parts.
+    ...(ask.vessel || ask.trainRun ? { vessel: ask.vessel ?? null, trainRun: ask.trainRun ?? null } : {}),
   };
 }
 
@@ -482,14 +452,10 @@ export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
 
 /**
  * Every kinetic fit, forecast and simulation fermOS keeps, with what it can feed `flowsheet`: `GET /api/fermos/fits`.
- * The program switch rides along (OF-BLD-020 §3.R): one of an archived program is left out unless it is on.
  */
-export async function fermosFits(flowsheet: string, includeArchived: boolean, signal?: AbortSignal): Promise<FermosFitInfo[]> {
+export async function fermosFits(flowsheet: string, signal?: AbortSignal): Promise<FermosFitInfo[]> {
   try {
-    return await call<FermosFitInfo[]>(
-      `/api/fermos/fits?flowsheet=${encodeURIComponent(flowsheet)}&includeArchived=${includeArchived ? 'true' : 'false'}`,
-      { signal },
-    );
+    return await call<FermosFitInfo[]>(`/api/fermos/fits?flowsheet=${encodeURIComponent(flowsheet)}`, { signal });
   } catch (e) {
     if (!noEndpoint(e)) throw e;
     throw new ServiceRefused(404, 'This service has no fermOS fit list, so it cannot offer a fit to this scenario yet.');
@@ -520,7 +486,6 @@ export interface CeilingAsk {
   /** Sent for a scenario made here alone: the service reads a seed scenario's own. */
   flowsheet?: string | null;
   host: string | null;
-  includeArchived: boolean;
   /** The fermOS fits a person chose, by input key (§5.1). */
   fits?: Record<string, string>;
   /** The yield's override, when a person typed one (OF-BLD-020 D3); the rest do not bear on the check. */
@@ -529,7 +494,7 @@ export interface CeilingAsk {
 
 /** `GET /api/proforma/ceiling-check`: a service that predates it says so in words. */
 export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promise<CeilingCheck> {
-  const q = new URLSearchParams({ scenarioId: ask.scenarioId, includeArchived: ask.includeArchived ? 'true' : 'false' });
+  const q = new URLSearchParams({ scenarioId: ask.scenarioId });
   if (ask.flowsheet) q.set('flowsheet', ask.flowsheet);
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
@@ -830,23 +795,12 @@ export function asResultGrid(modelId: string, g: ProformaGrid): ResultGrid {
 
 /**
  * The question a process modeller is asked about each input that rests on an
- * assumption, by flowsheet then input key (OF-BLD-019 §3.R, finding 5): two
- * flowsheets share keys (titre, yield, productivity) and a yeast page must
- * never ask PHA's questions. A flowsheet with no question of its own for an
- * input asks where it should come from.
+ * assumption, by flowsheet then input key (OF-BLD-019 §3.R, finding 5):
+ * flowsheets share keys (titre, yield, productivity), so each asks its own.
+ * A flowsheet with no question of its own for an input asks where it should
+ * come from.
  */
 export const QUESTIONS: Record<string, Record<string, string>> = {
-  pha_sugar_v0: {
-    recovery:
-      'What share of cell mass does a solids centrifuge recover from a PHA broth at this scale, and what does a second pass or a flocculant change?',
-    sugarPrice:
-      'What does a kilogram of fermentable sugar from this feedstock cost delivered to the fermenter, after pretreatment and hydrolysis?',
-    sugarFeed: 'What plant size, in sugar fed per hour, is a sensible first commercial train for this product?',
-    titre: 'What PHA titre at harvest is credible for a fed-batch on hydrolysate sugars in this host?',
-    yield: 'What PHA yield on sugar holds at scale, and how far below the network ceiling does a real culture sit?',
-    content: 'What PHA share of dry cell mass is reached at harvest without losing productivity?',
-    productivity: 'What volumetric productivity holds across a full batch, including the growth phase?',
-  },
   // OF-BLD-020 §6.1: a vessel and a train, priced. Its fermenter's inputs ask what the ethanol flowsheet's ask.
   custom_train_v1: {
     feed_glucose_conc:
@@ -1037,13 +991,11 @@ export function partsOf(scenario: Pick<Scenario, 'vessel' | 'trainRun'> | null |
   return scenario?.vessel && scenario?.trainRun ? { vessel: scenario.vessel, trainRun: scenario.trainRun } : null;
 }
 
-/** Every vessel design the service keeps (`GET /api/fermos/vessels`), newest first; one of an archived program left out unless asked. */
-export const compositeVessels = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<VesselSummary[]>(`/api/fermos/vessels?includeArchived=${includeArchived ? 'true' : 'false'}`, { signal });
+/** Every vessel design the service keeps (`GET /api/fermos/vessels`), newest first. */
+export const compositeVessels = (signal?: AbortSignal) => call<VesselSummary[]>('/api/fermos/vessels', { signal });
 
-/** Every train run the service keeps (`GET /api/pureos/train-runs`), newest first; one of an archived program left out unless asked. */
-export const compositeTrainRuns = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<TrainSummary[]>(`/api/pureos/train-runs?includeArchived=${includeArchived ? 'true' : 'false'}`, { signal });
+/** Every train run the service keeps (`GET /api/pureos/train-runs`), newest first. */
+export const compositeTrainRuns = (signal?: AbortSignal) => call<TrainSummary[]>('/api/pureos/train-runs', { signal });
 
 /** A kept vessel design in one line, for a chooser. */
 export const vesselWords = (v: VesselSummary) =>
@@ -1059,13 +1011,13 @@ export const trainRunPath = (artifactId: string) => `/pureos/train/${encodeURICo
 
 /**
  * Make a scenario on `custom_train_v1` from a vessel design and a train run,
- * in the program the train run belongs to, and return its id: what pureOS's
+ * and return its id: what pureOS's
  * Builder's **Price this in Proforma** calls (OF-BLD-020 §6.2), and what the
  * New scenario dialog makes when both are chosen. Durable, time-based id, not
  * run; the scenario's page binds it and says what waits.
  */
-export function scenarioFromVesselAndTrain(vesselId: string, trainRunId: string, program: ProgramId | null, name?: string): string {
+export function scenarioFromVesselAndTrain(vesselId: string, trainRunId: string, name?: string): string {
   return useStore
     .getState()
-    .createScenario(COMPOSITE_FLOWSHEET, name?.trim() || 'A vessel and a train, priced', program, { vessel: vesselId, trainRun: trainRunId });
+    .createScenario(COMPOSITE_FLOWSHEET, name?.trim() || 'A vessel and a train, priced', { vessel: vesselId, trainRun: trainRunId });
 }

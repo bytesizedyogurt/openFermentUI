@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, programs, tools, witness
+from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, tools, witness
 from .corpus import load_corpus
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
@@ -141,17 +141,15 @@ def health() -> dict:
 
 
 CORPUS_MISSING = (
-    "The corpus has not been generated. Run `pnpm export:corpus` from "
-    "the repository root and restart the service."
+    "The corpus could not be read, so there is no evidence to answer from. The service's log names "
+    "what went wrong; documents arrive through Intake."
 )
 
 
-def _ask_agent(question: str, on_step=None, cancelled=None, history=None, include_archived: bool = False) -> AnswerPlan:
+def _ask_agent(question: str, on_step=None, cancelled=None, history=None) -> AnswerPlan:
     """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands,
-    with the conversation's earlier turns when the question is a follow-up.
-    The browser's program switch rides in the tools' context (OF-BLD-016
-    §2.3): off, archived programs are left out of everything the loop reads."""
-    ctx = tools.ToolContext(include_archived=include_archived)
+    with the conversation's earlier turns when the question is a follow-up."""
+    ctx = tools.ToolContext()
     try:
         ctx.pool  # loaded now, so a missing corpus declines in words
     except FileNotFoundError as e:
@@ -176,7 +174,7 @@ def ask(request: AskRequest) -> AnswerPlan:
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     if request.mode == "agent":
-        return _ask_agent(question, history=request.history, include_archived=request.includeArchived)
+        return _ask_agent(question, history=request.history)
 
     try:
         corpus = load_corpus()
@@ -185,10 +183,7 @@ def ask(request: AskRequest) -> AnswerPlan:
         return AnswerPlan(question=question, declined=CORPUS_MISSING)
 
     limit = max(1, min(request.maxEvidence, MAX_EVIDENCE))
-    # The switch holds here too (OF-BLD-016 §2.3): an archived program's
-    # records are neither given to the model nor accepted from it.
-    records = [r for r in corpus.search(question, limit=MAX_EVIDENCE if not request.includeArchived else limit)
-               if not programs.hides(programs.program_of_record(r), request.includeArchived)][:limit]
+    records = corpus.search(question, limit=limit)
     log.info(
         "ask: %r → %d records%s",
         question[:80],
@@ -204,8 +199,7 @@ def ask(request: AskRequest) -> AnswerPlan:
 
     result = validate_claims(
         raw.get("claims") or [],
-        {rid: r for rid, r in corpus.records_by_id.items()
-         if not programs.hides(programs.program_of_record(r), request.includeArchived)},
+        dict(corpus.records_by_id),
         corpus.papers_by_id,
     )
 
@@ -262,8 +256,7 @@ def _stream_events(request: AskRequest):
                 plan = ask(request)
             else:
                 plan = _ask_agent(question, on_step=lambda s: events.put(("step", s.model_dump(mode="json"))),
-                                  cancelled=gone.is_set, history=request.history,
-                                  include_archived=request.includeArchived)
+                                  cancelled=gone.is_set, history=request.history)
             events.put(("plan", plan.model_dump(mode="json")))
         except Exception as e:  # the stream must end in words, never hang
             log.exception("ask stream failed")
@@ -284,13 +277,13 @@ def _stream_events(request: AskRequest):
 
 class CeilingRequest(BaseModel):
     modelId: str
-    product: str = "phb"
+    product: str = "ethanol"
     substrate: str
 
 
 class MixRequest(BaseModel):
     modelId: str
-    product: str = "phb"
+    product: str = "ethanol"
     a: str
     b: str
 
@@ -355,16 +348,15 @@ def fermos_forecast(req: ForecastRequest) -> ForecastResult:
 
 
 @app.get("/api/fermos/families")
-def fermos_families(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+def fermos_families() -> list[dict]:  # noqa: N803 (the wire name)
     """The model families (`FamilyInfo`): each with its equations, states,
-    parameters (ParameterSpecs) and the panel's groups. A family of an
-    archived program (storage_v1, PHA's) is left out unless asked."""
-    return [f.model_dump(mode="json") for f in fermos.families(includeArchived)]
+    parameters (ParameterSpecs) and the panel's groups."""
+    return [f.model_dump(mode="json") for f in fermos.families()]
 
 
 @app.get("/api/fermos/families/{family_id}")
 def fermos_family(family_id: str) -> dict:
-    """One model family by id, archived or not; 404 in words for none."""
+    """One model family by id; 404 in words for none."""
     from . import kinetics
 
     try:
@@ -390,12 +382,11 @@ def fermos_simulate(req: SimulationRequest) -> dict:
 @app.get("/api/fermos/bind")
 def fermos_bind(family: str, strain: str | None = None, product: str | None = None, sugar: str | None = None,
                 fit: str | None = None, startFrom: str = "records",  # noqa: N803 (the wire name)
-                durationPreset: str = "until-sugar-runs-out", includeArchived: bool = False,  # noqa: N803
+                durationPreset: str = "until-sugar-runs-out",  # noqa: N803
                 overrides: str | None = None) -> dict:
     """A family's parameters bound for a strain, product and sugar
     (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
-    (`?fit=`), the records of the evidence pool the switch shows through the
-    aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
+    (`?fit=`), the records of the evidence pool through the aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
     spec's convention, with its source; what waits, each named with the field
     that would bind it; and notes saying what bound from where. `?overrides=`
     (a JSON list of the person's overrides of `fermos:family:<family>`, as
@@ -413,7 +404,7 @@ def fermos_bind(family: str, strain: str | None = None, product: str | None = No
         raise HTTPException(status_code=422, detail=f"a run-length preset is until-sugar-runs-out or fit-length; "
                                                     f"{durationPreset!r} is neither")
     req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar, fitArtifact=fit,
-                            startFrom=startFrom, durationPreset=durationPreset, includeArchived=includeArchived,
+                            startFrom=startFrom, durationPreset=durationPreset,
                             overrides=_overrides_param(overrides))
     try:
         return fermos.bind(req).model_dump(mode="json")
@@ -422,15 +413,14 @@ def fermos_bind(family: str, strain: str | None = None, product: str | None = No
 
 
 @app.get("/api/fermos/simulations")
-def fermos_simulations(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
-    """The kept simulations, newest first (`SimulationSummary`); one of an
-    archived program is left out unless asked. A read: it runs nothing."""
-    return [s.model_dump(mode="json") for s in fermos.simulations(includeArchived)]
+def fermos_simulations() -> list[dict]:  # noqa: N803 (the wire name)
+    """The kept simulations, newest first (`SimulationSummary`). A read: it
+    runs nothing."""
+    return [s.model_dump(mode="json") for s in fermos.simulations()]
 
 
 @app.get("/api/fermos/harvest")
-def fermos_harvest(simulation: str, hour: float | None = None,
-                   includeArchived: bool = False) -> dict:  # noqa: N803 (the wire name)
+def fermos_harvest(simulation: str, hour: float | None = None) -> dict:  # noqa: N803 (the wire name)
     """A kept simulation's broth at an hour (`FermosHarvest`, OF-BLD-020
     §6.2, D10): its own harvest hour, or `?hour=`, a person's (the hour the
     Builder's inlet scope holds under their name; a model never sends one),
@@ -438,8 +428,7 @@ def fermos_harvest(simulation: str, hour: float | None = None,
     hour's source and how it was read. A read: nothing is integrated again
     and nothing is kept. 404 for a simulation not on file, 409 for one
     damaged on disk, 422 in words for an hour outside the simulated span, a
-    simulation that keeps no product in the broth, another artifact, and an
-    archived program's with the switch off."""
+    simulation that keeps no product in the broth, and another artifact."""
     from . import artifacts
 
     try:
@@ -450,23 +439,22 @@ def fermos_harvest(simulation: str, hour: float | None = None,
     except artifacts.ArtifactDamaged as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     try:
-        return fermos.harvest(art, hour, include_archived=includeArchived).model_dump(mode="json")
+        return fermos.harvest(art, hour).model_dump(mode="json")
     except fermos.SimulationRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @app.get("/api/fermos/fits")
-def fermos_fits(flowsheet: str, includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+def fermos_fits(flowsheet: str) -> list[dict]:  # noqa: N803 (the wire name)
     """The kinetic fits, forecasts and simulations fermOS keeps (a
     simulation since OF-BLD-020 §3.3), newest first, each with what it can
     feed a shelf flowsheet's titre, yield and productivity and why not
-    (OF-BLD-019 §5.1, D10); one of an archived program left out unless
-    `?includeArchived=true` (§3.R). A person picks one on the scenario page;
+    (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
     a read: it keeps nothing. A flowsheet a scenario cannot run is a 422."""
     from . import proforma
 
     try:
-        return [f.model_dump(mode="json") for f in proforma.fermos_fits(flowsheet, includeArchived)]
+        return [f.model_dump(mode="json") for f in proforma.fermos_fits(flowsheet)]
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -545,13 +533,12 @@ def proforma_status() -> dict:
 
 
 @app.get("/api/proforma/shelf")
-def proforma_shelf(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+def proforma_shelf() -> list[dict]:  # noqa: N803 (the wire name)
     """The shelf of flowsheets (OF-BLD-019 §2.1, D2): pure data, read with no
-    simulator. A flowsheet of an archived program is left out unless
-    `?includeArchived=true` asks for it, as the artifact list does."""
+    simulator."""
     from . import proforma
 
-    return [f.model_dump(mode="json") for f in proforma.shelf(include_archived=includeArchived)]
+    return [f.model_dump(mode="json") for f in proforma.shelf()]
 
 
 @app.get("/api/proforma/benchmark")
@@ -609,18 +596,17 @@ def proforma_reference_run(flowsheet_id: str) -> dict:
 
 
 @app.get("/api/proforma/scenarios")
-def proforma_scenarios(host: str | None = None, includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+def proforma_scenarios(host: str | None = None) -> list[dict]:  # noqa: N803 (the wire name)
     """The seed's BioSTEAM scenarios with their inputs bound to records
-    (§8.3; OF-BLD-019 §2.3): one per scenario whose program the switch
-    shows, so sc-yeast-1 with it off and sc-pha-1 too with it on. A read: it
-    starts no simulator."""
+    (§8.3; OF-BLD-019 §2.3), none since alpha 2.0 deleted the seed. A read:
+    it starts no simulator."""
     from . import proforma
 
-    return [s.model_dump(mode="json") for s in proforma.scenarios(include_archived=includeArchived, host=host)]
+    return [s.model_dump(mode="json") for s in proforma.scenarios(host=host)]
 
 
 @app.get("/api/proforma/bind")
-def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool = False,  # noqa: N803
+def proforma_bind(flowsheet: str, host: str | None = None,  # noqa: N803
                   fits: str | None = None, overrides: str | None = None, vessel: str | None = None,
                   trainRun: str | None = None) -> dict:  # noqa: N803 (the wire name)
     """A shelf flowsheet's inputs bound, as a scenario a person made in the
@@ -630,10 +616,10 @@ def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool
     scenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet
     built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1) names its
     vessel design and its train run (`?vessel=`, `?trainRun=`). A reference
-    biorefinery, the toy, an unknown id, a flowsheet of a program the switch
-    hides, a fit that cannot feed its input, an override that cannot
-    stand, or a composite's part that cannot (missing, another tool's,
-    damaged, of another or an archived program) is a 422 in words. A read:
+    biorefinery, the toy, an unknown id, a fit that cannot feed its input,
+    an override that cannot stand, or a composite's part that cannot
+    (missing, another tool's, damaged, of another chemical set) is a 422 in
+    words. A read:
     it starts no simulator."""
     from . import composite, proforma
 
@@ -648,7 +634,7 @@ def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool
         values, _ = proforma.named_values(None, inputs)
         if values:
             proforma._check_keys(proforma.runnable(flowsheet), values)
-        return proforma.bind_flowsheet(flowsheet, include_archived=includeArchived, host=host,
+        return proforma.bind_flowsheet(flowsheet, host=host,
                                        assumptions=values, fits=chosen, vessel=vessel,
                                        train_run=trainRun).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
@@ -657,7 +643,7 @@ def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool
 
 @app.get("/api/proforma/ceiling-check")
 def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: str | None = None,  # noqa: N803
-                           includeArchived: bool = False, fits: str | None = None,  # noqa: N803
+                           fits: str | None = None,  # noqa: N803
                            assumptions: str | None = None, overrides: str | None = None) -> dict:
     """A scenario's fermenter yield read against the newest stored geneOS
     ceiling of each shelf model of its organism, on its flowsheet's sugar
@@ -674,7 +660,7 @@ def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: 
     typed = _assumptions_param(assumptions)
     over = _overrides_param(overrides)
     try:
-        return proforma.ceiling_check(scenarioId, flowsheet, include_archived=includeArchived, host=host,
+        return proforma.ceiling_check(scenarioId, flowsheet, host=host,
                                       assumptions=typed, fits=chosen, overrides=over).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -719,7 +705,7 @@ def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
 def params_scope(scope: str, flowsheet: str | None = None, host: str | None = None, fits: str | None = None,
                  vesselType: str | None = None, strain: str | None = None, product: str | None = None,  # noqa: N803
                  sugar: str | None = None, fit: str | None = None, startFrom: str | None = None,  # noqa: N803
-                 durationPreset: str | None = None, includeArchived: bool = False,  # noqa: N803 (the wire name)
+                 durationPreset: str | None = None,  # noqa: N803 (the wire name)
                  unitType: str | None = None, train: str | None = None,  # noqa: N803 (the wire name)
                  vessel: str | None = None, trainRun: str | None = None) -> dict:  # noqa: N803 (the wire name)
     """A scope's parameters (`ParamScope`): every spec with its bounds and
@@ -731,8 +717,8 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     `?vesselType=`) reads its class's defaults through the Proforma worker,
     which a read starts when it is cold (OF-BLD-020 §4.1). `fermos:family:<id>`
     binds as GET /api/fermos/bind does, from `?strain=`, `?product=`,
-    `?sugar=`, `?fit=`, `?startFrom=`, `?durationPreset=` and
-    `?includeArchived=` (OF-BLD-020 §3.2). `pureos:unit:<train>:<unit>` takes
+    `?sugar=`, `?fit=`, `?startFrom=` and `?durationPreset=` (OF-BLD-020
+    §3.2). `pureos:unit:<train>:<unit>` takes
     the unit's catalogue type as `?unitType=` and reads its class's defaults
     through the Proforma worker as the vessel's do (§5.1); with no type it is
     a 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is
@@ -754,7 +740,7 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
                                                     f"{durationPreset!r} is neither")
     req = ParamResolveRequest(flowsheet=flowsheet, host=host, fits=_fits_param(fits), vesselType=vesselType,
                               strain=strain, product=product, sugar=sugar, fit=fit, startFrom=startFrom,
-                              durationPreset=durationPreset, includeArchived=includeArchived, unitType=unitType,
+                              durationPreset=durationPreset, unitType=unitType,
                               train=_train_param(train), vessel=vessel, trainRun=trainRun)
     try:
         return params.scope(scope, req).model_dump(mode="json")
@@ -849,13 +835,12 @@ def fermos_vessel(req: VesselRequest) -> VesselDesign:
 
 
 @app.get("/api/fermos/vessels")
-def fermos_vessels(includeArchived: bool = False) -> list[dict]:
+def fermos_vessels() -> list[dict]:
     """Every kept vessel design, newest first (`VesselSummary`): a read,
-    which starts no simulator. One for an archived program's simulation is
-    left out unless asked (OF-BLD-020 §8.R, finding 3)."""
+    which starts no simulator."""
     from . import vessel
 
-    return [v.model_dump(mode="json") for v in vessel.designs(includeArchived)]
+    return [v.model_dump(mode="json") for v in vessel.designs()]
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
@@ -865,11 +850,10 @@ def _thermo_answer(fn, req: ThermoPropsRequest):
     from . import artifacts, evidence_pool, thermo
 
     try:
-        # A person names the run or the record by id, so archived programs'
-        # records resolve too; the page says which program a run is of. Only
-        # a record needs the pool.
+        # A person names the run or the record by id. Only a record needs the
+        # pool.
         kind, _ = thermo.question(req)
-        return fn(req, pool=evidence_pool.load(include_archived=True) if kind == thermo.BEER else None)
+        return fn(req, pool=evidence_pool.load() if kind == thermo.BEER else None)
     except thermo.ThermoNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
     except thermo.ThermoRefused as e:
@@ -1293,11 +1277,10 @@ def practice_read() -> Practice:
 
 
 @app.post("/api/practice/draft", response_model=PracticeScenario)
-def practice_draft(request: PracticeDraftRequest, includeArchived: bool = False) -> PracticeScenario:  # noqa: N803 (the wire name)
-    """A scenario for one skill. An archived program's protocols are no source
-    unless `?includeArchived=true` asks for them (OF-BLD-016 §2.R)."""
+def practice_draft(request: PracticeDraftRequest) -> PracticeScenario:  # noqa: N803 (the wire name)
+    """A scenario for one skill."""
     try:
-        return practice.draft(request, include_archived=includeArchived)
+        return practice.draft(request)
     except practice.PracticeRefused as e:
         log.warning("practice refused a draft for %s — %s: %s ($%.4f spent)", request.skillId, e.rule, e.detail, e.usage.costUsd)
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -1353,22 +1336,9 @@ def witness_runs() -> list[ExtractRun]:
 
 
 @app.get("/api/biorepo/artifacts", response_model=list[Artifact])
-def artifacts_list(includeArchived: bool = False) -> list[Artifact]:  # noqa: N803 (the wire name)
-    """Every value this service computed and kept, newest first. A value
-    computed from an archived program's records, models, products or strains
-    is left out unless `?includeArchived=true` asks for it (OF-BLD-016 §2.R),
-    as the evidence pool leaves it out of Postdoc; a Proforma run by its
-    scenario and flowsheet too, as every reader decides it (OF-BLD-019 §6.R)."""
-    from . import module_stores
-
-    kept = artifacts.all_artifacts()
-    if includeArchived:
-        return kept
-    try:
-        lookup = load_corpus().record
-    except FileNotFoundError:
-        lookup = None
-    return [a for a in kept if not programs.hides(module_stores.artifact_program(a, lookup))]
+def artifacts_list() -> list[Artifact]:  # noqa: N803 (the wire name)
+    """Every value this service computed and kept, newest first."""
+    return artifacts.all_artifacts()
 
 
 @app.get("/api/biorepo/artifacts/{artifact_id}", response_model=Artifact)
@@ -1404,38 +1374,35 @@ def _record_lookup():
 
 
 @app.get("/api/pureos/trains")
-def pureos_trains(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+def pureos_trains() -> list[dict]:  # noqa: N803 (the wire name)
     """The trains on file: the newest Proforma run of each scenario, read
-    unit by unit from its stream table, with its overall recovery. A train of
-    an archived program is left out unless `?includeArchived=true` asks for it.
-    A read: it starts no simulator."""
+    unit by unit from its stream table, with its overall recovery. A read: it
+    starts no simulator."""
     from . import pureos
 
     return [pureos.summary(t).model_dump(mode="json")
-            for t in pureos.trains(include_archived=includeArchived, record_lookup=_record_lookup())]
+            for t in pureos.trains(record_lookup=_record_lookup())]
 
 
 @app.get("/api/pureos/train-runs")
-def pureos_train_runs(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
-    """Every kept pureOS train run (`TrainSummary`), newest first; one of an
-    archived program left out unless `?includeArchived=true` asks for it
-    (OF-BLD-020 §5.2). A read: it starts no simulator."""
+def pureos_train_runs() -> list[dict]:  # noqa: N803 (the wire name)
+    """Every kept pureOS train run (`TrainSummary`), newest first (OF-BLD-020
+    §5.2). A read: it starts no simulator."""
     from . import pureos
 
-    return [s.model_dump(mode="json") for s in pureos.train_runs(include_archived=includeArchived)]
+    return [s.model_dump(mode="json") for s in pureos.train_runs()]
 
 
 @app.get("/api/pureos/trains-kept")
-def pureos_trains_kept(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+def pureos_trains_kept() -> list[dict]:  # noqa: N803 (the wire name)
     """The trains a model built with `pureos_build` or `pureos_write`
     (`KeptTrain`: the train as data, `madeBy` the model, `at` and
-    `updatedAt`), the most recently changed first; one of an archived program
-    left out unless `?includeArchived=true` asks for it (OF-BLD-020 §5.4). A
+    `updatedAt`), the most recently changed first (OF-BLD-020 §5.4). A
     person's trains stay in their browser. A read: it writes nothing and starts
     no simulator."""
     from .pureos import kept
 
-    return [k.model_dump(mode="json") for k in kept.listed(include_archived=includeArchived)]
+    return [k.model_dump(mode="json") for k in kept.listed()]
 
 
 @app.post("/api/pureos/train/validate")
@@ -1462,7 +1429,7 @@ def pureos_train_check(req: TrainRunRequest) -> dict:
     from . import artifacts, pureos
 
     try:
-        return pureos.check_train(req.train, req.overrides, req.by, req.includeArchived).model_dump(mode="json")
+        return pureos.check_train(req.train, req.overrides, req.by).model_dump(mode="json")
     except artifacts.ArtifactDamaged as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
@@ -1483,7 +1450,7 @@ def pureos_train_from_run(req: TrainFromRunRequest) -> dict:
     from . import artifacts, pureos
 
     try:
-        return pureos.from_run(req.artifactId, req.trainId, req.includeArchived).model_dump(mode="json")
+        return pureos.from_run(req.artifactId, req.trainId).model_dump(mode="json")
     except pureos.RunNotOnFile as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
     except pureos.TrainRefused as e:
@@ -1504,7 +1471,7 @@ def pureos_train_run(req: TrainRunRequest) -> dict:
     from . import artifacts, pureos
 
     try:
-        return pureos.run_train(req.train, req.overrides, req.by, req.includeArchived).model_dump(mode="json")
+        return pureos.run_train(req.train, req.overrides, req.by).model_dump(mode="json")
     except pureos.TrainRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except artifacts.ArtifactDamaged as e:
@@ -1541,17 +1508,15 @@ def pureos_propose(req: ProposeRequest) -> dict:
     each unit at its library defaults or waiting, with one reason naming the
     rule, the property and its artifact; or none, naming what is missing.
     Keeps nothing but the property artifacts it reads. 404 for a product
-    neither the products seed nor thermo.CHEMICALS holds; 422 in words for a
-    refusal (an unknown host, an archived program with the switch off, an
-    inlet that is not one, a sequence ProtParam cannot read, a chemical the
+    neither the products catalogue nor thermo.CHEMICALS holds; 422 in words
+    for a refusal (an unknown host, an inlet that is not one, a sequence ProtParam cannot read, a chemical the
     library lacks); 409 for a property answer damaged on disk; 503 when the
     worker cannot answer a volatility question, or the corpus is not
     exported."""
     from . import artifacts, pureos
 
     try:
-        return pureos.propose(req.product, req.host, req.inletRef,
-                              include_archived=req.includeArchived).model_dump(mode="json")
+        return pureos.propose(req.product, req.host, req.inletRef).model_dump(mode="json")
     except pureos.ProposeUnknown as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
     except pureos.ProposeRefused as e:
@@ -1655,15 +1620,13 @@ def audit_read(limit: int = 200) -> list[AuditEntry]:
 
 
 @app.post("/api/tools/{name}", response_model=ToolResult)
-def tools_run(name: str, body: dict[str, Any], includeArchived: bool = False) -> ToolResult:  # noqa: N803 (the wire name)
+def tools_run(name: str, body: dict[str, Any]) -> ToolResult:  # noqa: N803 (the wire name)
     """Run one tool through the registry, the same path Postdoc's loop and
     the MCP server take. A refusal is a result with `error` set; an unknown
-    tool is a 404. The program switch is a query parameter,
-    `?includeArchived=true`, and rides in the tool's context: the body is the
-    tool's input, and no input carries it (OF-BLD-016 §2.3)."""
+    tool is a 404. The body is the tool's input."""
     if name not in tools.REGISTRY:
         raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
-    return tools.run(name, body, tools.ToolContext(include_archived=includeArchived))
+    return tools.run(name, body, tools.ToolContext())
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

@@ -9,7 +9,6 @@ import {
   Download,
   Info,
   KeyRound,
-  Layers,
   Moon,
   Palette,
   RotateCcw,
@@ -22,12 +21,10 @@ import {
   provenanceOf,
   guildView,
   actingIdOf,
-  useProgramFilter,
   type Density,
   type Theme,
   type UnitMode,
 } from '@/store';
-import { PROGRAMS } from '@/data/programs';
 import { policyOf } from '@/engine/competence';
 import { Tick } from '@/components/Provenance';
 import {
@@ -50,17 +47,6 @@ import type { FieldId, GateMode, GuildPolicy, ParameterDef } from '@/data/types'
 import { convert, fmt, toSI } from '@/engine/units';
 import { DISCLOSURE, exportCSV } from '@/lib/csv';
 
-// Seed counts are captured once, at module load, before any session edit — so
-// the reset confirmation describes what will actually be restored.
-const SEEDED = (() => {
-  const s = useStore.getState();
-  return {
-    records: s.records.length,
-    protocols: s.protocols.length,
-    scenarios: s.scenarios.length,
-  };
-})();
-
 const APP_VERSION = '0.1.0';
 
 interface SectionDef {
@@ -77,16 +63,10 @@ const SECTIONS: SectionDef[] = [
     blurb: 'Theme, density, motion and the rehearsal clock. Changes apply immediately.',
   },
   {
-    id: 'programs',
-    label: 'Programs',
-    blurb:
-      'The research programs the corpus serves, which are active and which archived, and the one switch that shows archived programs again.',
-  },
-  {
     id: 'units',
     label: 'Units & display',
     blurb:
-      'Choose how quantities are shown, and inspect the 24-field parameter ontology every number is validated against.',
+      `Choose how quantities are shown, and inspect the ${ONTOLOGY.length} record fields every number is typed to.`,
   },
   {
     id: 'architecture',
@@ -277,10 +257,7 @@ function AppearanceSection() {
   const density = useStore((s) => s.ui.density);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
   const setUI = useStore((s) => s.setUI);
-  const allRecords = useStore((s) => s.records);
-  const shows = useProgramFilter();
-  // The preview draws the first records whose program shows (OF-BLD-016 §2.2).
-  const records = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
+  const records = useStore((s) => s.records);
   const previewRecords = records.slice(0, 3);
 
   const [systemReduced] = useState(() =>
@@ -359,9 +336,7 @@ function AppearanceSection() {
                       className="px-1 text-caption text-ink-soft"
                       style={{ height: 'var(--row-h)' }}
                     >
-                      {allRecords.length > records.length
-                        ? 'No values in the active programs yet. Values in archived programs are hidden; Settings → Programs shows them.'
-                        : 'No records loaded in this session.'}
+                      No records loaded in this session.
                     </td>
                   </tr>
                 ) : (
@@ -417,117 +392,14 @@ function AppearanceSection() {
   );
 }
 
-// ── programs (OF-BLD-016 §2.1, §2.2, E.1′) ───────────────────────────────
-//
-// The programs are data (src/data/programs.ts); this section lists them and
-// holds the one switch. Off, the default, an archived program's papers,
-// values, strains, molecules, scenarios, protocols, runbooks, lessons and
-// suggested questions leave every list, count and prompt; on, everything
-// shows as it did before programs existed. Nothing is deleted either way
-// (D1), and a link to an archived entity opens it under a banner. The switch
-// is in the Durable tier, so it survives a reload; clearing this browser's
-// data turns it off, because the shipped state hides archived programs.
-
-/** "threads A to O", "thread Q": a program's letters, written out. */
-function lettersLabel(letters: readonly string[]): string {
-  const l = [...letters].sort();
-  return l.length === 1 ? `thread ${l[0]}` : `threads ${l[0]} to ${l[l.length - 1]}`;
-}
-
-function ProgramsSection() {
-  const showArchived = useStore((s) => s.showArchived);
-  const setShowArchived = useStore((s) => s.setShowArchived);
-  const archived = PROGRAMS.filter((p) => p.status === 'archived');
-
-  return (
-    <div className="space-y-6" data-testid="settings-programs">
-      <section>
-        <SectionTitle>Programs</SectionTitle>
-        <ul className="space-y-2">
-          {PROGRAMS.map((p) => (
-            <li key={p.id}>
-              <Card className="p-3" data-program={p.id} data-program-status={p.status}>
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <span className="font-serif text-section-title font-semibold">{p.name}</span>
-                  <span className="text-caption uppercase tracking-wide text-ink-soft">
-                    {lettersLabel(p.letters)}
-                  </span>
-                  <span
-                    className={cx(
-                      'chip text-[11px] py-0',
-                      p.status === 'active'
-                        ? 'border-accent/40 text-accent'
-                        : 'border-line text-ink-soft',
-                    )}
-                  >
-                    {p.status === 'active' ? 'Active' : 'Archived'}
-                  </span>
-                </div>
-                <p className="text-body text-ink-soft mt-1 max-w-3xl">{p.summary}</p>
-              </Card>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <SectionTitle>Archived programs and examples</SectionTitle>
-        <Card className="p-3">
-          <label className="flex items-start gap-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              role="switch"
-              aria-checked={showArchived}
-              className="mt-1 shrink-0"
-              checked={showArchived}
-              onChange={(e) => setShowArchived(e.target.checked)}
-              data-testid="show-archived"
-            />
-            <span>
-              <span className="block text-body font-medium">Show archived programs and examples</span>
-              <span className="block text-caption text-ink-soft mt-0.5 max-w-3xl">
-                When it is off,{' '}
-                {archived.length === 0 ? 'nothing is hidden, because no program is archived' : (
-                  <>
-                    the papers, values, strains, molecules, scenarios, protocols, runbooks, lessons
-                    and suggested questions of{' '}
-                    {archived.map((p, i) => (
-                      <span key={p.id}>
-                        {i > 0 && (i === archived.length - 1 ? ' and ' : ', ')}
-                        <span className="text-ink">{p.name}</span>
-                      </span>
-                    ))}{' '}
-                    leave every list, count and prompt
-                  </>
-                )}
-                . When it is on, everything shows as before. Nothing is deleted either way, and a
-                link to something archived still opens it, under a note that names its program.
-              </span>
-              <span className="block text-caption text-ink-soft mt-1 max-w-3xl" data-testid="show-archived-examples">
-                The same switch shows the examples: the seed runbooks, protocols, scenarios and lessons that
-                describe a run nobody made. They are kept to show the shape of a run, never as a record of one.
-              </span>
-            </span>
-          </label>
-          <div className="text-caption text-ink-soft mt-2 pt-2 border-t border-line" data-testid="show-archived-state">
-            {showArchived
-              ? 'Archived programs and examples are showing everywhere. The setting is kept in this browser across reloads.'
-              : 'Archived programs and examples are hidden. The setting is kept in this browser across reloads.'}
-          </div>
-        </Card>
-      </section>
-    </div>
-  );
-}
-
 // ── units ──────────────────────────────────────────────────────────────
 
+/**
+ * The playground starts at one of the field's canonical unit: a unit to
+ * convert, which states nothing about what any culture or process reaches.
+ */
 function defaultFor(def: ParameterDef): QuantityValue {
-  const [lo, hi] = def.range;
-  const mid = lo + (hi - lo) * 0.3;
-  const step = Math.pow(10, Math.floor(Math.log10(mid))) / 10;
-  const rounded = Math.max(lo, Math.round(mid / step) * step);
-  return { value: Number(rounded.toPrecision(3)), unit: def.canonicalUnit };
+  return { value: 1, unit: def.canonicalUnit };
 }
 
 function UnitsSection() {
@@ -545,9 +417,6 @@ function UnitsSection() {
   } catch {
     canonical = null;
   }
-  const outOfRange =
-    canonical !== null && (canonical < def.range[0] || canonical > def.range[1]);
-
   const columns: Column<ParameterDef>[] = [
     {
       key: 'name',
@@ -572,28 +441,9 @@ function UnitsSection() {
       value: (d) => d.canonicalUnit,
     },
     {
-      key: 'range',
-      header: 'Validation range',
-      numeric: true,
-      priority: 1,
-      render: (d) => (
-        <span className="font-num">
-          {fmt(d.range[0])} – {fmt(d.range[1])}
-        </span>
-      ),
-      value: (d) => d.range[0],
-    },
-    {
-      key: 'notes',
-      header: 'Notes',
-      priority: 3,
-      render: (d) => <span className="text-ink-soft">{d.notes || '—'}</span>,
-      value: (d) => d.notes,
-    },
-    {
       key: 'definition',
       header: 'Definition',
-      defaultHidden: true,
+      priority: 3,
       render: (d) => <span className="text-ink-soft">{d.definition}</span>,
       value: (d) => d.definition,
     },
@@ -651,7 +501,7 @@ function UnitsSection() {
         <SectionTitle
           right={
             <span className="text-caption text-ink-soft inline-flex items-center gap-1.5">
-              <Ruler size={13} aria-hidden /> parameter ontology v1
+              <Ruler size={13} aria-hidden /> record fields
             </span>
           }
         >
@@ -726,13 +576,9 @@ function UnitsSection() {
                 </div>
               </dl>
               <div className="text-caption text-ink-soft mt-2">
-                Validation range for {fieldName(field)}:{' '}
-                <span className="font-num text-ink">
-                  {fmt(def.range[0])} – {fmt(def.range[1])} {def.canonicalUnit || '(dimensionless)'}
-                </span>
-                {outOfRange && (
-                  <span className="text-signal-warn"> — the current value sits outside it.</span>
-                )}
+                {fieldName(field)} is stored in{' '}
+                <span className="font-num text-ink">{def.canonicalUnit || '(dimensionless)'}</span>. A field
+                carries no range: a value is held to its unit and to the quote it stands in.
               </div>
             </div>
           </div>
@@ -742,19 +588,18 @@ function UnitsSection() {
       <section>
         <SectionTitle>The {ONTOLOGY.length} fields</SectionTitle>
         {/*
-          'curated', not 'demo': these definitions, canonical units and ranges were written by
-          hand from the catalogued literature, so nothing in this table is modeled. They carry
-          the same weight as any other curated row — real, and not yet checked back against the
-          source PDFs.
+          'curated': these definitions and canonical units are written by hand in
+          core/openferment_core/schema/fields.yaml, the one source of the fields, and nothing in
+          this table is modeled.
         */}
         <DataTable<ParameterDef>
           rows={ONTOLOGY}
           columns={columns}
           rowKey={(d) => d.id}
           tickOf={() => 'curated'}
-          searchOf={(d) => `${d.name} ${d.id} ${d.canonicalUnit} ${d.notes} ${d.definition}`}
-          exportName="openferment-ontology-v1"
-          exportNote="Ranges are the curator's, drawn from the catalogued literature, and are not a published standard. Values outside a range are warned about, never blocked — a paper may report a genuine outlier."
+          searchOf={(d) => `${d.name} ${d.id} ${d.canonicalUnit} ${d.definition}`}
+          exportName="openferment-record-fields"
+          exportNote="The record fields as core/openferment_core/schema/fields.yaml defines them: an id, a name, a definition and a canonical unit. A field carries no range and no example value."
           maxHeight="520px"
           emptyTitle="No fields"
           emptyBody="The ontology module is empty, which should never happen in this build."
@@ -767,16 +612,8 @@ function UnitsSection() {
 // ── corpus (owner) ─────────────────────────────────────────────────────
 
 function CorpusSection() {
-  const allPapers = useStore((s) => s.papers);
-  const allRecords = useStore((s) => s.records);
-  const shows = useProgramFilter();
-  // The ontology and gold-set counts are of the papers and values whose
-  // program shows (OF-BLD-016 §2.2). The reset dialog below counts the whole
-  // store, because a reset restores all of it, archived programs included.
-  const papers = useMemo(() => allPapers.filter((p) => shows('paper', p.id)), [allPapers, shows]);
-  const visibleRecords = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
-  const records = allRecords;
-  const archivedHidden = papers.length < allPapers.length || visibleRecords.length < allRecords.length;
+  const papers = useStore((s) => s.papers);
+  const records = useStore((s) => s.records);
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
   const clearBrowserData = useStore((s) => s.clearBrowserData);
@@ -785,7 +622,7 @@ function CorpusSection() {
   const reviewer = useStore((s) => s.reviewer);
   const setReviewerName = useStore((s) => s.setReviewerName);
 
-  const gold = useMemo(() => visibleRecords.filter((r) => r.gold), [visibleRecords]);
+  const gold = useMemo(() => records.filter((r) => r.gold), [records]);
   const goldPapers = useMemo(() => new Set(gold.map((r) => r.paperId)).size, [gold]);
   const goldByField = useMemo(() => {
     const m = new Map<FieldId, number>();
@@ -851,25 +688,14 @@ function CorpusSection() {
             </div>
             <div>
               <div className="text-caption uppercase tracking-wide text-ink-soft">Records</div>
-              <div className="font-num text-display leading-tight">{visibleRecords.length}</div>
+              <div className="font-num text-display leading-tight">{records.length}</div>
             </div>
           </div>
-          {archivedHidden && (
-            <p className="text-caption text-ink-soft mt-2" data-testid="corpus-archived-hidden">
-              Counted over the active programs. Papers and values in archived programs are kept and
-              hidden;{' '}
-              <a className="text-accent hover:underline" href="#/settings/programs">
-                Settings → Programs
-              </a>{' '}
-              shows them again.
-            </p>
-          )}
           <p className="text-body text-ink-soft mt-3 max-w-3xl">
-            Every extracted value is typed to one of these fields, converted to the field's
-            canonical unit, and range-checked at entry. Extending the ontology is a schema change,
-            not a setting — this build ships v1 and does not allow adding fields. Real values the
-            corpus holds that v1 has no field for are listed on the validation screen rather than
-            forced into a neighbouring field.
+            Every extracted value is typed to one of these fields and converted to the field&rsquo;s
+            canonical unit. The fields are defined in{' '}
+            <code className="font-mono text-caption">core/openferment_core/schema/fields.yaml</code>; adding one
+            is a schema change, made there.
           </p>
           <div className="flex flex-wrap items-center gap-2 mt-3">
             <LinkButton to="/settings/units" size="sm">
@@ -879,17 +705,9 @@ function CorpusSection() {
               size="sm"
               onClick={() =>
                 exportCSV(
-                  'openferment-ontology-v1.csv',
-                  ['Field id', 'Name', 'Canonical unit', 'Range low', 'Range high', 'Definition', 'Notes'],
-                  ONTOLOGY.map((d) => [
-                    d.id,
-                    d.name,
-                    d.canonicalUnit,
-                    d.range[0],
-                    d.range[1],
-                    d.definition,
-                    d.notes,
-                  ]),
+                  'openferment-record-fields.csv',
+                  ['Field id', 'Name', 'Canonical unit', 'Definition'],
+                  ONTOLOGY.map((d) => [d.id, d.name, d.canonicalUnit, d.definition]),
                 )
               }
             >
@@ -910,17 +728,7 @@ function CorpusSection() {
           Gold set
         </SectionTitle>
         <Card className="p-3">
-          {gold.length === 0 && archivedHidden && allRecords.some((r) => r.gold) ? (
-            <div className="text-body text-ink-soft">
-              No value in the active programs is flagged for the gold set yet. The gold set&rsquo;s
-              values sit in archived programs, which are hidden;{' '}
-              <a className="text-accent hover:underline" href="#/settings/programs">
-                Settings → Programs
-              </a>{' '}
-              shows them again. Flag a value with <span className="kbd">g</span> in the review queue
-              and it joins the baseline immediately.
-            </div>
-          ) : gold.length === 0 ? (
+          {gold.length === 0 ? (
             <div className="text-body text-ink-soft">
               No records are flagged for the gold set, and none ship flagged: a gold annotation
               has to be made against the paper's own words, and no full text has been retrieved.
@@ -997,10 +805,9 @@ function CorpusSection() {
 
       <Modal open={confirm} onClose={() => setConfirm(false)} title="Clear this browser’s data">
         <p className="text-body">
-          Restores all <span className="font-num">{SEEDED.records}</span> records,{' '}
-          <span className="font-num">{SEEDED.protocols}</span> protocols, and{' '}
-          <span className="font-num">{SEEDED.scenarios}</span> scenarios to their seeded state.
-          Exports you&rsquo;ve downloaded are unaffected.
+          Returns this browser to the state it starts in, with no records, protocols or scenarios of its
+          own; what the service keeps is laid back on at once. Exports you&rsquo;ve downloaded are
+          unaffected.
         </p>
         <p className="text-body mt-2">
           This also clears the durable store in this browser, so{' '}
@@ -1197,8 +1004,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   {
     feature: 'Unit-aware fields and the SI toggle',
     fidelity: 'Full',
-    notes:
-      'Parsing, dimension checking, conversion and range validation run for all 24 ontology fields, including temperature offsets and the conversions the engine refuses outright.',
+    notes: `Parsing, dimension checking and conversion run for all ${ONTOLOGY.length} record fields, including temperature offsets and the conversions the engine refuses outright.`,
   },
   {
     feature: 'Review queue',
@@ -1210,7 +1016,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Validation metrics',
     fidelity: 'Real, from the service when it is running',
     notes:
-      'Witness scores the extractor\'s run (claude-1) against the curated records on the papers it fetched, and labels the figures provisional with the number of records they stand on. With the service down, or before any run, it shows the planned gold set and the difficulty cases instead, and no figure.',
+      'Witness scores the extractor\'s run (claude-1) against the curated records on the papers it fetched, and labels the figures provisional with the number of records they stand on. With the service down, or before any run, it shows what unblocks a figure, and no figure.',
   },
   {
     feature: 'Leave-one-out methodology',
@@ -1247,9 +1053,9 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Simulation results',
-    fidelity: 'Full interpolation over authored precomputed grids',
+    fidelity: 'Full, through the service when it is running',
     notes:
-      'Multilinear interpolation across an authored cost-model sweep. The interpolation is real; the cost model is invented.',
+      'A Proforma scenario runs on BioSTEAM in the service and is kept as an artifact with its inputs. The authored cost-model grids of alpha 1.0 left with the seed (alpha 2.0).',
   },
   {
     feature: 'Scenario compare',
@@ -1272,7 +1078,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Learn lessons and checkpoints',
     fidelity: 'Full',
     notes:
-      'Lesson prose is authored; navigation, live embeds, checkpoint grading and progress tracking are real.',
+      'No lesson ships with this build: the authored lessons left with the seed (alpha 2.0). Navigation, live embeds, checkpoint grading and progress tracking work for any lesson the store holds.',
   },
   {
     feature: 'Guided tour',
@@ -1311,14 +1117,8 @@ function fidelityKind(f: string): Fidelity {
 }
 
 function AboutSection() {
-  const allPapers = useStore((s) => s.papers);
-  const allRecords = useStore((s) => s.records);
-  const shows = useProgramFilter();
-  // The colophon counts what shows: with archived programs hidden it counts
-  // the active ones, and says so (OF-BLD-016 §2.2).
-  const papers = useMemo(() => allPapers.filter((p) => shows('paper', p.id)), [allPapers, shows]);
-  const records = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
-  const archivedHidden = papers.length < allPapers.length || records.length < allRecords.length;
+  const papers = useStore((s) => s.papers);
+  const records = useStore((s) => s.records);
 
   const counts = useMemo(() => {
     const c: Record<Fidelity, number> = { Full: 0, Authored: 0, Visual: 0 };
@@ -1358,15 +1158,6 @@ function AboutSection() {
     <div className="space-y-6">
       <section>
         <SectionTitle>Colophon</SectionTitle>
-        {archivedHidden && (
-          <p className="text-caption text-ink-soft mb-2" data-testid="about-archived-hidden">
-            The counts below are of the active programs. Archived programs are kept and hidden;{' '}
-            <a className="text-accent hover:underline" href="#/settings/programs">
-              Settings → Programs
-            </a>{' '}
-            shows them again.
-          </p>
-        )}
         <Callout kind="warn" title="Read this before you believe a number on this site">
           <ul className="space-y-1.5 mt-1">
             <li>
@@ -1405,17 +1196,15 @@ function AboutSection() {
             <li>
               <span className="font-medium">What you do here is kept in this browser.</span>{' '}
               Depositions, review decisions, runbook locks, the lessons finished here, Postdoc&rsquo;s
-              conversations, this browser&rsquo;s copy of Guild&rsquo;s ledger and the program switch
-              survive a refresh.
+              conversations and this browser&rsquo;s copy of Guild&rsquo;s ledger survive a refresh.
               With the service running, a review decision is also written to the service&rsquo;s
               files on its machine. There is no account and no sign-in.
             </li>
             <li>
-              <span className="font-medium">Simulation economics are illustrative.</span> The cost
-              models are authored spreadsheets swept over a grid — cost model v0, illustrative
-              economics, not validated. This is the part of the build that really is synthetic.
-              Treat a minimum selling price here as a shape to reason about, never as a number to
-              plan against.
+              <span className="font-medium">Simulation economics come from BioSTEAM.</span> A price
+              here is a run the service kept, with its inputs and where each came from. A minimum
+              selling price is a model output to reason about; plan against one only once its inputs
+              are checked.
             </li>
             <li>
               <span className="font-medium">Postdoc answers only through the service.</span>{' '}
@@ -1521,8 +1310,7 @@ function AboutSection() {
             <span className="font-num">{ONTOLOGY.length}</span> fields
           </Row>
           <Row label="Extractor">
-            The seed records were transcribed by hand from the curation document and carry no run
-            label. With the service running, the extractor&rsquo;s candidates (run claude-1) arrive
+            With the service running, the extractor&rsquo;s candidates (run claude-1) arrive
             through the overlay, each anchored to a sentence of a fetched paper and unverified until a
             named reviewer decides; Witness scores that run.
           </Row>
@@ -1532,8 +1320,8 @@ function AboutSection() {
             service down it says so, and nothing answers in its place.
           </Row>
           <Row label="Retrieval">
-            In the service: passages cut from the fetched papers, searched by the lane the service
-            names (BioRepo &rarr; Search, Witness &rarr; Retrieval). The browser holds no index; the
+            In the service, through the literature layer that alpha 2.0&rsquo;s stage 3 brings; until it
+            lands, Postdoc&rsquo;s passage search says no index exists yet. The browser holds no index; the
             &ldquo;Embed&rdquo; stage in the offline ingest board is a timed animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
             one structured response per paper for the candidates.
           </Row>
@@ -1595,7 +1383,6 @@ export default function Settings({ section }: { section: string }) {
                     )}
                   >
                     {s.id === 'appearance' && <Sun size={14} aria-hidden />}
-                    {s.id === 'programs' && <Layers size={14} aria-hidden />}
                     {s.id === 'units' && <Ruler size={14} aria-hidden />}
                     {s.id === 'corpus' && <Database size={14} aria-hidden />}
                     {s.id === 'guild' && <ShieldCheck size={14} aria-hidden />}
@@ -1617,7 +1404,6 @@ export default function Settings({ section }: { section: string }) {
 
         <div className="min-w-0">
           {active === 'appearance' && <AppearanceSection />}
-          {active === 'programs' && <ProgramsSection />}
           {active === 'units' && <UnitsSection />}
           {active === 'corpus' && <CorpusSection />}
           {active === 'guild' && <GuildPolicySection />}

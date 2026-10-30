@@ -1861,6 +1861,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pypdf" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "rank-bm25" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1897,6 +1898,7 @@ requires-dist = [
     { name = "pypdf", specifier = ">=5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
     { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "pyyaml", specifier = ">=6" },
     { name = "rank-bm25", specifier = ">=0.2.2" },
     { name = "scipy", marker = "extra == 'sim'" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },

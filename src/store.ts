@@ -12,7 +12,6 @@ import type {
   Candidate,
   ReviewDecision,
   ActivityEvent,
-  ClearanceStateId,
   Collection,
   LiveConversation,
   LiveTurn,
@@ -28,7 +27,6 @@ import type {
   Protocol,
   Provenance,
   RecordStatus,
-  ResultGrid,
   Runbook,
   SeriesRole,
   FermosFitResponse,
@@ -36,7 +34,6 @@ import type {
   TrainFromRun,
   TrainRun,
   KeptTrain,
-  RunbookStage,
   RunOutput,
   RunState,
   Scenario,
@@ -56,21 +53,10 @@ import type {
   CheckNote,
   CheckResult,
   Checks,
-  Program,
-  ProgramId,
+  Skill,
   TrainSpec,
 } from '@/data/types';
-import { PAPERS } from '@/data/papers';
-import { RECORDS } from '@/data/records';
 import { RUN_OUTPUTS } from '@/data/runOutputs';
-import { STRAINS } from '@/data/strains';
-import { PRODUCTS } from '@/data/products';
-import { RUNBOOKS } from '@/data/runbooks';
-import { PROTOCOLS } from '@/data/protocols';
-import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
-import { MODULES } from '@/data/learn';
-import { PROGRAMS, PROGRAM_BY_ID, isArchived, programOfPaperId } from '@/data/programs';
-import { buildGrid } from '@/engine/grids';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
@@ -103,7 +89,6 @@ import {
 import { loadPractice as loadPracticeFromService } from '@/lib/practice';
 import { CheckRefused, loadChecks as loadChecksFromService, postBrief, postDismiss, postPropose, postRecord, postRequest, postSchedule, whyNot } from '@/lib/checks';
 import { competenceOf, localToday, mayCosign, statusOf } from '@/engine/competence';
-import { SKILL_BY_ID } from '@/data/skills';
 
 export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
@@ -168,8 +153,6 @@ function decisionOf(
   };
 }
 
-const SEED_BY_ID = new Map(RECORDS.map((r) => [r.id, r]));
-
 /**
  * The span a promotion re-anchored a curated record to (§7.3), when it did:
  * the record's quote and section differ from the seed's. Null for a record on
@@ -180,7 +163,7 @@ const SEED_BY_ID = new Map(RECORDS.map((r) => [r.id, r]));
  * without it would be anchored on the seed quote, which is not in the paper.
  */
 function reanchoredSpan(r: ExtractionRecord): { quote: string; sectionId: string } | null {
-  const was = r.original ?? SEED_BY_ID.get(r.id);
+  const was = r.original;
   if (!was || (r.quote === was.quote && r.sectionId === was.sectionId)) return null;
   return { quote: r.quote, sectionId: r.sectionId };
 }
@@ -303,9 +286,10 @@ export interface OFState {
   measuredEvidence: MeasuredEvidence[];
   protocols: Protocol[];
   scenarios: Scenario[];
-  grids: Record<string, ResultGrid>;
   collections: Collection[];
   modules: LearnModule[];
+  /** A lab's skills (stage 2 serves them); none ship with the app. */
+  skills: Skill[];
   activity: ActivityEvent[];
   /**
    * Postdoc's Live conversations, newest first. Durable: a question asked
@@ -444,14 +428,6 @@ export interface OFState {
   addProtocolVersion: (protocolId: string, version: Protocol['versions'][number]) => void;
 
   // runbooks (OF-BLD-005 §7) — a slice of its own, never folded into jobs
-  /**
-   * Blocked → research handoff (§8). Builds a research runbook that enumerates
-   * around whatever fence the product is behind, and is honest when
-   * enumeration would not help: a claim reciting a functional class is not
-   * escaped by molecular diversity, and the runbook says so instead of
-   * spending compute to find out again.
-   */
-  handoffToResearchRunbook: (productId: string) => string | null;
   /** Research → industrial in one action, carrying the finding across. */
   promoteRunbook: (runbookId: string) => string | null;
   /**
@@ -482,12 +458,11 @@ export interface OFState {
   supersedeRunbook: (runbookId: string) => string | null;
 
   // scenarios
-  setScenarioPoint: (id: string, point: Record<string, number>) => void;
   togglePin: (id: string) => void;
   duplicateScenario: (id: string) => string;
   /**
    * A `biosteam` scenario on a shelf flowsheet (OF-BLD-019 §3.1): its name,
-   * its program (null for a general one), no inputs of its own, not run.
+   * no inputs of its own, not run.
    * Durable, under a time-based id; returns the id.
    */
   /**
@@ -497,7 +472,6 @@ export interface OFState {
   createScenario: (
     flowsheetId: string,
     name: string,
-    program: ProgramId | null,
     parts?: { vessel: string; trainRun: string } | null,
   ) => string;
   /** The newest run artifact of a scenario, as a run on its page returned it (D6). */
@@ -583,15 +557,6 @@ export interface OFState {
    */
   reviewer: string;
   setReviewerName: (name: string) => void;
-  /**
-   * Whether archived programs show (OF-BLD-016 §2.1, E.1′). Off by default:
-   * casein and PHA leave every list, count, prompt and evidence pool until a
-   * person turns this on in Settings → Programs. Durable, like the reviewer's
-   * name: a choice about what to see should survive a reload. Screens read
-   * it through `useProgramFilter()` / `programVisible`, never directly.
-   */
-  showArchived: boolean;
-  setShowArchived: (on: boolean) => void;
   /**
    * The review decisions the Durable tier restored, with the snapshot's
    * savedAt — kept so a server decision for the same record can be compared
@@ -743,91 +708,6 @@ export interface OFState {
 }
 
 /**
- * How a claim reads, per clearance state — the input to the blocked → research
- * handoff (OF-BLD-005 §8).
- *
- * The distinction that matters is what the claim RECITES. A claim reciting a
- * sequence or a structure fences a region you can walk around, and enumeration
- * is worth paying for. A claim reciting a function or an application fences the
- * job itself, and no amount of molecular diversity gets you out — the
- * cross-kingdom substitution that still infringed is the documented case. The
- * handoff therefore declines as readily as it accepts, and says which.
- */
-const CLAIM_READING: Record<
-  ClearanceStateId,
-  { reading: string; enumerable: boolean; stages: RunbookStage[] }
-> = {
-  blocked: {
-    reading: 'Structure-reciting — the claims name sequences, so the genus around them is enumerable',
-    enumerable: true,
-    stages: [
-      { name: 'Homolog retrieval', status: 'running', detail: 'Cross-genus sequence search', value: null },
-      { name: 'Identity-band mapping', status: 'pending', detail: 'Where the claimed band ends', value: null },
-      { name: 'Activity prediction', status: 'pending', detail: null, value: null },
-      { name: 'Enablement package', status: 'pending', detail: null, value: null },
-    ],
-  },
-  'watch-variant': {
-    reading: 'Core free, engineered variants fenced — the boundary is worth mapping precisely',
-    enumerable: true,
-    stages: [
-      { name: 'Boundary map', status: 'running', detail: 'Where the fenced variants start', value: null },
-      { name: 'Free-region candidates', status: 'pending', detail: null, value: null },
-      { name: 'Enablement package', status: 'pending', detail: null, value: null },
-    ],
-  },
-  'watch-process': {
-    reading:
-      'Process-reciting — the fence is on the route, not the molecule, so enumerating sequences would not move it',
-    enumerable: false,
-    stages: [
-      {
-        name: 'Recommendation',
-        status: 'done',
-        detail: 'Design around the process. Enumerating the molecule spends compute on the wrong axis.',
-        value: null,
-      },
-    ],
-  },
-  unknown: {
-    reading: 'Not yet assessed — classification has to happen before anything else is worth running',
-    enumerable: true,
-    stages: [
-      { name: 'Clearance sweep', status: 'running', detail: 'Claim classification first', value: null },
-      { name: 'Claim classification', status: 'pending', detail: null, value: null },
-      { name: 'Recommendation', status: 'pending', detail: null, value: null },
-    ],
-  },
-  'clear-none': {
-    reading: 'No blocking claims found — there is no fence here to enumerate around',
-    enumerable: false,
-    stages: [
-      {
-        name: 'Recommendation',
-        status: 'done',
-        detail: 'Proceed with counsel confirmation. Enumeration compute would buy nothing.',
-        value: null,
-      },
-    ],
-  },
-  'clear-expired': {
-    reading: 'Foundational IP expired — the region is open and the evidence trail is the deliverable',
-    enumerable: false,
-    stages: [
-      {
-        name: 'Recommendation',
-        status: 'done',
-        detail: 'Proceed and document the expiry evidence. Nothing to design around.',
-        value: null,
-      },
-    ],
-  },
-};
-
-const seedGrids = (): Record<string, ResultGrid> =>
-  Object.fromEntries(COST_MODELS.map((m) => [m.modelId, buildGrid(m)]));
-
-/**
  * Enforcement rather than convention (OF-BLD-006 §3.3).
  *
  * A comment saying "do not mutate this after locking" is a comment. Freezing
@@ -849,21 +729,24 @@ function freezeLocked(runbooks: Runbook[]): Runbook[] {
   return runbooks;
 }
 
+// alpha 2.0 ships no seeded science (ADR-010): every list starts empty and is
+// filled from the service, a project's records from stage 2 on.
 const seedState = () => ({
-  papers: structuredClone(PAPERS),
-  records: structuredClone(RECORDS).map(stampOriginal),
+  papers: [] as Paper[],
+  records: [] as ExtractionRecord[],
   runOutputs: structuredClone(RUN_OUTPUTS),
-  strains: structuredClone(STRAINS),
-  products: structuredClone(PRODUCTS),
-  runbooks: freezeLocked(structuredClone(RUNBOOKS)),
+  strains: [] as Strain[],
+  products: [] as Product[],
+  runbooks: freezeLocked([] as Runbook[]),
+  skills: [] as Skill[],
   depositions: [] as Deposition[],
   measuredEvidence: [] as MeasuredEvidence[],
-  protocols: structuredClone(PROTOCOLS),
-  scenarios: structuredClone(SCENARIOS),
+  protocols: [] as Protocol[],
+  scenarios: [] as Scenario[],
   // Collections and activity start empty: what lands in them is what a
   // person did in this browser, never an authored history (OF-BLD-016 §3.1).
   collections: [] as Collection[],
-  modules: structuredClone(MODULES),
+  modules: [] as LearnModule[],
   activity: [] as ActivityEvent[],
   liveConversations: [] as LiveConversation[],
   runs: {} as Record<string, RunState>,
@@ -902,7 +785,6 @@ function initialTheme(): Theme {
 
 export const useStore = create<OFState>()((set, get) => ({
   ...seedState(),
-  grids: seedGrids(),
   toasts: [],
   durableReady: false,
   durableReview: null as { savedAt: string; decisions: Record<string, DurableReviewDecision> } | null,
@@ -931,8 +813,6 @@ export const useStore = create<OFState>()((set, get) => ({
 
   // Outside seedState: a reset discards the session's work, not what the
   // person chose to see.
-  showArchived: false,
-  setShowArchived: (on) => set({ showArchived: on }),
 
   guild: EMPTY_GUILD,
   guildPending: [] as string[],
@@ -1675,93 +1555,6 @@ export const useStore = create<OFState>()((set, get) => ({
 
   // ── runbooks (OF-BLD-005 §7, §8) ─────────────────────────────────────
 
-  handoffToResearchRunbook: (productId) => {
-    const s = get();
-    const product = s.products.find((p) => p.id === productId);
-    if (!product) return null;
-
-    const id = nextId('rb');
-    const stages: RunbookStage[] = [
-      {
-        name: 'Claim classification',
-        status: 'done',
-        detail: CLAIM_READING[product.clearanceState].reading,
-        value: null,
-      },
-      ...CLAIM_READING[product.clearanceState].stages,
-    ];
-    const enumerable = CLAIM_READING[product.clearanceState].enumerable;
-
-    const runbook: Runbook = {
-      id,
-      kind: 'research',
-      title: `${product.name} — enumeration around the claim`,
-      // Nothing runs behind an enumeration yet, so it opens as a draft with no
-      // ETA, cost, progress or count (OF-BLD-016 §3.R).
-      status: enumerable ? 'draft' : 'complete',
-      stages,
-      note: enumerable
-        ? 'Handed off from the molecule catalogue. The industrial route is fenced, so this asks the question the fence does not cover: what else does the job, and does any of it fall outside the claim.'
-        : 'Handed off from the molecule catalogue and stopped immediately, on purpose. Claim architecture, not molecular diversity, decides whether enumeration is worth paying for — and here it is not. Recorded so nobody funds the same sweep next quarter.',
-      eta: null,
-      outputs: enumerable ? [] : ['Claim reading', 'Recommendation not to enumerate'],
-      productId: product.id,
-      progressPct: enumerable ? 0 : 100,
-      estCostUsd: null,
-      strainId: product.defaultStrainId,
-      // The prediction IS the claim being handed off. When the claim recites a
-      // function rather than a sequence the honest prediction is zero escapes
-      // — the same call rb-heme-calib records, reached the same way.
-      // An enumerable claim gets no count: nobody has one to predict yet.
-      predictions: enumerable
-        ? []
-        : [
-            {
-              id: `${id}-escapes`,
-              label: 'Candidates falling outside the claim',
-              value: 0,
-              unit: 'candidates',
-              confidence: 'high',
-              basis: 'The claim recites a functional class rather than a sequence, so molecular diversity does not escape it.',
-            },
-          ],
-      measurementSchema: [
-        {
-          id: `${id}-ms-escapes`,
-          label: 'Candidates outside the claim on counsel review',
-          unit: 'candidates',
-          timepoint: 'analysis',
-          predictionId: enumerable ? null : `${id}-escapes`,
-        },
-      ],
-      // The declined sweep's reasoning is locked at creation; a draft is not.
-      lockedAt: enumerable ? null : new Date().toISOString(),
-      lockHash: null,
-    };
-    if (runbook.lockedAt) runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
-
-    set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
-
-    get().logActivity({
-      at: stamp(),
-      icon: 'runbook',
-      text: enumerable
-        ? `Research runbook drafted — enumeration around the claims on ${product.name}`
-        : `Enumeration declined for ${product.name} — the claim recites a function, not a sequence`,
-      href: `#/runbooks/${id}`,
-      provenance: 'user',
-    });
-    get().toast({
-      text: enumerable
-        ? `Drafted a research runbook for ${product.name}. Nothing runs behind it yet; this is a research lead, not clearance.`
-        : `Enumeration would not help ${product.name} — opened the reasoning instead.`,
-      kind: enumerable ? 'info' : 'warn',
-      href: `#/runbooks/${id}`,
-      hrefLabel: 'Open',
-    });
-    return id;
-  },
-
   promoteRunbook: (runbookId) => {
     const s = get();
     const source = s.runbooks.find((r) => r.id === runbookId);
@@ -2314,11 +2107,6 @@ export const useStore = create<OFState>()((set, get) => ({
   },
 
   // ── scenarios ────────────────────────────────────────────────────────
-  setScenarioPoint: (id, point) =>
-    set((s) => ({
-      scenarios: s.scenarios.map((sc) => (sc.id === id ? { ...sc, point: { ...sc.point, ...point } } : sc)),
-    })),
-
   togglePin: (id) =>
     set((s) => ({
       scenarios: s.scenarios.map((sc) => (sc.id === id ? { ...sc, pinned: !sc.pinned } : sc)),
@@ -2334,7 +2122,6 @@ export const useStore = create<OFState>()((set, get) => ({
       return get().createScenario(
         src.flowsheetId,
         `${src.name} (copy)`,
-        src.program ?? null,
         src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
       );
     const copy: Scenario = {
@@ -2352,7 +2139,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // and this outlives one (as adopted runbooks and Live conversations do).
   // It holds no input value: the service binds records, and a named person
   // types an assumption on its page, kept in proformaAssumptions under its id.
-  createScenario: (flowsheetId, name, program, parts) => {
+  createScenario: (flowsheetId, name, parts) => {
     const id = timeId('sc');
     const made: Scenario = {
       id,
@@ -2366,7 +2153,6 @@ export const useStore = create<OFState>()((set, get) => ({
       point: {},
       assumptions: [],
       pinned: false,
-      ...(program ? { program } : {}),
       // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
       ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun } : {}),
       lastRunId: null,
@@ -2647,7 +2433,6 @@ export const useStore = create<OFState>()((set, get) => ({
         reviewer: snap.reviewerName ?? '',
         // OF-BLD-016 §2.1 — older snapshots predate the switch; the current
         // position (off unless changed since load) stands.
-        showArchived: snap.showArchived ?? s.showArchived,
         // OF-BLD-013 §1.3 — the ledger as this browser last held it, and what
         // it still owes the service. Older snapshots predate the field.
         guild: snap.guild?.ledger ?? s.guild,
@@ -3163,7 +2948,7 @@ export const useStore = create<OFState>()((set, get) => ({
       runs: { ...x.runs, [runId]: { ...x.runs[runId], guildRecorded: { ...(x.runs[runId].guildRecorded ?? {}), [stepId]: true } } },
     }));
     const today = localToday();
-    const map = competenceOf(ledger.evidence, ledger.people, SKILL_BY_ID, today);
+    const map = competenceOf(ledger.evidence, ledger.people, skillById(s.skills), today);
     const chosen = run.cosigned?.[stepId] ?? null;
     const cosigner = canHold(chosen) ? chosen : null;
     const where = `${run.depositionId ? `Deposition ${run.depositionId}` : `Run ${runId}`}, step ${stepId}`;
@@ -3388,7 +3173,7 @@ export const useStore = create<OFState>()((set, get) => ({
     const serviceUp = get().serviceUp;
     // The shipped state hides archived programs, so the switch goes off too
     // (it lives outside seedState so that nothing else resets it).
-    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {}, showArchived: false });
+    set({ ...seedState(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {} });
     if (overlay) get().applyOverlay(overlay);
     // Guild's ledger is the service's when there is one, and survives a reset
     // the way the overlay does; what was only ever in this browser goes.
@@ -3637,7 +3422,6 @@ export function snapshotOf(s: OFState): DurableSnapshot {
     reviewDecisions,
     runbookLocks,
     reviewerName: s.reviewer,
-    showArchived: s.showArchived,
     guild: {
       ledger: s.guild,
       pending: s.guildPending,
@@ -3695,7 +3479,6 @@ if (durableAvailable()) {
       s.runbooks === prev.runbooks &&
       s.measuredEvidence === prev.measuredEvidence &&
       s.reviewer === prev.reviewer &&
-      s.showArchived === prev.showArchived &&
       s.guild === prev.guild &&
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
@@ -3717,15 +3500,6 @@ if (durableAvailable()) {
   window.addEventListener('pagehide', flushDurable);
 }
 
-// ── programs (OF-BLD-016 §2.1, E.1′) ───────────────────────────────────
-//
-// One question, asked one way: which program does this entity belong to, and
-// does it show? Every list a screen renders, every count on Home and every
-// suggested prompt filters through `programVisible` (or the hook below); no
-// screen reads `showArchived` or a `program` field itself. The service asks
-// the same of corpus.json and modules.json through `programs.py`.
-
-/** What `programOf` can be asked about. */
 /**
  * OF-BLD-020 §5.R — what pureOS's Builder showed of one train this session
  * (`builderShown`): each part absent until the page has shown it.
@@ -3741,241 +3515,21 @@ export interface BuilderShown {
   pricing?: boolean;
 }
 
-export type ProgramEntityKind =
-  | 'paper'
-  | 'record'
-  | 'strain'
-  | 'product'
-  | 'scenario'
-  | 'protocol'
-  | 'runbook'
-  | 'module'
-  | 'lesson'
-  | 'deposition';
-
-/**
- * The lists `programOf` reads, from the store's state or any part of it.
- * Each falls back to the seed when absent, so a check script or the corpus
- * export can ask with no store at all. `records` and `runbooks` are worth
- * passing from the store: the first holds the extractor's candidates, the
- * second the runbooks adopted from a draft. `depositions` exist nowhere else.
- */
-export type ProgramLookup = Partial<
-  Pick<OFState, 'records' | 'strains' | 'products' | 'scenarios' | 'protocols' | 'runbooks' | 'modules' | 'depositions'>
->;
-
-const idIndexes = new WeakMap<readonly { id: string }[], Map<string, { id: string }>>();
-/** An id → entity map per list, built once per list identity. */
-function indexById<T extends { id: string }>(list: readonly T[]): Map<string, T> {
-  let m = idIndexes.get(list) as Map<string, T> | undefined;
-  if (!m) {
-    m = new Map(list.map((x) => [x.id, x]));
-    idIndexes.set(list, m);
-  }
-  return m;
+/** Skills by id, for the competence engine: a lab's own skills (stage 2). */
+export function skillById(skills: readonly Skill[]): Record<string, Skill> {
+  return Object.fromEntries(skills.map((sk) => [sk.id, sk]));
 }
 
-const lessonIndexes = new WeakMap<readonly LearnModule[], Map<string, { lesson: ProgramId | undefined; module: ProgramId | undefined }>>();
-function lessonIndex(modules: readonly LearnModule[]) {
-  let m = lessonIndexes.get(modules);
-  if (!m) {
-    m = new Map(modules.flatMap((mod) => mod.lessons.map((l) => [l.id, { lesson: l.program, module: mod.program }] as const)));
-    lessonIndexes.set(modules, m);
-  }
-  return m;
+/** The lab's skills, for a component: none ship with the app (ADR-010). */
+export function useSkills(): Skill[] {
+  return useStore((s) => s.skills);
 }
 
-/** The programs that show by default: those whose status is active. */
-export function activePrograms(): Program[] {
-  return PROGRAMS.filter((p) => p.status === 'active');
+/** The lab's skills by id, for a component. */
+export function useSkillById(): Record<string, Skill> {
+  const skills = useSkills();
+  return useMemo(() => skillById(skills), [skills]);
 }
-
-/**
- * The program an entity belongs to, or null when it is general (and always
- * shows) or unknown.
- *
- *   paper       by its thread letter ('P12' → 'pha')
- *   record      by the paper it cites, candidates included
- *   strain, product, scenario, protocol, module
- *               by the entry's own `program` field
- *   lesson      its own field, else its module's
- *   runbook     its own field, else the product it names, else the strain
- *   deposition  the runbook it follows, else its protocol
- */
-export function programOf(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): ProgramId | null {
-  switch (kind) {
-    case 'paper':
-      return programOfPaperId(id);
-    case 'record': {
-      const r = indexById(s.records ?? RECORDS).get(id) ?? indexById(RECORDS).get(id);
-      return r ? programOfPaperId(r.paperId) : null;
-    }
-    case 'strain':
-      return indexById(s.strains ?? STRAINS).get(id)?.program ?? null;
-    case 'product':
-      return indexById(s.products ?? PRODUCTS).get(id)?.program ?? null;
-    case 'scenario':
-      return indexById(s.scenarios ?? SCENARIOS).get(id)?.program ?? null;
-    case 'protocol':
-      return indexById(s.protocols ?? PROTOCOLS).get(id)?.program ?? null;
-    case 'module':
-      return indexById(s.modules ?? MODULES).get(id)?.program ?? null;
-    case 'lesson': {
-      const l = lessonIndex(s.modules ?? MODULES).get(id);
-      return l?.lesson ?? l?.module ?? null;
-    }
-    case 'runbook': {
-      const rb = indexById(s.runbooks ?? RUNBOOKS).get(id);
-      if (!rb) return null;
-      return (
-        rb.program ??
-        (rb.productId ? programOf('product', rb.productId, s) : null) ??
-        (rb.strainId ? programOf('strain', rb.strainId, s) : null)
-      );
-    }
-    case 'deposition': {
-      const d = indexById(s.depositions ?? []).get(id);
-      if (!d) return null;
-      return programOf('runbook', d.runbookId, s) ?? programOf('protocol', d.protocolId, s);
-    }
-  }
-}
-
-const exampleLessonIndexes = new WeakMap<readonly LearnModule[], Map<string, boolean>>();
-function exampleLessonIndex(modules: readonly LearnModule[]) {
-  let m = exampleLessonIndexes.get(modules);
-  if (!m) {
-    m = new Map(modules.flatMap((mod) => mod.lessons.map((l) => [l.id, !!(l.example ?? mod.example)] as const)));
-    exampleLessonIndexes.set(modules, m);
-  }
-  return m;
-}
-
-/**
- * Whether an entity is an example (OF-BLD-016 §3.3, D3): a seed runbook,
- * protocol, scenario, module or lesson that describes a run nobody made. An
- * example is treated as archived — hidden by default, shown by the same
- * switch, opened under ArchivedBanner by a link — and is never deleted. A
- * lesson is an example when it or its module says so. A deposition is one
- * only by its own flag: a run a person starts from an example runbook is a
- * run someone made.
- */
-export function isExample(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): boolean {
-  switch (kind) {
-    case 'runbook':
-      return !!indexById(s.runbooks ?? RUNBOOKS).get(id)?.example;
-    case 'protocol':
-      return !!indexById(s.protocols ?? PROTOCOLS).get(id)?.example;
-    case 'scenario':
-      return !!indexById(s.scenarios ?? SCENARIOS).get(id)?.example;
-    case 'module':
-      return !!indexById(s.modules ?? MODULES).get(id)?.example;
-    case 'lesson':
-      return exampleLessonIndex(s.modules ?? MODULES).get(id) ?? false;
-    case 'deposition':
-      return !!indexById(s.depositions ?? []).get(id)?.example;
-    default:
-      return false;
-  }
-}
-
-/**
- * Whether an entity shows: it is general or its program is active, and it is
- * not an example — or the person has turned archived programs and examples
- * on. The one selector every screen calls (through `useProgramFilter` in a
- * component).
- */
-export function programVisible(
-  kind: ProgramEntityKind,
-  id: string,
-  s: ProgramLookup & Pick<OFState, 'showArchived'>,
-): boolean {
-  return s.showArchived || (!isArchived(programOf(kind, id, s)) && !isExample(kind, id, s));
-}
-
-/** The archived program an entity belongs to, or null — what ArchivedBanner names. */
-export function archivedProgramOf(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): Program | null {
-  const p = programOf(kind, id, s);
-  return p && isArchived(p) ? PROGRAM_BY_ID[p] : null;
-}
-
-/**
- * `programVisible` bound to the store, for a component: call it once per
- * render and filter with the predicate it returns —
- *
- *   const shows = useProgramFilter();
- *   const papers = allPapers.filter((p) => shows('paper', p.id));
- *
- * It re-renders the component when the switch moves, a candidate arrives,
- * a runbook is adopted, a scenario is copied or a deposition starts. Every
- * list `programOf` reads comes from the store, so a copy of an archived
- * scenario (which keeps its `program`) stays with its program.
- */
-export function useProgramFilter(): (kind: ProgramEntityKind, id: string) => boolean {
-  const showArchived = useStore((s) => s.showArchived);
-  const lookup = useProgramLookup();
-  return useCallback(
-    (kind: ProgramEntityKind, id: string) => programVisible(kind, id, { ...lookup, showArchived }),
-    [showArchived, lookup],
-  );
-}
-
-/**
- * The program filter as a page that names one entity applies it.
- *
- * Every list on the page filters through `useProgramFilter`, with one
- * widening: when the page's own entity belongs to an archived program (a deep
- * link to cw15's strain page, a runbook or lesson opened from an old link),
- * what belongs to that same program shows too, because the link opens what
- * it names and the page sits under ArchivedBanner saying so. Anything of
- * another archived program stays hidden. With no page entity, or a general
- * or active one, this is `useProgramFilter` itself.
- */
-export function useProgramScope(
-  page?: { kind: ProgramEntityKind; id: string | null | undefined } | null,
-): (kind: ProgramEntityKind, id: string) => boolean {
-  const shows = useProgramFilter();
-  const lookup = useProgramLookup();
-  const kind = page?.kind;
-  const id = page?.id;
-  const own = useMemo(
-    () => (kind && id ? archivedProgramOf(kind, id, lookup)?.id ?? null : null),
-    [kind, id, lookup],
-  );
-  // An example opened by link (§3.3) widens the same way: the other examples
-  // it names show beside it, unless their program is archived and not its own.
-  const ownExample = useMemo(() => (kind && id ? isExample(kind, id, lookup) : false), [kind, id, lookup]);
-  return useCallback(
-    (k: ProgramEntityKind, x: string) => {
-      if (shows(k, x)) return true;
-      const p = programOf(k, x, lookup);
-      if (own !== null && p === own) return true;
-      return ownExample && isExample(k, x, lookup) && (!isArchived(p) || p === own);
-    },
-    [shows, own, ownExample, lookup],
-  );
-}
-
-/**
- * The store's lists `programOf` reads, as one value that changes only when
- * one of them does: what `useProgramFilter` and `ArchivedBanner` ask with.
- */
-export function useProgramLookup(): ProgramLookup {
-  const records = useStore((s) => s.records);
-  const strains = useStore((s) => s.strains);
-  const products = useStore((s) => s.products);
-  const scenarios = useStore((s) => s.scenarios);
-  const protocols = useStore((s) => s.protocols);
-  const runbooks = useStore((s) => s.runbooks);
-  const modules = useStore((s) => s.modules);
-  const depositions = useStore((s) => s.depositions);
-  return useMemo(
-    () => ({ records, strains, products, scenarios, protocols, runbooks, modules, depositions }),
-    [records, strains, products, scenarios, protocols, runbooks, modules, depositions],
-  );
-}
-
-// ── derived selectors ──────────────────────────────────────────────────
 
 /**
  * A record's display provenance. The stored `provenance` field is

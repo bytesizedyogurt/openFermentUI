@@ -4,8 +4,8 @@
 //
 // THE RULES ARE THE SERVICE'S. `POST /api/pureos/propose` reads the product's
 // class and the properties its class's rule splits on (thermosteam's
-// volatility, Biopython's ProtParam on the sequence a products seed entry
-// carries, whether the seed says the product is secreted) and proposes a
+// volatility, Biopython's ProtParam on the sequence a product's entry
+// carries, whether the entry says the product is secreted) and proposes a
 // train of catalogue unit types in order, each with one reason naming the
 // rule, the property and the artifact that holds it; or nothing, naming each
 // missing property. This file sends ids and words and shows what comes back
@@ -15,15 +15,14 @@
 // Builder (/pureos/build/:trainId, OF-BLD-020 §5.3) opens it with the reasons
 // beside each unit, every parameter at its library default or waiting.
 //
-// The products offered are the active program's (the ones fermOS and geneOS
-// have words for, ethanol for yeast) and then Dominion's catalogue as the
-// program switch shows it; the hosts are the strains of the programs the
-// switch shows; the inlet is none (typed in the Builder) or a kept
-// simulation's harvest. The service refuses what does not fit, in words.
+// The products offered are the ones fermOS and geneOS have words for
+// (lib/geneos.ts's PRODUCT_WORDS) and then the products on file; the hosts are
+// the strains on file; the inlet is none (typed in the Builder) or a kept
+// simulation's harvest. Products and strains arrive with the documents that
+// report them, through Intake. The service refuses what does not fit, in words.
 import { useEffect, useMemo, useState } from 'react';
-import { PRODUCTS } from '@/data/products';
 import type { SimulationSummary, TrainProposal } from '@/data/types';
-import { useProgramFilter, useStore } from '@/store';
+import { useStore } from '@/store';
 import { PureosDown, PureosRefused, proposeTrain } from '@/lib/pureos';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
 import { fermosSimulations } from '@/lib/fermos';
@@ -40,16 +39,11 @@ const problemOf = (e: unknown) =>
         : String(e);
 
 export function ProposeTrain() {
-  const showArchived = useStore((s) => s.showArchived);
-  const strainsAll = useStore((s) => s.strains);
+  const hosts = useStore((s) => s.strains);
+  const products = useStore((s) => s.products);
   const keepProposedTrain = useStore((s) => s.keepProposedTrain);
-  const shows = useProgramFilter();
-  const programProducts = useMemo(() => Object.keys(PRODUCT_WORDS).filter((p) => shows('product', p)), [shows]);
-  const catalogue = useMemo(
-    () => PRODUCTS.filter((p) => shows('product', p.id) && !programProducts.includes(p.id)),
-    [shows, programProducts],
-  );
-  const hosts = useMemo(() => strainsAll.filter((s) => s.program && shows('strain', s.id)), [strainsAll, shows]);
+  const named = useMemo(() => Object.keys(PRODUCT_WORDS), []);
+  const catalogue = useMemo(() => products.filter((p) => !named.includes(p.id)), [products, named]);
   const [open, setOpen] = useState(false);
   const [product, setProduct] = useState('');
   const [host, setHost] = useState('');
@@ -63,20 +57,20 @@ export function ProposeTrain() {
   useEffect(() => {
     if (!open) return;
     const ctrl = new AbortController();
-    fermosSimulations(showArchived, ctrl.signal)
+    fermosSimulations(ctrl.signal)
       .then(setSims)
       .catch(() => !ctrl.signal.aborted && setSims([]));
     return () => ctrl.abort();
-  }, [open, showArchived]);
+  }, [open]);
 
-  const productChosen = product || programProducts[0] || catalogue[0]?.id || '';
+  const productChosen = product || named[0] || catalogue[0]?.id || '';
   const hostChosen = host && hosts.some((s) => s.id === host) ? host : (hosts[0]?.id ?? '');
 
   const propose = () => {
     setBusy(true);
     setProblem(null);
     setResult(null);
-    proposeTrain({ product: productChosen, host: hostChosen, inletRef: inlet || null, includeArchived: showArchived })
+    proposeTrain({ product: productChosen, host: hostChosen, inletRef: inlet || null })
       .then((proposal) => setResult({ proposal, trainId: keepProposedTrain(proposal) }))
       .catch((e: unknown) => setProblem(problemOf(e)))
       .finally(() => setBusy(false));
@@ -96,7 +90,7 @@ export function ProposeTrain() {
       <p className="text-body text-ink-soft">
         The service proposes a train for a product and a host by written rules, each naming the property it read:
         thermosteam's boiling points and azeotrope for a small molecule, ProtParam's isoelectric point and molecular
-        weight on a protein's sequence, and where the products seed says the product is. Every parameter stays at its
+        weight on a protein's sequence, and where the product's entry says the product is. Every parameter stays at its
         library default or waits for you in the Builder.
       </p>
       {open && (
@@ -111,22 +105,22 @@ export function ProposeTrain() {
                 onChange={(e) => setProduct(e.target.value)}
                 data-testid="propose-product"
               >
-                {programProducts.length > 0 && (
-                  <optgroup label="This program's products">
-                    {programProducts.map((p) => (
-                      <option key={p} value={p}>
-                        {productWords(p).option}
+                <optgroup label="Named by fermOS and geneOS">
+                  {named.map((p) => (
+                    <option key={p} value={p}>
+                      {productWords(p).option}
+                    </option>
+                  ))}
+                </optgroup>
+                {catalogue.length > 0 && (
+                  <optgroup label="Products on file">
+                    {catalogue.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
                       </option>
                     ))}
                   </optgroup>
                 )}
-                <optgroup label="Dominion's catalogue">
-                  {catalogue.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </optgroup>
               </select>
             </label>
             <label className="block text-caption text-ink-soft">
@@ -167,7 +161,11 @@ export function ProposeTrain() {
             <Button variant="primary" onClick={propose} disabled={busy || !productChosen || !hostChosen} data-testid="propose-submit">
               {busy ? 'Proposing…' : 'Propose'}
             </Button>
-            {!hostChosen && <span className="text-caption text-ink-soft">No host of a program the switch shows is in geneOS.</span>}
+            {!hostChosen && (
+              <span className="text-caption text-ink-soft">
+                No host is on file in geneOS yet: strains arrive with the documents that report them, through Intake.
+              </span>
+            )}
           </div>
           {problem && (
             <div data-testid="propose-problem">

@@ -36,11 +36,10 @@ from typing import Any
 
 from .models import Candidate, Claim, DroppedCandidate, PassageRef, Quantity, Range, weakest_provenance
 from .units import (
-    DATA as CORPUS_PATH,
+    SCHEMA,
     UnitError,
     convert,
     field as ontology_field,
-    in_range,
     normalize as normalize_unit,
     to_canonical,
     to_si,
@@ -81,7 +80,7 @@ _MAGNITUDE = re.compile(
 
 # Identifiers carry digits and are not quantities. Strain designations
 # (cenpk113-7d, S288C, cw15, UVM4, CC-4350), model names (iMM904, Yeast9),
-# assay names (OD600), proteins (CK2) and corpus ids (Q4, r-A1-1) all contain
+# assay names (OD600), proteins (CK2) and corpus ids (T5, r-T5-1) all contain
 # digits, and a claim that cannot name the strain it is about is useless —
 # "Ethanol yield on glucose in cenpk113-7d under anaerobic conditions" is a
 # GOOD claim (the specification's own worked example named cw15 the same way).
@@ -608,7 +607,7 @@ _WORD_QUANTITY = re.compile(
 # A cardinal that is not counting anything: 'one of the highest titres' states
 # no titre of 1, and 'a two-step purification' states no 2. A partitive ('of'
 # straight after) and a hyphenated compound ('two-step', 'three-dimensional')
-# are left alone; '-fold' is the one compound that IS a number (r-J10-3).
+# are left alone; '-fold' is the one compound that IS a number.
 _NOT_COUNTING = re.compile(r"\s+of(?![A-Za-z])|-(?!fold(?![A-Za-z]))[A-Za-z]", re.IGNORECASE)
 
 # An absence is a measurement the paper made. A curator who recorded
@@ -825,7 +824,7 @@ def value_basis(
 
 
 # Rule codes, in rule order. The counts are keyed by these.
-ANCHOR_RULES = ("field", "section", "quote", "value", "unit", "range", "method")
+ANCHOR_RULES = ("field", "section", "quote", "value", "unit", "method")
 
 # Fields anchoring may drop from a candidate it KEEPS (OF-BLD-014 §2.1), each
 # its own reason. A drop is not a rejection: the candidate stays, without the
@@ -848,26 +847,32 @@ FIELD_DROP_REASONS = ("carbonSource",)
 
 @lru_cache(maxsize=4)
 def vocabulary(path: str | None = None) -> dict[str, dict[str, str]]:
-    """The strain aliases and the carbon-source spellings, as the browser
-    exported them: two maps from a lower-case spelling to an id.
+    """The strain aliases and the carbon-source spellings: two maps from a
+    lower-case spelling to an id. With no path, the carbon sources this
+    package ships (`schema/vocabulary.yaml`) and no strain alias: strains
+    arrive with a project's records (alpha 2.0 stage 2). A path names a JSON
+    file holding `strainAliases` and `carbonSources`, how a test hands the
+    resolver a vocabulary of its own."""
+    if path:
+        raw = json.loads(Path(path).read_text())
+        if "strainAliases" not in raw or "carbonSources" not in raw:
+            raise ValueError(f"{path} carries no `strainAliases` or `carbonSources` key")
+        strains, carbon = dict(raw["strainAliases"]), raw["carbonSources"]
+    else:
+        import yaml
 
-    Raises when the file is missing or predates §2.1, for the reason
-    `units.tables` does: a resolver with no table would have to guess."""
-    target = Path(path) if path else CORPUS_PATH
-    if not target.exists():
-        raise FileNotFoundError(
-            f"{target} not found. Generate it with `pnpm export:corpus` from the repository root."
-        )
-    raw = json.loads(target.read_text())
-    if "strainAliases" not in raw or "carbonSources" not in raw:
-        raise ValueError(
-            f"{target} carries no `strainAliases` or `carbonSources` key. It predates "
-            "OF-BLD-014 §2.1 — regenerate it with `pnpm export:corpus`."
-        )
-    return {
-        "strains": dict(raw["strainAliases"]),
-        "carbon": {sp: c["id"] for c in raw["carbonSources"] for sp in c["spellings"]},
-    }
+        strains = {}
+        carbon = yaml.safe_load((SCHEMA / "vocabulary.yaml").read_text(encoding="utf-8"))["carbonSources"]
+    return {"strains": strains, "carbon": {sp: c["id"] for c in carbon for sp in c["spellings"]}}
+
+
+def unit_operations() -> list[dict[str, Any]]:
+    """The downstream unit operations (`schema/vocabulary.yaml`): each step's
+    id, label, stage, note and the BioSTEAM unit classes it stands for."""
+    import yaml
+
+    raw = yaml.safe_load((SCHEMA / "vocabulary.yaml").read_text(encoding="utf-8"))
+    return [dict(u) for u in raw.get("unitOperations") or []]
 
 
 _WORD_CHAR = re.compile(r"[a-z0-9]")
@@ -1046,7 +1051,6 @@ def anchor_candidate(
         if normalize_text(value).lower() not in norm_quote.lower():
             return None, "value", f"value {value!r} does not appear in the quote"
         unit = ""
-        canonical: float | None = None
         si = Quantity(value=value.strip(), unit="")
     else:
         # The tool asks for the number as the paper wrote it, and a paper
@@ -1081,18 +1085,11 @@ def anchor_candidate(
         if not unit and spec["canonicalUnit"]:
             return None, "unit", f"field {field_id} is denominated in {spec['canonicalUnit']!r}; no unit given"
         try:
-            canonical = to_canonical(number, unit, field_id)
+            to_canonical(number, unit, field_id)
         except UnitError as e:
             why = e.reason or str(e)
             return None, "unit", f"unit {unit!r} is not in the family of {spec['canonicalUnit']!r}: {why}"
 
-        # 5. Inside the field's range, in canonical units.
-        if not in_range(canonical, field_id):
-            low, high = spec["range"]
-            return None, "range", (
-                f"{canonical:g} {spec['canonicalUnit']} is outside the range "
-                f"{low:g}–{high:g} for {field_id}"
-            )
         si_value, si_unit = to_si(number, unit)
         si = Quantity(value=si_value, unit=si_unit)
 

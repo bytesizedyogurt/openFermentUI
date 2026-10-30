@@ -1,0 +1,37 @@
+# openFerment — ethanol source identifiers
+#
+# Carried over from thread Q of alpha 1.0 (tag alpha-1.0: src/data/corpus/threadQ.ts and
+# docs/thread-q-include.txt) when the TypeScript corpus was deleted (ADR-010). The file holds
+# identifiers, titles and approvals; no value from any paper. Intake ingests these sources
+# through its collectors into a project's literature (stage 3: Sci RAG Kit).
+#
+# One identifier per line, then '#' and a note:
+#   PMC<id>     a paper in Europe PMC (open-access full text where its licence allows)
+#   osti:<id>   a report on OSTI (its PDF)
+#   sgd:<id>    a strain entry in the Saccharomyces Genome Database
+#   doi:<doi>   any other source by DOI
+#
+# Approver and date are the ones the thread Q apply step recorded for each source.
+
+osti:1013269     # Humbird 2011 · Process Design and Economics for Biochemical Conversion of Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover · approved by Sean Creighton, 2026-10-20
+osti:1129271     # Tao 2014 · NREL 2012 Achievement of Ethanol Cost Targets: Biochemical Ethanol Fermentation via Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover · approved by Sean Creighton, 2026-10-20
+sgd:S000203483   # Saccharomyces Genome Database · Saccharomyces Genome Database strain entry: S288C · approved by Sean Creighton, 2026-10-20
+sgd:S000203459   # Saccharomyces Genome Database · Saccharomyces Genome Database strain entry: CEN.PK · approved by Sean Creighton, 2026-10-20
+PMC4842200       # Ji 2016 · Growth characteristics of freeze-tolerant baker's yeast Saccharomyces cerevisiae AFY in aerobic batch culture · approved by Sean Creighton, 2026-10-20
+PMC7906595       # Zentou 2021 · A New Model of Alcoholic Fermentation under a Byproduct Inhibitory Effect · approved by Sean Creighton, 2026-10-20
+PMC3639890       # Pagliardini 2013 · The metabolic costs of improving ethanol yield by reducing glycerol formation capacity under anaerobic conditions in Saccharomyces cerevisiae · approved by Sean Creighton, 2026-10-20
+PMC5574463       # Papapetridis 2016 · Improving ethanol yield in acetate-reducing Saccharomyces cerevisiae by cofactor engineering of 6-phosphogluconate dehydrogenase and deletion of ALD6 · approved by Sean Creighton, 2026-10-20
+PMC2887396       # Pagliardini 2010 · Quantitative evaluation of yeast's requirement for glycerol formation in very high ethanol performance fed-batch process · approved by Sean Creighton, 2026-10-20
+PMC5784725       # Papapetridis 2018 · Optimizing anaerobic growth rate and fermentation kinetics in Saccharomyces cerevisiae strains expressing Calvin-cycle enzymes for improved ethanol yield · approved by Sean Creighton, 2026-10-20
+PMC9600970       # Postma 2022 · Top-Down, Knowledge-Based Genetic Reduction of Yeast Central Carbon Metabolism · approved by Sean Creighton, 2026-10-20
+PMC6723480       # Zentou 2019 · Modelling of Molasses Fermentation for Bioethanol Production: A Comparative Investigation of Monod and Andrews Models Accuracy Assessment · approved by Sean Creighton, 2026-10-20
+PMC6453773       # Moodley 2019 · Bioethanol production from sugarcane leaf waste: Effect of various optimized pretreatments and fermentation conditions on process kinetics · approved by Sean Creighton, 2026-10-20
+PMC13382827      # Almeida 2026 · Vacuum-Assisted Gas Stripping Extractive Fermentation for Process Intensification of Sorghum-Based Bioethanol Production: An Experimental and Modeling Study · approved by Sean Creighton, 2026-10-20
+PMC10176687      # van 2023 · Quantification and mitigation of byproduct formation by low-glycerol-producing Saccharomyces cerevisiae strains containing Calvin-cycle enzymes · approved by Sean Creighton, 2026-10-20
+PMC7440791       # Wiersma 2020 · Squalene-Tetrahymanol Cyclase Expression Enables Sterol-Independent Growth of Saccharomyces cerevisiae · approved by Sean Creighton, 2026-10-20
+PMC5349206       # Bisschops 2015 · Oxygen availability strongly affects chronological lifespan and thermotolerance in batch cultures of Saccharomyces cerevisiae · approved by Sean Creighton, 2026-10-20
+PMC12671053      # Sheikhi 2025 · Adaptive laboratory evolution of Saccharomyces cerevisiae CEN.PK 113-7D to enhance ethanol tolerance · approved by Sean Creighton, 2026-10-20
+PMC6053494       # Ganucci 2018 · Quantifying the Effects of Ethanol and Temperature on the Fitness Advantage of Predominant Saccharomyces cerevisiae Strains Occurring in Spontaneous Wine Fermentations · approved by Sean Creighton, 2026-10-20
+PMC13038894      # Canseco 2026 · Selection of highly stress-tolerant yeast strains relevant for bioethanol fermentation using predictive growth models · approved by Sean Creighton, 2026-10-20
+PMC11278885      # Ginovart 2024 · Adaptation of Saccharomyces to High Glucose Concentrations and Its Impact on Growth Kinetics of Alcoholic Fermentations · approved by Sean Creighton, 2026-10-20
+PMC9578259       # van 2022 · An engineered non-oxidative glycolytic bypass based on Calvin-cycle enzymes enables anaerobic co-fermentation of glucose and sorbitol by Saccharomyces cerevisiae · approved by Sean Creighton, 2026-10-20
