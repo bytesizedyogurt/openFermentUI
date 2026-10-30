@@ -101,6 +101,29 @@ thirty-four.
   the turn allows): the loop stops asking for tools when what it spent and what the answer could
   cost reach the question's budget, so the answer is paid for within it.
 
+### 6.4 (2026-10-30)
+
+- The evaluation set is two tables of the project (migration 0006): `eval_questions`, each
+  question with the tool groups a good answer reaches for, what its claims cite and whether it
+  states a labelled estimate, and `eval_runs`, each scored run (`postdoc/evaluate.py`). A run asks
+  every question through the service's answer path, as a turn of a conversation (a question that
+  follows another is asked in that one's conversation and reads its history from the service),
+  and scores it by code: the share of tool groups reached, the share of claims citing what the
+  question expects, whether a labelled estimate stands exactly where one is asked for (every claim
+  stating one `assumed`), and whether a claim was dropped for a number, with the count.
+- Offline, the evaluation's stand-in answers (`evaluate.StandIn`, named `openferment-standin`
+  wherever a model is named, the `plan` route pointed at it): each default question's script of
+  tool calls and a plan written from what the tools returned; its follow-up drops a claim with a
+  bare number on purpose. Live (`--live`), the routing table answers. `pnpm eval seed | run
+  [--live]` (`openferment_core/evaluation.py`, outside the `postdoc` package because it reaches
+  the API's answer path, which `postdoc` may not import).
+- `scripts/prove.py` step 6 runs it offline against the proof's project and checks it through
+  the service: the selling price cited by evidence id, the scenario of a labelled estimate run and
+  `assumed` and its price read by the run's artifact id, the bare number dropped and counted, the
+  follow-up's history read from the service, each turn and its tool calls kept.
+- Specialist agents still wait for an evaluation that shows the single loop failing: two
+  questions offline say nothing of a model, and the live set grows with the projects that run it.
+
 ## Revisit condition
 
 That evaluation (development plan §8, "Let the simple system compete").

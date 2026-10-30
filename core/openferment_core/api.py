@@ -245,9 +245,12 @@ CORPUS_MISSING = (
 )
 
 
-def _ask_agent(question: str, on_step=None, cancelled=None, history=None, on_call=None, on_result=None) -> AnswerPlan:
+def _ask_agent(question: str, on_step=None, cancelled=None, history=None, on_call=None, on_result=None,
+               converse=None) -> AnswerPlan:
     """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands,
-    with the conversation's earlier turns when the question is a follow-up."""
+    with the conversation's earlier turns when the question is a follow-up.
+    `converse` stands in for the model (the evaluation's offline stand-in);
+    None asks the routing table's models."""
     ctx = tools.ToolContext()
     try:
         ctx.pool  # loaded now, so a missing corpus declines in words
@@ -255,10 +258,10 @@ def _ask_agent(question: str, on_step=None, cancelled=None, history=None, on_cal
         log.error("corpus missing: %s", e)
         return AnswerPlan(question=question, declined=CORPUS_MISSING)
     return postdoc_agent.ask(question, ctx=ctx, on_step=on_step, cancelled=cancelled, history=history,
-                             on_call=on_call, on_result=on_result)
+                             on_call=on_call, on_result=on_result, converse=converse)
 
 
-def _answer(request: AskRequest, *, on_step=None, cancelled=None, on_turn=None) -> AnswerPlan:
+def _answer(request: AskRequest, *, on_step=None, cancelled=None, on_turn=None, converse=None) -> AnswerPlan:
     """One question through the loop, kept as a turn of its conversation
     (postdoc/conversations.py): a follow-up's history read from what the
     service keeps, each tool call kept under the turn with what it answered,
@@ -293,7 +296,8 @@ def _answer(request: AskRequest, *, on_step=None, cancelled=None, on_turn=None) 
                                              "evidenceIds": [e.id for e in res.evidence], "artifactIds": kept})
 
     try:
-        plan = _ask_agent(question, on_step=step, cancelled=cancelled, history=history, on_call=call, on_result=result)
+        plan = _ask_agent(question, on_step=step, cancelled=cancelled, history=history, on_call=call, on_result=result,
+                          converse=converse)
     except Exception as e:
         _conversations.finish(tid, plan=None, steps=[], artifacts=artifacts, error=_conversations.error_of(
             f"Postdoc failed while answering: {type(e).__name__}."))

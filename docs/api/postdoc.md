@@ -61,6 +61,22 @@ A turn the service holds stays as the service kept it, unless it is `running` an
 answering it, when the page's record of how it ended stands. A turn moved to another
 conversation is refused in words.
 
+## The evaluation set
+
+A project's questions for Postdoc are rows of `eval_questions`, each scored run a row of
+`eval_runs` (migration 0006; `core/openferment_core/postdoc/evaluate.py`). `pnpm eval seed` keeps
+the default questions in the project named by `OPENFERMENT_PROJECT`; `pnpm eval run` asks each
+through the service's answer path, as turns of a conversation, offline with the evaluation's
+stand-in model or with `--live` on the routing table's, and prints the runs and the mean of each
+score as JSON:
+
+| Score | What it is |
+|---|---|
+| `tools` | The share of the question's tool groups the trace reached (any one tool of a group) |
+| `citations` | The share of the claims kept that cite what the question expects (evidence, records, passages, module rows) |
+| `estimates` | 1 when a labelled estimate stands exactly where the question asks for one, every claim stating one `assumed` |
+| `bareNumbers` | 1 when no claim was dropped for a number in its text; `droppedForNumbers` keeps the count |
+
 ## Routes
 
 | Route | Answers |

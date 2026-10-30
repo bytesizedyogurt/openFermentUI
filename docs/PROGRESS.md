@@ -89,6 +89,8 @@ installation).
 | 2026-10-30 16:04 | `test:core` with 6.1 (conversations, events); typecheck, plan, secrets, state, guild, figures | 2193 passed, 2 skipped, 168 deselected; all passed. The run before it failed one test that read the ask stream's first event as a step (now `turn`) | 4 min 56 s | 6.1 |
 | 2026-10-30 16:40 | `test:core` with 6.2 (typed values, the study tools, the generated reference); `check:tools`, `gen:tools --check`, typecheck, plan, secrets | 2216 passed, 2 skipped, 168 deselected; all passed. The run before it failed seventeen tests: a module write's fields of a value and a unit in words were read as a quantity, so quantities now stand only where a tool's schema asks for one | 5 min 33 s | 6.2 |
 | 2026-10-30 16:52 | `test:core` with 6.3 (the routing table, the final turn kept back); secrets | 2231 passed, 2 skipped, 168 deselected; passed | 5 min 21 s | 6.3 |
+| 2026-10-30 17:00 | `pnpm prove --steps 6` (steps 1, 2, 6), the real worker | 14 of 14 checks hold | 1 min 18 s | 6.4 |
+| 2026-10-30 17:06 | `test:core` with 6.4 (the evaluation set) | 2234 passed, 2 skipped, 168 deselected | 5 min 27 s | 6.4 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -594,3 +596,10 @@ installation).
   the per-request key override waits for the owner the same way (owner question 10; ADR-008,
   Implementation 6.3, has the design it would take). The ask budget now keeps back the final
   turn's worst case before another round. `test_llm.py`, `test_ready.py`, `test_postdoc_agent.py`.
+- 6.4 (evaluation) The evaluation set is two tables (migration 0006): `eval_questions`, with what
+  a good answer does, and `eval_runs`, each run scored by code on tool choice, citations, labelled
+  estimates and the claims dropped for a number (`postdoc/evaluate.py`; `pnpm eval seed | run
+  [--live]`). Offline, a stand-in named `openferment-standin` answers through the service's answer
+  path; its follow-up reads its history from the service and drops a bare number on purpose.
+  `scripts/prove.py` step 6 runs it against the proof's project. ADR-008, Implementation 6.4.
+  `test_evaluate.py`.

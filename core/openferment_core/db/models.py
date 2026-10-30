@@ -284,6 +284,12 @@ tool_calls = Table(
 
 proposals = _scoped("proposals", Column("state", Text, nullable=False), updated=True)
 
+# Postdoc's evaluation set (execution prompt §10 stage 6.4): a project's
+# questions, each with what a good answer does, and each scored run of one.
+eval_questions = _scoped("eval_questions")
+eval_runs = _scoped("eval_runs", Column("question_id", Text, nullable=False),
+                    Index(None, "project_id", "question_id"))
+
 jobs = _scoped("jobs", Column("kind", Text, nullable=False), Column("state", Text, nullable=False), updated=True)
 
 # ── Guild and Primer ──────────────────────────────────────────────────────

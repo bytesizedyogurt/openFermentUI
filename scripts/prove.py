@@ -1,16 +1,16 @@
 """The proof (execution prompt §9.1): an end-to-end path with nothing seeded.
 
-    pnpm prove                    every step this build holds: 1, 2, 4, 5, 7, 8
+    pnpm prove                    every step this build holds: 1, 2, 4, 5, 6, 7, 8
     pnpm prove --steps 5,8        the steps named, after the steps they stand on
     pnpm prove --keep             leave the service running at the end, and say where
 
 The service runs on loopback as a host serves it (uvicorn, `openferment_core.api`), on a
 database of the proof's own, made on the tests' server (OPENFERMENT_TEST_DATABASE_URL) and
 dropped at the end, with a data directory of its own: a proof touches no core/data/ and no
-other database. It runs without the model key and makes no model call; steps 3 and 6, which
-read the literature and ask Postdoc with a stand-in model, arrive with stages 6 and 8. Every
-check prints ✓ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot
-start.
+other database. It runs without the model key and makes no model call: step 6 asks Postdoc
+through its evaluation's offline stand-in. Step 3, which reads the literature, arrives with
+stage 8. Every check prints ✓ or ✗ with what it saw; the proof exits 1 when a check fails, 2
+when it cannot start.
 
     1  a fresh database, migrated to its head; `ready --offline` green
     2  a project made through the API
@@ -25,6 +25,12 @@ start.
        `assumed`; a comparison; a runbook made and locked under the browser's digest; the
        export package (JSON, Markdown, SFF files, versions) opened by the standard library
        alone, with every installed package off the path
+    6  Postdoc on the project, its evaluation set asked offline through the service's answer
+       path with the evaluation's stand-in model: a run's selling price cited by evidence id; a
+       scenario of a labelled estimate proposed, run and explained by the run's artifact id; a
+       claim with a bare number dropped and counted; the follow-up asked in the same
+       conversation, reading its history from the service; each turn and its tool calls on the
+       service, and each question scored and kept
     7  one of the toolkit's reference SFF files imported as a flowsheet record; it draws
     8  the service stopped and started again: everything from 2 to 7 reloads from PostgreSQL,
        and the flowsheet's artifact replays within its tolerance
@@ -71,12 +77,14 @@ DEPARTURES = {
 }
 DIGITS = 10
 # A step, and the steps it stands on.
-STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 4: (2,), 5: (2,), 7: (2,), 8: (2,)}
+STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,)}
 TITLES = {
     1: "a fresh database, migrated; ready green",
     2: "a project made through the API",
     4: "the library's plants; the cellulosic ethanol reference plant held to its package's test",
     5: "the flowsheet on the library's defaults; A→B→A; a scenario, a comparison, a runbook, the export",
+    6: "Postdoc offline: cites a run, proposes and runs a scenario of a labelled estimate, drops a bare number, "
+       "reads its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
 }
@@ -384,6 +392,58 @@ def step_5(proof: Proof) -> None:
     proof.check(seen["sff"] == held, f"each run's SFF file in it is the project's, byte for byte ({len(held)} files)")
 
 
+def evaluation(proof: Proof, *args: str) -> dict[str, Any]:
+    """`python -m openferment_core.evaluation` in the proof's project and database, its JSON."""
+    env = {**environment(proof, int(proof.origin.rsplit(":", 1)[1])), "OPENFERMENT_PROJECT": proof.project}
+    done = subprocess.run([sys.executable, "-m", "openferment_core.evaluation", *args], cwd=CORE, text=True,
+                          capture_output=True, env=env, timeout=RUN_TIMEOUT_S)
+    if done.returncode != 0:
+        raise Stop(f"evaluation {' '.join(args)} exited {done.returncode}: {(done.stderr or done.stdout).strip()[-400:]}")
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+def step_6(proof: Proof) -> None:
+    from openferment_core.postdoc import evaluate
+
+    seeded = evaluation(proof, "seed")["seeded"]
+    proof.check(seeded == ["eq-price", "eq-dearer"], f"the evaluation set kept in the project as rows: {', '.join(seeded)}")
+    report = evaluation(proof, "run")
+    runs = {r["questionId"]: r for r in report["runs"]}
+    price, dearer = runs.get("eq-price"), runs.get("eq-dearer")
+    if price is None or dearer is None:
+        raise Stop(f"the evaluation answered {', '.join(runs) or 'nothing'}, not both questions")
+    proof.check(all(r["mode"] == "offline" and r["models"] == [evaluate.STANDIN] for r in runs.values()),
+                f"asked offline, through the service's answer path, of the stand-in {evaluate.STANDIN}; no model key")
+    proof.check(price["scores"] == {"tools": 1.0, "citations": 1.0, "estimates": 1.0, "bareNumbers": 1.0}
+                and price["claims"] == 1,
+                f"{OTHER_PLANT}'s selling price: a claim kept, citing the run by evidence id; scored {price['scores']}")
+    turns = api(proof, "GET", f"/api/conversations/{price['conversationId']}")["turns"]
+    proof.check(dearer["conversationId"] == price["conversationId"] and [t["status"] for t in turns] == ["answered"] * 2
+                and report["followUps"].get("eq-dearer") is True,
+                f"the follow-up asked in conversation {price['conversationId']}: both turns kept on the service, and the "
+                "stand-in handed the question it follows, read from the service")
+    (kept,) = turns[1]["plan"]["claims"]
+    values = {v["quantity"]["origin"]["kind"]: v for v in kept["values"]}
+    estimate, read = values.get("model-estimate"), values.get("artifact")
+    proof.check(estimate is not None and estimate["quantity"]["origin"]["by"] == evaluate.STANDIN
+                and kept["provenance"] == "assumed",
+                f"the dearer cane's claim states the stand-in's estimate as a labelled value, marked {evaluate.STANDIN}'s, "
+                f"and is {kept['provenance']}")
+    run_id = read["quantity"]["origin"]["ref"] if read else None
+    run = api(proof, "GET", f"/api/runs/{run_id}")["run"] if run_id else {}
+    proof.check(bool(run) and read["source"].startswith(f"{run_id}:") and run.get("scenarioId") is not None
+                and run.get("provenance") == "assumed",
+                f"the scenario run {run_id} ({run.get('scenarioId')}, {run.get('provenance')}), and the claim's selling "
+                f"price read from it by evidence id {read['source'] if read else None}")
+    proof.check(dearer["droppedForNumbers"] == 1 and dearer["rejected"] == 1 and dearer["scores"]["bareNumbers"] == 0.0,
+                "a claim with a bare number dropped and counted: one dropped, the turn's bare-number score 0")
+    calls = api(proof, "GET", f"/api/conversations/{dearer['conversationId']}/turns/{dearer['turnId']}/calls")
+    proof.check([c["tool"] for c in calls] == ["engine_parameters", "study_scenario", "engine_run"],
+                f"the follow-up's tool calls kept with its turn: {', '.join(c['tool'] for c in calls)}")
+    proof.check(report["mean"] == {"tools": 1.0, "citations": 1.0, "estimates": 1.0, "bareNumbers": 0.5},
+                f"each question scored and kept: {report['mean']}")
+
+
 def step_7(proof: Proof) -> None:
     listed = api(proof, "GET", "/api/flowsheets/library")
     entry = next((f for f in listed if f["id"] == REFERENCE_FILE), None)
@@ -439,7 +499,8 @@ def step_8(proof: Proof) -> None:
                        f"within its tolerance: {again['withinTolerance']} ({len(again['differences'])} differences)"))
 
 
-RUNNERS: dict[int, Callable[[Proof], None]] = {1: step_1, 2: step_2, 4: step_4, 5: step_5, 7: step_7, 8: step_8}
+RUNNERS: dict[int, Callable[[Proof], None]] = {1: step_1, 2: step_2, 4: step_4, 5: step_5, 6: step_6, 7: step_7,
+                                               8: step_8}
 
 
 def order(asked: list[int]) -> list[int]:
