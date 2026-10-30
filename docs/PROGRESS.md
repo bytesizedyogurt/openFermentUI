@@ -16,20 +16,24 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 4, step 4.4** — runs, artifacts, parameter specs and panels on `Quantity`
-   with origins; `demo` renamed `assumed`; runs on the `runs` table writing their SFF file; then
-   the stage 4 gate (ADR-006, ADR-004; execution prompt §10 stage 4, §8.4). Steps 4.1 (SFF), 4.2
-   (the library plant runner) and 4.3 (the composed cellulosic ethanol flowsheet) are committed;
-   ADR-003's and ADR-004's Implementation sections say what each built.
+4. **Next step: stage 5, step 5.1** — the `studies/` package and its tables (scenarios,
+   comparisons, runbooks), comparison and runbook artifacts, the export package (JSON, Markdown,
+   SFF files, versions) and routes; then 5.2, the run report, comparison and runbook screens on
+   `RunReport`, `FigureFrame` and `ParameterPanel`; the gate is steps 5 and 8 of `scripts/prove.py`
+   (execution prompt §10 stage 5, §9.1). Stage 4 is complete: engine runs live on the `runs` table
+   (`engine/runs.py`, `docs/api/runs.md`), each with its inputs' origins and its SFF file; a
+   scenario's overrides may carry a model's estimate (ADR-006), and `studies/` is held to its row
+   of §7.2 by `test_boundaries.py` from its first commit.
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 4 — the BioSTEAM adapter and SFF — is in progress: 4.1 (the vendored SFF toolkit, its
-worker ops, SFF records, the reference corpus fetched and hashed), 4.2 (the library plant
-runner, the shelf regenerated from discovery) and 4.3 (the composed cellulosic ethanol flowsheet
-and its recipe) are done; 4.4 (runs on `Quantity` with origins, the gate) remains. Stages 0 to 3 are complete (the tag push waits on the owner; see
-Blockers).
+Stage 5 — studies: scenarios, comparisons, runbooks, exports — is next. Stages 0 to 4 are
+complete (the tag push waits on the owner; see Blockers). Stage 4 built the vendored SFF toolkit
+and its worker ops (4.1), the library plant runner (4.2), the composed cellulosic ethanol flowsheet
+(4.3), and in 4.4 the rename of `demo` to `assumed`, quantities with origins and the model's
+estimate, engine runs on the `runs` table writing their SFF files, replay within a run's stated
+precision, the package rules of §7.2 as a test, the worker op reference, and two CI fixes.
 
 ## Last green runs
 
@@ -62,6 +66,9 @@ Blockers).
 | 2026-10-30 11:31 | `test:core` with 4.4 (the rename); `typecheck`, `check:plan`, `check:figures`, `check:tools`, `check:state`, `check:guild`, `check:secrets` | 2076 passed, 2 skipped, 162 deselected; all passed | 5 min 16 s | 4.4 (rename) |
 | 2026-10-30 11:48 | `test:core` with 4.4 (origins); `typecheck`, `check:plan`, `check:figures` | 2090 passed, 2 skipped, 162 deselected; all passed | 4 min 59 s | 4.4 (origins) |
 | 2026-10-30 12:04 | `test:core` with 4.4 (runs); `test_runs_sim.py` (`sim`); `typecheck`, `check:plan` | 2100 passed, 2 skipped, 166 deselected; 4 passed; all passed | 5 min 29 s; 48 s | 4.4 (runs) |
+| 2026-10-30 12:05 | Stage 4 gate in a clean worktree at `309e8ab`: `test:core`; `test:lit`; `test:sim` (the library plants with their regression, the composed flowsheet, A→B→A, SFF export, import and drawing, engine runs and replay within tolerance) | 2112 passed, 2 skipped, 166 deselected; 10 passed; 130 passed, 2150 deselected | 5 min 46 s; 14 s; 6 min 44 s | 4.4 (gate) |
+| 2026-10-30 12:05 | Stage 4 gate, the same worktree: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile; the worktree left clean | all passed; 11 of 11 rail entries open | | 4.4 (gate) |
+| 2026-10-30 12:22 | `test:core` with the CI fixes; `test_cellulosic.py`; `test_proforma_worker.py` (`sim`) | 2112 passed, 2 skipped, 166 deselected; 7 passed; 7 passed | 5 min 19 s | `49b8eac` |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -156,7 +163,7 @@ Blockers).
 | The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | stage 7, when the UI reads the library shelf |
 | A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and not offered | after alpha 2.0 (4.3 composes the cellulosic plant's pretreatment and fermentation instead) |
 | A second organism's reaction set for the composed flowsheet: the package holds one | when a package or a record gives another |
-| `docs/api/workers.md` gives the SFF ops' requests and results in full and the other ops by name | the stage 4 gate |
+| Small handler mismatches the worker op reference found (4.4): `train_spec.py` sends `train_run` a `product` its handler reads nowhere; `grid` and `montecarlo` leave out the `structure` that `evaluate` and `run` pass on (both ops are called by tests alone); an unknown flowsheet's refusal arrives quoted (`Refused: 'there is no flowsheet …'`); an unknown catalogue type raises `CatalogueUnknown`, which callers avoid by checking the type first | the next change to those ops (stage 5 reshapes the Proforma scenarios) |
 
 ## Owner questions (execution prompt §13) and the defaults taken
 
@@ -183,6 +190,13 @@ Blockers).
 - Stage 2: a role `openferment` (password `openferment`, may create databases) and a database
   `openferment_dev` on the local cluster, for the development address and the tests' default.
   Container state, gone with the container.
+- CI (`.github/workflows/verify.yml`, read through the GitHub tools, 2026-10-30): verify runs on
+  the runner's Python 3.12 with a `pgvector/pgvector:pg17` service. Green on 3.1 and 4.1; red on
+  3.2 and 3.3 (fixed by 4.1), on 4.2 (`test_proforma_worker.py`'s toy fixture compared floats
+  exactly, and the runner's sum ends `56.0` where this container's ends `56.00000000000001`) and
+  on 4.3 (the recipe's `environment.yaml` pinned the Python that wrote it, 3.13 here and 3.12
+  there). Both fixed in 4.4: the fixture is compared to twelve significant digits, and the recipe
+  pins the lowest Python `core/uv.lock` resolves for.
 
 ## Log
 
@@ -445,4 +459,14 @@ Blockers).
   forbids; six exceptions are written down with their reasons (literature → projects and
   migrations; engine → artifacts, basis, the shelf's package-test reader and projects), and an
   exception no longer used fails the test. studies/ and postdoc/ are held to their rows from the
-  commit that makes them.
+  commit that makes them. `docs/api/workers.md` gives every op's request and result (the Proforma
+  worker's flowsheet, thermo, vessel and catalogue, and train ops, the geneos ops, beside the SFF
+  and library ops), each read from its handler and its callers.
+- 4.4 (CI) CI's verify had failed on 4.2 (the toy fixture compared floats to the last bit) and on
+  4.3 (the recipe pinned the Python that wrote it); both fixed (`49b8eac`; Environment facts).
+- Stage 4 gate, in a clean worktree at `309e8ab`: `test:core` 2112 passed, 2 skipped; `test:lit` 10
+  passed; `test:sim` 130 passed: the library plants with their package tests, the composed
+  flowsheet and its gates, A→B→A, an SFF export that validates and scores, a reference file
+  imported and drawn, engine runs with their SFF files, and a replay within tolerance. Secrets,
+  typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke` (11 of 11 rail
+  entries) and reconcile passed, and the worktree stayed clean.
