@@ -275,7 +275,7 @@ Request `{"plant", "configuration", "overrides": {key: number}, "digits": 1–17
 float rounded to `digits` significant digits: `{"plant", "configuration", "simulator",
 "package", "found", "price": {"priced", "teaClass", "IRR", "sales", "material_cost",
 "utility_cost", "installed_equipment_cost", "TCI", "FCI", "FOC", "VOC", "NPV", "product",
-"packagePrice", "solvedPrice", "feedstock", "feedstockKgPerH"}, "measured": {the package test's
+"packagePrice", "solvedPrice", "feedstock", "feedstockKgPerH", "units": {key: unit}} (its `NPV` kept to one unit in the last kept digit of `TCI`), "measured": {the package test's
 expressions}, "parameters" (read back after the values were set), "libraryDefaults": {key:
 value as built}, "overrides"}` and the run's tables (`tablesSource`, `tea`, `streams`, `units`,
 `utilities`, `diagramNote`, `unitOrder`, `tableUnits`). A plant whose TEA BioSTEAM cannot break
@@ -286,8 +286,9 @@ openFerment's composed flowsheets run through the same ops: `plant` is `cellulos
 (`feed.moisture`, `feed.dry.<component>`, `unit.<id>.solids_loading`, `unit.<id>.tau…`,
 `rxn.<unit>.<set>.<index>`). A run of it adds `readBack` (each process unit's mode, temperature,
 residence times, vessel count and reaction sets; the organism the recipe declares; the TEA's
-settings; the utility prices and cost index; the versions) and `outputs` (`mespUsdPerKg`,
-`mespUsdPerGal`, `ethanolKgPerH`, `dryFeedKgPerH`, `ethanolKgPerKgDryFeed`). Its gates refuse in
+settings; the utility prices and cost index; the versions), `outputs` (`mespUsdPerKg`,
+`mespUsdPerGal`, `ethanolKgPerH`, `dryFeedKgPerH`, `ethanolKgPerKgDryFeed`,
+`ethanolDensityKgPerGal`) and `outputUnits` (each output's unit). Its gates refuse in
 words before it runs: dry shares that do not sum to one, a moisture outside [0, 1), a reactant's
 conversions summing past one; a case BioSTEAM finds infeasible is refused with its
 `InfeasibleRegion` words. Its export embeds the recipe (`metadata.reproducibility`).

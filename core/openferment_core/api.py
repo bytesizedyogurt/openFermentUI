@@ -96,6 +96,9 @@ from .models import (
     ScenarioCreate,
     StudyRequest,
     StudyScenario,
+    ComparisonCreate,
+    ComparisonReport,
+    StudyComparison,
     LibraryShelf,
     PackageRegression,
     ReplayResult,
@@ -111,6 +114,7 @@ from .models import (
 from . import llm, spend
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
 from .engine import runs as _runs
+from .studies import comparisons as _comparisons  # noqa: F401  (registers study.comparison for compute and replay)
 from .studies import scenarios as _scenarios
 from .postdoc import PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
@@ -908,6 +912,30 @@ def study_scenario_run(scenario_id: str, asked: StudyRequest) -> RunReport:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {scenario_id}: {e}") from e
+
+
+@app.get("/api/studies/comparisons")
+def study_comparisons() -> list[StudyComparison]:
+    """The project's comparisons, newest first."""
+    return _comparisons.listed()
+
+
+@app.post("/api/studies/comparisons")
+def study_comparison_make(asked: ComparisonCreate) -> ComparisonReport:
+    """Two or more engine runs set side by side, computed as one
+    `study.comparison` artifact and kept with the title."""
+    try:
+        return _comparisons.make(asked)
+    except _comparisons.ComparisonRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/studies/comparisons/{comparison_id}")
+def study_comparison(comparison_id: str) -> ComparisonReport:
+    try:
+        return _comparisons.get(comparison_id)
+    except _comparisons.ComparisonNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
 
 
 @app.get("/api/proforma/scenarios")

@@ -472,3 +472,24 @@ precision, the package rules of §7.2 as a test, the worker op reference, and tw
   imported and drawn, engine runs with their SFF files, and a replay within tolerance. Secrets,
   typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke` (11 of 11 rail
   entries) and reconcile passed, and the worktree stayed clean.
+
+### Stage 5 — 2026-10-30
+
+- 5.1 (scenarios) `studies/` begins (`docs/api/studies.md`): a scenario names a plant on the
+  library shelf, its configuration and the values it sets, each a quantity in the parameter's
+  unit whose origin is a person's assumption or a model's estimate; checked against the plant's
+  parameters when made, kept in `scenarios` with kind `engine` (migration 0004; the Proforma
+  screens' rows are kind `proforma`), run as an engine run that names it. A plant's refusal is
+  kept with the scenario as a receipt. `test_studies.py`.
+- 5.1 (fresh builds) A library plant's `load()` returned a cached plant after the first build
+  (ADR-004, Implementation 5.1): cornstover's second build costed at BioSTEAM's defaults. Every
+  `ProcessModel` cache is now emptied while a `load()` builds; a mixer's inlets are listed by ID;
+  an NPV at a solved price is kept to the precision of the plant's capital. The regression report
+  is unchanged.
+- 5.1 (comparisons) A comparison sets two to twelve engine runs side by side as one
+  `study.comparison` artifact over the runs' artifacts (provenance the weakest of theirs,
+  replayable): the price block and a flowsheet's outputs in their units with each run's change
+  from the first, and each value a run set with its origin beside the library's default. A run's
+  price block and a flowsheet's outputs now carry their units (`library run 2`).
+  `test_comparisons.py`, `test_studies_sim.py` (`sim`: the flowsheet against a scenario with a
+  person's assumption and a model's estimate, compared and `assumed`).

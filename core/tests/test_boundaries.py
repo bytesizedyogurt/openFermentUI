@@ -61,6 +61,8 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
                               "the regression check reads the package's own test by ast)",
     ("engine", "projects"): "a run and a flowsheet record belong to the current project (ADR-005)",
     ("studies", "projects"): "a scenario, a comparison and a runbook belong to the current project (ADR-005)",
+    ("studies", "artifacts"): "a comparison is computed as an artifact over the runs' artifacts, replayable (§7.4)",
+    ("studies", "basis"): "a value's origin and a comparison's provenance are the basis rules' (ADR-006)",
 }
 
 

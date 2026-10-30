@@ -62,7 +62,8 @@ from . import simulator
 SHELF_FILE = Path(__file__).with_name("library_shelf.json")
 TEST_FILE = "biorefineries/tests/test_biorefineries.py"
 LIBRARY_RUN = "library.run"
-LIBRARY_RUN_VERSION = "library run 1"
+# 2: a run's price block and a flowsheet's outputs carry their units (stage 5).
+LIBRARY_RUN_VERSION = "library run 2"
 # The significant digits a run keeps (as a reference run keeps them): BioSTEAM
 # sums a set of units in an order that moves the last digits from one build to
 # the next, and a replay compares the plant. A precision, stated in every basis.

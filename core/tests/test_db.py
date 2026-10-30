@@ -201,6 +201,42 @@ def test_migration_0003_names_the_old_demo_class_assumed_in_every_row_and_back(t
         migrate.drop(name, test_database.server)
 
 
+class _Answer(Exception):
+    """A PostgreSQL refusal as asyncpg's errors carry it: its code."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.sqlstate = code
+
+
+def test_a_drop_the_role_may_not_force_asks_the_other_sessions_to_leave_and_waits(monkeypatch):
+    """FORCE ends a session only for a role that may end it; an autovacuum
+    worker on a database a test has just written is the server's. A plain
+    DROP asks it to leave, and is tried again while the database is in use."""
+    said, answers = [], iter([_Answer(migrate.NO_PRIVILEGE), _Answer(migrate.IN_USE), None])
+
+    async def autocommit(url, sql):
+        said.append(sql)
+        answer = next(answers)
+        if answer is not None:
+            raise answer
+
+    monkeypatch.setattr(migrate, "_autocommit", autocommit)
+    monkeypatch.setattr(migrate, "DROP_WAIT_S", 0)
+    migrate.drop("openferment_test_x", "postgresql://nobody:nothing@127.0.0.1:9/none")
+    plain = 'DROP DATABASE IF EXISTS "openferment_test_x"'
+    assert said == [f"{plain} WITH (FORCE)", plain, plain]
+
+
+def test_a_drop_refused_for_another_reason_says_so(monkeypatch):
+    async def autocommit(url, sql):
+        raise _Answer("3D000")
+
+    monkeypatch.setattr(migrate, "_autocommit", autocommit)
+    with pytest.raises(_Answer):
+        migrate.drop("openferment_test_x", "postgresql://nobody:nothing@127.0.0.1:9/none")
+
+
 @pytest.mark.parametrize("name", ["openferment", "Openferment", "x; drop table", "", "has-dash"])
 def test_reset_refuses_the_production_database_and_any_name_it_would_not_make(name):
     # Refused before any connection is tried: the address answers nothing.

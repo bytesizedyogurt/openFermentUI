@@ -732,6 +732,13 @@ def simulate(p: Plant) -> None:
         raise Refused(f"the plant could not be simulated with these values: {type(e).__name__}: {e}") from e
 
 
+# The unit of each number `priced` reads, as BioSTEAM's TEA and streams keep
+# it: a year's flows of money, a plant's capital, a stream's price and flow.
+PRICE_UNITS = {"IRR": "", "sales": "USD/yr", "material_cost": "USD/yr", "utility_cost": "USD/yr",
+               "installed_equipment_cost": "USD", "TCI": "USD", "FCI": "USD", "FOC": "USD/yr", "VOC": "USD/yr",
+               "NPV": "USD", "packagePrice": "USD/kg", "solvedPrice": "USD/kg", "feedstockKgPerH": "kg/hr"}
+
+
 def priced(p: Plant) -> dict[str, Any]:
     """The TEA's numbers at the package's prices, and the product's price
     solved at the TEA's IRR."""
@@ -751,6 +758,7 @@ def priced(p: Plant) -> dict[str, Any]:
     if p.feedstock is not None:
         out["feedstock"] = p.feedstock.ID
         out["feedstockKgPerH"] = _number(p.feedstock.F_mass)
+    out["units"] = {k: u for k, u in PRICE_UNITS.items() if k in out}
     return out
 
 
@@ -801,6 +809,7 @@ def run(plant: str, configuration: str | None, overrides: dict[str, Any], *,
         if p.flowsheet is not None:
             out["readBack"] = p.flowsheet.read_back(p)
             out["outputs"] = p.flowsheet.outputs(p)
+            out["outputUnits"] = dict(p.flowsheet.OUTPUT_UNITS)
         try:
             out.update(read_tables(_Module(), p, draw))
         except Exception as e:  # noqa: BLE001 — the tables are read without the TEA's breakdown, and say why

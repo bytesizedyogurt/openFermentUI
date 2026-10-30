@@ -315,6 +315,11 @@ def read_back(p: Plant) -> dict[str, Any]:
     }
 
 
+# The unit of each output `outputs` gives.
+OUTPUT_UNITS = {"mespUsdPerKg": "USD/kg", "mespUsdPerGal": "USD/gal", "ethanolKgPerH": "kg/hr",
+                "dryFeedKgPerH": "kg/hr", "ethanolKgPerKgDryFeed": "kg/kg", "ethanolDensityKgPerGal": "kg/gal"}
+
+
 def outputs(p: Plant) -> dict[str, Any]:
     """The minimum ethanol selling price, per kilogram and per gallon (the
     package's own density per gallon), and what the plant makes of its feed."""

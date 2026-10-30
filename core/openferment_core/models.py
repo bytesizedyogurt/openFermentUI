@@ -3986,3 +3986,35 @@ class StudyRequest(BaseModel):
     """Who asks: a run of a scenario, a lock."""
 
     by: str = Field(default="", max_length=200)
+
+
+class ComparisonCreate(BaseModel):
+    """POST /api/studies/comparisons: the engine runs to set side by side, in
+    the order the comparison reads them (the first is the one each change is
+    reckoned from)."""
+
+    title: str = Field(min_length=1, max_length=200)
+    runIds: list[str] = Field(min_length=2, max_length=12)
+    by: str = Field(default="", max_length=200)
+
+
+class StudyComparison(BaseModel):
+    """A comparison of engine runs: a row of `comparisons` under the id of
+    the `study.comparison` artifact that computes it."""
+
+    id: str
+    title: str
+    runIds: list[str]
+    artifactId: str
+    # The artifact's: the weakest of the runs' (ADR-006).
+    provenance: Provenance
+    by: str
+    at: str
+
+
+class ComparisonReport(BaseModel):
+    """GET /api/studies/comparisons/{id}: the comparison and its artifact,
+    whose output holds the runs, the rows and the values each run set."""
+
+    comparison: StudyComparison
+    artifact: Artifact

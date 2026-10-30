@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from pathlib import Path
 
 from alembic import command
@@ -95,10 +96,45 @@ def create(name: str, url: URL | str | None = None) -> URL:
     return base.set(database=name)
 
 
+# PostgreSQL's codes for the two answers a drop can meet: the role may not
+# end another session (an autovacuum worker the server started on the
+# database), and the database is still in use.
+NO_PRIVILEGE, IN_USE = "42501", "55006"
+DROP_TRIES, DROP_WAIT_S = 10, 0.5
+
+
+def _sqlstate(e: BaseException) -> str | None:
+    """The PostgreSQL error code an exception carries, through SQLAlchemy's
+    and asyncpg's wrappers."""
+    seen: BaseException | None = e
+    while seen is not None:
+        code = getattr(seen, "sqlstate", None) or getattr(getattr(seen, "orig", None), "sqlstate", None)
+        if code:
+            return str(code)
+        seen = seen.__cause__ or seen.__context__
+    return None
+
+
 def drop(name: str, url: URL | str | None = None) -> None:
-    """Remove database `name`, closing its connections first."""
-    base = as_async(url or database_url())
-    asyncio.run(_autocommit(base.set(database="postgres"), f'DROP DATABASE IF EXISTS "{_checked(name)}" WITH (FORCE)'))
+    """Remove database `name`, closing its connections first. A session
+    the role may not end (an autovacuum worker) is asked to leave by a plain
+    DROP, which waits for it; it is tried again while the database is in use."""
+    target = as_async(url or database_url()).set(database="postgres")
+    sql = f'DROP DATABASE IF EXISTS "{_checked(name)}"'
+    try:
+        asyncio.run(_autocommit(target, f"{sql} WITH (FORCE)"))
+        return
+    except Exception as e:
+        if _sqlstate(e) != NO_PRIVILEGE:
+            raise
+    for attempt in range(DROP_TRIES):
+        try:
+            asyncio.run(_autocommit(target, sql))
+            return
+        except Exception as e:
+            if _sqlstate(e) != IN_USE or attempt == DROP_TRIES - 1:
+                raise
+            time.sleep(DROP_WAIT_S)
 
 
 def reset(name: str, url: URL | str | None = None) -> URL:
