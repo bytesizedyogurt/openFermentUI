@@ -21,8 +21,8 @@ import logging
 import os
 from typing import Any
 
-from . import llm
-from .models import Usage
+from .. import llm
+from ..models import Usage
 
 log = logging.getLogger("openferment.postdoc")
 

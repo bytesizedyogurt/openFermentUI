@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..evidence_pool import MAX_LIMIT
 from ..models import ToolResult
-from ..postdoc import _evidence_payload
+from ..postdoc.single import _evidence_payload
 from . import Tool, ToolContext, register
 
 

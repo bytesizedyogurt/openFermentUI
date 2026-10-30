@@ -977,7 +977,7 @@ export const useStore = create<OFState>()((set, get) => ({
         scenarios: [...s.scenarios.filter((sc) => !made.has(sc.id) && !s.createdScenarioIds.includes(sc.id)), ...state.scenarios],
         createdScenarioIds: [...made],
         trainsMade: state.trains,
-        // A turn still running when its page went away has no stream to finish it, and says so.
+        // A turn the service reads as running is being answered there; the screen follows it.
         liveConversations: mergeConversations(state.conversations, []),
       };
     }),
@@ -3455,18 +3455,14 @@ const STATE_RETRY_MS = 15_000;
 
 /**
  * The Live conversations after a hydrate: those this page started since it
- * loaded, then the snapshot's, newest first, one per id. A turn the snapshot
- * left running was cut short by the reload and is marked so.
+ * loaded, then the service's (which it lists in the order they were made),
+ * newest first, one per id. Each turn's status is the service's: a turn it is
+ * answering reads `running`, and one nobody is answering any longer reads
+ * `interrupted` (postdoc/conversations.py).
  */
 function mergeConversations(saved: LiveConversation[], current: LiveConversation[]): LiveConversation[] {
   const ids = new Set(current.map((c) => c.id));
-  const restored = saved
-    .filter((c) => !ids.has(c.id))
-    .map((c) => ({
-      ...c,
-      turns: c.turns.map((t) => (t.status === 'running' ? { ...t, status: 'interrupted' as const } : t)),
-    }));
-  return [...current, ...restored].slice(0, MAX_LIVE_CONVERSATIONS);
+  return [...current, ...saved.filter((c) => !ids.has(c.id)).reverse()].slice(0, MAX_LIVE_CONVERSATIONS);
 }
 
 // Every change to the open project's rows goes to the outbox and is sent

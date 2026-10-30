@@ -16,21 +16,21 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 6, step 6.1** — Postdoc's conversations on the server: conversation, turn
-   and tool-call tables under a project; the loop reads a follow-up's history from the server; tool
-   traces and the artifacts each turn produced linked to it; SSE events (`job.*`, `tool.call/result`,
-   `artifact.kept`, `turn.*`) on `/api/events?project=`. Then 6.2 (typed values in claims, the
-   study, literature and engine tools, `docs/TOOLS.md` generated, the MCP server project-scoped),
-   6.3 (`llm.ROUTES`; a change to how keys are read is the owner's, §11.1) and 6.4 (the evaluation
-   set as a table); the gate is proof step 6 offline, `test_postdoc_agent` extended, `check:tools`
-   green (execution prompt §10 stage 6). Stage 5 is complete: `studies/` (scenarios, comparisons,
-   runbooks locked under the browser's digest, the export package), the run, comparison and
-   studies screens, and `pnpm prove` (steps 1, 2, 4, 5, 7, 8; 34 checks; `docs/api/studies.md`).
+4. **Next step: stage 6, step 6.2** — typed values in claims (`numbers_in` generalized for
+   `Quantity`), the prompt rules revised, the `study_*`, `literature_*` and `engine_*` tools,
+   `docs/TOOLS.md` generated, `check:tools` revised, the MCP server project-scoped. Then 6.3
+   (`llm.ROUTES`; a change to how keys are read is the owner's, §11.1) and 6.4 (the evaluation set
+   as a table); the gate is proof step 6 offline, `test_postdoc_agent` extended, `check:tools`
+   green (execution prompt §10 stage 6). Step 6.1 is done: conversations, turns and tool calls on
+   the server (migration 0005), the loop's history read from them, and the event stream
+   (`docs/api/postdoc.md`). Stage 5 is complete: `studies/`, the studies screens and `pnpm prove`
+   (steps 1, 2, 4, 5, 7, 8; 34 checks).
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 6 — Postdoc: server memory, typed values, routes, tools — is next. Stages 0 to 5 are
+Stage 6 — Postdoc: server memory, typed values, routes, tools — is under way: step 6.1 put
+Postdoc's conversations on the server and opened the project's event stream. Stages 0 to 5 are
 complete (the tag push waits on the owner; see Blockers). Stage 5 built the studies package:
 scenarios on a plant with each value's origin, run as engine runs; comparisons as artifacts over
 the runs'; runbooks made from a run's outputs and locked on the service under the browser's
@@ -81,6 +81,7 @@ installation).
 | 2026-10-30 15:03 | `test:core` with 5.2 (screens, stream prices); typecheck, plan, figures, secrets | 2173 passed, 2 skipped, 168 deselected; all passed | 5 min 30 s | `a965984` |
 | 2026-10-30 15:25 | Stage 5 gate in a clean worktree at `f612377`: `test:core`; `test:lit`; `test:sim` (the flowsheet identical after sugarcane among them) | 2174 passed, 2 skipped, 168 deselected; 10 passed; 132 passed, 2212 deselected | 5 min 33 s; 10 s; 6 min 9 s | 5.2 (gate) |
 | 2026-10-30 15:25 | Stage 5 gate, the same worktree: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile, `pnpm prove` (steps 1, 2, 4, 5, 7, 8); the worktree left clean | all passed; 12 of 12 screens open; 34 of 34 checks hold | 1 min 56 s (prove) | 5.2 (gate) |
+| 2026-10-30 16:04 | `test:core` with 6.1 (conversations, events); typecheck, plan, secrets, state, guild, figures | 2193 passed, 2 skipped, 168 deselected; all passed. The run before it failed one test that read the ask stream's first event as a step (now `turn`) | 4 min 56 s | 6.1 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -543,3 +544,21 @@ installation).
   10 passed; `test:sim` 132 passed; secrets, typecheck, plan, licences, tools, guild, state,
   figures, build, `pnpm smoke` (12 of 12 screens) and reconcile passed; `pnpm prove` held 34 of 34
   checks; the worktree stayed clean.
+
+### Stage 6 — 2026-10-30
+
+- 6.1 (conversations) Postdoc keeps each question as a turn of its conversation under the
+  project: `conversations`, `turns` in order and `tool_calls` under each turn, each call with
+  what it answered the model and what it offered to cite, each turn with the artifacts its calls
+  produced (`postdoc/conversations.py`; migration 0005 split the conversations the page kept
+  whole). An ask names its conversation, its turn and who asked; a follow-up's history is read
+  from the store, and a turn is asked once. The page's writes land on the same store and the
+  service's turns stand; a turn the page writes `running` is taken over by its ask; a turn nobody
+  is answering reads `interrupted`, and the screen follows one the service is still answering
+  after a reload. `postdoc.py` is now `postdoc/single.py`. Reloaded conversations list newest
+  first again (the load had read them oldest first since stage 2). ADR-008, Implementation 6.1.
+- 6.1 (events) `GET /api/events`: engine runs say `job.queued/running/done/failed`, a kept
+  artifact `artifact.kept`, a question `turn.started`, each `tool.call` and `tool.result`, each
+  step `turn.delta` and its `turn.plan` or `turn.decline`. A page resumes with `Last-Event-ID`;
+  one that falls behind is closed and reconnects; the stream holds no thread
+  (`docs/api/postdoc.md`). `test_conversations.py`, `test_events.py`.

@@ -305,6 +305,10 @@ class AnswerPlan(BaseModel):
     # OF-BLD-014 §9.2: a runbook the agent drafted, its numbers written by the
     # service (runbook_draft.py), for a person to adopt and lock.
     runbookDraft: "RunbookDraft | None" = None
+    # The conversation and the turn the service kept this answer as
+    # (postdoc/conversations.py); None on the single-call path.
+    conversationId: str | None = None
+    turnId: str | None = None
 
 
 def weakest_provenance(provenances: list[str]) -> str:
@@ -346,11 +350,75 @@ class AskRequest(BaseModel):
     # than refused — the cap is a token-budget contract, not a permission.
     maxEvidence: int = 30
     # OF-BLD-014 §5.3: `agent` is the bounded loop (postdoc_agent.py), the
-    # default; `single` is one retrieval and one call (postdoc.py).
+    # default; `single` is one retrieval and one call (postdoc/single.py).
     mode: Literal["agent", "single"] = "agent"
-    # The earlier turns of the same conversation, oldest first. The agent
-    # reads the last few as context; `single` mode ignores them.
+    # The earlier turns of the same conversation, oldest first, for a caller
+    # that names no conversation. A follow-up in a conversation the service
+    # keeps reads the service's history, and this is not read.
     history: list[PriorTurn] = Field(default_factory=list)
+    # The conversation this question continues or starts, and the turn it is,
+    # by the ids the page made (or the service makes them): the service keeps
+    # the turn under them (postdoc/conversations.py).
+    conversationId: str | None = Field(default=None, max_length=200)
+    turnId: str | None = Field(default=None, max_length=200)
+    # Who asks.
+    by: str = Field(default="", max_length=200)
+
+
+TurnStatus = Literal["running", "answered", "failed", "stopped", "interrupted"]
+
+
+class TurnError(BaseModel):
+    message: str
+    remedy: str
+
+
+class LiveTurn(BaseModel):
+    """One turn of a Postdoc conversation (mirrors `LiveTurn` in
+    src/data/types.ts): the question, its loop's steps, the validated plan or
+    the failure in words, and its status. The service keeps it
+    (postdoc/conversations.py) with who asked and the artifacts its tool calls
+    produced; a turn the service was answering when it stopped reads
+    `interrupted`."""
+
+    id: str
+    question: str
+    askedAt: str
+    steps: list[TraceStep] = Field(default_factory=list)
+    plan: AnswerPlan | None = None
+    error: TurnError | None = None
+    status: TurnStatus
+    by: str | None = None
+    artifactIds: list[str] = Field(default_factory=list)
+
+
+class LiveConversation(BaseModel):
+    """A Postdoc conversation, its turns oldest first (mirrors
+    `LiveConversation` in src/data/types.ts; GET /api/conversations/{id})."""
+
+    id: str
+    title: str
+    startedAt: str
+    turns: list[LiveTurn] = Field(default_factory=list)
+
+
+class ToolCallRecord(BaseModel):
+    """One tool call a turn made (GET /api/conversations/{id}/turns/{turn}/calls):
+    the tool, what it was asked, what it answered the model, and what it
+    offered to cite, by id."""
+
+    seq: int
+    turnId: str
+    tool: str
+    input: dict[str, Any]
+    summary: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+    evidenceIds: list[str] = Field(default_factory=list)
+    recordIds: list[str] = Field(default_factory=list)
+    passageIds: list[str] = Field(default_factory=list)
+    artifactIds: list[str] = Field(default_factory=list)
+    by: str
+    at: str
 
 
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────

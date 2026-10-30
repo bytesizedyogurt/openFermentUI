@@ -316,6 +316,10 @@ const PAIRS = [
   ['ComparisonReport', 'ComparisonReport'],
   ['PredictedOutput', 'PredictedOutput'],
   ['RunbookCreate', 'RunbookCreate'],
+  // Execution prompt §4.8 — Postdoc's conversations, kept on the service (postdoc/conversations.py).
+  ['LiveTurn', 'LiveTurn'],
+  ['LiveConversation', 'LiveConversation'],
+  ['ToolCallRecord', 'ToolCallRecord'],
 ];
 
 let compared = 0;

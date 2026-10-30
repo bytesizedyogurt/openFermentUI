@@ -245,6 +245,10 @@ def _database(test_database, monkeypatch):
     previous = db.bind(binding)
     with projects.using(TEST_PROJECT):
         yield binding
+    # A turn the test began is answered by nobody once its transaction is gone.
+    from openferment_core.postdoc import conversations
+
+    conversations._answering.clear()
     db.bind(previous)
     if binding.connection is not None:
         db.run(binding.close())

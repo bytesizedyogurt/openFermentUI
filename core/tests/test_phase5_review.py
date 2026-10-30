@@ -98,7 +98,7 @@ def test_the_stream_cancels_its_question_when_the_reader_goes(monkeypatch):
 
     seen = {}
 
-    def fake(question, on_step=None, cancelled=None, history=None):
+    def fake(question, on_step=None, cancelled=None, history=None, **_):
         seen["cancelled"] = cancelled
         seen["history"] = history
         on_step(postdoc_agent.TraceStep(n=1, kind="tool", tool="t", input={}, summary="s", ms=0, ok=True))
@@ -112,10 +112,16 @@ def test_the_stream_cancels_its_question_when_the_reader_goes(monkeypatch):
     monkeypatch.setattr(api, "_ask_agent", fake)
     earlier = PriorTurn(question="Which strains?", claims=["A strain was named."])
     body = api._stream_events(api.AskRequest(question="q?", history=[earlier]))
+    assert next(body).startswith("event: turn")
     assert next(body).startswith("event: step")
     body.close()
     assert seen["cancelled"]() is True
-    # A follow-up's earlier turns reach the loop as the browser sent them.
+    # The question ends on its own thread, which keeps the turn as it stopped.
+    import threading
+    for t in threading.enumerate():
+        if t.name == "ask-stream":
+            t.join(timeout=10)
+    # A question that names no conversation reads its earlier turns as the caller sent them.
     assert seen["history"] == [earlier]
 
 

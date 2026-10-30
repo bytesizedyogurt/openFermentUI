@@ -44,6 +44,8 @@ from .models import (
     AnswerPlan,
     Artifact,
     AskRequest,
+    LiveConversation,
+    ToolCallRecord,
     Check,
     CheckDismiss,
     CheckRecord,
@@ -121,6 +123,8 @@ from .studies import exports as _exports
 from .studies import runbooks as _runbooks
 from .studies import scenarios as _scenarios
 from .postdoc import PostdocUnavailable, ask_model
+from .postdoc import conversations as _conversations
+from . import events as event_stream
 from .validate import decline_reason, validate_claims
 
 # core/.env, which is gitignored. Loaded here rather than by the shell so that
@@ -241,7 +245,7 @@ CORPUS_MISSING = (
 )
 
 
-def _ask_agent(question: str, on_step=None, cancelled=None, history=None) -> AnswerPlan:
+def _ask_agent(question: str, on_step=None, cancelled=None, history=None, on_call=None, on_result=None) -> AnswerPlan:
     """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands,
     with the conversation's earlier turns when the question is a follow-up."""
     ctx = tools.ToolContext()
@@ -250,7 +254,54 @@ def _ask_agent(question: str, on_step=None, cancelled=None, history=None) -> Ans
     except FileNotFoundError as e:
         log.error("corpus missing: %s", e)
         return AnswerPlan(question=question, declined=CORPUS_MISSING)
-    return postdoc_agent.ask(question, ctx=ctx, on_step=on_step, cancelled=cancelled, history=history)
+    return postdoc_agent.ask(question, ctx=ctx, on_step=on_step, cancelled=cancelled, history=history,
+                             on_call=on_call, on_result=on_result)
+
+
+def _answer(request: AskRequest, *, on_step=None, cancelled=None, on_turn=None) -> AnswerPlan:
+    """One question through the loop, kept as a turn of its conversation
+    (postdoc/conversations.py): a follow-up's history read from what the
+    service keeps, each tool call kept under the turn with what it answered,
+    and the turn, each step, each call and the plan said on the project's
+    event stream (events.py) as they happen."""
+    question = request.question.strip()
+    try:
+        cid, tid, seq = _conversations.begin(question, conversation_id=request.conversationId, turn_id=request.turnId,
+                                             by=request.by)
+    except _conversations.ConversationRefused as e:
+        return AnswerPlan(question=question, declined=str(e))
+    who = request.by.strip() or "this browser"
+    ids = {"conversationId": cid, "turnId": tid}
+    if on_turn is not None:
+        on_turn({**ids, "seq": seq})
+    event_stream.publish("turn.started", {**ids, "seq": seq, "question": question, "by": who})
+    history = _conversations.history(cid) if request.conversationId else list(request.history)
+    artifacts: list[str] = []
+
+    def step(s) -> None:
+        event_stream.publish("turn.delta", {**ids, "step": s.model_dump(mode="json")})
+        if on_step is not None:
+            on_step(s)
+
+    def call(name: str, args: dict) -> None:
+        event_stream.publish("tool.call", {**ids, "tool": name, "input": args})
+
+    def result(name: str, args: dict, res: ToolResult) -> None:
+        kept = _conversations.called(tid, name, args, res, by=who)
+        artifacts.extend(a for a in kept if a not in artifacts)
+        event_stream.publish("tool.result", {**ids, "tool": name, "ok": res.error is None, "error": res.error,
+                                             "evidenceIds": [e.id for e in res.evidence], "artifactIds": kept})
+
+    try:
+        plan = _ask_agent(question, on_step=step, cancelled=cancelled, history=history, on_call=call, on_result=result)
+    except Exception as e:
+        _conversations.finish(tid, plan=None, steps=[], artifacts=artifacts, error=_conversations.error_of(
+            f"Postdoc failed while answering: {type(e).__name__}."))
+        raise
+    plan = plan.model_copy(update=ids)
+    _conversations.finish(tid, plan=plan, steps=plan.trace, artifacts=artifacts, stopped=bool(cancelled and cancelled()))
+    event_stream.publish("turn.decline" if plan.declined else "turn.plan", {**ids, "plan": plan.model_dump(mode="json")})
+    return plan
 
 
 @app.post("/api/ask", response_model=AnswerPlan)
@@ -269,7 +320,7 @@ def ask(request: AskRequest) -> AnswerPlan:
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     if request.mode == "agent":
-        return _ask_agent(question, history=request.history)
+        return _answer(request)
 
     try:
         corpus = load_corpus()
@@ -330,9 +381,12 @@ def _sse(event: str, data: Any) -> str:
 @app.post("/api/ask/stream")
 def ask_stream(request: AskRequest) -> StreamingResponse:
     """The loop's steps as they complete (OF-BLD-014 §5.3), as server-sent
-    events: `step` (a TraceStep), then `plan` (the validated AnswerPlan), or
-    `error` when the service itself failed. A declined plan is a `plan`. In
-    `single` mode there are no steps, and the plan is the only event."""
+    events: `turn` (the conversation and the turn the service keeps the
+    question as), each `step` (a TraceStep), then `plan` (the validated
+    AnswerPlan), or `error` when the service itself failed. A declined plan
+    is a `plan`. In `single` mode there is no turn and no step, and the plan
+    is the only event. The same turn is said on the project's event stream
+    (`GET /api/events`)."""
     return StreamingResponse(_stream_events(request), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
@@ -341,7 +395,7 @@ def _stream_events(request: AskRequest):
     """The events of one question, as text. When the reader goes, the
     generator is closed, and the loop stops before its next model turn
     (§5.R) rather than spending on an answer nobody will read."""
-    events: queue.Queue = queue.Queue()
+    inbox: queue.Queue = queue.Queue()
     gone = threading.Event()
 
     def work() -> None:
@@ -350,22 +404,64 @@ def _stream_events(request: AskRequest):
             if request.mode == "single" or not question:
                 plan = ask(request)
             else:
-                plan = _ask_agent(question, on_step=lambda s: events.put(("step", s.model_dump(mode="json"))),
-                                  cancelled=gone.is_set, history=request.history)
-            events.put(("plan", plan.model_dump(mode="json")))
+                plan = _answer(request, on_step=lambda s: inbox.put(("step", s.model_dump(mode="json"))),
+                               cancelled=gone.is_set, on_turn=lambda turn: inbox.put(("turn", turn)))
+            inbox.put(("plan", plan.model_dump(mode="json")))
         except Exception as e:  # the stream must end in words, never hang
             log.exception("ask stream failed")
-            events.put(("error", {"message": f"Postdoc failed while answering: {type(e).__name__}. The service log names what went wrong."}))
+            inbox.put(("error", {"message": f"Postdoc failed while answering: {type(e).__name__}. The service log names what went wrong."}))
         finally:
-            events.put(None)
+            inbox.put(None)
 
     # The loop runs on a thread of its own, in this request's project.
     threading.Thread(target=contextvars.copy_context().run, args=(work,), name="ask-stream", daemon=True).start()
     try:
-        while (item := events.get()) is not None:
+        while (item := inbox.get()) is not None:
             yield _sse(*item)
     finally:
         gone.set()
+
+
+# ── conversations and the event stream (execution prompt §4.8, §7.3) ──
+
+
+@app.get("/api/conversations", response_model=list[LiveConversation])
+def conversations_listed() -> list[LiveConversation]:
+    """The project's Postdoc conversations, oldest first, each with its turns."""
+    return _conversations.listed()
+
+
+@app.get("/api/conversations/{conversation_id}", response_model=LiveConversation)
+def conversation(conversation_id: str) -> LiveConversation:
+    try:
+        return _conversations.get(conversation_id)
+    except _conversations.ConversationNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+
+
+@app.get("/api/conversations/{conversation_id}/turns/{turn_id}/calls", response_model=list[ToolCallRecord])
+def conversation_calls(conversation_id: str, turn_id: str) -> list[ToolCallRecord]:
+    """The tool calls one turn made, in order, each with what it answered the
+    model and what it offered to cite."""
+    try:
+        return _conversations.calls(conversation_id, turn_id)
+    except _conversations.ConversationNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+
+
+@app.get("/api/events")
+def project_events(request: Request, after: int | None = None) -> StreamingResponse:
+    """The project's events as they happen (events.py): jobs, tool calls,
+    artifacts kept and Postdoc's turns, as server-sent events. `Last-Event-ID`
+    (an EventSource's reconnection) or `?after=` resumes after the event a
+    page saw last; a page that names none is sent what happens from now."""
+    header = request.headers.get("last-event-id")
+    try:
+        resume = int(header) if header else after
+    except ValueError:
+        resume = after
+    return StreamingResponse(event_stream.stream(projects.current(), resume), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────

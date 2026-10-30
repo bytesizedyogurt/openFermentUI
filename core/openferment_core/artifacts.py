@@ -34,7 +34,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from sqlalchemy import func, select
 
-from . import db, projects
+from . import db, events, projects
 from .basis import basis_provenance
 from .db import models as t
 from .db import rows
@@ -291,7 +291,10 @@ def compute(
     )
     if not keep:
         return artifact
-    return db.run(_keep(projects.current(), artifact, replace=False))
+    kept = db.run(_keep(projects.current(), artifact, replace=False))
+    events.publish("artifact.kept", {"id": kept.id, "tool": kept.tool, "toolVersion": kept.toolVersion,
+                                     "provenance": kept.provenance, "durationMs": kept.durationMs})
+    return kept
 
 
 def basis_of(artifact: Artifact) -> ComputedBasis:

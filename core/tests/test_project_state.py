@@ -17,7 +17,11 @@ def client() -> TestClient:
 
 DEPOSITION = {"id": "dep-1", "runbookId": "rb-1", "entries": [{"step": "s1", "value": 7.2}]}
 TRAIN = {"train": {"id": "tr-1", "units": []}, "savedAt": "2026-10-30T07:00:00Z", "by": "Ada Moreno"}
-LIVE = {"id": "lc-1", "turns": [{"question": "What limits the titre?", "status": "done"}]}
+LIVE = {"id": "lc-1", "title": "What limits the titre?", "startedAt": "2026-10-30T07:00:00Z",
+        "turns": [{"id": "t-1", "question": "What limits the titre?", "askedAt": "2026-10-30T07:00:00Z", "steps": [],
+                   "plan": None, "error": None, "status": "answered"}]}
+# As Postdoc keeps it (postdoc/conversations.py): the page's turn, with who asked and what it produced.
+KEPT = {**LIVE, "turns": [{**LIVE["turns"][0], "by": None, "artifactIds": []}]}
 
 
 def test_a_new_project_keeps_nothing_and_says_so_by_kind():
@@ -36,7 +40,7 @@ def test_each_kind_comes_back_as_the_page_keeps_it():
     kept = project_state.load()
     assert kept["depositions"] == [DEPOSITION]
     assert kept["trains"] == {"tr-1": TRAIN}
-    assert kept["conversations"] == [LIVE]
+    assert kept["conversations"] == [KEPT]
     assert kept["fits"] == {"sc-1": {"mu_max": "0123456789abcdef"}}
     assert kept["runbookLocks"] == {"rb-1": {"lockedAt": "2026-10-30T07:00:00Z", "lockHash": "abc"}}
     assert kept["overrides"] == {"proforma:sc-1": [{"scope": "proforma:sc-1", "key": "price", "value": 1.2, "by": "Ada Moreno"}]}
@@ -77,6 +81,7 @@ def test_a_projects_rows_are_its_own():
         ("runbookLocks", "rb-1", {"lockHash": "abc"}, "names when it was made"),
         ("overrides", "proforma:sc-1", [{"scope": "proforma:sc-2", "key": "price"}], "naming this scope"),
         ("depositions", "dep-1", {"id": "dep-1", "blob": "x" * 2_000_001}, "over 2 MB"),
+        ("conversations", "lc-1", {"id": "lc-1", "turns": "every word"}, "is a Live conversation"),
     ],
 )
 def test_what_is_not_a_row_of_its_kind_is_refused_in_words(kind, item_id, value, words):
@@ -91,7 +96,8 @@ def test_a_lock_is_kept_as_made_and_a_deposition_is_never_taken_back():
     with pytest.raises(project_state.StateRefused, match="locked already"):
         project_state.put("runbookLocks", "rb-1", {**lock, "lockHash": "other"}, "Ada Moreno")
     project_state.put("depositions", "dep-1", DEPOSITION, "Ada Moreno")
-    for kind, item_id in (("runbookLocks", "rb-1"), ("depositions", "dep-1"), ("measuredEvidence", "me-1")):
+    for kind, item_id in (("runbookLocks", "rb-1"), ("depositions", "dep-1"), ("measuredEvidence", "me-1"),
+                          ("conversations", "lc-1")):
         with pytest.raises(project_state.StateRefused, match="never taken back"):
             project_state.remove(kind, item_id, "Ada Moreno")
     assert project_state.load()["runbookLocks"] == {"rb-1": lock}

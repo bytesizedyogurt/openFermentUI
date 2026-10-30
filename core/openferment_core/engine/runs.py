@@ -37,7 +37,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from .. import artifacts, db, projects
+from .. import artifacts, db, events, projects
 from ..basis import ASSUMED_KINDS, origin_of
 from ..db import models as t
 from ..db import rows
@@ -200,11 +200,19 @@ def run(plant_id: str, configuration: str | None = None, overrides: list[Overrid
     base = dict(id=run_id, plant=plant_id, configuration=str(named) if named is not None else None,
                 tool=library.LIBRARY_RUN, toolVersion=version, inputs=_inputs(inputs), versions=_versions(inputs),
                 by=who, at=_now(), scenarioId=scenario_id)
+    job = {"id": run_id, "kind": "engine.run", "plant": plant_id, "configuration": base["configuration"],
+           "scenarioId": scenario_id, "by": who}
+    events.publish("job.queued", job, project=project_id)
+    events.publish("job.running", job, project=project_id)
     try:
         art = artifacts.compute(library.LIBRARY_RUN, inputs)
     except library.LibraryRefused as e:
         db.run(_put(project_id, EngineRun(**base, status="refused", refused=str(e)), who))
+        events.publish("job.failed", {**job, "status": "refused", "words": str(e)}, project=project_id)
         raise RunRefused(str(e), run_id) from None
+    except Exception as e:
+        events.publish("job.failed", {**job, "status": "failed", "words": f"{type(e).__name__}: {e}"}, project=project_id)
+        raise
     flowsheet, refused = None, None
     try:
         flowsheet = sff.export(library.plant_of(art), project_id=project_id, run_artifact_id=art.id, by=who)
@@ -220,4 +228,6 @@ def run(plant_id: str, configuration: str | None = None, overrides: list[Overrid
                                 score=flowsheet.completeness.score,
                                 tags=sorted(k for k, v in flowsheet.tags.items() if v.earned)) if flowsheet else None)
     db.run(_put(project_id, kept, who))
+    events.publish("job.done", {**job, "status": "done", "provenance": kept.provenance, "artifactId": kept.artifactId,
+                                "sffRecordId": kept.sff.recordId if kept.sff else None}, project=project_id)
     return _report(kept, art, flowsheet)

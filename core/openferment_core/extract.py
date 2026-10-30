@@ -5,7 +5,7 @@ The whole document goes in, as the passages Sci RAG Kit holds for it
 in); candidate records come out as JSON that
 matches the `emit_candidates` schema, through structured outputs (llm.py), so
 the model has exactly one way to respond and the API checks the shape before
-we see it. The same pattern `postdoc.py` uses with `emit_answer_plan`, for the
+we see it. The same pattern `postdoc/single.py` uses with `emit_answer_plan`, for the
 same reason: structured output by construction, not by asking nicely for JSON.
 The model is Claude Opus 5.5, with Claude Sonnet 5.5 for a paper Opus declines
 or cannot take; each response records which answered.

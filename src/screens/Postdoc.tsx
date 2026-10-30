@@ -9,12 +9,12 @@
 // stay where they were, and a question typed meanwhile stays in the box.
 import { useEffect, useRef, useState } from 'react';
 import { MessageSquarePlus, PanelLeft, RefreshCw, Send, Sparkles, Square } from 'lucide-react';
-import { useStore, timeId } from '@/store';
+import { useStore, timeId, reviewerName } from '@/store';
 import { navigate, useRoute } from '@/router';
 import type { LiveConversation, LiveTurn } from '@/data/types';
 import { Button, Card, cx, EmptyState, Callout } from '@/components/ui';
 import { AnswerPlanView, PostdocDownNotice } from '@/components/AnswerPlanView';
-import { askPostdocStream, postdocHealth, PostdocDown, priorTurns, type PostdocHealth } from '@/lib/postdoc';
+import { askPostdocStream, fetchConversation, postdocHealth, PostdocDown, type PostdocHealth } from '@/lib/postdoc';
 import { PlanTrace } from '@/components/PlanTrace';
 
 /**
@@ -25,18 +25,23 @@ import { PlanTrace } from '@/components/PlanTrace';
  * A turn is a question and the AnswerPlan the service returned (LiveTurn), in
  * its own list (`liveConversations`), kept in the open project's rows
  * (lib/projectState.ts): a citation followed and returned from, or a reload,
- * finds the conversation where it was, and a follow-up sends the earlier
- * turns' words with its question (`priorTurns`). The loop reads the history
- * the page sends; stage 6 gives Postdoc its memory on the service.
+ * finds the conversation where it was. Each question names its conversation
+ * and its turn, and the service keeps it as that turn (postdoc/conversations.py):
+ * a follow-up's history is what the service keeps of the conversation, and a
+ * turn the service is still answering after a reload is followed there until
+ * it ends (`fetchConversation`).
  */
+
+/** How often a turn the service is answering for another page, or from before a reload, is looked at. */
+const FOLLOW_MS = 2000;
 
 /** The streams in flight, by turn id. Module-level, so Stop still reaches a
  * question asked before the page last mounted. */
 const inflight = new Map<string, AbortController>();
 
 const TURN_NOTE: Record<Exclude<LiveTurn['status'], 'running' | 'answered' | 'failed'>, string> = {
-  stopped: 'Stopped before an answer came back. Nothing was kept from this question.',
-  interrupted: 'The page reloaded before this answer came back, so it never arrived. Ask it again.',
+  stopped: 'Stopped before an answer came back. The turn keeps the steps it took until then.',
+  interrupted: 'Cut short before an answer came back: the service stopped while answering it, or the page closed before asking it. Ask it again.',
 };
 
 function LiveTurnView({
@@ -227,6 +232,31 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   const running = !!conversation?.turns.some((t) => t.status === 'running' && inflight.has(t.id));
   const down = healthChecked && health === null && !reached;
 
+  // A turn running with no stream in this page (asked before a reload, or in
+  // another tab) is being answered on the service: follow it there, and take
+  // the service's turn once it ends.
+  const followed = (conversation?.turns ?? [])
+    .filter((t) => t.status === 'running' && !inflight.has(t.id))
+    .map((t) => t.id)
+    .join(' ');
+  useEffect(() => {
+    const id = conversation?.id;
+    if (!followed || !id) return;
+    const ac = new AbortController();
+    const timer = setInterval(() => {
+      fetchConversation(id, ac.signal)
+        .then((held) => {
+          for (const t of held.turns)
+            if (followed.split(' ').includes(t.id) && t.status !== 'running') useStore.getState().patchLiveTurn(id, t.id, t);
+        })
+        .catch(() => undefined);
+    }, FOLLOW_MS);
+    return () => {
+      ac.abort();
+      clearInterval(timer);
+    };
+  }, [followed, conversation?.id]);
+
   // A question handed over in the address (?q=) is asked once, after the
   // health probe has settled, and then leaves the address so a reload or
   // Back does not ask it again.
@@ -262,9 +292,9 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
     const store = useStore.getState();
     const before = { activeId, path: route.path };
     const current = fresh ? null : conversation;
-    const history = current ? priorTurns(current.turns) : [];
     const convId = current?.id ?? store.startLiveConversation(text.slice(0, 60));
     const turnId = timeId('lt');
+    const by = reviewerName() ?? undefined;
     store.addLiveTurn(convId, {
       id: turnId,
       question: text,
@@ -273,6 +303,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
       plan: null,
       error: null,
       status: 'running',
+      by,
     });
     setActiveId(convId);
     if (route.path !== `/postdoc/${convId}` || route.query.has('q')) navigate(`/postdoc/${convId}`, { replace: true });
@@ -287,10 +318,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
           setReached(true);
           patch(convId, turnId, { step });
         },
-        {
-          signal: ac.signal,
-          history,
-        },
+        { signal: ac.signal, conversationId: convId, turnId, by },
       );
       setReached(true);
       patch(convId, turnId, { plan, status: 'answered' });

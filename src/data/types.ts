@@ -1463,6 +1463,9 @@ export interface AnswerPlan {
   coverage?: CoverageMap | null;
   /** OF-BLD-015 §7.2: the module rows the claims cite. Absent on older plans. */
   rows?: ModuleRow[];
+  /** The conversation and turn the service kept this answer as; null on the single-call path. */
+  conversationId?: string | null;
+  turnId?: string | null;
 }
 
 /**
@@ -1482,8 +1485,13 @@ export interface AskRequest {
   question: string;
   maxEvidence: number;
   mode: 'agent' | 'single';
-  /** The conversation's earlier turns, oldest first. */
+  /** The conversation's earlier turns, oldest first, for a caller that names no conversation; the service reads its own otherwise. */
   history: PriorTurn[];
+  /** The conversation this question continues or starts, and the turn it is, by the page's ids. */
+  conversationId?: string | null;
+  turnId?: string | null;
+  /** Who asks. */
+  by?: string;
 }
 
 /**
@@ -1501,14 +1509,36 @@ export interface LiveTurn {
   error: { message: string; remedy: string } | null;
   /** `running` until the plan or the failure arrives. A turn a reload cut short reads `interrupted`. */
   status: 'running' | 'answered' | 'failed' | 'stopped' | 'interrupted';
+  /** Who asked, as the service kept the turn. */
+  by?: string | null;
+  /** The artifacts the turn's tool calls produced or read, as the service kept it. */
+  artifactIds?: string[];
 }
 
-/** A Live-mode conversation: its turns, oldest first. Durable. */
+/** A Live-mode conversation: its turns, oldest first. Kept by the service (postdoc/conversations.py). */
 export interface LiveConversation {
   id: string;
   title: string;
   startedAt: string;
   turns: LiveTurn[];
+}
+
+/** One tool call a turn made (GET /api/conversations/{id}/turns/{turn}/calls). */
+export interface ToolCallRecord {
+  seq: number;
+  turnId: string;
+  tool: string;
+  input: Record<string, unknown>;
+  /** What the tool answered the model. */
+  summary: Record<string, unknown>;
+  error: string | null;
+  /** What it offered to cite, by id. */
+  evidenceIds: string[];
+  recordIds: string[];
+  passageIds: string[];
+  artifactIds: string[];
+  by: string;
+  at: string;
 }
 
 // ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────

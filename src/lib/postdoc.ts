@@ -2,7 +2,9 @@
 //
 // No key here. The service holds the key, runs Postdoc's loop of tools and
 // the model calls, and validates the plan; this asks it a question and gets
-// back the plan, or watches the loop's steps arrive (`askPostdocStream`).
+// back the plan, or watches the loop's steps arrive (`askPostdocStream`). The
+// service keeps each question as a turn of its conversation, and a follow-up
+// reads the earlier turns from what the service keeps (`fetchConversation`).
 //
 // NO SILENT FALLBACK. When the service is unreachable this says so and says how
 // to start it. It never quietly replays a scripted flow — a convincing fake
@@ -10,7 +12,7 @@
 // everything looks like it is working and the thing you are demonstrating is
 // not running. The scripted flows still exist; they are fixtures now, not a
 // safety net (§9).
-import type { AnswerPlan, AnswerPlanUsage, AskRequest, LiveTurn, PriorTurn, TraceStep } from '@/data/types';
+import type { AnswerPlan, AnswerPlanUsage, AskRequest, LiveConversation, PriorTurn, TraceStep } from '@/data/types';
 import { apiFetch } from './project';
 
 /** Exactly what to type, so the message is actionable rather than sympathetic. */
@@ -63,16 +65,28 @@ export async function postdocHealth(signal?: AbortSignal): Promise<PostdocHealth
  * default; `single` is one retrieval and one call. */
 export type AskMode = 'agent' | 'single';
 
-async function post(
-  path: string,
-  question: string,
-  opts: { maxEvidence?: number; signal?: AbortSignal; mode?: AskMode; history?: PriorTurn[] },
-): Promise<Response> {
+/** What a question names besides its words: the conversation and the turn the
+ * service keeps it as (a follow-up's history is the conversation's), and who asked. */
+export interface AskOptions {
+  maxEvidence?: number;
+  signal?: AbortSignal;
+  mode?: AskMode;
+  /** Earlier turns, for a question asked outside a conversation the service keeps. */
+  history?: PriorTurn[];
+  conversationId?: string;
+  turnId?: string;
+  by?: string;
+}
+
+async function post(path: string, question: string, opts: AskOptions): Promise<Response> {
   const body: AskRequest = {
     question,
     maxEvidence: opts.maxEvidence ?? 30,
     mode: opts.mode ?? 'agent',
     history: opts.history ?? [],
+    ...(opts.conversationId ? { conversationId: opts.conversationId } : {}),
+    ...(opts.turnId ? { turnId: opts.turnId } : {}),
+    ...(opts.by ? { by: opts.by } : {}),
   };
   let response: Response;
   try {
@@ -121,10 +135,7 @@ async function post(
  * is an answer, and one of the more useful ones. Only the service being
  * unreachable throws.
  */
-export async function askPostdoc(
-  question: string,
-  opts: { maxEvidence?: number; signal?: AbortSignal; mode?: AskMode; history?: PriorTurn[] } = {},
-): Promise<AnswerPlan> {
+export async function askPostdoc(question: string, opts: AskOptions = {}): Promise<AnswerPlan> {
   const response = await post('/api/ask', question, opts);
   return (await response.json()) as AnswerPlan;
 }
@@ -156,12 +167,14 @@ export function parseEvents(buffer: string): { events: StreamEvent[]; rest: stri
  * Ask through the loop and watch it work (OF-BLD-014 §5.3). `onStep` is
  * called with each step as the service completes it; the promise resolves
  * with the validated plan. An `error` event, or a stream that ends without a
- * plan, throws PostdocDown with the service's words.
+ * plan, throws PostdocDown with the service's words. The stream's first
+ * event, `turn`, names the conversation and the turn the service keeps the
+ * question as: the ids the page sent, or ids the service made.
  */
 export async function askPostdocStream(
   question: string,
   onStep: (step: TraceStep) => void,
-  opts: { maxEvidence?: number; signal?: AbortSignal; history?: PriorTurn[] } = {},
+  opts: Omit<AskOptions, 'mode'> = {},
 ): Promise<AnswerPlan> {
   const response = await post('/api/ask/stream', question, { ...opts, mode: 'agent' });
   const checkLog = 'The service is running, so check its log — it will name what went wrong.';
@@ -203,17 +216,11 @@ export function cachedShare(u: AnswerPlanUsage): number | null {
 }
 
 /**
- * The earlier turns a follow-up sends: each answered turn's question and its
- * plan's words. A turn that failed, or was stopped, carries no answer and is
- * left out.
+ * A conversation as the service keeps it, its turns in order, each with its
+ * steps, its plan and who asked (`GET /api/conversations/{id}`).
  */
-export function priorTurns(turns: LiveTurn[]): PriorTurn[] {
-  return turns
-    .filter((t) => t.status === 'answered' && t.plan)
-    .map((t) => ({
-      question: t.question,
-      claims: t.plan!.claims.map((c) => c.text),
-      gaps: t.plan!.gaps,
-      declined: t.plan!.declined,
-    }));
+export async function fetchConversation(id: string, signal?: AbortSignal): Promise<LiveConversation> {
+  const response = await apiFetch(`/api/conversations/${encodeURIComponent(id)}`, { signal });
+  if (!response.ok) throw new PostdocDown(`Postdoc answered ${response.status} for conversation ${id}.`);
+  return (await response.json()) as LiveConversation;
 }

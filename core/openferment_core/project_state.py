@@ -18,10 +18,12 @@ page can send, and, once a runbook is locked, predictions and measures that
 are the ones its lock froze (runbook_lock.py computes the digest the page
 writes). The rules that act on the content run where they always ran.
 
-What a person made, locked or measured stays: a deposition, a measurement
-and a lock are never taken back through here. Making, locking and taking back
-are audited; the many saves of one deposition while it runs at the bench are
-the same row moving and are not.
+What a person made, locked, measured or asked stays: a deposition, a
+measurement, a lock and a conversation are never taken back through here.
+Making, locking and taking back are audited; the many saves of one deposition
+while it runs at the bench are the same row moving and are not. A Live
+conversation is Postdoc's own record (postdoc/conversations.py), which a
+page's write is laid onto.
 """
 from __future__ import annotations
 
@@ -39,6 +41,7 @@ from . import audit, db, projects
 from .basis import EstimateRefused, refuse_estimates
 from .db import models as t
 from .db import rows
+from .postdoc import conversations as _conversations
 from .runbook_lock import frozen_as
 
 # An id as the pages make them, and an override scope (`pureos:unit:tr-1:inlet`).
@@ -63,12 +66,6 @@ class Kind:
     where: Callable[[], list[Any]] = field(default=lambda: [])
 
 
-def _title(value: dict[str, Any]) -> dict[str, Any]:
-    turns = value.get("turns") or []
-    first = turns[0] if turns and isinstance(turns[0], dict) else {}
-    return {"title": str(first.get("question") or "")[:200]}
-
-
 KINDS: dict[str, Kind] = {
     k.name: k
     for k in (
@@ -81,16 +78,18 @@ KINDS: dict[str, Kind] = {
              where=lambda: [t.scenarios.c.kind == "proforma"]),
         Kind("trains", t.trains, "pureos", columns=lambda v: {"kind": "made"},
              where=lambda: [t.trains.c.kind == "made"]),
-        Kind("conversations", t.conversations, "home", columns=_title),
     )
 }
 # A deposition and a measurement are records of the bench: no model's
 # estimate enters them (ADR-006).
 RECORD_KINDS = ("depositions", "measuredEvidence")
-# Two kinds keep their own tables' shapes: a lock is (runbook, hash, when),
-# and the overrides of one scope are one row per key.
-LOCKS, OVERRIDES = "runbookLocks", "overrides"
-NAMES = (*KINDS, LOCKS, OVERRIDES)
+# Three kinds keep their own tables' shapes: a lock is (runbook, hash, when),
+# the overrides of one scope are one row per key, and a Live conversation is
+# Postdoc's own, kept as a conversation and its turns (postdoc/conversations.py):
+# a page's write is laid onto what the service keeps, and a load reads it back
+# whole.
+LOCKS, OVERRIDES, CONVERSATIONS = "runbookLocks", "overrides", "conversations"
+NAMES = (*KINDS, LOCKS, OVERRIDES, CONVERSATIONS)
 
 
 def _checked(kind: str, item_id: str, value: Any) -> Any:
@@ -149,6 +148,7 @@ async def _load(project_id: str) -> dict[str, Any]:
         )).all():
             overrides.setdefault(r.scope, []).append(r.body)
         out[OVERRIDES] = overrides
+    out[CONVERSATIONS] = [c.model_dump(mode="json") for c in await _conversations._listed(project_id)]
     # Fits and trains are keyed in the page by scenario and by train.
     out["fits"] = {f["id"]: f["byInput"] for f in out["fits"]}
     out["trains"] = {tr["train"]["id"]: tr for tr in out["trains"]}
@@ -220,6 +220,12 @@ async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) ->
 def put(kind: str, item_id: str, value: Any, by: str) -> Any:
     """Keep one row whole, or refuse it in words; what was kept."""
     checked = _checked(kind, item_id, value)
+    if kind == CONVERSATIONS:
+        try:
+            _conversations.merge(checked, by=by)
+        except _conversations.ConversationRefused as e:
+            raise StateRefused(str(e)) from None
+        return checked
     db.run(_put(projects.current(), kind, item_id, checked, (by or "").strip() or "this browser"))
     return checked
 
@@ -245,7 +251,7 @@ def remove(kind: str, item_id: str, by: str) -> None:
     and a lock stay; taking back what is not held is nothing."""
     if kind not in NAMES:
         raise StateRefused(f"{kind!r} is not something a project keeps; it keeps {', '.join(NAMES)}")
-    if kind == LOCKS or (kind in KINDS and not KINDS[kind].removable):
+    if kind in (LOCKS, CONVERSATIONS) or (kind in KINDS and not KINDS[kind].removable):
         raise StateRefused(f"a {kind[:-1] if kind.endswith('s') else kind} is kept as it was made, and never taken back")
     if not ID.match(item_id):
         raise StateRefused(f"{item_id!r} is not an id")

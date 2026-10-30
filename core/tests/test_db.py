@@ -53,9 +53,9 @@ def test_the_session_database_is_at_the_newest_revision_of_both_schemas(test_dat
     from openferment_core import migrations
 
     test_database.open()
-    assert migrate.head() == "0004"
+    assert migrate.head() == "0005"
     assert migrations.kit_head() == "0006"
-    assert migrations.at_head(test_database.url) == {"openferment": ("0004", "0004"), "sci_rag": ("0006", "0006")}
+    assert migrations.at_head(test_database.url) == {"openferment": ("0005", "0005"), "sci_rag": ("0006", "0006")}
 
 
 def test_rollback_1_a_row_a_test_writes_is_there_for_the_rest_of_that_test():
@@ -196,6 +196,59 @@ def test_migration_0003_names_the_old_demo_class_assumed_in_every_row_and_back(t
         command.downgrade(migrate.config(url), "0002")
         back, hashed, record = db.run(held())
         assert record == "demo" and back == body and hashed == body["outputHash"]
+    finally:
+        db.run(engine.dispose())
+        migrate.drop(name, test_database.server)
+
+
+def test_migration_0005_keeps_each_turn_of_a_conversation_kept_whole_as_a_row_and_back(test_database):
+    """A database at 0004 holding two Live conversations the page kept whole, the second
+    with a turn whose id the first's took. At 0005 each turn is a row of `turns` in its
+    conversation's order, with its status and its body, the taken id kept under its
+    conversation's, and each conversation's body its id, title and beginning; at 0004 again
+    each conversation is whole as it was written."""
+    from alembic import command
+
+    test_database.open()
+    name = f"{test_database.name}_0005"
+    url = migrate.create(name, test_database.server)
+    engine = make_engine(url)
+    first = {"id": "lc-1", "title": "What limits the titre?", "startedAt": "2026-10-29T08:00:00Z", "turns": [
+        {"id": "t-1", "question": "What limits the titre?", "askedAt": "2026-10-29T08:00:00Z", "steps": [], "plan": None,
+         "error": None, "status": "answered"},
+        {"id": "t-2", "question": "And at 30 C?", "askedAt": "2026-10-29T08:05:00Z", "steps": [], "plan": None,
+         "error": {"message": "Postdoc service not running.", "remedy": "Start it."}, "status": "failed"}]}
+    second = {"id": "lc-2", "title": "Another", "startedAt": "2026-10-29T09:00:00Z", "turns": [
+        {"id": "t-1", "question": "Another", "askedAt": "2026-10-29T09:00:00Z", "steps": [], "plan": None, "error": None,
+         "status": "running"}]}
+
+    async def seed() -> None:
+        async with engine.begin() as c:
+            await c.execute(insert(t.projects).values(id="p", name="p", created_by="test"))
+            for body in (first, second):
+                await c.execute(insert(t.conversations).values(project_id="p", id=body["id"], title=body["title"], body=body,
+                                                               created_by="Ada Moreno"))
+
+    async def held() -> tuple[dict, list]:
+        async with engine.connect() as c:
+            heads = {r.id: r.body for r in (await c.execute(select(t.conversations.c.id, t.conversations.c.body))).all()}
+            turns = (await c.execute(select(t.turns.c.id, t.turns.c.conversation_id, t.turns.c.seq, t.turns.c.status,
+                                            t.turns.c.body).order_by(t.turns.c.conversation_id, t.turns.c.seq))).all()
+            return heads, [tuple(r) for r in turns]
+
+    try:
+        migrate.upgrade(url, "0004")
+        db.run(seed())
+        migrate.upgrade(url, "0005")
+        heads, turns = db.run(held())
+        assert heads["lc-1"] == {"id": "lc-1", "title": first["title"], "startedAt": first["startedAt"], "by": "Ada Moreno"}
+        assert [(i, c, n, st) for i, c, n, st, _ in turns] == [
+            ("t-1", "lc-1", 1, "answered"), ("t-2", "lc-1", 2, "failed"), ("t-1-lc-2", "lc-2", 1, "running")]
+        assert turns[1][4]["error"] == first["turns"][1]["error"] and turns[2][4]["question"] == "Another"
+        command.downgrade(migrate.config(url), "0004")
+        heads, turns = db.run(held())
+        assert turns == [] and heads["lc-1"] == first
+        assert heads["lc-2"]["turns"][0]["question"] == "Another"
     finally:
         db.run(engine.dispose())
         migrate.drop(name, test_database.server)

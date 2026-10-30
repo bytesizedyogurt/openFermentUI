@@ -288,6 +288,10 @@ class _Run:
     coverage: CoverageMap | None = None
     cancelled: Callable[[], bool] = lambda: False
     history: list[PriorTurn] = field(default_factory=list)
+    # Told of each tool call before it runs and of its result after, cached or not: the
+    # conversation store keeps them and the event stream says them (postdoc/conversations.py).
+    on_call: Callable[[str, dict[str, Any]], None] | None = None
+    on_result: Callable[[str, dict[str, Any], ToolResult], None] | None = None
 
     def step(self, **kw: Any) -> TraceStep:
         s = TraceStep(n=len(self.trace) + 1, **kw)
@@ -375,6 +379,8 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
     key = json.dumps({"tool": call.name, "input": call.input}, sort_keys=True, default=str)
     started = run.clock()
     run.ctx.seen = run.seen
+    if run.on_call is not None:
+        run.on_call(call.name, call.input)
     # A draft is checked against what this conversation has seen, so it is
     # never served from the cache across a restart (§9.2); a train a model
     # builds changes between calls, so its steps and its run are never served
@@ -390,6 +396,8 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
         if result.error is None and call.name in CHANGES_ROWS:
             _forget_reads(run, CHANGES_ROWS[call.name])
     ms = int(round((run.clock() - started) * 1000))
+    if run.on_result is not None:
+        run.on_result(call.name, call.input, result)
     run.seen.add(result)
     if result.draft is not None and result.error is None:
         run.draft = result.draft
@@ -531,18 +539,21 @@ def ask(
     on_step: Callable[[TraceStep], None] | None = None,
     cancelled: Callable[[], bool] | None = None,
     history: list[PriorTurn] | None = None,
+    on_call: Callable[[str, dict[str, Any]], None] | None = None,
+    on_result: Callable[[str, dict[str, Any], ToolResult], None] | None = None,
 ) -> AnswerPlan:
     """One question through the loop. Every failure is a plan with `declined`
     set, as in the single-shot path. `history` is the conversation's earlier
     turns, oldest first; a restart reads them too, since they are part of
-    what the question means."""
+    what the question means. `on_call` and `on_result` are told of each tool
+    call before it runs and of what it answered."""
     question = question.strip()
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     ctx = ctx or tools.ToolContext()
     ctx.ask_id = f"ask-{uuid.uuid4().hex[:12]}"
     run = _Run(question=question, ctx=ctx, converse=converse or llm.converse, clock=clock, started=clock(),
-               history=list(history or []))
+               history=list(history or []), on_call=on_call, on_result=on_result)
     if cancelled is not None:
         run.cancelled = cancelled
     if on_step is not None:
