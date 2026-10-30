@@ -303,12 +303,48 @@ def _sid(s: Any) -> str:
     return "unnamed"
 
 
+def units_in_order(system: Any) -> list[Any]:
+    """The system's units in the order they run. BioSTEAM orders facilities
+    by network priority over a set (`Facility.ordered_facilities`), so
+    facilities it ranks alike come in an order one build does not repeat;
+    each such run of facilities is put in the order of their IDs, and every
+    other unit stays where BioSTEAM ran it, so a table reads the same build
+    after build (a replay compares like with like)."""
+    units = list(system.units)
+    out: list[Any] = []
+    n = 0
+    while n < len(units):
+        rank = getattr(units[n], "network_priority", None) if isinstance(units[n], bst.Facility) else None
+        m = n + 1
+        if rank is not None:
+            while m < len(units) and isinstance(units[m], bst.Facility) and \
+                    getattr(units[m], "network_priority", None) == rank:
+                m += 1
+        out.extend(sorted(units[n:m], key=lambda u: u.ID) if m - n > 1 else units[n:m])
+        n = m
+    return out
+
+
+def streams_in_order(system: Any) -> list[Any]:
+    """The system's streams in the order BioSTEAM lists them (each where its
+    first unit, in run order, takes it in or sends it out), over the units
+    in the order `units_in_order` gives."""
+    at = {u: n for n, u in enumerate(units_in_order(system))}
+
+    def first(s: Any) -> tuple[int, int]:
+        seen = [(at[u], next((i for i, x in enumerate([*u._ins, *u._outs]) if x is s), 0))
+                for u in (s.sink, s.source) if u is not None and u in at]
+        return min(seen) if seen else (len(at), 0)
+
+    return sorted(system.streams, key=first)
+
+
 def stream_table(system: Any) -> list[dict[str, Any]]:
     """Every stream of the system, in the order its units run: where it comes
     from and goes, its phase, temperature, pressure, total mass flow and the
     mass flow of each component that flows."""
     rows = []
-    for s in system.streams:
+    for s in streams_in_order(system):
         ids = s.chemicals.IDs
         flows = {i: float(m) for i, m in zip(ids, s.mass) if m}
         rows.append({
@@ -334,7 +370,7 @@ def unit_table(system: Any) -> list[dict[str, Any]]:
     """Every unit operation in run order, with its BioSTEAM class, its costs,
     and its duties and power where it has them."""
     rows = []
-    for n, u in enumerate(system.units):
+    for n, u in enumerate(units_in_order(system)):
         heating, cooling = _duties(u.heat_utilities)
         power = _num(u.power_utility.rate)
         rows.append({
@@ -475,7 +511,7 @@ def tables(module: Any, b: Any, draw: bool | None = None) -> dict[str, Any]:
             "units": unit_table(system),
             "utilities": utility_duties(units, "the units the TEA costs" if tea is not None else "every unit of the system"),
             **diagram(system, draw),
-            "unitOrder": [u.ID for u in system.units],
+            "unitOrder": [u.ID for u in units_in_order(system)],
             "tableUnits": TABLE_UNITS,
         }
     finally:

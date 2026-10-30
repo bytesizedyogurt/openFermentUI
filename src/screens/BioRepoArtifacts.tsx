@@ -277,6 +277,12 @@ function ArtifactBody({
           <div className="mb-3" data-testid="replay-result">
             {replay.result.identical ? (
               <Callout kind="info">Replayed identically: the tool computed the same output from the same inputs.</Callout>
+            ) : replay.result.withinTolerance && replay.result.tolerance ? (
+              <Callout kind="info">
+                Replayed within the precision its basis states ({replay.result.tolerance.why}):{' '}
+                {replay.result.differences.length} number{replay.result.differences.length === 1 ? '' : 's'} moved in
+                their last kept digit, and nothing else changed.
+              </Callout>
             ) : (
               <Callout kind="warn">
                 The replay differs from what was stored:

@@ -61,6 +61,7 @@ Blockers).
 | 2026-10-30 11:14 | `test:core` with 4.3 | 2074 passed, 2 skipped, 162 deselected | 5 min 19 s | 4.3 |
 | 2026-10-30 11:31 | `test:core` with 4.4 (the rename); `typecheck`, `check:plan`, `check:figures`, `check:tools`, `check:state`, `check:guild`, `check:secrets` | 2076 passed, 2 skipped, 162 deselected; all passed | 5 min 16 s | 4.4 (rename) |
 | 2026-10-30 11:48 | `test:core` with 4.4 (origins); `typecheck`, `check:plan`, `check:figures` | 2090 passed, 2 skipped, 162 deselected; all passed | 4 min 59 s | 4.4 (origins) |
+| 2026-10-30 12:04 | `test:core` with 4.4 (runs); `test_runs_sim.py` (`sim`); `typecheck`, `check:plan` | 2100 passed, 2 skipped, 166 deselected; 4 passed; all passed | 5 min 29 s; 48 s | 4.4 (runs) |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -151,7 +152,7 @@ Blockers).
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run: this container has no Docker daemon, so stages 2 and 3 run on the distribution's PostgreSQL 16 with pgvector 0.6.0. CI's verify runs the same image as a service from 3.1 on (the workflow had no database through stage 2, so verify failed in CI on the stage 2 pushes) | the first CI run of 3.1, or the owner's machine |
 | The kit's MCP server (`literature_mcp.py`) has run only as an import here: the session's MCP clients start from `.mcp.json` at session start | the next session, or the owner's Claude Code |
 | `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7 |
-| Runs do not yet write their SFF file on their own: a run is exported through `POST /api/flowsheets/export` | stage 4.4, when runs move to the `runs` table |
+| fermOS, pureOS and Proforma take a run's values as `Override`s (a person's assumption or a model's estimate) and name each input's source in the basis, which `basis.origin_of` reads as an `Origin`; their requests are not yet lists of `Quantity` objects, and their runs are artifacts with no row in `runs` (engine runs alone are) | stage 6 (tool inputs as `Quantity` objects), stage 7 (`gen:api`) |
 | The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | stage 7, when the UI reads the library shelf |
 | A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and not offered | after alpha 2.0 (4.3 composes the cellulosic plant's pretreatment and fermentation instead) |
 | A second organism's reaction set for the composed flowsheet: the package holds one | when a package or a record gives another |
@@ -428,3 +429,14 @@ Blockers).
   store and a project's depositions and measurements refusing an estimate before writing.
   Tests: `test_estimates.py` (A6: an estimate planted at each record store and refused; one
   reaching a library run, a parameter panel and a scenario's overrides).
+- 4.4 (runs) Engine runs on the `runs` table (ADR-004 and ADR-003, Implementation 4.4;
+  `docs/api/runs.md`): each run's inputs as quantities with origins, its artifact, outputs,
+  versions and the SFF file it wrote; a plant's refusal kept as a receipt; `POST
+  /api/library/{plant}/run` answers the run's report, `GET /api/runs[/{id}]` reads them. Replay
+  within the precision a library run's basis states. The worker's tables order facilities BioSTEAM
+  ranks alike by ID, so a composed plant's tables read the same build after build. Tests:
+  `test_runs.py` (offline: kept, answered from its row, a receipt, nothing kept for a bad request,
+  a file that cannot be written, a model's estimate, replay tolerance, the routes) and
+  `test_runs_sim.py` (`sim`: the flowsheet on library defaults with a valid SFF file, a scenario
+  with a person's assumption and a model's estimate `assumed`, a replay within tolerance, AFEX's
+  receipt).

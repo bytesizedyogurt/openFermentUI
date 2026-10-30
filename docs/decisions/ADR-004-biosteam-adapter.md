@@ -124,8 +124,25 @@ determinism after `empty_recycles()` and `tea._sales = 0`.
   state, which is what A→B→A needs.
 - An integer parameter stays an integer (a vessel count, a TEA's finance years are used as
   indices); a refusal carries BioSTEAM's words without its terminal colour codes.
-- Not yet: an organism's reaction set beyond the package's one (none other is in the package);
-  the flowsheet's runs on `Quantity` with origins (4.4).
+- Not yet: an organism's reaction set beyond the package's one (none other is in the package).
+
+### 4.4 (2026-10-30)
+
+- Engine runs live on the `runs` table (`engine/runs.py`, `docs/api/runs.md`): a library plant's or
+  a flowsheet's run keeps its inputs as quantities with their origins (ADR-006), its `library.run`
+  artifact and provenance, its outputs and versions, and the SFF file it wrote (`sff.export`,
+  validated, scored and tagged in the worker), under the artifact id of its basis. A plant's
+  refusal (InfeasibleRegion, a gate) is kept as a `refused` receipt and answered from it; a request
+  refused before a plant is built keeps nothing. `POST /api/library/{plant}/run` answers the run's
+  report (`{run, artifact, flowsheet}`); `GET /api/runs` and `GET /api/runs/{id}` read them.
+  `library.run` stays the computation alone.
+- A replay holds a library run to the precision its basis states (`library.tolerance`: one unit in
+  the last of the ten significant digits it keeps, and the package test's absolute tolerance near
+  zero; `ReplayResult.withinTolerance`). The worker's tables put facilities that BioSTEAM ranks
+  alike in the order of their IDs (`units_in_order`): `Facility.ordered_facilities` sorts a set by
+  network priority, so the composed plant's CIP, ADP, FWT and CT came in a different order each
+  build, which moved rows of the stream and unit tables (measured: three builds in one process,
+  three orders) while every number agreed. Every other unit keeps the place BioSTEAM ran it.
 
 ## Revisit condition
 

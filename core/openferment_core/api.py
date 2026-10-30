@@ -91,6 +91,8 @@ from .models import (
     ProjectCreate,
     LibraryParameters,
     LibraryRunRequest,
+    RunReport,
+    EngineRun,
     LibraryShelf,
     PackageRegression,
     ReplayResult,
@@ -105,6 +107,7 @@ from .models import (
 )
 from . import llm, spend
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
+from .engine import runs as _runs
 from .postdoc import PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
@@ -827,18 +830,36 @@ def library_regression(plant: str, configuration: str | None = None) -> PackageR
     return _library.regression(plant, configuration)
 
 
-@app.post("/api/library/{plant}/run", response_model=Artifact)
-def library_run(plant: str, request: LibraryRunRequest) -> Artifact:
-    """One run of a library plant, built afresh with a person's values set,
-    priced and read back, kept as one `library.run` artifact (a basis
-    already run returns its stored artifact)."""
+@app.post("/api/library/{plant}/run", response_model=RunReport)
+def library_run(plant: str, request: LibraryRunRequest) -> RunReport:
+    """One engine run of a library plant or an openFerment flowsheet, built
+    afresh with the values set for it, priced, read back and written as an
+    SFF file, kept in the project's runs (engine/runs.py): the run, its
+    `library.run` artifact and its SFF record. A basis already run answers
+    from its row; values the plant refuses are kept as a receipt and
+    answered 422 in the plant's words."""
     _library_plant(plant)
     try:
-        return _library.run(plant, request.configuration, request.overrides)
+        return _runs.run(plant, request.configuration, request.overrides, by=request.by)
     except _library.LibraryRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {plant}: {e}") from e
+
+
+@app.get("/api/runs")
+def runs_list() -> list[EngineRun]:
+    """The project's engine runs, newest first."""
+    return _runs.listed()
+
+
+@app.get("/api/runs/{run_id}")
+def runs_report(run_id: str) -> RunReport:
+    """One engine run with its artifact and its SFF record."""
+    try:
+        return _runs.report(run_id)
+    except _runs.RunNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
 
 
 @app.get("/api/proforma/scenarios")

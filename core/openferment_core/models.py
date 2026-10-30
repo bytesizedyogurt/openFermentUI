@@ -1280,6 +1280,16 @@ class ReplayDifference(BaseModel):
     replayed: Any = None
 
 
+class ReplayTolerance(BaseModel):
+    """How near a replayed number must come to the stored one to count as
+    the same: within `atol + rtol·|stored|` (numpy's allclose), the precision
+    the tool's basis states."""
+
+    rtol: float
+    atol: float
+    why: str
+
+
 class ReplayResult(BaseModel):
     artifactId: str
     identical: bool
@@ -1287,6 +1297,10 @@ class ReplayResult(BaseModel):
     replayedHash: str
     differences: list[ReplayDifference] = Field(default_factory=list)
     durationMs: int
+    # The precision the tool's basis states, when it states one, and whether
+    # every difference is a number within it (true for an identical replay).
+    tolerance: ReplayTolerance | None = None
+    withinTolerance: bool = False
 
 
 # ── tools (OF-BLD-014 §3.4, E.6) ───────────────────────────────────────
@@ -3844,7 +3858,68 @@ class LibraryParameters(BaseModel):
 
 class LibraryRunRequest(BaseModel):
     """POST /api/library/{plant}/run: the configuration (None: the plant's
-    own) and a person's values, each an Override of the plant's scope."""
+    own), the values set for the run, each an Override of the plant's scope
+    (a person's assumption or a model's estimate), and who asks for the run."""
 
     configuration: str | None = Field(default=None, max_length=40)
     overrides: list[Override] = Field(default_factory=list)
+    by: str = Field(default="", max_length=200)
+
+
+# ── engine runs (execution prompt §7.4; engine/runs.py) ─────────────────
+
+RunStatus = Literal["done", "refused"]
+
+
+class RunInput(BaseModel):
+    """One input of an engine run: its name, and its value as a quantity
+    with its origin (ADR-006)."""
+
+    name: str
+    quantity: Quantity
+
+
+class RunSFF(BaseModel):
+    """The SFF file a run wrote: its flowsheet record and what the toolkit
+    said of it."""
+
+    recordId: str
+    valid: bool
+    score: float | None = None
+    # The tags the file earns.
+    tags: list[str] = Field(default_factory=list)
+
+
+class EngineRun(BaseModel):
+    """One engine run in a project: a row of `runs` (GET /api/runs)."""
+
+    # Its computation's id: the artifact id of its basis.
+    id: str
+    plant: str
+    configuration: str | None = None
+    status: RunStatus
+    tool: str
+    toolVersion: str
+    inputs: list[RunInput]
+    # The artifact's, computed on its basis; None for a refused run.
+    provenance: Provenance | None = None
+    artifactId: str | None = None
+    # The price, a flowsheet's own outputs, and how the package's test held it.
+    outputs: dict[str, Any] = Field(default_factory=dict)
+    versions: dict[str, str] = Field(default_factory=dict)
+    sff: RunSFF | None = None
+    # Why no SFF file could be written, in the toolkit's or the worker's words.
+    sffRefused: str | None = None
+    # The plant's own words, for a refused run.
+    refused: str | None = None
+    by: str
+    at: str
+    durationMs: int | None = None
+
+
+class RunReport(BaseModel):
+    """GET /api/runs/{id}: a run with its computation and its SFF record."""
+
+    run: EngineRun
+    artifact: Artifact | None = None
+    flowsheet: SFFFlowsheet | None = None

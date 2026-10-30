@@ -38,7 +38,7 @@ from . import db, projects
 from .basis import basis_provenance
 from .db import models as t
 from .db import rows
-from .models import Artifact, BasisInput, ComputedBasis, ReplayDifference, ReplayResult
+from .models import Artifact, BasisInput, ComputedBasis, ReplayDifference, ReplayResult, ReplayTolerance
 
 # The function a tool registers: its inputs and seed in, a JSON-ready dict out.
 # It must be pure: the same inputs give the same output, or replay will say so.
@@ -71,6 +71,9 @@ class Registered:
     # A tool whose version depends on what it computes (fermOS's simulation
     # names its family, OF-BLD-020 §3.1) reads it from the inputs.
     version_of: Callable[[Sequence[BasisInput]], str] | None = None
+    # A tool whose basis states the precision its numbers keep (a library
+    # run's significant digits) reads the tolerance a replay holds them to.
+    tolerance_of: Callable[[Sequence[BasisInput]], ReplayTolerance] | None = None
 
     def version_for(self, inputs: Sequence[BasisInput]) -> str:
         return self.version_of(inputs) if self.version_of is not None else self.version
@@ -83,12 +86,15 @@ _LAZY: dict[str, Callable[[], None]] = {}
 
 
 def register(tool: str, version: str, fn: ToolFn,
-             version_of: Callable[[Sequence[BasisInput]], str] | None = None) -> None:
+             version_of: Callable[[Sequence[BasisInput]], str] | None = None,
+             tolerance_of: Callable[[Sequence[BasisInput]], ReplayTolerance] | None = None) -> None:
     """Make `tool` computable and replayable. Registering a name again replaces
     it: that is how a tool's code changes between versions. `version_of`,
     when given, reads the version from the inputs, so one tool name can
-    carry what it computes in its version (`version` is then its stem)."""
-    _REGISTRY[tool] = Registered(tool, version, fn, version_of)
+    carry what it computes in its version (`version` is then its stem).
+    `tolerance_of` reads the precision the basis states, which a replay
+    holds each number to."""
+    _REGISTRY[tool] = Registered(tool, version, fn, version_of, tolerance_of)
 
 
 def register_lazy(tool: str, registrar: Callable[[], None]) -> None:
@@ -343,9 +349,27 @@ def _diff(stored: Any, replayed: Any, path: str, out: list[ReplayDifference]) ->
         out.append(ReplayDifference(path=path, stored=stored, replayed=replayed))
 
 
+def _number(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _within(stored: Any, replayed: Any, tol: ReplayTolerance) -> bool:
+    """Whether a replayed output is the stored one with every number within
+    the tolerance (|replayed − stored| ≤ atol + rtol·|stored|) and all else
+    the same."""
+    if isinstance(stored, dict) and isinstance(replayed, dict):
+        return stored.keys() == replayed.keys() and all(_within(stored[k], replayed[k], tol) for k in stored)
+    if isinstance(stored, list) and isinstance(replayed, list):
+        return len(stored) == len(replayed) and all(_within(a, b, tol) for a, b in zip(stored, replayed))
+    if _number(stored) and _number(replayed):
+        return abs(replayed - stored) <= tol.atol + tol.rtol * abs(stored)
+    return canonical(stored) == canonical(replayed)
+
+
 def replay(aid: str) -> ReplayResult:
-    """Recompute a stored artifact with the tool registered now, and compare.
-    A replay changes nothing stored."""
+    """Recompute a stored artifact with the tool registered now, and compare:
+    identical, or within the precision its basis states when the tool reads
+    one (`tolerance_of`). A replay changes nothing stored."""
     artifact = get(aid)
     reg = registered(artifact.tool)
     try:
@@ -363,6 +387,7 @@ def replay(aid: str) -> ReplayResult:
             durationMs=0,
         )
     replayed = output_hash(output)
+    tolerance = reg.tolerance_of(artifact.inputs) if reg.tolerance_of is not None else None
     differences: list[ReplayDifference] = []
     if replayed != artifact.outputHash:
         _diff(artifact.output, output, "", differences)
@@ -374,11 +399,14 @@ def replay(aid: str) -> ReplayResult:
             differences.insert(
                 0, ReplayDifference(path="toolVersion", stored=artifact.toolVersion, replayed=now)
             )
+    identical = replayed == artifact.outputHash
     return ReplayResult(
         artifactId=aid,
-        identical=replayed == artifact.outputHash,
+        identical=identical,
         storedHash=artifact.outputHash,
         replayedHash=replayed,
         differences=differences,
         durationMs=ms,
+        tolerance=tolerance,
+        withinTolerance=identical or (tolerance is not None and _within(artifact.output, output, tolerance)),
     )

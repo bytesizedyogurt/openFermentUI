@@ -2280,6 +2280,13 @@ export interface ReplayDifference {
   replayed: unknown;
 }
 
+/** How near a replayed number must come to the stored one: within atol + rtol·|stored|. */
+export interface ReplayTolerance {
+  rtol: number;
+  atol: number;
+  why: string;
+}
+
 export interface ReplayResult {
   artifactId: string;
   identical: boolean;
@@ -2287,6 +2294,10 @@ export interface ReplayResult {
   replayedHash: string;
   differences: ReplayDifference[];
   durationMs: number;
+  /** The precision the tool's basis states, when it states one. */
+  tolerance?: ReplayTolerance | null;
+  /** Every difference a number within the tolerance; true for an identical replay. */
+  withinTolerance?: boolean;
 }
 
 // ── tools (OF-BLD-014 §3.4, E.6) ───────────────────────────────────────

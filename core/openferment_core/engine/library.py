@@ -44,6 +44,7 @@ from typing import Any
 from ..basis import ASSUMED_KINDS, override_source
 from ..flowsheets import shelf as _shelf
 from ..models import (
+    ReplayTolerance,
     BasisInput,
     BasisSource,
     LibraryParameters,
@@ -347,11 +348,22 @@ def _run_library(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
     return out
 
 
+def tolerance(inputs: list[BasisInput]) -> ReplayTolerance:
+    """What a replay holds a library run's numbers to: one unit in the last
+    significant digit the run keeps (its `precision` input), and the absolute
+    tolerance of the package's own test, for a number near zero."""
+    digits = int(str(_named(inputs, "precision") or DIGITS).split()[0])
+    return ReplayTolerance(rtol=10.0 ** (1 - digits), atol=ALLCLOSE_ATOL, why=(
+        f"one unit in the last of the {digits} significant digits the run keeps, and the package test's absolute "
+        f"tolerance ({ALLCLOSE_ATOL:g}) for a number near zero"))
+
+
 def _register() -> None:
     from .. import artifacts
 
     artifacts.register(LIBRARY_RUN, f"{LIBRARY_RUN_VERSION} · biosteam {_installed('biosteam')} · "
-                                    f"biorefineries {_installed('biorefineries')}", _run_library)
+                                    f"biorefineries {_installed('biorefineries')}", _run_library,
+                       tolerance_of=tolerance)
 
 
 def _register_lazy() -> None:
@@ -364,8 +376,9 @@ _register_lazy()
 
 
 def run(plant_id: str, configuration: str | None = None, overrides: list[Override] | None = None):
-    """Run a library plant (or return the stored run of the same basis) and
-    keep it as one `library.run` artifact."""
+    """Compute a library plant's run (or return the stored computation of
+    the same basis) as one `library.run` artifact. An engine run, kept with
+    its SFF file in the `runs` table, is engine/runs.py's `run`."""
     from .. import artifacts
 
     return artifacts.compute(LIBRARY_RUN, run_inputs(plant_id, configuration, list(overrides or [])))

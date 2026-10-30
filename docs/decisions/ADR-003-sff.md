@@ -97,6 +97,12 @@ openFerment's own replay check (re-run within tolerance) is the verification tha
   SFF file embeds it through the toolkit's own `build_reproducibility`; the toolkit finds the
   recipe present and its digests valid. Earning `reproducible` through the conda harness stays off.
 
+### 4.4 (2026-10-30)
+
+- Every engine run writes its SFF file (`engine/runs.py`): the run's record names it (`sff`:
+  record id, valid, completeness score, earned tags), or says in the toolkit's or the worker's
+  words why none could be written (`sffRefused`), and the run stands either way.
+
 ## Revisit condition
 
 The toolkit ships an importer or packaging; the schema reaches 1.0.

@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core.api import app
-from openferment_core.engine import library, simulator
+from openferment_core.engine import library, sff, simulator
 from openferment_core.models import Artifact, LibraryShelf, Override
 from openferment_core.workers import WorkerError
 
@@ -242,7 +242,11 @@ def test_a_run_is_kept_and_assumed_when_it_rests_on_a_persons_value(worker):
 # ── the routes ─────────────────────────────────────────────────────────
 
 
-def test_the_routes_serve_the_shelf_the_regression_and_refuse_what_cannot_run(worker):
+def test_the_routes_serve_the_shelf_the_regression_and_refuse_what_cannot_run(worker, monkeypatch):
+    def unwritten(*a, **k):
+        raise sff.SFFRefused("the stand-in writes no SFF file")
+
+    monkeypatch.setattr(sff, "export", unwritten)  # test_runs.py runs the export with a stand-in toolkit
     client = TestClient(app)
     assert {p["id"] for p in client.get("/api/library").json()["plants"]} >= NAMED_PLANTS
     assert client.get("/api/library/sugarcane/regression").json()["test"] == "test_sugarcane"
@@ -253,7 +257,8 @@ def test_the_routes_serve_the_shelf_the_regression_and_refuse_what_cannot_run(wo
     params = client.get("/api/library/sugarcane/parameters").json()
     assert params["values"][0]["origin"] == "library-default"
     ran = client.post("/api/library/sugarcane/run", json={"overrides": [over("stream.sugarcane.price", 0.05).model_dump()]})
-    assert ran.status_code == 200 and ran.json()["tool"] == "library.run" and ran.json()["provenance"] == "assumed"
+    assert ran.status_code == 200 and ran.json()["artifact"]["tool"] == "library.run"
+    assert ran.json()["run"]["provenance"] == "assumed" and ran.json()["run"]["sffRefused"] == "the stand-in writes no SFF file"
 
 
 # ── openFerment's composed flowsheet, on the same shelf ─────────────────
