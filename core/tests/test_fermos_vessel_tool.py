@@ -25,9 +25,8 @@ STANDIN_PERSON = "Stand-In Person"
 
 @pytest.fixture()
 def marked(store, worker, monkeypatch):  # noqa: F811
-    """The audit log and the proposals in the test's store, and the model the
-    writes are marked with."""
-    monkeypatch.setattr(proposals, "PATH", store / "proposals.json")
+    """The audit log and the proposals in the test's rolled-back database, and
+    the model the writes are marked with."""
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
     return store

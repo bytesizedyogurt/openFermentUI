@@ -242,7 +242,7 @@ export interface InputCounts {
   /** Bound to records by the service, or, with no binding to read, inputs that can bind to records. */
   records: number;
   /**
-   * Inputs a person chose a fermOS fit for in this browser (OF-BLD-019 §5.1),
+   * Inputs a person chose a fermOS fit for in this project (OF-BLD-019 §5.1),
    * counted from the choice: the index binds without the fits, so it says
    * "with a fermOS fit chosen", never that the service bound one (§5.R).
    */

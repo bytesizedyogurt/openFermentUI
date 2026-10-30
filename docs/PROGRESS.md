@@ -16,18 +16,18 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 2, step 2.3** — the stores the service keeps alone move to their tables,
-   function names kept: `spend` (the day's cap across projects), `artifacts`, BioRepo's decisions
-   and the extraction candidates (with the import of `core/data/biorepo.json` by migration), then
-   Guild, checks, Practice, proposals and pureOS's kept trains. Each test that pointed a store at
-   a temporary file runs on the rolled-back database instead.
+4. **Next step: stage 2, step 2.4 (the gate)** — the restart test (a real service process
+   stores, stops, starts and serves the same rows); `python -m openferment_core.db import-files`
+   for a live instance's alpha 1.0 stores; `ready.py`, `install.sh`, `deploy.sh` and `nightly.sh`
+   with PostgreSQL; then `test:core`, `test:sim`, typecheck, build and the smoke in a clean
+   worktree, and push.
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 2 — PostgreSQL and the record stores. 2.1 (the `db/` package, migrations, commands and the
-test database) and 2.2 (projects, request scoping, the audit log in its table) are committed;
-the stores follow one by one. Stage 1 is
+Stage 2 — PostgreSQL and the record stores. 2.1 (the `db/` package), 2.2 (projects and request
+scoping) and 2.3 (every store on its table; the browser's scientific state on the service) are
+committed; 2.4, the gate, is next. Stage 1 is
 complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Blockers).
 
 ## Last green runs
@@ -44,6 +44,7 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | 2026-10-30 06:10 | Stage 1 gate in a clean worktree: `typecheck`, `build`, `test:core` | 1888 passed, 2 skipped, 128 deselected | 4 min 7 s | 1.6 |
 | 2026-10-30 06:10 | Stage 1 gate: `test_no_seed.py`, `test:sim`, `pnpm smoke` | 45 passed; 102 passed, 1916 deselected; 11 of 11 rail entries open | 4 s; 3 min 59 s; 22 s | 1.6 |
 | 2026-10-30 06:25 | `test:core` with 2.1 | 1905 passed, 2 skipped, 128 deselected | 4 min 33 s | 2.1 |
+| 2026-10-30 07:16 | `test:core` with 2.3 | 1947 passed, 2 skipped, 128 deselected | 4 min 25 s | 2.3 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -79,6 +80,10 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | §5.2 | Eval set O (`evalo.py`, `pnpm eval:o`) and the identifier tooling (`identifiers.py`, `scripts/resolve-identifiers.py`, `pnpm ids:*`) are deleted | Eval set O's ten questions named the seed; the identifier tooling patched DOIs into the TypeScript seed |
 | §5.5, §10 stage 1 | Stage 1 deletes the merge driver, the data-sync, data-prepare and decisions-push scripts, `sync_decisions.sh` and the `openferment-data` branch convention. The file stores (`core/data/*.json`, `audit.jsonl`, `artifacts/`, `candidates/`, `live/`) and the browser's Durable scientific state stay until stage 2 replaces each with its PostgreSQL store, as stage 2 step 2 says; `core/data/biorepo.json` stays tracked until then | Untracking `biorepo.json` would make the live Mini's next pull delete the review decisions people made there (§11.1); stage 2 imports them into PostgreSQL |
 | §7.4 | Tables `overrides`, `fits`, `trains` and `practice_scenarios`, and `projects.settings`, beyond the list; each table keeps its lookup keys as columns and the rest of a row as `body`, the Pydantic model as JSONB | §5.5 moves those browser states to the server; the Pydantic models stay the one description of content (ADR-001, Implementation) |
+| §5.5, stage 2 | The fetched full texts (`core/data/fulltext/`) and the fetched genome-scale models (`core/data/models/`) stay files | They are caches of documents fetched from outside, fetched again when gone; stage 3 hands documents to Sci RAG Kit's tables |
+| §5.5, stage 2 | The browser keeps an outbox: review decisions, Guild changes and project rows the service has not yet acknowledged, saved in IndexedDB until sent; and three preferences, who is deciding, who is acting in Guild, and the lessons finished here | A deposition at the bench must survive a reload while the service is away (the reason Durable state existed); the outbox holds nothing the service already has |
+| §7.4, stage 2 | A Live conversation is kept whole in `conversations.body`; `turns` and `tool_calls` wait for stage 6 | Stage 6 gives Postdoc its memory on the server and fills them |
+| §7.4, stage 2 | `project_state.py` checks a page's row for kind, id and shape, and keeps its content as sent | The content's rules run where they always ran; stage 7 generates the page's types from Pydantic models |
 | §4, §5.2 | The record fields, the vocabulary (carbon sources and unit operations) and the unit tables live in `core/openferment_core/schema/` (`fields.yaml`, `vocabulary.yaml`, `units.json`), with no range and no example value; `src/data/ontology.ts` and `vocabulary.ts` mirror them, held equal by `test_schema.py` through the fixture `pnpm export:unit-fixtures` writes. BioRepo's typed-value refusal is renamed `range` → `unit`; `pyyaml` is a direct dependency | The service needs the fields without the TypeScript seed; a range is a number about a field (ADR-010) |
 
 ## Blockers
@@ -92,15 +97,15 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
 | Debt | Paid at |
 |---|---|
 | `core/tests/standins.py` carries invented stand-in records (on real strain ids) and a closed-form evaluator for rule tests | stage 4: fixtures from `biorefineries` library plants |
-| `program` survives as pureOS's chemical-set key (`TrainSpec.program`), and as a field of `FlowsheetInfo`, `VesselSummary`, `TrainSummary` and `TrainProposal`; the UI no longer shows or filters by it | stage 2 (projects) and stage 4 (the adapter) |
+| `program` survives as pureOS's chemical-set key (`TrainSpec.program`), and as a field of `FlowsheetInfo`, `VesselSummary`, `TrainSummary` and `TrainProposal`; the UI no longer shows or filters by it; projects (stage 2) took the scoping, so what remains is the chemical-set key | stage 4 (the adapter) |
 | Proforma tool rules that need a successful run of a seed scenario (`run_flowsheet` keeps one run and audits it; `stream_table` on a scenario's run) lost their tests with the seed scenarios | stage 5, when scenarios live in projects |
-| The vessel's organism check reads the yeast program's species from a strain catalogue that is empty; its test supplies one | stage 2 (strains with a project's records) or stage 4 |
+| The vessel's organism check reads the yeast program's species from a strain catalogue that is empty; its test supplies one | stage 3 (strains with a project's records) or stage 4 |
 | `test_proforma_slow.py` and `flowsheets/cornstover_benchmark.py` still state the benchmark price this build once measured (1.968 USD per gallon); the browser no longer shows it | stage 4: the adapter holds a library plant to its package's own test values |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program | the vocabulary review at stage 3 |
 | `docs/TOOLS.md` was edited by hand to remove Dominion and the program switch | stage 6 regenerates it (A5) |
 | `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's funnel | stage 7 |
 | Dead service paths the deletions left: the storage machinery (`kinetics.py`'s N and Q states, `fermos._no_broth_product`'s store-in-cells branch, `proforma.fit_info`'s store branch), `proforma._strain_labels`' program map, `proforma.basis_inputs`' `cap` and the yield cap in `_specs`; `fermos.NAMED_NOTE` still says "program" (its text is hashed into every simulation's basis) | stage 4, with the adapter |
-| Catalogues that left with the seed are empty in production and supplied by fixtures in tests: held scenarios, the strain catalogue and its aliases, the proposer's products and hosts. Until a project's records carry them, every pureOS proposal is refused for want of a host on file | stage 2 |
+| Catalogues that left with the seed are empty in production and supplied by fixtures in tests: held scenarios, the strain catalogue and its aliases, the proposer's products and hosts. Until a project's records carry them, every pureOS proposal is refused for want of a host on file. Stage 2 gave each project its tables; what fills them is the literature | stage 3 (records), stage 5 (scenarios) |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | stage 4 |
 | `test_proforma.py` holds the package's own regression values and this build's benchmark price to test the parser | stage 4 (A4 review) |
 | `core/tests/standins.py` keeps a closed-form ethanol evaluator, stand-in yeast records and `STANDIN_THEORETICAL` | stage 4 (with the row above on stand-ins) |
@@ -222,3 +227,21 @@ complete (gate passed at 1.6). Stage 0 is complete except the tag push (see Bloc
   its request's context; a thread a test starts finds `OPENFERMENT_PROJECT`). `test_projects.py`
   holds the scoping rules. Migration 0001 was edited before any instance ran it: rows are timed
   by `clock_timestamp()`, so the rows of one transaction keep their order.
+- 2.3 Every store on its table, function names and refusals kept: spend (the machine's day across
+  projects, a reservation a row until it settles; a database that does not answer closes the
+  gate as `SpendUnknown`; live tests charge the real database), BioRepo's decisions (one row per
+  decision in order, an undo a row too, `read()` replaying the rows; the decided candidate kept
+  with its decision), the extraction candidates (`model` and `hand` rows per paper), artifacts,
+  Guild's ledger (policy in `projects.settings`) and checks, Practice, proposals (with
+  `audit.add` in the store's transaction), and pureOS's kept trains. Three helper agents ported
+  Guild and checks, Practice and proposals, and artifacts and kept trains in parallel, each on
+  its own files; each lock-held read-check-write has a test with writers on separate
+  connections. `db/rows.py` holds the row reads and writes the stores share. Content columns
+  are `json` (key order is kept: a simulation's curves are drawn in it). `ready.py`'s data row
+  reports the database (set, answering, at head, what it holds). The browser's scientific state
+  moved to the service (`project_state.py`, `GET/PUT/DELETE /api/state`): depositions,
+  measured evidence, adopted runbooks and locks, overrides, fits, scenarios, trains made and Live
+  conversations load when a project opens; every change is diffed into an outbox kept in
+  IndexedDB until the service acknowledges it (`src/lib/projectState.ts`, `pnpm check:state`);
+  a snapshot from before alpha 2.0 is carried to the open project once; a browser reset never
+  takes back a row on the service. `check:tools` reads row writes as it read file writes.

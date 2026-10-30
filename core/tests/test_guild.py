@@ -2,13 +2,16 @@
 
 Every rule that keeps a bad write off the ledger has a test that presents
 that write and reads the refusal's rule. Then what a good write leaves behind:
-the entry as sent, stamped by the service, persisted whole; a withdrawal that
-keeps the entry; a dry run that writes nothing; and the four endpoints, which
-answer with the same rules over HTTP. The skills projection is the one
-`pnpm export:corpus` writes; `pnpm test:core` runs that export first.
+the entry as sent, stamped by the service, kept whole in its row; a
+withdrawal that keeps the entry; a dry run that writes nothing; writers at
+once on separate connections, every one landing; and the four endpoints,
+which answer with the same rules over HTTP. The skills are the frozen
+projection conftest.py points Guild at. Every test runs in its own
+rolled-back transaction, in the test project.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import threading
 from datetime import date, timedelta
@@ -16,18 +19,17 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
-from openferment_core import guild, practice
+from openferment_core import db, guild, projects
 from openferment_core.api import app
-from openferment_core.models import EvidenceSource, GuildEvidence, GuildPerson, GuildWithdrawal
+from openferment_core.db import migrate
+from openferment_core.db import models as t
+from openferment_core.db import rows
+from openferment_core.db.engine import make_engine
+from openferment_core.models import EvidenceSource, GuildEvidence, GuildPerson, GuildWithdrawal, ProjectCreate
 
 TODAY = date.today().isoformat()
-
-
-@pytest.fixture(autouse=True)
-def _ledger(monkeypatch, tmp_path):
-    monkeypatch.setattr(guild, "PATH", tmp_path / "guild.json")
-    monkeypatch.setattr(practice, "PATH", tmp_path / "practice.json")
 
 
 def person(pid: str, name: str, role: str = "member", added_by: str | None = "p-sean", **extra) -> GuildPerson:
@@ -119,20 +121,35 @@ def test_the_ledger_never_loses_its_last_lead():
 # ── evidence ───────────────────────────────────────────────────────────
 
 
+async def _evidence_rows() -> list[dict]:
+    async with db.session() as s:
+        return await rows.bodies(s, t.guild_evidence, projects.current())
+
+
+async def _row_counts() -> tuple[int, int]:
+    async with db.session() as s:
+        people = (await s.execute(select(func.count()).select_from(t.guild_people))).scalar_one()
+        evidence = (await s.execute(select(func.count()).select_from(t.guild_evidence))).scalar_one()
+    return people, evidence
+
+
 def test_a_good_signoff_is_stored_whole_and_stamped():
     team()
     stored = guild.write_evidence(entry("e-check-1", "p-patrick", raw="  Inverted, blanked on spent medium  "))
     assert stored.raw == "Inverted, blanked on spent medium"
     assert stored.recordedAt and stored.withdrawnAt is None
-    on_disk = json.loads(guild.PATH.read_text())
-    assert [e["id"] for e in on_disk["evidence"]] == ["e-desig-eric-od", "e-check-1"]
+    kept = db.run(_evidence_rows())
+    assert [e["id"] for e in kept] == ["e-desig-eric-od", "e-check-1"]
+    assert kept[-1] == stored.model_dump(mode="json", exclude_none=True), "the row is the entry, whole"
 
 
 def test_dry_run_runs_every_rule_and_writes_nothing():
     team()
-    before = guild.PATH.read_text()
+    before, rows_before = guild.read(), db.run(_row_counts())
     guild.write_evidence(entry("e-check-1", "p-patrick"), dry_run=True)
-    assert guild.PATH.read_text() == before
+    guild.write_person(person("p-dry", "Dry Run"), dry_run=True)
+    guild.withdraw(GuildWithdrawal(evidenceId="e-desig-eric-od", by="p-sean", at=TODAY, reason="Asking only"), dry_run=True)
+    assert guild.read() == before and db.run(_row_counts()) == rows_before
     refused("observer", guild.write_evidence, entry("e-check-2", "p-patrick", observer=None), dry_run=True)
 
 
@@ -259,6 +276,68 @@ def test_concurrent_writes_all_land():
     assert not errors
     ids = {e.id for e in guild.read().evidence}
     assert all(f"e-par-{i:04d}" in ids for i in range(24))
+
+
+@pytest.fixture()
+def committed(test_database):
+    """A database of this test's own, with real connections and commits, as
+    two processes see it: the per-test rollback shares one connection, where
+    writers can only take turns."""
+    test_database.open()
+    name = f"{test_database.name}_guild"
+    url = migrate.create(name, test_database.server)
+    engine = make_engine(url, pool_size=8, max_overflow=0)
+    previous_engine, previous_binding = db.use_engine(engine), db.bind(None)
+    try:
+        migrate.upgrade(url)
+        projects.create(ProjectCreate(id=projects.current(), name="Test project", by="test"))
+        yield
+    finally:
+        db.bind(previous_binding)
+        db.use_engine(previous_engine)
+        db.run(engine.dispose())
+        migrate.drop(name, test_database.server)
+
+
+def test_writers_on_separate_connections_take_turns_and_an_entry_id_lands_once(committed, monkeypatch):
+    """Eight writers post the same entry id, each on a connection of its own.
+    Each one, having read the ledger, waits until all eight have read it (or a
+    moment has passed): with no lock all eight would pass the duplicate rule
+    on the same empty ledger. Under the lock one entry lands and the other
+    seven are refused as duplicates."""
+    team()
+    real = guild.read_in
+    seen = {"reads": 0}
+    everyone_read = asyncio.Event()
+
+    async def slow_read(s, project_id):
+        held = await real(s, project_id)
+        seen["reads"] += 1
+        if seen["reads"] >= 8:
+            everyone_read.set()
+        try:
+            await asyncio.wait_for(everyone_read.wait(), timeout=0.3)
+        except TimeoutError:
+            pass
+        return held
+
+    monkeypatch.setattr(guild, "read_in", slow_read)
+    outcomes: list[str] = []
+
+    def post(i: int) -> None:
+        try:
+            guild.write_evidence(entry("e-race-0001", "p-patrick", kind="supervised", raw=f"Run seen by writer {i}"))
+            outcomes.append("kept")
+        except guild.GuildRefused as e:
+            outcomes.append(e.rule)
+
+    writers = [threading.Thread(target=post, args=(i,)) for i in range(8)]
+    for w in writers:
+        w.start()
+    for w in writers:
+        w.join()
+    assert sorted(outcomes) == ["duplicate"] * 7 + ["kept"]
+    assert [e.id for e in guild.read().evidence].count("e-race-0001") == 1
 
 
 # ── over HTTP ──────────────────────────────────────────────────────────

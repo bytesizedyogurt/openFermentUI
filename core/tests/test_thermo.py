@@ -44,9 +44,9 @@ def _run(aid=RUN_ID, provenance="computed", tool="proforma.run") -> Artifact:
 
 
 def _keep(art: Artifact) -> None:
-    folder = artifacts.folder()
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{art.id}.json").write_text(art.model_dump_json(), encoding="utf-8")
+    from standins import plant_artifact
+
+    plant_artifact(art)
 
 
 class StandIn:
@@ -326,7 +326,9 @@ def test_a_damaged_file_is_a_409_in_words_never_a_500(store, worker, client):
     """OF-BLD-019 §4.R: a run's file, or the answer's, that does not parse is
     said in words, as GET /api/biorepo/artifacts/{id} says it, and the card
     shows them; it was an unhandled 500 ('check its log')."""
-    (artifacts.folder() / "bbbbbbbbbbbbbbb2.json").write_text("not json", encoding="utf-8")
+    from standins import plant_damaged
+
+    plant_damaged("bbbbbbbbbbbbbbb2")
     q = {"artifactId": "bbbbbbbbbbbbbbb2", "streamId": "beer"}
     for r in (client.get("/api/thermo/props", params=q), client.post("/api/thermo/props", json=q)):
         assert r.status_code == 409 and "bbbbbbbbbbbbbbb2 is damaged on disk" in r.json()["detail"], r.text
@@ -335,7 +337,7 @@ def test_a_damaged_file_is_a_409_in_words_never_a_500(store, worker, client):
     inputs, _ = thermo.basis_inputs(ThermoPropsRequest(**asked), None)
     reg = artifacts.registered(thermo.TOOL)
     answer = artifacts.artifact_id(reg.tool, reg.version, inputs)
-    (artifacts.folder() / f"{answer}.json").write_text("{trunc", encoding="utf-8")
+    plant_damaged(answer)
     for r in (client.get("/api/thermo/props", params=asked), client.post("/api/thermo/props", json=asked)):
         assert r.status_code == 409 and f"{answer} is damaged on disk" in r.json()["detail"], r.text
     assert worker.calls == [], "nothing is asked of thermosteam over a damaged answer"
@@ -559,8 +561,10 @@ def test_the_volatility_endpoints_answer_read_and_say_what_is_missing(store, vwo
 
 
 def test_a_damaged_volatility_is_a_409_in_words(store, vworker, client):
+    from standins import plant_damaged
+
     art = thermo.volatility("ethanol")
-    (artifacts.folder() / f"{art.id}.json").write_text("{trunc", encoding="utf-8")
+    plant_damaged(art.id)
     for r in (client.get("/api/thermo/volatility", params={"product": "ethanol"}),
               client.post("/api/thermo/volatility", json={"product": "ethanol"})):
         assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"], r.text

@@ -398,8 +398,7 @@ def test_the_bind_endpoint_and_the_family_scope_bind_alike(client):
     bad = client.get(f"/api/params/{SCOPE}", params={"fit": "0123456789abcdef"})
     assert bad.status_code == 422 and "there is no kept fit" in bad.json()["detail"]
     # A binding keeps nothing.
-    kept = intake.DATA_DIR / "artifacts"
-    assert not kept.exists() or not list(kept.glob("*.json"))
+    assert artifacts.all_artifacts() == []
 
 
 # ── records named for a parameter (OF-BLD-020 §3.4, D13) ───────────────

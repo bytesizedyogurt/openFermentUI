@@ -11,11 +11,11 @@ from pathlib import Path
 
 import anthropic
 import httpx
-import json
 
 import pytest
 
-from openferment_core import api, biorepo, extract, intake, llm, ready
+from openferment_core import api, db, intake, llm, projects, ready
+from openferment_core.db import migrate
 
 # Shaped like a key, so check_key accepts it; random, so no piece of it turns
 # up in the report by coincidence. Built from parts so check:secrets, which
@@ -56,11 +56,13 @@ class FakeClient:
 
 
 @pytest.fixture(autouse=True)
-def _scratch(monkeypatch, tmp_path):
+def _scratch(monkeypatch, tmp_path, test_database):
     monkeypatch.delenv("OPENFERMENT_FIXTURES", raising=False)
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
+    # The data row reads the database at the address set: the session's own,
+    # migrated to head.
+    test_database.open()
+    monkeypatch.setenv(db.URL_SETTING, test_database.url.render_as_string(hide_password=False))
 
 
 # ── the key ────────────────────────────────────────────────────────────
@@ -289,14 +291,35 @@ def test_a_damaged_corpus_is_a_failure_with_the_fix(monkeypatch):
     assert check.mark == "fail" and "could not be read" in check.detail and "Expecting value" in check.detail
 
 
-def test_data_reports_a_file_that_does_not_parse():
-    biorepo.PATH.write_text("{ not json", encoding="utf-8")
-    assert ready.check_data().mark == "fail"
-
-
-def test_data_counts_decisions():
+def test_data_names_the_setting_when_no_database_is_set(monkeypatch):
+    monkeypatch.delenv(db.URL_SETTING, raising=False)
     check = ready.check_data()
-    assert check.mark == "ok" and check.detail.startswith("0 review decisions")
+    assert check.mark == "fail" and db.URL_SETTING in check.detail
+
+
+def test_data_reports_a_database_that_does_not_answer(monkeypatch):
+    monkeypatch.setenv(db.URL_SETTING, "postgresql://nobody:nothing@127.0.0.1:9/none")
+    check = ready.check_data()
+    assert check.mark == "fail" and "did not answer" in check.detail and "nothing@" not in check.detail
+
+
+def test_data_reports_a_database_behind_the_newest_schema(monkeypatch, test_database):
+    test_database.open()
+    name = f"{test_database.name}_bare"
+    bare = migrate.create(name, test_database.server)
+    try:
+        monkeypatch.setenv(db.URL_SETTING, bare.render_as_string(hide_password=False))
+        check = ready.check_data()
+        assert check.mark == "fail" and "pnpm db:migrate" in check.detail
+    finally:
+        migrate.drop(name, test_database.server)
+
+
+def test_data_counts_projects_and_decisions(monkeypatch, test_database):
+    test_database.open()
+    monkeypatch.setenv(db.URL_SETTING, test_database.url.render_as_string(hide_password=False))
+    check = ready.check_data()
+    assert check.mark == "ok" and check.detail.startswith("1 project, 0 review decisions, at revision")
 
 
 def test_dist_dir_is_the_one_the_service_mounts():
@@ -404,28 +427,38 @@ def test_a_model_file_that_is_missing_or_changed_is_named(monkeypatch):
     assert c.mark == "warn" and "iMM904's file is not on this machine" in c.detail and "Yeast9's file" in c.detail
 
 
-def test_artifacts_are_counted(monkeypatch, tmp_path):
-    from openferment_core import artifacts
+def test_artifacts_are_counted_across_every_project():
+    from openferment_core.db import models as t
+    from openferment_core.db import rows
 
-    monkeypatch.setattr(artifacts, "folder", lambda: tmp_path)
-    (tmp_path / "a.json").write_text("{}")
-    (tmp_path / "b.json").write_text("{}")
+    async def keep() -> None:
+        async with db.session() as s:
+            for aid in ("a" * 16, "b" * 16):
+                await rows.put(s, t.artifacts, projects.current(), aid, {}, by="test", tool="t", version="1", output_hash="h")
+
+    db.run(keep())
     assert ready.check_artifacts().detail == "2 kept"
 
 
-def test_spend_reads_today_against_the_cap_and_a_damaged_file_fails(monkeypatch, tmp_path):
+def test_spend_reads_today_against_the_cap_and_unknown_spend_fails(monkeypatch):
     from openferment_core import spend
+    from openferment_core.db.engine import make_engine
 
-    f = tmp_path / "spend.json"
-    monkeypatch.setattr(spend, "path", lambda: f)
     monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "2")
-    f.write_text(json.dumps({"day": spend.today(), "byRole": {"answer": 1.5, "index": 0.25}, "calls": 3, "reservations": {}}))
+    spend.charge("answer", 1.5)
+    spend.charge("index", 0.25)
     c = ready.check_spend()
     assert c.mark == "ok" and "$1.75 of the $2.00 daily cap" in c.detail
-    f.write_text(json.dumps({"day": spend.today(), "byRole": {"answer": 2.0}, "calls": 3, "reservations": {}}))
+    spend.charge("answer", 0.25)
     assert ready.check_spend().mark == "warn"
-    f.write_text("{not json")
-    assert ready.check_spend().mark == "fail"
+    down = make_engine("postgresql://nobody:nothing@127.0.0.1:9/none")
+    previous_binding, previous_engine = db.bind(None), db.use_engine(down)
+    try:
+        assert ready.check_spend().mark == "fail"
+    finally:
+        db.use_engine(previous_engine)
+        db.bind(previous_binding)
+        db.run(down.dispose())
 
 
 def test_a_worker_that_does_not_answer_is_said(monkeypatch):

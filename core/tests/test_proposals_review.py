@@ -155,8 +155,6 @@ def test_a_restart_does_not_propose_twice(pool, store, monkeypatch):  # noqa: F8
 
 @pytest.fixture()
 def ledger(store, monkeypatch):
-    monkeypatch.setattr(guild, "PATH", store / "guild.json")
-    monkeypatch.setattr(checks, "PATH", store / "checks.json")
     monkeypatch.setattr(checks, "ENV_FILE", store / ".env")
 
     def person(pid, name, role="member", added_by="p-sean"):

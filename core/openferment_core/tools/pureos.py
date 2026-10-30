@@ -36,8 +36,8 @@ act on, because `afterUnitId` names where a unit goes and not which one, and
 Every action is a free write through `tools/writes.py` (the same function as
 `pureos_write`'s `new_train`, `add_unit`, `remove_unit`, `set_from_record` and
 `run_train`), at no gate, audited with the model as agent. The train itself is
-kept on the service (`pureos.kept`, `core/data/pureos-trains.json`), marked as
-the model's; a person's trains stay in their browser. The service holds no
+kept on the service (`pureos.kept`, rows of the `trains` table), marked as
+the model's; a person's trains are the project's rows the Builder keeps. The service holds no
 person's value, so a value nothing binds waits at the run, and the call returns
 the refusal's words: a person types it in pureOS → Builder.
 

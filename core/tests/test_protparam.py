@@ -233,8 +233,10 @@ def test_the_endpoints_say_what_is_missing_and_what_is_refused(store, seed, clie
 
 
 def test_a_damaged_answer_is_a_409_in_words(store, seed, client):
+    from standins import plant_damaged
+
     art = protparam.of_product("insulin-b-chain")
-    (artifacts.folder() / f"{art.id}.json").write_text("{trunc", encoding="utf-8")
+    plant_damaged(art.id)
     for r in (client.get("/api/protparam", params={"product": "insulin-b-chain"}),
               client.post("/api/protparam", json={"product": "insulin-b-chain"})):
         assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"], r.text

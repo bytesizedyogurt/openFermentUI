@@ -18,6 +18,48 @@ CORE = Path(__file__).resolve().parent.parent
 AT = "2026-09-15T09:00:00Z"
 
 
+# ── Planting rows in the artifact store ────────────────────────────────
+#
+# A test that needs an artifact the code would never keep (a copy under
+# another id, an output changed by hand, an older date, a damaged row) plants
+# it in the current project's artifact store (ADR-001) with these, the way
+# the file store's tests wrote a file by hand.
+PLANTED_BY = "openFerment test fixture"
+
+
+def plant_artifact(art: Any) -> Any:
+    """Keep `art` exactly as given, over any row of the same id; return it."""
+    from openferment_core import db, projects
+    from openferment_core.db import models as t
+    from openferment_core.db import rows
+
+    project_id = projects.current()
+
+    async def keep() -> None:
+        async with db.session() as s:
+            await rows.put(s, t.artifacts, project_id, art.id, art.model_dump(mode="json"), by=PLANTED_BY,
+                           tool=art.tool, version=art.toolVersion, output_hash=art.outputHash)
+
+    db.run(keep())
+    return art
+
+
+def plant_damaged(aid: str) -> None:
+    """A row under `aid` whose body does not read as an artifact."""
+    from openferment_core import db, projects
+    from openferment_core.db import models as t
+    from openferment_core.db import rows
+
+    project_id = projects.current()
+
+    async def keep() -> None:
+        async with db.session() as s:
+            await rows.put(s, t.artifacts, project_id, aid, {"id": aid, "output": "a STAND-IN body that reads as no "
+                           "artifact"}, by=PLANTED_BY, tool="damaged", version="", output_hash="")
+
+    db.run(keep())
+
+
 _SHAPE = {"x0": 0.12, "mu": 0.3, "xmax": 9.0, "p0": 0.05, "alpha": 0.35, "beta": 0.015, "s0": 60.0, "gamma": 4.2, "delta": 0.04}
 
 
@@ -61,8 +103,9 @@ BRIDGE_LABELS = {"biomass": "Dry cell weight (STAND-IN)", "product": "Ethanol (S
 
 
 def _bridge_fits() -> tuple[str, str]:
-    """The bridge's STAND-IN fit and its forecast, kept in the current store
-    (artifacts.folder()) through the real code: their ids, the fit's first."""
+    """The bridge's STAND-IN fit and its forecast, kept in the current
+    project's artifact store through the real code: their ids, the fit's
+    first."""
     from openferment_core import fermos
     from openferment_core.models import FermosSeries
 
@@ -344,11 +387,11 @@ STANDIN_CEILING_NOTE = ("STAND-IN ceiling for tests and the browser double: not 
 
 def standin_ceiling(model_id: str, product: str, substrate: str, g_per_g: float, *, at: str = AT,
                     version: str = "STAND-IN ceiling 1"):
-    """Keep one STAND-IN `geneos.ceiling` artifact in the current store
-    (artifacts.folder()), in the shape the geneOS worker writes, for the
-    shelf model `model_id`; return it. Its basis is geneos's own but for the
-    model input, an assumption that says what it is."""
-    from openferment_core import artifacts, atomic, geneos, geneos_models
+    """Keep one STAND-IN `geneos.ceiling` artifact in the current project's
+    artifact store, in the shape the geneOS worker writes, for the shelf
+    model `model_id`; return it. Its basis is geneos's own but for the model
+    input, an assumption that says what it is."""
+    from openferment_core import artifacts, geneos, geneos_models
     from openferment_core.basis import basis_provenance
     from openferment_core.models import Artifact, BasisInput, BasisSource, ComputedBasis
 
@@ -365,9 +408,7 @@ def standin_ceiling(model_id: str, product: str, substrate: str, g_per_g: float,
     art = Artifact(id=aid, tool=geneos.CEILING, toolVersion=version, inputs=inputs, output=output,
                    outputHash=artifacts.output_hash(output), provenance=basis_provenance(basis, {}, {}), createdAt=at,
                    durationMs=0)
-    artifacts.folder().mkdir(parents=True, exist_ok=True)
-    atomic.write_text(artifacts.folder() / f"{aid}.json", art.model_dump_json(indent=2) + "\n")
-    return art
+    return plant_artifact(art)
 
 
 VESSEL_FIXTURE_RTOL = 1e-6

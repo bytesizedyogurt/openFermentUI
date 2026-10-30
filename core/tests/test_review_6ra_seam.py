@@ -29,6 +29,7 @@ from fastapi.testclient import TestClient
 import test_vessel as tv
 from openferment_core import artifacts, fermos, kinetics, proforma, pureos, vessel
 from openferment_core.models import Artifact, Override, TrainSpec, VesselRequest
+from standins import plant_artifact
 from test_train import (  # noqa: F401 (the fixtures, by name)
     AT,
     BY,
@@ -76,9 +77,7 @@ def states_of(h) -> dict[str, float]:
 def keep_copy(art: Artifact, aid: str, **output) -> Artifact:
     """A copy of a kept simulation written by hand under another id, its
     output changed as given (a STAND-IN artifact)."""
-    copy = art.model_copy(update={"id": aid, "output": {**art.output, **output}})
-    (artifacts.folder() / f"{aid}.json").write_text(copy.model_dump_json(), encoding="utf-8")
-    return copy
+    return plant_artifact(art.model_copy(update={"id": aid, "output": {**art.output, **output}}))
 
 
 def without_harvest_point(art: Artifact, aid: str) -> Artifact:

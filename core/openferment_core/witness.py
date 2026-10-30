@@ -281,7 +281,7 @@ def match_run(
 
     # falsePositives stays empty here on purpose: a candidate the seed does
     # not cover is unscored until a reviewer rejects it (§6.2, §7.3) —
-    # `false_positives` below reads those rejections from biorepo.json.
+    # `false_positives` below reads those rejections from the decisions.
     return ExtractRun(run=run, results=results, falsePositives=[])
 
 
@@ -334,11 +334,11 @@ def seed_records() -> list[dict[str, Any]]:
 
 @dataclass
 class Gathered:
-    """Everything the cache and biorepo.json say about candidates, read once."""
+    """Everything the candidates and the decisions say about candidates, read once."""
 
     candidates: list[Candidate] = field(default_factory=list)
     # The candidates the extractor produces NOW — what the run is scored on.
-    # A copy biorepo.json keeps of a candidate a re-extraction no longer
+    # A copy a decision keeps of a candidate a re-extraction no longer
     # produces is still a record (if accepted) and still a false positive (if
     # rejected), but it is not something the current run got right.
     current: list[Candidate] = field(default_factory=list)
@@ -351,12 +351,12 @@ class Gathered:
 
 
 def _gather() -> Gathered:
-    """Every candidate the extractor produced, plus the copies biorepo.json
-    keeps of the ones a reviewer decided — the same candidate when both exist
+    """Every candidate the extractor produced, plus the copies the decisions
+    keep of the ones a reviewer decided — the same candidate when both exist
     (ids are content-addressed, so the same id IS the same content), and the
-    only copy on a fresh clone where candidates/ is empty. The scored papers
-    are the extracted ones alone: a decided candidate does not make its paper
-    a paper the extractor ran over in this checkout.
+    only copy where the extraction is gone. The scored papers are the
+    extracted ones alone: a decided candidate does not make its paper a paper
+    the extractor ran over in this project.
 
     A candidate a model wrote by hand is gathered for the overlay, so Guild
     shows it, and never scored: it makes no paper extracted and is never the
@@ -407,8 +407,8 @@ def _run(g: Gathered, seed: list[dict[str, Any]]) -> ExtractRun:
 
 
 def runs() -> list[ExtractRun]:
-    """GET /api/witness/runs — recomputed from every candidates/*.json against
-    the seed, with the reviewers' rejections from biorepo.json as the false
+    """GET /api/witness/runs — recomputed from every paper's candidates against
+    the seed, with the reviewers' rejections from the decisions as the false
     positives. Empty when nothing has been extracted: no run, no number."""
     g = _gather()
     if not g.papers:
@@ -418,9 +418,9 @@ def runs() -> list[ExtractRun]:
 
 def new_candidates() -> list[Candidate]:
     """The candidates the seed has no record for (§6.2): the undecided ones
-    from the cache, and every one a reviewer has decided, from biorepo.json,
-    so an accepted record is still a record on a checkout that never ran the
-    extractor."""
+    from the candidates, and every one a reviewer has decided, from the
+    decisions, so an accepted record is still a record where the extraction
+    is gone."""
     g = _gather()
     decided = {c.id for c in biorepo.records()}
     fresh = new_records(g.candidates, seed_records(), papers=g.papers) if g.papers else []
@@ -440,7 +440,7 @@ def overlay_candidates() -> list[Candidate]:
 
 def overlay_bundle() -> tuple[list[ExtractRun], list[Candidate], dict[str, ReviewDecision]]:
     """Runs, candidates and decisions for the overlay, from ONE read of the
-    cache and biorepo.json — the store asks on every page load and after
+    candidates and the decisions — the store asks on every page load and after
     every extraction. A missing corpus.json costs the run, not the rest."""
     g = _gather()
     try:

@@ -23,10 +23,11 @@ import { PlanTrace } from '@/components/PlanTrace';
  * searched, what came back, how long it took.
  *
  * A turn is a question and the AnswerPlan the service returned (LiveTurn), in
- * its own list (`liveConversations`), in the Durable tier: a citation followed
- * and returned from, or a reload, finds the conversation where it was, and a
- * follow-up sends the earlier turns' words with its question (`priorTurns`).
- * The service keeps no history; the browser sends it.
+ * its own list (`liveConversations`), kept in the open project's rows
+ * (lib/projectState.ts): a citation followed and returned from, or a reload,
+ * finds the conversation where it was, and a follow-up sends the earlier
+ * turns' words with its question (`priorTurns`). The loop reads the history
+ * the page sends; stage 6 gives Postdoc its memory on the service.
  */
 
 /** The streams in flight, by turn id. Module-level, so Stop still reaches a

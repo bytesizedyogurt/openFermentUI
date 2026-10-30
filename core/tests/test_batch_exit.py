@@ -17,7 +17,6 @@ from openferment_core.models import ExtractResponse, FetchResult, IntakeStatus
 @pytest.fixture(autouse=True)
 def _scratch(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
 
 
 def result(paper_id: str, status: str = "failed:fetch") -> FetchResult:

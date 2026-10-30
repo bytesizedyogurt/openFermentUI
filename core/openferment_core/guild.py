@@ -1,14 +1,17 @@
 """Guild — the competence ledger, and the only functions that write it (OF-BLD-013 §1.2, §2.1, §3.1).
 
-core/data/guild.json holds the people on the team and every entry recorded
-about them: a passed lesson, a training briefing, a supervised run, a run
-alone, a deviation, a witnessed check, the lead's designation of an assessor. A person's level on a skill is never
-stored. The browser computes it from these entries (src/engine/competence.ts),
-so the ledger only has to be right about what happened and who saw it.
+A project's ledger is its rows in `guild_people` and `guild_evidence`, with
+the lead's policy in the project's settings: the people on the team and
+every entry recorded about them, a passed lesson, a training briefing, a
+supervised run, a run alone, a deviation, a witnessed check, the lead's
+designation of an assessor. A person's level on a skill is never stored. The
+browser computes it from these entries (src/engine/competence.ts), so the
+ledger only has to be right about what happened and who saw it.
 
-Four writes, each a read-modify-write under one lock, each refusing with the
-rule that failed and the reason in words, each with a `dry_run` that runs
-every rule and writes nothing:
+Four writes, each a read-check-write in one transaction under the project's
+Guild lock (`db.lock`), each refusing with the rule that failed and the
+reason in words, each with a `dry_run` that runs every rule and writes
+nothing:
 
   write_person      add someone, or change their title, role or active flag
   write_evidence    append one entry
@@ -62,23 +65,29 @@ from __future__ import annotations
 import json
 import logging
 import re
-import threading
 from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from . import atomic, intake
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from . import db, projects
 from .biorepo import MIN_REVIEWER_CHARS, PLACEHOLDER_REVIEWERS
 from .competence import Competence
+from .db import models as t
+from .db import rows
 from .models import Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal
+
+if TYPE_CHECKING:
+    from .models import Check
 
 log = logging.getLogger("openferment.guild")
 
-PATH = intake.DATA_DIR / "guild.json"
 PROJECTION = Path(__file__).parent / "data" / "skills.json"
-
-_WRITE_LOCK = threading.Lock()
+# Where the lead's policy sits in the project's settings.
+POLICY_KEY = "guildPolicy"
 
 RULES = (
     "name",
@@ -176,18 +185,54 @@ def protocol_ids() -> set[str]:
     return {st["protocolId"] for st in projection()["steps"]}
 
 
-# ── the file ───────────────────────────────────────────────────────────
+# ── the rows ───────────────────────────────────────────────────────────
+
+
+async def read_in(s: AsyncSession, project_id: str) -> Guild:
+    """The project's ledger inside a transaction under way: people and entries
+    in the order they were written, and the lead's policy, or the default
+    while none has been set. Nobody added yet is an empty ledger."""
+    people = [GuildPerson.model_validate(b) for b in await rows.bodies(s, t.guild_people, project_id)]
+    evidence = [GuildEvidence.model_validate(b) for b in await rows.bodies(s, t.guild_evidence, project_id)]
+    settings = (await s.execute(select(t.projects.c.settings).where(t.projects.c.id == project_id))).scalar_one_or_none()
+    held = (settings or {}).get(POLICY_KEY)
+    return Guild(people=people, evidence=evidence, policy=GuildPolicy.model_validate(held) if held else GuildPolicy())
+
+
+async def _read(project_id: str) -> Guild:
+    async with db.session() as s:
+        return await read_in(s, project_id)
 
 
 def read() -> Guild:
-    """The ledger. A missing file is an empty ledger: nobody has been added."""
-    if not PATH.exists():
-        return Guild()
-    return Guild.model_validate_json(PATH.read_text(encoding="utf-8"))
+    """The current project's ledger."""
+    return db.run(_read(projects.current()))
 
 
-def _persist(ledger: Guild) -> None:
-    atomic.write_text(PATH, ledger.model_dump_json(indent=2, exclude_none=True) + "\n")
+def _body(model: GuildPerson | GuildEvidence | GuildPolicy) -> dict[str, Any]:
+    return model.model_dump(mode="json", exclude_none=True)
+
+
+async def _keep_person(s: AsyncSession, project_id: str, person: GuildPerson) -> None:
+    # The first person is added by nobody; their row is the system's.
+    await rows.put(s, t.guild_people, project_id, person.id, _body(person), by=person.addedBy or "system")
+
+
+async def _keep_entry(s: AsyncSession, project_id: str, entry: GuildEvidence) -> None:
+    # Who signed it, or the operator, for a record that names no observer.
+    await rows.put(
+        s, t.guild_evidence, project_id, entry.id, _body(entry),
+        by=entry.observerId or entry.personId, person_id=entry.personId, skill_id=entry.skillId,
+    )
+
+
+async def _keep_policy(s: AsyncSession, project_id: str, policy: GuildPolicy) -> None:
+    held = (
+        await s.execute(select(t.projects.c.settings).where(t.projects.c.id == project_id).with_for_update())
+    ).scalar_one()
+    await s.execute(
+        update(t.projects).where(t.projects.c.id == project_id).values(settings={**(held or {}), POLICY_KEY: _body(policy)})
+    )
 
 
 def _now() -> str:
@@ -241,17 +286,22 @@ def write_policy(policy: GuildPolicy, *, dry_run: bool = False) -> GuildPolicy:
     changes them, and the change names who made it."""
     if not 0 <= policy.checksPerQuarter <= 12:
         raise GuildRefused("policy", "checks per quarter is a whole number from none to twelve")
-    with _WRITE_LOCK:
-        ledger = read()
+    stored = db.run(_write_policy(projects.current(), policy, dry_run))
+    if not dry_run:
+        log.info("guild: policy %s/%s, %d checks a quarter, by %s", stored.routineGate, stored.criticalGate, stored.checksPerQuarter, stored.updatedBy)
+    return stored
+
+
+async def _write_policy(project_id: str, policy: GuildPolicy, dry_run: bool) -> GuildPolicy:
+    async with db.session() as s:
+        await db.lock(s, "guild", project_id)
+        ledger = await read_in(s, project_id)
         if not _active_lead(ledger, policy.updatedBy):
             raise GuildRefused("authority", "only an active lead changes the team's gate and check rate")
         stored = policy.model_copy(update={"updatedAt": _now()})
-        if dry_run:
-            return stored
-        ledger.policy = stored
-        _persist(ledger)
-    log.info("guild: policy %s/%s, %d checks a quarter, by %s", stored.routineGate, stored.criticalGate, stored.checksPerQuarter, stored.updatedBy)
-    return stored
+        if not dry_run:
+            await _keep_policy(s, project_id, stored)
+        return stored
 
 
 def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:
@@ -268,9 +318,17 @@ def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:
         raise GuildRefused("duplicate", f"{person.id!r} is not a person id (p- and lower-case letters, digits, hyphens)")
     if _day(person.joinedAt) is None:
         raise GuildRefused("date", f"joinedAt {person.joinedAt!r} is not a date")
+    stored, existing = db.run(_write_person(projects.current(), person, dry_run))
+    if not dry_run:
+        log.info("guild: person %s (%s) %s", stored.id, stored.role, "changed" if existing else "added")
+    return stored
 
-    with _WRITE_LOCK:
-        ledger = read()
+
+async def _write_person(project_id: str, person: GuildPerson, dry_run: bool) -> tuple[GuildPerson, GuildPerson | None]:
+    """The person as stored, and as they stood before when they were already on the ledger."""
+    async with db.session() as s:
+        await db.lock(s, "guild", project_id)
+        ledger = await read_in(s, project_id)
         existing = _people(ledger).get(person.id)
         if existing is None:
             if any(p.name.strip().lower() == person.name.strip().lower() for p in ledger.people):
@@ -287,7 +345,6 @@ def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:
             elif not _active_lead(ledger, person.addedBy):
                 raise GuildRefused("added", f"{person.addedBy!r} is not an active lead; only a lead adds people")
             stored = person.model_copy(update={"addedAt": _now(), "updatedBy": None, "updatedAt": None})
-            ledger.people.append(stored)
         else:
             if not _active_lead(ledger, person.updatedBy):
                 raise GuildRefused("added", f"{person.updatedBy!r} is not an active lead; only a lead changes a person")
@@ -307,12 +364,9 @@ def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:
                     "updatedAt": _now(),
                 }
             )
-            ledger.people = [stored if p.id == person.id else p for p in ledger.people]
-        if dry_run:
-            return stored
-        _persist(ledger)
-    log.info("guild: person %s (%s) %s", stored.id, stored.role, "changed" if existing else "added")
-    return stored
+        if not dry_run:
+            await _keep_person(s, project_id, stored)
+        return stored, existing
 
 
 # ── evidence ───────────────────────────────────────────────────────────
@@ -337,8 +391,11 @@ def write_check_entries(entries: list[GuildEvidence], check_id: str, *, dry_run:
     return _write_entries(entries, dry_run=dry_run, from_check=check_id)
 
 
-def _precheck(entry: GuildEvidence, known: dict[str, dict[str, Any]], from_check: str | None) -> date:
-    """Every rule that needs no ledger. Returns the entry's day."""
+def _precheck(
+    entry: GuildEvidence, known: dict[str, dict[str, Any]], from_check: str | None, check: Check | None = None
+) -> date:
+    """Every rule that needs no ledger. Returns the entry's day. `check` is the
+    open check a run is writing, read in the run's own transaction."""
     if not EVIDENCE_ID.match(entry.id):
         raise GuildRefused("duplicate", f"{entry.id!r} is not an entry id (e- and 4 to 64 letters, digits or hyphens)")
     if entry.skillId not in known:
@@ -382,7 +439,7 @@ def _precheck(entry: GuildEvidence, known: dict[str, dict[str, Any]], from_check
         if from_check != entry.source.ref:
             raise GuildRefused("source", "an entry from a check is written by running the check at the bench, which calls every criterion")
 
-        ck = checks.get(entry.source.ref)
+        ck = check if check is not None and check.id == entry.source.ref else checks.get(entry.source.ref)
         if ck is None:
             raise GuildRefused("source", f"{entry.source.ref!r} is not a check")
         if ck.state not in checks.OPEN:
@@ -417,18 +474,50 @@ def _precheck(entry: GuildEvidence, known: dict[str, dict[str, Any]], from_check
 def _write_entries(entries: list[GuildEvidence], *, dry_run: bool, from_check: str | None) -> list[GuildEvidence]:
     known = skills()
     days = [_precheck(e, known, from_check) for e in entries]
-    with _WRITE_LOCK:
-        ledger = read()
-        people = _people(ledger)
-        stored_all: list[GuildEvidence] = []
-        for entry, day in zip(entries, days):
-            stored_all.append(_admit(entry, day, ledger, people, known, stored_all))
-        if dry_run:
-            return stored_all
-        ledger.evidence.extend(stored_all)
-        _persist(ledger)
+    stored_all = db.run(_write_prechecked(projects.current(), entries, days, known, dry_run))
+    if not dry_run:
+        for stored in stored_all:
+            log.info("guild: %s %s on %s for %s by %s", stored.kind, stored.outcome, stored.skillId, stored.personId, stored.observerId)
+    return stored_all
+
+
+async def _write_prechecked(
+    project_id: str, entries: list[GuildEvidence], days: list[date], known: dict[str, dict[str, Any]], dry_run: bool
+) -> list[GuildEvidence]:
+    async with db.session() as s:
+        return await _admit_and_keep(s, project_id, entries, days, known, dry_run)
+
+
+async def write_check_entries_in(
+    s: AsyncSession, project_id: str, entries: list[GuildEvidence], check: Check, *, dry_run: bool = False
+) -> list[GuildEvidence]:
+    """`write_check_entries` inside the run's own transaction, so the entries
+    and the check they close commit together (`checks.record`)."""
+    known = skills()
+    days = [_precheck(e, known, check.id, check) for e in entries]
+    return await _admit_and_keep(s, project_id, entries, days, known, dry_run)
+
+
+async def _admit_and_keep(
+    s: AsyncSession,
+    project_id: str,
+    entries: list[GuildEvidence],
+    days: list[date],
+    known: dict[str, dict[str, Any]],
+    dry_run: bool,
+) -> list[GuildEvidence]:
+    """Every entry asked against one ledger and kept in one transaction:
+    the batch lands whole or not at all."""
+    await db.lock(s, "guild", project_id)
+    ledger = await read_in(s, project_id)
+    people = _people(ledger)
+    stored_all: list[GuildEvidence] = []
+    for entry, day in zip(entries, days):
+        stored_all.append(_admit(entry, day, ledger, people, known, stored_all))
+    if dry_run:
+        return stored_all
     for stored in stored_all:
-        log.info("guild: %s %s on %s for %s by %s", stored.kind, stored.outcome, stored.skillId, stored.personId, stored.observerId)
+        await _keep_entry(s, project_id, stored)
     return stored_all
 
 
@@ -535,8 +624,16 @@ def withdraw(request: GuildWithdrawal, *, dry_run: bool = False) -> GuildEvidenc
         raise GuildRefused("note", "a withdrawal says why")
     if _day(request.at) is None:
         raise GuildRefused("date", f"{request.at!r} is not a date")
-    with _WRITE_LOCK:
-        ledger = read()
+    stored = db.run(_withdraw(projects.current(), request, dry_run))
+    if not dry_run:
+        log.info("guild: %s withdrawn by %s", stored.id, stored.withdrawnBy)
+    return stored
+
+
+async def _withdraw(project_id: str, request: GuildWithdrawal, dry_run: bool) -> GuildEvidence:
+    async with db.session() as s:
+        await db.lock(s, "guild", project_id)
+        ledger = await read_in(s, project_id)
         target = next((e for e in ledger.evidence if e.id == request.evidenceId), None)
         if target is None:
             raise GuildRefused("evidence", f"{request.evidenceId} is not on the ledger")
@@ -550,9 +647,6 @@ def withdraw(request: GuildWithdrawal, *, dry_run: bool = False) -> GuildEvidenc
         stored = target.model_copy(
             update={"withdrawnAt": request.at, "withdrawnBy": by.id, "withdrawReason": request.reason.strip()}
         )
-        if dry_run:
-            return stored
-        ledger.evidence = [stored if e.id == target.id else e for e in ledger.evidence]
-        _persist(ledger)
-    log.info("guild: %s withdrawn by %s", stored.id, stored.withdrawnBy)
-    return stored
+        if not dry_run:
+            await _keep_entry(s, project_id, stored)
+        return stored

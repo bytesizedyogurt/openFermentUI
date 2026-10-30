@@ -313,6 +313,7 @@ export default function App() {
   const hydrateDurable = useStore((s) => s.hydrateDurable);
   const hydrateOverlay = useStore((s) => s.hydrateOverlay);
   const loadProjects = useStore((s) => s.loadProjects);
+  const hydrateProjectState = useStore((s) => s.hydrateProjectState);
   const route = useRoute();
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
@@ -328,12 +329,14 @@ export default function App() {
   // Asynchronous and best-effort: if IndexedDB is unavailable the app runs on
   // memory and Settings says so, rather than blocking the screen on storage.
   useEffect(() => {
-    void hydrateDurable();
     // alpha 2.0 (ADR-005) — the projects first, so every later call to the
     // service names the open one; then the service's overlay, applied when
-    // the service answers and silent when it does not.
-    void loadProjects().then(() => hydrateOverlay());
-  }, [hydrateDurable, hydrateOverlay, loadProjects]);
+    // the service answers and silent when it does not; then, with what this
+    // browser still owes the service read, the open project's rows.
+    const projects = loadProjects();
+    void projects.then(() => hydrateOverlay());
+    void Promise.all([hydrateDurable(), projects]).then(() => hydrateProjectState());
+  }, [hydrateDurable, hydrateOverlay, loadProjects, hydrateProjectState]);
 
   // Theme / density / motion applied at the document root.
   useEffect(() => {

@@ -31,8 +31,12 @@ from typing import Callable
 import httpx
 from dotenv import load_dotenv
 
-from . import biorepo, extract, intake
+from sqlalchemy import func, select
+
+from . import db, extract, intake
 from .corpus import load_corpus
+from .db import migrate
+from .db import models as t
 from . import llm, spend
 
 CORE = Path(__file__).parent.parent
@@ -86,16 +90,39 @@ def check_build() -> Check:
     return Check("app", "warn", "not built, so the service answers /api alone. Run: pnpm build")
 
 
+def _count(table, *where) -> int:
+    """How many rows `table` holds across every project: `pnpm ready` speaks
+    for the machine."""
+
+    async def count() -> int:
+        async with db.session() as s:
+            return (await s.execute(select(func.count()).select_from(table).where(*where))).scalar_one()
+
+    return db.run(count())
+
+
+def _held() -> tuple[int, int]:
+    """How many projects the database holds, and how many review decisions."""
+    return _count(t.projects), _count(t.decisions)
+
+
 def check_data() -> Check:
-    folder = biorepo.PATH.parent
-    if folder.exists() and not os.access(folder, os.W_OK):
-        return Check("data", "fail", f"{folder} is not writable, so Guild decisions cannot be kept")
+    """The database every record is kept in (ADR-001): set, answering, at the
+    newest schema, and what it holds."""
     try:
-        repo = biorepo.read()
-    except ValueError as e:
-        return Check("data", "fail", f"core/data/biorepo.json does not parse: {str(e).splitlines()[0]}")
-    n = len(repo.decisions)
-    return Check("data", "ok", f"{n} review decision{'s' if n != 1 else ''} in core/data/biorepo.json")
+        url = db.database_url()
+    except db.DatabaseUnavailable as e:
+        return Check("data", "fail", str(e))
+    where = url.render_as_string(hide_password=True)
+    try:
+        at, head = migrate.revision(url), migrate.head()
+    except Exception as e:  # the server's own words are the row's answer
+        return Check("data", "fail", f"{where} did not answer ({type(e).__name__}: {e}). Start PostgreSQL: pnpm db:up")
+    if at != head:
+        return Check("data", "fail", f"{where} is at revision {at or 'none'} of {head}. Run: pnpm db:migrate")
+    n_projects, n_decisions = _held()
+    return Check("data", "ok", f"{n_projects} project{'s' if n_projects != 1 else ''}, {n_decisions} review "
+                               f"decision{'s' if n_decisions != 1 else ''}, at revision {head}")
 
 
 def check_intake() -> Check:
@@ -111,7 +138,10 @@ def check_intake() -> Check:
             complete += 1
         else:
             missed += 1
-    extracted = len(list(extract.CANDIDATES_DIR.glob("*.json")))
+    try:
+        extracted: int | str = _count(t.candidates, t.candidates.c.source == extract.MODEL)
+    except Exception:  # the data row says why the database cannot be read
+        extracted = "an unknown number"
     summary = f"{complete} papers fetched with full text, {missed} misses cached, {extracted} extracted"
     if damaged:
         return Check("intake", "warn", f"{summary}; {len(damaged)} damaged ({', '.join(damaged[:5])}). "
@@ -178,12 +208,10 @@ def check_graphviz() -> Check:
 
 
 def check_artifacts() -> Check:
-    from . import artifacts
-
     try:
-        n = len(list(artifacts.folder().glob("*.json")))
-    except OSError as e:
-        return Check("artifacts", "warn", f"the artifact store cannot be read: {e}")
+        n = _count(t.artifacts)
+    except Exception as e:  # the database's own words are the row's answer
+        return Check("artifacts", "warn", f"the artifact store cannot be read: {type(e).__name__}: {e}")
     return Check("artifacts", "ok", f"{n} kept")
 
 
@@ -191,8 +219,8 @@ def check_spend() -> Check:
     try:
         cap = spend.daily_budget()
         day = spend.today()
-        spent = sum(float(v) for v in spend._read(day)["byRole"].values())
-    except (spend.BudgetSettingInvalid, spend.SpendFileDamaged) as e:
+        spent = spend.total_today()
+    except (spend.BudgetSettingInvalid, spend.SpendUnknown) as e:
         return Check("spend", "fail", str(e))
     mark = "warn" if spent >= cap else "ok"
     return Check("spend", mark, f"${spent:.2f} of the ${cap:.2f} daily cap spent today ({day}, UTC)")
@@ -267,7 +295,7 @@ def check_roles(have_key: bool, client_factory: Callable[[], object] | None = No
         return Check("roles", "fail", str(e))
     try:
         today = f"today ${spend.total_today():.2f} of the ${cap:.2f} daily cap"
-    except spend.SpendFileDamaged as e:
+    except spend.SpendUnknown as e:
         return Check("roles", "fail", str(e))
     chains = {role: llm.chain(role) for role in llm.ROLES}
     named = "; ".join(f"{role}: {' → '.join(models)}" for role, models in chains.items())

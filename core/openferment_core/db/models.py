@@ -4,7 +4,10 @@ Every scientific row carries `project_id`, `created_by` (a person, a model id
 or `system`) and `created_at`. The keys a store looks a row up by are columns;
 the rest of the row is `body`, the Pydantic model of `models.py` dumped as
 JSON, so the Pydantic models stay the one description of a record's content
-and these tables hold and index it. Artifact ids keep the sha256 of their
+and these tables hold and index it. The content columns are `json`, which
+keeps the text as written: an object's keys keep their order (a simulation's
+series are drawn in it) and a negative zero stays one. Nothing here queries
+inside a body. Artifact ids keep the sha256 of their
 canonical inputs, so replay works unchanged.
 
 Tables are SQLAlchemy Core: the stores read and write whole rows by key and
@@ -30,7 +33,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
+from sqlalchemy.dialects.postgresql import JSON, TIMESTAMP
 
 from .engine import SCHEMA
 
@@ -63,7 +66,7 @@ def _project(primary: bool = False) -> Column:
 
 
 def _body() -> Column:
-    return Column("body", JSONB, nullable=False)
+    return Column("body", JSON, nullable=False)
 
 
 def _scoped(name: str, *columns: Column | Index | ForeignKeyConstraint, updated: bool = False) -> Table:
@@ -91,7 +94,7 @@ projects = Table(
     Column("name", Text, nullable=False),
     Column("description", Text, nullable=False, server_default=""),
     # What a project sets for itself: Guild's policy, today.
-    Column("settings", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("settings", JSON, nullable=False, server_default=text("'{}'::json")),
     Column("created_by", Text, nullable=False),
     _when(),
 )
@@ -115,7 +118,7 @@ documents_link = Table(
     # The kit's document id, in schema sci_rag.
     Column("document_id", Text, primary_key=True),
     # The selection that stored it: who chose it, from what, and why.
-    Column("selection", JSONB, nullable=False),
+    Column("selection", JSON, nullable=False),
     Column("created_by", Text, nullable=False),
     _when(),
 )
@@ -151,6 +154,10 @@ decisions = Table(
     _project(),
     Column("record_id", Text, nullable=False),
     _body(),
+    # The candidate the decision was about, as it stood when decided: a
+    # later extraction run replaces the candidates, and a decision about a
+    # candidate nobody can see any more would be a decision about nothing.
+    Column("record", JSON),
     Column("created_by", Text, nullable=False),
     _when(),
     Index(None, "project_id", "record_id"),
@@ -257,8 +264,8 @@ tool_calls = Table(
     _project(),
     Column("turn_id", Text),
     Column("tool", Text, nullable=False),
-    Column("input", JSONB, nullable=False),
-    Column("result", JSONB),
+    Column("input", JSON, nullable=False),
+    Column("result", JSON),
     Column("created_by", Text, nullable=False),
     _when(),
 )
@@ -316,7 +323,10 @@ spend = Table(
     # `reserved` until settled; `settled` and `charged` are spent.
     Column("state", Text, nullable=False),
     Column("reservation", Text, unique=True),
-    Column("project_id", Text, ForeignKey(f"{SCHEMA}.projects.id", ondelete="RESTRICT")),
+    # The project the call was made in, when there was one: an attribution,
+    # kept without a foreign key, because the cap is the machine's and a call
+    # is charged even where its project is not a row (a live test's).
+    Column("project_id", Text),
     _when(),
     Column("expires_at", TIMESTAMP(timezone=True)),
 )

@@ -4,14 +4,13 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import audit, extract, intake, module_stores, proposals, tools
-from openferment_core.models import Candidate, ExtractResponse, FetchResult, FetchedSection, Usage
+from openferment_core.models import FetchResult, FetchedSection
 from openferment_core.tools import gates, writes
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 
@@ -24,8 +23,6 @@ def store(tmp_path, monkeypatch, pool):  # noqa: F811
     the test's rolled-back database."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
     return tmp_path
@@ -216,9 +213,8 @@ def test_a_candidate_written_by_hand_is_not_an_extraction(pool, store, monkeypat
     """OF-BLD-016 §1.R finding 3: a hand-written candidate never makes the
     extractor's file, so the extractor still runs on the paper and the
     evidence pool still reads the candidate."""
-    from openferment_core import biorepo, evidence_pool
+    from openferment_core import evidence_pool
 
-    monkeypatch.setattr(biorepo, "PATH", store / "biorepo.json")
     _fetched(store)
     r = write("biorepo", ctx(pool), "candidate", fields=HAND)
     assert r.error is None, r.error
@@ -253,7 +249,6 @@ def test_a_decision_on_a_candidate_written_by_hand_finds_it(pool, store, monkeyp
     from openferment_core import biorepo
     from openferment_core.models import ReviewDecision
 
-    monkeypatch.setattr(biorepo, "PATH", store / "biorepo.json")
     _fetched(store)
     cid = write("biorepo", ctx(pool), "candidate", fields=HAND).summary["candidateId"]
     assert biorepo._resolve(cid).id == cid

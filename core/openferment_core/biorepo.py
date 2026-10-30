@@ -1,17 +1,19 @@
 """BioRepo — one write function for the corpus (OF-BLD-012 §2.3, §7.1).
 
-Every change to core/data/biorepo.json goes through `write(decision)`. There
-is no second path: not the API, not a script, not a test helper. The file is
-the one data file this increment commits, because it holds human decisions
-and the short quotes that anchor them, and a file that several functions can
-write is a file whose history nobody can explain.
+Every review decision goes through `write(decision)`. There is no second
+path: not the API, not a script, not a test helper. A project's decisions
+are rows of the `decisions` table (ADR-001), one per decision in the order
+made, each signed by its reviewer and carrying the candidate it was about;
+the newest on a record holds. An undo is a row too, so what was decided and
+taken back stays readable, and `read()` replays the rows into the decisions
+that stand.
 
 `write` refuses a decision when any of these hold, and says which:
 
   record     recordId resolves to nothing in the seed or the candidates
   reviewer   reviewer is empty, shorter than two characters, or one of the
              placeholders nobody is called ('you', 'me', 'reviewer', 'user',
-             'test') — the committed file records who decided what
+             'test') — the decisions record who decided what
   fulltext   a verified or gold decision names a record whose paper has no
              fetched full text — there is nothing for a promotion to anchor to
   quote      a verified or gold decision carries a quote that fails §2.4
@@ -19,9 +21,8 @@ write is a file whose history nobody can explain.
              its own or the record's, because gold means "this sentence in
              this paper says this number" and a gold record without a
              sentence is a curated record wearing a badge
-  paper      the record's paper carries no PMCID, DOI or PMID — the rule
-             `check:biorepo` enforces on the committed file (§7.4), enforced
-             here first so a decision the build would reject is never stored
+  paper      the record's paper carries no PMCID, DOI or PMID — a decision
+             stands on a paper a reader can look up (§7.4)
   unit       a typed value — corrected or gold — is not a number, or its unit
              does not convert into the field's canonical unit: §2.4 rule 4,
              applied to what a reviewer typed as well as to what the model
@@ -36,33 +37,24 @@ filled in, an unfetched paper is not fetched on the way through.
 
 What a stored decision looks like: exactly what the browser sent, plus — for
 a gold decision that anchored on the record's own quote — that quote and
-section copied onto it, so `check:biorepo`'s rule that every gold decision
-has a quote holds by construction and not by convention.
+section copied onto it, so every gold decision has a quote by construction.
 """
 from __future__ import annotations
 
-import re
-import threading
-
 import logging
+import re
 from typing import Any
 
-from . import atomic, extract, intake
+from sqlalchemy import insert, select
+
+from . import db, extract, intake, projects
 from .corpus import load_corpus
+from .db import models as t
 from .models import BioRepo, Candidate, Quantity, ReviewDecision
 from .units import UnitError, field as ontology_field, to_canonical
 from .validate import anchor_candidate
 
 log = logging.getLogger("openferment.biorepo")
-
-PATH = intake.DATA_DIR / "biorepo.json"
-
-# One decision at a time (OF-BLD-012 §B.8). FastAPI runs these endpoints on a
-# thread pool, so two reviewers, or one in two tabs, can post together; each
-# would read the file, add its decision and write, and the second write would
-# erase the first. The read-modify-write below holds this lock. The server is
-# the only process that writes this file, so a lock inside it is enough.
-_WRITE_LOCK = threading.Lock()
 
 RULES = ("record", "reviewer", "fulltext", "quote", "paper", "unit", "status")
 
@@ -99,19 +91,56 @@ class WriteRefused(ValueError):
         self.why = why
 
 
-# ── the file ───────────────────────────────────────────────────────────
+# ── the decisions ──────────────────────────────────────────────────────
+
+
+async def _standing(project_id: str) -> BioRepo:
+    """The decisions that stand, replayed from the rows in the order made: a
+    decision on a record replaces the one before it in place, an undo takes
+    the record out, and the candidates are those of the standing decisions,
+    the most recently decided last."""
+    async with db.session() as s:
+        rows = (
+            await s.execute(
+                select(t.decisions.c.record_id, t.decisions.c.body, t.decisions.c.record)
+                .where(t.decisions.c.project_id == project_id)
+                .order_by(t.decisions.c.seq)
+            )
+        ).all()
+    repo = BioRepo()
+    for row in rows:
+        decision = ReviewDecision.model_validate(row.body)
+        repo.records = [c for c in repo.records if c.id != row.record_id]
+        if _is_withdrawal(decision):
+            repo.decisions.pop(row.record_id, None)
+            continue
+        repo.decisions[row.record_id] = decision
+        if row.record is not None:
+            repo.records.append(Candidate.model_validate(row.record))
+    return repo
 
 
 def read() -> BioRepo:
-    """The committed decisions. A missing file is an empty repository, not an
-    error — a fresh clone has made no decisions yet."""
-    if not PATH.exists():
-        return BioRepo()
-    return BioRepo.model_validate_json(PATH.read_text(encoding="utf-8"))
+    """The project's standing decisions; none before anyone has decided."""
+    return db.run(_standing(projects.current()))
 
 
-def _persist(repo: BioRepo) -> None:
-    atomic.write_text(PATH, repo.model_dump_json(indent=2, exclude_none=True) + "\n")
+async def _keep(project_id: str, decision: ReviewDecision, record: Candidate | None, *, undo: bool) -> None:
+    """Add one row under the project's lock. An undo of a record with no
+    standing decision adds nothing: there is nothing to take back."""
+    async with db.session() as s:
+        await db.lock(s, "biorepo", project_id)
+        if undo and decision.recordId not in (await _standing(project_id)).decisions:
+            return
+        await s.execute(
+            insert(t.decisions).values(
+                project_id=project_id,
+                record_id=decision.recordId,
+                body=decision.model_dump(mode="json", exclude_none=True),
+                record=record.model_dump(mode="json", exclude_none=True) if record is not None else None,
+                created_by=(decision.reviewer or "").strip(),
+            )
+        )
 
 
 def decisions() -> dict[str, ReviewDecision]:
@@ -125,25 +154,22 @@ def records() -> list[Candidate]:
 # ── resolving a record ─────────────────────────────────────────────────
 
 
-# A paper id is letters, digits and underscores ('B5', 'O8m'); the segment is
-# a file name under candidates/, and nothing with a slash or a dot in it is
-# opened (OF-BLD-012.1 §6.9).
+# A paper id is letters, digits and underscores ('B5', 'O8m'), as a
+# candidate id carries it (OF-BLD-012.1 §6.9).
 _CANDIDATE_ID = re.compile(r"^[^-]+-(?P<paper>[A-Za-z0-9_]+)-[0-9a-f]{8}$")
 # A candidate a model wrote by hand ('mw1-B5-0000', OF-BLD-015 §7.3), kept in
-# its own file beside the extractor's (OF-BLD-016 §1.R).
+# its own row beside the extractor's (OF-BLD-016 §1.R).
 _HAND_ID = re.compile(rf"^{extract.MODEL_PREFIX}-(?P<paper>[A-Za-z0-9_]+)-[0-9]{{4}}$")
 
 
 def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
     """What this id names: the extractor's current candidate under it first —
-    a decision is about what the extractor says NOW, and the copy kept here is
-    refreshed on write — then the copy biorepo.json keeps (the only one on a
-    checkout that never ran the extractor), then the seed record.
+    a decision is about what the extractor says NOW, and the copy kept with a
+    decision is refreshed on write — then the copy kept with its standing
+    decision, then the seed record.
 
-    A candidate id names its paper ('cl1-T5-276fbb61'), so there is one file
-    to open; a record id ('r-T5-1') names none, and the cache is not read at
-    all. Guild asks `/check` twice per card, and each ask used to read and
-    validate every candidates/*.json on disk."""
+    A candidate id names its paper ('cl1-T5-276fbb61'), so one paper's row is
+    read; a record id ('r-T5-1') names none, and no candidates are read."""
     m = _CANDIDATE_ID.match(record_id)
     hand = _HAND_ID.match(record_id)
     response = extract.cached(m.group("paper")) if m else extract.hand(hand.group("paper")) if hand else None
@@ -201,7 +227,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
         raise WriteRefused(
             "reviewer",
             f"{reviewer!r} is a placeholder, not a person. Set a reviewer name in Settings — "
-            "the committed file is the record of who decided what",
+            "the decisions are the record of who decided what",
         )
 
     rec = _resolve(decision.recordId)
@@ -215,7 +241,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
         raise WriteRefused(
             "paper",
             f"{decision.recordId} is on {paper_id}, which carries no PMCID, DOI or PMID; "
-            "a decision on it could not be committed (check:biorepo, §7.4)",
+            "a decision stands on a paper a reader can look up (§7.4)",
         )
     if _is_gold(decision) and decision.status != "verified":
         raise WriteRefused("status", f"a gold decision is a verified one; this one says {decision.status!r}")
@@ -241,17 +267,11 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
     stored = decision.model_copy()
     typed = decision.corrected is not None or decision.gold is not None
     if _is_withdrawal(decision):
-        # An undo: the record as it was before anyone decided. Nothing to
-        # keep, and nothing to keep beside it — the candidate copy went with
-        # the decision it sat next to. Idempotent when there was none.
-        with _WRITE_LOCK:
-            repo = read()
-            if decision.recordId in repo.decisions:
-                del repo.decisions[decision.recordId]
-                repo.records = [c for c in repo.records if c.id != decision.recordId]
-                if not dry_run:
-                    _persist(repo)
-                    log.info("biorepo: %s withdrawn by %s", decision.recordId, reviewer)
+        # An undo: the record as it was before anyone decided, the candidate
+        # it was about with it. Idempotent when there was none.
+        if not dry_run:
+            db.run(_keep(projects.current(), stored, None, undo=True))
+            log.info("biorepo: %s withdrawn by %s", decision.recordId, reviewer)
         return stored
     if _is_promotion(decision) or typed:
         fetched = intake.cached(paper_id)
@@ -307,15 +327,10 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
             stored.quote = quote
             stored.sectionId = section_id
 
-    with _WRITE_LOCK:
-        repo = read()
-        repo.decisions[decision.recordId] = stored
-        if isinstance(rec, Candidate):
-            # The candidate the decision is about, kept where the decision is.
-            repo.records = [c for c in repo.records if c.id != rec.id] + [rec]
-        if dry_run:
-            return stored
-        _persist(repo)
+    if dry_run:
+        return stored
+    # The candidate the decision is about, kept with the decision.
+    db.run(_keep(projects.current(), stored, rec if isinstance(rec, Candidate) else None, undo=False))
     log.info(
         "biorepo: %s → %s%s by %s",
         decision.recordId,

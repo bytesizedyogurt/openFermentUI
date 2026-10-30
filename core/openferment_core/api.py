@@ -1135,8 +1135,8 @@ def biorepo_overlay() -> Overlay:
     """What the service knows that the seed does not.
 
     Papers from fulltext/ (§5); the run and the new candidates recomputed
-    from candidates/ against the seed (§6.2); the reviewers' decisions from
-    biorepo.json (§7.2). The store applies whatever is here in one action at
+    from the project's candidates against the seed (§6.2); the reviewers'
+    decisions from the project's decision rows (§7.2). The store applies whatever is here in one action at
     load, and nothing here changes a record's status — that path goes
     through `biorepo.write` alone. A missing corpus.json costs the run, not
     the overlay.
@@ -1151,7 +1151,7 @@ def biorepo_overlay() -> Overlay:
 
 @app.post("/api/biorepo/decisions", response_model=ReviewDecision)
 def biorepo_decisions(decision: ReviewDecision) -> ReviewDecision:
-    """The one way a decision reaches biorepo.json (§2.3, §7.2): through
+    """The one way a decision reaches the project's decisions (§2.3, §7.2): through
     `biorepo.write`, which stores it or refuses it with the rule that failed.
     422 carries the rule and the reason; nothing is repaired on the way."""
     try:
@@ -1701,6 +1701,45 @@ def projects_get(project_id: str) -> Project:
     if found is None:
         raise HTTPException(status_code=404, detail=f"no project named {project_id!r}")
     return found
+
+
+# ── What a project keeps of its pages (stage 2, project_state.py) ──────
+
+
+class StateWrite(BaseModel):
+    """PUT /api/state/{kind}/{id}: the row as the page keeps it, and who."""
+
+    by: str = ""
+    value: Any
+
+
+@app.get("/api/state")
+def state_load() -> dict[str, Any]:
+    """Everything the project keeps of its pages, keyed as the page keeps it."""
+    from . import project_state
+
+    return project_state.load()
+
+
+@app.put("/api/state/{kind}/{item_id}")
+def state_put(kind: str, item_id: str, write: StateWrite) -> dict[str, Any]:
+    from . import project_state
+
+    try:
+        return {"kind": kind, "id": item_id, "value": project_state.put(kind, item_id, write.value, write.by)}
+    except project_state.StateRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.delete("/api/state/{kind}/{item_id}")
+def state_remove(kind: str, item_id: str, by: str = "") -> dict[str, Any]:
+    from . import project_state
+
+    try:
+        project_state.remove(kind, item_id, by)
+    except project_state.StateRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    return {"kind": kind, "id": item_id, "removed": True}
 
 
 @app.get("/api/audit", response_model=list[AuditEntry])

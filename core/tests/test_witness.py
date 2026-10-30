@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import biorepo, extract, intake, witness
+from openferment_core import biorepo, db, extract, intake, projects, witness
 from openferment_core.api import app
 from openferment_core.models import Candidate, DroppedCandidate, ExtractRun, Overlay, Quantity, Range, ReviewDecision
 from openferment_core.units import to_si
@@ -242,9 +242,7 @@ GOOD = {
 def _offline(monkeypatch, tmp_path, test_corpus):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
 
 
 @pytest.fixture
@@ -340,12 +338,10 @@ def test_a_candidate_written_by_hand_is_shown_and_never_scored(client, monkeypat
 
     monkeypatch.setattr(extract, "call_model", model)
     assert client.post("/api/intake/T5/extract").status_code == 200 and asked == ["T5"]
-    # A rejection of the hand-written one, as biorepo.json would keep it.
-    repo = biorepo.read()
-    repo.decisions[made.id] = ReviewDecision(status="rejected", provenance="unverified", reviewer="Sean Creighton",
-                                             recordId=made.id, at="2026-10-20T00:00:00Z", rejectReason="a placeholder row")
-    repo.records.append(made)
-    biorepo.PATH.write_text(repo.model_dump_json())
+    # A rejection of the hand-written one, kept as biorepo.write keeps it.
+    rejection = ReviewDecision(status="rejected", provenance="unverified", reviewer="Sean Creighton",
+                               recordId=made.id, at="2026-10-20T00:00:00Z", rejectReason="a placeholder row")
+    db.run(biorepo._keep(projects.current(), rejection, made, undo=False))
 
     [run] = witness.runs()
     # The extractor's 7 is the reading scored; the hand-written 9 would have matched.

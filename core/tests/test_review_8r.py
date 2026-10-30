@@ -117,10 +117,9 @@ def _keep(aid: str, tool: str, output: dict, inputs: list[BasisInput]) -> Artifa
     art = Artifact(id=aid, tool=tool, toolVersion=STANDIN, inputs=inputs, output=output,
                    outputHash=artifacts.output_hash(output), provenance="demo", createdAt="2026-10-21T00:00:00Z",
                    durationMs=0, seed=None)
-    folder = artifacts.folder()
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{aid}.json").write_text(art.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    return art
+    from standins import plant_artifact
+
+    return plant_artifact(art)
 
 
 def _standin_sim(aid: str, strain: str | None, product: str | None = "ethanol") -> Artifact:

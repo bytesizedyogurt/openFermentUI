@@ -8,8 +8,9 @@ they disagree, the TypeScript side is right. The nightly job proposes; an
 assessor can ask for a run of the ranking at any time, and a person or an
 assessor can ask for a check by name.
 
-core/data/checks.json keeps every check, and never enters git. Every write
-is a read-modify-write under one lock, refused with the rule that held:
+A project's checks are its rows in `guild_checks`, every one kept. Every write
+is a read-check-write in one transaction under the project's checks lock
+(`db.lock`), refused with the rule that held:
 
   person     the person is not active on the ledger, or is an auditor; an
              open check on someone no longer active can only be dismissed
@@ -28,15 +29,17 @@ is a read-modify-write under one lock, refused with the rule that held:
   brief      the model's brief named a step or criterion the check does not
              involve, or wrote a number of its own (§5.3)
 
-Running a check writes one witnessed entry per skill through
-guild.write_check_entries, with the check as its source and the assessor's
-own words as its raw: passed when every criterion of that skill was met. The
-entries are asked against one ledger and written in one write, so a run
-lands whole or not at all; an entry naming a check as its source is taken
-from nowhere else (OF-BLD-013 §5.5).
+Running a check writes one witnessed entry per skill through Guild
+(`guild.write_check_entries_in`), with the check as its source and the
+assessor's own words as its raw: passed when every criterion of that skill
+was met. The entries are asked against one ledger and written in the same
+transaction that closes the check, so a run lands whole or not at all; an
+entry naming a check as its source is taken from nowhere else (OF-BLD-013
+§5.5).
 
-The nightly job is a second process, so every read-modify-write here holds
-`atomic.held(PATH)` as well as the thread lock (`_held`).
+The nightly job is a second process; the lock is the database's, so it holds
+across processes as well as threads. The nightly commands act in the project
+OPENFERMENT_PROJECT names, or in every project the database holds.
 """
 from __future__ import annotations
 
@@ -46,16 +49,17 @@ import os
 import re
 import secrets
 import sys
-import threading
 import time
-from collections.abc import Iterator
-from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from . import atomic, guild, intake, llm
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from . import db, guild, llm, projects
 from .competence import Competence, days_between
+from .db import models as t
+from .db import rows
 from .models import (
     Check,
     CheckBrief,
@@ -73,17 +77,8 @@ from .models import (
 
 log = logging.getLogger("openferment.checks")
 
-PATH = intake.DATA_DIR / "checks.json"
 # Where `main` finds the key for the nightly briefs. Tests point it elsewhere.
 ENV_FILE = Path(__file__).parent.parent / ".env"
-_WRITE_LOCK = threading.Lock()
-
-
-@contextmanager
-def _held() -> Iterator[None]:
-    """The service's threads, and the nightly job's process, one at a time."""
-    with _WRITE_LOCK, atomic.held(PATH):
-        yield
 
 RULES = ("person", "skill", "authority", "state", "duplicate", "note", "date", "results", "check", "brief")
 OPEN = ("proposed", "scheduled")
@@ -103,17 +98,37 @@ class CheckRefused(ValueError):
         self.why = why
 
 
-# ── the file ───────────────────────────────────────────────────────────
+# ── the rows ───────────────────────────────────────────────────────────
+
+
+async def read_in(s: AsyncSession, project_id: str) -> Checks:
+    """The project's checks inside a transaction under way, oldest first."""
+    return Checks(checks=[Check.model_validate(b) for b in await rows.bodies(s, t.guild_checks, project_id)])
+
+
+async def _read(project_id: str) -> Checks:
+    async with db.session() as s:
+        return await read_in(s, project_id)
 
 
 def read() -> Checks:
-    if not PATH.exists():
-        return Checks()
-    return Checks.model_validate_json(PATH.read_text(encoding="utf-8"))
+    """The current project's checks."""
+    return db.run(_read(projects.current()))
 
 
-def _persist(checks: Checks) -> None:
-    atomic.write_text(PATH, checks.model_dump_json(indent=2, exclude_none=True) + "\n")
+async def _keep(s: AsyncSession, project_id: str, c: Check) -> Check:
+    # The nightly ranking proposes in nobody's name; its rows are the system's.
+    await rows.put(
+        s, t.guild_checks, project_id, c.id, c.model_dump(mode="json", exclude_none=True),
+        by=c.proposedBy or "system", state=c.state,
+    )
+    return c
+
+
+async def _locked(s: AsyncSession, project_id: str) -> Checks:
+    """Take the project's checks lock, then read the checks it guards."""
+    await db.lock(s, "checks", project_id)
+    return await read_in(s, project_id)
 
 
 def _now() -> str:
@@ -124,8 +139,14 @@ def _id() -> str:
     return f"ck-{int(time.time() * 1000):x}-{secrets.token_hex(3)}"
 
 
+async def _get(project_id: str, check_id: str) -> Check | None:
+    async with db.session() as s:
+        held = await rows.body(s, t.guild_checks, project_id, check_id)
+    return Check.model_validate(held) if held is not None else None
+
+
 def get(check_id: str) -> Check | None:
-    return next((c for c in read().checks if c.id == check_id), None)
+    return db.run(_get(projects.current(), check_id))
 
 
 def covered(checks: Checks) -> set[str]:
@@ -257,8 +278,14 @@ def propose(by: str | None, *, today: str | None = None, limit: int = PROPOSALS_
     if by is not None and not (_lead(ledger, by) or _assessor_anywhere(ledger, by)):
         raise CheckRefused("authority", "the ranking is run by an assessor or the lead")
     day = today or date.today().isoformat()
-    with _held():
-        checks = read()
+    made = db.run(_propose(projects.current(), ledger, by, day, limit))
+    log.info("checks: %d proposed%s", len(made), f" by {by}" if by else " by the nightly ranking")
+    return made
+
+
+async def _propose(project_id: str, ledger: Guild, by: str | None, day: str, limit: int) -> list[Check]:
+    async with db.session() as s:
+        checks = await _locked(s, project_id)
         made = [
             Check(
                 id=_id(),
@@ -271,10 +298,9 @@ def propose(by: str | None, *, today: str | None = None, limit: int = PROPOSALS_
             )
             for p in propose_from(ledger, guild.skills(), day, covered(checks), limit)
         ]
-        checks.checks.extend(made)
-        _persist(checks)
-    log.info("checks: %d proposed%s", len(made), f" by {by}" if by else " by the nightly ranking")
-    return made
+        for c in made:
+            await _keep(s, project_id, c)
+        return made
 
 
 def request(asked: CheckRequest) -> Check:
@@ -288,8 +314,12 @@ def request(asked: CheckRequest) -> Check:
         raise CheckRefused("skill", "a check names the skills it is for, from src/data/skills.ts")
     if asked.by != asked.personId and not any(_assessor(ledger, asked.by, s) for s in asked.skillIds):
         raise CheckRefused("authority", "a check is asked for by the person, or by an assessor on one of its skills")
-    with _held():
-        checks = read()
+    return db.run(_request(projects.current(), ledger, asked))
+
+
+async def _request(project_id: str, ledger: Guild, asked: CheckRequest) -> Check:
+    async with db.session() as s:
+        checks = await _locked(s, project_id)
         cover = covered(checks)
         fresh = [s for s in dict.fromkeys(asked.skillIds) if f"{asked.personId}|{s}" not in cover]
         if not fresh:
@@ -303,9 +333,7 @@ def request(asked: CheckRequest) -> Check:
             proposedAt=_now(),
             proposedBy=asked.by,
         )
-        checks.checks.append(made)
-        _persist(checks)
-    return made
+        return await _keep(s, project_id, made)
 
 
 def _open(checks: Checks, check_id: str) -> Check:
@@ -322,38 +350,39 @@ def _still_active(ledger: Guild, c: Check) -> None:
         raise CheckRefused("person", f"{c.personId!r} is no longer active on the ledger; the check can be dismissed")
 
 
-def _replace(checks: Checks, c: Check) -> Check:
-    checks.checks = [c if x.id == c.id else x for x in checks.checks]
-    _persist(checks)
-    return c
-
-
 def schedule(check_id: str, s: CheckSchedule) -> Check:
     ledger = guild.read()
     day = _day(s.scheduledFor)
     if day is None:
         raise CheckRefused("date", f"{s.scheduledFor!r} is not a date")
-    with _held():
-        checks = read()
-        c = _open(checks, check_id)
+    return db.run(_schedule(projects.current(), ledger, check_id, s, day))
+
+
+async def _schedule(project_id: str, ledger: Guild, check_id: str, asked: CheckSchedule, day: date) -> Check:
+    async with db.session() as s:
+        c = _open(await _locked(s, project_id), check_id)
         _still_active(ledger, c)
-        if s.by == c.personId or not all(_assessor(ledger, s.by, k) for k in c.skillIds):
+        if asked.by == c.personId or not all(_assessor(ledger, asked.by, k) for k in c.skillIds):
             raise CheckRefused("authority", "a check is scheduled by an assessor on every one of its skills, never by the person checked")
-        return _replace(checks, c.model_copy(update={"state": "scheduled", "assessorId": s.by, "scheduledFor": day.isoformat()}))
+        return await _keep(s, project_id, c.model_copy(update={"state": "scheduled", "assessorId": asked.by, "scheduledFor": day.isoformat()}))
 
 
 def dismiss(check_id: str, d: CheckDismiss) -> Check:
     ledger = guild.read()
     if len(d.reason.strip()) < 2:
         raise CheckRefused("note", "a dismissal says why; it is kept for the audit trail")
-    with _held():
-        checks = read()
-        c = _open(checks, check_id)
+    made = db.run(_dismiss(projects.current(), ledger, check_id, d))
+    log.info("checks: %s dismissed by %s: %s", made.id, d.by, made.dismissReason)
+    return made
+
+
+async def _dismiss(project_id: str, ledger: Guild, check_id: str, d: CheckDismiss) -> Check:
+    async with db.session() as s:
+        c = _open(await _locked(s, project_id), check_id)
         if d.by == c.personId or not (_lead(ledger, d.by) or any(_assessor(ledger, d.by, k) for k in c.skillIds)):
             raise CheckRefused("authority", "a check is dismissed by an assessor on one of its skills or by the lead, never by the person checked")
         made = c.model_copy(update={"state": "dismissed", "dismissedBy": d.by, "dismissReason": d.reason.strip(), "closedAt": _now()})
-        log.info("checks: %s dismissed by %s: %s", c.id, d.by, made.dismissReason)
-        return _replace(checks, made)
+        return await _keep(s, project_id, made)
 
 
 def record(check_id: str, r: CheckRecord) -> Check:
@@ -366,9 +395,21 @@ def record(check_id: str, r: CheckRecord) -> Check:
         raise CheckRefused("date", f"{r.at!r} is not a date")
     if day > date.today() + timedelta(days=1):
         raise CheckRefused("date", f"{r.at} is in the future")
-    with _held():
-        checks = read()
-        c = _open(checks, check_id)
+    done, stored = db.run(_record(projects.current(), ledger, known, check_id, r, day))
+    if stored is None:
+        log.warning("checks: %s was on the ledger and still open; closed from the ledger", done.id)
+    else:
+        log.info("checks: %s run by %s, %s", done.id, r.by, ", ".join(f"{e.skillId} {e.outcome}" for e in stored))
+    return done
+
+
+async def _record(
+    project_id: str, ledger: Guild, known: dict[str, dict[str, Any]], check_id: str, r: CheckRecord, day: date
+) -> tuple[Check, list[GuildEvidence] | None]:
+    """The closed check, and the entries the run wrote, or None when the
+    ledger already held them."""
+    async with db.session() as s:
+        c = _open(await _locked(s, project_id), check_id)
         _still_active(ledger, c)
         if r.by == c.personId or not all(_assessor(ledger, r.by, k) for k in c.skillIds):
             raise CheckRefused("authority", "a check is run by an assessor on every one of its skills, never by the person checked")
@@ -392,18 +433,19 @@ def record(check_id: str, r: CheckRecord) -> Check:
         for k in c.skillIds:
             if len(notes.get(k, "")) < 2:
                 raise CheckRefused("note", f"write what you saw on {known[k]['name']}; an empty note cannot be audited")
-        landed = [e for e in guild.read().evidence if e.source.kind == "check" and e.source.ref == c.id and not e.withdrawnAt]
+        held = await guild.read_in(s, project_id)
+        landed = [e for e in held.evidence if e.source.kind == "check" and e.source.ref == c.id and not e.withdrawnAt]
         if landed:
-            # The ledger holds this run and the check was never closed: the
-            # two files are written one after the other, and something
-            # stopped between them. The ledger is the record; close from it.
+            # The ledger holds this run and the check is still open: entries
+            # written by `guild.write_check_entries` on its own, or carried
+            # over from alpha 1.0's two files, which were written one after
+            # the other. The ledger is the record; close from it.
             if {e.skillId for e in landed} != set(c.skillIds) or any(e.observerId != r.by for e in landed):
                 raise CheckRefused("state", f"a run of {c.id} is already on the ledger, signed by someone else")
             done = c.model_copy(
                 update={"state": "done", "assessorId": r.by, "results": r.results, "evidenceIds": [e.id for e in landed], "closedAt": _now()}
             )
-            log.warning("checks: %s was on the ledger and still open; closed from the ledger", c.id)
-            return _replace(checks, done)
+            return await _keep(s, project_id, done), None
         entries = [
             GuildEvidence(
                 id=f"e-{_id()[3:]}",
@@ -418,8 +460,9 @@ def record(check_id: str, r: CheckRecord) -> Check:
             )
             for k in c.skillIds
         ]
-        # Asked against one ledger and written in one write: whole or not at all.
-        stored = guild.write_check_entries(entries, c.id)
+        # Asked against one ledger and written in this transaction with the
+        # check's close: the run lands whole or not at all.
+        stored = await guild.write_check_entries_in(s, project_id, entries, c)
         done = c.model_copy(
             update={
                 "state": "done",
@@ -429,8 +472,7 @@ def record(check_id: str, r: CheckRecord) -> Check:
                 "closedAt": _now(),
             }
         )
-        log.info("checks: %s run by %s, %s", c.id, r.by, ", ".join(f"{e.skillId} {e.outcome}" for e in stored))
-        return _replace(checks, done)
+        return await _keep(s, project_id, done), stored
 
 
 # ── briefs (§5.3) ──────────────────────────────────────────────────────
@@ -574,17 +616,23 @@ def brief(check_id: str, by: str | None, *, ask=None) -> Check:
     except llm.ModelUnavailable as e:
         raise BriefUnavailable(str(e)) from e
     drafted = validate_brief(result.data, c, model=result.model, usage=result.usage)
-    with _held():
-        checks = read()
-        now = _open(checks, check_id)
-        made = _replace(checks, now.model_copy(update={"brief": drafted}))
+    made = db.run(_keep_brief(projects.current(), check_id, drafted))
     log.info("checks: brief for %s, $%.4f", c.id, drafted.usage.costUsd)
     return made
 
 
+async def _keep_brief(project_id: str, check_id: str, drafted: CheckBrief) -> Check:
+    async with db.session() as s:
+        now = _open(await _locked(s, project_id), check_id)
+        return await _keep(s, project_id, now.model_copy(update={"brief": drafted}))
+
+
 def main(argv: list[str]) -> int:
     """`python -m openferment_core.checks propose` and `brief --missing`,
-    which the nightly job runs in that order."""
+    which the nightly job runs in that order, in the project
+    OPENFERMENT_PROJECT names or in every project the database holds."""
+    from .nightly_checks import each_project
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     # The nightly job's environment holds no key; it lives in core/.env, read
     # here as extract and intake read it (§5.5).
@@ -592,20 +640,26 @@ def main(argv: list[str]) -> int:
 
     load_dotenv(ENV_FILE, override=False)
     if argv[:1] == ["propose"]:
-        made = propose(None)
-        print(f"{len(made)} check(s) proposed")
-        for c in made:
-            print(f"  {c.id} {c.personId}: {', '.join(c.skillIds)} (score {c.score})")
+        for project_id in each_project():
+            with projects.using(project_id):
+                made = propose(None)
+            print(f"{project_id}: {len(made)} check(s) proposed")
+            for c in made:
+                print(f"  {c.id} {c.personId}: {', '.join(c.skillIds)} (score {c.score})")
         return 0
     if argv[:2] == ["brief", "--missing"]:
-        waiting = [c for c in read().checks if c.state in OPEN and c.brief is None]
+        waiting: list[tuple[str, Check]] = []
+        for project_id in each_project():
+            with projects.using(project_id):
+                waiting += [(project_id, c) for c in read().checks if c.state in OPEN and c.brief is None]
         if not os.environ.get("ANTHROPIC_API_KEY"):
             print(f"{len(waiting)} check(s) without a brief; no key in core/.env, so they wait")
             return 0
         failed = 0
-        for c in waiting:
+        for project_id, c in waiting:
             try:
-                made = brief(c.id, None)
+                with projects.using(project_id):
+                    made = brief(c.id, None)
                 print(f"  {c.id}: brief drafted, ${made.brief.usage.costUsd:.4f}" if made.brief else f"  {c.id}")
             except (CheckRefused, BriefUnavailable) as e:
                 failed += 1

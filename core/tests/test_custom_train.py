@@ -184,7 +184,9 @@ def test_a_part_of_another_tool_not_on_file_or_damaged_is_refused_in_words(parts
     with pytest.raises(proforma.ScenarioRefused, match="there is no kept artifact aaaaaaaaaaaaaaaa here for the vessel "
                                                        "design: fermOS → Vessel designs one"):
         composite.parts_of("a" * 16, parts.train)
-    (store / "artifacts" / ("b" * 16 + ".json")).write_text("{ not json", encoding="utf-8")
+    from standins import plant_damaged
+
+    plant_damaged("b" * 16)
     with pytest.raises(proforma.ScenarioRefused, match="the train run, artifact bbbbbbbbbbbbbbbb is damaged on disk"):
         composite.parts_of(parts.vessel, "b" * 16)
 

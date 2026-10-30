@@ -43,6 +43,7 @@ from openferment_core import artifacts, fermos, kinetics, pureos
 from openferment_core.flowsheets import shelf
 from openferment_core.models import Artifact, TrainSpec
 from openferment_core.pureos import train_spec
+from standins import plant_artifact, plant_damaged
 from test_builder import STREAMS, _keep
 from test_train import (  # noqa: F401 (the fixtures, by name)
     BY,
@@ -88,9 +89,7 @@ def states_of(h) -> dict[str, float]:
 def keep_copy(art: Artifact, aid: str, **output) -> Artifact:
     """A copy of a kept simulation written by hand under another id, its
     output changed as given (a STAND-IN artifact for a refusal)."""
-    copy = art.model_copy(update={"id": aid, "output": {**art.output, **output}})
-    (artifacts.folder() / f"{aid}.json").write_text(copy.model_dump_json(), encoding="utf-8")
-    return copy
+    return plant_artifact(art.model_copy(update={"id": aid, "output": {**art.output, **output}}))
 
 
 # ── fermos.harvest: read from the kept series, never integrated again ──
@@ -106,9 +105,9 @@ def test_the_harvest_is_the_end_state_read_from_the_kept_series_and_nothing_is_i
 
     monkeypatch.setattr(fermos, "_trajectory", never)
     monkeypatch.setattr(kinetics, "_integrate", never)
-    kept_before = sorted(p.name for p in artifacts.folder().glob("*.json"))
+    kept_before = sorted(a.id for a in artifacts.all_artifacts())
     h = fermos.harvest(sim.artifactId)
-    assert sorted(p.name for p in artifacts.folder().glob("*.json")) == kept_before  # nothing kept
+    assert sorted(a.id for a in artifacts.all_artifacts()) == kept_before  # nothing kept
     assert h.hourSource == fermos.HARVEST_HOUR and h.how == "the hour its sugar runs out"
     assert h.asked == h.hour == h.harvestH == sim.harvestH and h.exact and h.runEndH == sim.end["t"]
     assert [x.state for x in h.states] == ["X", "S", "P"]
@@ -175,8 +174,7 @@ def test_a_series_that_cannot_be_read_and_another_artifact_are_refused_in_words(
     no_hours = keep_copy(art, "f" * 16, series={"X": [1.0], "P": [1.0]})
     with pytest.raises(fermos.SimulationRefused, match="keeps no series of hours"):
         fermos.harvest(no_hours.id)
-    other = art.model_copy(update={"id": "a" * 16, "tool": "kinetic_fit"})
-    (artifacts.folder() / f"{other.id}.json").write_text(other.model_dump_json(), encoding="utf-8")
+    other = plant_artifact(art.model_copy(update={"id": "a" * 16, "tool": "kinetic_fit"}))
     with pytest.raises(fermos.SimulationRefused, match="is a kinetic_fit, not a simulation fermOS keeps"):
         fermos.harvest(other.id)
 
@@ -236,9 +234,7 @@ def test_a_train_run_on_a_simulations_harvest_names_its_source(store, worker, no
 
 def test_a_scenario_inlet_reads_its_newest_runs_broth_as_its_flowsheet_names_it(store, worker, no_pool):
     older = _keep("bbbbbbbbbbbbbbb2")
-    older_file = artifacts.folder() / f"{older.id}.json"
-    older_file.write_text(older.model_copy(update={"createdAt": "2026-10-20T10:00:00Z"}).model_dump_json(),
-                          encoding="utf-8")
+    plant_artifact(older.model_copy(update={"createdAt": "2026-10-20T10:00:00Z"}))
     newest = _keep()  # 2026-10-21, sc-k3x9q-1, ethanol_glucose_v0
     spec = spec_of(inlet={"kind": "run-stream", "ref": "sc-k3x9q-1"})
     assert pureos.validate(spec) == []
@@ -323,7 +319,7 @@ def test_the_harvest_endpoint_reads_the_kept_series_and_refuses_in_words(client,
     keep_copy(art, "c" * 16, series={k: v for k, v in art.output["series"].items() if k != "P"})
     r = client.get(f"/api/fermos/harvest?simulation={'c' * 16}")
     assert r.status_code == 422 and "keeps no product series (P" in r.json()["detail"]
-    (artifacts.folder() / f"{'9' * 16}.json").write_text("{ not json", encoding="utf-8")
+    plant_damaged("9" * 16)
     r = client.get(f"/api/fermos/harvest?simulation={'9' * 16}")
     assert r.status_code == 409 and "damaged on disk" in r.json()["detail"]
     assert client.get("/api/fermos/harvest").status_code == 422

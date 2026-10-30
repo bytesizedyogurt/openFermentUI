@@ -1,16 +1,30 @@
 """What the nightly job checks after intake (OF-BLD-014 §10.2): every
-fetched model file against its pinned hash, and the ten newest artifacts
-replayed against what was kept. It reports and rewrites nothing; the exit
-code is non-zero when a file does not match or a replay differs, so the
-night's log says so.
+fetched model file against its pinned hash, and the ten newest artifacts of
+each project replayed against what was kept. It reports and rewrites
+nothing; the exit code is non-zero when a file does not match or a replay
+differs, so the night's log says so.
 
     python -m openferment_core.nightly_checks
+
+A nightly command acts in the project OPENFERMENT_PROJECT names, or in every
+project the database holds (`each_project`); the checks queue's commands
+share it.
 """
 from __future__ import annotations
 
+import os
 import sys
 
 REPLAY_NEWEST = 10
+
+
+def each_project() -> list[str]:
+    """The projects a nightly command acts in: the one OPENFERMENT_PROJECT
+    names, or every project the database holds, oldest first."""
+    from . import projects
+
+    named = os.environ.get(projects.ENV, "").strip()
+    return [named] if named else [p.id for p in projects.listed()]
 
 
 def check_models() -> list[str]:
@@ -67,7 +81,13 @@ def replay_newest(n: int = REPLAY_NEWEST) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    problems = check_models() + replay_newest()
+    from . import projects
+
+    problems = check_models()
+    for project_id in each_project():
+        print(f"project {project_id}")
+        with projects.using(project_id):
+            problems += [f"{project_id}: {p}" for p in replay_newest()]
     for p in problems:
         print(f"✗ {p}")
     print(f"nightly checks: {len(problems)} problem{'s' if len(problems) != 1 else ''}")

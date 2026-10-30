@@ -58,15 +58,24 @@ def test_a_result_json_cannot_hold_is_an_error_and_the_worker_lives(worker):
     assert worker.ping()["pid"] == pid
 
 
-# R5a — a damaged spend file closes the gate rather than resetting the day.
-def test_a_damaged_spend_file_refuses_and_is_not_overwritten(monkeypatch):
+# R5a — spend that cannot be read closes the gate rather than resetting the day.
+def test_unknown_spend_refuses_and_leaves_the_day_as_it_was(monkeypatch):
+    from openferment_core import db
+    from openferment_core.db.engine import make_engine
+
     monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "25")
     spend.charge("answer", 24.0)
-    spend.path().write_text("{damaged", encoding="utf-8")
-    assert spend.would_pass(5)[0] is True
-    with pytest.raises(spend.SpendFileDamaged):
-        spend.charge("answer", 0.1)
-    assert spend.path().read_text(encoding="utf-8") == "{damaged"
+    down = make_engine("postgresql://nobody:nothing@127.0.0.1:9/none")
+    previous_binding, previous_engine = db.bind(None), db.use_engine(down)
+    try:
+        assert spend.would_pass(5)[0] is True
+        with pytest.raises(spend.SpendUnknown):
+            spend.charge("answer", 0.1)
+    finally:
+        db.use_engine(previous_engine)
+        db.bind(previous_binding)
+        db.run(down.dispose())
+    assert spend.total_today() == 24.0
 
 
 # R5b — a model with no price cannot slip under the cap.
@@ -136,16 +145,24 @@ def test_a_damaged_artifact_file_is_a_409_naming_it(monkeypatch, tmp_path):
     from openferment_core import api
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    (tmp_path / "artifacts").mkdir()
-    (tmp_path / "artifacts" / "0123456789abcdef.json").write_text("{bad", encoding="utf-8")
+    from standins import plant_damaged
+
+    plant_damaged("0123456789abcdef")
     c = TestClient(api.app, base_url="http://127.0.0.1")
     for r in (c.get("/api/biorepo/artifacts/0123456789abcdef"), c.post("/api/biorepo/artifacts/0123456789abcdef/replay")):
         assert r.status_code == 409 and "damaged" in r.json()["detail"]
 
 
-def test_ready_names_a_damaged_spend_file():
-    from openferment_core import ready
+def test_ready_names_spend_it_cannot_read():
+    from openferment_core import db, ready
+    from openferment_core.db.engine import make_engine
 
-    spend.path().write_text("{bad", encoding="utf-8")
-    check = ready.check_roles(False)
-    assert check.mark == "fail" and "delete it" in check.detail
+    down = make_engine("postgresql://nobody:nothing@127.0.0.1:9/none")
+    previous_binding, previous_engine = db.bind(None), db.use_engine(down)
+    try:
+        check = ready.check_roles(False)
+    finally:
+        db.use_engine(previous_engine)
+        db.bind(previous_binding)
+        db.run(down.dispose())
+    assert check.mark == "fail" and "cannot be read" in check.detail

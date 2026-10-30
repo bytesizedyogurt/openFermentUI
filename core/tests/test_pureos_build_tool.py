@@ -16,16 +16,14 @@ from __future__ import annotations
 
 import ast
 import json
-import sys
 import threading
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, audit, intake, module_stores, proposals, pureos, tools
-from openferment_core.models import TrainSpec
 from openferment_core.pureos import build, kept, train_spec
 from openferment_core.validate import SeenSet, validate_plan
 from test_module_tools import ctx_for, read
@@ -69,11 +67,10 @@ def worker(monkeypatch):
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch, worker):
-    """A throwaway data directory with the proposals in it (the audit log is
-    the test's own rolled-back database), the stand-in pool as the run's, and
-    the model the writes are marked with."""
+    """A throwaway data directory (the audit log and the proposals are the
+    test's own rolled-back database), the stand-in pool as the run's, and the
+    model the writes are marked with."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())
     monkeypatch.setenv("OPENFERMENT_MODEL", MODEL)
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
@@ -507,25 +504,35 @@ def test_the_store_is_written_by_one_function_under_its_locks_and_keeps_every_ch
         kept.keep_train(tid, lambda cur: cur.model_copy(update={"id": "tr-other"}), MODEL)
     with pytest.raises(kept.KeptTrainRefused, match="names the model that made it"):
         kept.keep_train(None, lambda _: spec_of(), " ")
-    # The file is the service's data directory's, and no file but its own is written.
-    assert kept.path() == store / kept.FILE and kept.path().exists()
-    assert sorted(p.name for p in store.iterdir() if p.name.startswith("pureos-trains")) == [
-        "pureos-trains.json", "pureos-trains.json.lock"]
+    # The store is the project's rows of the trains table, of kind kept: the
+    # one train, and no other row.
+    from sqlalchemy import select
+
+    from openferment_core import db, projects
+    from openferment_core.db import models as t
+
+    async def held() -> list[tuple[str, str]]:
+        async with db.session() as s:
+            return [tuple(r) for r in await s.execute(select(t.trains.c.id, t.trains.c.kind))]
+
+    assert db.run(held()) == [(tid, kept.KIND)] and projects.current() == "test-project"
 
 
-def test_kept_py_writes_only_through_atomic_and_holds_no_process_number():
+def test_kept_py_writes_only_its_table_under_the_lock_and_holds_no_process_number():
     for rel in ("pureos/kept.py", "pureos/build.py"):
         src = (PKG / rel).read_text(encoding="utf-8")
         tree = ast.parse(src)
-        named = {"ID_HEX", "SUMMARY_DIGITS", "MAX_LINE_CHARS", "JSON_INDENT"}
+        named = {"ID_HEX", "SUMMARY_DIGITS", "MAX_LINE_CHARS"}
         allowed = {id(n.value) for n in tree.body if isinstance(n, ast.Assign)
                    and any(isinstance(t, ast.Name) and t.id in named for t in n.targets)}
         found = [(n.lineno, n.value) for n in ast.walk(tree) if isinstance(n, ast.Constant)
                  and isinstance(n.value, (int, float)) and not isinstance(n.value, bool)
                  and n.value not in (0, 1) and id(n) not in allowed]
         assert found == [], (rel, found)
-        assert ".write_text(" not in src.replace("atomic.write_text(", ""), rel
-    assert "atomic.write_text(" in (PKG / "pureos/kept.py").read_text(encoding="utf-8")
+        assert ".write_text(" not in src and "atomic" not in src, rel
+    # One write, a row of the trains table, made under the store's lock.
+    src = (PKG / "pureos/kept.py").read_text(encoding="utf-8")
+    assert src.count("rows.put(") == 1 and "await db.lock(s, TABLE, project_id)" in src
 
 
 def test_the_trains_kept_endpoint_lists_them_newest_first(store, inlet):
@@ -641,7 +648,6 @@ def real(monkeypatch, tmp_path):
     proforma.start(background=False)
     assert proforma.status()["status"] == "ready", proforma.status()
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(train_spec, "_SPECS", {})
     monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())
     monkeypatch.setenv("OPENFERMENT_MODEL", MODEL)

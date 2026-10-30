@@ -14,20 +14,18 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import llm, practice
+from openferment_core import db, llm, practice, projects
 from openferment_core.api import app
+from openferment_core.db import models as t
+from openferment_core.db import rows
 from openferment_core.models import (
     PracticeDeposition,
     PracticeDepositionEntry,
     PracticeDepositionObservation,
     PracticeDraftRequest,
+    PracticeSession,
     Usage,
 )
-
-
-@pytest.fixture(autouse=True)
-def _store(monkeypatch, tmp_path):
-    monkeypatch.setattr(practice, "PATH", tmp_path / "practice.json")
 
 
 def run(dep_id: str = "dep-1", protocol: str = "PR-OD-01", started: str = "2026-10-01T09:00:00Z") -> PracticeDeposition:
@@ -251,8 +249,7 @@ from openferment_core.models import GuildPerson, PracticeTurnRequest  # noqa: E4
 
 
 @pytest.fixture()
-def team(monkeypatch, tmp_path):
-    monkeypatch.setattr(guild, "PATH", tmp_path / "guild.json")
+def team():
     person = lambda pid, name, role="member", by="p-sean": GuildPerson(  # noqa: E731
         id=pid, name=name, role=role, joinedAt="2026-06-01", addedBy=by, addedAt="2026-06-01T00:00:00Z"
     )
@@ -381,15 +378,26 @@ def test_an_answer_that_lost_the_race_keeps_nothing(team):
 
     def meanwhile(**kwargs):
         # Another tab answers the same session while this one waits for the tutor.
-        with practice._WRITE_LOCK:
-            p = practice.read()
-            s = next(x for x in p.sessions if x.id == held.id)
-            s.turns.append(s.turns[0])
-            practice._persist(p)
+        rewrite(held.id, lambda s: s.model_copy(update={"turns": [*s.turns, s.turns[0]]}))
         return stand_in(reply("why"))(**kwargs)
 
     why = turn_refused_with(sc, held, meanwhile)
     assert "first" in why
+
+
+def rewrite(session_id: str, change) -> None:
+    """Write one session's row as another writer would: another tab, or a
+    link lost after the ledger took its entry."""
+    pid = projects.current()
+
+    async def go() -> None:
+        async with db.session() as s:
+            held = PracticeSession.model_validate(await rows.body(s, t.practice_sessions, pid, session_id))
+            changed = change(held)
+            await rows.put(s, t.practice_sessions, pid, session_id,
+                           changed.model_dump(mode="json", exclude_none=True), by="another writer")
+
+    db.run(go())
 
 
 def turn_refused_with(sc, held, ask) -> str:
@@ -449,10 +457,8 @@ def test_a_lost_link_or_a_failed_write_has_a_way_back(team, monkeypatch):
     again = practice.record(held.id)
     assert again.evidenceId and practice.session(held.id).evidenceId == again.evidenceId
     # The link lost after the ledger took the entry: asking again finds it.
-    with practice._WRITE_LOCK:
-        p = practice.read()
-        p.sessions = [s.model_copy(update={"evidenceId": None}) if s.id == held.id else s for s in p.sessions]
-        practice._persist(p)
+    rewrite(held.id, lambda s: s.model_copy(update={"evidenceId": None}))
+    assert practice.session(held.id).evidenceId is None
     assert practice.record(held.id).evidenceId == again.evidenceId
     assert sum(1 for e in guild.read().evidence if e.source.ref == held.id) == 1
 

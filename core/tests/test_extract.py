@@ -10,26 +10,41 @@ The live test that actually calls the model is test_extract_live.py, marked live
 """
 from __future__ import annotations
 
-import json
 
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import biorepo, extract, intake
+from sqlalchemy import select
+
+from openferment_core import db, extract, intake, projects
 from openferment_core.api import app
+from openferment_core.db import models as t
 from openferment_core.models import ExtractResponse, Usage
 from openferment_core.units import tables
 
 STRUCTURAL_PMCID = "structural"
 
 
+
+def kept_row(paper_id: str) -> dict:
+    """The extractor's row for a paper, as stored."""
+
+    async def read() -> dict:
+        async with db.session() as s:
+            q = select(t.candidates.c.body).where(
+                t.candidates.c.project_id == projects.current(),
+                t.candidates.c.document_id == paper_id,
+                t.candidates.c.source == extract.MODEL,
+            )
+            return (await s.execute(q)).scalar_one()
+
+    return db.run(read())
+
 @pytest.fixture(autouse=True)
 def _offline(monkeypatch, tmp_path, test_corpus):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
 
 
 def fetch_structural_as(paper_id: str):
@@ -146,10 +161,8 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
     assert "[t1 · Table 1 Placeholder rows, kept as rows.]" in sent["user_text"]
     assert any("titer_secreted" in v["properties"]["field"]["enum"] for v in item_variants(sent["tool"]))
 
-    # Persisted, and the cache is honoured.
-    path = extract.CANDIDATES_DIR / "X1.json"
-    assert path.exists()
-    stored = json.loads(path.read_text())
+    # Persisted, and the kept run is honoured.
+    stored = kept_row("X1")
     assert stored["run"] == "claude-1" and len(stored["candidates"]) == 2 and len(stored["dropped"]) == 4
     again = extract.extract_paper("X1")
     assert again.extractedAt == r.extractedAt and len(call.calls) == 1
@@ -488,7 +501,7 @@ def test_a_carbon_source_that_sits_in_the_section_is_kept(monkeypatch):
     assert [c.carbonSource for c in result.candidates] == ["glucose", "glucose"]
     assert result.fieldDrops == {"carbonSource": 0}
     # Persisted as it was answered.
-    stored = json.loads((extract.CANDIDATES_DIR / "P3.json").read_text())
+    stored = kept_row("P3")
     assert stored["candidates"][0]["carbonSource"] == "glucose"
 
 

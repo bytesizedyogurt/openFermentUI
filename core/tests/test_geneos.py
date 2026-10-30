@@ -305,7 +305,9 @@ def test_a_sugar_a_model_cannot_take_up_stores_no_number(store):
     r = geneos.ceiling("toy", "ethanol", "xylose", allow_toy=True)
     assert r.finding == "this reconstruction has no uptake reaction for xylose"
     assert r.evidence is None and r.artifactId is None and r.output == {}
-    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+    from openferment_core import artifacts
+
+    assert artifacts.all_artifacts() == []
 
 
 def test_a_ceiling_is_kept_with_its_basis_and_replays(store):

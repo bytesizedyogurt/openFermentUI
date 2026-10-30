@@ -1,7 +1,7 @@
 """biorepo.write — one write function, four refusals (OF-BLD-012 §2.3, §7.1–7.2).
 
-Every rule that keeps a bad decision out of the committed file has a test
-that presents that decision and reads the refusal's rule. Then the paths a
+Every rule that keeps a bad decision out of the project's decisions has a
+test that presents that decision and reads the refusal's rule. Then the paths a
 good decision takes: a candidate a reviewer accepted or rejected is copied
 beside the decision, a rejection reaches Witness as a false positive, an
 accepted record survives a checkout that never ran the extractor, and a
@@ -16,8 +16,10 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import delete, func, select
 
-from openferment_core import biorepo, extract, intake, witness
+from openferment_core import biorepo, db, extract, intake, projects, witness
+from openferment_core.db import models as t
 from openferment_core.api import app
 from openferment_core.corpus import load_corpus
 from openferment_core.models import (
@@ -48,9 +50,33 @@ NEW_TITRE = {
 def _offline(monkeypatch, tmp_path, test_corpus):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
+
+
+def decision_rows() -> list[dict]:
+    """The project's decision rows, in the order made."""
+
+    async def read() -> list[dict]:
+        async with db.session() as s:
+            q = select(t.decisions.c.body).where(t.decisions.c.project_id == projects.current())
+            return list((await s.execute(q.order_by(t.decisions.c.seq))).scalars())
+
+    return db.run(read())
+
+
+def nothing_decided() -> bool:
+    return decision_rows() == []
+
+
+def drop_candidates() -> None:
+    """Every candidate row of the project goes, as a later extraction run
+    replaces them."""
+
+    async def drop() -> None:
+        async with db.session() as s:
+            await s.execute(delete(t.candidates).where(t.candidates.c.project_id == projects.current()))
+
+    db.run(drop())
 
 
 def fetch_t5():
@@ -112,7 +138,7 @@ def unidentified_seed_record() -> str:
 # ── the file ───────────────────────────────────────────────────────────
 
 
-def test_a_missing_file_is_an_empty_repository():
+def test_a_project_nobody_has_decided_in_is_an_empty_repository():
     assert biorepo.read() == BioRepo()
     assert biorepo.decisions() == {} and biorepo.records() == []
 
@@ -130,7 +156,7 @@ def test_refuses_a_record_that_resolves_to_nothing():
     with pytest.raises(biorepo.WriteRefused) as caught:
         biorepo.write(decision("r-NOPE-1", "rejected"))
     assert caught.value.rule == "record"
-    assert not biorepo.PATH.exists(), "a refusal writes nothing"
+    assert nothing_decided(), "a refusal writes nothing"
 
 
 @pytest.mark.parametrize("reviewer", [None, "", "   "])
@@ -175,7 +201,7 @@ def test_refuses_any_decision_on_a_paper_with_no_identifier():
         with pytest.raises(biorepo.WriteRefused) as caught:
             biorepo.write(decision(rid, status, rejectReason="x"))
         assert caught.value.rule == "paper"
-    assert not biorepo.PATH.exists()
+    assert nothing_decided()
 
 
 def test_refuses_a_typed_value_whose_unit_does_not_convert():
@@ -211,7 +237,7 @@ def test_both_typed_values_are_unit_checked_not_just_the_first():
         biorepo.write(decision("r-T5-1", "verified", provenance="gold",
                                gold=Quantity(value=9, unit="d"), corrected=Quantity(value=9, unit="furlongs")))
     assert caught.value.rule == "unit" and "corrected" in caught.value.why
-    assert not biorepo.PATH.exists()
+    assert nothing_decided()
 
 
 def test_refuses_gold_that_is_not_verified():
@@ -261,26 +287,45 @@ def test_a_rejected_candidate_is_a_false_positive_in_the_run(monkeypatch):
     assert overlay.records["cl1-T5-276fbb61"].status == "rejected"
 
 
-def test_a_decided_candidate_outlives_the_cache(monkeypatch):
+def test_a_decided_candidate_outlives_its_extraction(monkeypatch):
     extract_t5(monkeypatch)
     biorepo.write(decision("cl1-T5-276fbb61", "verified"))
-    for path in extract.CANDIDATES_DIR.glob("*.json"):
-        path.unlink()
-    # No run — nothing was extracted in this checkout — but the record is
-    # still a record, and a later decision about it still resolves.
+    drop_candidates()
+    # No run — the extraction is gone — but the record is still a record,
+    # kept with its decision, and a later decision about it still resolves.
     assert witness.runs() == []
     assert [c.id for c in witness.new_candidates()] == ["cl1-T5-276fbb61"]
     again = biorepo.write(decision("cl1-T5-276fbb61", "rejected", rejectReason="on reflection, a placeholder"))
     assert again.status == "rejected" and len(biorepo.read().records) == 1
 
 
-def test_the_file_is_written_the_way_the_guard_reads_it():
+def test_a_decision_is_kept_as_sent_one_row_each_signed_by_its_reviewer():
     fetch_t5()
     biorepo.write(decision("r-T5-1", "verified"))
-    raw = json.loads(biorepo.PATH.read_text(encoding="utf-8"))
-    assert raw["version"] == 1 and list(raw["decisions"]) == ["r-T5-1"]
-    assert raw["decisions"]["r-T5-1"]["recordId"] == "r-T5-1"
-    assert "quote" not in raw["decisions"]["r-T5-1"], "None is left out, not written as null"
+    [row] = decision_rows()
+    assert row["recordId"] == "r-T5-1" and list(biorepo.decisions()) == ["r-T5-1"]
+    assert "quote" not in row, "None is left out, not written as null"
+
+    async def signed() -> list[str]:
+        async with db.session() as s:
+            return list((await s.execute(select(t.decisions.c.created_by))).scalars())
+
+    assert db.run(signed()) == ["sean"]
+
+
+def test_every_decision_and_every_undo_stays_a_row_and_the_newest_holds():
+    fetch_t5()
+    biorepo.write(decision("r-T5-1", "verified"))
+    biorepo.write(decision("r-T5-1", "rejected", rejectReason="on reflection"))
+    biorepo.write(decision("r-T5-1", "unverified", provenance="unverified"))
+    assert [r["status"] for r in decision_rows()] == ["verified", "rejected", "unverified"]
+    assert "r-T5-1" not in biorepo.decisions()
+
+    async def count() -> int:
+        async with db.session() as s:
+            return (await s.execute(select(func.count()).select_from(t.decisions))).scalar_one()
+
+    assert db.run(count()) == 3
 
 
 # ── the endpoint ───────────────────────────────────────────────────────
@@ -381,11 +426,11 @@ def test_a_dry_run_answers_the_same_and_writes_nothing():
     fetch_t5()
     good = decision("r-T5-3", "verified")
     assert biorepo.write(good, dry_run=True).status == "verified"
-    assert not biorepo.PATH.exists(), "a dry run is a question, not a decision"
+    assert nothing_decided(), "a dry run is a question, not a decision"
     with pytest.raises(biorepo.WriteRefused) as caught:
         biorepo.write(decision(unfetched_seed_record(), "verified"), dry_run=True)
     assert caught.value.rule == "fulltext"
-    assert not biorepo.PATH.exists()
+    assert nothing_decided()
     # And the real write still stores it.
     biorepo.write(good)
     assert "r-T5-3" in biorepo.decisions()
@@ -412,12 +457,12 @@ def test_the_check_endpoint_answers_ok_or_the_rule(client):
 def test_refuses_a_reviewer_who_is_not_a_person(name):
     # README: "a verified record is one a named reviewer promoted against a
     # quote in the paper's own text". A corpus signed 'you' is signed by
-    # nobody, and the file is the record of who decided what.
+    # nobody, and the decisions are the record of who decided what.
     fetch_t5()
     with pytest.raises(biorepo.WriteRefused) as caught:
         biorepo.write(decision("r-T5-3", "verified", reviewer=name))
     assert caught.value.rule == "reviewer"
-    assert not biorepo.PATH.exists()
+    assert nothing_decided()
 
 
 def test_a_named_reviewer_is_stored():
@@ -473,17 +518,17 @@ def test_an_undecided_decision_withdraws_the_one_it_replaces(monkeypatch):
     assert "cl1-T5-276fbb61" not in biorepo.decisions()
     assert biorepo.records() == [], "the copy goes with the decision it sat beside"
     # Withdrawing what was never decided is nothing, not an error; and
-    # dry_run answers without touching the file.
+    # dry_run answers without adding a row.
+    before = decision_rows()
     biorepo.write(decision("cl1-T5-276fbb61", "unverified", provenance="unverified"))
-    before = biorepo.PATH.read_text(encoding="utf-8")
     biorepo.write(decision("cl1-T5-276fbb61", "unverified", provenance="unverified"), dry_run=True)
-    assert biorepo.PATH.read_text(encoding="utf-8") == before
+    assert decision_rows() == before
 
 
-def test_resolving_a_candidate_opens_its_own_papers_file_and_no_other(monkeypatch):
-    # The id names the paper — 'cl1-T5-276fbb61' — so there is one file to
-    # read. `_resolve` read and validated EVERY candidates/*.json on every
-    # call, and Guild asks /check twice per card.
+def test_resolving_a_candidate_reads_its_own_papers_row_and_no_other(monkeypatch):
+    # The id names the paper — 'cl1-T5-276fbb61' — so there is one row to
+    # read. `_resolve` once read and validated every paper's candidates on
+    # every call, and Guild asks /check twice per card.
     extract_t5(monkeypatch)
     monkeypatch.setattr(extract, "all_cached", lambda: pytest.fail("scanned the whole cache"))
     stored = biorepo.write(decision("cl1-T5-276fbb61", "rejected", rejectReason="a placeholder row"))
@@ -494,10 +539,9 @@ def test_resolving_a_candidate_opens_its_own_papers_file_and_no_other(monkeypatc
 
 
 def test_a_candidate_id_names_a_paper_id_and_nothing_else(monkeypatch):
-    # The paper segment of a candidate id picks the cache file to open. Read
-    # as `.+` it would have let 'cl1-../../x-deadbeef' ask for
-    # candidates/../../x.json — a file-existence oracle at worst on a
-    # loopback service, and still not a shape a paper id can have.
+    # The paper segment of a candidate id picks the paper whose candidates
+    # are read. Read as `.+` it would have let 'cl1-../../x-deadbeef' ask for
+    # a paper id no paper can have.
     fetch_t5()
     opened: list[str] = []
     real = extract.cached
@@ -510,4 +554,4 @@ def test_a_candidate_id_names_a_paper_id_and_nothing_else(monkeypatch):
     with pytest.raises(biorepo.WriteRefused) as caught:
         biorepo.write(decision("cl1-../../x-deadbeef", "rejected", rejectReason="no"))
     assert caught.value.rule == "record"
-    assert opened == [], "nothing outside candidates/ was even asked for"
+    assert opened == [], "no paper's candidates were even asked for"

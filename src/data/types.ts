@@ -614,7 +614,7 @@ export interface Scenario {
   createdAt?: string;
   /**
    * OF-BLD-020 §6.1 (D11): what a scenario on `custom_train_v1` is built
-   * from, kept with it in the Durable tier (`createdScenarios`) and sent with
+   * from, kept with it in the project's rows (`scenarios`) and sent with
    * every binding and run: the kept `fermos.vessel` design (its artifact id)
    * and the kept `pureos.train_run` (its artifact id). Absent on any other.
    */
@@ -3094,8 +3094,8 @@ export interface Volatility {
 // Every model family, vessel design, catalogue unit and shelf flowsheet
 // declares its parameters once, in Python (`core/openferment_core/params.py`);
 // `GET /api/params/{scope}` serves a scope's specs with each value and where
-// it came from. A person's change is an `Override`: a named assumption this
-// browser keeps in the Durable tier (`parameterOverrides`, D3) and a run
+// it came from. A person's change is an `Override`: a named assumption the
+// project keeps in its rows (`parameterOverrides`, D3) and a run
 // carries; the basis names it as an `assumption`, so the result is `demo`.
 // Bounds are conventions with a written reason (D4): a value outside them is
 // kept and flagged in words, never clamped. A model never sets one.
@@ -3734,7 +3734,7 @@ export interface TrainUnitSpec {
   readFrom?: TrainUnitReadFrom | null;
 }
 
-/** A train as data (D9), kept whole in this browser and sent with a run. */
+/** A train as data (D9), kept whole in the project's rows and sent with a run. */
 export interface TrainSpec {
   id: string;
   name: string;
@@ -3877,8 +3877,9 @@ export interface TrainFromRun {
 
 /**
  * A train a model built with `pureos_build` or `pureos_write` (OF-BLD-020
- * §5.4), kept on the service in `core/data/pureos-trains.json`:
- * `GET /api/pureos/trains-kept`. A person's trains stay in this browser.
+ * §5.4), kept on the service as rows of `trains` marked `kept`:
+ * `GET /api/pureos/trains-kept`. A person's trains are the project's rows the
+ * Builder keeps (`trains` marked `made`).
  */
 export interface KeptTrain {
   spec: TrainSpec;

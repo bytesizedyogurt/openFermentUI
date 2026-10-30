@@ -290,13 +290,13 @@ def stored(tmp_path, monkeypatch):
     """Two runs on file: the line, which no scenario claims here, and a run
     of another flowsheet whose basis names its scenario."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    folder = tmp_path / "artifacts"
-    folder.mkdir()
+    from standins import plant_artifact
+
     named = _art("aaaaaaaaaaaaaaa5", flowsheet="test_other", created="2026-10-21T10:00:00Z", inputs=[
         BasisInput(name="flowsheet", value="test_other", unit="", source=BasisSource(kind="convention")),
         BasisInput(name="scenario", value="sc-o", unit="", source=BasisSource(kind="convention"))])
     for a in (_art(), named):
-        (folder / f"{a.id}.json").write_text(a.model_dump_json(), encoding="utf-8")
+        plant_artifact(a)
     return named
 
 
@@ -328,12 +328,13 @@ def test_the_page_and_pureos_read_give_one_train_one_provenance(tmp_path, monkey
     the pool is worth less now. pureos_read worked that out from its inputs;
     the page served the file's word. Both read it as it stands now."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    (tmp_path / "artifacts").mkdir()
+    from standins import plant_artifact
+
     inputs = [BasisInput(name="flowsheet", value="test_line", unit="", source=BasisSource(kind="convention")),
               BasisInput(name="titre", value="a record", unit="", source=BasisSource(kind="record", id="gone-record-1"))]
     a = _art(inputs=inputs)
     assert a.provenance == "computed"
-    (tmp_path / "artifacts" / f"{a.id}.json").write_text(a.model_dump_json(), encoding="utf-8")
+    plant_artifact(a)
     row = read("pureos", ctx_for(pool, artifacts=lambda: [a]), ids=[LINE], kind="train").rows[0]
     c = _client()
     page = c.get(f"/api/pureos/train/{LINE}").json()

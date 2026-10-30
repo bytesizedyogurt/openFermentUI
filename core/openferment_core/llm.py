@@ -306,7 +306,7 @@ def _reserve(model: str, request: dict[str, Any], max_tokens: int, spent: Usage,
         )
     try:
         return spend.reserve(role, worst_case_usd(model, request, max_tokens))
-    except spend.SpendFileDamaged as e:
+    except spend.SpendUnknown as e:
         raise BudgetExhausted(str(e), spent) from None
     except spend.CapReached as e:
         held = f" with ${e.reserved:.2f} held for calls in flight" if e.reserved else ""

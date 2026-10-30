@@ -2,10 +2,11 @@
 
 Every calculation from §3.4 on goes through `compute`: a tool registers a pure
 function from its inputs to a small output, and `compute` runs it once per
-distinct (tool, version, inputs, seed), writes the result to
-`core/data/artifacts/<id>.json` and returns it. The same call again returns
-the stored artifact and computes nothing. `replay` runs the registered
-function again on the stored inputs and says whether the output is the same.
+distinct (tool, version, inputs, seed) in a project, keeps the result as a row
+of the `artifacts` table under the current project (ADR-001) and returns it.
+The same call again returns the stored artifact and computes nothing.
+`replay` runs the registered function again on the stored inputs and says
+whether the output is the same.
 
 The artifact's provenance is `basis.basis_provenance` over its inputs, read
 when it is computed; no caller sets it.
@@ -14,24 +15,29 @@ when it is computed; no caller sets it.
     GET  /api/biorepo/artifacts/{id}
     POST /api/biorepo/artifacts/{id}/replay
 
-The folder is gitignored and travels on the data branch (E.10). One
-exception: a calculation over a labelled sample is returned inline and kept
-nowhere (§7.4), which is `compute(..., keep=False)`.
+A row's key is the project and the artifact's id; its columns name the
+tool, the version and the output's hash, and its body is the artifact whole.
+The tool's function runs outside any transaction; keeping its result is one
+short transaction under the store's advisory lock. One exception: a
+calculation over a labelled sample is returned inline and kept nowhere (§7.4),
+which is `compute(..., keep=False)`.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import re
-import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
-from . import atomic, intake
+from sqlalchemy import func, select
+
+from . import db, projects
 from .basis import basis_provenance
+from .db import models as t
+from .db import rows
 from .models import Artifact, BasisInput, ComputedBasis, ReplayDifference, ReplayResult
 
 # The function a tool registers: its inputs and seed in, a JSON-ready dict out.
@@ -50,7 +56,7 @@ class ArtifactNotFound(KeyError):
 
 
 class ArtifactDamaged(ValueError):
-    """A stored file that does not parse as an artifact."""
+    """A stored row whose body does not read as an artifact."""
 
 
 class ToolNotRegistered(LookupError):
@@ -74,13 +80,6 @@ _REGISTRY: dict[str, Registered] = {}
 # A tool whose version cannot be known at import (it reads a file that may not
 # exist yet) registers a function that registers it, run on first use.
 _LAZY: dict[str, Callable[[], None]] = {}
-_LOCK = threading.Lock()
-
-
-def folder() -> Path:
-    """Read at call time, so a test that points `intake.DATA_DIR` elsewhere
-    moves the store with it."""
-    return intake.DATA_DIR / "artifacts"
 
 
 def register(tool: str, version: str, fn: ToolFn,
@@ -142,39 +141,84 @@ def output_hash(output: Mapping[str, Any]) -> str:
 # ── the store ──────────────────────────────────────────────────────────
 
 
-def _path(aid: str) -> Path:
+def _checked(aid: str) -> str:
     if not ID_PATTERN.match(aid):
-        # Ids are hex: anything else could name a path outside the folder.
+        # Ids are hex: anything else names no artifact.
         raise ArtifactNotFound(aid)
-    return folder() / f"{aid}.json"
+    return aid
+
+
+def _valid(aid: str, raw: Any) -> Artifact:
+    """A stored body as an artifact, or ArtifactDamaged in words naming it."""
+    try:
+        return Artifact.model_validate(raw)
+    except ValueError as e:
+        raise ArtifactDamaged(
+            f"artifact {aid} is damaged on disk (its row in the artifact store): {e}".splitlines()[0]
+        ) from None
+
+
+async def _get(project_id: str, aid: str) -> Artifact:
+    async with db.session() as s:
+        raw = await rows.body(s, t.artifacts, project_id, aid)
+    if raw is None:
+        raise ArtifactNotFound(aid)
+    return _valid(aid, raw)
 
 
 def get(aid: str) -> Artifact:
-    path = _path(aid)
-    try:
-        return Artifact.model_validate_json(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        raise ArtifactNotFound(aid) from None
-    except ValueError as e:
-        raise ArtifactDamaged(f"artifact {aid} is damaged on disk ({path.name}): {e}".splitlines()[0]) from None
+    """One artifact of the current project."""
+    return db.run(_get(projects.current(), _checked(aid)))
 
 
-def all_artifacts() -> list[Artifact]:
-    """Every stored artifact, newest first. A file that does not parse is
-    skipped, so one bad file never hides the rest."""
+async def _all(project_id: str) -> list[Artifact]:
+    async with db.session() as s:
+        found = (await s.execute(select(t.artifacts.c.body).where(t.artifacts.c.project_id == project_id))).scalars()
+        bodies = list(found)
     out: list[Artifact] = []
-    root = folder()
-    if not root.is_dir():
-        return out
-    for path in root.glob("*.json"):
-        if not ID_PATTERN.match(path.stem):
-            continue
+    for raw in bodies:
         try:
-            out.append(Artifact.model_validate_json(path.read_text(encoding="utf-8")))
-        except (OSError, ValueError):
+            out.append(Artifact.model_validate(raw))
+        except ValueError:
             continue
     out.sort(key=lambda a: (a.createdAt, a.id), reverse=True)
     return out
+
+
+def all_artifacts() -> list[Artifact]:
+    """Every artifact of the current project, newest first. A row that does
+    not read as an artifact is skipped, so one damaged row never hides the
+    rest."""
+    return db.run(_all(projects.current()))
+
+
+async def _count() -> int:
+    async with db.session() as s:
+        return int((await s.execute(select(func.count()).select_from(t.artifacts))).scalar_one())
+
+
+def count() -> int:
+    """How many artifacts the database keeps, every project's together: the
+    machine's figure `pnpm ready` reports."""
+    return db.run(_count())
+
+
+async def _keep(project_id: str, artifact: Artifact, *, replace: bool) -> Artifact:
+    """Keep `artifact` under the store's lock. Two callers that computed the
+    same thing at once both return the row the first one wrote, so there is
+    one artifact; `replace` writes over the row (a provenance brought up to
+    date)."""
+    async with db.session() as s:
+        await db.lock(s, "artifacts", project_id)
+        if not replace:
+            raw = await rows.body(s, t.artifacts, project_id, artifact.id)
+            if raw is not None:
+                return _valid(artifact.id, raw)
+        await rows.put(
+            s, t.artifacts, project_id, artifact.id, artifact.model_dump(mode="json"), by="system",
+            tool=artifact.tool, version=artifact.toolVersion, output_hash=artifact.outputHash,
+        )
+    return artifact
 
 
 def _now() -> str:
@@ -218,14 +262,12 @@ def compute(
         if stored is not None:
             # The output is the same; the provenance is what the inputs are
             # worth now. A record demoted since the first computation demotes
-            # the value, and the stored file is brought up to date (§3.R).
+            # the value, and the stored row is brought up to date (§3.R).
             now = basis_provenance(basis_of(stored), records, _artifacts_for(inputs))
             if now == stored.provenance:
                 return stored
             updated = stored.model_copy(update={"provenance": now})
-            with _LOCK, atomic.held(folder() / ".store"):
-                atomic.write_text(_path(aid), updated.model_dump_json(indent=2) + "\n")
-            return updated
+            return db.run(_keep(projects.current(), updated, replace=True))
 
     output, ms = _run(reg, inputs, seed)
     basis = ComputedBasis(tool=reg.tool, toolVersion=version, inputs=inputs, artifactId=aid, at=_now(), seed=seed)
@@ -243,15 +285,7 @@ def compute(
     )
     if not keep:
         return artifact
-    path = _path(aid)
-    # One lock for the store, held across processes, beside the files.
-    with _LOCK, atomic.held(folder() / ".store"):
-        # Two callers may have computed the same thing at once. The first to
-        # write wins and both return its file, so there is one artifact.
-        if path.exists():
-            return get(aid)
-        atomic.write_text(path, artifact.model_dump_json(indent=2) + "\n")
-    return artifact
+    return db.run(_keep(projects.current(), artifact, replace=False))
 
 
 def basis_of(artifact: Artifact) -> ComputedBasis:
@@ -311,7 +345,7 @@ def _diff(stored: Any, replayed: Any, path: str, out: list[ReplayDifference]) ->
 
 def replay(aid: str) -> ReplayResult:
     """Recompute a stored artifact with the tool registered now, and compare.
-    The stored file is never changed by a replay."""
+    A replay changes nothing stored."""
     artifact = get(aid)
     reg = registered(artifact.tool)
     try:

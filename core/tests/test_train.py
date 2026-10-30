@@ -546,9 +546,9 @@ def test_the_run_endpoint_answers_422_409_and_503_in_words(client, store, worker
                   "unit D1: BinaryDistillation waits for Light key and Heavy key"):
         assert words in detail, detail
     # A damaged inlet artifact is a 409.
-    folder = store / "artifacts"
-    folder.mkdir(exist_ok=True)
-    (folder / ("b" * 16 + ".json")).write_text("{ not json", encoding="utf-8")
+    from standins import plant_damaged
+
+    plant_damaged("b" * 16)
     damaged = spec_of(inlet={"kind": "simulation", "ref": "b" * 16, "params": {"broth_flow": typed(1.0)}})
     r = client.post("/api/pureos/train/run", json={"train": damaged.model_dump(mode="json")})
     assert r.status_code == 409 and "damaged on disk" in r.json()["detail"]

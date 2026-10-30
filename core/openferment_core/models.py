@@ -179,7 +179,7 @@ class ModuleRow(BaseModel):
 
 
 class AuditEntry(BaseModel):
-    """One line of core/data/audit.jsonl (OF-BLD-015 §7.3): a write a model
+    """One row of the audit table (OF-BLD-015 §7.3): a write a model
     made, or a proposal a person carried out or dismissed."""
 
     at: str
@@ -228,7 +228,7 @@ class Proposal(BaseModel):
 
 
 class Proposals(BaseModel):
-    """core/data/proposals.json."""
+    """The project's proposals, as `proposals.read` gives them."""
 
     version: Literal[1] = 1
     proposals: list[Proposal] = Field(default_factory=list)
@@ -424,8 +424,8 @@ class Overlay(BaseModel):
     top of the seed; with the service down the app is exactly the seed.
 
     `papers` from fulltext/ (§5); `runs` and `candidates` recomputed from
-    candidates/ against the seed by `witness.py` (§6.2); `records` from
-    biorepo.json (§7).
+    the project's candidates against the seed by `witness.py` (§6.2);
+    `records` from the project's decisions (§7).
 
     `candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service
     always sends the full list, so an empty list means the extractor produced
@@ -602,16 +602,17 @@ class ReviewDecision(BaseModel):
 
 
 class BioRepo(BaseModel):
-    """core/data/biorepo.json (§2.2, §7.1) — the one data file that is
-    committed, because it holds human decisions and the short quotes that
-    anchor them. This file IS the corpus growing.
+    """A project's standing review decisions (§2.2, §7.1), as `biorepo.read`
+    replays them from the decision rows: human decisions and the short quotes
+    that anchor them. This IS the corpus growing.
 
     `decisions` is keyed by recordId. `records` holds the candidates those
     decisions were made about — accepted ones, which are new records, and
-    rejected ones, which Witness lists as false positives — copied here
-    because candidates/ is gitignored and a decision about a candidate nobody
-    can see any more would be a decision about nothing. The copy keeps the
-    candidate's own status; the decision is the authority.
+    rejected ones, which Witness lists as false positives — kept with each
+    decision, because a later extraction run replaces the candidates and a
+    decision about a candidate nobody can see any more would be a decision
+    about nothing. The copy keeps the candidate's own status; the decision
+    is the authority.
     """
 
     version: Literal[1] = 1
@@ -656,9 +657,10 @@ class ExtractResponse(BaseModel):
 # ── Guild (OF-BLD-013) ───────────────────────────────────────────────────
 #
 # Who may verify, extended from records to the people running protocol steps.
-# The ledger is core/data/guild.json, written only by `guild.write_*`, and it is
-# gitignored: the repository is public and a competence ledger is personnel
-# data. Mirrored in src/data/types.ts and held to it by `check:plan`.
+# The ledger is the project's rows of `guild_people` and `guild_evidence`,
+# written only by `guild.write_*`; a competence ledger is personnel data and
+# never enters the public repository. Mirrored in src/data/types.ts and held
+# to it by `check:plan`.
 
 GuildRole = Literal["member", "lead", "auditor"]
 
@@ -755,7 +757,7 @@ class GuildPolicy(BaseModel):
 
 
 class Guild(BaseModel):
-    """core/data/guild.json — the people and everything recorded about them."""
+    """A project's ledger — the people and everything recorded about them."""
 
     version: Literal[1] = 1
     people: list[GuildPerson] = Field(default_factory=list)
@@ -769,8 +771,8 @@ class Guild(BaseModel):
 # runs, and a tutor questions the trainee's reasoning in short turns. The
 # model writes words and cites sources; every value a trainee sees is copied
 # by the service from the source it cites, so no quantity in a scenario comes
-# from model weights. core/data/practice.json holds the scenarios and the
-# sessions, and never enters git: a session is a person's own words.
+# from model weights. The project's rows hold the scenarios and the
+# sessions (ADR-001), never the repository: a session is a person's own words.
 
 PracticeSourceKind = Literal["step", "material", "entry", "observation"]
 PracticeMove = Literal["why", "change", "next", "close"]
@@ -905,7 +907,7 @@ class PracticeTurnRequest(BaseModel):
 
 
 class Practice(BaseModel):
-    """core/data/practice.json — every scenario drafted and every session held."""
+    """A project's Practice — every scenario drafted and every session held."""
 
     version: Literal[1] = 1
     scenarios: list[PracticeScenario] = Field(default_factory=list)
@@ -918,7 +920,7 @@ class Practice(BaseModel):
 # src/engine/checks.ts), or asked for by the person or an assessor, then
 # scheduled and run at the bench by an assessor. Running it writes one
 # witnessed entry per skill through guild.write_evidence, with the check as
-# its source. core/data/checks.json never enters git.
+# its source. The checks are the project's rows of `guild_checks`.
 
 CheckState = Literal["proposed", "scheduled", "done", "dismissed"]
 CheckReasonKind = Literal["suspended", "lapsed", "lapsing", "ready", "deviation", "confidence", "rate", "requested"]
@@ -983,7 +985,7 @@ class Check(BaseModel):
 
 
 class Checks(BaseModel):
-    """core/data/checks.json — every check proposed, asked for, run or dismissed."""
+    """A project's checks — every check proposed, asked for, run or dismissed."""
 
     version: Literal[1] = 1
     checks: list[Check] = Field(default_factory=list)
@@ -3239,10 +3241,10 @@ class TrainFromRun(BaseModel):
 
 # ── a train a model built (OF-BLD-020 §5.4) ──────────────────────────────
 #
-# A person's trains live in their browser (D9). A model building a train across
-# tool calls, and an outside assistant over MCP (which has no ask), needs the
-# service to hold its draft: `core/data/pureos-trains.json`, written through
-# `pureos.kept.keep_train` alone, gitignored, on this machine alone.
+# A person's trains are the project's rows the Builder keeps (D9; stage 2). A
+# model building a train across tool calls, and an outside assistant over MCP
+# (which has no ask), needs the service to hold its draft too: rows of the
+# `trains` table marked `kept`, written through `pureos.kept.keep_train` alone.
 
 
 class KeptTrain(BaseModel):
@@ -3264,7 +3266,7 @@ class KeptTrain(BaseModel):
 
 
 class KeptTrains(BaseModel):
-    """core/data/pureos-trains.json."""
+    """The trains a model built, as `pureos.kept` reads them from their rows."""
 
     trains: list[KeptTrain] = Field(default_factory=list)
 

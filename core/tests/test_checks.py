@@ -7,16 +7,20 @@ witnessed entries on the ledger with the check as their source.
 """
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
 from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import checks, guild, practice
+from openferment_core import checks, db, guild, projects
 from openferment_core.api import app
 from openferment_core.competence import Competence
+from openferment_core.db import migrate
+from openferment_core.db.engine import make_engine
 from openferment_core.models import (
     CheckDismiss,
     CheckNote,
@@ -29,6 +33,7 @@ from openferment_core.models import (
     GuildEvidence,
     GuildPerson,
     GuildPolicy,
+    ProjectCreate,
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "competence.json"
@@ -37,9 +42,6 @@ TODAY = date.today().isoformat()
 
 @pytest.fixture(autouse=True)
 def _files(monkeypatch, tmp_path):
-    monkeypatch.setattr(guild, "PATH", tmp_path / "guild.json")
-    monkeypatch.setattr(checks, "PATH", tmp_path / "checks.json")
-    monkeypatch.setattr(practice, "PATH", tmp_path / "practice.json")
     # Never the real core/.env: a key there would make the nightly path call the model.
     monkeypatch.setattr(checks, "ENV_FILE", tmp_path / ".env")
 
@@ -285,16 +287,67 @@ def test_a_check_on_someone_no_longer_active_can_only_be_dismissed(team):
     assert checks.dismiss(c.id, CheckDismiss(by="p-sean", reason="Left the team")).state == "dismissed"
 
 
-def test_the_queue_is_held_against_another_process(team):
-    import fcntl
+@pytest.fixture()
+def committed(test_database):
+    """A database of this test's own, with real connections and commits, as
+    the service and the nightly job see it: the per-test rollback shares one
+    connection, where writers can only take turns."""
+    test_database.open()
+    name = f"{test_database.name}_checks"
+    url = migrate.create(name, test_database.server)
+    engine = make_engine(url, pool_size=8, max_overflow=0)
+    previous_engine, previous_binding = db.use_engine(engine), db.bind(None)
+    try:
+        migrate.upgrade(url)
+        projects.create(ProjectCreate(id=projects.current(), name="Test project", by="test"))
+        yield
+    finally:
+        db.bind(previous_binding)
+        db.use_engine(previous_engine)
+        db.run(engine.dispose())
+        migrate.drop(name, test_database.server)
 
-    with checks._held():
-        with open(checks.PATH.with_name(checks.PATH.name + ".lock"), "a") as other:
-            with pytest.raises(BlockingIOError):
-                fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    with open(checks.PATH.with_name(checks.PATH.name + ".lock"), "a") as other:
-        fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        fcntl.flock(other.fileno(), fcntl.LOCK_UN)
+
+def test_the_queue_is_held_against_another_process(committed, monkeypatch):
+    """Eight asks for the same person and skill, each on a connection of its
+    own, as from the service and the nightly job at once. Each one, having
+    read the queue, waits until all eight have read it (or a moment has
+    passed): with no lock all eight would find the pair uncovered. Under the
+    lock one check is made and the other seven are refused as duplicates."""
+    guild.write_person(person("p-sean", "Sean Creighton", "lead", None))
+    guild.write_person(person("p-patrick", "Patrick Mugisha"))
+    real = checks.read_in
+    seen = {"reads": 0}
+    everyone_read = asyncio.Event()
+
+    async def slow_read(s, project_id):
+        held = await real(s, project_id)
+        seen["reads"] += 1
+        if seen["reads"] >= 8:
+            everyone_read.set()
+        try:
+            await asyncio.wait_for(everyone_read.wait(), timeout=0.3)
+        except TimeoutError:
+            pass
+        return held
+
+    monkeypatch.setattr(checks, "read_in", slow_read)
+    outcomes: list[str] = []
+
+    def ask() -> None:
+        try:
+            checks.request(CheckRequest(personId="p-patrick", skillIds=["SK-OD"], by="p-patrick"))
+            outcomes.append("made")
+        except checks.CheckRefused as e:
+            outcomes.append(e.rule)
+
+    askers = [threading.Thread(target=ask) for _ in range(8)]
+    for a in askers:
+        a.start()
+    for a in askers:
+        a.join()
+    assert sorted(outcomes) == ["duplicate"] * 7 + ["made"]
+    assert [c.personId for c in checks.read().checks] == ["p-patrick"]
 
 
 def test_the_endpoints(team):

@@ -245,8 +245,9 @@ def _unidentify(aid: str, name: str) -> None:
     leave it, its interval reaching zero (as test_fermos does to a fit)."""
     art = artifacts.get(aid)
     params = [dict(p, low=-1.0, identified=False) if p["name"] == name else p for p in art.output["params"]]
-    changed = art.model_copy(update={"output": {**art.output, "params": params}})
-    (intake.DATA_DIR / "artifacts" / f"{aid}.json").write_text(changed.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    from standins import plant_artifact
+
+    plant_artifact(art.model_copy(update={"output": {**art.output, "params": params}}))
 
 
 def test_an_unidentified_mu_refuses_naming_mu(standin):
@@ -298,8 +299,9 @@ def test_one_unit_spelled_two_ways_is_one_unit_and_gives_the_yield(store):
     # (a STAND-IN: its file rewritten so), says so, never that they differ.
     kept = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=30.0)
     art = artifacts.get(kept.artifactId)
-    old = art.model_copy(update={"output": {**art.output, "yieldInterval": None}})
-    (intake.DATA_DIR / "artifacts" / f"{art.id}.json").write_text(old.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    from standins import plant_artifact
+
+    plant_artifact(art.model_copy(update={"output": {**art.output, "yieldInterval": None}}))
     said = feeds_of(proforma.fit_info(artifacts.get(art.id), ETHANOL))["yield"].refused
     assert "drawn before g L-1 and g/L were read as one unit" in said, said
     # Two mass units that are not one are refused, saying which.
@@ -330,8 +332,9 @@ def test_a_damaged_fit_file_refuses_what_rests_on_it_and_the_rest_still_lists(cl
     fit = kept_fit()
     fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=LONG_H)
     other = kept_fit(dep="dep-other", seed=5)
-    path = artifacts.folder() / f"{fit.kineticArtifactId}.json"
-    path.write_text(path.read_text(encoding="utf-8")[:200], encoding="utf-8")  # cut short, as a partial write
+    from standins import plant_damaged
+
+    plant_damaged(fit.kineticArtifactId)  # a row that no longer reads as an artifact
     listed = {i.artifactId: i for i in proforma.fermos_fits(ETHANOL)}
     assert set(listed) == {fc.artifactId, other.kineticArtifactId}
     assert listed[fc.artifactId].refused and "is damaged on disk" in listed[fc.artifactId].refused

@@ -520,7 +520,7 @@ def train_inlet(tmp_path, monkeypatch):
     STAND-IN records as the pool, and a stream a STAND-IN person's train run
     kept, which a model's train takes as its inlet. Imported here, inside the
     fixture: test_train reaches test_module_tools, which imports this file."""
-    from openferment_core import audit, intake, proforma, proposals, pureos
+    from openferment_core import intake, proforma, pureos
     from openferment_core.pureos import catalogue, train_spec
     from test_pureos_build_tool import stand_in_pool
     from test_train import TrainWorker, spec_of
@@ -529,7 +529,6 @@ def train_inlet(tmp_path, monkeypatch):
     for mod, name in ((catalogue, "_SPECS"), (train_spec, "_SPECS"), (train_spec, "_UNITS")):
         monkeypatch.setattr(mod, name, {})
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())
     run = pureos.run_train(spec_of())
     return f"{run.artifactId}/F1_liquid", stand_in_pool()

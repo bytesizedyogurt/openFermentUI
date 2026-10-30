@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from openferment_core import atomic, biorepo, extract, intake
+from openferment_core import atomic, biorepo, intake
 from openferment_core.corpus import load_corpus
 from openferment_core.models import ReviewDecision
 
@@ -65,8 +65,6 @@ def test_a_new_file_is_readable_by_others(tmp_path):
 def scratch_repo(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
 
 
 def _identified_seed_records(n: int) -> list[str]:

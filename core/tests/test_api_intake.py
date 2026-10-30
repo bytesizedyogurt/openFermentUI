@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import biorepo, extract, intake
+from openferment_core import intake
 from openferment_core.api import app
 from openferment_core.models import Overlay
 
@@ -30,8 +30,6 @@ def _offline(monkeypatch, tmp_path, test_corpus):
     shutil.copy(FIXTURES / "jats" / "structural.xml", jats / "structural.xml")
     monkeypatch.setattr(intake, "FIXTURE_DIR", jats)
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
 
 
 @pytest.fixture

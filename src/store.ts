@@ -1,7 +1,9 @@
 // Single store (OF-DES-001 §13.3). All mutations flow through actions so
 // provenance-affecting changes fan out to derived views in one place.
-// No localStorage/sessionStorage anywhere — session-only by design (§9.5);
-// what must survive a reload goes to the Durable tier (src/lib/durable.ts).
+// The scientific records live on the service, in the open project
+// (lib/projectState.ts and the service's own stores); what this browser keeps
+// is its preferences and the writes the service has not yet acknowledged
+// (src/lib/durable.ts), and localStorage holds the last-open project alone.
 import { useMemo } from 'react';
 import { create } from 'zustand';
 import type {
@@ -75,7 +77,17 @@ import { DecisionRefused, IntakeDown, extractPaper, fetchPaper, loadOverlay, pos
 import { blocks, carryOverSpan, isNewCandidate, spanChangesNumber, writeRefusal, type ReviewAction } from '@/lib/review';
 import { postdocHealth } from '@/lib/postdoc';
 import { call } from '@/lib/http';
-import { openProjectId, setOpenProjectId } from '@/lib/project';
+import { openProjectId, projectSettled, setOpenProjectId } from '@/lib/project';
+import {
+  EMPTY_STATE,
+  applyEntries,
+  changes,
+  enqueue,
+  flush,
+  loadProjectState,
+  type OutboxEntry,
+  type ProjectState,
+} from '@/lib/projectState';
 import {
   EMPTY_GUILD,
   GuildRefused,
@@ -117,7 +129,7 @@ export const nextId = (prefix: string) => `${prefix}-${++seq}`;
 /** An id that stays unique across reloads: the time, and a counter for ties. */
 export const timeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq}`;
 
-/** How many Live conversations the Durable tier keeps, newest first. */
+/** How many Live conversations the page holds, newest first; the project keeps every one. */
 const MAX_LIVE_CONVERSATIONS = 30;
 
 /** Deterministic clock-free timestamp label for audit entries. */
@@ -275,8 +287,10 @@ export interface OFState {
    */
   runbooks: Runbook[];
   /**
-   * The Durable tier (OF-BLD-006 §4.6). A deposition is a record, not a
-   * session: a fermentation at hour 14 cannot be lost to a page reload.
+   * The open project's depositions (OF-BLD-006 §4.6; lib/projectState.ts).
+   * A deposition is a record, not a session: a fermentation at hour 14
+   * cannot be lost to a page reload, so a change the service has not yet
+   * acknowledged waits in the outbox.
    */
   depositions: Deposition[];
   /**
@@ -572,6 +586,24 @@ export interface OFState {
   /** Make a project, signed with the reviewer name, and open it. */
   createProject: (asked: { name: string; description?: string }) => Promise<Project>;
   /**
+   * What the open project holds of its pages, as last loaded or sent: the
+   * base the next change is compared with (lib/projectState.ts). Null until
+   * the project's rows have loaded, and nothing is sent before then.
+   */
+  stateSeen: ProjectState | null;
+  /** Project rows the service has not yet acknowledged, oldest first. */
+  stateOutbox: OutboxEntry[];
+  /** Rows this browser kept itself before alpha 2.0, until a project is open to carry them to. */
+  stateLegacy: ProjectState | null;
+  /** Why the open project's rows could not be loaded, in words; null when they were. */
+  stateProblem: string | null;
+  /** Load the open project's rows, lay the unsent ones over them, and send what is owed. */
+  hydrateProjectState: () => Promise<void>;
+  /** Put a project's rows in the page. */
+  applyProjectState: (state: ProjectState) => void;
+  /** Send the outbox; what the service does not answer stays for the next try. */
+  flushProjectState: () => Promise<void>;
+  /**
    * The review decisions the Durable tier restored, with the snapshot's
    * savedAt — kept so a server decision for the same record can be compared
    * against them: the later of the two wins (OF-BLD-012 §7.3).
@@ -821,6 +853,10 @@ export const useStore = create<OFState>()((set, get) => ({
   projects: null,
   projectsProblem: null,
   projectId: openProjectId(),
+  stateSeen: null,
+  stateOutbox: [],
+  stateLegacy: null,
+  stateProblem: null,
 
   loadProjects: async () => {
     let listed: Project[];
@@ -828,12 +864,14 @@ export const useStore = create<OFState>()((set, get) => ({
       listed = await call<Project[]>('/api/projects');
     } catch (e) {
       set({ projectsProblem: e instanceof Error ? e.message : String(e) });
+      projectSettled();
       return;
     }
     const open = get().projectId;
     const keep = open && listed.some((p) => p.id === open) ? open : listed.length === 1 ? listed[0].id : null;
     if (keep !== open) setOpenProjectId(keep);
     set({ projects: listed, projectsProblem: null, projectId: keep });
+    projectSettled();
   },
 
   openProject: (id) => {
@@ -854,6 +892,94 @@ export const useStore = create<OFState>()((set, get) => ({
     set((s) => ({ projects: [...(s.projects ?? []), made] }));
     get().openProject(made.id);
     return made;
+  },
+
+  hydrateProjectState: async () => {
+    const project = get().projectId;
+    if (!project) return;
+    let held: ProjectState;
+    try {
+      held = await loadProjectState();
+    } catch (e) {
+      set({ stateProblem: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    // Rows this browser kept before alpha 2.0 go to the open project, once.
+    const legacy = get().stateLegacy;
+    const outbox = legacy ? enqueue(get().stateOutbox, changes(EMPTY_STATE, legacy, project, decidedBy())) : get().stateOutbox;
+    // What this browser still owes the service stands over what it holds.
+    get().applyProjectState(applyEntries(held, outbox.filter((e) => e.project === project)));
+    set({ stateSeen: projectStateOf(get()), stateOutbox: outbox, stateLegacy: null, stateProblem: null });
+    if (legacy)
+      get().logActivity({
+        at: stamp(),
+        icon: 'upload',
+        text: 'The depositions, locks, scenarios, trains and conversations this browser kept itself are being sent to the open project',
+        href: '#/',
+        provenance: 'user',
+      });
+    void get().flushProjectState();
+  },
+
+  applyProjectState: (state) =>
+    set((s) => {
+      const adopted = new Set(state.runbooks.map((r) => r.id));
+      // Runbooks adopted from a draft first, then every lock laid on by id.
+      const runbooks = [...state.runbooks, ...s.runbooks.filter((r) => !adopted.has(r.id) && !s.adoptedRunbookIds.includes(r.id))].map(
+        (r) => {
+          const l = state.runbookLocks[r.id];
+          return l && !r.lockedAt ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
+        },
+      );
+      const made = new Set(state.scenarios.map((sc) => sc.id));
+      return {
+        depositions: state.depositions,
+        measuredEvidence: state.measuredEvidence,
+        runbooks: freezeLocked(runbooks),
+        adoptedRunbookIds: [...adopted],
+        parameterOverrides: state.overrides,
+        proformaAssumptions: assumptionsFromOverrides(state.overrides),
+        proformaFits: state.fits,
+        scenarios: [...s.scenarios.filter((sc) => !made.has(sc.id) && !s.createdScenarioIds.includes(sc.id)), ...state.scenarios],
+        createdScenarioIds: [...made],
+        trainsMade: state.trains,
+        // A turn still running when its page went away has no stream to finish it, and says so.
+        liveConversations: mergeConversations(state.conversations, []),
+      };
+    }),
+
+  flushProjectState: async () => {
+    if (stateFlushing) return;
+    stateFlushing = true;
+    try {
+      for (;;) {
+        const pending = get().stateOutbox;
+        if (!pending.length) return;
+        const { left, sent, refused } = await flush(pending);
+        set((s) => ({ stateOutbox: [...left, ...s.stateOutbox.filter((e) => !pending.includes(e))] }));
+        for (const { entry, why } of refused)
+          get().logActivity({
+            at: stamp(),
+            icon: 'alert',
+            text: `The service refused ${entry.kind} ${entry.id} and it was dropped: ${why}`,
+            href: '#/',
+            provenance: 'user',
+          });
+        if (refused.length)
+          get().toast({ text: `The service refused ${refused.length} change${refused.length === 1 ? '' : 's'}: ${refused[0].why}`, kind: 'error' });
+        if (left.length) {
+          // The service did not answer; try again shortly, and on the next change.
+          if (stateRetry === null) stateRetry = setTimeout(() => {
+            stateRetry = null;
+            void get().flushProjectState();
+          }, STATE_RETRY_MS);
+          return;
+        }
+        if (!sent) return;
+      }
+    } finally {
+      stateFlushing = false;
+    }
   },
 
   // Outside seedState: a reset discards the session's work, not what the
@@ -1781,7 +1907,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // OF-BLD-014 §9.2 — a draft becomes a research runbook, unlocked, with the
   // predictions and measures the service wrote. The person reads it and locks
   // it on the runbook's page. Its id is unique across reloads, because the
-  // runbook outlives this page in the Durable tier.
+  // runbook outlives this page in the project's rows.
   adoptRunbookDraft: (draft) => {
     const id = `rb-draft-${Date.now().toString(36)}-${nextId('d').slice(2)}`;
     const runbook: Runbook = {
@@ -2310,11 +2436,6 @@ export const useStore = create<OFState>()((set, get) => ({
   // round-trips a snapshot through it with no IndexedDB (§9.2).
   applyDurable: (snap) => {
     set((s) => {
-      // OF-BLD-020 §2.1 (D3) — the overrides typed here, the snapshot's
-      // older proformaAssumptions read once into `proforma:<id>` where it
-      // holds no entry for that scope; anything typed since load wins, by
-      // scope and key. proformaAssumptions is read from the result.
-      const parameterOverrides = mergeOverrides(overridesOfSnapshot(snap), s.parameterOverrides);
       // Review decisions are re-applied over the seeded records rather than
       // replacing them, so a corpus update ships new records without
       // discarding what a reviewer already decided.
@@ -2331,38 +2452,13 @@ export const useStore = create<OFState>()((set, get) => ({
         decisionAt[r.id] = madeAt;
         return applyDecision(r, d);
       });
-      // Locks re-apply only to runbooks that still exist. A lock whose runbook
-      // was created in a previous session and is not in this one is dropped —
-      // a lock with nothing under it is not worth keeping.
-      // §9.2 — runbooks adopted from a draft come back first, then every
-      // lock (theirs included) is re-applied by id.
-      const adopted = (snap.adoptedRunbooks ?? []).filter((a) => !s.runbooks.some((r) => r.id === a.id));
-      const runbooks = [...adopted, ...s.runbooks].map((r) => {
-        const l = snap.runbookLocks[r.id];
-        return l ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
-      });
-      // OF-BLD-019 D6 — scenarios made here come back after the seeded ones,
-      // unless this page already holds one by the id (made since load wins);
-      // a seeded scenario takes back the newest run it had here.
-      const madeHere = Object.values(snap.createdScenarios ?? {}).filter((sc) => !s.scenarios.some((x) => x.id === sc.id));
-      const runs = snap.scenarioRuns ?? {};
-      // §3.3 — a seeded scenario pinned here is pinned again (Compare's pins survive a reload).
-      const pins = new Set(snap.pinnedScenarios ?? []);
-      const scenarios = [
-        ...s.scenarios.map((sc) => {
-          const run = runs[sc.id] && !sc.lastRunId ? { lastRunId: runs[sc.id] } : {};
-          const pin = pins.has(sc.id) && !sc.pinned && !s.createdScenarioIds.includes(sc.id) ? { pinned: true } : {};
-          return 'lastRunId' in run || 'pinned' in pin ? { ...sc, ...run, ...pin } : sc;
-        }),
-        ...madeHere,
-      ];
       return {
-        scenarios,
-        createdScenarioIds: [...new Set([...s.createdScenarioIds, ...madeHere.map((sc) => sc.id)])],
         records,
-        runbooks: freezeLocked(runbooks),
-        depositions: snap.depositions,
-        measuredEvidence: snap.measuredEvidence ?? [],
+        // The project rows still owed to the service, and the rows this
+        // browser kept itself before alpha 2.0, carried to the open project
+        // when its rows load (hydrateProjectState).
+        stateOutbox: enqueue(snap.outbox ?? [], s.stateOutbox),
+        stateLegacy: legacyStateOf(snap),
         durableReady: durableAvailable(),
         durableReview: { savedAt: snap.savedAt, decisions: snap.reviewDecisions },
         decisionAt,
@@ -2371,9 +2467,9 @@ export const useStore = create<OFState>()((set, get) => ({
         reviewer: snap.reviewerName ?? '',
         // OF-BLD-016 §2.1 — older snapshots predate the switch; the current
         // position (off unless changed since load) stands.
-        // OF-BLD-013 §1.3 — the ledger as this browser last held it, and what
-        // it still owes the service. Older snapshots predate the field.
-        guild: snap.guild?.ledger ?? s.guild,
+        // OF-BLD-013 §1.3 — what Guild's ledger still owes the service, laid
+        // beside the ledger the page holds. Older snapshots predate the field.
+        guild: owedLedger(s.guild, snap.guild?.ledger),
         guildPending: snap.guild?.pending ?? [],
         guildPendingWithdrawals: snap.guild?.withdrawals ?? [],
         guildActingId: snap.guild?.actingId ?? s.guildActingId,
@@ -2381,19 +2477,6 @@ export const useStore = create<OFState>()((set, get) => ({
         // §3.2 — lessons finished in this browser. Anything finished since the
         // page loaded is kept beside what the snapshot remembers.
         learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
-        // §8.4 — assumptions typed here; anything typed since load wins.
-        // Since OF-BLD-020 §2.1 they are the overrides of each proforma scope.
-        parameterOverrides,
-        proformaAssumptions: assumptionsFromOverrides(parameterOverrides),
-        // OF-BLD-019 §5.1 — the fermOS fits chosen here; a scenario's choice
-        // made since load wins over the snapshot's.
-        proformaFits: { ...(snap.proformaFits ?? {}), ...s.proformaFits },
-        // OF-BLD-020 §5.3 — the trains built here; one saved since load wins by id.
-        trainsMade: { ...(snap.trainsMade ?? {}), ...s.trainsMade },
-        adoptedRunbookIds: [...new Set([...adopted.map((r) => r.id), ...s.adoptedRunbookIds])],
-        // Postdoc's Live conversations. A turn still running when the page
-        // went away has no stream to finish it, and says so.
-        liveConversations: mergeConversations(snap.liveConversations ?? [], s.liveConversations),
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -3108,9 +3191,21 @@ export const useStore = create<OFState>()((set, get) => ({
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
-    // The shipped state hides archived programs, so the switch goes off too
-    // (it lives outside seedState so that nothing else resets it).
-    set({ ...seedState(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {} });
+    // The open project's rows are the service's, and survive a reset the way
+    // the overlay does: they are loaded again, and nothing is taken back on
+    // the service. What this browser still owed it goes with the browser's data.
+    set({
+      ...seedState(),
+      toasts: [],
+      serviceUp,
+      durableReview: null,
+      decisionAt: {},
+      refusedDecisions: {},
+      stateSeen: null,
+      stateOutbox: [],
+      stateLegacy: null,
+    });
+    void get().hydrateProjectState();
     if (overlay) get().applyOverlay(overlay);
     // Guild's ledger is the service's when there is one, and survives a reset
     // the way the overlay does; what was only ever in this browser goes.
@@ -3122,7 +3217,7 @@ export const useStore = create<OFState>()((set, get) => ({
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished, conversations, Proforma scenarios, the trains built here and the parameters changed here are gone, archived programs are hidden again, and the corpus is as it shipped',
+      text: 'This browser’s data is cleared: the lessons finished here and every change it had not yet sent to the service are gone; the project’s rows load again from the service',
       kind: 'info',
     });
   },
@@ -3319,22 +3414,15 @@ export function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverri
   return out;
 }
 
-/** The snapshot's overrides under those typed since load, merged by key within each scope (as `mergeAssumptions`). */
-export function mergeOverrides(saved: Record<string, Override[]>, since: Record<string, Override[]>): Record<string, Override[]> {
-  const out: Record<string, Override[]> = { ...saved };
-  for (const [scope, typed] of Object.entries(since)) {
-    const keys = new Set(typed.map((o) => o.key));
-    out[scope] = [...(saved[scope] ?? []).filter((o) => !keys.has(o.key)), ...typed];
-  }
-  return out;
-}
-
 export function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
   for (const r of s.records) {
-    // Only records a reviewer has actually touched. Persisting all 134 every
-    // time would write the seed back to disk on every keystroke.
+    // Only records a reviewer has actually touched.
     if (r.status === 'unverified' && !r.gold && !r.corrected && !r.reviewer) continue;
+    // And only decisions the service does not hold yet: one it holds at this
+    // time or later is its own, and loads with the overlay.
+    const server = s.overlay?.records[r.id];
+    if (server && s.decisionAt[r.id] && server.at >= s.decisionAt[r.id]) continue;
     reviewDecisions[r.id] = {
       status: r.status,
       provenance: r.provenance,
@@ -3347,50 +3435,99 @@ export function snapshotOf(s: OFState): DurableSnapshot {
       ...(reanchoredSpan(r) ?? {}),
     };
   }
-  const runbookLocks: DurableSnapshot['runbookLocks'] = {};
-  for (const r of s.runbooks) {
-    if (r.lockedAt && r.lockHash) runbookLocks[r.id] = { lockedAt: r.lockedAt, lockHash: r.lockHash };
-  }
+  const owed = new Set(s.guildPending);
+  const legacy = s.stateLegacy;
   return {
     ...EMPTY_SNAPSHOT,
     savedAt: new Date().toISOString(),
-    depositions: s.depositions,
-    measuredEvidence: s.measuredEvidence,
     reviewDecisions,
-    runbookLocks,
     reviewerName: s.reviewer,
     guild: {
-      ledger: s.guild,
+      // Only what the service has not acknowledged; the ledger loads from it.
+      ledger: { ...s.guild, people: s.guild.people.filter((x) => owed.has(x.id)), evidence: s.guild.evidence.filter((x) => owed.has(x.id)) },
       pending: s.guildPending,
       withdrawals: s.guildPendingWithdrawals,
       actingId: s.guildActingId,
     },
     learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
-    proformaAssumptions: s.proformaAssumptions,
-    // OF-BLD-020 §2.1 (D3) — the parameter panel's overrides, by scope.
-    parameterOverrides: s.parameterOverrides,
-    proformaFits: s.proformaFits,
-    // Unlocked content as adopted; a lock rides in runbookLocks like any other.
-    adoptedRunbooks: s.runbooks
-      .filter((r) => s.adoptedRunbookIds.includes(r.id))
-      .map((r) => ({ ...structuredClone({ ...r, predictions: [...r.predictions], measurementSchema: [...r.measurementSchema] }), lockedAt: null, lockHash: null })),
-    liveConversations: s.liveConversations,
-    // OF-BLD-019 D6 — scenarios made here, whole and keyed by id; the newest
-    // run of each seeded scenario that ran here.
-    createdScenarios: Object.fromEntries(
-      s.scenarios.filter((sc) => s.createdScenarioIds.includes(sc.id)).map((sc) => [sc.id, structuredClone(sc)]),
-    ),
-    scenarioRuns: Object.fromEntries(
-      s.scenarios
-        .filter((sc) => !s.createdScenarioIds.includes(sc.id) && sc.lastRunId)
-        .map((sc) => [sc.id, sc.lastRunId as string]),
-    ),
-    // OF-BLD-019 §3.3 (D6) — the seeded scenarios pinned to compare here.
-    pinnedScenarios: s.scenarios.filter((sc) => !s.createdScenarioIds.includes(sc.id) && sc.pinned).map((sc) => sc.id),
-    // OF-BLD-020 §5.3 — pureOS's trains built here, whole, by id.
-    trainsMade: s.trainsMade,
+    outbox: s.stateOutbox,
+    // Rows kept here before alpha 2.0 stay until a project is open to take them.
+    ...(legacy
+      ? {
+          depositions: legacy.depositions,
+          measuredEvidence: legacy.measuredEvidence,
+          runbookLocks: legacy.runbookLocks,
+          adoptedRunbooks: legacy.runbooks,
+          parameterOverrides: legacy.overrides,
+          proformaFits: legacy.fits,
+          createdScenarios: Object.fromEntries(legacy.scenarios.map((sc) => [sc.id, sc])),
+          trainsMade: legacy.trains,
+          liveConversations: legacy.conversations,
+        }
+      : {}),
   };
 }
+
+/** The open project's rows as the page holds them (lib/projectState.ts). */
+export function projectStateOf(s: OFState): ProjectState {
+  const runbookLocks: ProjectState['runbookLocks'] = {};
+  for (const r of s.runbooks) if (r.lockedAt && r.lockHash) runbookLocks[r.id] = lockOf(r.id, r.lockedAt, r.lockHash);
+  return {
+    depositions: s.depositions,
+    measuredEvidence: s.measuredEvidence,
+    runbooks: s.runbooks.filter((r) => s.adoptedRunbookIds.includes(r.id)),
+    runbookLocks,
+    overrides: s.parameterOverrides,
+    fits: s.proformaFits,
+    scenarios: s.scenarios.filter((sc) => s.createdScenarioIds.includes(sc.id)),
+    trains: s.trainsMade,
+    conversations: s.liveConversations,
+  };
+}
+
+// One object per lock, so a runbook object that changes for another reason
+// does not read as a new lock (a lock is sent once, and kept as made).
+const LOCKS = new Map<string, { lockedAt: string; lockHash: string }>();
+function lockOf(id: string, lockedAt: string, lockHash: string): { lockedAt: string; lockHash: string } {
+  const key = `${id}\u0000${lockedAt}\u0000${lockHash}`;
+  let lock = LOCKS.get(key);
+  if (!lock) LOCKS.set(key, (lock = { lockedAt, lockHash }));
+  return lock;
+}
+
+/** The rows a snapshot from before alpha 2.0 kept in this browser, or null when it kept none. */
+function legacyStateOf(snap: DurableSnapshot): ProjectState | null {
+  const state: ProjectState = {
+    depositions: snap.depositions ?? [],
+    measuredEvidence: snap.measuredEvidence ?? [],
+    runbooks: snap.adoptedRunbooks ?? [],
+    runbookLocks: snap.runbookLocks ?? {},
+    overrides: overridesOfSnapshot(snap),
+    fits: snap.proformaFits ?? {},
+    scenarios: Object.values(snap.createdScenarios ?? {}),
+    trains: snap.trainsMade ?? {},
+    conversations: snap.liveConversations ?? [],
+  };
+  const held = Object.values(state).some((v) => (Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0));
+  return held ? state : null;
+}
+
+/** The ledger the page holds, with what a snapshot still owes the service laid beside it. */
+function owedLedger(ledger: Guild, owed: Guild | undefined): Guild {
+  if (!owed) return ledger;
+  const people = new Set(ledger.people.map((p) => p.id));
+  const evidence = new Set(ledger.evidence.map((e) => e.id));
+  return {
+    ...ledger,
+    people: [...ledger.people, ...owed.people.filter((p) => !people.has(p.id))],
+    evidence: [...ledger.evidence, ...owed.evidence.filter((e) => !evidence.has(e.id))],
+  };
+}
+
+let stateFlushing = false;
+let stateRetry: ReturnType<typeof setTimeout> | null = null;
+/** How long a project row the service did not answer waits before it is sent again. */
+const STATE_RETRY_MS = 15_000;
 
 /**
  * The Live conversations after a hydrate: those this page started since it
@@ -3408,27 +3545,46 @@ function mergeConversations(saved: LiveConversation[], current: LiveConversation
   return [...current, ...restored].slice(0, MAX_LIVE_CONVERSATIONS);
 }
 
+// Every change to the open project's rows goes to the outbox and is sent
+// (lib/projectState.ts); nothing is compared before the rows have loaded.
+if (typeof window !== 'undefined') {
+  useStore.subscribe((s, prev) => {
+    if (
+      !s.stateSeen ||
+      !s.projectId ||
+      (s.depositions === prev.depositions &&
+        s.measuredEvidence === prev.measuredEvidence &&
+        s.runbooks === prev.runbooks &&
+        s.adoptedRunbookIds === prev.adoptedRunbookIds &&
+        s.parameterOverrides === prev.parameterOverrides &&
+        s.proformaFits === prev.proformaFits &&
+        s.scenarios === prev.scenarios &&
+        s.createdScenarioIds === prev.createdScenarioIds &&
+        s.trainsMade === prev.trainsMade &&
+        s.liveConversations === prev.liveConversations)
+    )
+      return;
+    const now = projectStateOf(s);
+    const owed = changes(s.stateSeen, now, s.projectId, decidedBy());
+    useStore.setState(owed.length ? { stateSeen: now, stateOutbox: enqueue(s.stateOutbox, owed) } : { stateSeen: now });
+    if (owed.length) void useStore.getState().flushProjectState();
+  });
+}
+
 if (durableAvailable()) {
   useStore.subscribe((s, prev) => {
     if (
-      s.depositions === prev.depositions &&
       s.records === prev.records &&
-      s.runbooks === prev.runbooks &&
-      s.measuredEvidence === prev.measuredEvidence &&
+      s.decisionAt === prev.decisionAt &&
+      s.overlay === prev.overlay &&
       s.reviewer === prev.reviewer &&
       s.guild === prev.guild &&
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
       s.guildActingId === prev.guildActingId &&
       s.learnProgress === prev.learnProgress &&
-      s.proformaAssumptions === prev.proformaAssumptions &&
-      s.parameterOverrides === prev.parameterOverrides &&
-      s.proformaFits === prev.proformaFits &&
-      s.trainsMade === prev.trainsMade &&
-      s.adoptedRunbookIds === prev.adoptedRunbookIds &&
-      s.liveConversations === prev.liveConversations &&
-      s.scenarios === prev.scenarios &&
-      s.createdScenarioIds === prev.createdScenarioIds
+      s.stateOutbox === prev.stateOutbox &&
+      s.stateLegacy === prev.stateLegacy
     )
       return;
     saveDurable(snapshotOf(s));

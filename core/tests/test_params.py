@@ -451,11 +451,10 @@ def test_the_left_out_words_name_the_flowsheets_own_feed(monkeypatch, standin):
 def test_an_artifact_damaged_on_disk_under_a_vessel_scope_is_a_409_in_words(client, store):
     """§2.R finding 17: the params endpoints answered a bare 500 where the
     vessel's own route answers 409 in words."""
-    from openferment_core import artifacts
+    from standins import plant_damaged
 
     aid = "0123456789abcdef"
-    artifacts.folder().mkdir(parents=True, exist_ok=True)
-    (artifacts.folder() / f"{aid}.json").write_text("{not json", encoding="utf-8")
+    plant_damaged(aid)
     scope = f"fermos:vessel:{aid}"
     for r in (client.get(f"/api/params/{scope}"), client.post(f"/api/params/{scope}/resolve", json={})):
         assert r.status_code == 409 and f"artifact {aid} is damaged on disk" in r.json()["detail"], (r.status_code, r.text)

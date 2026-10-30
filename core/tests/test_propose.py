@@ -280,9 +280,9 @@ def test_an_unknown_product_is_unknown_and_an_unknown_host_refused(store, seed, 
 def _kept(store: Path, aid: str, tool: str, output: dict) -> Artifact:
     art = Artifact(id=aid, tool=tool, toolVersion="a test's", inputs=[], output=output, outputHash="0",
                    provenance="demo", createdAt="2026-10-21T00:00:00Z", durationMs=0)
-    (store / "artifacts").mkdir(exist_ok=True)
-    (store / "artifacts" / f"{aid}.json").write_text(art.model_dump_json(), encoding="utf-8")
-    return art
+    from standins import plant_artifact
+
+    return plant_artifact(art)
 
 
 def test_an_inlet_names_a_kept_simulation_or_a_runs_stream(store, seed, worker, monkeypatch):
@@ -358,8 +358,10 @@ def test_post_proposes_and_says_what_is_unknown_refused_or_cannot_be_asked(clien
 
 
 def test_a_damaged_property_answer_is_a_409_in_words(client, store):
+    from standins import plant_damaged
+
     art = thermo.volatility("ethanol")
-    (artifacts.folder() / f"{art.id}.json").write_text("{trunc", encoding="utf-8")
+    plant_damaged(art.id)
     r = client.post("/api/pureos/propose", json={"product": "ethanol", "host": YEAST})
     assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"]
 

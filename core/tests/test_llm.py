@@ -519,15 +519,27 @@ def test_a_rejected_key_through_the_sdk_does_not_fall_back():
 # ── a cache from before the move ───────────────────────────────────────
 
 
-def test_an_extraction_cached_by_an_earlier_run_is_extracted_again(monkeypatch, tmp_path):
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path)
-    old = {"paperId": "B5", "run": "haiku-1", "extractedAt": "2026-09-01T00:00:00Z", "candidates": [], "dropped": []}
-    (tmp_path / "B5.json").write_text(json.dumps(old))
-    assert extract.cached("B5") is None, "another run's file is not this run's extraction"
+def test_an_extraction_kept_by_an_earlier_run_is_extracted_again():
+    from sqlalchemy import delete, insert
+
+    from openferment_core import db, projects
+    from openferment_core.db import models as t
+
+    def keep(body: dict) -> None:
+        async def put() -> None:
+            async with db.session() as s:
+                await s.execute(delete(t.candidates))
+                await s.execute(insert(t.candidates).values(project_id=projects.current(), document_id="B5",
+                                                            source=extract.MODEL, body=body, created_by="test"))
+
+        db.run(put())
+
+    keep({"paperId": "B5", "run": "haiku-1", "extractedAt": "2026-09-01T00:00:00Z", "candidates": [], "dropped": []})
+    assert extract.cached("B5") is None, "another run's row is not this run's extraction"
     assert extract.all_cached() == []
 
     current = extract.ExtractResponse(paperId="B5", run=extract.RUN, extractedAt="2026-10-08T00:00:00Z")
-    (tmp_path / "B5.json").write_text(current.model_dump_json())
+    keep(current.model_dump(mode="json"))
     assert extract.cached("B5") == current and extract.all_cached() == [current]
 
 

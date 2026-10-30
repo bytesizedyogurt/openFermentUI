@@ -124,7 +124,7 @@ def test_convert_units_converts_within_a_family_and_keeps_an_artifact(pool, tmp_
     assert ev.provenance == "computed", "a curated input does not weaken a computed value below computed"
     assert [i.source.kind for i in ev.basis.inputs] == ["record", "convention"]
     assert ev.basis.inputs[0].source.id == "r-X1-1"
-    assert (tmp_path / "artifacts" / f"{ev.basis.artifactId}.json").is_file()
+    assert artifacts.get(ev.basis.artifactId).id == ev.basis.artifactId
     assert artifacts.replay(ev.basis.artifactId).identical
 
 
@@ -366,12 +366,11 @@ def proforma_store(tmp_path, monkeypatch):
     as the offline Proforma tests run."""
     from types import SimpleNamespace
 
-    from openferment_core import audit, proforma, proposals
+    from openferment_core import proforma
 
     import standins
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
     monkeypatch.setattr(proforma, "call", standins._standin_call)
@@ -501,11 +500,9 @@ def fermos_store(tmp_path, monkeypatch):
     """A throwaway store with the audit log and the proposals in it, and
     test_fermos_bind's STAND-IN batch_v1 pool (records written in the test
     on thread Q paper ids, none a paper's value)."""
-    from openferment_core import audit, proposals
     from test_fermos_bind import STANDIN, pool_of, rec
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
     return pool_of(*STANDIN, rec("pm1", "ethanol_max_conc", 90.0), rec("al1", "ethanol_lp_alpha", 2.0, "g g-1"),

@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, audit, fermos, intake, kinetics, params, proforma, proposals, tools
+from openferment_core import artifacts, fermos, intake, kinetics, params, proforma, tools
 from openferment_core.models import Override, ParamResolveRequest, SimulationRequest
 
 BY = "openFerment test fixture"
@@ -40,7 +40,6 @@ def typed(family=BATCH, by=BY, **values):
 @pytest.fixture()
 def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(fermos, "_load_pool", lambda *a, **k: EMPTY)
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
@@ -68,10 +67,11 @@ def _ctx(pool=EMPTY):
 
 
 def test_a_damaged_kept_simulation_is_refused_in_words_on_bind_and_simulate_never_a_500(store):
+    from standins import plant_damaged
+
     sid = _batch()
-    path = store / "artifacts" / f"{sid}.json"
-    assert path.exists()
-    path.write_text('{"id": "' + sid + '", "tool": ', encoding="utf-8")
+    assert artifacts.get(sid).id == sid
+    plant_damaged(sid)
     client = _api()
     ask = {"family": BATCH, "product": "ethanol", "sugar": "glucose", "startFrom": f"simulation:{sid}"}
     r = client.get("/api/fermos/bind", params=ask)

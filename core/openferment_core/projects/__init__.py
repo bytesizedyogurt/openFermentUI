@@ -62,6 +62,14 @@ def current() -> str:
     return str(value)
 
 
+def current_or_none() -> str | None:
+    """`current()`, or None where nothing names a project."""
+    try:
+        return current()
+    except ProjectRequired:
+        return None
+
+
 @contextmanager
 def using(project_id: str | None) -> Iterator[None]:
     """Act in `project_id` inside the block. None names none: a store call

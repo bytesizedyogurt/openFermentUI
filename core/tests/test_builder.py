@@ -193,10 +193,9 @@ def _keep(aid=RUN_ID, *, tool="proforma.run", flowsheet="ethanol_glucose_v0", st
         inputs.append(BasisInput(name="scenario", value=scenario, unit="", source=BasisSource(kind="convention")))
     art = Artifact(id=aid, tool=tool, toolVersion="test", output=out, outputHash="0" * 64, provenance="computed",
                    createdAt="2026-10-21T10:00:00Z", durationMs=0, inputs=inputs)
-    folder = artifacts.folder()
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{aid}.json").write_text(art.model_dump_json(), encoding="utf-8")
-    return art
+    from standins import plant_artifact
+
+    return plant_artifact(art)
 
 
 def test_a_runs_train_takes_every_unit_the_product_passes_through_by_its_class(store, monkeypatch):
@@ -314,7 +313,9 @@ def test_a_composite_runs_train_reads_no_unit_of_the_composite_and_takes_its_tra
     composite = _keep(flowsheet="custom_train_v1", scenario=None)
     composite.inputs.append(BasisInput(name="train run", value=train_run.artifactId, unit="", source=BasisSource(
         kind="artifact", id=train_run.artifactId)))
-    (artifacts.folder() / f"{RUN_ID}.json").write_text(composite.model_dump_json(), encoding="utf-8")
+    from standins import plant_artifact
+
+    plant_artifact(composite)
     got = pureos.from_run(RUN_ID)
     by = {u.id: u for u in got.train.units}
     assert not [u.id for u in got.train.units if u.readFrom is not None and u.readFrom.flowsheet == "custom_train_v1"]

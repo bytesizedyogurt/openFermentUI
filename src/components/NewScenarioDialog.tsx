@@ -5,9 +5,9 @@
 // scenario can name, and the toy never. A reference biorefinery runs whole on its
 // package's own defaults, so it is not offered here: a scenario is made on a
 // flowsheet whose inputs bind to records or to a named person's assumption.
-// What is made is a `biosteam` scenario and nothing else (D5), held in this
-// browser's Durable tier under a time-based id (D6); it carries no input
-// value of its own.
+// What is made is a `biosteam` scenario and nothing else (D5), kept in the
+// open project's rows under a time-based id (D6; lib/projectState.ts); it
+// carries no input value of its own.
 //
 // Proforma's index opens this, and so does the palette's "New Proforma
 // scenario" (through `ui.newScenarioOpen`); fermOS → Forecast's "Send to

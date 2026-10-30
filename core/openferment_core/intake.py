@@ -62,11 +62,11 @@ from . import atomic
 from .models import FetchedSection, FetchLicense, FetchResult, FetchSource, IntakeStatus, OverlayPaper
 
 EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
-# Where the service keeps what it fetched, extracted and decided (§2.2), and
-# where fixture mode reads from. Both overridable by environment, read once
-# at import, so a whole service can be pointed at a fixture directory and a
-# scratch data directory without touching core/data/biorepo.json — the
-# committed file — or anything anyone fetched for real (§8.1).
+# Where the service keeps what it fetched (§2.2), and where fixture mode
+# reads from. Both overridable by environment, read once at import, so a
+# whole service can be pointed at a fixture directory and a scratch data
+# directory without touching anything anyone fetched for real (§8.1). What
+# is extracted and decided is kept in the database (ADR-001).
 _CORE = Path(__file__).parent.parent
 
 

@@ -22,19 +22,22 @@ Fails when:
    every function of the service that calls `artifacts.compute` for a
    `proforma.run`, `proforma.reference`, `proforma_benchmark`,
    `fermos.simulation`, `fermos.vessel` or `pureos.train_run` artifact (or for
-   a tool it cannot name) or `audit.append`, or that writes through `atomic`
-   in a module naming a store a model's write keeps (`KEPT_STORES`: the trains
-   a model built, `pureos-trains.json`, OF-BLD-020 §5.4), and every function
-   that reaches one of those, to a fixed point, each name followed through its
-   import as rule 2 follows it. A tool file may reach none of them but through
-   writes.py, may not call `artifacts.compute` for a run, and, as in rule 2,
-   may not hand a store module around bare or import by name at run time.
-   OF-BLD-020 §5.R (finding 18): a function that writes through `atomic` and
-   names a kept store's file by a function or constant of the module that
-   names it (`kept.path()`, `kept.FILE`) is a writer wherever it lives, and a
-   tool file writes no file itself: it may not reach `atomic.write_text` or
-   `write_bytes`, nor call a path's or a handle's write, a dump, a file made,
-   moved or taken away, or `open` with a mode that writes;
+   a tool it cannot name) or `audit.append`, or that writes a row (`db.rows`'
+   `put` or `drop`, or SQLAlchemy's insert, update or delete) in a module
+   naming a store a model's write keeps (`KEPT_STORES`: the table of the
+   trains a model built, `trains`, OF-BLD-020 §5.4; ADR-001), and every
+   function that reaches one of those, to a fixed point, each name followed
+   through its import as rule 2 follows it. A tool file may reach none of them
+   but through writes.py, may not call `artifacts.compute` for a run, and, as
+   in rule 2, may not hand a store module around bare or import by name at run
+   time. OF-BLD-020 §5.R (finding 18): a function that writes a row and names
+   a kept store's table, through `db.models` or a constant of the module that
+   names it (`kept.TABLE`), is a writer wherever it lives; and a tool file
+   writes no row and no file itself: it may not reach `db.rows`' writes,
+   SQLAlchemy's insert, update or delete, `atomic.write_text` or
+   `write_bytes`, nor hold SQL that writes, nor call a path's or a handle's
+   write, a dump, a file made, moved or taken away, or `open` with a mode that
+   writes;
 3. a gated action can complete without a person's id on it: every (module,
    action) in `gates.GATES` comes back `proposed` with nothing written but
    the proposal, and carrying it out with no name, a placeholder or one
@@ -153,9 +156,10 @@ ALLOWED_WRITES = (
 # The modules that keep a store: anything of theirs a write tool names is a
 # write function in ALLOWED_WRITES, an exception, or a constant.
 STORES = ("geneos", "fermos", "vessel", "proforma", "extract", "intake", "proposals", "audit", "checks", "guild",
-          "biorepo", "artifacts", "atomic", "pureos.kept", "pureos.train_spec")
+          "biorepo", "artifacts", "atomic", "db.rows", "pureos.kept", "pureos.train_spec")
 # What a write tool may never do itself.
-FORBIDDEN = ("write_text", "open(", "json.dump", ".write(", "atomic.", "_persist", "Path(", "write_bytes", "unlink(", "rename(")
+FORBIDDEN = ("write_text", "open(", "json.dump", ".write(", "atomic.", "_persist", "Path(", "write_bytes", "unlink(", "rename(",
+             "rows.put", "rows.drop", "db.session", "db.run")
 
 errors: list[str] = []
 
@@ -332,11 +336,23 @@ RUN_KINDS = frozenset({_proforma_mod.RUN, _proforma_mod.REFERENCE, _proforma_mod
                        _vessel_mod.TOOL, TRAIN_RUN})
 COMPUTE = "openferment_core.artifacts.compute"
 APPEND = "openferment_core.audit.append"
-# The stores a model's free write keeps beside the artifacts, by file name
-# (OF-BLD-020 §5.4: the trains a model built). A function of a module that
-# names one and writes through `atomic` keeps it.
-KEPT_STORES = frozenset({"pureos-trains.json"})
+# The same row inside a store's own transaction (ADR-001): a write and its
+# audit row commit together.
+ADD = "openferment_core.audit.add"
+# The stores a model's free write keeps beside the artifacts, by table
+# (OF-BLD-020 §5.4: the trains a model built; ADR-001). A function of a
+# module that names one and writes a row keeps it.
+KEPT_STORES = frozenset({"trains"})
 ATOMIC_WRITES = frozenset({"openferment_core.atomic.write_text", "openferment_core.atomic.write_bytes"})
+# A row written: the row helpers every store shares, and SQLAlchemy's own
+# statements that change rows, by the dotted name an import gives them.
+ROW_WRITES = frozenset({"openferment_core.db.rows.put", "openferment_core.db.rows.drop"})
+SQL_WRITES = frozenset({"sqlalchemy.insert", "sqlalchemy.update", "sqlalchemy.delete",
+                        "sqlalchemy.dialects.postgresql.insert", "sqlalchemy.sql.insert", "sqlalchemy.sql.update",
+                        "sqlalchemy.sql.delete", "sqlalchemy.sql.expression.insert", "sqlalchemy.sql.expression.update",
+                        "sqlalchemy.sql.expression.delete"})
+# SQL text that changes rows, held in a string.
+SQL_TEXT = re.compile(r"^\s*(insert\s+into|update\s+\S+\s+set|delete\s+from|truncate)\b", re.IGNORECASE)
 WRITES = f"{writes.__name__}."
 _UNKNOWN = object()
 
@@ -516,27 +532,55 @@ class _Module:
 
 service = [_Module(p) for p in sorted(PACKAGE_DIR.rglob("*.py"))
            if p.relative_to(PACKAGE_DIR).parts[0] not in WORKER_SIDE]
-# OF-BLD-020 §5.R (finding 18): the modules that name a kept store's file. A
-# function anywhere that writes through `atomic` and names that file, or
-# reaches a function of such a module (its `path()`, its `FILE` read as an
-# attribute), keeps the store as surely as one whose own module names it.
+# OF-BLD-020 §5.R (finding 18): the modules that name a kept store's table.
+# A function anywhere that writes a row and names that table (the table
+# itself, through `db.models`, or the name), or reaches a function or reads
+# a constant of such a module (its `TABLE`), keeps the store as surely as one
+# whose own module names it.
 STORE_MODULES = {mod.name for mod in service
                  if any(isinstance(v, str) and v in KEPT_STORES for v in mod.consts.values())}
 
 
 def _names_store(mod: _Module, fn_refs: list) -> bool:
+    from sqlalchemy import Table
+
     for _, r, a, _, t, lc in fn_refs:
         key, obj = mod.resolve(r, a, t, lc)
         if isinstance(obj, str) and obj in KEPT_STORES:
             return True
+        if isinstance(obj, Table) and obj.name in KEPT_STORES:
+            return True
         if key and any(key.startswith(f"{m}.") for m in STORE_MODULES):
+            return True
+        if not key and any(target.startswith(f"{m}.") or target == m for m in STORE_MODULES for target in t):
             return True
     return False
 
 
+def _sql_writes(refs: list) -> list[tuple[int, str]]:
+    """Each use of SQLAlchemy's insert, update or delete among `refs`:
+    (line, its dotted name)."""
+    found = []
+    for _, root, attrs, line, targets, local in refs:
+        if local:
+            continue
+        for target in targets:
+            dotted = ".".join([target, *attrs])
+            if dotted in SQL_WRITES or target in SQL_WRITES:
+                found.append((line, dotted if dotted in SQL_WRITES else target))
+    return found
+
+
+def _sql_text(mod: _Module) -> list[tuple[int, str]]:
+    """Every string in the file that is SQL changing rows: (line, its start)."""
+    return [(n.lineno, n.value.strip()[:24]) for n in ast.walk(mod.tree)
+            if isinstance(n, ast.Constant) and isinstance(n.value, str) and SQL_TEXT.match(n.value)]
+
+
 # A tool file's own file writes past atomic (OF-BLD-020 §5.R, finding 18): a
 # path's or a handle's write, a dump into a handle, a file made, moved or
-# taken away, and a file opened to write. A tool file reads; it writes nothing.
+# taken away, and a file opened to write. A tool file reads; it writes nothing,
+# file or row.
 FILE_WRITES = frozenset({"write_text", "write_bytes", "write", "writelines", "dump", "touch", "mkdir", "unlink",
                          "rename", "rmdir"})
 WRITE_MODES = frozenset("wax+")
@@ -559,17 +603,23 @@ def _raw_writes(mod: _Module, refs: list) -> list[tuple[int, str]]:
     return found
 
 
+def _sql_text_in(fn: ast.AST) -> bool:
+    return any(isinstance(n, ast.Constant) and isinstance(n.value, str) and SQL_TEXT.match(n.value)
+               for n in ast.walk(fn))
+
+
 # What each function reaches, and the ones that keep a run or append to the audit log themselves.
 edges: dict[str, set[str]] = {}
-WRITERS: set[str] = {APPEND}
+WRITERS: set[str] = {APPEND, ADD}
 for mod in service:
     keeps_store = mod.name in STORE_MODULES
     for key, fn in mod.functions():
         fn_refs = mod.refs(fn)
         reached = {k for _, r, a, _, t, lc in fn_refs for k in [mod.resolve(r, a, t, lc)[0]] if k}
         edges[key] = {k for k in reached if not k.startswith(WRITES)}
-        if APPEND in reached or mod.run_computes(fn, fn_refs) or (
-                reached & ATOMIC_WRITES and (keeps_store or _names_store(mod, fn_refs))):
+        writes = reached & (ATOMIC_WRITES | ROW_WRITES) or _sql_writes(fn_refs) or _sql_text_in(fn)
+        if reached & {APPEND, ADD} or mod.run_computes(fn, fn_refs) or (
+                writes and (keeps_store or _names_store(mod, fn_refs))):
             WRITERS.add(key)
 grew = True
 while grew:
@@ -580,9 +630,10 @@ while grew:
             grew = True
 if not {f"{_proforma_mod.__name__}.run", f"{_proforma_mod.__name__}.run_flowsheet", APPEND,
         f"{_fermos_mod.__name__}.simulate", f"{_vessel_mod.__name__}.design",
-        "openferment_core.pureos.kept.keep_train", "openferment_core.pureos.train_spec.run_train"} <= WRITERS:
+        "openferment_core.pureos.kept.keep_train", "openferment_core.pureos.train_spec.run_train",
+        "openferment_core.proposals.propose"} <= WRITERS:
     fail("rule 2b no longer finds proforma.run, proforma.run_flowsheet, fermos.simulate, vessel.design, "
-         "pureos.kept.keep_train, pureos.train_spec.run_train and audit.append among the writers: it has stopped "
+         "pureos.kept.keep_train, pureos.train_spec.run_train, proposals.propose and audit.append among the writers: it has stopped "
          "reading the service")
 
 for mod in service:
@@ -620,6 +671,12 @@ for mod in service:
             fail(f"{where} line {line} writes a file through {key} itself (as {spelled}): a tool file keeps "
                  "nothing; a write goes through tools/writes.py to its module's write function, where rule 2 "
                  "reads it")
+        elif key in ROW_WRITES:
+            # The same for a row: the store a model's write keeps is written by
+            # its module's write function, through writes.py.
+            fail(f"{where} line {line} writes a row through {key} itself (as {spelled}): a tool file keeps "
+                 "nothing; a write goes through tools/writes.py to its module's write function, where rule 2 "
+                 "reads it")
         elif key in WRITERS and key not in own and not key.startswith(WRITES):
             fail(f"{where} line {line} reaches {key} (as {spelled}), which keeps a Proforma run, a simulation, a "
                  "vessel, a train run or a train a model built, or writes an audit line: a tool that does goes through "
@@ -629,6 +686,9 @@ for mod in service:
              "through tools/writes.py, where rule 2 reads it")
     for line, how in _raw_writes(mod, tool_refs):
         fail(f"{where} line {line} writes a file itself ({how}): a tool file keeps nothing; a write goes through "
+             "tools/writes.py to its module's write function, where rule 2 reads it")
+    for line, how in _sql_writes(tool_refs) + _sql_text(mod):
+        fail(f"{where} line {line} writes a row itself ({how}): a tool file keeps nothing; a write goes through "
              "tools/writes.py to its module's write function, where rule 2 reads it")
 
 # 3. a gated action completes only with a person's name on it
@@ -648,7 +708,7 @@ for gate in gates.GATES:
             fail(f"{module}_write {action} did not come back proposed at gate {gate.id}: {r.error or r.summary}")
             continue
         after = {p.name for p in data.iterdir()}
-        extra = after - before - {"proposals.json", "proposals.json.lock"}
+        extra = after - before
         if extra:
             fail(f"{module}_write {action} wrote {sorted(extra)} besides the proposal")
         pid = r.summary["proposalId"]

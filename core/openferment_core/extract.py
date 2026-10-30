@@ -29,28 +29,30 @@ demo replays the loop that way, and the tests here stub the call directly.
 from __future__ import annotations
 
 import json
-import threading
 import logging
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import atomic, intake, llm
+from . import db, intake, llm, projects
+from .db import models as t
 from .models import AuditEvent, Candidate, ExtractResponse, Usage
 from .units import tables
 from .validate import ANCHOR_RULES, anchor_all, anchor_candidate
 
 log = logging.getLogger("openferment.extract")
 
-CANDIDATES_DIR = intake.DATA_DIR / "candidates"
 # A candidate a model wrote by hand (§7.3) is named apart from the extractor's,
-# and kept apart from it, in candidates/hand/ (OF-BLD-016 §1.R finding 3).
+# and kept apart from it, in its own row of the candidates table (source
+# `hand`; the extractor's is `model`; OF-BLD-016 §1.R finding 3).
 MODEL_PREFIX = "mw1"
-HAND_DIR = "hand"
-_WRITE_LOCK = threading.Lock()
+MODEL, HAND = "model", "hand"
 FIXTURE_DIR = intake.FIXTURE_ROOT / "extract"
 # The first extraction run that runs for real. Named for the pipeline and not
 # for one model: Opus answers most papers and Sonnet the ones Opus declines,
@@ -342,39 +344,72 @@ def call_model(paper_id: str, user_text: str, tool: dict[str, Any]) -> tuple[dic
 
 
 # ── persistence ────────────────────────────────────────────────────────
+#
+# One row of the `candidates` table per paper and source: the extractor's
+# run (`model`) and the candidates a model wrote by hand (`hand`), each the
+# ExtractResponse as JSON, in the current project (ADR-001, ADR-005).
 
 
-def _path(paper_id: str) -> Path:
-    return CANDIDATES_DIR / f"{paper_id}.json"
+async def _row(s: AsyncSession, project_id: str, paper_id: str, source: str) -> dict[str, Any] | None:
+    return (
+        await s.execute(
+            select(t.candidates.c.body).where(
+                t.candidates.c.project_id == project_id,
+                t.candidates.c.document_id == paper_id,
+                t.candidates.c.source == source,
+            )
+        )
+    ).scalar_one_or_none()
 
 
-def cached(paper_id: str) -> ExtractResponse | None:
-    """This run's extraction of a paper, or None. A file left by an earlier
-    run (`haiku-1`, from before the move to Opus) is not this run's and is
-    not read: the paper counts as unextracted and the next batch extracts it
+async def _rows(project_id: str, source: str) -> list[dict[str, Any]]:
+    async with db.session() as s:
+        q = select(t.candidates.c.body).where(t.candidates.c.project_id == project_id, t.candidates.c.source == source)
+        return list((await s.execute(q.order_by(t.candidates.c.document_id))).scalars())
+
+
+async def _put(s: AsyncSession, project_id: str, source: str, result: ExtractResponse, by: str) -> None:
+    stmt = insert(t.candidates).values(
+        project_id=project_id, document_id=result.paperId, source=source, body=result.model_dump(mode="json"), created_by=by
+    )
+    await s.execute(
+        stmt.on_conflict_do_update(
+            index_elements=[t.candidates.c.project_id, t.candidates.c.document_id, t.candidates.c.source],
+            set_={"body": stmt.excluded.body, "updated_at": func.clock_timestamp()},
+        )
+    )
+
+
+async def _one(project_id: str, paper_id: str, source: str) -> dict[str, Any] | None:
+    async with db.session() as s:
+        return await _row(s, project_id, paper_id, source)
+
+
+def _this_run(paper_id: str, body: dict[str, Any] | None) -> ExtractResponse | None:
+    """`body` when it is this run's extraction. One left by an earlier run
+    (`haiku-1`, from before the move to Opus) is not this run's and is not
+    read: the paper counts as unextracted and the next batch extracts it
     again, under the current run, rather than serving one model's output
     under another's name."""
-    path = _path(paper_id)
-    if not path.exists():
+    if body is None:
         return None
-    text = path.read_text(encoding="utf-8")
-    try:
-        run = json.loads(text).get("run")
-    except (ValueError, AttributeError):
-        run = None
+    run = body.get("run") if isinstance(body, dict) else None
     if run is not None and run != RUN:
         log.info("%s: cached extraction is from run %r, not %r; it will be extracted again", paper_id, run, RUN)
         return None
-    return ExtractResponse.model_validate_json(text)
+    return ExtractResponse.model_validate(body)
+
+
+def cached(paper_id: str) -> ExtractResponse | None:
+    """This run's extraction of a paper, or None."""
+    return _this_run(paper_id, db.run(_one(projects.current(), paper_id, MODEL)))
 
 
 def all_extracted() -> list[ExtractResponse]:
-    """This run's extractions, one per paper: what Witness scores."""
-    if not CANDIDATES_DIR.exists():
-        return []
+    """This run's extractions, one per paper, by paper id: what Witness scores."""
     out = []
-    for path in sorted(CANDIDATES_DIR.glob("*.json")):
-        r = cached(path.stem)
+    for body in db.run(_rows(projects.current(), MODEL)):
+        r = _this_run(str(body.get("paperId")), body)
         if r is not None:
             out.append(r)
     return out
@@ -382,16 +417,12 @@ def all_extracted() -> list[ExtractResponse]:
 
 # ── candidates a model wrote by hand (OF-BLD-015 §7.3) ─────────────────
 #
-# Kept in candidates/hand/<paper>.json and never in the extractor's file
-# (OF-BLD-016 §1.R finding 3). A hand-written candidate is not an
-# extraction: in the extractor's file it made `cached` answer for a paper the
-# extractor never ran over, so the batch skipped the paper for good and
-# Witness scored a run that never happened. The file has the extractor's
-# shape and is read by `hand` alone, never by `cached`.
-
-
-def _hand_path(paper_id: str) -> Path:
-    return CANDIDATES_DIR / HAND_DIR / f"{paper_id}.json"
+# Kept in a row of their own and never in the extractor's (OF-BLD-016 §1.R
+# finding 3). A hand-written candidate is not an extraction: in the
+# extractor's row it made `cached` answer for a paper the extractor never ran
+# over, so the batch skipped the paper for good and Witness scored a run that
+# never happened. The row has the extractor's shape and is read by `hand`
+# alone, never by `cached`.
 
 
 def by_hand(candidate_id: str) -> bool:
@@ -401,28 +432,28 @@ def by_hand(candidate_id: str) -> bool:
 
 def hand(paper_id: str) -> ExtractResponse | None:
     """The candidates a model wrote by hand on a paper, or None."""
-    path = _hand_path(paper_id)
-    if not path.exists():
-        return None
-    return ExtractResponse.model_validate_json(path.read_text(encoding="utf-8"))
+    body = db.run(_one(projects.current(), paper_id, HAND))
+    return None if body is None else ExtractResponse.model_validate(body)
 
 
 def all_hand() -> list[ExtractResponse]:
-    folder = CANDIDATES_DIR / HAND_DIR
-    if not folder.exists():
-        return []
-    return [r for path in sorted(folder.glob("*.json")) if (r := hand(path.stem)) is not None]
+    return [ExtractResponse.model_validate(b) for b in db.run(_rows(projects.current(), HAND))]
 
 
 def all_cached() -> list[ExtractResponse]:
-    """Every cached candidate's file: this run's extractions, then the
-    candidates written by hand. The evidence pool reads all of them; Witness
-    scores `all_extracted` alone."""
+    """Every paper's candidates: this run's extractions, then the candidates
+    written by hand. The evidence pool reads all of them; Witness scores
+    `all_extracted` alone."""
     return all_extracted() + all_hand()
 
 
+async def _keep(project_id: str, result: ExtractResponse) -> None:
+    async with db.session() as s:
+        await _put(s, project_id, MODEL, result, by=RUN)
+
+
 def _persist(result: ExtractResponse) -> ExtractResponse:
-    atomic.write_text(_path(result.paperId), result.model_dump_json(indent=2) + "\n")
+    db.run(_keep(projects.current(), result))
     return result
 
 
@@ -617,20 +648,27 @@ def add_candidate(paper_id: str, raw: dict[str, Any], *, who: str) -> tuple[Cand
     if fetched is None or fetched.status != "complete" or not fetched.sections:
         raise ExtractUnavailable(f"{paper_id} has no cached full text. Fetch it first — there is nothing to anchor to.")
     sections = [s.model_dump() for s in fetched.sections]
-    path = _hand_path(paper_id)
-    with _WRITE_LOCK, atomic.held(path):
-        current = hand(paper_id)
+    return db.run(_add_candidate(projects.current(), paper_id, raw, sections, who))
+
+
+async def _add_candidate(
+    project_id: str, paper_id: str, raw: dict[str, Any], sections: list[dict[str, Any]], who: str
+) -> tuple[Candidate | None, str | None, str | None]:
+    async with db.session() as s:
+        await db.lock(s, "candidates", project_id, paper_id)
+        body = await _row(s, project_id, paper_id, HAND)
+        current = None if body is None else ExtractResponse.model_validate(body)
         n = len(current.candidates) if current else 0
         made, rule, detail = anchor_candidate(raw, sections, paper_id=paper_id, candidate_id=f"{MODEL_PREFIX}-{paper_id}-{n:04d}")
         if made is None:
             return None, rule, detail
         now = datetime.now(timezone.utc).isoformat()
         if current is None:
-            # No model call made this file: no usage, and no calls.
+            # No model call made this row: no usage, and no calls.
             current = ExtractResponse(paperId=paper_id, extractedAt=now, candidates=[], audit=[], usage=Usage(), calls=0)
         current.candidates.append(made)
         current.audit.append(AuditEvent(at=now, who=who, action=f"candidate {made.id} written by hand"))
-        atomic.write_text(path, current.model_dump_json(indent=2) + "\n")
+        await _put(s, project_id, HAND, current, by=who)
     return made, None, None
 
 

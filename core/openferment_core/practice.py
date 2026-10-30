@@ -20,8 +20,10 @@ draft is refused whole, never repaired, when:
   steps       a named step does not exist, or none of them needs the skill
   skill       the skill is not in src/data/skills.ts
 
-core/data/practice.json keeps every scenario and every session, and never
-enters git: a session holds a person's own words.
+Every scenario and every session is a row of the project's `practice_scenarios`
+and `practice_sessions` (ADR-001). A session holds a person's own words: the
+file it was kept in never entered git, and the row stays in the project's
+database.
 """
 from __future__ import annotations
 
@@ -29,12 +31,13 @@ import json
 import logging
 import re
 import secrets
-import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from . import atomic, guild, intake, llm
+from . import db, guild, llm, projects
+from .db import models as t
+from .db import rows
 from .models import (
     EvidenceSource,
     GuildEvidence,
@@ -54,9 +57,6 @@ from .models import (
 from .validate import find_number
 
 log = logging.getLogger("openferment.practice")
-
-PATH = intake.DATA_DIR / "practice.json"
-_WRITE_LOCK = threading.Lock()
 
 RULES = ("shape", "quantity", "unresolved", "steps", "skill", "scenario", "session", "closed", "answer", "move")
 
@@ -108,17 +108,82 @@ class PracticeUnavailable(RuntimeError):
 Ask = Callable[..., llm.Result]
 
 
-# ── the file ───────────────────────────────────────────────────────────
+# ── the store ──────────────────────────────────────────────────────────
+#
+# A session's answer and the tutor's reply are written under the project's
+# practice lock (`db.lock`), which stands where the file's write lock stood.
+# No model call runs while it is held: a draft and a tutor's turn are asked
+# first, and only what passed is written.
+
+
+def _body(model: PracticeScenario | PracticeSession) -> dict[str, Any]:
+    return model.model_dump(mode="json", exclude_none=True)
+
+
+async def _load(pid: str) -> Practice:
+    async with db.session() as s:
+        scenarios = [PracticeScenario.model_validate(b) for b in await rows.bodies(s, t.practice_scenarios, pid)]
+        sessions = [PracticeSession.model_validate(b) for b in await rows.bodies(s, t.practice_sessions, pid)]
+    return Practice(scenarios=scenarios, sessions=sessions)
 
 
 def read() -> Practice:
-    if not PATH.exists():
-        return Practice()
-    return Practice.model_validate_json(PATH.read_text(encoding="utf-8"))
+    """The project's scenarios and sessions, each in the order it was made."""
+    return db.run(_load(projects.current()))
 
 
-def _persist(practice: Practice) -> None:
-    atomic.write_text(PATH, practice.model_dump_json(indent=2, exclude_none=True) + "\n")
+async def _one_scenario(pid: str, scenario_id: str) -> PracticeScenario | None:
+    async with db.session() as s:
+        found = await rows.body(s, t.practice_scenarios, pid, scenario_id)
+    return PracticeScenario.model_validate(found) if found is not None else None
+
+
+async def _one_session(pid: str, session_id: str) -> PracticeSession | None:
+    async with db.session() as s:
+        found = await rows.body(s, t.practice_sessions, pid, session_id)
+    return PracticeSession.model_validate(found) if found is not None else None
+
+
+async def _keep_scenario(pid: str, sc: PracticeScenario) -> None:
+    async with db.session() as s:
+        await db.lock(s, "practice", pid)
+        await rows.put(s, t.practice_scenarios, pid, sc.id, _body(sc), by=sc.model)
+
+
+async def _keep_answer(
+    pid: str,
+    held: PracticeSession,
+    answer: str,
+    reply: PracticeTurn,
+    observed: list[PracticeObservation],
+    usage: Usage,
+) -> PracticeSession:
+    """The trainee's answer and the tutor's reply, written together, unless
+    another answer reached the session while the tutor was asked."""
+    async with db.session() as s:
+        await db.lock(s, "practice", pid)
+        found = await rows.body(s, t.practice_sessions, pid, held.id, for_update=True)
+        stored = PracticeSession.model_validate(found) if found is not None else None
+        if stored is not None and len(stored.turns) != len(held.turns):
+            raise PracticeRefused("session", "another answer reached this session first; reload it", usage)
+        held = held.model_copy(
+            update={
+                "turns": [*held.turns, PracticeTurn(role="trainee", text=answer, at=_now()), reply],
+                "usage": llm.add(held.usage, usage),
+            }
+        )
+        if reply.move == "close":
+            held = held.model_copy(update={"observed": observed, "closedAt": _now()})
+        await rows.put(s, t.practice_sessions, pid, held.id, _body(held), by=held.personId or "system")
+    return held
+
+
+async def _keep_link(pid: str, held: PracticeSession) -> None:
+    """The ledger entry's id on a session the project holds."""
+    async with db.session() as s:
+        await db.lock(s, "practice", pid)
+        if await rows.body(s, t.practice_sessions, pid, held.id, for_update=True) is not None:
+            await rows.put(s, t.practice_sessions, pid, held.id, _body(held), by=held.personId or "system")
 
 
 def _now() -> str:
@@ -459,10 +524,7 @@ def draft(request: PracticeDraftRequest, *, ask: Ask | None = None) -> PracticeS
         model=result.model,
         usage=result.usage,
     )
-    with _WRITE_LOCK:
-        practice = read()
-        practice.scenarios.append(scenario)
-        _persist(practice)
+    db.run(_keep_scenario(projects.current(), scenario))
     log.info(
         "practice: drafted %s for %s from %d source(s), $%.4f",
         scenario.id, scenario.skillId, len(scenario.evidence), scenario.usage.costUsd,
@@ -550,11 +612,11 @@ TURN_SCHEMA: dict[str, Any] = {
 
 
 def scenario(scenario_id: str) -> PracticeScenario | None:
-    return next((s for s in read().scenarios if s.id == scenario_id), None)
+    return db.run(_one_scenario(projects.current(), scenario_id))
 
 
 def session(session_id: str) -> PracticeSession | None:
-    return next((s for s in read().sessions if s.id == session_id), None)
+    return db.run(_one_session(projects.current(), session_id))
 
 
 def _learner(person_id: str | None) -> None:
@@ -666,11 +728,8 @@ def _link(held: PracticeSession, sc: PracticeScenario) -> PracticeSession:
     evidence_id = _record(held, sc)
     if not evidence_id:
         return held
-    with _WRITE_LOCK:
-        practice = read()
-        held = held.model_copy(update={"evidenceId": evidence_id})
-        practice.sessions = [held if s.id == held.id else s for s in practice.sessions]
-        _persist(practice)
+    held = held.model_copy(update={"evidenceId": evidence_id})
+    db.run(_keep_link(projects.current(), held))
     return held
 
 
@@ -722,22 +781,7 @@ def turn(request: PracticeTurnRequest, *, ask: Ask | None = None) -> PracticeSes
         label="practice tutor: ",
     )
     reply, observed = validate_turn(result.data, sc, last=last, usage=result.usage)
-
-    with _WRITE_LOCK:
-        practice = read()
-        stored = next((s for s in practice.sessions if s.id == held.id), None)
-        if stored is not None and len(stored.turns) != len(held.turns):
-            raise PracticeRefused("session", "another answer reached this session first; reload it", result.usage)
-        held = held.model_copy(
-            update={
-                "turns": [*held.turns, PracticeTurn(role="trainee", text=answer, at=_now()), reply],
-                "usage": llm.add(held.usage, result.usage),
-            }
-        )
-        if reply.move == "close":
-            held = held.model_copy(update={"observed": observed, "closedAt": _now()})
-        practice.sessions = [s for s in practice.sessions if s.id != held.id] + [held]
-        _persist(practice)
+    held = db.run(_keep_answer(projects.current(), held, answer, reply, observed, result.usage))
 
     if held.closedAt:
         held = _link(held, sc)

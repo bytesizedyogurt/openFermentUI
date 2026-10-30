@@ -139,7 +139,7 @@ def test_a_fit_is_kept_with_the_deposition_as_its_source(store):
 def test_a_sample_run_is_kept_nowhere(store):
     out = fermos.fit("sample", batch(np.linspace(0, 30, 10)), sample=True)
     assert out.kineticArtifactId is None and out.sample
-    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+    assert artifacts.all_artifacts() == []
 
 
 def test_the_endpoint(store):
@@ -220,7 +220,7 @@ def test_the_sample_forecast_is_inline_and_kept_nowhere(store):
     k = fermos.kinetic_fit(batch(T, np.random.default_rng(6), SD))
     out = fermos.forecast_run(fit_inline=k, sample=True)
     assert out.artifactId is None and out.sample and out.evidence.provenance == "demo"
-    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+    assert artifacts.all_artifacts() == []
 
 
 def test_the_forecast_endpoint_and_the_tool(store):
@@ -378,7 +378,7 @@ def test_a_waiting_parameter_refuses_the_simulation_naming_it_and_its_field(stor
     ):
         with pytest.raises(fermos.SimulationRefused, match=words):
             fermos.simulate(req)
-    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+    assert artifacts.all_artifacts() == []
 
 
 def test_yps_is_set_beside_the_newest_stored_ceiling_and_flagged_above_it(store, catalogue):  # noqa: F811
