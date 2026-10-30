@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import json
 import os
 import secrets
 import threading
@@ -43,18 +44,15 @@ def _spend_kept_apart(request, monkeypatch):
 
 # Guild's skills, protocol step tags and lessons: the service ships with none
 # (alpha 2.0 deleted the seed, ADR-010), so the tests read the frozen fixture
-# alpha 1.0's export wrote. A test of the empty default sets PROJECTION back.
-GUILD_PROJECTION = Path(__file__).parent / "fixtures" / "guild-projection.json"
+# alpha 1.0's export wrote, handed in place of `guild.projection`.
+GUILD_PROJECTION = json.loads((Path(__file__).parent / "fixtures" / "guild-projection.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture(autouse=True)
 def _guild_projection(monkeypatch):
     from openferment_core import guild
 
-    monkeypatch.setattr(guild, "PROJECTION", GUILD_PROJECTION)
-    guild._projection.cache_clear()
-    yield
-    guild._projection.cache_clear()
+    monkeypatch.setattr(guild, "projection", lambda: GUILD_PROJECTION)
 
 
 # The corpus the service ships is empty (alpha 2.0 deleted the seed, ADR-010).

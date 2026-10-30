@@ -55,19 +55,16 @@ The rules, by name:
   policy      a check rate outside none to twelve a quarter
 
 Nothing is repaired on the way through. The skills, the protocol steps that
-need them and the lessons that count toward them are read from skills.json;
-the authored catalogue it was exported from left with the seed (alpha 2.0,
-ADR-010), so with no file there are none, and the tests read a frozen
-fixture.
+need them and the lessons that count toward them come from `projection()`;
+the authored catalogue left with the seed (alpha 2.0, ADR-010) and no store
+holds one yet, so there are none, and the tests hand in a frozen fixture.
 """
 from __future__ import annotations
 
-import json
+import copy
 import logging
 import re
 from datetime import date, datetime, timedelta, timezone
-from functools import lru_cache
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
@@ -85,7 +82,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("openferment.guild")
 
-PROJECTION = Path(__file__).parent / "data" / "skills.json"
 # Where the lead's policy sits in the project's settings.
 POLICY_KEY = "guildPolicy"
 
@@ -141,22 +137,17 @@ class GuildRefused(ValueError):
 # ── the projection ─────────────────────────────────────────────────────
 
 
-# alpha 2.0 deleted the TypeScript skills, protocols and lessons this file was
-# projected from (ADR-010): with no file a lab has defined no skill yet, and
-# the lists are empty until stage 2 keeps them as records. Tests write one.
+# alpha 2.0 deleted the TypeScript skills, protocols and lessons these were
+# projected from (ADR-010), and no store holds them yet: a lab has defined no
+# skill, and every list is empty. Tests hand in alpha 1.0's frozen export in
+# place of `projection`.
 EMPTY_PROJECTION: dict[str, Any] = {"skills": [], "steps": [], "lessons": [], "protocols": []}
 
 
-@lru_cache(maxsize=1)
-def _projection(path: str) -> dict[str, Any]:
-    target = Path(path)
-    if not target.exists():
-        return json.loads(json.dumps(EMPTY_PROJECTION))
-    return json.loads(target.read_text(encoding="utf-8"))
-
-
 def projection() -> dict[str, Any]:
-    return _projection(str(PROJECTION))
+    """The skills, the protocol steps that need them and the lessons that
+    count toward them: none, a copy of its own for each caller."""
+    return copy.deepcopy(EMPTY_PROJECTION)
 
 
 def skills() -> dict[str, dict[str, Any]]:
@@ -179,10 +170,6 @@ def lesson_skills(lesson_id: str) -> list[str] | None:
         if lesson["lessonId"] == lesson_id:
             return list(lesson["skills"])
     return None
-
-
-def protocol_ids() -> set[str]:
-    return {st["protocolId"] for st in projection()["steps"]}
 
 
 # ── the rows ───────────────────────────────────────────────────────────

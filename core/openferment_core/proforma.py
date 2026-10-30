@@ -1007,10 +1007,7 @@ def seed_scenarios() -> list[dict]:
     so there are none until stage 2's store holds scenarios."""
     from . import module_stores
 
-    try:
-        rows = list(module_stores._projection()["proforma"]["scenarios"])
-    except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
-        rows = []
+    rows = list(module_stores._projection()["proforma"]["scenarios"])
     return [r for r in rows if r.get("kind") == "biosteam" and r.get("modelId") in _shelf.SHELF
             and not _shelf.SHELF[r["modelId"]].reference]
 
@@ -1665,10 +1662,7 @@ def _strain_labels() -> tuple[dict[str, str], dict[str, str]]:
     the same). Both empty with no projection here."""
     from . import module_stores
 
-    try:
-        hosts = module_stores._projection()["geneos"]["hosts"]
-    except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
-        return {}, {}
+    hosts = module_stores._projection()["geneos"]["hosts"]
     labels = {h["id"]: h["name"] for h in hosts if h.get("id") and h.get("name")}
     by_program: dict[str, set[str]] = {}
     for h in hosts:

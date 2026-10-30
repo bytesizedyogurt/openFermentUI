@@ -1,17 +1,18 @@
 """Every module's store, read the same way (OF-BLD-015 §7.1, §7.2).
 
-Postdoc was asked what is open in Dominion and answered that the corpus held
-nothing, while Dominion showed the molecules: it could read records and
-passages and nothing else. This module reads all eleven destinations behind
-Home's rail and gives every row one shape, `Row`: the module, the kind of
-row, its id, a label, the module's own word for where it stands, and the one
-`state` Postdoc reads, which is computed here from that word.
+Postdoc once answered that a module held nothing while its screen showed
+rows: it could read records and passages and nothing else. This module reads
+every destination behind Home's rail and gives every row one shape, `Row`:
+the module, the kind of row, its id, a label, the module's own word for where
+it stands, and the one `state` Postdoc reads, which is computed here from
+that word.
 
 Where each module's rows come from:
 
-- the module projection, `modules.json` (the runbooks and protocols,
-  geneOS's hosts and pathways, Proforma's scenarios, Primer's lessons),
-  empty since alpha 2.0 deleted the TypeScript seed it was exported from;
+- the module projection (the runbooks and protocols, geneOS's hosts and
+  pathways, Proforma's scenarios, Primer's lessons), empty since alpha 2.0
+  deleted the TypeScript seed it was projected from and until a store holds
+  them;
 - pureOS's unit operations, from `schema/vocabulary.yaml`;
 - the service's own stores (records and candidates through the evidence
   pool, artifacts, Guild's ledger and checks, Intake's fetch state, the
@@ -29,15 +30,12 @@ row the service holds shows, and projects scope them from stage 2 on.
 """
 from __future__ import annotations
 
-import json
+import copy
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from .models import CoverageHit, CoverageMap, ModuleCoverage, ModuleRow
-
-PROJECTION = Path(__file__).parent / "data" / "modules.json"
 
 # The rail's order (src/data/nav.ts), Home last because it gathers the rest.
 MODULES = ("runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild", "primer", "intake", "home")
@@ -172,10 +170,6 @@ def intake_state(ingest: str) -> str:
 
 # ── the sources ───────────────────────────────────────────────────────────
 
-class ProjectionMissing(FileNotFoundError):
-    pass
-
-
 @dataclass
 class Sources:
     """Where rows are read from. Each is a callable so a test hands in a
@@ -203,9 +197,9 @@ def _kept_trains() -> list[Any]:
 
 # What a module holds that is no service record of its own (runbooks and
 # protocols, hosts and pathways, scenarios, lessons). alpha 2.0 deleted the
-# TypeScript seed that `pnpm export:corpus` projected here (ADR-010); a file
-# at PROJECTION is still read when present (tests write one), and with none
-# every list is empty until stage 2 keeps these as a project's records.
+# TypeScript seed these were projected from (ADR-010) and no store holds them
+# yet, so every list is empty; a test hands its own in through
+# `Sources.projection`, or in place of `_projection`.
 EMPTY_PROJECTION: dict[str, Any] = {
     "runbooks": {"runbooks": [], "protocols": []},
     "geneos": {"hosts": [], "pathways": []},
@@ -215,9 +209,8 @@ EMPTY_PROJECTION: dict[str, Any] = {
 
 
 def _projection() -> dict[str, Any]:
-    if not PROJECTION.exists():
-        return json.loads(json.dumps(EMPTY_PROJECTION))
-    return json.loads(PROJECTION.read_text())
+    """The empty projection, a copy of its own for each caller."""
+    return copy.deepcopy(EMPTY_PROJECTION)
 
 
 def _strain_aliases() -> dict[str, str]:

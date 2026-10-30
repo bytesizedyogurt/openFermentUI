@@ -14,7 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from openferment_core import corpus, guild, module_stores
+from openferment_core import corpus, module_stores
+from openferment_core.guild import projection as shipped_guild_projection
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SRC = ROOT / "src"
@@ -65,9 +66,10 @@ DELETED = [
     "src/components/Clearance.tsx",
 ]
 
-# What the seed was projected into for the service to read. A stale copy left
-# on a machine would feed the service the deleted seed without a word.
-PROJECTIONS = ["corpus.json", "modules.json", "skills.json"]
+# What alpha 1.0 projected the seed into for the service to read. A checkout
+# that ran alpha 1.0 still holds them (gitignored), so the service must read
+# none of them, or a stale copy would feed it the deleted seed without a word.
+PROJECTIONS = ["modules.json", "skills.json"]
 
 SEEDED_TYPES = ("ExtractionRecord", "Paper", "Product", "Strain", "Scenario", "Protocol", "Runbook", "Lesson",
                 "LearnModule")
@@ -83,9 +85,10 @@ def test_a_deleted_module_is_absent(path):
 
 
 @pytest.mark.parametrize("name", PROJECTIONS)
-def test_no_projection_of_the_seed_waits_on_disk(name):
-    stale = PACKAGE / "data" / name
-    assert not stale.exists(), f"{stale} is a projection of the deleted seed: delete it"
+def test_the_service_reads_no_projection_of_the_seed(name):
+    naming = [str(p.relative_to(ROOT)) for p in sorted(PACKAGE.rglob("*.py"))
+              if "__pycache__" not in p.parts and name in p.read_text(encoding="utf-8")]
+    assert naming == [], f"{name} is a projection of the deleted seed, and these name it: {naming}"
 
 
 def test_no_file_under_src_data_exports_seeded_content():
@@ -113,11 +116,8 @@ def test_the_shipped_stores_are_empty():
 
 
 def test_guild_ships_no_skill():
-    guild._projection.cache_clear()
-    try:
-        assert not guild._projection(str(PACKAGE / "data" / "skills.json")).get("skills")
-    finally:
-        guild._projection.cache_clear()
+    shipped = shipped_guild_projection()
+    assert not any(shipped.values()), shipped
 
 
 def test_no_seed_record_id_is_written_into_the_app_or_the_service():

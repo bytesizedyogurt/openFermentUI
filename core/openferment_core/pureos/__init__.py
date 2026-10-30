@@ -32,9 +32,9 @@ TEA (the toy) names no product: its train lists units and masses and no
 recovery, and says why.
 
 WHICH SCENARIO a run belongs to: a basis input named `scenario`, when the
-run carries one; else the one seed scenario (modules.json, written by
-`pnpm export:corpus`) whose `modelId` is the run's flowsheet. A run no
-scenario claims is a train known by its artifact id.
+run carries one; else the one held scenario (the module projection's, none
+since alpha 2.0 deleted the seed's) whose `modelId` is the run's flowsheet.
+A run no scenario claims is a train known by its artifact id.
 
 THE PACKAGE (OF-BLD-020 §5.1). This module was pureos.py; it became the
 package so the train's pieces live beside it. `pureos.catalogue` is the unit
@@ -56,7 +56,7 @@ read), or by its artifact id.
 
 A TRAIN PROPOSED BY RULES (OF-BLD-020 §7.2, D12). `pureos.proposer` reads a
 product's class and the properties its class's rule splits on (thermosteam's
-volatility, ProtParam on its sequence, where the products seed says it is)
+volatility, ProtParam on its sequence, where the products catalogue holds one)
 and proposes a `TrainSpec` with every parameter at its library default or
 waiting, each unit with its reason; `propose` is re-exported here.
 """
@@ -101,10 +101,7 @@ def seed_scenarios() -> list[dict[str, Any]]:
     `scenario` input names its scenario."""
     from .. import module_stores
 
-    try:
-        return list(module_stores._projection()["proforma"]["scenarios"])
-    except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
-        return []
+    return list(module_stores._projection()["proforma"]["scenarios"])
 
 
 def scenario_of(art: Artifact, scenarios: Iterable[dict[str, Any]]) -> tuple[str | None, str | None]:

@@ -1436,11 +1436,7 @@ class _Context:
 
         self.labels, _ = proforma._strain_labels()
         self.strain, self.sugar, self.product = req.strain, req.sugar, req.product
-        hosts: list[str] = []
-        try:
-            hosts = [h["id"] for h in module_stores._projection()["geneos"]["hosts"] if h.get("id")]
-        except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
-            pass
+        hosts = [h["id"] for h in module_stores._projection()["geneos"]["hosts"] if h.get("id")]
         if self.strain and hosts and self.strain not in hosts:
             raise SimulationRefused(f"there is no catalogued strain {self.strain}: a strain is named by its id in "
                                     f"geneOS's hosts, such as {', '.join(sorted(hosts)[:4])}")
