@@ -1566,6 +1566,35 @@ export interface PasteRequest {
   reason?: string;
 }
 
+/** One passage a search found (GET /api/literature/search). Mirrors models.py `SearchHit`. */
+export interface SearchHit {
+  documentId: string;
+  passageId: string;
+  title: string;
+  text: string;
+  sectionPath: string | null;
+  citation: string | null;
+  licenceClass: string;
+  year: number | null;
+  score: number;
+  layers: string[];
+  isTable: boolean;
+}
+
+/** GET /api/literature/search. Mirrors models.py `SearchResponse`. */
+export interface SearchResponse {
+  query: string;
+  profile: string;
+  hits: SearchHit[];
+  degradedStages: string[];
+}
+
+/** POST /api/literature/answer. Mirrors models.py `LiteratureQuestion`. */
+export interface LiteratureQuestion {
+  question: string;
+  topK?: number;
+}
+
 /** One document a project holds (GET /api/literature/documents). Mirrors models.py `LiteratureDocument`. */
 export interface LiteratureDocument {
   documentId: string;

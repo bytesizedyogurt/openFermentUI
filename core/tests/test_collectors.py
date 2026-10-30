@@ -249,3 +249,13 @@ def test_a_collected_document_is_written_under_a_safe_name(tmp_path):
     path = found.write(tmp_path)
     assert path.parent == tmp_path and path.name == "A-title-with-slashes.md"
     assert path.read_text() == found.text
+
+
+def test_an_upload_keeps_the_title_it_gives_itself():
+    md = collectors.uploaded("notes-2023.md", b"Some words first.\n\n# Feed Trials of 2023\n\nWords.")
+    assert md.citation.title == "Feed Trials of 2023"
+    page = collectors.uploaded("page.html", b"<html><head><title>A <b>Report</b></title></head><body>x</body></html>")
+    assert page.citation.title == "A Report"
+    plain = collectors.uploaded("plain.txt", b"no title here")
+    assert plain.citation.title == "plain"
+    assert collectors.uploaded("notes.md", b"# Own", title="Given").citation.title == "Given"

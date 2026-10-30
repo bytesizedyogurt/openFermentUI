@@ -37,9 +37,10 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import queue
 import secrets
 import threading
-from collections.abc import AsyncIterator, Callable, Coroutine
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
@@ -680,6 +681,104 @@ def stats(project_id: str) -> dict[str, Any]:
             return await service().stats()
 
     return db.run(go())
+
+
+@dataclass(frozen=True)
+class Hit:
+    """One passage a search found, with where it stands and how it was found."""
+
+    document_id: str
+    passage_id: str
+    chunk_id: str
+    title: str
+    text: str
+    section_path: str | None
+    citation: str | None
+    licence_class: str
+    year: int | None
+    score: float
+    layers: tuple[str, ...]
+    is_table: bool
+
+
+async def _where(chunk_ids: list[str]) -> dict[str, tuple[int, int | None]]:
+    """Each chunk's index in its document, and the document's year."""
+    if not chunk_ids:
+        return {}
+    async with async_sessionmaker(_engine("loop"), expire_on_commit=False)() as session:
+        rows = (await session.execute(
+            select(Chunk.id, Chunk.chunk_index, Document.publication_year)
+            .join(Document, Document.id == Chunk.document_id)
+            .where(Chunk.id.in_(chunk_ids))
+        )).all()
+    return {chunk_id: (index, year) for chunk_id, index, year in rows}
+
+
+def _words(content: str) -> str:
+    head, sep, rest = content.partition("\n\n")
+    return rest if sep else content
+
+
+def search(query: str, *, project_id: str, top_k: int = 8,
+           profile: str = "interactive") -> tuple[list[Hit], RetrievalResult]:
+    """The passages of the project's documents that best answer `query`, best
+    first, each with its passage id (`p<index>`) so a reader can open it and a
+    quote can anchor to it. 'interactive' asks no model (vector and keyword
+    alone); 'deep' adds the graph and HyDE, which do."""
+
+    async def go() -> tuple[RetrievalResult, dict[str, tuple[int, int | None]]]:
+        with projects.using(project_id):
+            result = await service().retrieve(query, top_k=top_k, profile=profile)
+        return result, await _where([i.id for i in result.items if i.kind == "chunk"])
+
+    result, where = db.run(go())
+    hits = [
+        Hit(
+            document_id=str(item.document_id), passage_id=passage_id(where[item.id][0]), chunk_id=item.id,
+            title=item.title, text=_words(item.content), section_path=item.section_path, citation=item.citation,
+            licence_class=item.license_class, year=where[item.id][1], score=item.score, layers=tuple(item.layers),
+            is_table=item.is_table,
+        )
+        for item in result.items
+        if item.kind == "chunk" and item.document_id and item.id in where
+    ]
+    return hits, result
+
+
+def answer(query: str, *, project_id: str, top_k: int = 8, profile: str = "interactive",
+           max_tokens: int = 2048) -> Iterator[dict[str, Any]]:
+    """The kit's cited answer over the project's documents, event by event,
+    for a synchronous caller (a streaming route): `retrieval_done`, `delta`
+    (text), `citations` (every source, its passage id, and whether the answer
+    cited it), `done`, or `error`. The model is the installed client, through
+    llm.py; what the kit passes between its own steps is left out."""
+    events: queue.Queue[Any] = queue.Queue()
+    end = object()
+
+    async def pump() -> None:
+        try:
+            with projects.using(project_id):
+                async for event in service().answer_stream(query, profile=profile, top_k=top_k, max_tokens=max_tokens):
+                    events.put(event)
+        except Exception as e:  # the stream says what stopped it
+            events.put(e)
+        finally:
+            events.put(end)
+
+    threading.Thread(target=lambda: db.run(pump()), name="kit-answer", daemon=True).start()
+    while True:
+        item = events.get()
+        if item is end:
+            return
+        if isinstance(item, Exception):
+            yield {"type": "error", "code": type(item).__name__, "message": str(item)}
+            continue
+        data = {k: v for k, v in item.data.items() if not k.startswith("_")}
+        if item.type == "citations":
+            where = db.run(_where([c["chunk_id"] for c in data.get("citations", []) if c.get("chunk_id")]))
+            for c in data.get("citations", []):
+                c["passage_id"] = passage_id(where[c["chunk_id"]][0]) if c.get("chunk_id") in where else None
+        yield {"type": item.type, **data}
 
 
 def rest_app() -> Any:

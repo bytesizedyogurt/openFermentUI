@@ -270,3 +270,59 @@ def test_extraction_anchors_in_the_kits_passages_and_witness_scores_the_reviewer
     }]
     [run] = witness.runs()
     assert [(r.goldRecordId, r.outcome) for r in run.results] == [(candidate.id, "match")]
+
+
+# ── search and answers over the kit (stage 3, step 3) ───────────────────
+
+
+def test_search_finds_the_projects_passages_with_their_passage_ids(tmp_path, two_projects):
+    mine = _store(tmp_path, HERE, "lactate search")
+    _store(tmp_path, THERE, "lactate search elsewhere")
+    hits, result = kit.search("lactate search placeholder vessel", project_id=HERE, top_k=10)
+    assert {h.document_id for h in hits} == {mine.document_id}
+    passages = {p["id"]: p["text"] for p in kit.passages(mine.document_id, project_id=HERE).sections}
+    for h in hits:
+        assert passages[h.passage_id] == h.text, "a hit's words are its passage's"
+        assert h.citation and h.licence_class == "public"
+    assert result.profile == "interactive"
+
+
+def test_the_search_route_answers_in_the_named_project(tmp_path, two_projects):
+    from openferment_core.api import app
+
+    mine = _store(tmp_path, HERE, "route search")
+    client = TestClient(app)
+    body = client.get("/api/literature/search", params={"q": "route search placeholder"}).json()
+    assert body["profile"] == "interactive" and {h["documentId"] for h in body["hits"]} == {mine.document_id}
+    assert all(h["passageId"].startswith("p") for h in body["hits"])
+    assert client.get("/api/literature/search", params={"q": "  "}).status_code == 422
+
+
+def test_the_passage_tool_searches_the_project_through_the_kit(tmp_path):
+    from openferment_core import tools
+
+    mine = _store(tmp_path, HERE, "tool search")
+    result = tools.run("search_passages", {"query": "tool search placeholder vessel", "k": 3}, tools.ToolContext())
+    assert result.error is None, result.error
+    assert result.summary["engine"] == "sci-rag-kit"
+    assert {p.paperId for p in result.passages} == {mine.document_id}
+    assert all(h["paperTitle"] == "tool search" for h in result.summary["passages"])
+
+
+def test_an_answer_streams_its_words_and_citations_with_passage_ids(tmp_path, monkeypatch):
+    from openferment_core.api import app
+
+    mine = _store(tmp_path, HERE, "streamed answer")
+    monkeypatch.setattr(kit, "_MODEL", lambda role: MockLLM(responses=["It was placeholder work [1]."]))
+    client = TestClient(app)
+    with client.stream("POST", "/api/literature/answer", json={"question": "streamed answer placeholder"}) as r:
+        assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
+        raw = "".join(r.iter_text())
+    events = [(block.split("\n")[0][len("event: "):], __import__("json").loads(block.split("\n")[1][len("data: "):]))
+              for block in raw.strip().split("\n\n")]
+    kinds = [k for k, _ in events]
+    assert kinds[-1] == "done" and "citations" in kinds
+    assert "".join(d["text"] for k, d in events if k == "delta") == "It was placeholder work [1]."
+    [cited] = [c for k, d in events if k == "citations" for c in d["citations"] if c["cited"]]
+    assert cited["document_id"] == mine.document_id and cited["passage_id"].startswith("p")
+    assert all("_" not in key[:1] for _, d in events for key in d), "nothing internal to the kit is sent"

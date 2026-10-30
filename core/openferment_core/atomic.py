@@ -1,7 +1,7 @@
 """Whole-file writes that land whole or not at all (OF-BLD-012 §B.8).
 
-Every file the service still keeps (a fetch in fulltext/, a genome-scale
-model in models/, an export) would be written with `Path.write_text`, which
+Every file the service still keeps (a genome-scale model in models/, an
+export) would be written with `Path.write_text`, which
 truncates first and fills second. A crash, a power cut or a full disk between
 the two leaves a half-written file. A reader in another process (the nightly
 job writes while the server reads) could also catch a file mid-write. The

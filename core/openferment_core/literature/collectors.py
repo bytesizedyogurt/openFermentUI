@@ -153,13 +153,10 @@ def _get(
 
 
 def resolve_pmcid(paper: dict[str, Any]) -> str | None:
-    """The PMCID to fetch, from the seed when it has one and Europe PMC when it
-    has only a DOI or PMID. None when there is no open-access full text.
-
-    The search is one request and is only made for papers the seed could not
-    name; `fetch_paper` caches the answer, including a None, so each DOI-only
-    paper is asked exactly once.
-    """
+    """The PMCID to fetch for a paper's identifiers: its own when it carries
+    one, else Europe PMC's answer for its DOI or PMID. None when there is no
+    open-access full text. The search is one request, made only when the
+    paper names no PMCID."""
     pmcid = (paper.get("pmcid") or "").strip()
     if pmcid:
         return pmcid
@@ -1355,9 +1352,26 @@ def uploaded(filename: str, data: bytes, *, title: str = "", licence_class: str 
             tables=sum(1 for s in result.sections if s.id.startswith("t")), stated_class=chosen,
         )
     return Collected(
-        collector="upload", identifier=name, citation=Citation(title=title.strip() or stem), licence=stated,
-        data=data, suffix=suffix, stated_class=chosen,
+        collector="upload", identifier=name, citation=Citation(title=title.strip() or _own_title(data, suffix) or stem),
+        licence=stated, data=data, suffix=suffix, stated_class=chosen,
     )
+
+
+_MD_TITLE = re.compile(r"^#\s+(.+?)\s*$", re.M)
+_HTML_TITLE = re.compile(r"<title[^>]*>(.*?)</title>|<h1[^>]*>(.*?)</h1>", re.I | re.S)
+
+
+def _own_title(data: bytes, suffix: str) -> str:
+    """The title a Markdown or HTML file gives itself: its first H1, or its
+    <title>. Empty when it gives none."""
+    text = data[:200_000].decode("utf-8", errors="replace")
+    if suffix in (".md", ".markdown"):
+        found = _MD_TITLE.search(text)
+        return found.group(1).strip() if found else ""
+    if suffix in (".html", ".htm"):
+        found = _HTML_TITLE.search(text)
+        return _html_words(found.group(1) or found.group(2)) if found else ""
+    return ""
 
 
 def pasted(title: str, text: str, *, url: str = "", licence_class: str = "", licence: str = "") -> Collected:

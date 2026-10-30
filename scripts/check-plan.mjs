@@ -83,6 +83,9 @@ const PAIRS = [
   ['CollectRequest', 'CollectRequest'],
   ['PasteRequest', 'PasteRequest'],
   ['LiteratureDocument', 'LiteratureDocument'],
+  ['SearchHit', 'SearchHit'],
+  ['SearchResponse', 'SearchResponse'],
+  ['LiteratureQuestion', 'LiteratureQuestion'],
   ['OverlayPaper', 'OverlayPaper'],
   ['Overlay', 'Overlay'],
   // OF-BLD-012 §2.5 — extraction and review. The service's names differ

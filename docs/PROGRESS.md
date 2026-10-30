@@ -16,22 +16,17 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage 3, step 3.3** — BioRepo → Search over the kit (`kit.retrieve`, cited
-   answers through `ProjectService.answer_stream`), PaperReader over a held document's passages
-   (it reads the overlay's papers today), the retrieval report from the kit's evaluation
-   harness, and the stage 3 gate: `pnpm test:lit` over the demo corpus
-   (`core/tests/fixtures/kit-demo/`): ingest, search with citations, answer with citations,
-   extraction anchored, decision accepted, the project scope filtering results.
+4. **Next step: stage 4, step 4.1** — the BioSTEAM adapter and SFF (ADR-003, ADR-004): read the
+   stage 4 text of the execution prompt (§10) and §8.3 first.
 5. Files in flight: none.
 
 ## Current stage
 
-Stage 3 — Sci RAG Kit — is under way: 3.1 (the kit wired in, the collectors, Intake, `/rag`, the
-kit's MCP server) and 3.2 (extraction, anchoring, BioRepo and Witness over the kit's text) are
-done; 3.3 is next. Stage 2 is complete: 2.1 to 2.4 put every store on
-PostgreSQL, scope every request to a project, move the browser's scientific state to the service,
-and passed the gate in a clean worktree. Stages 0 and 1 are complete (the tag push waits on the
-owner; see Blockers).
+Stage 4 — the BioSTEAM adapter and SFF — is next. Stage 3 is complete: 3.1 wired Sci RAG Kit in
+(the collectors, Intake, `/rag`, its MCP server), 3.2 moved extraction, anchoring, BioRepo and
+Witness onto the kit's text, and 3.3 added Search, cited answers, the retrieval report and the
+gate over the demo corpus. Stages 0 to 2 are complete (the tag push waits on the owner; see
+Blockers).
 
 ## Last green runs
 
@@ -50,6 +45,10 @@ owner; see Blockers).
 | 2026-10-30 07:16 | `test:core` with 2.3 | 1947 passed, 2 skipped, 128 deselected | 4 min 25 s | 2.3 |
 | 2026-10-30 07:43 | Stage 2 gate in a clean worktree: `test:core`; the store rules with the restart test; `test:sim` | 1952 passed, 2 skipped, 128 deselected; 258 passed; 102 passed, 1980 deselected | 4 min 28 s; 28 s; 4 min 0 s | 2.4 |
 | 2026-10-30 07:43 | Stage 2 gate: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile | all passed; 11 of 11 rail entries open in the project | | 2.4 |
+| 2026-10-30 08:23 | `test:core` with 3.1; `test:lit`; `pnpm smoke` | 2007 passed, 2 skipped, 133 deselected; 5 passed; 11 of 11 rail entries open | 5 min 8 s | 3.1 |
+| 2026-10-30 08:51 | `test:core` with 3.2; `test:lit`; `pnpm smoke` | 2003 passed, 2 skipped, 133 deselected; 5 passed; 11 of 11 | 5 min 5 s | 3.2 |
+| 2026-10-30 09:16 | Stage 3 gate in a clean worktree: `test:core`; `test:lit` (the demo corpus gate); `test:sim` | 2008 passed, 2 skipped, 138 deselected; 10 passed; 102 passed, 2046 deselected | 5 min 37 s; 15 s; 4 min 37 s | 3.3 |
+| 2026-10-30 09:16 | Stage 3 gate: secrets, typecheck, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile; no full-text cache left | all passed; 11 of 11 rail entries open | | 3.3 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -309,4 +308,20 @@ owner; see Blockers).
   by identifier (`intake.collect`); Intake's module rows are the project's documents. Tests: the
   `held_documents` fixture serves passages to rule tests; `test_literature_kit.py` extracts over
   the kit's own passages, takes a gold decision and has Witness score the run.
+- 3.3 Search and answers over the kit. `kit.search` (the project's passages with passage ids,
+  vector and keyword, no model) behind `GET /api/literature/search`, BioRepo → Search and the
+  `search_passages` tool's seam; `kit.answer` (the kit's cited answer as events, internal fields
+  left out, each source with its passage id) behind `POST /api/literature/answer`. The Search
+  screen searches and asks for a cited answer; a hit opens the reader at its passage. An upload
+  keeps the title it gives itself. `pnpm lit:report` (`literature/report.py`) runs the kit's
+  retrieval evaluation over its demo corpus and its seed questions (vendored,
+  `core/tests/fixtures/kit-demo/eval_seed_questions.jsonl`) in a database of its own and writes
+  `docs/reports/literature-retrieval.md` and `.json`: `interactive` and `vector_only` place the
+  evidence passage first for all nine answerable questions (hit@5 1.00, MRR 1.00, nDCG@10 0.94),
+  `keyword_only` for three. The gate: `test_literature_demo.py` (`lit`), the demo corpus held by
+  one project and two of it by another: embedded once and linked by each, a search finds each
+  seed question's evidence passage with its citation (at least 80 % in the top five; all nine
+  here), an answer cites the document its evidence stands in, an extraction anchors in a demo
+  passage and a gold decision on it is accepted and scored by Witness, and each project sees
+  its own documents alone.
 

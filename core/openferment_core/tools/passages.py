@@ -1,8 +1,7 @@
 """`search_passages`: the papers' own words, found for a question.
 
 The literature layer answers it through one seam, `search` (ADR-002): Sci RAG
-Kit's retrieval once stage 3 wires it. Until then no literature index exists
-here and the tool says so in words. The summary gives each hit's passage id,
+Kit's retrieval over the project's documents. The summary gives each hit's passage id,
 paper title, year, section heading and text, the text cut to `TEXT_CHARS`, so
 the model reads sentences it may then quote by passage id; the passages
 themselves travel in `ToolResult.passages`, which is what a quote is checked
@@ -10,7 +9,7 @@ against (`quotes.is_whole_sentence`).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -37,15 +36,33 @@ class Found:
     engine: str
     usage: Usage | None = None
     note: str | None = None
+    # Each document's title and year, as the literature layer holds them.
+    papers: dict[str, dict] = field(default_factory=dict)
 
 
 def search(query: str, k: int) -> Found:
-    """The literature layer's answer to a question. Stage 3 replaces this body
-    with Sci RAG Kit's retrieval over the project's documents."""
-    raise LiteratureUnavailable(
-        "no literature index exists yet: documents enter through Intake into Sci RAG Kit "
-        "(alpha 2.0 stage 3), and search reads them there."
-    )
+    """The literature layer's answer to a question: Sci RAG Kit's retrieval
+    over the current project's documents (ADR-002), vector and keyword, no
+    model asked. Each hit is a passage `<documentId>:<passageId>:0`, its words
+    the kit's chunk."""
+    from .. import projects
+    from ..literature import kit
+
+    project_id = projects.current_or_none()
+    if project_id is None:
+        raise LiteratureUnavailable("no project is open, and the literature is a project's")
+    hits, result = kit.search(query, project_id=project_id, top_k=k)
+    passages = [
+        Passage(
+            id=f"{h.document_id}:{h.passage_id}:0", paperId=h.document_id, sectionId=h.passage_id,
+            heading=h.section_path or h.title, kind="table" if h.is_table else "prose", text=h.text,
+            start=0, end=len(h.text),
+        )
+        for h in hits
+    ]
+    papers = {h.document_id: {"title": h.title, "year": h.year} for h in hits}
+    note = f"layers that did not answer: {', '.join(result.degraded_stages)}" if result.degraded_stages else None
+    return Found(passages=passages, engine="sci-rag-kit", note=note, papers=papers)
 
 
 class SearchPassagesInput(BaseModel):
@@ -69,7 +86,7 @@ def _run(inp: SearchPassagesInput, ctx: ToolContext) -> ToolResult:
         return ToolResult(error=f"The papers cannot be searched here: {e}")
     hits = []
     for p in found.passages[:k]:
-        meta = _paper_meta(ctx, p.paperId)
+        meta = found.papers.get(p.paperId) or _paper_meta(ctx, p.paperId)
         text = p.text if len(p.text) <= TEXT_CHARS else p.text[:TEXT_CHARS].rsplit(" ", 1)[0] + " …"
         hits.append(
             {

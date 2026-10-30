@@ -114,6 +114,15 @@ Two adaptations, both offered upstream:
   promotion rule reads them, and Witness scores a run against the values reviewers typed. The
   overlay carries the project's documents with their citations and passages, from which the
   browser makes its papers.
+- **Search, answers and the report (3.3).** `kit.search` (the project's passages for a question,
+  each with its passage id; `interactive` asks no model) serves BioRepo → Search, `GET
+  /api/literature/search` and Postdoc's `search_passages` tool, whose seam it fills; `kit.answer`
+  streams the kit's cited answer (`POST /api/literature/answer`, server-sent events, one model
+  call through llm.py). The reader opens a held document at a passage. `pnpm lit:report` runs the
+  kit's retrieval evaluation over its demo corpus and seed questions (vendored with the corpus)
+  in a database of its own, in the configurations that ask no model, and writes
+  `docs/reports/literature-retrieval.md` and `.json`. The stage 3 gate is
+  `core/tests/test_literature_demo.py` under `pnpm test:lit`.
 - **`pnpm ready`** adds three rows: `literature` (the vector extension, the kit's revision, the
   column's dimension, the domain profile, chunks embedded by another model), `embedder` (the
   model file cached) and `rag` (whether a key is set).

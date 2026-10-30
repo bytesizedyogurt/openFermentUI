@@ -453,6 +453,42 @@ class LiteratureDocument(BaseModel):
     linkedAt: str
 
 
+class SearchHit(BaseModel):
+    """One passage of the project's documents a search found
+    (GET /api/literature/search): where it stands, its words, and how it was
+    found. `passageId` is the passage the reader opens and a quote anchors to."""
+
+    documentId: str
+    passageId: str
+    title: str
+    text: str
+    sectionPath: str | None = None
+    citation: str | None = None
+    licenceClass: str
+    year: int | None = None
+    score: float
+    layers: list[str] = Field(default_factory=list)
+    isTable: bool = False
+
+
+class SearchResponse(BaseModel):
+    """GET /api/literature/search: the hits, best first, and the retrieval
+    layers that timed out or failed, so a narrow result says why."""
+
+    query: str
+    profile: str
+    hits: list[SearchHit] = Field(default_factory=list)
+    degradedStages: list[str] = Field(default_factory=list)
+
+
+class LiteratureQuestion(BaseModel):
+    """POST /api/literature/answer: a question for a cited answer over the
+    project's documents."""
+
+    question: str = Field(min_length=1, max_length=2000)
+    topK: int = Field(default=8, ge=1, le=20)
+
+
 class OverlayPaper(BaseModel):
     """One document the project holds, as the overlay carries it (§2.1;
     ADR-002): its passages in the kit as its sections, its citation, its
@@ -482,9 +518,10 @@ class Overlay(BaseModel):
     """GET /api/biorepo/overlay (§2.1). The store applies it in one action on
     top of the seed; with the service down the app is exactly the seed.
 
-    `papers` from fulltext/ (§5); `runs` and `candidates` recomputed from
-    the project's candidates against the seed by `witness.py` (§6.2);
-    `records` from the project's decisions (§7).
+    `papers`, the documents the project holds in the kit (ADR-002); `runs`
+    and `candidates` recomputed from the project's candidates against the
+    values reviewers typed by `witness.py` (§6.2); `records` from the
+    project's decisions (§7).
 
     `candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service
     always sends the full list, so an empty list means the extractor produced

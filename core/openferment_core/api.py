@@ -77,8 +77,11 @@ from .models import (
     GuildPolicy,
     GuildWithdrawal,
     LiteratureDocument,
+    SearchHit,
+    SearchResponse,
     Overlay,
     PasteRequest,
+    LiteratureQuestion,
     Practice,
     PracticeDraftRequest,
     PracticeScenario,
@@ -1168,6 +1171,43 @@ def literature_stats() -> dict[str, Any]:
     """The project's documents and chunks in the kit, by source, licence class
     and embedding version; the concept graph's size is the instance's."""
     return kit.stats(projects.current())
+
+
+@app.get("/api/literature/search", response_model=SearchResponse)
+def literature_search(q: str, topK: int = 10, profile: str = "interactive") -> SearchResponse:
+    """The passages of the project's documents that best answer `q`, best
+    first, each with its document, passage id and citation. 'interactive'
+    (vector and keyword) asks no model; 'deep' adds the graph and HyDE."""
+    if not q.strip():
+        raise HTTPException(status_code=422, detail="a search needs words")
+    if profile not in ("interactive", "deep"):
+        raise HTTPException(status_code=422, detail="profile is interactive or deep")
+    hits, result = kit.search(q, project_id=projects.current(), top_k=max(1, min(topK, 50)), profile=profile)
+    return SearchResponse(
+        query=q, profile=result.profile, degradedStages=result.degraded_stages,
+        hits=[SearchHit(
+            documentId=h.document_id, passageId=h.passage_id, title=h.title, text=h.text, sectionPath=h.section_path,
+            citation=h.citation, licenceClass=h.licence_class, year=h.year, score=h.score, layers=list(h.layers),
+            isTable=h.is_table,
+        ) for h in hits],
+    )
+
+
+@app.post("/api/literature/answer")
+def literature_answer(request: LiteratureQuestion) -> StreamingResponse:
+    """A cited answer over the project's documents, as server-sent events:
+    `delta` (text), `citations` (every source with its passage id and whether
+    the answer cited it), `done`, or `error`. One model call through llm.py,
+    under the day's cap; with no key the stream says so in an `error`."""
+    project_id = projects.current()
+
+    def events():
+        for event in kit.answer(request.question, project_id=project_id, top_k=request.topK):
+            kind = event.pop("type")
+            yield _sse(kind, event)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 class _KitREST:
