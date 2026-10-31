@@ -4,7 +4,7 @@
 #   bash scripts/prototype-up.sh        pnpm prototype:up
 #
 # Runs session-start.sh (dependencies, core/.env, pnpm ready), builds the app,
-# starts openferment-core on 127.0.0.1:8000 over the real data directories,
+# starts openferment-core on 127.0.0.1:8000 on the database core/.env names,
 # and serves the build on 127.0.0.1:4173 with /api passed through to the
 # service. Then it prints the address. Ctrl-C stops both.
 #
@@ -115,7 +115,7 @@ node -e '
   const h = JSON.parse(process.argv[1]);
   console.log("\nopenFerment — the prototype");
   console.log("───────────────────────────");
-  console.log(`  service   http://${process.argv[2]}:${process.argv[3]}  core/data/, ${h.records} records, key: ${h.hasKey ? "present" : "none (Extract and Live mode wait for core/.env)"}`);
+  console.log(`  service   http://${process.argv[2]}:${process.argv[3]}  key: ${h.hasKey ? "present" : "none (extraction and Postdoc wait for core/.env)"}`);
   console.log(`  open      http://${process.argv[2]}:${process.argv[4]}/`);
   console.log("\n  Ctrl-C stops the service and the server.\n");
 ' "$health" "$HOST" "$API_PORT" "$PORT"

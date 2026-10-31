@@ -104,7 +104,7 @@ Postdoc (execution prompt §7.2, §4.8; ADR-008): the loop, its validator, the c
 |---|---|
 | `conversations.py` | Postdoc's conversations, kept under the project (execution prompt §4.8; ADR-008). |
 | `evaluate.py` | Postdoc's evaluation set (execution prompt §10 stage 6.4; ADR-006, ADR-008). |
-| `single.py` | The Postdoc call (OF-BLD-007 §6). |
+| `plan.py` | The plan Postdoc answers in (OF-BLD-007 §6): its system prompt, its schema and the shape evidence takes in a tool's result. |
 
 ### `projects/`
 

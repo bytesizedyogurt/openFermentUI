@@ -1,30 +1,20 @@
-"""The Postdoc call (OF-BLD-007 §6).
+"""The plan Postdoc answers in (OF-BLD-007 §6): its system prompt, its schema
+and the shape evidence takes in a tool's result.
 
-The single-shot path: one retrieval, one call. Since OF-BLD-014 §5.2 it is
-`mode: 'single'`; the default is the bounded loop in `postdoc_agent.py`, which
-keeps this module's system prompt and plan schema and adds tools. The answer
-comes back as JSON that
-matches the `emit_answer_plan` schema, through structured outputs (llm.py):
-the model has exactly one way to respond and the API checks the shape before
-it reaches us. The model is Claude Opus 5.5, with Claude Sonnet 5.5 when Opus
-declines or is unavailable; llm.py says which answered and what it cost.
+The bounded loop in `postdoc_agent.py` builds on this prompt and adds its
+tools. The answer comes back as JSON that matches the `emit_answer_plan`
+schema, through structured outputs (llm.py): the model has exactly one way to
+respond and the API checks the shape before it reaches us. The routing table
+(`llm.ROUTES`) names the models; llm.py says which answered and what it cost.
 
 WHAT THIS MODULE IS NOT ALLOWED TO DO. It does not decide whether a claim is
 good — `validate.py` does, and it runs on everything that comes back. It does
-not compute provenance. It does not repair. Its only job is to turn a question
-plus evidence into raw claims, and to be honest about the cost.
+not compute provenance. It does not repair.
 """
 from __future__ import annotations
 
-import json
-import logging
-import os
 from typing import Any
 
-from .. import llm
-from ..models import Usage
-
-log = logging.getLogger("openferment.postdoc")
 
 # A plan is a handful of claims, but these models think before they answer and
 # the thinking counts against this limit. Room for both.
@@ -33,9 +23,9 @@ MAX_TOKENS = 8000
 SYSTEM = """You are Postdoc, a research assistant for fermentation and \
 bioprocess research in the openFerment platform.
 
-You may only make claims supported by the evidence records you are given. You \
-have no other sources. If you know something from elsewhere and no record \
-supports it, you may not claim it here.
+You may only make claims supported by evidence your tools return. You have no \
+other sources. If you know something from elsewhere and no tool returned it, \
+you may not claim it here.
 
 NEVER WRITE A NUMBER IN CLAIM TEXT. Not in digits, not in words, not as \
 "twofold" or "an order of magnitude". Name what was measured and under what \
@@ -132,17 +122,7 @@ TOOL = {
 }
 
 
-class PostdocUnavailable(RuntimeError):
-    """No key, or the API could not be reached. Distinct from a bad answer.
-    `usage` is anything already spent, such as a billed refusal before an
-    outage, so the plan that reports the failure can still show the cost."""
-
-    def __init__(self, message: str, usage: Usage | None = None):
-        super().__init__(message)
-        self.usage = usage or Usage()
-
-
-def _evidence_payload(records: list[dict[str, Any]], corpus) -> list[dict[str, Any]]:
+def evidence_payload(records: list[dict[str, Any]], papers) -> list[dict[str, Any]]:
     """Records as structured JSON, not prose (§6).
 
     Trimmed to what a claim needs. The BM25 score and matched terms are dropped:
@@ -151,7 +131,7 @@ def _evidence_payload(records: list[dict[str, Any]], corpus) -> list[dict[str, A
     """
     payload = []
     for r in records:
-        paper = corpus.paper(r["paperId"]) or {}
+        paper = papers.paper(r["paperId"]) or {}
         payload.append(
             {
                 "recordId": r["id"],
@@ -177,78 +157,3 @@ def _evidence_payload(records: list[dict[str, Any]], corpus) -> list[dict[str, A
             }
         )
     return payload
-
-
-def ask_model(question: str, records: list[dict[str, Any]], corpus) -> tuple[dict[str, Any], Usage]:
-    """One question, one call. Returns the model's raw plan and what it cost.
-
-    The plan is RAW — unvalidated, provenance not yet computed. Everything that
-    comes back goes through validate.py before anybody sees it.
-    """
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise PostdocUnavailable(
-            "ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and "
-            "restart the service."
-        )
-
-    evidence = _evidence_payload(records, corpus)
-
-    user_turn = (
-        f"Question: {question}\n\n"
-        f"Evidence records ({len(evidence)}):\n"
-        f"{json.dumps(evidence, indent=None, ensure_ascii=False)}"
-    )
-    if not evidence:
-        user_turn = (
-            f"Question: {question}\n\n"
-            "Evidence records: none. Retrieval found nothing in the corpus that "
-            "bears on this question. Decline, and say what would need to be in "
-            "the corpus to answer it."
-        )
-
-    try:
-        result = llm.call(
-            system=SYSTEM,
-            user=user_turn,
-            # One way to respond, and the API checks the shape before we see
-            # it: far more reliable than asking for JSON in prose.
-            schema=TOOL["input_schema"],
-            max_tokens=MAX_TOKENS,
-            label="postdoc: ",
-            family="explain",
-        )
-    except llm.ModelRefused as e:
-        log.warning("postdoc: %s", e)
-        return (
-            {
-                "claims": [],
-                "gaps": [],
-                "declined": (
-                    "The model's safety classifier declined this question "
-                    f"({e.category or 'no category given'}), on every model tried. "
-                    "Nothing is shown rather than an answer nobody gave."
-                ),
-            },
-            e.usage,
-        )
-    except llm.ModelUnavailable as e:
-        raise PostdocUnavailable(str(e), e.usage) from e
-
-    if result.data is not None:
-        return result.data, result.usage
-    # Structured outputs make this close to unreachable (a response cut off at
-    # max_tokens is the likely way), but "close to" is not "never", and a
-    # silently empty plan would render as a blank answer.
-    log.warning("no plan in the response; stop_reason=%s", result.stop_reason)
-    return (
-        {
-            "claims": [],
-            "gaps": [],
-            "declined": (
-                "Postdoc did not return an answer in the expected form. Nothing is "
-                "shown rather than guessing at what it meant."
-            ),
-        },
-        result.usage,
-    )

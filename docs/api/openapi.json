@@ -245,20 +245,6 @@
             "title": "History",
             "type": "array"
           },
-          "maxEvidence": {
-            "default": 30,
-            "title": "Maxevidence",
-            "type": "integer"
-          },
-          "mode": {
-            "default": "agent",
-            "enum": [
-              "agent",
-              "single"
-            ],
-            "title": "Mode",
-            "type": "string"
-          },
           "question": {
             "title": "Question",
             "type": "string"
@@ -10005,7 +9991,7 @@
   "paths": {
     "/api/ask": {
       "post": {
-        "description": "One question in, one AnswerPlan out. `mode: 'agent'` (the default) runs\nthe bounded loop of tools (OF-BLD-014 §5.2); `mode: 'single'` is one\nretrieval and one call.\n\nEvery failure below returns a plan with `declined` set rather than an HTTP\nerror, because a declined plan is a thing the UI already knows how to\nrender honestly and a 500 is a thing it can only apologise for. The one\nexception is the service being unreachable, which the browser detects\nitself — there is no response to put a reason in.",
+        "description": "One question in, one AnswerPlan out: the bounded loop of tools\n(OF-BLD-014 §5.2), kept as a turn of its conversation.\n\nEvery failure below returns a plan with `declined` set rather than an HTTP\nerror, because a declined plan is a thing the UI already knows how to\nrender honestly and a 500 is a thing it can only apologise for. The one\nexception is the service being unreachable, which the browser detects\nitself — there is no response to put a reason in.",
         "operationId": "ask_api_ask_post",
         "parameters": [
           {
@@ -10056,7 +10042,7 @@
     },
     "/api/ask/stream": {
       "post": {
-        "description": "The loop's steps as they complete (OF-BLD-014 §5.3), as server-sent\nevents: `turn` (the conversation and the turn the service keeps the\nquestion as), each `step` (a TraceStep), then `plan` (the validated\nAnswerPlan), or `error` when the service itself failed. A declined plan\nis a `plan`. In `single` mode there is no turn and no step, and the plan\nis the only event. The same turn is said on the project's event stream\n(`GET /api/events`).",
+        "description": "The loop's steps as they complete (OF-BLD-014 §5.3), as server-sent\nevents: `turn` (the conversation and the turn the service keeps the\nquestion as), each `step` (a TraceStep), then `plan` (the validated\nAnswerPlan), or `error` when the service itself failed. A declined plan\nis a `plan`. The same turn is said on the project's event stream\n(`GET /api/events`).",
         "operationId": "ask_stream_api_ask_stream_post",
         "parameters": [
           {

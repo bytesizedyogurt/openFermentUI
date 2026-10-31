@@ -2,8 +2,6 @@
 before its fix. STAND-IN text, not a paper's words."""
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
 
 import pytest
 
@@ -139,29 +137,6 @@ def test_a_restart_gets_its_own_call_budget(pool, two_models):  # noqa: F811
     assert sum(s.kind == "restart" for s in out.trace) == 1
     assert out.stopped == "done", "the second model's three calls fit its own twelve"
     assert sum(s.kind == "tool" for s in out.trace) == 12
-
-
-# R8 — ask:batch counts rounds, and survives a missing corpus.
-ROOT = Path(__file__).resolve().parents[2]
-_spec = importlib.util.spec_from_file_location("ask_batch_r", ROOT / "scripts" / "ask-batch.py")
-ask_batch = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(ask_batch)
-
-
-def test_ask_batch_rounds_are_tool_rounds_of_the_answering_conversation(pool, tmp_path, two_models):  # noqa: F811
-    script = Script([records()], llm.ModelUnavailable("overloaded"), [records()], plan())
-    ctx = tools.ToolContext(pool_factory=lambda: pool)
-    rows = ask_batch.run(["q"], tmp_path / "out", ask=lambda q, converse: postdoc_agent.ask(q, converse=converse, ctx=ctx),
-                         converse=script, echo=lambda _: None)
-    assert rows[0]["rounds"] == 2, "one tool round and the answer, on the second model"
-    assert two_models[1] in rows[0]["models"]
-
-
-def test_ask_batch_says_so_when_there_is_no_corpus(monkeypatch, capsys):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-stand-in")
-    monkeypatch.setattr(ask_batch, "pool_or_none", lambda: None)
-    assert ask_batch.main(["questions.txt"]) == 2
-    assert "could not read the corpus" in capsys.readouterr().err
 
 
 # R9 — a gap is held to Rule 1 like a claim.

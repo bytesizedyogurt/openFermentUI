@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..evidence_pool import MAX_LIMIT
 from ..models import ToolResult
-from ..postdoc.single import _evidence_payload
+from ..postdoc.plan import evidence_payload
 from . import Tool, ToolContext, register
 
 
@@ -35,7 +35,7 @@ class SearchRecordsInput(BaseModel):
 def _run(inp: SearchRecordsInput, ctx: ToolContext) -> ToolResult:
     pool = ctx.pool
     hits = pool.search(inp.query, field=inp.field or "", organism=inp.organism or "", limit=inp.limit)
-    payload = _evidence_payload(hits, pool)
+    payload = evidence_payload(hits, pool)
     for item, hit in zip(payload, hits):
         item["carbonSource"] = hit.get("carbonSource")
     return ToolResult(

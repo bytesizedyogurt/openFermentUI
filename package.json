@@ -35,7 +35,6 @@
     "session:start": "bash scripts/session-start.sh",
     "intake:extract": "cd core && uv run python -m openferment_core.extract",
     "geneos:fetch": "cd core && uv run --all-extras python -m openferment_core.geneos fetch",
-    "ask:batch": "cd core && uv run --all-extras python ../scripts/ask-batch.py",
     "prototype:up": "bash scripts/prototype-up.sh",
     "check:guild": "tsx scripts/check-guild.ts",
     "check:state": "tsx scripts/check-state.ts",

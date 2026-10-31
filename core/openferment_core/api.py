@@ -35,7 +35,6 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 
 from . import artifacts, biorepo, checks, db, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, projects, tools, witness
 from .literature import kit
-from .corpus import load_corpus
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
     AuditEntry,
@@ -121,10 +120,8 @@ from .studies import comparisons as _comparisons  # noqa: F401  (registers study
 from .studies import exports as _exports
 from .studies import runbooks as _runbooks
 from .studies import scenarios as _scenarios
-from .postdoc import PostdocUnavailable, ask_model
 from .postdoc import conversations as _conversations
 from . import events as event_stream
-from .validate import decline_reason, validate_claims
 
 # core/.env, which is gitignored. Loaded here rather than by the shell so that
 # `uv run uvicorn ...` works with no ceremony; `override=False` means a real
@@ -235,10 +232,6 @@ async def refuse_changes_from_elsewhere(request: Request, call_next):
         return JSONResponse(status_code=403, content={"detail": why})
     return await call_next(request)
 
-# §6 caps evidence at 30 records. The cap is the contract with the token budget.
-MAX_EVIDENCE = 30
-
-
 @app.get("/api/health")
 def health() -> dict:
     """Liveness, and what the service can actually do right now.
@@ -247,30 +240,15 @@ def health() -> dict:
     has no key" — two different problems with two different fixes, and a single
     "unavailable" would send somebody to restart a process that is running fine.
     """
-    try:
-        corpus = load_corpus()
-        records = len(corpus.records)
-        corpus_error = None
-    except FileNotFoundError as e:
-        records = 0
-        corpus_error = str(e)
     return {
-        "ok": corpus_error is None,
+        "ok": True,
         "service": "openferment-core",
         "model": llm.primary(),
         # The model a call falls back to when the primary declines or is
         # unavailable (llm.py).
         "fallbackModel": llm.fallback(),
         "hasKey": bool(os.environ.get("ANTHROPIC_API_KEY")),
-        "records": records,
-        "corpusError": corpus_error,
     }
-
-
-CORPUS_MISSING = (
-    "The corpus could not be read, so there is no evidence to answer from. The service's log names "
-    "what went wrong; documents arrive through Intake."
-)
 
 
 def _ask_agent(question: str, on_step=None, cancelled=None, history=None, on_call=None, on_result=None,
@@ -279,13 +257,7 @@ def _ask_agent(question: str, on_step=None, cancelled=None, history=None, on_cal
     with the conversation's earlier turns when the question is a follow-up.
     `converse` stands in for the model (the evaluation's offline stand-in);
     None asks the routing table's models."""
-    ctx = tools.ToolContext()
-    try:
-        ctx.pool  # loaded now, so a missing corpus declines in words
-    except FileNotFoundError as e:
-        log.error("corpus missing: %s", e)
-        return AnswerPlan(question=question, declined=CORPUS_MISSING)
-    return postdoc_agent.ask(question, ctx=ctx, on_step=on_step, cancelled=cancelled, history=history,
+    return postdoc_agent.ask(question, ctx=tools.ToolContext(), on_step=on_step, cancelled=cancelled, history=history,
                              on_call=on_call, on_result=on_result, converse=converse)
 
 
@@ -339,9 +311,8 @@ def _answer(request: AskRequest, *, on_step=None, cancelled=None, on_turn=None, 
 
 @app.post("/api/ask", response_model=AnswerPlan)
 def ask(request: AskRequest) -> AnswerPlan:
-    """One question in, one AnswerPlan out. `mode: 'agent'` (the default) runs
-    the bounded loop of tools (OF-BLD-014 §5.2); `mode: 'single'` is one
-    retrieval and one call.
+    """One question in, one AnswerPlan out: the bounded loop of tools
+    (OF-BLD-014 §5.2), kept as a turn of its conversation.
 
     Every failure below returns a plan with `declined` set rather than an HTTP
     error, because a declined plan is a thing the UI already knows how to
@@ -349,62 +320,9 @@ def ask(request: AskRequest) -> AnswerPlan:
     exception is the service being unreachable, which the browser detects
     itself — there is no response to put a reason in.
     """
-    question = request.question.strip()
-    if not question:
+    if not request.question.strip():
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
-    if request.mode == "agent":
-        return _answer(request)
-
-    try:
-        corpus = load_corpus()
-    except FileNotFoundError as e:
-        log.error("corpus missing: %s", e)
-        return AnswerPlan(question=question, declined=CORPUS_MISSING)
-
-    limit = max(1, min(request.maxEvidence, MAX_EVIDENCE))
-    records = corpus.search(question, limit=limit)
-    log.info(
-        "ask: %r → %d records%s",
-        question[:80],
-        len(records),
-        f" (top: {records[0]['id']} on {records[0]['matchedTerms']})" if records else "",
-    )
-
-    try:
-        raw, usage = ask_model(question, records, corpus)
-    except PostdocUnavailable as e:
-        log.error("postdoc unavailable: %s", e)
-        return AnswerPlan(question=question, declined=str(e), usage=e.usage)
-
-    result = validate_claims(
-        raw.get("claims") or [],
-        dict(corpus.records_by_id),
-        corpus.papers_by_id,
-    )
-
-    # §5 — log the rejection rate. A rate that climbs is the signal that the
-    # prompt has drifted, and it is the only signal there is.
-    if result.rejected:
-        log.warning(
-            "validator dropped %d/%d claims: %s",
-            result.rejected,
-            result.rejected + len(result.claims),
-            "; ".join(result.reasons),
-        )
-
-    # Gaps and the decline are model prose, held to Rule 1 as the loop holds
-    # them: one with a number is dropped and named (OF-BLD-016 §1.R).
-    gaps, said = postdoc_agent.held_to_rule_one(raw.get("gaps"), raw.get("declined"), result.reasons)
-
-    return AnswerPlan(
-        question=question,
-        claims=result.claims,
-        gaps=gaps,
-        declined=decline_reason(result, said),
-        usage=usage,
-        rejected=result.rejected,
-        rejectionReasons=result.reasons,
-    )
+    return _answer(request)
 
 
 def _sse(event: str, data: Any) -> str:
@@ -417,8 +335,7 @@ def ask_stream(request: AskRequest) -> StreamingResponse:
     events: `turn` (the conversation and the turn the service keeps the
     question as), each `step` (a TraceStep), then `plan` (the validated
     AnswerPlan), or `error` when the service itself failed. A declined plan
-    is a `plan`. In `single` mode there is no turn and no step, and the plan
-    is the only event. The same turn is said on the project's event stream
+    is a `plan`. The same turn is said on the project's event stream
     (`GET /api/events`)."""
     return StreamingResponse(_stream_events(request), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -433,8 +350,7 @@ def _stream_events(request: AskRequest):
 
     def work() -> None:
         try:
-            question = request.question.strip()
-            if request.mode == "single" or not question:
+            if not request.question.strip():
                 plan = ask(request)
             else:
                 plan = _answer(request, on_step=lambda s: inbox.put(("step", s.model_dump(mode="json"))),

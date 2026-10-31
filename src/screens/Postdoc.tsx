@@ -145,11 +145,6 @@ function LivePanel({
           </p>
         </Callout>
       )}
-      {health && !health.ok && health.corpusError && (
-        <Callout kind="warn" title="Postdoc could not read its corpus">
-          <p className="text-ink">The service said: {health.corpusError}</p>
-        </Callout>
-      )}
 
       {turns.map((t, i) => (
         <div key={t.id} className={cx(i > 0 && 'pt-4 border-t border-line')}>

@@ -20,7 +20,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, test_corpus):
+def _offline(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
 
 
@@ -31,8 +31,7 @@ def client():
 
 def test_health_still_answers(client):
     body = client.get("/api/health").json()
-    assert body["ok"] is True
-    assert body["records"] > 0, "the test corpus holds records"
+    assert body["ok"] is True and body["service"] == "openferment-core"
 
 
 def test_the_overlay_holds_no_paper_before_anything_is_collected(client, kit_database):

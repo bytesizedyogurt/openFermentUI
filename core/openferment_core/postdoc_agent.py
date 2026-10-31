@@ -61,7 +61,7 @@ from typing import Any, Callable
 
 from . import llm, module_stores, spend, tools
 from .models import AnswerPlan, CoverageMap, PriorTurn, RunbookDraft, ToolResult, TraceStep, Usage
-from .postdoc import MAX_TOKENS, SYSTEM as SINGLE_SYSTEM, TOOL as SINGLE_TOOL
+from .postdoc import MAX_TOKENS, SYSTEM as PLAN_SYSTEM, TOOL as PLAN_TOOL
 from .validate import SeenSet, decline_reason, find_number, validate_plan
 
 log = logging.getLogger("openferment.postdoc_agent")
@@ -102,18 +102,8 @@ FOLLOW_UP = (
     "your tools return for this question."
 )
 
-_SOURCES_SINGLE = (
-    "You may only make claims supported by the evidence records you are given. You have no other sources. "
-    "If you know something from elsewhere and no record supports it, you may not claim it here."
-)
-_SOURCES_AGENT = (
-    "You may only make claims supported by evidence your tools return. You have no other sources. "
-    "If you know something from elsewhere and no tool returned it, you may not claim it here."
-)
-assert _SOURCES_SINGLE in SINGLE_SYSTEM, "postdoc.SYSTEM changed; restate the agent's sources sentence"
-
 AGENT_SYSTEM = (
-    SINGLE_SYSTEM.replace(_SOURCES_SINGLE, _SOURCES_AGENT)
+    PLAN_SYSTEM
     + """
 
 HOW TO WORK, in this order:
@@ -227,8 +217,8 @@ section, each citable by a whole sentence as search_passages' are."""
 
 
 def _plan_schema() -> dict[str, Any]:
-    """The single-shot plan schema, with a claim's quotes and computed values."""
-    schema = copy.deepcopy(SINGLE_TOOL["input_schema"])
+    """The plan schema, with a claim's quotes and computed values."""
+    schema = copy.deepcopy(PLAN_TOOL["input_schema"])
     claim = schema["properties"]["claims"]["items"]
     claim["properties"]["passages"] = {
         "type": "array",
@@ -602,8 +592,7 @@ def held_to_rule_one(gaps: Any, declined: Any, reasons: list[str]) -> tuple[list
     held to Rule 1 the same way: one with a number is dropped and named in
     `reasons`, never repaired (§5.R; the decline, OF-BLD-016 §1.R). Returns
     the gaps kept and the model's decline, or None when it held a number, so
-    the decline code writes stands in. The single path holds its plan to it
-    too."""
+    the decline code writes stands in."""
     kept: list[str] = []
     for g in (str(g) for g in (gaps or [])):
         if not g.strip():
@@ -642,7 +631,7 @@ def ask(
     on_result: Callable[[str, dict[str, Any], ToolResult], None] | None = None,
 ) -> AnswerPlan:
     """One question through the loop. Every failure is a plan with `declined`
-    set, as in the single-shot path. `history` is the conversation's earlier
+    set. `history` is the conversation's earlier
     turns, oldest first; a restart reads them too, since they are part of
     what the question means. `on_call` and `on_result` are told of each tool
     call before it runs and of what it answered."""

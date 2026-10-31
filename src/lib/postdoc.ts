@@ -36,17 +36,14 @@ export interface PostdocHealth {
   fallbackModel?: string;
   /** False means the service is up but has no key — a different fix entirely. */
   hasKey: boolean;
-  records: number;
-  corpusError: string | null;
 }
 
 /**
  * Is the service there, and can it actually answer?
  *
- * Separated from `askPostdoc` because "not running", "running without a key"
- * and "running without a corpus" need three different sentences, and a screen
- * that collapses them into "unavailable" sends somebody to restart a process
- * that is running fine.
+ * Separated from asking because "not running" and "running without a key"
+ * need different sentences, and a screen that collapses them into
+ * "unavailable" sends somebody to restart a process that is running fine.
  */
 export async function postdocHealth(signal?: AbortSignal): Promise<PostdocHealth> {
   let response: Response;
@@ -61,16 +58,10 @@ export async function postdocHealth(signal?: AbortSignal): Promise<PostdocHealth
   return (await response.json()) as PostdocHealth;
 }
 
-/** `agent` is the bounded loop of tools (OF-BLD-014 §5.2), the service's
- * default; `single` is one retrieval and one call. */
-export type AskMode = 'agent' | 'single';
-
 /** What a question names besides its words: the conversation and the turn the
  * service keeps it as (a follow-up's history is the conversation's), and who asked. */
 export interface AskOptions {
-  maxEvidence?: number;
   signal?: AbortSignal;
-  mode?: AskMode;
   /** Earlier turns, for a question asked outside a conversation the service keeps. */
   history?: PriorTurn[];
   conversationId?: string;
@@ -81,8 +72,6 @@ export interface AskOptions {
 async function post(path: string, question: string, opts: AskOptions): Promise<Response> {
   const body: AskRequest = {
     question,
-    maxEvidence: opts.maxEvidence ?? 30,
-    mode: opts.mode ?? 'agent',
     history: opts.history ?? [],
     ...(opts.conversationId ? { conversationId: opts.conversationId } : {}),
     ...(opts.turnId ? { turnId: opts.turnId } : {}),
@@ -128,18 +117,6 @@ async function post(path: string, question: string, opts: AskOptions): Promise<R
   return response;
 }
 
-/**
- * Ask a question, get a plan.
- *
- * A declined plan is a SUCCESS, not an error: "the corpus cannot support this"
- * is an answer, and one of the more useful ones. Only the service being
- * unreachable throws.
- */
-export async function askPostdoc(question: string, opts: AskOptions = {}): Promise<AnswerPlan> {
-  const response = await post('/api/ask', question, opts);
-  return (await response.json()) as AnswerPlan;
-}
-
 /** One server-sent event: its name and its parsed data. */
 export interface StreamEvent {
   event: string;
@@ -174,9 +151,9 @@ export function parseEvents(buffer: string): { events: StreamEvent[]; rest: stri
 export async function askPostdocStream(
   question: string,
   onStep: (step: TraceStep) => void,
-  opts: Omit<AskOptions, 'mode'> = {},
+  opts: AskOptions = {},
 ): Promise<AnswerPlan> {
-  const response = await post('/api/ask/stream', question, { ...opts, mode: 'agent' });
+  const response = await post('/api/ask/stream', question, opts);
   const checkLog = 'The service is running, so check its log — it will name what went wrong.';
   if (!response.body) throw new PostdocDown('Postdoc answered with no stream.', checkLog);
   const reader = response.body.getReader();

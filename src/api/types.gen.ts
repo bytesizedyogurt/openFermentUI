@@ -17,9 +17,8 @@ export interface paths {
         put?: never;
         /**
          * Ask
-         * @description One question in, one AnswerPlan out. `mode: 'agent'` (the default) runs
-         *     the bounded loop of tools (OF-BLD-014 §5.2); `mode: 'single'` is one
-         *     retrieval and one call.
+         * @description One question in, one AnswerPlan out: the bounded loop of tools
+         *     (OF-BLD-014 §5.2), kept as a turn of its conversation.
          *
          *     Every failure below returns a plan with `declined` set rather than an HTTP
          *     error, because a declined plan is a thing the UI already knows how to
@@ -49,8 +48,7 @@ export interface paths {
          *     events: `turn` (the conversation and the turn the service keeps the
          *     question as), each `step` (a TraceStep), then `plan` (the validated
          *     AnswerPlan), or `error` when the service itself failed. A declined plan
-         *     is a `plan`. In `single` mode there is no turn and no step, and the plan
-         *     is the only event. The same turn is said on the project's event stream
+         *     is a `plan`. The same turn is said on the project's event stream
          *     (`GET /api/events`).
          */
         post: operations["ask_stream_api_ask_stream_post"];
@@ -2579,17 +2577,6 @@ export interface components {
             conversationId?: string | null;
             /** History */
             history?: components["schemas"]["PriorTurn"][];
-            /**
-             * Maxevidence
-             * @default 30
-             */
-            maxEvidence: number;
-            /**
-             * Mode
-             * @default agent
-             * @enum {string}
-             */
-            mode: "agent" | "single";
             /** Question */
             question: string;
             /** Turnid */

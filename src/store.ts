@@ -76,7 +76,6 @@ import {
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
 import { blocks, carryOverSpan, isNewCandidate, spanChangesNumber, writeRefusal, type ReviewAction } from '@/lib/review';
-import { postdocHealth } from '@/lib/postdoc';
 import { call } from '@/lib/http';
 import { openProjectId, projectSettled, setOpenProjectId } from '@/lib/project';
 import {

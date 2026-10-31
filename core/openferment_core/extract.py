@@ -5,10 +5,10 @@ The whole document goes in, as the passages Sci RAG Kit holds for it
 in); candidate records come out as JSON that
 matches the `emit_candidates` schema, through structured outputs (llm.py), so
 the model has exactly one way to respond and the API checks the shape before
-we see it. The same pattern `postdoc/single.py` uses with `emit_answer_plan`, for the
-same reason: structured output by construction, not by asking nicely for JSON.
-The model is Claude Opus 5.5, with Claude Sonnet 5.5 for a paper Opus declines
-or cannot take; each response records which answered.
+we see it. The same pattern Postdoc's plan uses with `emit_answer_plan`
+(postdoc/plan.py), for the same reason: structured output by construction, not
+by asking nicely for JSON. The routing table names the models; each response
+records which answered.
 
 NOTHING THE MODEL EMITS ENTERS BIOREPO ON ITS SAY-SO. Every candidate goes
 through `validate.anchor_candidate` — §2.4's six rules — and only a candidate

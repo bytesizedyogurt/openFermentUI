@@ -314,51 +314,7 @@ def test_no_key_is_unavailable(monkeypatch):
     assert "ANTHROPIC_API_KEY" in str(e.value)
 
 
-# ── the two callers ────────────────────────────────────────────────────
-
-
-def test_postdoc_turns_a_refusal_into_a_declined_plan_it_still_pays_for(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
-    spent = Usage(inputTokens=10, outputTokens=0, costUsd=0.01, models=[OPUS, SONNET])
-
-    def refused(**_):
-        raise llm.ModelRefused("bio", [OPUS, SONNET], spent)
-
-    monkeypatch.setattr(llm, "call", refused)
-    raw, usage = postdoc.ask_model("what is the titre", [], corpus=None)
-    assert raw["claims"] == [] and "declined" in raw["declined"] and "bio" in raw["declined"]
-    assert usage == spent
-
-
-def test_postdoc_reports_an_unavailable_model_as_the_service_being_unavailable(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
-
-    def down(**_):
-        raise llm.ModelUnavailable("claude-opus-5-5 answered 529")
-
-    monkeypatch.setattr(llm, "call", down)
-    with pytest.raises(postdoc.PostdocUnavailable, match="529"):
-        postdoc.ask_model("q", [], corpus=None)
-
-
-def test_a_plan_that_failed_after_a_billed_refusal_still_shows_the_cost(monkeypatch):
-    from openferment_core import api
-    from openferment_core.models import AskRequest
-
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
-    spent = Usage(inputTokens=3000, outputTokens=0, costUsd=0.012, models=[OPUS])
-
-    def down(**_):
-        raise llm.ModelUnavailable("claude-sonnet-5-5 answered 529", spent)
-
-    monkeypatch.setattr(llm, "call", down)
-    with pytest.raises(postdoc.PostdocUnavailable) as e:
-        postdoc.ask_model("q", [], corpus=None)
-    assert e.value.usage == spent
-
-    monkeypatch.setattr(api, "load_corpus", lambda: SimpleNamespace(search=lambda q, limit: []))
-    plan = api.ask(AskRequest(question="what is the titre", mode="single"))
-    assert "529" in plan.declined and plan.usage == spent
+# ── extraction, a caller ───────────────────────────────────────────────
 
 
 def test_extract_names_what_was_spent_before_an_outage(monkeypatch):

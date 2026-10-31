@@ -163,7 +163,6 @@ def test_network_checks_skip_in_fixture_mode(monkeypatch):
     assert ready.check_model(True, client_factory=FakeClient).mark == "skip"
     assert ready.check_europe_pmc().mark == "skip"
     assert ready.check_huggingface().mark == "skip"
-    assert ready.check_backup().mark == "skip"
 
 
 # ── Hugging Face, the optional row (OF-BLD-014 §1.3) ───────────────────
@@ -196,11 +195,10 @@ def test_huggingface_warns_when_blocked_and_never_fails(monkeypatch, outcome, ma
 def test_a_blocked_huggingface_leaves_the_exit_code_alone(monkeypatch, capsys):
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
-    for name in ("check_model", "check_roles", "check_europe_pmc", "check_backup"):
+    for name in ("check_model", "check_roles", "check_europe_pmc"):
         row = name.removeprefix("check_").replace("_", "")
         monkeypatch.setattr(ready, name, lambda *a, row=row, **k: ready.Check(row, "ok", "stand-in"))
     monkeypatch.setattr(ready, "check_service", lambda *a, **k: ready.Check("service", "ok", "stand-in"))
-    monkeypatch.setattr(ready, "check_corpus", lambda: ready.Check("corpus", "ok", "stand-in"))
     _hf_answers(monkeypatch, httpx.ConnectError("blocked"))
     assert ready.main([]) == 0
     out = capsys.readouterr().out
@@ -226,11 +224,10 @@ def test_a_missing_graphviz_leaves_the_exit_code_and_the_lane_alone(monkeypatch,
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
-    for name in ("check_model", "check_roles", "check_europe_pmc", "check_backup", "check_huggingface"):
+    for name in ("check_model", "check_roles", "check_europe_pmc", "check_huggingface"):
         row = name.removeprefix("check_").replace("_", "")
         monkeypatch.setattr(ready, name, lambda *a, row=row, **k: ready.Check(row, "ok", "stand-in"))
     monkeypatch.setattr(ready, "check_service", lambda *a, **k: ready.Check("service", "ok", "stand-in"))
-    monkeypatch.setattr(ready, "check_corpus", lambda: ready.Check("corpus", "ok", "stand-in"))
     monkeypatch.setattr(shutil, "which", lambda name: None)
     assert ready.main([]) == 0
     out = capsys.readouterr().out
@@ -328,15 +325,6 @@ def test_the_rag_row_says_whether_a_key_is_set(monkeypatch):
     assert ready.check_rag().mark == "ok"
 
 
-def test_a_damaged_corpus_is_a_failure_with_the_fix(monkeypatch):
-    def damaged():
-        raise ValueError("Expecting value: line 1 column 1")
-
-    monkeypatch.setattr(ready, "load_corpus", damaged)
-    check = ready.check_corpus()
-    assert check.mark == "fail" and "could not be read" in check.detail and "Expecting value" in check.detail
-
-
 def test_data_names_the_setting_when_no_database_is_set(monkeypatch):
     monkeypatch.delenv(db.URL_SETTING, raising=False)
     check = ready.check_data()
@@ -400,7 +388,7 @@ def test_an_offline_run_asks_for_no_key_and_no_network(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "· key" in out and "makes no model call" in out and "✗" not in out
     marks = {c.name: c.mark for c in ready.run(offline=True, port=1)}
-    assert marks["key"] == "skip" and all(marks[n] == "skip" for n in ("model", "roles", "europepmc", "huggingface", "backup"))
+    assert marks["key"] == "skip" and all(marks[n] == "skip" for n in ("model", "roles", "europepmc", "huggingface"))
 
 
 def test_service_address_comes_from_the_installed_job(tmp_path, monkeypatch):

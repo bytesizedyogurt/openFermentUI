@@ -1497,8 +1497,6 @@ export interface PriorTurn {
 /** What the browser posts to /api/ask and /api/ask/stream (models.py AskRequest). */
 export interface AskRequest {
   question: string;
-  maxEvidence: number;
-  mode: 'agent' | 'single';
   /** The conversation's earlier turns, oldest first, for a caller that names no conversation; the service reads its own otherwise. */
   history: PriorTurn[];
   /** The conversation this question continues or starts, and the turn it is, by the page's ids. */

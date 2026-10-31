@@ -25,7 +25,6 @@ units where its diagram would be.
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,7 +36,6 @@ from dotenv import load_dotenv
 from sqlalchemy import func, select
 
 from . import db, extract, intake
-from .corpus import load_corpus
 from .db import migrate
 from .db import models as t
 from . import llm, spend
@@ -46,7 +44,7 @@ CORE = Path(__file__).parent.parent
 REPO = CORE.parent
 MARKS = {"ok": "✓", "warn": "!", "fail": "✗", "skip": "·"}
 PLACEHOLDER_KEY = "sk-ant-..."
-# A paper with a PMCID in the seed: B5's, the one the offline demo replays.
+# A PMCID the Europe PMC check asks about: one search says whether it answers.
 PROBE_PMCID = "PMC8471596"
 # Where FastEmbed fetches its model file from, once (ADR-002).
 HUGGINGFACE = "https://huggingface.co"
@@ -69,21 +67,11 @@ class Check:
 def check_key() -> Check:
     key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
     if not key or key == PLACEHOLDER_KEY:
-        return Check("key", "fail", "core/.env holds no key. Postdoc's Live mode and Extract need one: set a "
+        return Check("key", "fail", "core/.env holds no key. Postdoc and extraction need one: set a "
                      "spend cap in the Anthropic console, copy core/.env.example to core/.env, add the key")
     if not key.startswith("sk-ant-"):
         return Check("key", "warn", "core/.env holds a key that does not start the way Anthropic keys do")
     return Check("key", "ok", "core/.env holds a key")
-
-
-def check_corpus() -> Check:
-    try:
-        corpus = load_corpus()
-    except (ValueError, KeyError) as e:
-        return Check("corpus", "fail", f"the corpus could not be read: {e}")
-    if not corpus.papers:
-        return Check("corpus", "ok", "empty: documents arrive through Intake")
-    return Check("corpus", "ok", f"{len(corpus.records)} records on {len(corpus.papers)} papers")
 
 
 def check_build() -> Check:
@@ -500,30 +488,8 @@ def check_service(port: int, have_key: bool, host: str = "127.0.0.1") -> Check:
         return Check("service", "warn", "running, but started before the key was added. "
                      "Restart it: sudo launchctl kickstart -k system/com.umutuzo.openferment")
     if not body.get("ok"):
-        return Check("service", "warn", f"running, but reports: {body.get('corpusError') or 'not ok'}")
-    return Check("service", "ok", f"answers on {host}:{port} with {body.get('records')} records")
-
-
-def check_backup() -> Check:
-    if intake.fixtures_only():
-        return Check("backup", "skip", "OPENFERMENT_FIXTURES is set")
-    try:
-        r = subprocess.run(
-            ["git", "push", "--dry-run", "origin", "HEAD"],
-            cwd=REPO, capture_output=True, text=True, timeout=30,
-            env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "", "SSH_ASKPASS": ""},
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return Check("backup", "warn", f"could not ask GitHub: {type(e).__name__}")
-    said = (r.stdout + r.stderr).lower()
-    # A dry run that GitHub answered at all, accepted or rejected as behind,
-    # means the credentials work.
-    if r.returncode == 0 or "rejected" in said:
-        return Check("backup", "ok", "this checkout can push, so Guild decisions made here can be backed up")
-    if "not a git repository" in said:
-        return Check("backup", "skip", "not a git checkout")
-    return Check("backup", "warn", "this checkout cannot push to GitHub, so decisions made here stay on this "
-                 "machine. Sign in once: gh auth login (or set up an SSH key)")
+        return Check("service", "warn", "running, but reports itself not ok: its log says why")
+    return Check("service", "ok", f"answers on {host}:{port}")
 
 
 # ── the report ─────────────────────────────────────────────────────────
@@ -536,7 +502,7 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True,
     no_network = no_network or offline
     key = Check("key", "skip", "--offline: this run makes no model call, so it asks for no key") if offline else check_key()
     have_key = key.mark in ("ok", "warn")
-    checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
+    checks = [key, check_build(), check_data(), check_intake()]
     # §10.R: one damaged file must not stop the report; a row that cannot be
     # checked says why and the rest still run.
     for name, row in (("literature", check_literature), ("embedder", check_embedder), ("rag", check_rag),
@@ -547,9 +513,9 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True,
         except Exception as e:  # any failure is the row's answer, in words
             checks.append(Check(name, "warn", f"could not be checked: {type(e).__name__}: {e}"))
     if no_network:
-        checks += [Check(n, "skip", "--no-network") for n in ("model", "roles", "europepmc", "huggingface", "backup")]
+        checks += [Check(n, "skip", "--no-network") for n in ("model", "roles", "europepmc", "huggingface")]
     else:
-        checks += [check_model(have_key), check_roles(have_key), check_europe_pmc(), check_huggingface(), check_backup()]
+        checks += [check_model(have_key), check_roles(have_key), check_europe_pmc(), check_huggingface()]
     checks.append(check_service(port, have_key, host))
     return checks
 
