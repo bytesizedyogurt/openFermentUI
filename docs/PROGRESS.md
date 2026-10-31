@@ -108,6 +108,9 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-10-31 01:56 | 8.5 gate on `74381fb`, no key: `pnpm verify`, all sixteen stages (`test:core` 2257 passed, 1 skipped; `test:sim` 132 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens); `pnpm prove`, steps 1 to 9 offline | every stage green; 63 of 63 checks hold, no call in the proof's spend table | 11 min 42 s (verify); 2 min 24 s (prove) | `74381fb` (8.5 gate) |
 | 2026-10-31 01:58 | On the proof's kept service: a document pasted in (no DOI, no PMCID), a stand-in candidate on it, the default review queue in Chromium, Accept; both MCP servers over stdio on the proof's database | the candidate listed and accepted, the service keeping the decision `verified` under the reviewer's name, no console error; `openferment` 45 tools, `runbooks_read` lists the proof's locked study runbook, `selling_price` refuses an unknown id in words; `sci-rag` refuses with no project, serves the project's 7 documents in 36 chunks and refuses an unknown document in words | | `74381fb` (8.5 gate) |
 | 2026-10-31 02:00 | `pnpm test:slow` (by hand, outside verify), on the 8.5 gate's head | 8 passed, 2418 deselected | 1 min 55 s | `74381fb` (8.5 gate) |
+| 2026-10-31 02:59 | `pnpm build`, then `pnpm prove --keep` on `b72fd12`; the tour's eleven screenshots in Chromium on the kept service | 63 of 63 checks hold; every page opens, and the shots show what the second pass fixed | 2 min 24 s (prove) | `b72fd12` |
+| 2026-10-31 03:12 | `test:core`, typecheck, plan, figures, state, reconcile, `gen:components --check`, `gen:api --check`, `pnpm smoke` on the second pass; the shots again on the rebuilt client | 2257 passed, 1 skipped, 168 deselected; all passed; 12 of 12 screens open | 4 min 37 s | `d0bda01` |
+| 2026-10-31 03:22 | `pnpm prove` with its data directory removed at the end; `test:core` | 63 of 63 checks hold, and the run's directory is gone from `/tmp`; 2257 passed, 1 skipped, 168 deselected | 2 min 20 s; 4 min 36 s | (this commit) |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Decisions
@@ -815,3 +818,6 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
       id in a page's eyebrow was set in capitals; the reader said "Full text from pasted text" and
       repeated a document's title as a passage heading; a licence class read "unknown" alone; and
       a disclosure laid out as flex lost its marker. Each is fixed in the client.
+    - `pnpm prove` stopped its service and dropped its database at the end, and left its data
+      directory in `/tmp` after every run, about 870 KB each. It removes the directory when every
+      check holds, and keeps it with the service's log when one fails.

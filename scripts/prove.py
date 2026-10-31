@@ -10,7 +10,8 @@
 
 The service runs on loopback as a host serves it (uvicorn, `openferment_core.api`), on a
 database of the proof's own, made on the tests' server (OPENFERMENT_TEST_DATABASE_URL) and
-dropped at the end, with a data directory of its own: a proof touches no core/data/ and no
+dropped at the end, with a data directory of its own, removed at the end when every check
+holds and kept with the service's log when one fails: a proof touches no core/data/ and no
 other database. It runs without the model key and makes no model call, and in fixture mode,
 so its collectors refuse the network: step 3's extraction reads a stand-in's written response
 where it would call a model, and step 6 asks Postdoc through its evaluation's offline stand-in.
@@ -55,6 +56,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -840,6 +842,8 @@ def main(argv: list[str]) -> int:
             dropped = migrations("drop", proof.database)
             if dropped.returncode != 0:
                 print(f"(database {proof.database} was left behind: {(dropped.stderr or dropped.stdout).strip()[-200:]})")
+            if not proof.failed:
+                shutil.rmtree(proof.data_dir, ignore_errors=True)
     print(f"{proof.passed + proof.failed} checks in {time.monotonic() - started:.0f} s: "
           + (f"{proof.failed} failed. The service's log: {proof.log}" if proof.failed else "every one holds."))
     return 1 if proof.failed else 0
