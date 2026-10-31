@@ -9,7 +9,6 @@ the network.
 """
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -24,7 +23,6 @@ from openferment_core.validate import SeenSet, validate_plan
 from openferment_core.workers import WorkerError
 
 CORE = Path(__file__).resolve().parent.parent
-PROTOTYPE = Path(__file__).parent / "fixtures" / "prototype"
 RUN_ID = "bbbbbbbbbbbbbbb1"
 STANDIN = "STAND-IN for this test: invented numbers in the worker's shape"
 
@@ -46,9 +44,9 @@ def _run(aid=RUN_ID, provenance="computed", tool="proforma.run") -> Artifact:
 
 
 def _keep(art: Artifact) -> None:
-    folder = artifacts.folder()
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{art.id}.json").write_text(art.model_dump_json(), encoding="utf-8")
+    from standins import plant_artifact
+
+    plant_artifact(art)
 
 
 class StandIn:
@@ -88,7 +86,7 @@ def store(monkeypatch, tmp_path):
 
 @pytest.fixture()
 def worker(monkeypatch):
-    w = StandIn(refuse={"PHB"})
+    w = StandIn(refuse={"Unobtainium"})
     monkeypatch.setattr(proforma, "call", w)
     return w
 
@@ -152,10 +150,10 @@ def test_a_stream_is_read_from_the_run_and_its_answer_kept(store, worker):
     assert again.id == art.id and len(worker.calls) == 1
 
 
-def test_a_run_resting_on_an_assumption_makes_its_streams_answers_demo(store, worker):
-    _keep(_run("bbbbbbbbbbbbbbb2", provenance="demo"))
+def test_a_run_resting_on_an_assumption_makes_its_streams_answers_assumed(store, worker):
+    _keep(_run("bbbbbbbbbbbbbbb2", provenance="assumed"))
     art = thermo.props(ThermoPropsRequest(artifactId="bbbbbbbbbbbbbbb2", streamId="beer"))
-    assert art.provenance == "demo"
+    assert art.provenance == "assumed"
 
 
 def test_stored_reads_without_asking_the_worker(store, worker):
@@ -183,10 +181,10 @@ def test_an_artifact_that_is_no_run_has_no_stream_table(store, worker):
         thermo.props(ThermoPropsRequest(artifactId="bbbbbbbbbbbbbbb3", streamId="beer"))
 
 
-def test_a_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, worker):
+def test_a_stream_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, worker):
     _keep(Artifact.model_validate({**_run("bbbbbbbbbbbbbbb4").model_dump(), "output": {
-        "streams": [_stream("cells", {"Water": 1.0, "PHB": 1.0})], "units": [], "tableUnits": {}}}))
-    with pytest.raises(thermo.ThermoRefused, match="no chemical named PHB"):
+        "streams": [_stream("cells", {"Water": 1.0, "Unobtainium": 1.0})], "units": [], "tableUnits": {}}}))
+    with pytest.raises(thermo.ThermoRefused, match="no chemical named Unobtainium"):
         thermo.props(ThermoPropsRequest(artifactId="bbbbbbbbbbbbbbb4", streamId="cells"))
     assert [a.tool for a in artifacts.all_artifacts()].count("thermo_props") == 0
 
@@ -249,7 +247,7 @@ def test_each_property_is_its_own_evidence_with_the_artifacts_basis(store, worke
 
 def _tool(**fields):
     raw = {"artifactId": "", "streamId": "", "preset": "", "recordId": "", **fields}
-    return tools.run("thermo_props", raw, tools.ToolContext(pool_factory=lambda: _titres(TITRE), include_archived=True))
+    return tools.run("thermo_props", raw, tools.ToolContext(pool_factory=lambda: _titres(TITRE)))
 
 
 def test_the_tool_is_a_loose_read_in_the_closed_registry():
@@ -285,17 +283,6 @@ def test_a_claim_may_cite_the_answer_like_any_computed_value(store, worker):
     assert out.rejected == 1 and "cites what no tool returned" in out.reasons[0]
 
 
-def test_the_tool_refuses_an_archived_programs_run_with_the_switch_off(store, worker):
-    kept = json.loads((PROTOTYPE / "artifacts.json").read_text(encoding="utf-8"))["response"]
-    pha = Artifact.model_validate(next(a for a in kept if a["tool"] == "proforma.run"))
-    _keep(pha)
-    raw = {"artifactId": pha.id, "streamId": "sugar", "preset": "", "recordId": ""}
-    off = tools.run("thermo_props", raw, tools.ToolContext(include_archived=False))
-    assert "archived (hidden)" in off.error and "PHA" in off.error and worker.calls == []
-    on = tools.run("thermo_props", raw, tools.ToolContext(include_archived=True))
-    assert on.error is None and on.evidence
-
-
 # ── the endpoints ────────────────────────────────────────────────────────
 
 
@@ -328,9 +315,9 @@ def test_the_endpoints_say_what_is_not_on_file_and_what_cannot_be_asked(store, w
 
 def test_a_chemical_the_library_lacks_is_a_422_and_a_dead_worker_a_503(store, worker, client, monkeypatch):
     _keep(Artifact.model_validate({**_run("bbbbbbbbbbbbbbb6").model_dump(), "output": {
-        "streams": [_stream("cells", {"PHB": 1.0}), _stream("odd", {"boom": 1.0})], "units": [], "tableUnits": {}}}))
+        "streams": [_stream("cells", {"Unobtainium": 1.0}), _stream("odd", {"boom": 1.0})], "units": [], "tableUnits": {}}}))
     r = client.post("/api/thermo/props", json={"artifactId": "bbbbbbbbbbbbbbb6", "streamId": "cells"})
-    assert r.status_code == 422 and "no chemical named PHB" in r.json()["detail"]
+    assert r.status_code == 422 and "no chemical named Unobtainium" in r.json()["detail"]
     r = client.post("/api/thermo/props", json={"artifactId": "bbbbbbbbbbbbbbb6", "streamId": "odd"})
     assert r.status_code == 503 and "where thermosteam runs" in r.json()["detail"]
 
@@ -339,7 +326,9 @@ def test_a_damaged_file_is_a_409_in_words_never_a_500(store, worker, client):
     """OF-BLD-019 §4.R: a run's file, or the answer's, that does not parse is
     said in words, as GET /api/biorepo/artifacts/{id} says it, and the card
     shows them; it was an unhandled 500 ('check its log')."""
-    (artifacts.folder() / "bbbbbbbbbbbbbbb2.json").write_text("not json", encoding="utf-8")
+    from standins import plant_damaged
+
+    plant_damaged("bbbbbbbbbbbbbbb2")
     q = {"artifactId": "bbbbbbbbbbbbbbb2", "streamId": "beer"}
     for r in (client.get("/api/thermo/props", params=q), client.post("/api/thermo/props", json=q)):
         assert r.status_code == 409 and "bbbbbbbbbbbbbbb2 is damaged on disk" in r.json()["detail"], r.text
@@ -348,24 +337,11 @@ def test_a_damaged_file_is_a_409_in_words_never_a_500(store, worker, client):
     inputs, _ = thermo.basis_inputs(ThermoPropsRequest(**asked), None)
     reg = artifacts.registered(thermo.TOOL)
     answer = artifacts.artifact_id(reg.tool, reg.version, inputs)
-    (artifacts.folder() / f"{answer}.json").write_text("{trunc", encoding="utf-8")
+    plant_damaged(answer)
     for r in (client.get("/api/thermo/props", params=asked), client.post("/api/thermo/props", json=asked)):
         assert r.status_code == 409 and f"{answer} is damaged on disk" in r.json()["detail"], r.text
     assert worker.calls == [], "nothing is asked of thermosteam over a damaged answer"
 
-
-# ── the double's answers ─────────────────────────────────────────────────
-
-
-def test_the_doubles_answers_are_the_stand_in_runs_streams_and_say_what_they_are():
-    entries = json.loads((PROTOTYPE / "thermo-props.json").read_text(encoding="utf-8"))["response"]["entries"]
-    train = json.loads((PROTOTYPE / "pureos-train.json").read_text(encoding="utf-8"))["response"]
-    by = {(e["request"].get("artifactId"), e["request"].get("streamId")): e for e in entries}
-    for s in train["streams"]:
-        assert (train["artifactId"], s["id"]) in by, f"the double cannot answer for stream {s['id']} of the train"
-    assert by[(train["artifactId"], "broth")]["status"] == 422 and "PHB" in by[(train["artifactId"], "broth")]["body"]["detail"]
-    answered = [e["body"] for e in entries if e["status"] == 200]
-    assert answered and all("STAND-IN" in ThermoProps.model_validate(a["output"]).library for a in answered)
 
 
 def test_the_service_never_imports_thermosteam():
@@ -505,7 +481,7 @@ def test_a_missing_volatility_is_a_not_found_and_a_refusal_is_not():
     assert not issubclass(thermo.VolatilityMissing, thermo.ThermoRefused)
 
 
-def test_a_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, vworker):
+def test_a_product_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, vworker):
     with pytest.raises(thermo.ThermoRefused, match="no chemical named Unobtainium"):
         thermo.volatility("unobtainium-product")
     assert [a.tool for a in artifacts.all_artifacts()].count("volatility") == 0
@@ -585,8 +561,10 @@ def test_the_volatility_endpoints_answer_read_and_say_what_is_missing(store, vwo
 
 
 def test_a_damaged_volatility_is_a_409_in_words(store, vworker, client):
+    from standins import plant_damaged
+
     art = thermo.volatility("ethanol")
-    (artifacts.folder() / f"{art.id}.json").write_text("{trunc", encoding="utf-8")
+    plant_damaged(art.id)
     for r in (client.get("/api/thermo/volatility", params={"product": "ethanol"}),
               client.post("/api/thermo/volatility", json={"product": "ethanol"})):
         assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"], r.text

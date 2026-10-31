@@ -1,14 +1,7 @@
-// Protocol library (OF-DES-001 §8.10) — a filterable card grid over the seeded
-// protocols, with a table view for scanning. Filter state lives in this screen
-// rather than inside DataTable, so switching between card and table view
-// preserves exactly what the user has narrowed to.
-//
-// PROGRAMS (OF-BLD-016 §2.2). The library reads through the store's program
-// filter: a protocol in an archived program leaves the cards, the table, the
-// facet counts, the text filter and the header's totals while the switch is
-// off, and a host in an archived program leaves the organism chips and the
-// Organism facet, so a general protocol written for casein hosts lists none of
-// them. With the switch on, every row and chip is back in its old order.
+// Protocol library (OF-DES-001 §8.10) — a filterable card grid over the
+// store's protocols, with a table view for scanning. Filter state lives in
+// this screen rather than inside DataTable, so switching between card and
+// table view preserves exactly what the user has narrowed to.
 import { useMemo, useState } from 'react';
 import {
   Beaker,
@@ -34,8 +27,7 @@ import type {
   ProtocolVersion,
   Strain,
 } from '@/data/types';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { programOf, useProgramFilter, useStore, provenanceOf } from '@/store';
+import { useStore, provenanceOf } from '@/store';
 import { href, navigate } from '@/router';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Tick, ProvenanceLegend, type ProvKind } from '@/components/Provenance';
@@ -89,7 +81,7 @@ export interface Capabilities {
 /**
  * Steps that ask the operator to work a number out rather than read one off.
  * Matches a `{{stock:…}}` binding (an explicit stock-solution computation) or
- * the arithmetic verbs the seeded protocols use: calculat*, dilut*, inocul*,
+ * the arithmetic verbs protocols use: calculat*, dilut*, inocul*,
  * "adjust to", "make up to".
  */
 const CALC_TEXT_RE = /\{\{stock:|\b(?:calculat|dilut|inocul)|\b(?:adjust|make up) to\b/i;
@@ -162,7 +154,7 @@ export function capabilityReason(key: CapabilityKey, c: Capabilities): string {
 
 /**
  * The strongest provenance among a set of cited records and papers. Anything
- * citing nothing at all has no literature ancestry, so it falls to 'demo' —
+ * citing nothing at all has no literature ancestry, so it falls to 'assumed' —
  * modeled, not measured — and gets the dashed tick (§20).
  */
 export function provenanceFromRefs(
@@ -180,7 +172,7 @@ export function provenanceFromRefs(
   for (const _ of paperIds) cited++;
   if (resolved.some((r) => provenanceOf(r) === 'gold')) return 'gold';
   if (resolved.some((r) => provenanceOf(r) === 'verified')) return 'verified';
-  return cited > 0 ? 'unverified' : 'demo';
+  return cited > 0 ? 'unverified' : 'assumed';
 }
 
 /** A protocol version's provenance: everything its materials and steps cite. */
@@ -209,7 +201,7 @@ export function fmtMinutes(min: number): string {
 
 export function strainLabel(id: string, strains: Strain[]): { label: string; title: string } {
   const s = strains.find((x) => x.id === id);
-  if (!s) return { label: id, title: `${id} — not a seeded strain in this session` };
+  if (!s) return { label: id, title: `${id} — not among the strains in this session` };
   return { label: s.designation, title: `${s.binomial} ${s.designation} · BSL-${s.bsl}` };
 }
 
@@ -217,7 +209,7 @@ export function strainLabel(id: string, strains: Strain[]): { label: string; tit
 
 interface ProtoRow {
   protocol: Protocol;
-  /** The protocol's hosts that the program filter shows, in the protocol's order. */
+  /** The protocol's hosts, in the protocol's order. */
   organisms: string[];
   version: ProtocolVersion;
   caps: Capabilities;
@@ -327,21 +319,6 @@ function CapabilityChips({ caps }: { caps: Capabilities }) {
   );
 }
 
-// ── Hosts hidden with their program ────────────────────────────────────
-
-/** What a protocol's host list says when every host it names is in an archived program. */
-export function HostsArchived() {
-  return (
-    <span
-      className="text-caption text-ink-soft"
-      data-testid="hidden-by-archive"
-      title="The hosts this protocol names belong to archived programs. Settings → Programs shows them again."
-    >
-      Hosts in archived programs
-    </span>
-  );
-}
-
 // ── Card ───────────────────────────────────────────────────────────────
 
 function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
@@ -383,7 +360,6 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
           {protocol.organisms.length === 0 && (
             <span className="text-caption text-ink-soft">Organism-independent</span>
           )}
-          {protocol.organisms.length > 0 && row.organisms.length === 0 && <HostsArchived />}
           {row.organisms.map((o) => {
             const s = strainLabel(o, strains);
             return (
@@ -432,15 +408,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
 // ── Screen ─────────────────────────────────────────────────────────────
 
 export default function Protocols() {
-  const allProtocols = useStore((s) => s.protocols);
-  const shows = useProgramFilter();
-  const protocols = useMemo(() => allProtocols.filter((p) => shows('protocol', p.id)), [allProtocols, shows]);
-  const hiddenPrograms = useMemo(() => {
-    const ids = new Set(
-      allProtocols.filter((p) => !shows('protocol', p.id)).map((p) => programOf('protocol', p.id, { protocols: allProtocols })),
-    );
-    return PROGRAMS.filter((p) => ids.has(p.id));
-  }, [allProtocols, shows]);
+  const protocols = useStore((s) => s.protocols);
   const records = useStore((s) => s.records);
   const strains = useStore((s) => s.strains);
   const runs = useStore((s) => s.runs);
@@ -459,14 +427,14 @@ export default function Protocols() {
         protocol.versions.find((v) => v.version === protocol.currentVersion) ?? protocol.versions[0];
       return {
         protocol,
-        organisms: protocol.organisms.filter((o) => shows('strain', o)),
+        organisms: protocol.organisms,
         version,
         caps: capabilitiesOf(version),
         prov: protocolProvenance(version, records),
         runCount: runCounts.get(protocol.id) ?? 0,
       };
     });
-  }, [protocols, records, runs, shows]);
+  }, [protocols, records, runs]);
 
   const matchesQuery = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -624,10 +592,8 @@ export default function Protocols() {
       width: '140px',
       priority: 2,
       render: (r) =>
-        r.protocol.organisms.length === 0 ? (
+        r.organisms.length === 0 ? (
           <span className="text-ink-soft">—</span>
-        ) : r.organisms.length === 0 ? (
-          <HostsArchived />
         ) : (
           <span className="flex flex-nowrap gap-1 overflow-hidden">
             {r.organisms.slice(0, 2).map((o) => {
@@ -749,38 +715,15 @@ export default function Protocols() {
     </>
   );
 
-  if (allRows.length === 0 && hiddenPrograms.length > 0) {
-    return (
-      <>
-        {header}
-        <Card>
-          <EmptyState
-            title="Every protocol here is in an archived program"
-            body={
-              <span data-testid="hidden-by-archive">
-                The protocols in this session belong to {hiddenPrograms.map((p) => p.name).join(' and ')}, and{' '}
-                {hiddenPrograms.length === 1 ? 'that program is archived' : 'those programs are archived'}, so the library
-                hides them. Settings → Programs shows archived programs again; a link to a protocol still opens it.
-              </span>
-            }
-            icon={<ClipboardList size={22} />}
-            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
-          />
-        </Card>
-      </>
-    );
-  }
-
   if (allRows.length === 0) {
     return (
       <>
         {header}
         <Card>
           <EmptyState
-            title="No protocols in this session"
-            body="The protocol set is empty in this session. Clearing this browser’s data from the corpus settings brings the bench procedures back."
+            title="No protocols yet"
+            body="No protocol ships with the app. The lab’s protocols appear here once they are on the service, each with its steps, materials and the records its quantities cite."
             icon={<ClipboardList size={22} />}
-            action={<LinkButton to="/settings/corpus">Open corpus settings</LinkButton>}
           />
         </Card>
       </>

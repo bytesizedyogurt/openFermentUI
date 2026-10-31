@@ -19,7 +19,7 @@
  * Emits core/tests/fixtures/competence.json, gitignored like units.json.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { SKILL_BY_ID } from '../src/data/skills';
+import { TEST_SKILL_BY_ID as SKILL_BY_ID } from './lib/guild-test-skills';
 import { sampleGuild } from './lib/guild-ladder';
 import { DEFAULT_POLICY, addDays, competenceOf } from '../src/engine/competence';
 import { proposeChecks, rankPairs } from '../src/engine/checks';

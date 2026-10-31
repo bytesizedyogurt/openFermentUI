@@ -13,9 +13,10 @@ structurally incapable of originating a quantity (§5).
 """
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
 # Mirrors the Provenance union in src/data/types.ts, weakest last. The order IS
 # the ranking: `weakest_provenance` walks this list, so adding a class in the
@@ -29,7 +30,7 @@ Provenance = Literal[
     "unverified",
     "user",
     "industry-estimate",
-    "demo",
+    "assumed",
 ]
 
 # The same order as PROVENANCE_RANK in src/store.ts, member for member;
@@ -46,8 +47,26 @@ PROVENANCE_ORDER: list[str] = [
     "unverified",
     "user",
     "industry-estimate",
-    "demo",
+    "assumed",
 ]
+
+# Alpha 1.0 named `assumed` `demo` (ADR-006). Where an older store's rows
+# enter (import_alpha1; migration 0003 for this schema's own rows), each
+# `provenance` holding an old name is read under the new one; nothing writes
+# an old name.
+RENAMED_PROVENANCE = {"demo": "assumed"}
+
+
+def renamed_provenance(value: Any) -> Any:
+    """A JSON value with every `provenance` key that holds an old name set to
+    its new one (RENAMED_PROVENANCE); every other value as it was."""
+    if isinstance(value, dict):
+        return {k: RENAMED_PROVENANCE.get(v, v) if k == "provenance" and isinstance(v, str)
+                else renamed_provenance(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [renamed_provenance(v) for v in value]
+    return value
+
 
 Support = Literal["direct", "inferred", "unsupported"]
 
@@ -75,6 +94,8 @@ class Claim(BaseModel):
     # OF-BLD-015 §7.2: module rows it rests on, as `<module>/<kind>/<id>`,
     # each returned by a module's read tool in this run.
     moduleRefs: list[str] = Field(default_factory=list)
+    # ADR-006: the numbers it states, each typed with its origin; its text holds none.
+    values: list[ClaimValue] = Field(default_factory=list)
 
 
 class PassageRef(BaseModel):
@@ -126,8 +147,8 @@ class Usage(BaseModel):
 # in `module_stores.py` from the module's own word (a clearance state, a
 # runbook's status and lock, a check's state), never chosen by a model.
 ModuleState = Literal["open", "fenced", "approved", "locked", "proposed", "retired"]
-ModuleName = Literal["dominion", "runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild",
-                     "primer", "intake", "home"]
+ModuleName = Literal["runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild", "primer", "intake",
+                     "home"]
 
 
 class CoverageHit(BaseModel):
@@ -149,9 +170,9 @@ class ModuleCoverage(BaseModel):
     # How many rows match; `hits` lists at most COVERAGE_HITS of them.
     count: int = 0
     hits: list[CoverageHit] = Field(default_factory=list)
-    # The question names the module itself ("what is open in Dominion").
+    # The question names the module itself ("what is open in Runbooks").
     named: bool = False
-    # Set when part of the module lives only in a browser, in words.
+    # Set when a read leaves part of the module out (module_stores.PARTIAL), in words.
     partial: str | None = None
     # Set when the module's store could not be read, in words.
     error: str | None = None
@@ -171,15 +192,15 @@ class ModuleRow(BaseModel):
     state: ModuleState
     # The module's own word: a clearance state, a runbook status, an ingest state.
     status: str
-    # The row's provenance mark when the module keeps one; null for a seed
-    # row that carries none (a lesson, a unit operation).
+    # The row's provenance mark when the module keeps one; null for a row
+    # that carries none (a lesson, a unit operation).
     provenance: Provenance | None = None
     # A few named fields the module shows, kept short.
     detail: dict[str, Any] = Field(default_factory=dict)
 
 
 class AuditEntry(BaseModel):
-    """One line of core/data/audit.jsonl (OF-BLD-015 §7.3): a write a model
+    """One row of the audit table (OF-BLD-015 §7.3): a write a model
     made, or a proposal a person carried out or dismissed."""
 
     at: str
@@ -228,7 +249,7 @@ class Proposal(BaseModel):
 
 
 class Proposals(BaseModel):
-    """core/data/proposals.json."""
+    """The project's proposals, as `proposals.read` gives them."""
 
     version: Literal[1] = 1
     proposals: list[Proposal] = Field(default_factory=list)
@@ -245,22 +266,6 @@ class ProposalAction(BaseModel):
     actingId: str | None = None
 
 
-class ArchivedCoverage(BaseModel):
-    """What the question names in one archived program, left out of the
-    sweep while archived programs are hidden (OF-BLD-016 §2.3, E.2′): the
-    trace says "found in archived program PHA (hidden)" and the plan carries a
-    gap naming the switch."""
-
-    # The program's id and its name, as src/data/programs.ts declares them.
-    program: str
-    name: str
-    # The question's own words that named it.
-    entities: list[str] = Field(default_factory=list)
-    # How many hidden rows the question names, and the modules they sit in.
-    count: int = 0
-    modules: list[ModuleName] = Field(default_factory=list)
-
-
 class CoverageMap(BaseModel):
     """The sweep, module by module, in the order the rail lists them."""
 
@@ -269,10 +274,6 @@ class CoverageMap(BaseModel):
     searched: int = 0
     found: int = 0
     modules: list[ModuleCoverage] = Field(default_factory=list)
-    # OF-BLD-016 §2.3: whether archived programs were swept (the browser's
-    # switch), and, when they were not, what the question names in them.
-    includeArchived: bool = False
-    archived: list[ArchivedCoverage] = Field(default_factory=list)
 
 
 class AnswerPlan(BaseModel):
@@ -299,13 +300,17 @@ class AnswerPlan(BaseModel):
     trace: list[TraceStep] = Field(default_factory=list)
     stopped: StopReason = "done"
     # OF-BLD-015 §7.1: the modules swept before the first turn, and what each
-    # held. The answer's footer reads it; null on the single-call path.
+    # held. The answer's footer reads it; null when no sweep ran.
     coverage: CoverageMap | None = None
     # OF-BLD-015 §7.2: the module rows the claims cite.
     rows: list[ModuleRow] = Field(default_factory=list)
     # OF-BLD-014 §9.2: a runbook the agent drafted, its numbers written by the
     # service (runbook_draft.py), for a person to adopt and lock.
     runbookDraft: "RunbookDraft | None" = None
+    # The conversation and the turn the service kept this answer as
+    # (postdoc/conversations.py); None when none was kept.
+    conversationId: str | None = None
+    turnId: str | None = None
 
 
 def weakest_provenance(provenances: list[str]) -> str:
@@ -325,7 +330,7 @@ def weakest_provenance(provenances: list[str]) -> str:
         for p in provenances
     ]
     worst = max(ranked)
-    return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else "demo"
+    return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else "assumed"
 
 
 class PriorTurn(BaseModel):
@@ -343,38 +348,73 @@ class PriorTurn(BaseModel):
 
 class AskRequest(BaseModel):
     question: str
-    # §6 caps evidence at 30 records. A caller asking for more is clamped rather
-    # than refused — the cap is a token-budget contract, not a permission.
-    maxEvidence: int = 30
-    # OF-BLD-014 §5.3: `agent` is the bounded loop (postdoc_agent.py), the
-    # default; `single` is one retrieval and one call (postdoc.py).
-    mode: Literal["agent", "single"] = "agent"
-    # The earlier turns of the same conversation, oldest first. The agent
-    # reads the last few as context; `single` mode ignores them.
+    # The earlier turns of the same conversation, oldest first, for a caller
+    # that names no conversation. A follow-up in a conversation the service
+    # keeps reads the service's history, and this is not read.
     history: list[PriorTurn] = Field(default_factory=list)
-    # OF-BLD-016 §2.3: the browser's "show archived programs" switch. Off,
-    # the evidence pool, the passages, the coverage pass and every read tool
-    # leave archived programs out. It rides in the tools' context from this
-    # request; no tool input carries it.
-    includeArchived: bool = False
+    # The conversation this question continues or starts, and the turn it is,
+    # by the ids the page made (or the service makes them): the service keeps
+    # the turn under them (postdoc/conversations.py).
+    conversationId: str | None = Field(default=None, max_length=200)
+    turnId: str | None = Field(default=None, max_length=200)
+    # Who asks.
+    by: str = Field(default="", max_length=200)
 
 
-# ── Programs (OF-BLD-016 §2.1, E.1′, E.2′) ──────────────────────────────
-#
-# A program is data: the corpus threads that are its papers, a name, and
-# whether it is active or archived. Declared in src/data/programs.ts and
-# written into corpus.json and modules.json by `pnpm export:corpus`;
-# `programs.py` reads them. Mirrors `Program` in src/data/types.ts.
-
-ProgramStatus = Literal["active", "archived"]
+TurnStatus = Literal["running", "answered", "failed", "stopped", "interrupted"]
 
 
-class Program(BaseModel):
+class TurnError(BaseModel):
+    message: str
+    remedy: str
+
+
+class LiveTurn(BaseModel):
+    """One turn of a Postdoc conversation (mirrors `LiveTurn` in
+    src/data/types.ts): the question, its loop's steps, the validated plan or
+    the failure in words, and its status. The service keeps it
+    (postdoc/conversations.py) with who asked and the artifacts its tool calls
+    produced; a turn the service was answering when it stopped reads
+    `interrupted`."""
+
     id: str
-    name: str
-    letters: list[str]
-    status: ProgramStatus
-    summary: str
+    question: str
+    askedAt: str
+    steps: list[TraceStep] = Field(default_factory=list)
+    plan: AnswerPlan | None = None
+    error: TurnError | None = None
+    status: TurnStatus
+    by: str | None = None
+    artifactIds: list[str] = Field(default_factory=list)
+
+
+class LiveConversation(BaseModel):
+    """A Postdoc conversation, its turns oldest first (mirrors
+    `LiveConversation` in src/data/types.ts; GET /api/conversations/{id})."""
+
+    id: str
+    title: str
+    startedAt: str
+    turns: list[LiveTurn] = Field(default_factory=list)
+
+
+class ToolCallRecord(BaseModel):
+    """One tool call a turn made (GET /api/conversations/{id}/turns/{turn}/calls):
+    the tool, what it was asked, what it answered the model, and what it
+    offered to cite, by id."""
+
+    seq: int
+    turnId: str
+    tool: str
+    input: dict[str, Any]
+    summary: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+    evidenceIds: list[str] = Field(default_factory=list)
+    recordIds: list[str] = Field(default_factory=list)
+    passageIds: list[str] = Field(default_factory=list)
+    artifactIds: list[str] = Field(default_factory=list)
+    by: str
+    at: str
 
 
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
@@ -405,15 +445,15 @@ class FetchLicense(BaseModel):
 
 FetchStatus = Literal["complete", "failed:fetch", "failed:parse"]
 # Who served a fetched text: Europe PMC's JATS, an OSTI report's PDF, or a
-# Saccharomyces Genome Database strain entry (thread Q). A file cached before
+# Saccharomyces Genome Database strain entry. A file cached before
 # the field existed was fetched from Europe PMC, and reads as such.
-FetchSource = Literal["europepmc", "osti", "sgd"]
+FetchSource = Literal["europepmc", "osti", "sgd", "upload", "paste"]
 
 
 class FetchResult(BaseModel):
-    """What `intake.fetch_paper` produced, and what `fulltext/{paperId}.json`
-    holds. A failure is a result with a reason, not an exception — the UI
-    already renders `failed:fetch` and `failed:parse` (§5.2)."""
+    """What a collector's split produced (literature/collectors.py), before it
+    becomes Markdown for Sci RAG Kit. A failure is a result with a reason, and
+    the collector says it in words (`NotCollected`)."""
 
     paperId: str
     pmcid: str | None = None
@@ -429,46 +469,142 @@ class FetchResult(BaseModel):
     source: FetchSource = "europepmc"
 
 
-class IntakeStatus(BaseModel):
-    """One row of `GET /api/intake/status` — a paper's fetch state, summarised."""
+CollectStatus = Literal["ingested", "linked", "held", "failed"]
 
-    paperId: str
-    pmcid: str | None = None
-    ingest: str
-    textSource: Literal["full-text", "curation-note"]
+
+class CollectOutcome(BaseModel):
+    """What Intake did with one document (ADR-002): `ingested`, stored in the
+    kit for the first time; `linked`, the kit held the same text already and
+    the project now holds it too; `held`, the project held it before;
+    `failed`, nothing stored, and `reason` says why. `transient` marks a
+    failure that was the network's condition, worth asking again."""
+
+    status: CollectStatus
+    documentId: str | None = None
+    collector: str
+    identifier: str
+    title: str
+    licenceClass: str
+    licence: FetchLicense | None = None
     sections: int = 0
     tables: int = 0
-    license: str | None = None
-    fetchedAt: str | None = None
+    chunks: int = 0
     reason: str | None = None
-    source: FetchSource = "europepmc"
+    transient: bool = False
+
+
+class CollectRequest(BaseModel):
+    """POST /api/intake/collect: a paper, a report or a strain entry by its
+    identifier (a PMCID, a DOI, `PMID:<id>`, `OSTI:<id>`, `SGD:<SGDID>`, an
+    osti.gov or a yeastgenome.org address), who asked, and why."""
+
+    identifier: str = Field(min_length=1, max_length=500)
+    by: str = Field(min_length=1, max_length=200)
+    reason: str = Field(default="", max_length=2000)
+
+
+class PasteRequest(BaseModel):
+    """POST /api/intake/paste: text a person pasted, its title, where it came
+    from, the licence class they chose and what they say of the licence."""
+
+    title: str = Field(min_length=1, max_length=500)
+    text: str = Field(min_length=1, max_length=2_000_000)
+    by: str = Field(min_length=1, max_length=200)
+    url: str = Field(default="", max_length=2000)
+    licenceClass: str = Field(default="unknown", max_length=40)
+    licence: str = Field(default="", max_length=2000)
+    reason: str = Field(default="", max_length=2000)
+
+
+class LiteratureDocument(BaseModel):
+    """One document a project holds (GET /api/literature/documents)."""
+
+    documentId: str
+    title: str
+    authors: list[str] = Field(default_factory=list)
+    year: int | None = None
+    doi: str | None = None
+    journal: str | None = None
+    citation: str | None = None
+    source: str
+    sourceRef: str | None = None
+    licenceClass: str
+    chunks: int
+    collector: str | None = None
+    selection: dict[str, Any] = Field(default_factory=dict)
+    linkedBy: str
+    linkedAt: str
+
+
+class SearchHit(BaseModel):
+    """One passage of the project's documents a search found
+    (GET /api/literature/search): where it stands, its words, and how it was
+    found. `passageId` is the passage the reader opens and a quote anchors to."""
+
+    documentId: str
+    passageId: str
+    title: str
+    text: str
+    sectionPath: str | None = None
+    citation: str | None = None
+    licenceClass: str
+    year: int | None = None
+    score: float
+    layers: list[str] = Field(default_factory=list)
+    isTable: bool = False
+
+
+class SearchResponse(BaseModel):
+    """GET /api/literature/search: the hits, best first, and the retrieval
+    layers that timed out or failed, so a narrow result says why."""
+
+    query: str
+    profile: str
+    hits: list[SearchHit] = Field(default_factory=list)
+    degradedStages: list[str] = Field(default_factory=list)
+
+
+class LiteratureQuestion(BaseModel):
+    """POST /api/literature/answer: a question for a cited answer over the
+    project's documents."""
+
+    question: str = Field(min_length=1, max_length=2000)
+    topK: int = Field(default=8, ge=1, le=20)
 
 
 class OverlayPaper(BaseModel):
-    """What the overlay says about one paper (§2.1): its fetch state and, when
-    the fetch succeeded, the paper's own sections in place of the seed's
-    curation note. A failed fetch is here too, with its reason — the ingest
-    board renders it, and a board that only showed successes would be lying by
-    omission about the twenty-six DOI-only papers."""
+    """One document the project holds, as the overlay carries it (§2.1;
+    ADR-002): its passages in the kit as its sections, its citation, its
+    licence and who served it. The browser makes a paper of it, which
+    BioRepo, the review card, the reader and Witness read."""
 
     ingest: str
-    textSource: Literal["full-text", "curation-note"]
+    textSource: Literal["full-text"]
     sections: list[FetchedSection] = Field(default_factory=list)
     license: str | None = None
     fetchedAt: str | None = None
     reason: str | None = None
-    # Who served the text, so the reader names its source rather than
-    # assuming Europe PMC.
+    # Who served the text, so the reader names its source.
     source: FetchSource = "europepmc"
+    # The citation the kit holds for it, and its licence class.
+    title: str | None = None
+    authors: list[str] = Field(default_factory=list)
+    year: int | None = None
+    journal: str | None = None
+    doi: str | None = None
+    pmcid: str | None = None
+    url: str | None = None
+    licenceClass: str | None = None
 
 
 class Overlay(BaseModel):
-    """GET /api/biorepo/overlay (§2.1). The store applies it in one action on
-    top of the seed; with the service down the app is exactly the seed.
+    """GET /api/biorepo/overlay (§2.1). The browser's store applies it in one
+    action when it arrives; a project's records reach the page through it.
 
-    `papers` from fulltext/ (§5); `runs` and `candidates` recomputed from
-    candidates/ against the seed by `witness.py` (§6.2); `records` from
-    biorepo.json (§7).
+    `papers`, the documents the project holds in the kit (ADR-002); `runs`
+    and `candidates` recomputed from the project's candidates against the
+    values reviewers typed by `witness.py` (§6.2); `records` from the
+    project's decisions (§7).
 
     `candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service
     always sends the full list, so an empty list means the extractor produced
@@ -487,7 +623,7 @@ class Overlay(BaseModel):
 RecordStatus = Literal["unverified", "verified", "rejected"]
 # Mirrors ExtractorRun in types.ts. 'claude-1' is the first run that runs for
 # real: Claude Opus 5.5, with Claude Sonnet 5.5 where Opus declined (llm.py).
-ExtractorRun = Literal["v0.3", "v0.4", "v0.4r", "claude-1"]
+ExtractorRun = Literal["claude-1"]
 Outcome = Literal["match", "value_mismatch", "unit_error", "span_error", "miss"]
 
 
@@ -503,11 +639,83 @@ class AuditEvent(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+# ── typed quantities with origins (ADR-006; execution prompt §4.6) ─────
+#
+# Every number a model, a person or a library supplies enters as a
+# `Quantity` with an `Origin`. Provenance is computed from origins by code
+# (`basis.basis_provenance`), never set by a model or a person. A model's
+# number is an estimate: its origin names the model, whatever rests on it is
+# `assumed`, it is never averaged into evidence, and no record store takes it
+# (`basis.refuse_estimates`).
+
+OriginKind = Literal["record", "artifact", "person-assumption", "model-estimate", "library-default", "convention"]
+# The origins a value set for one run can have (an `Override`'s `origin`).
+OverrideOrigin = Literal["person-assumption", "model-estimate"]
+
+
+class Origin(BaseModel):
+    """Where a number came from (ADR-006)."""
+
+    kind: OriginKind
+    # The record, the artifact or the library entry it was read from.
+    ref: str | None = None
+    # The person who typed it, or the id of the model that estimated it.
+    by: str | None = None
+    # The day it was typed, or the moment it was estimated.
+    at: str | None = None
+    # What it rests on, in words.
+    note: str | None = None
+
+    @model_validator(mode="after")
+    def _names_its_source(self) -> "Origin":
+        if self.kind in ("person-assumption", "model-estimate") and not (self.by or "").strip():
+            who = "the person who typed it" if self.kind == "person-assumption" else "the model that estimated it"
+            raise ValueError(f"a {self.kind} names {who} (by)")
+        if self.kind in ("record", "artifact", "library-default") and not (self.ref or "").strip():
+            raise ValueError(f"a {self.kind} origin names what it was read from (ref)")
+        return self
+
+
 class Quantity(BaseModel):
-    """A value and its unit. Categorical fields carry a string value."""
+    """A value and its unit; a categorical field carries a string value. A
+    number a model, a person or a library supplies carries its origin
+    (ADR-006); a value code derives from another (the SI form of a record's
+    value) carries none, the thing it was derived from being its source."""
 
     value: float | str
     unit: str
+    # What the value is reckoned on, in words (dry basis, per litre of
+    # broth); None when the unit says it all.
+    basis: str | None = None
+    low: float | None = None
+    high: float | None = None
+    origin: Origin | None = None
+
+    @model_serializer(mode="wrap")
+    def _as_before_when_bare(self, handler: Any) -> Any:
+        # A quantity with no basis, range or origin is written as it was
+        # before they existed, so a stored output's hash and a stored
+        # record's row read the same (ADR-006).
+        out = handler(self)
+        if isinstance(out, dict):
+            for k in ("basis", "low", "high", "origin"):
+                if out.get(k) is None:
+                    out.pop(k, None)
+        return out
+
+
+class ClaimValue(BaseModel):
+    """A number a claim states, apart from its words (ADR-006): what it is,
+    and the quantity with its origin, which the validator computes from what
+    the plan names. A value read from a computed value or a record names it
+    in `source` and carries that origin; the answering model's estimate
+    carries `model-estimate` with the model's id, and the claim that states
+    it is `assumed`."""
+
+    label: str
+    quantity: Quantity
+    # The evidence id or the record id the value was read from; None for an estimate.
+    source: str | None = None
 
 
 class Range(BaseModel):
@@ -580,8 +788,9 @@ class DecisionCheck(BaseModel):
 
 class DroppedCandidate(BaseModel):
     """A candidate anchoring refused (§2.4), kept beside the survivors so the
-    run can be scored honestly (§6.2): a candidate whose value agreed with the
-    seed and whose quote failed is a `span_error` in Witness — the extractor
+    run can be scored honestly (§6.2): a candidate whose value agreed with a
+    value a reviewer typed and whose quote failed is a `span_error` in
+    Witness — the extractor
     produced it, and dropping it from BioRepo does not undo that. Never enters
     BioRepo; never repaired."""
 
@@ -595,7 +804,7 @@ class DroppedCandidate(BaseModel):
 
 
 class ExtractRunResult(BaseModel):
-    """One seed record scored against a run (§6.2)."""
+    """One reference, a value a reviewer typed, scored against a run (§6.2)."""
 
     goldRecordId: str
     outcome: Outcome
@@ -628,8 +837,8 @@ class ReviewDecision(BaseModel):
     The first six fields are exactly the browser's DurableReviewDecision — the
     shape the Durable tier already persists — so a decision made offline and a
     decision posted to the service are the same object. The rest say which
-    record, when, and, for a promotion that re-anchors a curated quote to the
-    paper's own words, the replacement span.
+    record, when, and, for a decision that re-anchors the record to another
+    sentence of the paper, the replacement span.
     """
 
     status: RecordStatus
@@ -645,16 +854,17 @@ class ReviewDecision(BaseModel):
 
 
 class BioRepo(BaseModel):
-    """core/data/biorepo.json (§2.2, §7.1) — the one data file that is
-    committed, because it holds human decisions and the short quotes that
-    anchor them. This file IS the corpus growing.
+    """A project's standing review decisions (§2.2, §7.1), as `biorepo.read`
+    replays them from the decision rows: human decisions and the short quotes
+    that anchor them. This IS the project's records growing.
 
     `decisions` is keyed by recordId. `records` holds the candidates those
     decisions were made about — accepted ones, which are new records, and
-    rejected ones, which Witness lists as false positives — copied here
-    because candidates/ is gitignored and a decision about a candidate nobody
-    can see any more would be a decision about nothing. The copy keeps the
-    candidate's own status; the decision is the authority.
+    rejected ones, which Witness lists as false positives — kept with each
+    decision, because a later extraction run replaces the candidates and a
+    decision about a candidate nobody can see any more would be a decision
+    about nothing. The copy keeps the candidate's own status; the decision
+    is the authority.
     """
 
     version: Literal[1] = 1
@@ -699,9 +909,10 @@ class ExtractResponse(BaseModel):
 # ── Guild (OF-BLD-013) ───────────────────────────────────────────────────
 #
 # Who may verify, extended from records to the people running protocol steps.
-# The ledger is core/data/guild.json, written only by `guild.write_*`, and it is
-# gitignored: the repository is public and a competence ledger is personnel
-# data. Mirrored in src/data/types.ts and held to it by `check:plan`.
+# The ledger is the project's rows of `guild_people` and `guild_evidence`,
+# written only by `guild.write_*`; a competence ledger is personnel data and
+# never enters the public repository. Mirrored in src/data/types.ts and held
+# to it by `check:plan`.
 
 GuildRole = Literal["member", "lead", "auditor"]
 
@@ -798,7 +1009,7 @@ class GuildPolicy(BaseModel):
 
 
 class Guild(BaseModel):
-    """core/data/guild.json — the people and everything recorded about them."""
+    """A project's ledger — the people and everything recorded about them."""
 
     version: Literal[1] = 1
     people: list[GuildPerson] = Field(default_factory=list)
@@ -812,8 +1023,8 @@ class Guild(BaseModel):
 # runs, and a tutor questions the trainee's reasoning in short turns. The
 # model writes words and cites sources; every value a trainee sees is copied
 # by the service from the source it cites, so no quantity in a scenario comes
-# from model weights. core/data/practice.json holds the scenarios and the
-# sessions, and never enters git: a session is a person's own words.
+# from model weights. The project's rows hold the scenarios and the
+# sessions (ADR-001), never the repository: a session is a person's own words.
 
 PracticeSourceKind = Literal["step", "material", "entry", "observation"]
 PracticeMove = Literal["why", "change", "next", "close"]
@@ -893,8 +1104,9 @@ class PracticeDepositionObservation(BaseModel):
 
 
 class PracticeDeposition(BaseModel):
-    """A Deposition as the browser sends it for drafting: Depositions live in
-    the browser's Durable tier, so the service sees the ones it is shown."""
+    """A Deposition as the page sends it for drafting: the project keeps its
+    depositions as rows (project_state.py), and a draft reads the ones the
+    page sends."""
 
     id: str
     protocolId: str
@@ -948,7 +1160,7 @@ class PracticeTurnRequest(BaseModel):
 
 
 class Practice(BaseModel):
-    """core/data/practice.json — every scenario drafted and every session held."""
+    """A project's Practice — every scenario drafted and every session held."""
 
     version: Literal[1] = 1
     scenarios: list[PracticeScenario] = Field(default_factory=list)
@@ -961,7 +1173,7 @@ class Practice(BaseModel):
 # src/engine/checks.ts), or asked for by the person or an assessor, then
 # scheduled and run at the bench by an assessor. Running it writes one
 # witnessed entry per skill through guild.write_evidence, with the check as
-# its source. core/data/checks.json never enters git.
+# its source. The checks are the project's rows of `guild_checks`.
 
 CheckState = Literal["proposed", "scheduled", "done", "dismissed"]
 CheckReasonKind = Literal["suspended", "lapsed", "lapsing", "ready", "deviation", "confidence", "rate", "requested"]
@@ -976,7 +1188,8 @@ class CheckReason(BaseModel):
 
 
 class CheckCriterion(BaseModel):
-    """One of a skill's mastery criteria, by its place in src/data/skills.ts."""
+    """One of a skill's mastery criteria, by its place in the skill's list
+    (Guild's skills; none ship with alpha 2.0)."""
 
     skillId: str
     index: int
@@ -1026,7 +1239,7 @@ class Check(BaseModel):
 
 
 class Checks(BaseModel):
-    """core/data/checks.json — every check proposed, asked for, run or dismissed."""
+    """A project's checks — every check proposed, asked for, run or dismissed."""
 
     version: Literal[1] = 1
     checks: list[Check] = Field(default_factory=list)
@@ -1069,7 +1282,10 @@ class CheckRecord(BaseModel):
 # where it came from. Its provenance is `basis.basis_provenance(...)`, never a
 # model's or a person's choice.
 
-BasisSourceKind = Literal["record", "deposition", "artifact", "model", "convention", "assumption"]
+# `assumption` is a named person's value (ADR-006's person-assumption);
+# `model-estimate` a model's, its id in `by`. Either makes whatever rests on
+# it `assumed`.
+BasisSourceKind = Literal["record", "deposition", "artifact", "model", "convention", "assumption", "model-estimate"]
 
 
 class BasisSource(BaseModel):
@@ -1078,7 +1294,7 @@ class BasisSource(BaseModel):
     id: str | None = None
     # What the convention is, or what the assumption rests on.
     note: str | None = None
-    # The named person, for an assumption.
+    # The named person, for an assumption; the model's id, for an estimate.
     by: str | None = None
 
 
@@ -1146,6 +1362,16 @@ class ReplayDifference(BaseModel):
     replayed: Any = None
 
 
+class ReplayTolerance(BaseModel):
+    """How near a replayed number must come to the stored one to count as
+    the same: within `atol + rtol·|stored|` (numpy's allclose), the precision
+    the tool's basis states."""
+
+    rtol: float
+    atol: float
+    why: str
+
+
 class ReplayResult(BaseModel):
     artifactId: str
     identical: bool
@@ -1153,6 +1379,10 @@ class ReplayResult(BaseModel):
     replayedHash: str
     differences: list[ReplayDifference] = Field(default_factory=list)
     durationMs: int
+    # The precision the tool's basis states, when it states one, and whether
+    # every difference is a number within it (true for an identical replay).
+    tolerance: ReplayTolerance | None = None
+    withinTolerance: bool = False
 
 
 # ── tools (OF-BLD-014 §3.4, E.6) ───────────────────────────────────────
@@ -1421,115 +1651,6 @@ class Passage(BaseModel):
     end: int
 
 
-class RagLane(BaseModel):
-    name: str
-    available: bool
-    # Why it is unavailable, or what it needs, in words.
-    why: str | None = None
-
-
-class RagStatus(BaseModel):
-    papersIndexed: int
-    passages: int
-    lanes: list[RagLane]
-    chosenLane: str
-    # The index's manifest, so a scorecard made on another index shows it.
-    manifestHash: str = ""
-
-
-class PassageHit(BaseModel):
-    """One passage a search returned (OF-BLD-014 §4.2)."""
-
-    passage: Passage
-    # The fused score: the sum over lanes of 1 / (60 + rank).
-    score: float
-    # Where each lane ranked it, 1 for first: "bm25", "dense", "phrasing-1", …
-    lanes: dict[str, int] = Field(default_factory=dict)
-    # From the grading reader, when a rerank lane ran: its grade, and the
-    # sentence it copied, checked verbatim against the passage.
-    grade: int | None = None
-    sentence: str | None = None
-
-
-# ── retrieval scorecard (OF-BLD-014 §4.3) ──────────────────────────────
-
-
-class RagMetrics(BaseModel):
-    """One lane on one question set."""
-
-    questions: int
-    recall5: float
-    recall10: float
-    recall20: float
-    mrr10: float
-    ndcg10: float
-    medianSeconds: float
-    costPerQuestion: float
-
-
-class RagLaneReport(BaseModel):
-    lane: str
-    available: bool
-    why: str | None = None
-    paid: bool
-    # Mean nDCG@10 over K and S (the sets present); None when it did not run.
-    score: float | None = None
-    sets: dict[str, RagMetrics] = Field(default_factory=dict)
-    # Questions left unscored because the helper model declined them.
-    refused: int = 0
-
-
-class RagSetInfo(BaseModel):
-    name: str
-    questions: int
-    # How the set was built and what it holds, in words.
-    note: str
-
-
-class RagReport(BaseModel):
-    date: str
-    manifestHash: str
-    papersIndexed: int
-    passages: int
-    sets: list[RagSetInfo]
-    lanes: list[RagLaneReport]
-    chosenLane: str
-    # The rule that chose it, in words.
-    rule: str
-    totalCostUsd: float
-    # The thread the questions were drawn from (OF-BLD-016 §4.1), or None for
-    # every paper. Every search ran over the whole index either way.
-    thread: str | None = None
-    # The lane search runs on now (core/data/index/config.json), which a person
-    # may hold apart from the rule's choice; the API fills it when it serves the
-    # report, and the stored report leaves it None (OF-BLD-016 §4.1).
-    laneInUse: str | None = None
-
-
-class RagSearchRequest(BaseModel):
-    question: str
-    k: int = 8
-    # A lane by name, or None for the chosen one.
-    lane: str | None = None
-    # OF-BLD-016 §2.3: the browser's switch; off leaves archived programs'
-    # passages out.
-    includeArchived: bool = False
-
-
-class RagSearchResponse(BaseModel):
-    """What `POST /api/rag/search` returns (OF-BLD-014 §4.4)."""
-
-    lane: str
-    hits: list[PassageHit]
-    # The other phrasings the expand lane searched, when it ran.
-    phrasings: list[str] = Field(default_factory=list)
-    # Sentences the grading reader returned that were not in their passage.
-    unverifiedSentences: int = 0
-    costUsd: float = 0.0
-    # Why another lane ran in place of the chosen one, when it did.
-    note: str | None = None
-
-
 # ── Proforma's BioSTEAM scenario (OF-BLD-014 §8.3) ──────────────────────
 
 
@@ -1604,7 +1725,9 @@ class ProformaRunRequest(BaseModel):
     # A person's changes in the parameter panel (OF-BLD-020 D3), each an
     # Override of scope `proforma:<scenarioId>`: a named assumption that wins
     # over the records and any fermOS fit for its input, and that the run's
-    # basis names with the person. The service keeps none.
+    # basis names with the person. The page sends the scenario's own, which
+    # the project keeps (project_state.py); `project_state.run_request`
+    # reads them for a run Postdoc makes.
     overrides: list[Override] = Field(default_factory=list)
     host: str | None = None
     seed: int = 0
@@ -1612,9 +1735,9 @@ class ProformaRunRequest(BaseModel):
     # default is proforma.SAMPLES, held equal by test_proforma, and
     # proforma.run refuses more than proforma.MAX_SAMPLES, in words.
     samples: int = 500
-    # The shelf flowsheet a scenario made in the browser runs (OF-BLD-019
-    # §2.3, D6): a seed scenario runs its own and needs none; a scenario id
-    # that is not a seed scenario's runs this one, bound as
+    # The shelf flowsheet the scenario runs (OF-BLD-019 §2.3, D6): a scenario
+    # the project keeps runs its own and needs none (another is refused); a
+    # scenario not yet saved runs this one, bound as
     # GET /api/proforma/bind binds it. A reference biorefinery, the toy or an
     # id the shelf does not hold is refused in words.
     flowsheet: str | None = None
@@ -1625,17 +1748,13 @@ class ProformaRunRequest(BaseModel):
     # is refused in words naming the parameter.
     fits: dict[str, str] = Field(default_factory=dict)
     # OF-BLD-020 §6.1 (D11): what a scenario on `custom_train_v1` is built
-    # from, as the scenario made in the browser keeps them: the kept
+    # from, as the scenario keeps them: the kept
     # `fermos.vessel` design its fermenter is rebuilt from, and the kept
     # `pureos.train_run` whose units follow it. Both are needed for that
     # flowsheet and refused for any other; each refused in words when it is
     # not on file, is another tool's, is damaged, or is of another program.
     vessel: str | None = None
     trainRun: str | None = None
-    # The program switch, for the parts a run names (§6.1): a vessel design
-    # or a train run of an archived program is refused unless it is on. A
-    # run's records bind whatever it says (a person opened the scenario).
-    includeArchived: bool = False
 
 
 class HistogramBin(BaseModel):
@@ -1807,7 +1926,7 @@ class CeilingCheck(BaseModel):
     substrate: str
     sugarWords: str
     # The scenario's organism: its host filter, else the strains its yield's
-    # records name, else its program's one species; and how that was read.
+    # records name; and how that was read.
     host: str | None = None
     strains: list[str] = Field(default_factory=list)
     species: list[str] = Field(default_factory=list)
@@ -1872,7 +1991,7 @@ class FlowsheetInfo(BaseModel):
     # The package and version it comes from ('biorefineries 2.35.1,
     # cornstover'), or 'this repository'.
     source: str
-    # A program id from src/data/programs.ts; None for a general flowsheet.
+    # The chemical-set key (`yeast`, train_spec.PROGRAM_CHEMICALS); None for a general flowsheet.
     program: str | None = None
     # A published reference biorefinery, run whole on its package's defaults.
     reference: bool = False
@@ -2127,7 +2246,7 @@ class Train(BaseModel):
     and `pureos_read`."""
 
     # The scenario the run belongs to (the basis's `scenario`, else the one
-    # seed scenario whose modelId is the run's flowsheet); None when no
+    # kept scenario whose modelId is the run's flowsheet); None when no
     # scenario claims it, and the train is then known by its artifact id.
     scenarioId: str | None = None
     scenarioName: str | None = None
@@ -2155,7 +2274,7 @@ class Train(BaseModel):
     note: str | None = None
     # OF-BLD-020 §5.2: the artifact a train is read from, a Proforma run or
     # a `pureos.train_run`, and for a train run the train it ran (its id and
-    # name as the browser keeps it, D9); None for a Proforma run.
+    # name as the project keeps it, D9); None for a Proforma run.
     tool: str = "proforma.run"
     trainId: str | None = None
     trainName: str | None = None
@@ -2384,14 +2503,57 @@ class RunbookDraft(BaseModel):
     measures: list[Measure]
 
 
+# ── Runbooks (OF-BLD-006 §3) ────────────────────────────────────────────
+
+RunbookKind = Literal["industrial", "research"]
+RunbookStatus = Literal["draft", "running", "complete", "awaiting_budget", "cache_hit", "needs_review",
+                        "blocked_unverified"]
+RunbookStageStatus = Literal["done", "running", "queued", "pending", "review", "blocked", "draft"]
+
+
+class RunbookStage(BaseModel):
+    """Mirrors `RunbookStage` in src/data/types.ts."""
+
+    name: str
+    status: RunbookStageStatus
+    detail: str | None = None
+    value: str | None = None
+
+
+class Runbook(BaseModel):
+    """Mirrors `Runbook` in src/data/types.ts: a row of the project's
+    `runbooks`, a person's or a study's (studies/runbooks.py). It is read
+    and written with `exclude_unset`, so a row comes back as it was kept:
+    the lock's digest reads a prediction's absent field and a null one
+    differently (runbook_lock.py)."""
+
+    id: str
+    kind: RunbookKind
+    title: str
+    status: RunbookStatus
+    stages: list[RunbookStage] = Field(default_factory=list)
+    note: str = ""
+    eta: str | None = None
+    outputs: list[str] = Field(default_factory=list)
+    productId: str | None = None
+    progressPct: float = 0
+    estCostUsd: float | None = None
+    strainId: str | None = None
+    predictions: list[Prediction] = Field(default_factory=list)
+    measurementSchema: list[Measure] = Field(default_factory=list)
+    # When the predictions and measures were frozen, and their digest.
+    lockedAt: str | None = None
+    lockHash: str | None = None
+
+
 # ── One parameter panel (OF-BLD-020 §2.1, D2–D4) ────────────────────────
 #
 # Every model family, vessel design, catalogue unit and shelf flowsheet
 # declares its parameters once, in Python, as `ParameterSpec`s; the service
 # resolves each to a `ParameterValue` naming where its value came from, in
 # the order its `sourceRule` gives. A person's change is an `Override`: a
-# named assumption the browser keeps (D3) and a run carries, which the
-# basis names as an `assumption`, so the result's provenance is `demo`.
+# named assumption the project keeps (D3) and a run carries, which the
+# basis names as an `assumption`, so the result's provenance is `assumed`.
 # Bounds are conventions with a written reason (D4): a value outside them
 # is kept and flagged in words, never clamped. `params.py` holds the rules.
 
@@ -2400,11 +2562,14 @@ class RunbookDraft(BaseModel):
 # `not-read`: a parameter the request's other choices leave unread (a
 # fed-batch's mu_set under a constant feed), which waits for nothing
 # (OF-BLD-020 §3.R, finding 16).
-ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "convention", "library-default", "waiting",
-                      "not-read"]
+# `assumption` is a person's value set by an Override, `model-estimate` a
+# model's (ADR-006).
+ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "model-estimate", "convention",
+                      "library-default", "waiting", "not-read"]
 # What a scope parameterises: a fermOS model family, a vessel designed for
-# a simulation, one unit of a pureOS train, or a Proforma scenario.
-ParamScopeKind = Literal["fermos-family", "fermos-vessel", "fermos-forecast", "pureos-unit", "proforma"]
+# a simulation, one unit of a pureOS train, a Proforma scenario, or a library
+# plant (an engine run's parameters, engine/runs.py `parameters_of`).
+ParamScopeKind = Literal["fermos-family", "fermos-vessel", "fermos-forecast", "pureos-unit", "proforma", "library"]
 # The entries a sourceRule may hold besides a record's, which names its
 # field as "record:<ontology field id>".
 SOURCE_RULE_ENTRIES = ("fit", "artifact", "simulation", "assumption", "convention", "library-default")
@@ -2493,8 +2658,9 @@ class ParameterValue(BaseModel):
 
 
 class Override(BaseModel):
-    """A person's change to one parameter of one scope: a named assumption,
-    kept in the browser that typed it and sent with the run (D3)."""
+    """A change to one parameter of one scope for a run (D3): a named
+    person's assumption, or a model's estimate (ADR-006), `by` naming the
+    person or the model."""
 
     scope: str
     key: str
@@ -2504,6 +2670,7 @@ class Override(BaseModel):
     by: str
     at: str
     note: str | None = None
+    origin: OverrideOrigin = "person-assumption"
 
     @field_validator("value", "low", "high", mode="before")
     @classmethod
@@ -2532,8 +2699,9 @@ class ParamResolveRequest(BaseModel):
     """POST /api/params/{scope}/resolve. Runs nothing."""
 
     overrides: list[Override] = Field(default_factory=list)
-    # A Proforma scenario made in the browser names the shelf flowsheet it
-    # runs, as ProformaRunRequest.flowsheet does; a seed scenario needs none.
+    # The shelf flowsheet a Proforma scenario not yet saved runs, as
+    # ProformaRunRequest.flowsheet names it; a scenario the project keeps
+    # needs none.
     flowsheet: str | None = None
     # A strain filter on the records, as GET /api/proforma/bind takes it.
     host: str | None = None
@@ -2544,24 +2712,22 @@ class ParamResolveRequest(BaseModel):
     # for; None is BioSTEAM's own default design. An anaerobic design takes none.
     vesselType: Literal["stirred-tank", "bubble-column"] | None = None
     # fermOS's family scope (OF-BLD-020 §3.2), bound as a simulation binds:
-    # the strain whose records bind (None: every strain of the program's
-    # organism), the product, the sugar the records must name, the fit a
-    # person chose, where the simulation starts (`records`, `fit` or
-    # `simulation:<artifact id>`), the run-length preset, and the program
-    # switch, which decides what the evidence pool shows.
+    # the strain whose records bind (None: every strain the evidence pool
+    # holds), the product, the sugar the records must name, the fit a person
+    # chose, where the simulation starts (`records`, `fit` or
+    # `simulation:<artifact id>`), and the run-length preset.
     strain: str | None = None
     product: str | None = None
     sugar: str | None = None
     fit: str | None = None
     startFrom: str | None = None
     durationPreset: Literal["until-sugar-runs-out", "fit-length"] | None = None
-    includeArchived: bool = False
     # pureOS's unit scope (OF-BLD-020 §5.1): the catalogue id of the unit's
     # type, when no train is sent; with a train it must agree with the unit's.
     unitType: str | None = None
-    # pureOS's unit scope (§5.2): the whole train, as the browser keeps it
+    # pureOS's unit scope (§5.2): the whole train, as the project keeps it
     # (D9), so the unit's per-component keys expand over the train's
-    # chemicals and its records bind by the train's program and product; the
+    # chemicals and its records bind from the evidence pool by field; the
     # scope `pureos:unit:<train id>:inlet` is the train's inlet. Its units'
     # typed values are not laid on here: a resolve's `overrides` are.
     train: TrainSpec | None = None
@@ -2615,7 +2781,6 @@ class VesselRequest(BaseModel):
     # A person's changes, each a named assumption (D3), scope
     # `fermos:vessel:<simulation or fit id>`.
     overrides: list[Override] = Field(default_factory=list)
-    includeArchived: bool = False
 
 
 class VesselDesignRow(BaseModel):
@@ -2777,7 +2942,7 @@ class VesselSummary(BaseModel):
 # with their sources (params.resolve), integrates on scipy, and keeps one
 # `fermos.simulation` artifact whose basis names every parameter, start
 # value and override, and whose provenance is basis_provenance over them
-# (a person's override makes it `demo`).
+# (a person's override makes it `assumed`).
 
 
 class FamilyInfo(BaseModel):
@@ -2797,9 +2962,6 @@ class FamilyInfo(BaseModel):
     specs: list[ParameterSpec]
     # The panel's groups this family's specs fall into, in order.
     groups: list[str]
-    # The program the family is archived with (storage_v1: PHA), or None for
-    # a general one.
-    program: str | None = None
 
 
 class SimulationRequest(BaseModel):
@@ -2815,7 +2977,6 @@ class SimulationRequest(BaseModel):
     # `records`, `fit`, or `simulation:<artifact id>`.
     startFrom: str = "records"
     durationPreset: Literal["until-sugar-runs-out", "fit-length"] = "until-sugar-runs-out"
-    includeArchived: bool = False
     # A parameter bound to exactly these records of the evidence pool, by
     # spec key (OF-BLD-020 §3.4, D13): each must be in the pool, carry a
     # field the parameter binds from, pass the aggregate gate and convert
@@ -2837,7 +2998,7 @@ class FermosBinding(BaseModel):
     # words the run refuses with (OF-BLD-020 §8.R, findings 12 and 14);
     # None when a run would go ahead.
     refused: str | None = None
-    # What bound from where: the program's papers, whose records, the sugar,
+    # What bound from where: the evidence pool's papers, whose records, the sugar,
     # the fit and the kept simulation, and what they could not give.
     notes: list[str] = Field(default_factory=list)
 
@@ -3218,8 +3379,9 @@ class TrainUnitSpec(BaseModel):
 
 
 class TrainSpec(BaseModel):
-    """A train as data (D9): the browser keeps it whole and sends it with a
-    run; the service keeps the runs."""
+    """A train as data (D9): the project keeps a person's train as a row
+    (pureOS's Builder), and the page sends it whole with a run; the service
+    keeps the runs."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -3257,7 +3419,6 @@ class TrainRunRequest(BaseModel):
     overrides: list[Override] = Field(default_factory=list)
     # The person an override that names nobody is by.
     by: str | None = None
-    includeArchived: bool = False
 
 
 class StreamImpurity(BaseModel):
@@ -3377,7 +3538,6 @@ class TrainFromRunRequest(BaseModel):
     artifactId: str
     # The id the train takes; by default `from-<artifact id>`.
     trainId: str | None = None
-    includeArchived: bool = False
 
 
 class TrainUnmapped(BaseModel):
@@ -3403,10 +3563,10 @@ class TrainFromRun(BaseModel):
 
 # ── a train a model built (OF-BLD-020 §5.4) ──────────────────────────────
 #
-# A person's trains live in their browser (D9). A model building a train across
-# tool calls, and an outside assistant over MCP (which has no ask), needs the
-# service to hold its draft: `core/data/pureos-trains.json`, written through
-# `pureos.kept.keep_train` alone, gitignored, on this machine alone.
+# A person's trains are the project's rows the Builder keeps (D9; stage 2). A
+# model building a train across tool calls, and an outside assistant over MCP
+# (which has no ask), needs the service to hold its draft too: rows of the
+# `trains` table marked `kept`, written through `pureos.kept.keep_train` alone.
 
 
 class KeptTrain(BaseModel):
@@ -3428,7 +3588,7 @@ class KeptTrain(BaseModel):
 
 
 class KeptTrains(BaseModel):
-    """core/data/pureos-trains.json."""
+    """The trains a model built, as `pureos.kept` reads them from their rows."""
 
     trains: list[KeptTrain] = Field(default_factory=list)
 
@@ -3437,7 +3597,7 @@ class KeptTrains(BaseModel):
 #
 # pureos/proposer.py reads a product's class and the properties its class's
 # rule splits on (thermosteam's volatility, ProtParam on its sequence, where
-# the seed says it is), and proposes a TrainSpec whose units are catalogue
+# the products catalogue says it is), and proposes a TrainSpec whose units are catalogue
 # types in order, every parameter at its library default or waiting, each
 # unit with one reason naming the rule, the property and its artifact.
 
@@ -3447,27 +3607,26 @@ class ProposeRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # A products seed id, or a product thermosteam's library is asked about by
-    # name (thermo.CHEMICALS: ethanol).
+    # A products catalogue id, or a product thermosteam's library is asked
+    # about by name (thermo.CHEMICALS: ethanol).
     product: str
     # A geneOS host (strain) id: the cells the product is made in.
     host: str
     # A kept fermOS simulation's artifact id, or a kept run's id and one of its
     # streams as `<artifact id>/<stream id>`; none, and the inlet is typed.
     inletRef: str | None = None
-    includeArchived: bool = False
 
 
 class ProposalReason(BaseModel):
     """Why one unit of a proposal is there: the rule, the property it read,
-    the artifact that holds that property (None when the products seed
-    states it), and the words, which carry no number."""
+    the artifact that holds that property (None when the products
+    catalogue states it), and the words, which carry no number."""
 
     unitId: str
     rule: str
     # A property name: `boilingPoint`, `azeotrope`, `molecularWeight`,
     # `isoelectricPoint` (each an evidence key of its artifact), or `class`,
-    # `location` (the products seed's).
+    # `location` (the products catalogue's).
     property: str
     artifactId: str | None = None
     words: str
@@ -3500,6 +3659,36 @@ class TrainProposal(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+# ── Projects (alpha 2.0, ADR-005) ─────────────────────────────────────────
+
+# A project's id: lower case, digits and dashes, as it appears in an address.
+PROJECT_ID = r"^[a-z0-9][a-z0-9-]{0,62}$"
+
+
+class Project(BaseModel):
+    """What scopes a lab's documents, records, flowsheets, runs, artifacts,
+    runbooks, depositions, conversations and Guild entries: every row the
+    service keeps belongs to one."""
+
+    id: str
+    name: str
+    description: str = ""
+    createdBy: str
+    createdAt: str
+
+
+class ProjectCreate(BaseModel):
+    """POST /api/projects. `id` is made from the name when left out."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=2000)
+    id: str | None = Field(default=None, pattern=PROJECT_ID)
+    # The person creating it, as the reviewer name they sign with.
+    by: str = Field(min_length=1, max_length=120)
+
+
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()
@@ -3509,3 +3698,475 @@ ProformaRunRequest.model_rebuild()
 ParamResolveRequest.model_rebuild()
 AnswerPlan.model_rebuild()
 ToolResult.model_rebuild()
+
+
+# ── SFF flowsheet records (alpha 2.0, ADR-003; engine/sff.py) ─────────────
+#
+# A flowsheet travels in and out as an SFF file (the PISCES Standard
+# Flowsheet Format). A record holds the file, what the vendored toolkit said
+# of it, the graph the UI draws, and where it came from. Every field below
+# the file is computed: the toolkit's verdicts in the worker, the graph and
+# the origin from the file itself.
+
+SFFOrigin = Literal["run", "library", "imported"]
+
+
+class SFFFinding(BaseModel):
+    """One result of the toolkit's validator that did not pass: the check's
+    id in its catalogue (validate/sff_checks.md), how severe a failure is,
+    whether it failed or was skipped, and its words."""
+
+    checkId: str
+    severity: str
+    status: str
+    message: str
+    path: str
+
+
+class SFFValidation(BaseModel):
+    """The toolkit's verdict against the schema it ships: valid unless the
+    schema gate or an error-severity check fails. `summary` counts every
+    result by severity and status; `findings` lists those that did not pass."""
+
+    valid: bool
+    schemaVersion: str
+    summary: dict[str, dict[str, int]] = Field(default_factory=dict)
+    findings: list[SFFFinding] = Field(default_factory=list)
+
+
+class SFFCriterion(BaseModel):
+    """One criterion of the toolkit's completeness registry, as it scored."""
+
+    id: str
+    category: str
+    criticality: str
+    weight: float
+    representable: bool
+    status: str
+    score: float | None = None
+    message: str
+    missing: list[str] = Field(default_factory=list)
+
+
+class SFFCompleteness(BaseModel):
+    """The toolkit's completeness report: how much of what BioSTEAM needs to
+    rebuild, simulate and cost the plant the file states. `score` weighs
+    every scored criterion; `representableScore` those the file's own SFF
+    version can state. `report` is the toolkit's plain-text rendering."""
+
+    score: float | None = None
+    representableScore: float | None = None
+    categories: dict[str, float | None] = Field(default_factory=dict)
+    criticalities: dict[str, float | None] = Field(default_factory=dict)
+    criteria: list[SFFCriterion] = Field(default_factory=list)
+    sffVersion: str | None = None
+    recipe: dict[str, Any] = Field(default_factory=dict)
+    report: str = ""
+
+
+class SFFTag(BaseModel):
+    """One of the toolkit's tags: whether the file earns it (None: not
+    evaluated; the reproducible tag needs the toolkit's conda harness, which
+    openFerment does not run), whether the file declares it, and what blocks it."""
+
+    earned: bool | None = None
+    declared: bool
+    blocking: list[str] = Field(default_factory=list)
+
+
+class SFFNode(BaseModel):
+    """A unit operation: a node of the graph. `rank` is its column when the
+    graph is drawn left to right, counted from the feeds."""
+
+    id: str
+    type: str
+    method: str | None = None
+    rank: int
+
+
+class SFFEdge(BaseModel):
+    """A stream from one unit to another: an edge of the graph."""
+
+    id: str
+    source: str
+    sink: str
+    massFlow: float | None = None
+
+
+class SFFBoundary(BaseModel):
+    """A stream crossing the plant's boundary: a feed enters `unit`, a
+    product leaves it. `name` is the display name the file's metadata gives
+    the feedstock or product it names; streams it does not name have none."""
+
+    id: str
+    unit: str
+    name: str | None = None
+    massFlow: float | None = None
+    price: float | None = None
+
+
+class SFFGraph(BaseModel):
+    """The flowsheet as the UI draws it, read from the file's units and
+    streams (`"None"` is the toolkit's boundary sentinel). A stream naming a
+    unit the file does not list is counted in `dangling`, never drawn."""
+
+    nodes: list[SFFNode] = Field(default_factory=list)
+    edges: list[SFFEdge] = Field(default_factory=list)
+    feeds: list[SFFBoundary] = Field(default_factory=list)
+    products: list[SFFBoundary] = Field(default_factory=list)
+    dangling: list[str] = Field(default_factory=list)
+    massFlowUnit: str = "kg/hr"
+
+
+class SFFFlowsheet(BaseModel):
+    """An SFF flowsheet record (GET /api/flowsheets/{id}).
+
+    `origin` is computed: `run` for a run of this project exported by
+    openFerment; `library` for a file whose sha256 is one of the toolkit's
+    reference flowsheets at the pinned commit, whichever door it came
+    through; `imported` for any other file. `sffVersion` is what the file
+    declares; `validation.schemaVersion` is the schema it was checked
+    against. `graph` is left out of a listing."""
+
+    id: str
+    title: str
+    origin: SFFOrigin
+    source: str
+    sffVersion: str | None = None
+    sha256: str
+    bytes: int
+    simulator: str | None = None
+    runArtifactId: str | None = None
+    libraryId: str | None = None
+    units: int
+    streams: int
+    validation: SFFValidation
+    completeness: SFFCompleteness
+    tags: dict[str, SFFTag] = Field(default_factory=dict)
+    graph: SFFGraph | None = None
+    toolkit: str
+    createdBy: str
+    createdAt: str
+
+
+class SFFLibraryEntry(BaseModel):
+    """One of the toolkit's reference flowsheets at the pinned commit
+    (GET /api/flowsheets/library): what the manifest says of it, and whether
+    this machine has fetched it."""
+
+    id: str
+    title: str
+    sffVersion: str | None = None
+    sha256: str
+    bytes: int
+    url: str
+    model: str | None = None
+    fetched: bool
+
+
+class SFFExportRequest(BaseModel):
+    """POST /api/flowsheets/export: the run whose base case is written as an
+    SFF file, and who asked."""
+
+    artifactId: str = Field(min_length=1, max_length=64)
+    by: str = Field(min_length=1, max_length=200)
+
+
+class SFFLibraryImport(BaseModel):
+    """POST /api/flowsheets/library/{id}: who keeps the reference flowsheet
+    in the project."""
+
+    by: str = Field(min_length=1, max_length=200)
+
+
+# ── Library plants (alpha 2.0, ADR-004; engine/library.py) ───────────────
+#
+# Every subpackage of the installed `biorefineries`, as discovery read it in
+# the worker (workers/library_plants.py) and as `engine/library_shelf.json`
+# holds it, regenerated by `pnpm library:discover`. A plant is run whole,
+# built afresh, its parameters read back as `library-default` values.
+
+
+class LibraryEntryParameter(BaseModel):
+    """One parameter of a plant's entry point, as its signature states it."""
+
+    name: str
+    kind: str
+    required: bool
+    default: Any = None
+
+
+class LibraryScenarioField(BaseModel):
+    """One field of a ProcessModel's scenario, with the package's default."""
+
+    name: str
+    type: str | None = None
+    default: Any = None
+
+
+class LibraryCompat(BaseModel):
+    """A change a plant needs to build under the pinned BioSTEAM, and why;
+    stated in the basis of every run of the plant."""
+
+    change: str
+    why: str
+
+
+class LibraryBuild(BaseModel):
+    """Whether a plant built here in one configuration (None: its own), as
+    the discovery command found when it built each: its units and whether a
+    TEA prices it, or the package's own error."""
+
+    configuration: str | None = None
+    ok: bool
+    units: int | None = None
+    priced: bool | None = None
+    error: str | None = None
+
+
+class LibraryPlant(BaseModel):
+    """One subpackage of the installed `biorefineries` (GET /api/library):
+    a plant with an entry point, a package of subsystem factories alone, or
+    one that offers neither; or one of openFerment's own flowsheets
+    (`flowsheet`), composed from a package's factories by its recipe and run
+    through the same adapter."""
+
+    id: str
+    module: str
+    kind: Literal["plant", "subsystems", "none", "unimportable", "flowsheet"]
+    # A composed flowsheet: the package it is composed from, its recipe
+    # directory, and the configuration a run takes when it names none.
+    composedFrom: str | None = None
+    recipe: str | None = None
+    defaultConfiguration: str | None = None
+    title: str | None = None
+    readme: str | None = None
+    entry: str | None = None
+    parameters: list[LibraryEntryParameter] = Field(default_factory=list)
+    processModel: bool = False
+    scenario: list[LibraryScenarioField] = Field(default_factory=list)
+    requiresConfiguration: bool = False
+    configurations: list[str] = Field(default_factory=list)
+    configurationsFrom: str | None = None
+    takesCache: bool = False
+    # The package test's functions for this plant (one per configuration).
+    tests: list[str] = Field(default_factory=list)
+    testNames: dict[str, Any] | None = None
+    compat: list[LibraryCompat] = Field(default_factory=list)
+    factories: list[str] = Field(default_factory=list)
+    error: str | None = None
+    builds: list[LibraryBuild] = Field(default_factory=list)
+
+
+class LibraryShelf(BaseModel):
+    """What discovery read of the installed package, and when."""
+
+    package: str
+    simulator: str
+    thermosteam: str
+    testFile: str
+    testTables: dict[str, Any] = Field(default_factory=dict)
+    plants: list[LibraryPlant] = Field(default_factory=list)
+
+
+class LibraryParameters(BaseModel):
+    """A library plant's parameters as the package builds it
+    (GET /api/library/{plant}/parameters): each as a ParameterSpec, its
+    value read back with origin `library-default`, and how the plant's
+    system, TEA, feedstock and product were found."""
+
+    plant: str
+    configuration: str | None = None
+    scope: str
+    found: dict[str, str] = Field(default_factory=dict)
+    specs: list[ParameterSpec] = Field(default_factory=list)
+    values: list[ParameterValue] = Field(default_factory=list)
+    simulator: str
+    package: str
+
+
+class LibraryRunRequest(BaseModel):
+    """POST /api/library/{plant}/run: the configuration (None: the plant's
+    own), the values set for the run, each an Override of the plant's scope
+    (a person's assumption or a model's estimate), and who asks for the run."""
+
+    configuration: str | None = Field(default=None, max_length=40)
+    overrides: list[Override] = Field(default_factory=list)
+    by: str = Field(default="", max_length=200)
+
+
+# ── engine runs (execution prompt §7.4; engine/runs.py) ─────────────────
+
+RunStatus = Literal["done", "refused"]
+
+
+class RunInput(BaseModel):
+    """One input of an engine run: its name, and its value as a quantity
+    with its origin (ADR-006)."""
+
+    name: str
+    quantity: Quantity
+
+
+class RunSFF(BaseModel):
+    """The SFF file a run wrote: its flowsheet record and what the toolkit
+    said of it."""
+
+    recordId: str
+    valid: bool
+    score: float | None = None
+    # The tags the file earns.
+    tags: list[str] = Field(default_factory=list)
+
+
+class EngineRun(BaseModel):
+    """One engine run in a project: a row of `runs` (GET /api/runs)."""
+
+    # Its computation's id: the artifact id of its basis.
+    id: str
+    plant: str
+    configuration: str | None = None
+    status: RunStatus
+    tool: str
+    toolVersion: str
+    inputs: list[RunInput]
+    # The artifact's, computed on its basis; None for a refused run.
+    provenance: Provenance | None = None
+    artifactId: str | None = None
+    # The price, a flowsheet's own outputs, and how the package's test held it.
+    outputs: dict[str, Any] = Field(default_factory=dict)
+    versions: dict[str, str] = Field(default_factory=dict)
+    sff: RunSFF | None = None
+    # Why no SFF file could be written, in the toolkit's or the worker's words.
+    sffRefused: str | None = None
+    # The plant's own words, for a refused run.
+    refused: str | None = None
+    # The study scenario that asked for it first (studies/scenarios.py).
+    scenarioId: str | None = None
+    by: str
+    at: str
+    durationMs: int | None = None
+
+
+class RunReport(BaseModel):
+    """GET /api/runs/{id}: a run with its computation, its SFF record, and
+    its parameters as the parameter panel reads them (each value the run's,
+    with its origin; None for a refused run)."""
+
+    run: EngineRun
+    artifact: Artifact | None = None
+    flowsheet: SFFFlowsheet | None = None
+    parameters: ParamScope | None = None
+
+
+# ── studies (execution prompt §7.2, §9.1 step 5; studies/) ──────────────
+
+
+class ScenarioValue(BaseModel):
+    """One value a scenario sets on its plant: the parameter's key, and the
+    value as a quantity whose origin is a named person's assumption or a
+    model's estimate (ADR-006)."""
+
+    key: str
+    quantity: Quantity
+
+    @model_validator(mode="after")
+    def _a_value_set_for_a_run(self) -> "ScenarioValue":
+        q = self.quantity
+        if q.origin is None or q.origin.kind not in ("person-assumption", "model-estimate"):
+            raise ValueError(f"{self.key}: a scenario's value is a person's assumption or a model's estimate, and "
+                             "names which (quantity.origin)")
+        if not (q.origin.at or "").strip():
+            raise ValueError(f"{self.key}: a scenario's value says when it was set (quantity.origin.at)")
+        if isinstance(q.value, bool) or not isinstance(q.value, (int, float)) or not math.isfinite(float(q.value)):
+            raise ValueError(f"{self.key}: a scenario's value is a finite number")
+        if q.low is not None or q.high is not None:
+            raise ValueError(f"{self.key}: an engine run sets one value per parameter; a range is for sampling")
+        return self
+
+
+class ScenarioCreate(BaseModel):
+    """POST /api/studies/scenarios."""
+
+    title: str = Field(min_length=1, max_length=200)
+    plant: str
+    configuration: str | None = Field(default=None, max_length=40)
+    values: list[ScenarioValue] = Field(default_factory=list)
+    note: str | None = Field(default=None, max_length=2000)
+    by: str = Field(default="", max_length=200)
+
+
+class StudyScenario(BaseModel):
+    """A study's scenario (GET /api/studies/scenarios/{id}): a plant, its
+    configuration and the values it sets, and the engine runs made of it."""
+
+    id: str
+    kind: Literal["engine"] = "engine"
+    title: str
+    plant: str
+    configuration: str | None = None
+    values: list[ScenarioValue]
+    note: str | None = None
+    # The engine runs made of it, oldest first (engine/runs.py ids).
+    runIds: list[str] = Field(default_factory=list)
+    by: str
+    at: str
+
+
+class StudyRequest(BaseModel):
+    """Who asks: a run of a scenario, a lock."""
+
+    by: str = Field(default="", max_length=200)
+
+
+class ComparisonCreate(BaseModel):
+    """POST /api/studies/comparisons: the engine runs to set side by side, in
+    the order the comparison reads them (the first is the one each change is
+    reckoned from)."""
+
+    title: str = Field(min_length=1, max_length=200)
+    runIds: list[str] = Field(min_length=2, max_length=12)
+    by: str = Field(default="", max_length=200)
+
+
+class StudyComparison(BaseModel):
+    """A comparison of engine runs: a row of `comparisons` under the id of
+    the `study.comparison` artifact that computes it."""
+
+    id: str
+    title: str
+    runIds: list[str]
+    artifactId: str
+    # The artifact's: the weakest of the runs' (ADR-006).
+    provenance: Provenance
+    by: str
+    at: str
+
+
+class ComparisonReport(BaseModel):
+    """GET /api/studies/comparisons/{id}: the comparison and its artifact,
+    whose output holds the runs, the rows and the values each run set."""
+
+    comparison: StudyComparison
+    artifact: Artifact
+
+
+class PredictedOutput(BaseModel):
+    """One output of an engine run a runbook predicts: its key in the run's
+    artifact (`outputs.<key>` of a flowsheet's outputs, `price.<key>` of the
+    price) and what the bench calls it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    output: str = Field(min_length=1, max_length=120)
+    label: str = Field(min_length=1, max_length=200)
+
+
+class RunbookCreate(BaseModel):
+    """POST /api/studies/runbooks: a runbook predicting outputs of one engine
+    run, each in the run's unit, measured at harvest."""
+
+    title: str = Field(min_length=1, max_length=200)
+    runId: str = Field(min_length=1, max_length=64)
+    predict: list[PredictedOutput] = Field(min_length=1, max_length=24)
+    by: str = Field(default="", max_length=200)

@@ -160,17 +160,6 @@ export function matchToSchema(raw: string, schema: Measure[]): CaptureMatch | nu
 }
 
 /**
- * Whether a line is worth a read-back beat.
- *
- * Only numbers entering the schema. Confirm everything and the screen is
- * unusable at the bench; confirm nothing and "four two" is 4.2 or 42 and the
- * failure is silent. One extra tap on the handful of values that matter.
- */
-export function needsReadBack(match: CaptureMatch | null): boolean {
-  return match !== null;
-}
-
-/**
  * The read-back sentence. Says the number the way a person would check it,
  * not the way a parser stored it.
  */

@@ -32,9 +32,9 @@ TEA (the toy) names no product: its train lists units and masses and no
 recovery, and says why.
 
 WHICH SCENARIO a run belongs to: a basis input named `scenario`, when the
-run carries one; else the one seed scenario (modules.json, written by
-`pnpm export:corpus`) whose `modelId` is the run's flowsheet. A run no
-scenario claims is a train known by its artifact id.
+run carries one; else the one scenario the project keeps
+(`proforma.held_scenarios`) whose `modelId` is the run's flowsheet.
+A run no scenario claims is a train known by its artifact id.
 
 THE PACKAGE (OF-BLD-020 §5.1). This module was pureos.py; it became the
 package so the train's pieces live beside it. `pureos.catalogue` is the unit
@@ -56,7 +56,7 @@ read), or by its artifact id.
 
 A TRAIN PROPOSED BY RULES (OF-BLD-020 §7.2, D12). `pureos.proposer` reads a
 product's class and the properties its class's rule splits on (thermosteam's
-volatility, ProtParam on its sequence, where the products seed says it is)
+volatility, ProtParam on its sequence, where the products catalogue holds one)
 and proposes a `TrainSpec` with every parameter at its library default or
 waiting, each unit with its reason; `propose` is re-exported here.
 """
@@ -95,16 +95,12 @@ def _flowsheet(art: Artifact) -> str | None:
     return str(named) if named else next((str(i.value) for i in art.inputs if i.name == "flowsheet"), None)
 
 
-def seed_scenarios() -> list[dict[str, Any]]:
-    """The seed's scenarios as `export:corpus` projects them; none when the
-    projection is missing, and then only a run's own `scenario` input names
-    its scenario."""
-    from .. import module_stores
+def held_scenarios() -> list[dict[str, Any]]:
+    """The BioSTEAM scenarios the project keeps (`proforma.held_scenarios`);
+    a run's own `scenario` input names its scenario before any of them."""
+    from .. import proforma
 
-    try:
-        return list(module_stores._projection()["proforma"]["scenarios"])
-    except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
-        return []
+    return proforma.held_scenarios()
 
 
 def scenario_of(art: Artifact, scenarios: Iterable[dict[str, Any]]) -> tuple[str | None, str | None]:
@@ -120,12 +116,8 @@ def scenario_of(art: Artifact, scenarios: Iterable[dict[str, Any]]) -> tuple[str
     return None, None
 
 
-def program_of(art: Artifact, scenario_id: str | None, scenarios: Iterable[dict[str, Any]],
-               record_lookup: Any = None) -> str | None:
-    """A train's program: its scenario's, its flowsheet's on the shelf, and
-    what its basis names (`programs.program_of_artifact`); an archived one
-    among them wins, as it does for an artifact."""
-    from .. import programs
+def program_of(art: Artifact, scenario_id: str | None, scenarios: Iterable[dict[str, Any]]) -> str | None:
+    """A train's chemical set: its scenario's, else its flowsheet's on the shelf."""
     from ..flowsheets import shelf as _shelf
 
     found: list[str | None] = [next((s.get("program") for s in scenarios if s["id"] == scenario_id), None)]
@@ -133,21 +125,8 @@ def program_of(art: Artifact, scenario_id: str | None, scenarios: Iterable[dict[
         found.append(_shelf.info(_flowsheet(art) or "", allow_toy=True).program)
     except _shelf.NotOnShelf:
         pass
-    try:
-        found.append(programs.program_of_artifact(art, record_lookup))
-    except FileNotFoundError:  # no corpus exported here: the basis names nothing known
-        pass
-    except Exception:  # a lookup that cannot load leaves the ids in the basis to speak
-        try:
-            found.append(programs.program_of_artifact(art))
-        except FileNotFoundError:
-            pass
     kept = [p for p in found if p]
-    try:
-        archived = next((p for p in kept if programs.is_archived(p)), None)
-    except FileNotFoundError:
-        archived = None
-    return archived or (kept[0] if kept else None)
+    return kept[0] if kept else None
 
 
 def _kept_tables(art: Artifact) -> bool:
@@ -238,7 +217,7 @@ def _train_product(art: Artifact, t: ProformaTables) -> tuple[str | None, str | 
 
 
 def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None, provenance: str | None = None,
-             runs: int = 1, record_lookup: Any = None) -> Train:
+             runs: int = 1) -> Train:
     """One run's train, read from its stream and unit tables alone: a
     Proforma run's, or a pureOS train run's (OF-BLD-020 §5.2)."""
     from .. import proforma
@@ -257,9 +236,9 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
         stream_id, product, how = _train_product(art, t)
         spec = (art.output or {}).get("train") or {}
         train_id, train_name = spec.get("id"), spec.get("name")
-        program = _train.program_of_run(art, record_lookup)
+        program = _train.program_of_run(art)
     else:
-        scenarios = list(seed_scenarios() if scenarios is None else scenarios)
+        scenarios = list(held_scenarios() if scenarios is None else scenarios)
         sid, sname = scenario_of(art, scenarios)
         infeasible = _base_infeasible(art)
         no_tea = (f"the base case could not run ({infeasible}), so the run kept no tables, names no product and reads "
@@ -268,7 +247,7 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
                   "this run was kept before runs carried their tables (OF-BLD-019 §2.1), so it names no product here "
                   "and reads no recovery")
         stream_id, product, how = product_of(t, no_tea=no_tea)
-        program = program_of(art, sid, scenarios, record_lookup)
+        program = program_of(art, sid, scenarios)
     by_id = {s.id: s for s in t.streams}
 
     def m(sid_: str) -> float:
@@ -351,8 +330,7 @@ class _Marks:
     """What each run is worth now (§4.R): `basis_provenance` over its inputs
     as they stand, the pool's records and the store's artifacts, as
     `module_stores` works out the mark pureos_read gives the same train. The
-    pool is loaded once, and only for a run that binds a record; a person
-    opens a train by id, so archived programs' records resolve."""
+    pool is loaded once, and only for a run that binds a record."""
 
     def __init__(self, kept: list[Artifact], records_by_id: Any = None):
         self.kept = {a.id: a for a in kept}
@@ -366,7 +344,7 @@ class _Marks:
         if "record" in kinds and self.records_by_id is None:
             from .. import evidence_pool
 
-            self.records_by_id = evidence_pool.load(include_archived=True).records_by_id
+            self.records_by_id = evidence_pool.load().records_by_id
         records = self.records_by_id if "record" in kinds else {}
         return basis_provenance(basis_of(art), records or {}, self.kept if "artifact" in kinds else {})
 
@@ -390,28 +368,20 @@ def _runs(arts: Iterable[Artifact], scenarios: list[dict[str, Any]]) -> dict[str
     return out
 
 
-def trains(include_archived: bool = False, *, arts: Iterable[Artifact] | None = None,
-           scenarios: Iterable[dict[str, Any]] | None = None, record_lookup: Any = None,
-           records_by_id: Any = None) -> list[Train]:
+def trains(*, arts: Iterable[Artifact] | None = None,
+           scenarios: Iterable[dict[str, Any]] | None = None, records_by_id: Any = None) -> list[Train]:
     """The newest run of every scenario with a run on file (and every run no
-    scenario claims), newest first. A train of an archived program is left
-    out unless the caller asks for archived programs (OF-BLD-016 §2.R). Each
-    train's provenance is its run's worth now, as pureos_read gives it."""
-    from .. import artifacts, programs
+    scenario claims), newest first. Each train's provenance is its run's
+    worth now, as pureos_read gives it."""
+    from .. import artifacts
 
-    scenarios = list(seed_scenarios() if scenarios is None else scenarios)
+    scenarios = list(held_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)
     mark = _Marks(kept, records_by_id)
     out = []
     for runs in _runs(kept, scenarios).values():
-        tr = train_of(runs[0], scenarios=scenarios, provenance=mark(runs[0]), runs=len(runs),
-                      record_lookup=record_lookup)
-        try:
-            hidden = programs.hides(tr.program, include_archived)
-        except FileNotFoundError:
-            hidden = False
-        if not hidden:
-            out.append(tr)
+        tr = train_of(runs[0], scenarios=scenarios, provenance=mark(runs[0]), runs=len(runs))
+        out.append(tr)
     return sorted(out, key=lambda tr: tr.createdAt, reverse=True)
 
 
@@ -423,24 +393,23 @@ def summary(tr: Train) -> TrainSummary:
 
 
 def train(key: str, *, arts: Iterable[Artifact] | None = None, scenarios: Iterable[dict[str, Any]] | None = None,
-          record_lookup: Any = None, records_by_id: Any = None) -> Train:
+          records_by_id: Any = None) -> Train:
     """The train a scenario id or a run's artifact id names: the newest run
-    of that scenario, or that run. A deep link opens whatever program it
-    belongs to, as every page opened by id does; the page says the program.
-    Its provenance is the run's worth now, as pureos_read gives it."""
+    of that scenario, or that run. Its provenance is the run's worth now, as
+    pureos_read gives it."""
     from .. import artifacts
 
-    scenarios = list(seed_scenarios() if scenarios is None else scenarios)
+    scenarios = list(held_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)
     mark = _Marks(kept, records_by_id)
     runs = _runs(kept, scenarios)
     if key in runs:
         a = runs[key][0]
-        return train_of(a, scenarios=scenarios, provenance=mark(a), runs=len(runs[key]), record_lookup=record_lookup)
+        return train_of(a, scenarios=scenarios, provenance=mark(a), runs=len(runs[key]))
     for group in runs.values():
         for a in group:
             if a.id == key:
-                return train_of(a, scenarios=scenarios, provenance=mark(a), runs=1, record_lookup=record_lookup)
+                return train_of(a, scenarios=scenarios, provenance=mark(a), runs=1)
     other = next((a for a in kept if a.id == key), None)
     if other is not None:
         raise TrainNotFound(f"artifact {key} is a {other.tool} artifact, not a Proforma run or a train run; a train is "

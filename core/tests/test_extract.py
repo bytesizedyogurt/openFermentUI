@@ -2,39 +2,63 @@
 
 The model call is stubbed — `call_model` is replaced with a function that
 returns a hand-written tool input — so every rule around the call is pinned
-without spending a token: what the prompt and tool contain, how a section is
+without spending a token: what the prompt and tool contain, how a passage is
 cut, what happens to the candidates the stub returns, what is persisted, and
 what the endpoint answers when there is nothing to anchor to.
+
+A document's passages come from Sci RAG Kit (`extract.passages`); here they
+are the structural fixture's sections, served as a held document's passages
+(`HELD`), so each rule is pinned against text a human can read. Extraction
+over a document the kit itself stores is tested in test_literature_kit.py.
 
 The live test that actually calls the model is test_extract_live.py, marked live.
 """
 from __future__ import annotations
 
-import json
 
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import biorepo, extract, intake
+from sqlalchemy import select
+
+from openferment_core import db, extract, projects
 from openferment_core.api import app
+from openferment_core.db import models as t
 from openferment_core.models import ExtractResponse, Usage
 from openferment_core.units import tables
 
-STRUCTURAL_PMCID = "structural"
+from conftest import structural_passages
 
+# The documents this test's project holds: id → passages (conftest's held_documents).
+HELD: dict[str, list[dict]] = {}
+
+
+
+def kept_row(paper_id: str) -> dict:
+    """The extractor's row for a paper, as stored."""
+
+    async def read() -> dict:
+        async with db.session() as s:
+            q = select(t.candidates.c.body).where(
+                t.candidates.c.project_id == projects.current(),
+                t.candidates.c.document_id == paper_id,
+                t.candidates.c.source == extract.MODEL,
+            )
+            return (await s.execute(q)).scalar_one()
+
+    return db.run(read())
 
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path):
+def _offline(monkeypatch, tmp_path, held_documents):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
+    global HELD
+    HELD = held_documents
 
 
-def fetch_structural_as(paper_id: str):
-    """Cache the structural document as this paper's full text."""
-    return intake.fetch_paper({"id": paper_id, "pmcid": STRUCTURAL_PMCID})
+def fetch_structural_as(paper_id: str) -> None:
+    """The structural document, held as this paper's passages."""
+    HELD[paper_id] = structural_passages()
 
 
 # The response a well-behaved model would give for the structural document:
@@ -146,10 +170,8 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
     assert "[t1 · Table 1 Placeholder rows, kept as rows.]" in sent["user_text"]
     assert any("titer_secreted" in v["properties"]["field"]["enum"] for v in item_variants(sent["tool"]))
 
-    # Persisted, and the cache is honoured.
-    path = extract.CANDIDATES_DIR / "X1.json"
-    assert path.exists()
-    stored = json.loads(path.read_text())
+    # Persisted, and the kept run is honoured.
+    stored = kept_row("X1")
     assert stored["run"] == "claude-1" and len(stored["candidates"]) == 2 and len(stored["dropped"]) == 4
     again = extract.extract_paper("X1")
     assert again.extractedAt == r.extractedAt and len(call.calls) == 1
@@ -161,15 +183,15 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
 def test_a_paper_with_no_full_text_is_refused_before_any_call(monkeypatch):
     call = stub_call({"candidates": []})
     monkeypatch.setattr(extract, "call_model", call)
-    with pytest.raises(extract.ExtractUnavailable) as caught:
+    with pytest.raises(extract.NothingToAnchor) as caught:
         extract.extract_paper("NOPE")
-    assert "no cached full text" in str(caught.value)
+    assert "holds no document NOPE" in str(caught.value)
     assert call.calls == []
 
 
-def test_a_failed_fetch_is_not_extractable(monkeypatch):
-    intake.fetch_paper({"id": "X2", "pmcid": "PMC0000000"})  # no fixture → failed:fetch
-    with pytest.raises(extract.ExtractUnavailable):
+def test_a_document_with_no_text_is_not_extractable(monkeypatch):
+    HELD["X2"] = []
+    with pytest.raises(extract.NothingToAnchor):
         extract.extract_paper("X2")
 
 
@@ -190,10 +212,9 @@ def test_a_truncated_response_is_refused_and_not_cached(monkeypatch):
 
 def test_extract_endpoint_answers_502_on_a_truncated_response(monkeypatch):
     client = TestClient(app)
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
-    client.post("/api/intake/B5/fetch")
+    fetch_structural_as("T5")
     monkeypatch.setattr(extract, "call_model", stub_call({"candidates": [], "truncated": True}))
-    r = client.post("/api/intake/B5/extract")
+    r = client.post("/api/intake/T5/extract")
     assert r.status_code == 502 and "token limit" in r.json()["detail"]
 
 
@@ -213,30 +234,27 @@ def client():
     return TestClient(app)
 
 
-def test_extract_endpoint_refuses_without_full_text(client):
-    r = client.post("/api/intake/B5/extract")
+def test_extract_endpoint_refuses_a_document_the_project_does_not_hold(client):
+    r = client.post("/api/intake/T5/extract")
     assert r.status_code == 422
-    assert "no cached full text" in r.json()["detail"]
-    assert client.post("/api/intake/NOPE/extract").status_code == 404
+    assert "holds no document T5" in r.json()["detail"]
 
 
 def test_extract_endpoint_returns_the_anchored_candidates(client, monkeypatch):
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
-    assert client.post("/api/intake/B5/fetch").json()["status"] == "complete"
+    fetch_structural_as("T5")
     monkeypatch.setattr(extract, "call_model", stub_call(GOOD_AND_BAD))
-    r = client.post("/api/intake/B5/extract")
+    r = client.post("/api/intake/T5/extract")
     assert r.status_code == 200, r.text
     body = ExtractResponse.model_validate(r.json())
-    assert body.paperId == "B5" and len(body.candidates) == 2 and body.rejected == 4
-    assert body.candidates[0].id == "cl1-B5-a07dd73c"
+    assert body.paperId == "T5" and len(body.candidates) == 2 and body.rejected == 4
+    assert body.candidates[0].id == "cl1-T5-276fbb61"
 
 
 def test_extract_endpoint_says_when_there_is_no_key(client, monkeypatch):
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
-    client.post("/api/intake/B5/fetch")
+    fetch_structural_as("T5")
     # Fixture mode with no saved response behaves like the no-key case: 503
     # with the reason, never a candidate list invented to fill the gap.
-    r = client.post("/api/intake/B5/extract")
+    r = client.post("/api/intake/T5/extract")
     assert r.status_code == 503
     assert "saved response" in r.json()["detail"]
 
@@ -263,31 +281,17 @@ def test_the_system_prompt_says_what_a_range_and_an_absence_are_for():
 def fetch_sections(paper_id: str, sections: list[tuple[str, str]]) -> None:
     """A fetched paper whose sections say these things, written where a real
     fetch would leave it."""
-    from openferment_core.models import FetchedSection, FetchResult
+    from openferment_core.models import FetchedSection
 
-    result = FetchResult(
-        paperId=paper_id,
-        status="complete",
-        fetchedAt="2026-09-15T00:00:00Z",
-        sections=[FetchedSection(id=i, heading="Results", text=t) for i, t in sections],
-    )
-    intake.FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
-    (intake.FULLTEXT_DIR / f"{paper_id}.json").write_text(result.model_dump_json(), encoding="utf-8")
+    HELD[paper_id] = [FetchedSection(id=i, heading="Results", text=t).model_dump() for i, t in sections]
 
 
 def fetch_saying(paper_id: str, section_id: str, text: str) -> None:
     """A fetched paper whose one section says this, written where a real
     fetch would leave it."""
-    from openferment_core.models import FetchedSection, FetchResult
+    from openferment_core.models import FetchedSection
 
-    result = FetchResult(
-        paperId=paper_id,
-        status="complete",
-        fetchedAt="2026-09-15T00:00:00Z",
-        sections=[FetchedSection(id=section_id, heading="Results", text=text)],
-    )
-    intake.FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
-    (intake.FULLTEXT_DIR / f"{paper_id}.json").write_text(result.model_dump_json(), encoding="utf-8")
+    HELD[paper_id] = [FetchedSection(id=section_id, heading="Results", text=text).model_dump()]
 
 
 def test_a_range_the_model_states_reaches_the_anchored_candidate(monkeypatch):
@@ -313,14 +317,14 @@ def test_a_range_the_model_states_reaches_the_anchored_candidate(monkeypatch):
 
 
 def test_an_absence_the_model_states_reaches_the_anchored_candidate(monkeypatch):
-    fetch_saying("R2", "s1", "The recombinant protein was not phosphorylated.")
+    fetch_saying("R2", "s1", "No secreted product was detected in the medium.")
     emitted = {
         "candidates": [
             {
-                "sectionId": "s1", "field": "phosphorylation_degree", "value": 0,
-                "unit": "% of native sites",
-                "quote": "The recombinant protein was not phosphorylated",
-                "negativeResult": True, "method": "undetermined",
+                "sectionId": "s1", "field": "titer_secreted", "value": 0,
+                "unit": "g/L",
+                "quote": "No secreted product was detected in the medium",
+                "negativeResult": True,
                 "isPrimary": True, "confidence": 0.9,
             }
         ]
@@ -355,11 +359,8 @@ def one_per_section(section_ids: list[str]) -> dict:
 
 
 def item_variants(tool: dict) -> list[dict]:
-    """The candidate schema's variants: one for the cell-mass fraction fields,
-    one for the rest (live test, 2026-10-16); a schema with no such fields
-    has one."""
-    items = tool["input_schema"]["properties"]["candidates"]["items"]
-    return items.get("anyOf", [items])
+    """The candidate schema, as the list of its one variant."""
+    return [tool["input_schema"]["properties"]["candidates"]["items"]]
 
 
 def sections_asked(tool: dict) -> list[str]:
@@ -453,28 +454,28 @@ def test_the_prompt_is_built_once_per_call(monkeypatch):
 
     monkeypatch.setattr(extract, "build_prompt", counting)
     extract.extract_paper("X1")
-    assert calls == [len(intake.cached("X1").sections)], calls
+    assert calls == [len(HELD["X1"])], calls
 
 
 # ── a polymer, a bacterium's growth rate, and what the cells were fed ──
 # (OF-BLD-014 §2.1). The section is a fixture about an imaginary run; its
 # numbers are test values, not results.
 
-PHA_SECTION = (
-    "On glucose the imaginary strain accumulated poly(3-hydroxybutyrate) to 62 wt% of "
-    "the cell dry mass. Its specific growth rate was 0.41 h-1 in the batch phase."
+CULTURE_SECTION = (
+    "On glucose the imaginary strain reached an ethanol titre of 62 g/L at harvest. "
+    "Its specific growth rate was 0.41 h-1 in the batch phase."
 )
 
 
-def _pha_candidates(**over) -> dict:
+def _culture_candidates(**over) -> dict:
     base = [
-        {  # a polymer content written as wt%
-            "sectionId": "s1", "field": "pha_content_cdw", "value": 62, "unit": "wt%",
-            "quote": "accumulated poly(3-hydroxybutyrate) to 62 wt% of the cell dry mass",
-            "method": "GC", "isPrimary": True, "confidence": 0.9,
-            "organism": "imaginary strain", "carbonSource": over.get("content_carbon", "glucose"),
+        {  # a titre
+            "sectionId": "s1", "field": "ethanol_titre", "value": 62, "unit": "g/L",
+            "quote": "the imaginary strain reached an ethanol titre of 62 g/L at harvest",
+            "isPrimary": True, "confidence": 0.9,
+            "organism": "imaginary strain", "carbonSource": over.get("titre_carbon", "glucose"),
         },
-        {  # a growth rate the old algal ceiling refused
+        {  # a growth rate
             "sectionId": "s1", "field": "growth_rate_mu", "value": 0.41, "unit": "h-1",
             "quote": "Its specific growth rate was 0.41 h-1 in the batch phase",
             "isPrimary": True, "confidence": 0.9,
@@ -484,53 +485,34 @@ def _pha_candidates(**over) -> dict:
     return {"candidates": base}
 
 
-def test_a_pha_content_written_as_wt_percent_normalises_to_percent_cdw(monkeypatch):
-    fetch_saying("P1", "s1", PHA_SECTION)
-    monkeypatch.setattr(extract, "call_model", lambda *_: (_pha_candidates(), extract.Usage()))
-    result = extract.extract_paper("P1")
-    assert result.rejected == 0, result.rejectionDetails
-    content = next(c for c in result.candidates if c.field == "pha_content_cdw")
-    assert content.unit == "% CDW" and content.value == 62 and content.method == "GC"
-    assert content.si.unit == "% CDW" and content.si.value == 62
-
-
-def test_a_growth_rate_the_old_bound_refused_now_anchors(monkeypatch):
-    fetch_saying("P2", "s1", PHA_SECTION)
-    monkeypatch.setattr(extract, "call_model", lambda *_: (_pha_candidates(), extract.Usage()))
-    result = extract.extract_paper("P2")
-    assert result.rejectionReasons["range"] == 0, result.rejectionDetails
-    rate = next(c for c in result.candidates if c.field == "growth_rate_mu")
-    assert rate.value == 0.41 and rate.unit == "h⁻¹"
-
-
 def test_a_carbon_source_that_sits_in_the_section_is_kept(monkeypatch):
-    fetch_saying("P3", "s1", PHA_SECTION)
-    monkeypatch.setattr(extract, "call_model", lambda *_: (_pha_candidates(), extract.Usage()))
+    fetch_saying("P3", "s1", CULTURE_SECTION)
+    monkeypatch.setattr(extract, "call_model", lambda *_: (_culture_candidates(), extract.Usage()))
     result = extract.extract_paper("P3")
     assert [c.carbonSource for c in result.candidates] == ["glucose", "glucose"]
     assert result.fieldDrops == {"carbonSource": 0}
     # Persisted as it was answered.
-    stored = json.loads((extract.CANDIDATES_DIR / "P3.json").read_text())
+    stored = kept_row("P3")
     assert stored["candidates"][0]["carbonSource"] == "glucose"
 
 
 def test_a_carbon_source_absent_from_the_section_is_dropped_and_its_candidate_kept(monkeypatch):
-    fetch_saying("P4", "s1", PHA_SECTION)
-    raw = _pha_candidates(content_carbon="xylose")
+    fetch_saying("P4", "s1", CULTURE_SECTION)
+    raw = _culture_candidates(titre_carbon="xylose")
     monkeypatch.setattr(extract, "call_model", lambda *_: (raw, extract.Usage()))
     result = extract.extract_paper("P4")
     assert result.rejected == 0, "a dropped field is not a rejected candidate"
     assert len(result.candidates) == 2
-    content = next(c for c in result.candidates if c.field == "pha_content_cdw")
+    titre = next(c for c in result.candidates if c.field == "ethanol_titre")
     rate = next(c for c in result.candidates if c.field == "growth_rate_mu")
-    assert content.carbonSource is None, "xylose is not in the section; the field goes"
+    assert titre.carbonSource is None, "xylose is not in the section; the field goes"
     assert rate.carbonSource == "glucose", "the other candidate's is untouched"
     assert result.fieldDrops == {"carbonSource": 1}
     assert all(v == 0 for v in result.rejectionReasons.values())
 
 
 def test_the_tool_asks_for_the_carbon_source_in_the_papers_words():
-    tool = extract.build_tool(["s1"], ["pha_content_cdw"])
+    tool = extract.build_tool(["s1"], ["ethanol_titre"])
     items = item_variants(tool)[0]
     prop = items["properties"]["carbonSource"]
     assert prop["type"] == "string"

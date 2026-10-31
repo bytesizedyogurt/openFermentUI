@@ -27,7 +27,6 @@ from openferment_core.units import (
     explain_refusal,
     family,
     field,
-    in_range,
     normalize,
     quantity_equals,
     tables,
@@ -131,17 +130,14 @@ def test_an_unknown_unit_is_an_error_not_a_guess():
 
 def test_every_ontology_field_has_a_canonical_unit_the_engine_knows():
     for field_id, d in tables()["ontology"].items():
+        if d["categorical"]:
+            # A string carries no unit.
+            assert d["canonicalUnit"] == "", f"{field_id}: categorical, yet carries a unit"
+            continue
         assert normalize(d["canonicalUnit"]) is not None, (
             f"{field_id}: canonical unit {d['canonicalUnit']!r} does not normalise — "
             "no candidate for this field could ever pass §2.4 rule 4"
         )
-        low, high = d["range"]
-        if d["categorical"]:
-            # A string has no range. The ontology writes [0, 0] and an empty
-            # unit for these, and rule 5 never runs on them.
-            assert d["canonicalUnit"] == "", f"{field_id}: categorical, yet carries a unit"
-            continue
-        assert low < high, f"{field_id}: range {d['range']} is not ascending"
 
 
 def test_to_canonical_converts_into_the_field_unit():
@@ -157,11 +153,17 @@ def test_to_canonical_refuses_across_families_with_the_reason():
     assert caught.value.reason is not None
 
 
-def test_to_canonical_refuses_a_categorical_field():
-    categorical = [k for k, d in tables()["ontology"].items() if d["categorical"]]
-    assert categorical, "the ontology has categorical fields (kinase_identity, glycan_species)"
+def test_to_canonical_refuses_a_categorical_field(monkeypatch):
+    # The record fields hold no categorical field at present (alpha 2.0,
+    # ADR-010), so the test hands the engine one of its own.
+    from openferment_core import units
+
+    real = units.tables()
+    test_field = {"id": "test_name", "family": "expression", "name": "A name (test field)", "definition": "A name.",
+                  "canonicalUnit": "", "categorical": True, "requiresMethod": False, "refuseConversionTo": []}
+    monkeypatch.setattr(units, "tables", lambda path=None: {**real, "ontology": {**real["ontology"], "test_name": test_field}})
     with pytest.raises(UnitError):
-        to_canonical(1, "", categorical[0])
+        to_canonical(1, "", "test_name")
 
 
 def test_to_canonical_refuses_an_unknown_field():
@@ -169,25 +171,14 @@ def test_to_canonical_refuses_an_unknown_field():
         to_canonical(1, "g/L", "no_such_field")
 
 
-def test_in_range_is_inclusive_at_both_ends():
-    low, high = field("titer_secreted")["range"]
-    assert in_range(low, "titer_secreted")
-    assert in_range(high, "titer_secreted")
-    assert not in_range(high * 10, "titer_secreted")
-    assert not in_range(low / 10, "titer_secreted")
-
-
-# ── the polymer family (OF-BLD-014 §2.1) ───────────────────────────────
-
-
 def test_a_share_of_dry_cells_refuses_a_titre_with_the_biomass_density_reason():
-    # The row crosses the boundary in corpus.json; units.explain_refusal reads
-    # it from there, and to_canonical carries it as the error's reason.
+    # The row crosses the boundary in the unit table; units.explain_refusal
+    # reads it from there, and to_canonical carries it as the error's reason.
     reason = explain_refusal("% CDW", "g/L")
     assert reason is not None and "biomass density of that culture" in reason
     assert explain_refusal("mg/L", "wt%") == reason
     with pytest.raises(UnitError) as caught:
-        to_canonical(40, "% CDW", "pha_titre")
+        to_canonical(40, "% CDW", "titer_secreted")
     assert caught.value.reason == reason
 
 
@@ -201,31 +192,13 @@ def test_the_polymer_aliases_normalise_into_their_own_families():
     assert not quantity_equals((40, "% CDW"), (40, "%"))
 
 
-def test_the_ontology_carries_the_five_polymer_fields_and_their_two_refusals():
+def test_the_fields_carry_no_range_and_the_four_families():
+    # alpha 2.0 (ADR-010): a field definition holds no plausibility range,
+    # and the casein and PHA programs' families left with their programs.
     ontology = tables()["ontology"]
-    polymer = {k: d for k, d in ontology.items() if d["family"] == "polymer"}
-    assert set(polymer) == {
-        "pha_content_cdw", "pha_titre", "pha_yield_substrate", "pha_productivity", "pha_mw",
-    }
-    assert polymer["pha_content_cdw"]["canonicalUnit"] == "% CDW"
-    assert polymer["pha_mw"]["canonicalUnit"] == "kDa"
-    assert {k for k, d in polymer.items() if d["requiresMethod"]} == {"pha_content_cdw", "pha_mw"}
-    refused = {k: [r["field"] for r in d["refuseConversionTo"]] for k, d in polymer.items() if d["refuseConversionTo"]}
-    assert refused == {"pha_content_cdw": ["pha_titre"], "pha_titre": ["pha_content_cdw"]}
-    # Both entries' reasons are the engine's own reason, for the reader of the file.
-    for d in (polymer["pha_content_cdw"], polymer["pha_titre"]):
-        assert "biomass density of that culture" in d["refuseConversionTo"][0]["because"]
+    assert ontology and not any("range" in d for d in ontology.values())
+    assert {d["family"] for d in ontology.values()} == {"expression", "cultivation", "downstream", "kinetics"}
 
-
-def test_a_bacterial_growth_rate_is_inside_the_widened_range():
-    # A rate a bacterium reaches, and the old algal ceiling refused: in range
-    # now, while a value an order of magnitude past it still is not.
-    assert in_range(to_canonical(0.41, "h⁻¹", "growth_rate_mu"), "growth_rate_mu")
-    assert in_range(to_canonical(24, "d⁻¹", "growth_rate_mu"), "growth_rate_mu")
-    assert not in_range(to_canonical(30, "h⁻¹", "growth_rate_mu"), "growth_rate_mu")
-
-
-# ── the kinetics family (thread Q) ─────────────────────────────────────
 
 KINETICS = {
     "monod_ks": "g L⁻¹",
@@ -294,8 +267,8 @@ def test_a_price_per_gallon_normalises_and_refuses_a_price_per_kilogram_with_the
     assert explain_refusal("USD gal⁻¹", "EUR kg⁻¹") is None
 
 
-# A paper nobody wrote: one sentence per kinetic quantity, each value placed
-# outside its field's guard, and one inside it. Test values, stated as such.
+# A paper nobody wrote: sentences of kinetic quantities. Test values, stated
+# as such.
 KINETICS_SECTION = [
     {
         "id": "s1",
@@ -310,37 +283,15 @@ KINETICS_SECTION = [
 ]
 
 
-@pytest.mark.parametrize(
-    "field_id, value, unit, quote, method",
-    [
-        ("ethanol_yield_substrate", 0.92, "g g-1", "the ethanol yield reached 0.92 g g-1 on glucose", None),
-        ("ethanol_mesp", 75, "$/gal", "the minimum ethanol selling price at $75/gal", "undetermined"),
-        ("monod_ks", 150, "g/L", "The fitted Ks of the imaginary strain was 150 g/L", None),
-        ("ethanol_lp_beta", 12, "g g-1 h-1", "The fitted beta was 12 g g-1 h-1", None),
-    ],
-)
-def test_a_value_outside_a_kinetic_fields_range_is_refused_at_anchoring(field_id, value, unit, quote, method):
-    raw = {
-        "sectionId": "s1", "field": field_id, "value": value, "unit": unit, "quote": quote,
-        "isPrimary": True, "confidence": 0.9,
-    }
-    if method:
-        raw["method"] = method
-    candidate, rule, detail = anchor_candidate(raw, KINETICS_SECTION, paper_id="Q1")
-    assert candidate is None and rule == "range", f"{rule}: {detail}"
-    assert field_id in detail
-
-
-def test_a_value_inside_the_range_anchors_on_the_same_sentence_shape():
+def test_a_kinetic_value_anchors_on_its_sentence():
     raw = {
         "sectionId": "s1", "field": "ethanol_yield_substrate", "value": 0.45, "unit": "g g-1",
         "quote": "the ethanol yield was 0.45 g g-1 on glucose",
-        "organism": "Saccharomyces cerevisiae CEN.PK113-7D", "isPrimary": True, "confidence": 0.9,
+        "organism": "the imaginary strain", "isPrimary": True, "confidence": 0.9,
     }
     candidate, rule, detail = anchor_candidate(raw, KINETICS_SECTION, paper_id="Q1")
     assert candidate is not None, f"{rule}: {detail}"
     assert candidate.value == 0.45 and candidate.unit == "g g⁻¹"
-    assert candidate.organism == "s-cerevisiae-cenpk113-7d"
 
 
 # Definitions reach the extraction model verbatim (extract.ontology_for_prompt),
@@ -348,10 +299,8 @@ def test_a_value_inside_the_range_anchors_on_the_same_sentence_shape():
 # numbers. Read by Rule 1's own detector for its digit form, a numeral outside
 # an identifier token: CK2 and cw15 are names. Its word numbers are not held
 # here, because "half" in a half-saturation constant and "first" in a
-# first-order rate are what those fields mean. Two definitions predate the
-# rule and state the native state and the numbering convention they are about;
-# every other field, and every field added after them, holds none.
-DEFINITIONS_WITH_NUMERALS = {"phosphate_count", "phospho_site_position"}
+# first-order rate are what those fields mean. Every field holds none.
+DEFINITIONS_WITH_NUMERALS: set[str] = set()
 
 
 def _numeral(text: str) -> str | None:

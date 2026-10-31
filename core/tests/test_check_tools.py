@@ -60,42 +60,52 @@ PLANTED = {
     # The same, the store module aliased.
     "plant_kept_alias.py": 'from ..pureos import kept as k\n\n\ndef f(spec):\n    return k.keep_train(None, lambda _: spec, "m")\n',
     # The store's private writer, which keep_train calls.
-    "plant_kept_persist.py": "from ..pureos import kept\n\n\ndef f(store):\n    return kept._persist(store)\n",
+    "plant_kept_persist.py": ("from ..pureos import kept\n\n\ndef f(spec):\n"
+                              '    return kept._keep("p", None, lambda _: spec, "m", effort=None, ask_id=None)\n'),
     # A train's run, through the package's re-export.
     "plant_run_train.py": "from .. import pureos\n\n\ndef f(spec):\n    return pureos.run_train(spec)\n",
     # A function outside tools/ that keeps a model's train.
     "plant_train_wrapper.py": "from .. import plant_train_keeper\n\n\ndef f(spec):\n    return plant_train_keeper.keep(spec)\n",
-    # A second writer of the same store, found by the file it names.
+    # A second writer of the same store, found by the table it names.
     "plant_store_wrapper.py": "from .. import plant_store\n\n\ndef f(text):\n    return plant_store.save(text)\n",
     # OF-BLD-020 §5.R (finding 18): a tool file that writes the kept-train
-    # store itself, past keep_train's locks and the audit log. Through atomic,
-    # by the store's own path function.
-    "plant_kept_direct.py": ("from .. import atomic\nfrom ..pureos import kept\n\n\ndef f(t):\n"
-                             "    atomic.write_text(kept.path(), t)\n"),
-    # The same, by the store's file name joined to the data directory.
-    "plant_kept_file.py": ("from .. import atomic\nfrom ..pureos import kept\n\n\ndef f(t):\n"
-                           "    atomic.write_text(kept.intake.DATA_DIR / kept.FILE, t)\n"),
-    # A tool file naming the store's file itself, its own function writing it.
-    "plant_kept_own.py": ('from .. import atomic, intake\n\nFILE = "pureos-trains.json"\n\n\n'
-                          "def _keep(text):\n    atomic.write_bytes(intake.DATA_DIR / FILE, text)\n\n\n"
-                          "def build(text):\n    return _keep(text)\n"),
-    # Past atomic altogether: the path's own write, and a file opened to write.
-    "plant_kept_path.py": "from ..pureos import kept\n\n\ndef f(t):\n    kept.path().write_text(t)\n",
-    "plant_kept_open.py": ('from ..pureos import kept\n\n\ndef f(t):\n    with open(kept.path(), "w") as fh:\n'
+    # store itself, past keep_train's lock and the audit log (the store is a
+    # table since alpha 2.0, ADR-001). Through the row helper, by the
+    # store's own table and kind.
+    "plant_kept_direct.py": ("from ..db import models as t, rows\nfrom ..pureos import kept\n\n\n"
+                             "async def f(s, spec):\n"
+                             '    await rows.put(s, t.trains, "p", spec.id, {}, by="m", kind=kept.KIND)\n'),
+    # The same, the row written by SQLAlchemy's own statement.
+    "plant_kept_file.py": ("from sqlalchemy import insert\nfrom ..db import models as t\n\n\nasync def f(s, spec):\n"
+                           '    await s.execute(insert(t.trains).values(project_id="p", id=spec.id, kind="kept", body={},'
+                           ' created_by="m"))\n'),
+    # A tool file naming the store's table itself, its own function writing it.
+    "plant_kept_own.py": ('from ..db import rows\n\nTABLE = "trains"\n\n\n'
+                          'async def _keep(s, table, spec):\n    await rows.put(s, table, "p", spec.id, {}, by="m", kind="kept")\n\n\n'
+                          "def build(s, table, spec):\n    return _keep(s, table, spec)\n"),
+    # SQL text that writes the table, through a connection's own execute.
+    "plant_kept_sql.py": ("async def f(conn, spec):\n"
+                          "    await conn.execute(\"INSERT INTO openferment.trains (project_id, id, kind, body, created_by) \"\n"
+                          "                       \"VALUES ($1, $2, 'kept', '{}', 'm')\", \"p\", spec.id)\n"),
+    # Past the store altogether: a path's own write, and a file opened to write.
+    "plant_kept_path.py": "from pathlib import Path\n\n\ndef f(t):\n    Path(\"trains.json\").write_text(t)\n",
+    "plant_kept_open.py": ('def f(t):\n    with open("trains.json", "w") as fh:\n'
                           "        fh.write(t)\n"),
-    # A helper outside tools/ that writes the store by its path function, not
-    # its file's name, reached from a tool file.
-    "plant_kept_helper_wrapper.py": "from .. import plant_kept_helper\n\n\ndef f(t):\n    return plant_kept_helper.save(t)\n",
+    # A helper outside tools/ that writes the store by the store module's
+    # constant, not the table's own name, reached from a tool file.
+    "plant_kept_helper_wrapper.py": "from .. import plant_kept_helper\n\n\ndef f(s, spec):\n    return plant_kept_helper.save(s, spec)\n",
 }
 # The function the last planted tool file reaches, outside tools/.
 KEEPER = "from . import proforma\n\n\ndef keep(req):\n    return proforma.run(req)\n"
 # OF-BLD-020 §5.4: what the train wrappers reach, outside tools/.
 TRAIN_KEEPER = 'from .pureos import kept\n\n\ndef keep(spec):\n    return kept.keep_train(None, lambda _: spec, "m")\n'
-STORE = ('from . import atomic, intake\n\nFILE = "pureos-trains.json"\n\n\ndef save(text):\n'
-         '    atomic.write_text(intake.DATA_DIR / FILE, text)\n')
+STORE = ('from .db import rows\n\nTABLE = "trains"\n\n\nasync def save(s, table, spec):\n'
+         '    await rows.put(s, table, "p", spec.id, {}, by="m", kind="kept")\n')
 # OF-BLD-020 §5.R (finding 18): what the last planted tool file reaches, a
-# module that names no store file and writes the store through its path.
-KEPT_HELPER = "from . import atomic\nfrom .pureos import kept\n\n\ndef save(text):\n    atomic.write_text(kept.path(), text)\n"
+# module that names no store table and writes the store through the store
+# module's constant.
+KEPT_HELPER = ("from .db import models as t, rows\nfrom .pureos import kept\n\n\nasync def save(s, spec):\n"
+               '    await rows.put(s, getattr(t, kept.TABLE), "p", spec.id, {}, by="m", kind=kept.KIND)\n')
 
 
 def _copy(tmp_path: Path) -> Path:
@@ -134,7 +144,7 @@ def test_rule_2b_names_every_way_a_tool_file_keeps_a_run_or_writes_an_audit_line
     assert any("plant_keeper.keep" in e for e in errors if e.startswith("tools/plant_wrapper.py ")), out.stdout
     assert any("plant_train_keeper.keep" in e for e in errors if e.startswith("tools/plant_train_wrapper.py ")), out.stdout
     assert any("plant_store.save" in e for e in errors if e.startswith("tools/plant_store_wrapper.py ")), out.stdout
-    assert any("pureos.kept._persist" in e for e in errors if e.startswith("tools/plant_kept_persist.py ")), out.stdout
+    assert any("pureos.kept._keep" in e for e in errors if e.startswith("tools/plant_kept_persist.py ")), out.stdout
     assert any("plant_kept_helper.save" in e for e in errors if e.startswith("tools/plant_kept_helper_wrapper.py ")), \
         out.stdout
 
@@ -162,6 +172,10 @@ def test_rule_6_names_a_numeric_field_in_a_fermos_tools_input_and_lets_the_top_l
     out = _check(root)
     assert out.returncode == 1, out.stdout + out.stderr
     errors = [line.strip()[2:] for line in out.stdout.splitlines() if line.strip().startswith("- ")]
+    # A field planted in a tool's input is a schema docs/TOOLS.md does not hold yet (rule 5).
+    stale = [e for e in errors if e.startswith("docs/TOOLS.md differs from what the registry writes")]
+    errors = [e for e in errors if e not in stale]
+    assert len(stale) == 1, out.stdout
     where = sorted(e.split(" at ", 1)[1].split(":", 1)[0] for e in errors)
     assert where == ["byKey.additionalProperties.items", "hours", "limit.additionalProperties"], out.stdout
     assert all(e.startswith("fermos_simulate's input schema holds a numeric field at ") and "(E.4‴)" in e

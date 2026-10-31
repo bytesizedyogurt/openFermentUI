@@ -1,11 +1,14 @@
 """A scenario's yield read against the geneOS ceiling (OF-BLD-019 §5.2, D11),
 with no simulator and no flux balance analysis.
 
-Every ceiling here is a STAND-IN artifact written by demo.standin_ceiling
+Every ceiling here is a STAND-IN artifact written by standins.standin_ceiling
 into a scratch store, at a value chosen in the test beside the stand-in
 records' yields; every record and assumption is a FIXTURE. None is a
 measurement and no number here is a result. The binding, the fits and the
-runs go through the real code over demo.py's closed-form STAND-IN evaluator.
+runs go through the real code over the closed-form STAND-IN evaluator
+(standins.py). The strain catalogue left with the seed (alpha 2.0, ADR-010),
+so the two strains the stand-in records and geneOS's yeast models name are
+catalogued here (`catalogue`).
 """
 from __future__ import annotations
 
@@ -14,13 +17,15 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, demo, fermos, geneos_models, intake, proforma
+from openferment_core import artifacts, fermos, geneos_models, intake, proforma
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.models import FermosPoint, FermosSeries, InputAssumption, ProformaRunRequest
 
 ETHANOL = "ethanol_glucose_v0"
 BY = "openFerment test fixture"
 MADE_HERE = "sc-k3x9q-1"  # an id as the browser's createScenario makes them
-# demo._standin_yeast_records' ethanol yields, in g g-1: 0.4, 0.45, 0.48.
+HELD = "sc-held-1"  # a scenario the service holds by its id, as the `held` fixture holds it
+# standins._standin_yeast_records' ethanol yields, in g g-1: 0.4, 0.45, 0.48.
 LOWEST, MEDIAN, HIGHEST = 0.4, 0.45, 0.48
 # Stand-in ceilings, chosen here around those yields.
 OVER_ALL, BETWEEN, UNDER_ALL = 0.5, 0.46, 0.3
@@ -34,6 +39,24 @@ def assume(key, value, low=None, high=None):
 ASSUMED = [assume("plant_scale", 100000.0), assume("glucose_price", 0.4, 0.3, 0.5)]
 
 
+@pytest.fixture(autouse=True)
+def catalogue(monkeypatch):
+    """The strains these tests name, by their labels, as the strain catalogue
+    would give them."""
+    labels = {"s-cerevisiae-cenpk113-7d": "Saccharomyces cerevisiae CEN.PK113-7D",
+              "s-cerevisiae-s288c": "Saccharomyces cerevisiae S288C"}
+    monkeypatch.setattr(proforma, "_strain_labels", lambda: (labels, {}))
+    return labels
+
+
+@pytest.fixture()
+def held(monkeypatch):
+    """One scenario the service holds by its id, on the ethanol flowsheet."""
+    row = {"id": HELD, "name": "A held test scenario", "kind": "biosteam", "modelId": ETHANOL}
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: [row])
+    return row
+
+
 @pytest.fixture()
 def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
@@ -42,9 +65,8 @@ def store(monkeypatch, tmp_path):
 
 @pytest.fixture()
 def pool(monkeypatch, store):
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
-    monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records() + demo._standin_yeast_records()
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
+    rs = standins._standin_yeast_records()
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
 
 
@@ -52,15 +74,15 @@ def pool(monkeypatch, store):
 def client(monkeypatch, pool):
     from openferment_core import api, evidence_pool
 
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: pool)
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: pool)
     return TestClient(api.app, base_url="http://127.0.0.1")
 
 
-def ceiling(g, model="Yeast9", product="ethanol", substrate="glucose", at=demo.AT, version="STAND-IN ceiling 1"):
-    return demo.standin_ceiling(model, product, substrate, g, at=at, version=version)
+def ceiling(g, model="Yeast9", product="ethanol", substrate="glucose", at=standins.AT, version="STAND-IN ceiling 1"):
+    return standins.standin_ceiling(model, product, substrate, g, at=at, version=version)
 
 
-def check(pool, scenario="sc-yeast-1", flowsheet=None, **kw):
+def check(pool, scenario=MADE_HERE, flowsheet=ETHANOL, **kw):
     return proforma.ceiling_check(scenario, flowsheet, pool=pool, **kw)
 
 
@@ -91,7 +113,7 @@ def test_a_yield_under_the_ceiling_is_within_and_not_flagged(pool):
 
 def test_a_yield_above_the_ceiling_is_flagged_and_never_clamped(pool):
     before = proforma.bind_flowsheet(ETHANOL, pool=pool)
-    run_before = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=ASSUMED), pool=pool)
+    run_before = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED), pool=pool)
     ceiling(UNDER_ALL)
     c = check(pool)
     r = row(c)
@@ -104,7 +126,7 @@ def test_a_yield_above_the_ceiling_is_flagged_and_never_clamped(pool):
     # The binding and the run are unchanged by a ceiling on file.
     after = proforma.bind_flowsheet(ETHANOL, pool=pool)
     assert after.model_dump() == before.model_dump()
-    run_after = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=ASSUMED), pool=pool)
+    run_after = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED), pool=pool)
     assert run_after.artifactId == run_before.artifactId
     assert not any(i.name == "yield cap" for i in artifacts.get(run_after.artifactId).inputs)
     # And the check kept nothing: the store holds the ceiling and the run alone.
@@ -123,13 +145,12 @@ def test_no_ceiling_on_file_says_so_and_names_where_one_is_computed(pool):
     assert c.rows == [] and not c.flagged
     assert c.models == ["iMM904", "Yeast9"]
     assert "No geneOS ceiling for ethanol on glucose is on file for iMM904, Yeast9" in c.empty
-    assert "geneOS → Model" in c.empty
+    assert "geneOS → Model" in c.empty and "One is computed in geneOS → Model: choose ethanol, glucose" in c.empty
     assert c.computeAt == "/geneos/model?product=ethanol&substrate=glucose&model=iMM904"
 
 
-def test_a_ceiling_on_another_sugar_or_product_is_left_aside(pool):
+def test_a_ceiling_on_another_sugar_is_left_aside(pool):
     ceiling(UNDER_ALL, substrate="xylose")
-    ceiling(UNDER_ALL, model="iJO1366", product="phb")  # a model of no host, another product
     c = check(pool)
     assert c.rows == [] and c.otherSugars == ["xylose"] and c.empty
     ceiling(OVER_ALL)
@@ -166,10 +187,9 @@ def test_records_of_another_strain_map_to_the_species_models_and_say_so(pool):
 
 
 def test_the_organism_line_counts_the_records_that_name_a_strain_and_those_that_name_none(pool):
-    """OF-BLD-019 §5.R, finding 4: on the live data 3 of sc-yeast-1's 18
-    yield records name CEN.PK113-7D and 15 name no catalogued strain, and the
-    card said every one was of CEN.PK113-7D. The line counts both, and the
-    species rows say how many records they cover."""
+    """OF-BLD-019 §5.R, finding 4: a few yield records that name a strain
+    once spoke for every record the yield binds. The line counts both kinds,
+    and the species rows say how many records they cover."""
     ceiling(OVER_ALL)
     unnamed = dict(pool.records_by_id["standin-ethanol_yield_substrate-1"], id="standin-ethanol_yield_substrate-3",
                    value=0.44, strainId=None, organismText="ST9681, a STAND-IN clone name")
@@ -178,10 +198,10 @@ def test_the_organism_line_counts_the_records_that_name_a_strain_and_those_that_
     assert c.yieldRecords == 4 and c.strains == ["s-cerevisiae-cenpk113-7d"] and c.species == ["saccharomyces cerevisiae"]
     w = c.organismWords
     assert "3 of the 4 records its yield binds name Saccharomyces cerevisiae CEN.PK113-7D" in w, w
-    assert "1 names no catalogued strain" in w and "the Yeast ethanol program's species" in w, w
+    assert "1 names no catalogued strain and names no organism the tree can read" in w, w
     assert not w.startswith("the strain of the records its yield binds"), w
     r = row(c)
-    assert r.match == "species" and "4 of the 4 records the yield binds are read as of it" in r.matchWords, r.matchWords
+    assert r.match == "species" and "3 of the 4 records the yield binds are read as of it" in r.matchWords, r.matchWords
     # Every record of the strain: said as all of them.
     assert "all 3 records its yield binds name Saccharomyces cerevisiae CEN.PK113-7D" in check(pool).organismWords
 
@@ -220,80 +240,43 @@ def test_a_fermos_fit_feeds_the_yield_the_check_reads(pool):
                                      series("substrate", "Glucose", 60 - 4.5 * (x - 0.1) - 0.05 * i + rng.normal(0, 0.6, len(t)))])
     fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=200.0)
     ceiling(OVER_ALL)
-    c = check(pool, fits={"yield": fc.artifactId})
+    # A yield a fit feeds binds no record, so the host names the organism.
+    c = check(pool, fits={"yield": fc.artifactId}, host="s-cerevisiae-s288c")
     assert c.yieldBinding == "artifact" and c.yieldSource.id == fc.artifactId and c.yieldRecords == 0
     # The yield the fit feeds: its Yp/s at the hour its median sugar runs out (§5.R).
     fed = next(f for f in proforma.fit_info(artifacts.get(fc.artifactId), ETHANOL).feeds if f.key == "yield")
     assert row(c).yieldGPerG == pytest.approx(fed.value)
 
 
-def test_the_pha_draft_reads_its_records_unclipped_and_says_its_run_clips(pool, monkeypatch):
-    c = check(pool, scenario="sc-pha-1", include_archived=True)
-    assert c.product == "phb" and c.substrate == "glucose" and c.models == ["RehMBEL1391"]
-    assert proforma.PHA_CLIP_NOTE in c.notes and "fermentable sugar" in c.sugarWords
-    # A STAND-IN RehMBEL1391 ceiling on glucose: a state the published network
-    # cannot reach (it has no glucose uptake reaction, test_geneos_live, so
-    # geneOS keeps none), written here only to exercise the unclipped reading.
-    ceiling(0.25, model="RehMBEL1391", product="phb")
-    monkeypatch.setattr(proforma, "yield_cap", lambda: (0.25, "a-cap"))
-    c = check(pool, scenario="sc-pha-1", include_archived=True)
-    r = row(c, "RehMBEL1391")
-    # The PHA records are 0.22, 0.3, 0.36: read as they are, not clipped to the cap.
-    assert r.match == "strain" and r.flag == "above" and c.yieldHigh == pytest.approx(0.36)
-    assert len(r.recordsAbove) == 2
-
-
-def test_a_model_fed_another_sugar_is_not_sent_to_compute_on_this_one(pool):
-    """OF-BLD-019 §5.R, finding 5: the PHA draft reads glucose, and its one
-    matching model, RehMBEL1391, opens on fructose (the published network
-    has no glucose uptake reaction: test_geneos_live), so geneOS keeps no
-    glucose ceiling for it. The card says what it lacks and why, names the
-    ceiling on file on its own sugar, and sends nobody to compute one."""
-    fructose = ceiling(0.3, model="RehMBEL1391", product="phb", substrate="fructose")
-    for host in ("c-necator-h16", None):
-        c = check(pool, scenario="sc-pha-1", include_archived=True, host=host)
-        assert c.models == ["RehMBEL1391"] and c.rows == [] and c.otherSugars == ["fructose"]
-        assert "One is computed" not in c.empty and "choose PHB, glucose" not in c.empty, c.empty
-        assert "No geneOS ceiling for PHB on glucose is on file for RehMBEL1391" in c.empty, c.empty
-        assert "computes a ceiling only on a sugar the network takes up" in c.empty, c.empty
-        assert "its shelf entry feeds it fructose" in c.empty and fructose.id in c.empty, c.empty
-    # A model fed this flowsheet's sugar is still sent to compute one.
-    assert "One is computed in geneOS → Model: choose ethanol, glucose" in check(pool).empty
-
-
-def test_it_is_refused_in_words_as_the_binding_is(pool):
-    with pytest.raises(proforma.ScenarioRefused, match="archived program"):
-        check(pool, scenario="sc-pha-1")
+def test_it_is_refused_in_words_as_the_binding_is(pool, held):
     with pytest.raises(proforma.ScenarioRefused, match="reference biorefinery"):
         check(pool, scenario=MADE_HERE, flowsheet="corn_drygrind")
-    with pytest.raises(proforma.ScenarioRefused, match="no seed scenario"):
-        check(pool, scenario=MADE_HERE)
-    with pytest.raises(proforma.ScenarioRefused, match="runs ethanol_glucose_v0, not pha_sugar_v0"):
-        check(pool, flowsheet="pha_sugar_v0")
+    with pytest.raises(proforma.ScenarioRefused, match="no held scenario"):
+        check(pool, scenario=MADE_HERE, flowsheet=None)
+    with pytest.raises(proforma.ScenarioRefused, match="runs ethanol_glucose_v0, not custom_train_v1"):
+        check(pool, scenario=HELD, flowsheet="custom_train_v1")
 
 
 # ── the endpoint ───────────────────────────────────────────────────────
 
 
-def test_the_endpoint_answers_a_seed_and_a_made_scenario_and_refuses_in_words(client):
+def test_the_endpoint_answers_a_held_and_a_made_scenario_and_refuses_in_words(client, held):
     ceiling(BETWEEN)
-    got = client.get("/api/proforma/ceiling-check", params={"scenarioId": "sc-yeast-1"})
+    got = client.get("/api/proforma/ceiling-check", params={"scenarioId": HELD})
     assert got.status_code == 200, got.text
     body = got.json()
-    assert body["scenarioId"] == "sc-yeast-1" and body["flagged"] is True
+    assert body["scenarioId"] == HELD and body["flagged"] is True
     assert body["rows"][0]["recordsAbove"] == ["standin-ethanol_yield_substrate-2"]
     made = client.get("/api/proforma/ceiling-check", params={"scenarioId": MADE_HERE, "flowsheet": ETHANOL})
     assert made.status_code == 200 and made.json()["scenarioId"] == MADE_HERE
     host = client.get("/api/proforma/ceiling-check", params={
-        "scenarioId": "sc-yeast-1", "host": "s-cerevisiae-s288c",
+        "scenarioId": HELD, "host": "s-cerevisiae-s288c",
         "assumptions": f"[{assume('yield', 0.42, 0.4, 0.47).model_dump_json()}]"})
     assert host.status_code == 200, host.text
     assert host.json()["yieldBinding"] == "assumption" and host.json()["rows"][0]["match"] == "strain"
-    for params, said in (({"scenarioId": "sc-pha-1"}, "archived program"),
-                         ({"scenarioId": "sc-yeast-1", "fits": "[1]"}, "fits is a JSON object"),
-                         ({"scenarioId": "sc-yeast-1", "assumptions": "{}"}, "assumptions is a JSON list"),
+    for params, said in (({"scenarioId": HELD, "fits": "[1]"}, "fits is a JSON object"),
+                         ({"scenarioId": HELD, "assumptions": "{}"}, "assumptions is a JSON list"),
                          ({"scenarioId": MADE_HERE, "flowsheet": "cornstover_benchmark"}, "reference biorefinery"),
-                         ({"scenarioId": "sc-yeast-1", "fits": '{"yield": "0000000000000000"}'}, "no kept artifact")):
+                         ({"scenarioId": HELD, "fits": '{"yield": "0000000000000000"}'}, "no kept artifact")):
         r = client.get("/api/proforma/ceiling-check", params=params)
         assert r.status_code == 422 and said in r.json()["detail"], (params, r.text)
-    assert client.get("/api/proforma/ceiling-check", params={"scenarioId": "sc-pha-1", "includeArchived": "true"}).status_code == 200

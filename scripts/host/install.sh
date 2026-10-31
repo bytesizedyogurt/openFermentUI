@@ -8,7 +8,7 @@
 # What it does, in order: checks the tools and where the checkout lives;
 # builds the app and the service's environment; sets the power settings an
 # always-on machine needs; installs two LaunchDaemons (the server, which starts
-# at power-on before anyone logs in, and the 03:00 fetch-and-extract); waits for
+# at power-on before anyone logs in, and the 03:00 extraction); waits for
 # /api/health; then publishes the port to your own devices with Tailscale.
 #
 # It asks for your password (sudo) for the power settings and for the two files
@@ -50,6 +50,9 @@ else
   echo "core/.env holds no key yet. The app runs; Postdoc's Live mode and Extract stay off until you"
   echo "copy core/.env.example to core/.env and add one (set a spend cap in the Anthropic console first)."
 fi
+
+say "PostgreSQL, the one store"
+ensure_database
 
 "$REPO/scripts/host/deploy.sh" --no-pull --no-restart
 

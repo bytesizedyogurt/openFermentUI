@@ -1,11 +1,10 @@
 /**
- * One static handler for every script that serves dist/ (OF-BLD-012.1 §6.9).
+ * The static handler for a script that serves dist/ apart from the service
+ * (OF-BLD-012.1 §6.9): `pnpm prototype:up`.
  *
- * Seven scripts — the smoke, the five browser checks and the offline demo —
- * each carried their own copy of the same eight lines, and every copy had
- * the same hole: `join(DIST, url)` collapses `..`, so `/../core/.env` read
- * the key off the disk of whoever was running `pnpm demo:offline`, and the
- * demo listened on every interface while it did. The path is resolved and
+ * The copies of these eight lines that earlier scripts carried shared a hole:
+ * `join(DIST, url)` collapses `..`, so `/../core/.env` read the key off the
+ * disk of whoever was serving, on every interface. The path is resolved and
  * CONFINED to dist/ here, once; a request that leaves it is a 404 like any
  * other miss, and the servers bind to loopback unless told otherwise.
  */

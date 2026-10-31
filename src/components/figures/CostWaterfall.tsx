@@ -29,7 +29,7 @@ export interface CostWaterfallProps {
   lines: WaterfallLine[];
   /** The price the run solved, on the lines' basis: the last row. Null when the run has none. */
   total: { label: string; value: number } | null;
-  /** The per-unit basis, e.g. "USD per kg of PHA contained in dried cell mass". */
+  /** The per-unit basis, e.g. "USD per gallon of ethanol". */
   unit: string;
   /** The annual amounts' unit, as the run's tables state it. */
   annualUnit: string;
@@ -102,7 +102,7 @@ export function CostWaterfall(props: CostWaterfallProps) {
       csvName={props.csvName ?? 'cost-breakdown'}
       basis={props.basis}
       notes={props.notes}
-      empty={props.lines.length ? null : (props.empty ?? { what: 'this run kept no TEA breakdown.', where: 'A run of a flowsheet with a TEA keeps one from OF-BLD-019 on; run the scenario again.' })}
+      empty={props.lines.length ? null : (props.empty ?? { what: 'this run kept no TEA breakdown.', where: 'A flowsheet with a TEA keeps its breakdown with every run; run the scenario again to make one.' })}
     >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={props.title} data-testid="waterfall">
         <line x1={x(0)} x2={x(0)} y1={T} y2={H - T} stroke="currentColor" strokeOpacity={0.4} />

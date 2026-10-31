@@ -5,13 +5,12 @@ enters each and the product leaves, and the add-on route to the product where
 a model lacks one. The geneOS worker (workers/geneos_worker.py) is the only
 module that reads these into cobra; nothing here imports it.
 
-    e_coli_core   E. coli K-12 central metabolism, bundled with cobra as `textbook`, + phaCAB   PHB
-    iJO1366       E. coli K-12 MG1655, genome scale, bundled with cobra,                + phaCAB   PHB
-    RehMBEL1391   C. necator H16, genome scale, fetched from GitHub       native PHAS, phb_c       PHB
     iMM904        S. cerevisiae S288C, genome scale, fetched from BiGG    native, EX_etoh_e        ethanol
     Yeast9        S. cerevisiae S288C, genome scale, fetched from GitHub  native, r_1761           ethanol
 
-`pnpm geneos:fetch` brings the three fetched files. The conventions here (the
+`pnpm geneos:fetch` brings the fetched files. (alpha 2.0 removed the PHA
+program's entries, ADR-010: the PHB product, the phaCAB add-on and the
+models that carried it; the add-on mechanism stays.) The conventions here (the
 uptake rate, each product's formula, the substrates' molar masses) are
 settings a ceiling is computed under, recorded in every result's basis as
 `convention` inputs. Every other bound stays as the model file publishes it.
@@ -32,22 +31,11 @@ UPTAKE = 10.0
 UPTAKE_UNIT = "mmol gDW-1 h-1"
 
 # The product, as the flux the network is asked to maximise: a demand on its
-# metabolite, which the worker adds where the file lacks one (PHB, kept in the
-# cell), or the exchange it is secreted through (ethanol), named by its BiGG
-# id; a model on another namespace maps it in `exchanges`. `label` is how a
-# result's label names it.
+# metabolite, which the worker adds where the file lacks one (a product kept
+# in the cell), or the exchange it is secreted through (ethanol), named by
+# its BiGG id; a model on another namespace maps it in `exchanges`. `label`
+# is how a result's label names it.
 PRODUCTS: dict[str, dict] = {
-    "phb": {
-        "name": "poly(3-hydroxybutyrate)",
-        "label": "PHB",
-        "metabolite": "phb_c",
-        # The repeat unit, C4H6O2: the convention that turns mol per mol into
-        # g per g. RehMBEL1391's phb_c carries no formula, so it is used for
-        # every model alike.
-        "formula": "C4H6O2",
-        "molarMass": 86.09,
-        "note": "the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
-    },
     "ethanol": {
         "name": "ethanol",
         "label": "ethanol",
@@ -77,28 +65,9 @@ MIX_POINTS = 11
 
 # ── the add-on route ───────────────────────────────────────────────────
 
-# phaCAB: acetoacetyl-CoA reductase (PHAB) and PHA synthase (PHAC), the route
-# the C. necator reconstruction carries natively (cited as model RehMBEL1391);
-# the core model also lacks the thiolase, ACACT1r, and gains it here. The
-# worker checks each added reaction with check_mass_balance() and refuses an
-# add-on that does not balance.
-PHACAB = {
-    "id": "phaCAB",
-    "source": "model: RehMBEL1391",
-    "metabolites": [
-        {"id": "aacoa_c", "formula": "C25H36N7O18P3S", "charge": -4, "name": "Acetoacetyl-CoA"},
-        {"id": "3hbcoa__R_c", "formula": "C25H38N7O18P3S", "charge": -4, "name": "(R)-3-Hydroxybutanoyl-CoA"},
-        {"id": "phb_c", "formula": "C4H6O2", "charge": 0, "name": "PHB repeat unit"},
-    ],
-    "reactions": [
-        # Added only where the model lacks it (the core model does).
-        {"id": "ACACT1r", "equation": "2 accoa_c <=> aacoa_c + coa_c", "lowerBound": -1000.0, "ifMissing": True},
-        {"id": "PHAB", "equation": "aacoa_c + nadph_c + h_c --> 3hbcoa__R_c + nadp_c", "lowerBound": 0.0},
-        {"id": "PHAC", "equation": "3hbcoa__R_c --> phb_c + coa_c", "lowerBound": 0.0},
-    ],
-}
-
-ADDONS = {"phaCAB": PHACAB}
+# Routes the worker adds to a model that lacks one, checked for mass balance
+# (workers/geneos_worker.py apply_addon). None is held now.
+ADDONS: dict[str, dict] = {}
 
 # ── the shelf ──────────────────────────────────────────────────────────
 
@@ -181,7 +150,7 @@ class ShelfModel:
     notes: list[str] = field(default_factory=list)
     # The products this entry names a route to, the first the one a view
     # opens on. What the network can make is the worker's to say (describe).
-    products: tuple[str, ...] = ("phb",)
+    products: tuple[str, ...] = ()
     # A substrate's or a product's exchange where the file does not use the
     # BiGG id SUBSTRATES and PRODUCTS name, by key; and the name the file
     # gives each such reaction, which the worker checks when it loads the
@@ -193,14 +162,6 @@ class ShelfModel:
     def product(self) -> str:
         return self.products[0]
 
-
-C_NECATOR = FetchedFile(
-    repository="https://github.com/m-jahn/genome-scale-models",
-    commit="00c70c5",
-    path="Ralstonia_eutropha/sbml/RehMBEL1391_sbml_L3V1.xml",
-    sha256="85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89",
-    licence="GPL-3.0",
-)
 
 # Yeast9, the community consensus reconstruction of S. cerevisiae: release
 # v9.1.1 of SysBioChalmers/yeast-GEM, whose LICENSE.md is CC-BY-4.0.
@@ -216,8 +177,8 @@ YEAST9 = FetchedFile(
 # iMM904 as BiGG Models serves it. BiGG's terms (bigg.ucsd.edu/license) grant
 # educational, research and non-profit use without fee, require the notice to
 # travel with every copy, and leave commercial use to an agreement with UC San
-# Diego. The file stays on the machine that fetched it: data-sync carries no
-# model file, so no copy leaves it.
+# Diego. The file stays on the machine that fetched it and is never committed,
+# so no copy leaves it.
 BIGG_IMM904 = UrlFile(
     url="https://bigg.ucsd.edu/static/models/iMM904.xml",
     revision='ETag "017c86841952cc365f20a8b466292b31", Last-Modified 2019-11-01',
@@ -227,25 +188,6 @@ BIGG_IMM904 = UrlFile(
 )
 
 SHELF: dict[str, ShelfModel] = {
-    "e_coli_core": ShelfModel(
-        id="e_coli_core", name="E. coli K-12 central metabolism (core model)", host=None,
-        scope="central carbon", bundled="textbook", addon="phaCAB",
-        route="add-on phaCAB (PHAB, PHAC and the thiolase ACACT1r), the route RehMBEL1391 carries",
-        licence="BiGG Models, bundled with cobra 0.32.1",
-    ),
-    "iJO1366": ShelfModel(
-        id="iJO1366", name="E. coli K-12 MG1655 (iJO1366)", host=None,
-        scope="genome scale", bundled="iJO1366", addon="phaCAB",
-        route="add-on phaCAB (PHAB, PHAC), the route RehMBEL1391 carries",
-        licence="BiGG Models, bundled with cobra 0.32.1",
-    ),
-    "RehMBEL1391": ShelfModel(
-        id="RehMBEL1391", name="Cupriavidus necator H16 (RehMBEL1391)", host="c-necator-h16",
-        scope="genome scale", fetched=C_NECATOR,
-        route="native: PHA synthase PHAS and phb_c; the file exports PHB through PHBt, and the worker adds the demand DM_phb_c",
-        licence="GPL-3.0", feed="fructose",
-        notes=["Its phb_c carries no formula; g per g uses the repeat unit's formula, as for the other models."],
-    ),
     "iMM904": ShelfModel(
         id="iMM904", name="Saccharomyces cerevisiae S288C (iMM904)", host="s-cerevisiae-s288c",
         scope="genome scale", fetched=BIGG_IMM904, products=("ethanol",),

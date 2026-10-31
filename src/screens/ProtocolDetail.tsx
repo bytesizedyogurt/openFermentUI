@@ -4,14 +4,9 @@
 // recomputed from @/engine/scale, so scaling 1 L → 5 L is one number changing
 // in one place and nothing else needing to agree by hand.
 //
-// PROGRAMS (OF-BLD-016 §2.2). A protocol in an archived program has left the
-// library, but its link still opens it here, under the banner that names the
-// program and the switch. Its host chips read through the program filter,
-// widened to the protocol's own program: a casein protocol opened by link
-// still names its casein hosts, and a general protocol shows no host of an
-// archived program while the switch is off. What its steps and materials
-// cite is the protocol's own provenance and is never filtered: a quantity
-// shown without its source would read as though it had none.
+// What its steps and materials cite is the protocol's own provenance and is
+// never filtered: a quantity shown without its source would read as though it
+// had none.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
@@ -27,8 +22,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import type { ExtractionRecord, Protocol, ProtocolVersion, RunState, Step } from '@/data/types';
-import { useProgramScope, useStore } from '@/store';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
+import { useSkillById, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import {
   batchLabel,
@@ -38,7 +32,6 @@ import {
   type ScaledMaterial,
 } from '@/engine/scale';
 import { diffVersions } from '@/engine/diff';
-import { SKILL_BY_ID } from '@/data/skills';
 import { convert, fmt, normalizeUnit, sameFamily } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { Markdown, inlineMarkdown } from '@/components/Markdown';
@@ -58,7 +51,6 @@ import { exportCSV, exportText } from '@/lib/csv';
 import {
   CAPABILITY_META,
   CATEGORY_META,
-  HostsArchived,
   capabilitiesOf,
   capabilityKeys,
   capabilityReason,
@@ -306,6 +298,7 @@ function StepCard({
   scale: number;
   records: ExtractionRecord[];
 }) {
+  const SKILL_BY_ID = useSkillById();
   const [noteOpen, setNoteOpen] = useState(false);
   const prov = stepProvenance(step, version, records);
   return (
@@ -431,7 +424,7 @@ function MaterialsTable({
             const rec = m.sourceRecordId ? records.find((r) => r.id === m.sourceRecordId) : undefined;
             const prov: ProvKind = m.sourceRecordId
               ? provenanceFromRefs([m.sourceRecordId], [], records)
-              : 'demo';
+              : 'assumed';
             return (
               <tr key={m.name} className="border-b border-line/60 align-top">
                 <td className="px-1 py-1.5">
@@ -800,7 +793,6 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
   const runs = useStore((s) => s.runs);
   const startRun = useStore((s) => s.startRun);
   const toast = useStore((s) => s.toast);
-  const inScope = useProgramScope({ kind: 'protocol', id: protocolId });
 
   const [versionId, setVersionId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
@@ -869,9 +861,6 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
 
   const meta = CATEGORY_META[protocol.category];
   const Glyph = meta.Icon;
-  // The hosts the program filter shows, and, on an archived protocol opened by
-  // link, the hosts of its own program too.
-  const hosts = protocol.organisms.filter((o) => inScope('strain', o));
   const caps = capabilitiesOf(version);
   const prov = protocolProvenance(version, records);
   const isCurrent = version.version === protocol.currentVersion;
@@ -1009,8 +998,6 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
         }
       />
 
-      <ArchivedBanner kind="protocol" id={protocol.id} />
-
       {!isCurrent && (
         <div className="mb-4">
           <Callout kind="warn" title={`You are reading v${version.version}, not the current version`}>
@@ -1033,11 +1020,9 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
           </span>
           {protocol.organisms.length === 0 ? (
             <span className="text-caption text-ink-soft">Organism-independent</span>
-          ) : hosts.length === 0 ? (
-            <HostsArchived />
           ) : (
             <span className="flex flex-wrap items-center gap-1">
-              {hosts.map((o) => {
+              {protocol.organisms.map((o) => {
                 const s = strainLabel(o, strains);
                 return (
                   <a
@@ -1279,7 +1264,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
             </div>
             <p className="text-caption text-ink-soft mt-2 flex items-start gap-1.5">
               <span className="mt-[5px] shrink-0">
-                <ProvDot p="demo" size={7} />
+                <ProvDot p="assumed" size={7} />
               </span>
               <span>
                 Amounts round to each material's own precision spec, so a scaled recipe stays

@@ -1,0 +1,308 @@
+# Vocabulary the service resolves a record's wording against: carbon sources
+# and the spellings papers use for each (names and spellings only).
+carbonSources:
+- id: glucose
+  label: Glucose
+  spellings:
+  - glucose
+  - d-glucose
+  - dextrose
+- id: xylose
+  label: Xylose
+  spellings:
+  - xylose
+  - d-xylose
+- id: fructose
+  label: Fructose
+  spellings:
+  - fructose
+  - d-fructose
+- id: glycerol
+  label: Glycerol
+  spellings:
+  - glycerol
+  - glycerin
+  - glycerine
+- id: acetate
+  label: Acetate
+  spellings:
+  - acetate
+  - acetic acid
+- id: mixed-sugars
+  label: Mixed sugars
+  spellings:
+  - mixed sugars
+  - mixed sugar
+  - sugar mixture
+  - mixture of sugars
+- id: hydrolysate
+  label: Hydrolysate
+  spellings:
+  - hydrolysate
+  - hydrolyzate
+
+# Downstream unit operations: the kinds of step a train is made of, by id,
+# with the BioSTEAM unit classes each one stands for (names only). Mirrored
+# by src/data/vocabulary.ts `UNIT_OPERATIONS`; test_schema.py holds the two
+# equal.
+unitOperations:
+- id: centrifugation
+  label: Centrifugation
+  stage: harvest
+  note: disc-stack at production scale
+  biosteamClasses:
+  - SolidsCentrifuge
+  - LiquidsCentrifuge
+  - LiquidsSplitCentrifuge
+  - LiquidsRatioCentrifuge
+  - SolidLiquidsSplitCentrifuge
+  - SLLECentrifuge
+- id: microfiltration
+  label: Microfiltration
+  stage: harvest
+  note: cell removal, secreted products
+  biosteamClasses: []
+- id: depth-filtration
+  label: Depth filtration
+  stage: clarification
+  note: null
+  biosteamClasses: []
+- id: homogenisation
+  label: High-pressure homogenisation
+  stage: cell disruption
+  note: intracellular products
+  biosteamClasses: []
+- id: bead-mill
+  label: Bead milling
+  stage: cell disruption
+  note: null
+  biosteamClasses: []
+- id: uf-df
+  label: Ultrafiltration / diafiltration
+  stage: concentration
+  note: buffer exchange + concentration
+  biosteamClasses: []
+- id: nanofiltration
+  label: Nanofiltration
+  stage: concentration
+  note: oligosaccharide retention
+  biosteamClasses: []
+- id: electrodialysis
+  label: Electrodialysis
+  stage: desalting
+  note: HMO salt removal
+  biosteamClasses: []
+- id: iex
+  label: Ion exchange chromatography
+  stage: capture/polish
+  note: null
+  biosteamClasses: []
+- id: hic
+  label: Hydrophobic interaction chromatography
+  stage: polish
+  note: null
+  biosteamClasses: []
+- id: imac
+  label: IMAC affinity
+  stage: capture
+  note: His-tagged products
+  biosteamClasses: []
+- id: affinity-custom
+  label: Custom affinity chromatography
+  stage: capture
+  note: null
+  biosteamClasses: []
+- id: sec
+  label: Size exclusion chromatography
+  stage: polish
+  note: low throughput, high resolution
+  biosteamClasses: []
+- id: mixed-mode
+  label: Mixed-mode chromatography
+  stage: polish
+  note: null
+  biosteamClasses: []
+- id: heat-step
+  label: Thermal clarification
+  stage: capture
+  note: thermostable enzymes only — huge cost saver for Taq-class products
+  biosteamClasses: []
+- id: refolding
+  label: Inclusion body solubilisation + refolding
+  stage: recovery
+  note: E. coli intracellular route
+  biosteamClasses: []
+- id: protease-cleavage
+  label: Protease tag cleavage
+  stage: polish
+  note: null
+  biosteamClasses: []
+- id: crystallisation
+  label: Crystallisation
+  stage: isolation
+  note: null
+  biosteamClasses:
+  - BatchCrystallizer
+- id: precipitation
+  label: Precipitation
+  stage: capture
+  note: ammonium sulfate / PEG
+  biosteamClasses: []
+- id: lle
+  label: Liquid-liquid extraction
+  stage: recovery
+  note: terpene recovery
+  biosteamClasses:
+  - LLEUnit
+  - LLESettler
+  - LLECentrifuge
+  - MixerSettler
+  - LiquidsSettler
+  - LiquidsSplitSettler
+  - LiquidsPartitionSettler
+- id: distillation
+  label: Distillation / rectification
+  stage: purification
+  note: terpene finishing; the beer column and rectifier of an ethanol plant
+  biosteamClasses:
+  - Distillation
+  - BinaryDistillation
+  - MESHDistillation
+  - AdiabaticMultiStageVLEColumn
+- id: molecular-sieve
+  label: Molecular sieve dehydration
+  stage: purification
+  note: adsorbs the water distillation cannot take past the ethanol-water azeotrope
+  biosteamClasses:
+  - MolecularSieve
+- id: spray-dry
+  label: Spray drying
+  stage: drying
+  note: ambient-stable powder
+  biosteamClasses:
+  - SprayDryer
+- id: lyophilisation
+  label: Lyophilisation
+  stage: drying
+  note: highest stability, highest cost
+  biosteamClasses: []
+- id: granulation
+  label: Granulation
+  stage: formulation
+  note: dust-free industrial enzyme
+  biosteamClasses: []
+- id: sterile-filtration
+  label: Sterile filtration
+  stage: finishing
+  note: null
+  biosteamClasses: []
+- id: endotoxin-removal
+  label: Endotoxin clearance
+  stage: polish
+  note: mandatory for E. coli-derived research/clinical proteins
+  biosteamClasses: []
+- id: nuclease-clearance
+  label: Nuclease/residual-DNA clearance
+  stage: polish
+  note: defining step for molecular-biology enzyme grade
+  biosteamClasses: []
+- id: pressure-filtration
+  label: Pressure filtration
+  stage: clarification
+  note: 'a filter press: solids stay as a cake, the filtrate passes'
+  biosteamClasses:
+  - PressureFilter
+- id: rotary-vacuum-filtration
+  label: Rotary vacuum filtration
+  stage: clarification
+  note: 'a turning drum under vacuum: the cake stays on the drum'
+  biosteamClasses:
+  - RotaryVacuumFilter
+- id: clarifier
+  label: Clarifier
+  stage: clarification
+  note: solids settle; the clear liquid overflows
+  biosteamClasses:
+  - Clarifier
+- id: flash
+  label: Flash
+  stage: concentration
+  note: part of the broth boils at a set pressure or temperature; vapour and liquid leave at equilibrium
+  biosteamClasses:
+  - Flash
+- id: distillation-shortcut
+  label: Distillation, shortcut column
+  stage: purification
+  note: stages by the Fenske–Underwood–Gilliland shortcut
+  biosteamClasses:
+  - ShortcutColumn
+- id: evaporation
+  label: Multi-effect evaporation
+  stage: concentration
+  note: water boiled off in effects at falling pressures
+  biosteamClasses:
+  - MultiEffectEvaporator
+- id: lle-multistage
+  label: Counter-current extraction
+  stage: recovery
+  note: mixer-settlers in series, the solvent against the broth
+  biosteamClasses:
+  - MultiStageMixerSettlers
+- id: adsorption
+  label: Adsorption column
+  stage: purification
+  note: a lead, guard and standby column swap as the bed loads
+  biosteamClasses:
+  - SingleComponentAdsorptionColumn
+- id: drying-drum
+  label: Drum drying
+  stage: drying
+  note: hot gas through a turning drum, the gas heated by burning fuel
+  biosteamClasses:
+  - DrumDryer
+- id: cell-disruption
+  label: Cell disruption
+  stage: cell disruption
+  note: 'homogeniser or bead mill: the product the cells hold moves into the liquid'
+  biosteamClasses: []
+- id: chromatography
+  label: Chromatography
+  stage: capture/polish
+  note: a column step by its mode, with declared recovery and purity until a column model computes them
+  biosteamClasses: []
+- id: heat-exchange
+  label: Heat exchange
+  stage: utility
+  note: heats or cools a stream with a utility
+  biosteamClasses:
+  - HXutility
+- id: tank
+  label: Storage tank
+  stage: utility
+  note: holds a stream for a residence time
+  biosteamClasses:
+  - StorageTank
+- id: mix-tank
+  label: Mix tank
+  stage: utility
+  note: mixes streams in a stirred tank
+  biosteamClasses:
+  - MixTank
+- id: pump
+  label: Pump
+  stage: utility
+  note: raises a stream's pressure
+  biosteamClasses:
+  - Pump
+- id: mixer
+  label: Mixer
+  stage: utility
+  note: joins streams into one
+  biosteamClasses:
+  - Mixer
+- id: splitter
+  label: Splitter
+  stage: utility
+  note: divides a stream by each component's split
+  biosteamClasses:
+  - Splitter

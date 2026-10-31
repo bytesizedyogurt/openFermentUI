@@ -2,8 +2,7 @@
 
 A simulation fed to Proforma is called a simulation wherever it feeds it
 (findings 0, 4, 5, 10, 11); a kept vessel design replays on a service just
-started (1); a vessel designed for an archived program's simulation hides
-with it (3); the vessel says what it took a simulation's cells and product
+started (1); the vessel says what it took a simulation's cells and product
 to be, and refuses another organism (6, 13); Simulate and the panel refuse
 what the run refuses, before it runs, by the run's own function (12, 14).
 
@@ -19,9 +18,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, evidence_pool, fermos, intake, params, proforma, tools, vessel
+from openferment_core import artifacts, evidence_pool, fermos, intake, params, proforma, vessel
 from openferment_core.models import (
     Artifact,
     BasisInput,
@@ -30,7 +28,6 @@ from openferment_core.models import (
     ParamResolveRequest,
     SimulationRequest,
 )
-from openferment_core.tools import ToolContext
 
 BY = "openFerment test fixture"
 AT = "2026-10-21"
@@ -39,8 +36,11 @@ BATCH = "batch_v1"
 ETHANOL = proforma.ETHANOL
 TYPED = dict(mu_max=0.4, ks=0.2, yxs=0.12, alpha=2.0, yps=0.45, p_max=90.0, x0=0.2, s0=50.0, p0=0.0)
 EMPTY = SimpleNamespace(records=[], records_by_id={}, hidden={})
-YEAST_STRAIN = "s-cerevisiae-cenpk113-7d"
-PHA_STRAIN = "c-necator-h16"
+YEAST_STRAIN = "strain-yeast-test"
+OTHER_STRAIN = "strain-ab12"
+# A strain catalogue written for these tests (the service ships none, alpha
+# 2.0 ADR-010): a yeast strain, and a strain of another, fictional species.
+STRAIN_LABELS = {YEAST_STRAIN: "Saccharomyces cerevisiae TEST-1", OTHER_STRAIN: "Testus organismus AB12"}
 
 
 def typed(scope=f"fermos:family:{BATCH}", **values):
@@ -50,8 +50,8 @@ def typed(scope=f"fermos:family:{BATCH}", **values):
 @pytest.fixture()
 def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(fermos, "_load_pool", lambda include_archived: EMPTY)
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: EMPTY)
+    monkeypatch.setattr(fermos, "_load_pool", lambda *a, **k: EMPTY)
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: EMPTY)
     return tmp_path
 
 
@@ -78,13 +78,14 @@ def test_a_simulation_fed_to_proforma_is_never_called_a_fit_or_a_forecast(store)
     with pytest.raises(proforma.ScenarioRefused) as e:
         proforma.apply_fits(proforma.bind_inputs(ETHANOL, [], None, None), {"productivity": sim.artifactId}, ETHANOL)
     assert "median sugar" not in str(e.value) and "harvest hour" in str(e.value)
-    # The panel serves each as a simulation, identified null (D2), never "fitted".
-    scope = params.scope("proforma:sc-yeast-1", ParamResolveRequest(fits=all3))
+    # The panel serves each as a simulation, identified null (D2), never "fitted":
+    # a scenario made here, on the ethanol flowsheet.
+    scope = params.scope("proforma:sc-made-here", ParamResolveRequest(fits=all3, flowsheet=ETHANOL))
     for v in scope.values:
         if v.key in all3:
             assert v.origin == "simulation" and v.identified is None, v
     # The ceiling check names the simulation's achieved yield, not a fit's band.
-    check = proforma.ceiling_check("sc-yeast-1", pool=EMPTY, fits={"yield": sim.artifactId})
+    check = proforma.ceiling_check("sc-made-here", flowsheet=ETHANOL, pool=EMPTY, fits={"yield": sim.artifactId})
     assert check.yieldTool == fermos.SIMULATION
     assert "simulation" in check.yieldWords and "percentile" not in check.yieldWords and "Yp/s" not in check.yieldWords
 
@@ -109,17 +110,16 @@ def test_the_vessel_tool_is_registered_when_the_service_starts():
     assert out.stdout.strip().endswith("registered")
 
 
-# ── finding 3: a vessel for an archived program's simulation hides ──────
+# ── the stand-in simulations a vessel reads ─────────────────────────────
 
 
 def _keep(aid: str, tool: str, output: dict, inputs: list[BasisInput]) -> Artifact:
     art = Artifact(id=aid, tool=tool, toolVersion=STANDIN, inputs=inputs, output=output,
-                   outputHash=artifacts.output_hash(output), provenance="demo", createdAt="2026-10-21T00:00:00Z",
+                   outputHash=artifacts.output_hash(output), provenance="assumed", createdAt="2026-10-21T00:00:00Z",
                    durationMs=0, seed=None)
-    folder = artifacts.folder()
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{aid}.json").write_text(art.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    return art
+    from standins import plant_artifact
+
+    return plant_artifact(art)
 
 
 def _standin_sim(aid: str, strain: str | None, product: str | None = "ethanol") -> Artifact:
@@ -132,29 +132,13 @@ def _standin_sim(aid: str, strain: str | None, product: str | None = "ethanol") 
     return _keep(aid, vessel.SIMULATION, out, inputs)
 
 
-def test_a_vessel_for_an_archived_programs_simulation_hides_with_it(store):
-    sim = _standin_sim("b0b0b0b0b0b0b0b1", PHA_STRAIN)
-    design = _keep("b0b0b0b0b0b0b0b2", vessel.TOOL, {"unitClass": STANDIN, "design": [], "flags": [], "source": sim.id,
-                                                     "sourceTool": sim.tool, "parameters": []},
-                   [BasisInput(name="simulation", value=sim.id, unit="", source=BasisSource(kind="artifact", id=sim.id))])
-    from openferment_core import api, module_stores
-
-    assert module_stores.artifact_program(design) == "pha", "fixed by §3.R: a vessel inherits its simulation's program"
-    client = TestClient(api.app, base_url="http://127.0.0.1")
-    assert design.id not in [a["id"] for a in client.get("/api/biorepo/artifacts").json()]
-    shown = client.get("/api/fermos/vessels").json()
-    assert all(v.get("artifactId") != design.id for v in shown), shown
-    assert [v.artifactId for v in vessel.designs(True)] == [design.id]
-    read = tools.run("fermos_read", {"kind": "vessel"}, ToolContext(include_archived=False))
-    assert design.id not in read.summary
-
-
 # ── findings 6 and 13: the vessel says what it assumed ──────────────────
 
 
-def test_the_vessel_refuses_another_organism_and_says_what_it_read_a_nameless_product_as(store):
+def test_the_vessel_refuses_another_organism_and_says_what_it_read_a_nameless_product_as(store, monkeypatch):
+    monkeypatch.setattr(proforma, "_strain_labels", lambda: (STRAIN_LABELS, {"yeast": "saccharomyces cerevisiae"}))
     with pytest.raises(vessel.VesselRefused, match="not of the yeast program's organism"):
-        vessel.simulation_inputs(_standin_sim("c0c0c0c0c0c0c0c1", PHA_STRAIN))
+        vessel.simulation_inputs(_standin_sim("c0c0c0c0c0c0c0c1", OTHER_STRAIN))
     read = vessel.simulation_inputs(_standin_sim("c0c0c0c0c0c0c0c2", YEAST_STRAIN, product=None))
     assert [a["name"] for a in read["assumed"]] == ["product read as"]
     assert any("names no product" in n and "ethanol" in n for n in read["readNotes"])

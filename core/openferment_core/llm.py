@@ -8,10 +8,20 @@ Override with OPENFERMENT_MODEL and OPENFERMENT_FALLBACK_MODEL in core/.env
 thinking depth with OPENFERMENT_EFFORT (low, medium, high, xhigh, max;
 default medium).
 
-TWO ROLES (OF-BLD-014 §3.3, E.7). `answer` is the chain above: Postdoc and
-Extract. `index` is bulk helper work, `OPENFERMENT_INDEX_MODEL` (default
-claude-haiku-5-5), falling back to the answer chain. `call(role=...)` picks
-one; every existing caller is `answer`.
+THE ROUTING TABLE (execution prompt §4.8; ADR-008). A call names its task
+family, and `routes()` gives the family's models, tried in order, and the
+effort they run at: `plan` (Postdoc's loop of tools), `explain` (an answer in
+one call, the literature layer's cited answers), `extract` (a document read
+into candidates), `index` (bulk helper work, OPENFERMENT_INDEX_MODEL first,
+default claude-haiku-5-5) and `judge` (an evaluation's grading). `ROUTES` is
+the table core/.env leaves alone; OPENFERMENT_ROUTES lays a JSON object of
+family to `{"models": [...], "effort": ...}` over it. A model is a spec in
+Sci RAG Kit's syntax, `provider:model` (a bare id is Anthropic's), so every
+provider routes the same way; the service serves Anthropic's models itself,
+and a route naming another provider waits, said in words, for the owner's
+decision on how its key is read (execution prompt §11.1). The day's spend is
+charged under two roles, `answer` and `index` (`SPEND_ROLES`); `role=` names
+a family as it did before (`answer` reads `plan`'s route).
 
 ONE DAILY CAP. Every response is charged to `spend.py` under its role, and a
 call whose worst case could take the UTC day past `OPENFERMENT_DAILY_BUDGET_USD`
@@ -62,6 +72,7 @@ a non-streaming request is cut off at ten; the final message is the same.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import logging
 import os
@@ -103,11 +114,113 @@ def effort() -> str:
 
 
 DEFAULT_INDEX = "claude-haiku-5-5"
+# The day's-spend roles (spend.py).
 ROLES = ("answer", "index")
 
 
 def index_model() -> str:
     return os.environ.get("OPENFERMENT_INDEX_MODEL", "").strip() or DEFAULT_INDEX
+
+
+# ── the routing table (execution prompt §4.8; ADR-008) ─────────────────────
+
+FAMILIES = ("plan", "explain", "extract", "index", "judge")
+# The day's-spend role each family is charged under.
+SPEND_ROLES = {"plan": "answer", "explain": "answer", "extract": "answer", "index": "index", "judge": "answer"}
+# The roles of before, as the families whose routes they read.
+ROLE_FAMILIES = {"answer": "plan", "index": "index"}
+ROUTES_SETTING = "OPENFERMENT_ROUTES"
+# The providers a spec may name, as Sci RAG Kit writes them (sci_rag.llm.spec).
+PROVIDERS = ("anthropic", "openai-compatible", "google")
+# The providers this service calls itself. Another provider's model is called
+# through the kit's client, which reads that provider's key from the kit's
+# settings: a change to how keys are read, which waits for the owner (§11.1).
+SERVED = ("anthropic",)
+
+
+class RoutesInvalid(ValueError):
+    """OPENFERMENT_ROUTES, or a model spec it holds, in words."""
+
+
+@dataclass(frozen=True)
+class Route:
+    """A family's models, tried in order, and the effort they run at."""
+
+    models: tuple[str, ...]
+    effort: str
+
+
+_DEFAULT_CHAIN = (DEFAULT_PRIMARY, DEFAULT_FALLBACK)
+ROUTES: dict[str, Route] = {
+    "plan": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
+    "explain": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
+    "extract": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
+    "index": Route((DEFAULT_INDEX, *_DEFAULT_CHAIN), DEFAULT_EFFORT),
+    "judge": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
+}
+
+
+def spec(text: str) -> tuple[str, str]:
+    """A model spec as Sci RAG Kit writes it, `provider:model`, as its two
+    halves; a bare model id is Anthropic's."""
+    raw = text.strip()
+    provider, sep, model = raw.partition(":")
+    if not sep:
+        return "anthropic", raw
+    if provider not in PROVIDERS:
+        raise RoutesInvalid(f"{raw!r} names the provider {provider!r}; the providers are {', '.join(PROVIDERS)}")
+    if not model.strip():
+        raise RoutesInvalid(f"{raw!r} names a provider and no model")
+    return provider, model.strip()
+
+
+def routes() -> dict[str, Route]:
+    """The routing table a call reads, when it is made: `ROUTES` with the
+    models and the effort core/.env names (OPENFERMENT_MODEL, its fallback,
+    OPENFERMENT_INDEX_MODEL, OPENFERMENT_EFFORT), then OPENFERMENT_ROUTES laid
+    over it family by family. Raises RoutesInvalid in words."""
+    answer = tuple(dict.fromkeys(m for m in (primary(), *(x.strip() for x in fallback().split(","))) if m))
+    table = {family: Route(answer, effort()) for family in FAMILIES}
+    table["index"] = Route(tuple(dict.fromkeys((index_model(), *answer))), effort())
+    raw = os.environ.get(ROUTES_SETTING, "").strip()
+    if not raw:
+        return table
+    try:
+        given = json.loads(raw)
+    except ValueError as e:
+        raise RoutesInvalid(f"{ROUTES_SETTING} is not JSON: {e}") from None
+    if not isinstance(given, dict):
+        raise RoutesInvalid(f"{ROUTES_SETTING} is an object of family to route")
+    for family, route in given.items():
+        if family not in FAMILIES:
+            raise RoutesInvalid(f"{ROUTES_SETTING} names {family!r}; the families are {', '.join(FAMILIES)}")
+        if not isinstance(route, dict) or set(route) - {"models", "effort"}:
+            raise RoutesInvalid(f"{ROUTES_SETTING}.{family} is an object of models and effort")
+        models = route.get("models", list(table[family].models))
+        if not isinstance(models, list) or not models or not all(isinstance(m, str) and m.strip() for m in models):
+            raise RoutesInvalid(f"{ROUTES_SETTING}.{family}.models is a list of model specs")
+        for m in models:
+            spec(m)
+        level = route.get("effort", table[family].effort)
+        if level not in EFFORTS:
+            raise RoutesInvalid(f"{ROUTES_SETTING}.{family}.effort is one of {', '.join(EFFORTS)}")
+        table[family] = Route(tuple(dict.fromkeys(m.strip() for m in models)), level)
+    return table
+
+
+def family_of(name: str) -> str:
+    """A family by its name, or by a role of before (`answer` reads `plan`'s route)."""
+    family = ROLE_FAMILIES.get(name, name)
+    if family not in FAMILIES:
+        raise ValueError(f"unknown family {name!r}; the families are {', '.join(FAMILIES)}, and the roles "
+                         f"{', '.join(ROLES)} name {ROLE_FAMILIES['answer']} and {ROLE_FAMILIES['index']}")
+    return family
+
+
+def waits(named: str) -> str:
+    """Why a route's model the service does not serve is passed over, in words."""
+    return (f"{named} is a {spec(named)[0]} model: calling it reads that provider's key through Sci RAG Kit's "
+            "settings, a change to how keys are read that waits for the owner (execution prompt §11.1)")
 
 # USD per million tokens, input and output, from the pricing page
 # (platform.claude.com/docs/en/about-claude/pricing, read 2026-10-08; the
@@ -159,6 +272,27 @@ class ModelUnavailable(RuntimeError):
         self.usage = usage or Usage()
 
 
+#: What the API answers (HTTP 400) when the one grammar it compiles for a
+#: request's answer schema and its strict tools grows too large. Measured
+#: 2026-10-30: Postdoc's plan schema, with each claim's typed values, beside
+#: seven strict tools; the same schema with every tool loose was accepted.
+GRAMMAR_TOO_LARGE = "compiled grammar is too large"
+
+
+class GrammarTooLarge(ModelUnavailable):
+    """The API refused a request because its compiled grammar is too large."""
+
+
+#: Requests found too large, by their answer schema and strict tools: their
+#: tools go out loose from then on, so no turn pays the refusal twice.
+_TOO_LARGE: set[str] = set()
+
+
+def _grammar_key(schema: dict[str, Any] | None, strict: list[dict[str, Any]]) -> str:
+    held = [schema, sorted((t["name"], t["input_schema"]) for t in strict)]
+    return hashlib.sha256(json.dumps(held, sort_keys=True, default=str).encode()).hexdigest()
+
+
 class BudgetExhausted(ModelUnavailable):
     """The call could take today's spend past the daily cap, so it was not
     sent. A kind of unavailability, so every caller that already reports one
@@ -182,7 +316,8 @@ class ModelRefused(RuntimeError):
 @dataclass
 class Result:
     """What one call produced. `data` is the parsed JSON, or None when the
-    response stopped at max_tokens or held no parseable JSON."""
+    response stopped at max_tokens or held no parseable JSON; `text` is the
+    response's words as written, for a call that asked for prose."""
 
     data: dict[str, Any] | None
     model: str
@@ -190,22 +325,18 @@ class Result:
     stop_reason: str | None = None
     fell_back: bool = False
     tried: list[str] = field(default_factory=list)
+    text: str = ""
 
     @property
     def truncated(self) -> bool:
         return self.stop_reason == "max_tokens"
 
 
-def chain(role: str = "answer") -> list[str]:
-    """The models a call in `role` tries, in order, without repeats. The
-    fallback may name several, comma-separated, each tried in turn. `index`
-    tries its own model first, then the answer chain (E.7)."""
-    if role not in ROLES:
-        raise ValueError(f"unknown role {role!r}; the roles are {', '.join(ROLES)}")
-    rungs = [primary(), *(m.strip() for m in fallback().split(","))]
-    if role == "index":
-        rungs = [index_model(), *rungs]
-    return list(dict.fromkeys(m for m in rungs if m))
+def chain(name: str = "plan") -> list[str]:
+    """The model specs a call in a family tries, in order, without repeats
+    (`routes()`). The fallback may name several, comma-separated, each tried
+    in turn; `index` tries its own model first, then the answer chain (E.7)."""
+    return list(routes()[family_of(name)].models)
 
 
 def prices_for(model: str, prompt_tokens: int = 0) -> tuple[float, float]:
@@ -306,7 +437,7 @@ def _reserve(model: str, request: dict[str, Any], max_tokens: int, spent: Usage,
         )
     try:
         return spend.reserve(role, worst_case_usd(model, request, max_tokens))
-    except spend.SpendFileDamaged as e:
+    except spend.SpendUnknown as e:
         raise BudgetExhausted(str(e), spent) from None
     except spend.CapReached as e:
         held = f" with ${e.reserved:.2f} held for calls in flight" if e.reserved else ""
@@ -360,6 +491,10 @@ def strict_schema(schema: dict[str, Any], *, keep_maps: bool = False) -> dict[st
     return out
 
 
+def _text_of(response: Any) -> str:
+    return "".join(_get(b, "text") or "" for b in (_get(response, "content") or []) if _get(b, "type") == "text")
+
+
 def _text_json(response: Any) -> dict[str, Any] | None:
     for block in _get(response, "content") or []:
         if _get(block, "type") == "text":
@@ -410,29 +545,45 @@ def call(
     *,
     system: str,
     user: str,
-    schema: dict[str, Any],
+    schema: dict[str, Any] | None,
     max_tokens: int,
     client_factory: Callable[[], Any] | None = None,
     label: str = "",
     role: str = "answer",
+    family: str | None = None,
 ) -> Result:
-    """One question, answered as JSON matching `schema`, by the first model in
-    the role's chain that will. Raises ModelRefused or ModelUnavailable
-    (BudgetExhausted among them) otherwise."""
+    """One question, answered as JSON matching `schema` (or in words when
+    `schema` is None), by the first model in the family's route that will
+    (`role` names one as before: `answer` is `explain` here, an answer in one
+    call). Raises ModelRefused or ModelUnavailable (BudgetExhausted among
+    them) otherwise."""
+    family = family_of(family or ("explain" if role == "answer" else role))
+    route = routes()[family]
+    role = SPEND_ROLES[family]
     client = (client_factory or _default_client)()
-    request = {
+    output: dict[str, Any] = {"effort": route.effort}
+    if schema is not None:
+        output["format"] = {"type": "json_schema", "schema": strict_schema(schema)}
+    request: dict[str, Any] = {
         "max_tokens": max_tokens,
-        "system": system,
         "messages": [{"role": "user", "content": user}],
-        "output_config": {"effort": effort(), "format": {"type": "json_schema", "schema": strict_schema(schema)}},
+        "output_config": output,
     }
-    models = chain(role)
+    if system:
+        request["system"] = system
+    models = list(route.models)
     spent = Usage()
     tried: list[str] = []
     refusal: str | None = None
     refused_by: list[str] = []
-    for i, model in enumerate(models):
+    for i, named in enumerate(models):
         last = i == len(models) - 1
+        provider, model = spec(named)
+        if provider not in SERVED:
+            if last:
+                raise ModelUnavailable(waits(named), spent)
+            log.warning("%s%s; trying %s", label, waits(named), models[i + 1])
+            continue
         tried.append(model)
         held = _reserve(model, request, max_tokens, spent, role)
         cost = 0.0
@@ -480,12 +631,13 @@ def call(
                 continue
             served = str(_get(response, "model") or model)
             return Result(
-                data=None if stop == "max_tokens" else _text_json(response),
+                data=None if stop == "max_tokens" or schema is None else _text_json(response),
                 model=served,
                 usage=spent,
                 stop_reason=stop,
                 fell_back=i > 0,
                 tried=tried,
+                text=_text_of(response),
             )
         finally:
             spend.settle(held, role, cost)
@@ -550,6 +702,7 @@ def converse(
     tool_choice: str = "auto",
     ask: Callable[[dict[str, Any]], Any] | None = None,
     role: str = "answer",
+    family: str | None = None,
 ) -> Turn:
     """One model turn on one named model. Tools go out strict; the answer
     schema, when given, goes in `output_config.format`; `cache_control` is set
@@ -566,9 +719,12 @@ def converse(
     """
     if tool_choice not in TOOL_CHOICES:
         raise ValueError(f"tool_choice {tool_choice!r} is not sent: these models answer a forced tool with a 400")
-    if role not in ROLES:
-        raise ValueError(f"unknown role {role!r}; the roles are {', '.join(ROLES)}")
-    output_config: dict[str, Any] = {"effort": effort()}
+    family = family_of(family or role)
+    role = SPEND_ROLES[family]
+    provider, model = spec(model)
+    if provider not in SERVED:
+        raise ModelUnavailable(waits(f"{provider}:{model}"), Usage())
+    output_config: dict[str, Any] = {"effort": routes()[family].effort}
     if schema is not None:
         output_config["format"] = {"type": "json_schema", "schema": strict_schema(schema)}
     request: dict[str, Any] = {
@@ -579,12 +735,26 @@ def converse(
         "output_config": output_config,
         "cache_control": {"type": "ephemeral"},
     }
+    strict = [t for t in tools if t.get("strict", True)]
+    key = _grammar_key(schema, strict)
     if tools:
-        request["tools"] = [tool_param(t["name"], t["description"], t["input_schema"], t.get("strict", True)) for t in tools]
+        request["tools"] = [tool_param(t["name"], t["description"], t["input_schema"],
+                                       t.get("strict", True) and key not in _TOO_LARGE) for t in tools]
         request["tool_choice"] = {"type": tool_choice}
     held = _reserve(model, request, max_tokens, Usage(), role)
     try:
-        response = _converse_once(request, ask, model)
+        try:
+            response = _converse_once(request, ask, model)
+        except GrammarTooLarge:
+            if not strict or key in _TOO_LARGE:
+                raise
+            # The answer schema stays strict and the tools go loose: `tools.run`
+            # validates every tool's input alike, strict or not.
+            _TOO_LARGE.add(key)
+            log.warning("the API's grammar for %d strict tools and the answer schema is too large; "
+                        "sending the tools loose", len(strict))
+            request["tools"] = [tool_param(t["name"], t["description"], t["input_schema"], False) for t in tools]
+            response = _converse_once(request, ask, model)
     except BaseException:
         spend.settle(held, role, 0.0)
         raise
@@ -617,7 +787,8 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
     except anthropic.APIConnectionError as e:
         raise ModelUnavailable(f"Could not reach the Anthropic API: {e}") from e
     except anthropic.BadRequestError as e:
-        raise ModelUnavailable(f"The Anthropic API refused the request as malformed: {e.message}") from e
+        refused = GrammarTooLarge if GRAMMAR_TOO_LARGE in str(e.message).lower() else ModelUnavailable
+        raise refused(f"The Anthropic API refused the request as malformed: {e.message}") from e
     except (anthropic.NotFoundError, anthropic.PermissionDeniedError) as e:
         raise ModelUnavailable(f"{model} is not available to this key ({e.status_code})") from e
     except (anthropic.APIError, _http.TransportError) as e:
@@ -625,3 +796,43 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
         why = f"{model} answered {status}" if status and status != 200 else f"{model} stream failed ({_error_type(e)})"
         raise ModelUnavailable(f"{why}: {getattr(e, 'message', e)}") from e
     return response
+
+
+# ── the literature layer's model client (ADR-002) ──────────────────────────
+
+
+#: The kit's roles, as our families: its answers with citations explain, its
+#: high-volume extraction (a document's graph, HyDE's passage) is an index
+#: chore, and its judge judges.
+KIT_ROLES = {"answer": "explain", "extraction": "index", "judge": "judge"}
+
+
+def kit_client(kit_role: str = "answer") -> Any:
+    """The model client Sci RAG Kit generates with, for one of its roles:
+    answers with citations, HyDE's hypothetical passage, a document's graph.
+    Every call goes through `call` here, so the kit's calls are capped by the
+    day's spend, read the key in this one place, and fall back along the
+    role's chain like any other. Built on demand: the kit is the `lit` extra."""
+    import asyncio
+
+    from sci_rag.llm.client import LLMClient
+
+    family = KIT_ROLES[kit_role]
+
+    class KitLLM(LLMClient):
+        model = chain(family)[0]
+
+        async def generate(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
+                           max_tokens: int = 2048, json_mode: bool = False) -> str:
+            result = await asyncio.to_thread(
+                call, system=system or "", user=prompt, schema=None, max_tokens=max_tokens,
+                family=family, label="sci-rag-kit: ",
+            )
+            return result.text
+
+        async def stream(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
+                         max_tokens: int = 2048):  # type: ignore[override]
+            yield await self.generate(prompt, system=system, temperature=temperature, max_tokens=max_tokens)
+
+    return KitLLM()
+

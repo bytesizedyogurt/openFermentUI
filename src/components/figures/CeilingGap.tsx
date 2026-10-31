@@ -11,7 +11,7 @@ import type { FigureTable } from './FigureFrame';
 /** The two fixed sentences every ceiling carries (§6.3). */
 export const CEILING_NOTES = [
   'A ceiling from flux balance analysis: the most product this reaction network can make from this feed, under the constraints listed. It has no time axis and no vessel.',
-  'The central-carbon ceiling uses the 95-reaction core model. The genome-scale ceiling uses every reaction in the full reconstruction, including routes a living cell may never run at pace. A reported yield above either line is marked for a reviewer to check its basis.',
+  'A genome-scale ceiling uses every reaction in the full reconstruction, including routes a living cell may never run at pace. A reported yield above the line is marked for a reviewer to check its basis.',
 ];
 
 export interface Ceiling {
@@ -19,7 +19,7 @@ export interface Ceiling {
   /** The model that made it. */
   model: string;
   basis?: ComputedBasis;
-  /** Its own provenance: computed, or demo for a stand-in network. */
+  /** Its own provenance: computed, or assumed for a stand-in network. */
   provenance?: Provenance;
 }
 

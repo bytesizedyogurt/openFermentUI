@@ -8,7 +8,6 @@ import {
   ArrowUp,
   Download,
   FileWarning,
-  Gauge,
   Minus,
   ScrollText,
   Send,
@@ -16,12 +15,8 @@ import {
 } from 'lucide-react';
 import type { Candidate, ExtractionRecord, ExtractorRun, FieldId, ReviewDecision, RunOutput } from '@/data/types';
 import { fieldName } from '@/data/ontology';
-import { isNewCandidate } from '@/lib/review';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, useProgramFilter, useStore } from '@/store';
+import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
-import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
-import { ONTOLOGY_GAPS } from '@/data/ontology';
 import { convert, fmt, sameFamily, toSI } from '@/engine/units';
 import { href } from '@/router';
 import { CitationChip } from '@/components/Chip';
@@ -42,32 +37,20 @@ import {
 import { useCategorical } from '@/lib/viz';
 import { exportCSV } from '@/lib/csv';
 import { OwnerTabs } from '@/components/OwnerTabs';
-import { RetrievalScorecard } from '@/components/RetrievalScorecard';
 import { BIOREPO_TABS } from '@/data/tabs';
 
 // ── run identity ───────────────────────────────────────────────────────
 
-// claude-1 last: it is the only run that actually ran (OF-BLD-012 §6), and it
-// arrives through the service overlay rather than the seed.
-const RUN_ORDER: ExtractorRun[] = ['v0.3', 'v0.4', 'v0.4r', 'claude-1'];
+// claude-1, the run that runs (OF-BLD-012 §6), arriving through the service's overlay.
+const RUN_ORDER: ExtractorRun[] = ['claude-1'];
 const RUN_LABEL: Record<ExtractorRun, string> = {
-  'v0.3': 'v0.3',
-  'v0.4': 'v0.4',
-  'v0.4r': 'v0.4 + rules',
   'claude-1': 'claude-1',
 };
-
-/** The spec's own sentence (OF-BLD-012 §6.4); the smoke test looks for it. */
-const PROVISIONAL_LABEL =
-  'Provisional — curated values from OF-COR-001 standing in as gold until a reviewer flags them in Guild.';
 
 const NO_CANDIDATES: Candidate[] = [];
 const NO_DECISIONS: Record<string, ReviewDecision> = {};
 const RUN_BLURB: Record<ExtractorRun, string> = {
-  'v0.3': 'Baseline pass — span retrieval plus a single extraction prompt.',
-  'v0.4': 'Adds unit normalisation against the ontology before scoring.',
-  'v0.4r': 'v0.4 with hand-written guard rules for the fields that failed most.',
-  'claude-1': 'One structured response per paper over fetched full text; every candidate anchored to a verbatim quote (OF-BLD-012 §2.4).',
+  'claude-1': 'One structured response per document over its passages; every candidate anchored to a verbatim quote.',
 };
 
 /** What a run says about itself: for claude-1, the models that answered,
@@ -96,10 +79,10 @@ const OUTCOME_EXPLAIN: Record<string, string> = {
   unit_error:
     'The magnitude was read correctly and the unit was not, so the normalised value is wrong. Counts once as a false positive and once as a false negative.',
   span_error:
-    'The run attributed the value to a different sentence. The run output records the outcome but not the rejected span, so only the curated span can be shown below.',
-  miss: 'The run produced no record for this gold annotation. Counts as a false negative only.',
+    'The run attributed the value to a different sentence. The run output records the outcome but not the rejected span, so only the record\u2019s own span can be shown below.',
+  miss: 'The run produced no record for this typed value. Counts as a false negative only.',
   spurious:
-    'The run produced a record the curated set does not contain. Counts as a false positive only; there is no gold annotation to compare against.',
+    'The run produced a record a reviewer rejected. Counts as a false positive only; there is no typed value to compare against.',
 };
 
 /** Severity colouring for the extracted side of a diff — never a provenance hue. */
@@ -230,66 +213,25 @@ function relativeGap(
 
 type SortKey = 'field' | 'nGold' | 'precision' | 'recall' | 'f1' | 'topFailure';
 
-/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
-function archivedNames(paperIds: string[]): string {
-  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
-  return PROGRAMS.filter((p) => hit.has(p.id))
-    .map((p) => p.name)
-    .join(' and ');
-}
-
-/** "… in Casein … Settings → Programs shows them." for a callout or an empty state. */
-function SettingsLink() {
-  return (
-    <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
-      Settings → Programs
-    </a>
-  );
-}
-
 export default function Witness() {
-  const runOutputsAll = useStore((s) => s.runOutputs);
-  const recordsAll = useStore((s) => s.records);
-  const papersAll = useStore((s) => s.papers);
-  // OF-BLD-016 §2.2: Witness scores what shows. With archived programs
-  // hidden (the default) a record, a paper, a run's scored value, a rejected
-  // candidate and a planned gold-set row from a casein or PHA paper leave
-  // every number and list here, and a callout says how many and where the
-  // switch is; with the switch on, every list below is the whole set as
-  // before. The retrieval scorecard is the service's report and is not
-  // filtered here.
-  const shows = useProgramFilter();
-  const records = useMemo(() => recordsAll.filter((r) => shows('record', r.id)), [recordsAll, shows]);
-  const papers = useMemo(() => papersAll.filter((p) => shows('paper', p.id)), [papersAll, shows]);
-  const runOutputs = useMemo<RunOutput[]>(
-    () =>
-      runOutputsAll.map((run) => ({
-        ...run,
-        results: run.results.filter((res) => shows('record', res.goldRecordId)),
-        falsePositives: run.falsePositives.filter((fp) => shows('paper', fp.paperId)),
-      })),
-    [runOutputsAll, shows],
-  );
-  // §6.2 — candidates the seed has no record for: the corpus growing, unscored.
+  // Witness scores every record, paper and run the store holds.
+  const runOutputs = useStore((s) => s.runOutputs);
+  const records = useStore((s) => s.records);
+  const papers = useStore((s) => s.papers);
+  // §6.2 — the project's candidates nobody has decided: unscored until a
+  // reviewer does.
   const overlayCandidates = useStore((s) => s.overlay?.candidates ?? NO_CANDIDATES);
   const overlayRecords = useStore((s) => s.overlay?.records ?? NO_DECISIONS);
   // A candidate a reviewer has decided is a record or a false positive now,
   // not an unscored one (§7.3).
-  const unscoredAll = useMemo(() => {
-    const local = new Map(recordsAll.map((r) => [r.id, r]));
+  const unscored = useMemo(() => {
+    const local = new Map(records.map((r) => [r.id, r]));
     return overlayCandidates.filter((c) => {
-      if (overlayRecords[c.id] || !isNewCandidate(c, recordsAll)) return false;
+      if (overlayRecords[c.id]) return false;
       const mine = local.get(c.id);
       return !mine || (mine.status === 'unverified' && !mine.gold);
     });
-  }, [overlayCandidates, overlayRecords, recordsAll]);
-  const unscored = useMemo(() => unscoredAll.filter((c) => shows('paper', c.paperId)), [unscoredAll, shows]);
-  // What the program filter holds back, for the callout that says so.
-  const planRows = useMemo(() => GOLD_SET_PLAN.filter((p) => shows('paper', p.paperId)), [shows]);
-  const gapRows = useMemo(
-    () => ONTOLOGY_GAPS.filter((g) => g.entry.split(' · ').some((id) => shows('paper', id))),
-    [shows],
-  );
+  }, [overlayCandidates, overlayRecords, records]);
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
   const palette = useCategorical();
@@ -300,8 +242,6 @@ export default function Witness() {
   const [open, setOpen] = useState<MismatchRow | null>(null);
   const [noteText, setNoteText] = useState('');
   const [filed, setFiled] = useState<Set<string>>(new Set());
-  // null until the reader touches the toggle; the default depends on the data.
-  const [provisionalPick, setProvisionalPick] = useState<boolean | null>(null);
 
   const upColor = palette[0];
   const downColor = palette[1];
@@ -314,44 +254,16 @@ export default function Witness() {
     [runOutputs],
   );
 
-  // ── provisional mode (OF-BLD-012 §6.4) ───────────────────────────────
-  // computeRunMetrics counts only records with `gold` set, and none has it
-  // yet. Until a reviewer flags some, the curated values on FETCHED papers
-  // can stand in — clearly labelled — so the run that ran gets a number.
-  // Once real gold exists the toggle defaults off and both numbers show.
-  const fetchedPapers = useMemo(
-    () => new Set(papers.filter((p) => p.textSource === 'full-text').map((p) => p.id)),
-    [papers],
-  );
-  const hasRealGold = useMemo(() => records.some((r) => r.gold), [records]);
-  const provisional = provisionalPick ?? !hasRealGold;
-  const provisionalRecords = useMemo<ExtractionRecord[]>(
-    () =>
-      records.map((r) =>
-        r.gold || r.status === 'rejected' || r.extractorRun === 'claude-1' || !fetchedPapers.has(r.paperId)
-          ? r
-          : { ...r, gold: { value: r.value, unit: r.unit } },
-      ),
-    [records, fetchedPapers],
-  );
-  const scoringRecords = provisional ? provisionalRecords : records;
-
-  // Every run is scored, every render, from the live records array — editing
-  // the gold set during a review session moves these numbers immediately.
-  // Both bases are computed so the other can sit beside the headline.
-  const measuredMetrics = useMemo<RunMetrics[]>(
+  // Every run is scored, every render, from the live records array — a value a
+  // reviewer types during a review session moves these numbers immediately.
+  const allMetrics = useMemo<RunMetrics[]>(
     () => orderedRuns.map((r) => computeRunMetrics(r, records)),
     [orderedRuns, records],
   );
-  const provisionalMetrics = useMemo<RunMetrics[]>(
-    () => orderedRuns.map((r) => computeRunMetrics(r, provisionalRecords)),
-    [orderedRuns, provisionalRecords],
-  );
-  const allMetrics = provisional ? provisionalMetrics : measuredMetrics;
 
   const recordById = useMemo(
-    () => new Map<string, ExtractionRecord>(scoringRecords.map((r) => [r.id, r])),
-    [scoringRecords],
+    () => new Map<string, ExtractionRecord>(records.map((r) => [r.id, r])),
+    [records],
   );
 
   const activeIdx = useMemo(() => {
@@ -363,21 +275,6 @@ export default function Witness() {
   const metrics = allMetrics[activeIdx];
   const prevMetrics = activeIdx > 0 ? allMetrics[activeIdx - 1] : null;
 
-  // OF-BLD-016 §2.2 — what this run scored on papers the filter hides.
-  const hidden = useMemo(() => {
-    const whole = run ? runOutputsAll.find((r) => r.run === run.run) : undefined;
-    const results = whole ? whole.results.filter((res) => !shows('record', res.goldRecordId)) : [];
-    const fps = whole ? whole.falsePositives.filter((fp) => !shows('paper', fp.paperId)) : [];
-    const cands = unscoredAll.filter((c) => !shows('paper', c.paperId));
-    const byId = new Map(recordsAll.map((r) => [r.id, r]));
-    const paperIds = [
-      ...results.map((res) => byId.get(res.goldRecordId)?.paperId ?? ''),
-      ...fps.map((fp) => fp.paperId),
-      ...cands.map((c) => c.paperId),
-    ];
-    return { results: results.length, fps: fps.length, unscored: cands.length, names: archivedNames(paperIds) };
-  }, [run, runOutputsAll, unscoredAll, recordsAll, shows]);
-  const anyHidden = hidden.results + hidden.fps + hidden.unscored > 0;
 
   const mismatches = useMemo<MismatchRow[]>(() => {
     if (!run) return [];
@@ -465,7 +362,7 @@ export default function Witness() {
 
   const exportMetrics = () => {
     const rows: unknown[][] = [];
-    const basis = provisional ? 'provisional — curated values as gold' : 'gold';
+    const basis = 'values reviewers typed';
     for (const m of allMetrics) {
       rows.push([
         m.run,
@@ -530,7 +427,7 @@ export default function Witness() {
   const header = (actions?: ReactNode) => (
     <>
     <PageHeader
-      eyebrow="Module 0 · Evidence"
+      eyebrow="BioRepo"
       title="Witness"
       subtitle="Witness asks one question — does it reproduce. This is what the extractor would be scored on, and what it has been scored on so far."
       actions={actions}
@@ -539,12 +436,10 @@ export default function Witness() {
     </>
   );
 
-  // No extractor has been run against this corpus, and the screen says so
-  // rather than showing a number (OF-COR-001 §22, actions 6–7). Every entry is
-  // catalogued: the curator's notes stand in for source text, so there are no
-  // source spans to annotate a gold set against and nothing to score.
+  // With no extractor run, the screen says so and shows no number
+  // (OF-COR-001 §22, actions 6–7): a score needs parsed source spans, a gold
+  // set annotated against them, and a run to compare with it.
   if (!run || !metrics) {
-    const plannedRecords = planRows.reduce((n, p) => n + p.records, 0);
     return (
       <>
         {header(<LinkButton to="/biorepo">Open BioRepo</LinkButton>)}
@@ -552,130 +447,20 @@ export default function Witness() {
         <div className="max-w-3xl space-y-4">
           <Callout kind="info" title="No extractor has been run against this corpus yet">
             <p className="mb-2">
-              Every one of the{' '}
-              <span className="font-num">{papers.length}</span> entries
-              {papers.length < papersAll.length ? ' in the programs showing' : ''} is{' '}
-              <strong>catalogued</strong>, not ingested: the curator&rsquo;s notes stand in for the
-              source text. There are no parsed source spans to annotate a gold set against, and no
-              extractor output to compare with one.
+              The corpus holds <span className="font-num">{papers.length}</span>{' '}
+              {papers.length === 1 ? 'paper' : 'papers'}. A precision or recall figure needs parsed source
+              spans, a gold set annotated against them, and an extractor&rsquo;s output to compare with it.
             </p>
             <p>
-              Showing a precision or recall figure here would mean scoring a run that never happened
-              against annotations that were never made. So this screen shows the plan and the gap
-              instead.
+              Showing a figure before all three exist would mean scoring a run that never happened against
+              annotations that were never made, so this screen shows what unblocks one.
             </p>
           </Callout>
-
-          {(planRows.length < GOLD_SET_PLAN.length || gapRows.length < ONTOLOGY_GAPS.length) && (
-            <Callout kind="info" title="What is planned here is in archived programs">
-              <span data-testid="archived-hidden">
-                {GOLD_SET_PLAN.length - planRows.length} of the {GOLD_SET_PLAN.length} papers planned for the
-                gold set, and {ONTOLOGY_GAPS.length - gapRows.length} of the {ONTOLOGY_GAPS.length} entries
-                holding values the ontology cannot, are in{' '}
-                {archivedNames(
-                  [...GOLD_SET_PLAN.map((p) => p.paperId), ...ONTOLOGY_GAPS.flatMap((g) => g.entry.split(' · '))].filter(
-                    (id) => !shows('paper', id),
-                  ),
-                )}
-                . Archived programs are hidden; <SettingsLink /> shows them.
-              </span>
-            </Callout>
-          )}
-
-          {planRows.length > 0 && (
-          <Card className="p-4">
-            <div className="flex items-baseline justify-between gap-3 mb-1">
-              <h2 className="font-serif text-section-title font-semibold">Gold set — planned</h2>
-              <span className="font-num text-caption text-ink-soft">
-                0 of {plannedRecords} annotated
-              </span>
-            </div>
-            <p className="text-body text-ink-soft mb-3">
-              {planRows.length} papers, weighted toward fields with enough independent
-              measurements to make precision and recall mean something.{' '}
-              {planRows.some((p) => p.blocked) && (
-                <span className="text-signal-warn">
-                  One row is blocked: the ontology has no field for what it asks for.
-                </span>
-              )}
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-body">
-                <thead>
-                  <tr className="border-b border-line text-caption text-ink-soft">
-                    <th className="text-left py-1.5">Paper</th>
-                    <th className="text-left">Field focus</th>
-                    <th className="text-right px-2">Records</th>
-                    <th className="text-left">Why chosen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {planRows.map((p) => (
-                    <tr key={p.paperId} className="border-b border-line/60 align-top">
-                      <td className="py-1.5">
-                        <CitationChip paperId={p.paperId} />
-                      </td>
-                      <td className="text-caption text-ink-soft pr-3">{p.fields}</td>
-                      <td className="text-right font-num px-2">{p.records}</td>
-                      <td className={cx('text-caption', p.blocked ? 'text-signal-warn' : 'text-ink-soft')}>
-                        {p.rationale}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-          )}
-
-          {/* The difficulty cases belong to the plan above: they name its papers. */}
-          {planRows.length > 0 && (
-          <Card className="p-4">
-            <h2 className="font-serif text-section-title font-semibold mb-2">
-              Difficulty cases the gold set must include
-            </h2>
-            <p className="text-body text-ink-soft mb-2">
-              A benchmark that only contains easy cases measures nothing. These are the six the
-              corpus document calls for.
-            </p>
-            <ul className="space-y-1.5">
-              {GOLD_SET_DIFFICULTY_CASES.map((c, i) => (
-                <li key={i} className="tick tick-gold text-body">
-                  {c}
-                </li>
-              ))}
-            </ul>
-          </Card>
-          )}
-
-          {gapRows.length > 0 && (
-          <Card className="p-4">
-            <h2 className="font-serif text-section-title font-semibold mb-1">
-              Values the ontology cannot hold
-            </h2>
-            <p className="text-body text-ink-soft mb-3">
-              These are real numbers in the corpus with no field to put them in. They were left
-              unrecorded rather than forced into an ill-fitting field, because an ontology that
-              quietly absorbs values it was not designed for produces confident nonsense.
-            </p>
-            <div className="space-y-2">
-              {gapRows.map((g) => (
-                <div key={g.entry} className="tick tick-industry-estimate">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-num text-caption text-ink-soft">{g.entry}</span>
-                    <span className="text-body">{g.values}</span>
-                  </div>
-                  <div className="text-caption text-ink-soft mt-0.5">Would need: {g.wouldNeed}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-          )}
 
           <Card className="p-4">
             <h2 className="font-serif text-section-title font-semibold mb-2">What unblocks this</h2>
             <ol className="list-decimal pl-5 space-y-1 text-body">
-              <li>Ingest tranche 1 — the open-access core papers — so spans anchor to real text.</li>
+              <li>Bring documents in through Intake, so spans anchor to real text.</li>
               <li>Hand-annotate the gold set against those spans.</li>
               <li>Run an extractor and score it here.</li>
             </ol>
@@ -686,7 +471,6 @@ export default function Witness() {
             </div>
           </Card>
         </div>
-        <RetrievalScorecard />
       </>
     );
   }
@@ -700,26 +484,9 @@ export default function Witness() {
   const partial = run.results.length < metrics.goldSize;
   const isBaseline = activeIdx === 0;
 
-  // The other basis, beside the headline, once both exist (§6.4).
-  const beside = hasRealGold ? (provisional ? measuredMetrics : provisionalMetrics)[activeIdx] : null;
-  const besideLabel = provisional ? 'Measured' : 'Provisional';
-  const besideLine = (value: number, defined: boolean) =>
-    beside ? (
-      <div className="text-caption text-ink-soft">
-        {besideLabel}{' '}
-        <span className="font-num">{defined ? `${pct(value)} %` : '—'}</span>
-      </div>
-    ) : null;
-  // The seeded runs are demo data; claude-1's numbers rest on whichever gold
-  // basis is in force, and the tick says which.
-  const headlineTick: 'demo' | 'curated' | 'gold' =
-    run.run === 'claude-1' ? (provisional ? 'curated' : 'gold') : 'demo';
-  const headlineTitle =
-    run.run === 'claude-1'
-      ? provisional
-        ? 'Micro-averaged over this run against curated values standing in as gold'
-        : 'Micro-averaged over this run against reviewer-flagged gold records'
-      : "Micro-averaged over this run's matched records against the gold-set annotations";
+  // claude-1's numbers rest on the values reviewers typed; another run is marked assumed.
+  const headlineTick: 'assumed' | 'gold' = run.run === 'claude-1' ? 'gold' : 'assumed';
+  const headlineTitle = "Micro-averaged over this run against the values reviewers typed";
 
   const headerActions = (
     <>
@@ -771,57 +538,13 @@ export default function Witness() {
               on your own tuning data.
             </p>
             <p className="text-signal-warn">
-              This Sim trains and runs no models. The scheme is described here, not executed.
+              openFerment trains no models: the scheme is described here, and no fold is run.
             </p>
           </Explain>
         </div>
 
-        <label className="flex items-center gap-2 text-body cursor-pointer">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-[var(--accent)]"
-            checked={provisional}
-            onChange={(e) => setProvisionalPick(e.target.checked)}
-          />
-          Score against curated records as provisional gold
-        </label>
-
         <div className="text-caption text-ink-soft">{runBlurb(run)}</div>
       </div>
-
-      {provisional && (
-        <div className="mb-4">
-          <Callout kind="warn" title={PROVISIONAL_LABEL}>
-            Every curated record on a fetched paper (
-            <span className="font-num">{fetchedPapers.size}</span>
-            {fetchedPapers.size === 1 ? ' paper' : ' papers'}) is scored as if its value were
-            gold. That measures whether the extractor reproduces the curator, not whether either
-            is right. Flag records for gold in the review queue and the measured number appears
-            beside this one.
-          </Callout>
-        </div>
-      )}
-
-      {anyHidden && (
-        <div className="mb-4">
-          <Callout kind="info" title="Scored on the programs showing">
-            <span data-testid="archived-hidden">
-              {[
-                hidden.results > 0 &&
-                  `${hidden.results} of ${RUN_LABEL[run.run] ?? run.run}'s scored value${hidden.results === 1 ? '' : 's'}`,
-                hidden.fps > 0 && `${hidden.fps} rejected candidate${hidden.fps === 1 ? '' : 's'}`,
-                hidden.unscored > 0 && `${hidden.unscored} unscored candidate${hidden.unscored === 1 ? '' : 's'}`,
-              ]
-                .filter((x): x is string => Boolean(x))
-                .join(', ')
-                .replace(/, (?=[^,]*$)/, ' and ')}{' '}
-              {hidden.results + hidden.fps + hidden.unscored === 1 ? 'is' : 'are'} on papers in {hidden.names}, and
-              every number on this page leaves them out. Archived programs are hidden; <SettingsLink /> shows
-              them.
-            </span>
-          </Callout>
-        </div>
-      )}
 
       {partial && (
         <div className="mb-4">
@@ -830,7 +553,7 @@ export default function Witness() {
               <FileWarning size={13} className="mt-[3px] shrink-0" aria-hidden />
               <span>
                 {RUN_LABEL[run.run]} reports <span className="font-num">{run.results.length}</span> of
-                the <span className="font-num">{metrics.goldSize}</span> records now in the gold set.
+                the <span className="font-num">{metrics.goldSize}</span> values reviewers have typed.
                 The missing{' '}
                 <span className="font-num">{metrics.goldSize - run.results.length}</span> are not
                 counted as misses — they were never scored, so precision and recall below describe
@@ -845,7 +568,7 @@ export default function Witness() {
         <div className="mb-4">
           <Callout
             kind="warn"
-            title={anyHidden ? 'No gold annotations in the programs showing' : 'No gold annotations in this session'}
+            title="No gold annotations in this session"
           >
             Precision and recall are undefined without a gold set. Flag records for gold in the
             review queue and this screen fills in.
@@ -858,7 +581,6 @@ export default function Witness() {
         <Tick p={headlineTick} className="card py-3 pr-3" title={headlineTitle}>
           <div className="text-caption uppercase tracking-wide text-ink-soft">Precision</div>
           <MetricValue value={metrics.micro.precision} defined={precisionDefined} />
-          {besideLine(beside?.micro.precision ?? 0, !!beside && beside.micro.tp + beside.micro.fp > 0)}
           <div className="mt-0.5">
             <Delta
               now={precisionDefined ? metrics.micro.precision : null}
@@ -874,7 +596,6 @@ export default function Witness() {
         <Tick p={headlineTick} className="card py-3 pr-3" title={headlineTitle}>
           <div className="text-caption uppercase tracking-wide text-ink-soft">Recall</div>
           <MetricValue value={metrics.micro.recall} defined={recallDefined} />
-          {besideLine(beside?.micro.recall ?? 0, !!beside && beside.micro.tp + beside.micro.fn > 0)}
           <div className="mt-0.5">
             <Delta
               now={recallDefined ? metrics.micro.recall : null}
@@ -890,10 +611,6 @@ export default function Witness() {
         <Tick p={headlineTick} className="card py-3 pr-3" title={headlineTitle}>
           <div className="text-caption uppercase tracking-wide text-ink-soft">F1 (micro)</div>
           <MetricValue value={metrics.micro.f1} defined={f1Defined} />
-          {besideLine(
-            beside?.micro.f1 ?? 0,
-            !!beside && beside.micro.tp + beside.micro.fp > 0 && beside.micro.tp + beside.micro.fn > 0,
-          )}
           <div className="mt-0.5">
             <Delta
               now={f1Defined ? metrics.micro.f1 : null}
@@ -908,14 +625,8 @@ export default function Witness() {
           </div>
         </Tick>
 
-        <Tick
-          p={provisional ? 'curated' : 'gold'}
-          className="card py-3 pr-3"
-          title={provisional ? 'Curated records on fetched papers, standing in as gold' : 'Curated gold-set annotations'}
-        >
-          <div className="text-caption uppercase tracking-wide text-ink-soft">
-            {provisional ? 'Gold-set size (provisional)' : 'Gold-set size'}
-          </div>
+        <Tick p="gold" className="card py-3 pr-3" title="Values reviewers typed: a gold value or a correction">
+          <div className="text-caption uppercase tracking-wide text-ink-soft">Typed values</div>
           <div className="font-num text-display leading-tight">{metrics.goldSize}</div>
           <div className="mt-0.5">
             <Delta
@@ -959,10 +670,10 @@ export default function Witness() {
         <div className="mb-6 max-w-4xl">
           <Callout
             kind="info"
-            title={`${unscored.length} candidate${unscored.length === 1 ? '' : 's'} new to the corpus — unscored`}
+            title={`${unscored.length} candidate${unscored.length === 1 ? '' : 's'} new to the project — unscored`}
           >
-            The extractor read values for fields the curated set has no record of on these papers.
-            They are the corpus growing, not false positives: nothing here can say whether they are
+            The extractor read values for fields no reviewer has typed a value for on these papers.
+            They are the project&rsquo;s records growing, and nothing here can say whether they are
             right until a reviewer decides in Guild. A rejection adds one to this run&rsquo;s false
             positives; an acceptance makes it a record.
           </Callout>
@@ -985,11 +696,7 @@ export default function Witness() {
         {sortedFields.length === 0 ? (
           <EmptyState
             title="No fields scored"
-            body={
-              anyHidden
-                ? 'This run produced no results that map onto a gold record in the programs showing. The ones on papers in archived programs are hidden; Settings → Programs shows them.'
-                : 'This run produced no results that map onto a gold record in the current session.'
-            }
+            body="This run produced no results that map onto a gold record in the current session."
           />
         ) : (
           <table className="w-full border-collapse" style={{ fontSize: 'var(--table-fs)' }}>
@@ -1117,12 +824,7 @@ export default function Witness() {
       </div>
 
       <Card className="overflow-x-auto">
-        {mismatches.length === 0 && run.results.length === 0 && run.falsePositives.length === 0 && anyHidden ? (
-          <EmptyState
-            title="Nothing scored in the programs showing"
-            body="Every value this run was scored on, and every candidate a reviewer rejected, is on a paper in an archived program. Archived programs are hidden; Settings → Programs shows them."
-          />
-        ) : mismatches.length === 0 ? (
+        {mismatches.length === 0 ? (
           <EmptyState
             title="No mismatches in this run"
             body="Every scored gold record matched and the run produced no spurious extractions. With a gold set this small that is a statement about the gold set, not about the extractor."
@@ -1231,11 +933,9 @@ export default function Witness() {
       </Card>
 
       <p className="text-caption text-ink-soft mt-3 max-w-4xl">
-        Every row above is a disagreement between the curated gold annotation and what the run
-        produced. Open one to read both sides against the text held for that paper — for a
-        catalogued entry that text is the curator&rsquo;s note, not the paper&rsquo;s own words. The
-        literature is real and citable, but a curated annotation has not yet been checked against
-        the source PDF, so a row here is a lead to check, not a verdict.
+        Every row above is a disagreement between a value a reviewer typed and what the run
+        produced. Open one to read both sides against the passages the project holds for that
+        paper; a row here is a lead to check against the paper.
       </p>
 
       {/* ── comparison sheet ─────────────────────────────────────────── */}
@@ -1276,7 +976,6 @@ export default function Witness() {
           />
         )}
       </Sheet>
-      <RetrievalScorecard />
     </>
   );
 }
@@ -1387,12 +1086,12 @@ function ComparisonBody({
             </>
           ) : (
             <div className="text-body text-ink-soft">
-              No gold annotation — the curated set contains no record for this claim.
+              No typed value — no reviewer has typed one for this claim.
             </div>
           )}
 
           <div className="text-caption uppercase tracking-wide text-ink-soft mt-3 mb-1">
-            Curated span{paperSectionText ? ` · ${paperSectionText.heading}` : ''}
+            Record&rsquo;s span{paperSectionText ? ` · ${paperSectionText.heading}` : ''}
           </div>
           <SpanBlock
             text={paperSectionText?.text ?? null}
@@ -1400,8 +1099,8 @@ function ComparisonBody({
             markClass="span-gold"
             emptyNote={
               record
-                ? 'The curated quote is not present in the parsed section text for this paper, so it cannot be shown in context.'
-                : 'No curated record exists for this row, so there is no span to show.'
+                ? 'The record\u2019s quote is not in the passages the project holds for this paper, so it cannot be shown in context.'
+                : 'No record backs this row, so there is no span to show.'
             }
           />
         </div>
@@ -1412,7 +1111,7 @@ function ComparisonBody({
             <div className="text-caption uppercase tracking-wide text-ink-soft">
               {runLabel} extraction
             </div>
-            <ProvenanceBadge p="demo" compact />
+            <ProvenanceBadge p="assumed" compact />
           </div>
           {row.extracted ? (
             <>
@@ -1457,7 +1156,7 @@ function ComparisonBody({
 
           {row.note && (
             <p className="text-caption text-ink-soft mt-2">
-              <span className="font-medium">Curator note:</span> {row.note}
+              <span className="font-medium">Note:</span> {row.note}
             </p>
           )}
         </div>

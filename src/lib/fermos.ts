@@ -4,7 +4,7 @@
 // as an artifact; a forecast is asked of a kept fit, or of the sample run's
 // fit inline. The fitted curve drawn through the points is the closed form
 // the service fitted, evaluated here on its parameters; it computes nothing
-// the fit did not already hold. Shares lib/rag.ts's call and its failures.
+// the fit did not already hold. Shares lib/http.ts's call and its failures.
 //
 // A SIMULATION (OF-BLD-020 §3.3, D1) is asked of the service whole: the
 // families (`GET /api/fermos/families`), what binds and what waits with the
@@ -32,9 +32,9 @@ import type {
 } from '@/data/types';
 import { seriesOf } from '@/engine/series';
 import type { TimeCourseProps, TrajectorySeries } from '@/components/figures';
-import { RagDown, RagRefused, call } from './rag';
+import { ServiceDown, ServiceRefused, call } from './http';
 
-export { RagDown as FermosDown, RagRefused as FermosRefused };
+export { ServiceDown as FermosDown, ServiceRefused as FermosRefused };
 
 const post = <T>(path: string, body: unknown, signal?: AbortSignal) =>
   call<T>(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
@@ -65,7 +65,7 @@ export const FIT_LENGTH = 'fit-length';
 /** What a simulation is asked with besides the overrides: ids and words alone. */
 export interface SimulateAsk {
   family: string;
-  /** Null: every strain of the program's organism. */
+  /** Null: any strain the bound records name. */
   strain: string | null;
   product: string | null;
   sugar: string | null;
@@ -73,7 +73,6 @@ export interface SimulateAsk {
   /** 'records', 'fit', or 'simulation:<artifact id>'. */
   startFrom: string;
   durationPreset: typeof UNTIL_RUN_OUT | typeof FIT_LENGTH;
-  includeArchived: boolean;
 }
 
 /** The parameter panel's ask for the same binding (GET /api/params/fermos:family:<id>). */
@@ -84,19 +83,16 @@ export const paramAskOf = (ask: SimulateAsk) => ({
   fit: ask.fitArtifact,
   startFrom: ask.startFrom,
   durationPreset: ask.durationPreset,
-  includeArchived: ask.includeArchived,
 });
 
-/** Every model family, a family of an archived program left out unless the switch is on. */
-export const fermosFamilies = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<FamilyInfo[]>(`/api/fermos/families${includeArchived ? '?includeArchived=true' : ''}`, { signal });
+/** Every model family. */
+export const fermosFamilies = (signal?: AbortSignal) => call<FamilyInfo[]>('/api/fermos/families', { signal });
 
 /** What binds and what waits, with the person's overrides laid on, as Simulate would bind it. */
 export function fermosBind(ask: SimulateAsk, overrides: Override[], signal?: AbortSignal): Promise<FermosBinding> {
   const q = new URLSearchParams({ family: ask.family, startFrom: ask.startFrom, durationPreset: ask.durationPreset });
   for (const k of ['strain', 'product', 'sugar'] as const) if (ask[k]) q.set(k, ask[k] as string);
   if (ask.fitArtifact) q.set('fit', ask.fitArtifact);
-  if (ask.includeArchived) q.set('includeArchived', 'true');
   if (overrides.length > 0) q.set('overrides', JSON.stringify(overrides));
   return call<FermosBinding>(`/api/fermos/bind?${q.toString()}`, { signal });
 }
@@ -105,9 +101,8 @@ export function fermosBind(ask: SimulateAsk, overrides: Override[], signal?: Abo
 export const fermosSimulate = (ask: SimulateAsk, overrides: Override[], signal?: AbortSignal) =>
   post<SimulationResult>('/api/fermos/simulate', { ...ask, overrides }, signal);
 
-/** The kept simulations, newest first (`GET /api/fermos/simulations`); an archived program's left out unless the switch shows it. Simulate and Vessel both read it. */
-export const fermosSimulations = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<SimulationSummary[]>(`/api/fermos/simulations${includeArchived ? '?includeArchived=true' : ''}`, { signal });
+/** The kept simulations, newest first (`GET /api/fermos/simulations`). Simulate and Vessel both read it. */
+export const fermosSimulations = (signal?: AbortSignal) => call<SimulationSummary[]>('/api/fermos/simulations', { signal });
 
 /**
  * OF-BLD-020 §6.2 (D10) — a kept simulation's broth at an hour, read by the
@@ -116,10 +111,9 @@ export const fermosSimulations = (includeArchived: boolean, signal?: AbortSignal
  * holds; a model never sends one). Nothing is integrated again or kept, and
  * the browser computes nothing of it: it shows each state with its unit.
  */
-export function fermosHarvest(simulationId: string, hour: number | null, includeArchived: boolean, signal?: AbortSignal) {
+export function fermosHarvest(simulationId: string, hour: number | null, signal?: AbortSignal) {
   const q = new URLSearchParams({ simulation: simulationId });
   if (hour != null) q.set('hour', String(hour));
-  if (includeArchived) q.set('includeArchived', 'true');
   return call<FermosHarvest>(`/api/fermos/harvest?${q.toString()}`, { signal });
 }
 
@@ -183,7 +177,7 @@ export const simulateFromFitPath = (family: string, fitId: string) =>
  * never computed. Unset ones are the run's own; a changed start names the
  * person who typed it, and a changed length the person who typed that
  * (`durationBy`, OF-BLD-020 §3.R): the service keeps each an assumption by
- * name, and the forecast is demo.
+ * name, and the forecast is assumed.
  */
 export function forecastAsk(overrides: Override[]): {
   start: Partial<StartValues>;
@@ -298,7 +292,7 @@ export function fitFigureSeries(series: FermosSeries[], fit: KineticFit | null):
 // The vessel a kept simulation (or, anaerobic, a kept fit) needs, designed by
 // BioSTEAM in the service's Proforma worker. The browser asks and shows: the
 // scope's parameters come from `GET /api/params/fermos:vessel:<id>` through
-// the panel, a person's changes are the scope's overrides (Durable), and
+// the panel, a person's changes are the scope's overrides (the project's rows), and
 // `POST /api/fermos/vessel` designs. Nothing here computes a value.
 
 /** The flowsheet a fit is read through for a vessel: its titre, yield and batch time, as the ethanol flowsheet reads them (vessel.FIT_FLOWSHEET). */
@@ -319,13 +313,12 @@ export function vesselTypeOf(overrides: Override[]): VesselType | null {
 }
 
 /** The design request: the source, the vessel type the person chose, and every override of the scope as typed. */
-export function vesselRequest(source: { simulation?: string | null; fit?: string | null }, overrides: Override[], includeArchived: boolean): VesselRequest {
+export function vesselRequest(source: { simulation?: string | null; fit?: string | null }, overrides: Override[]): VesselRequest {
   return {
     simulation: source.simulation ?? null,
     fit: source.fit ?? null,
     vesselType: vesselTypeOf(overrides),
     overrides,
-    includeArchived,
   };
 }
 

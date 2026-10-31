@@ -1,30 +1,28 @@
 // Component attribution (OF-BLD-006 §2.4). When a named component does work,
 // this says which one.
 //
-// openFerment's architecture has eighteen named components (COMPONENTS.md),
+// openFerment's architecture has named components (Settings → Architecture),
 // and since §2.2 was reversed those names are also what the rail says. This
 // tag still has a separate job from the label above it: the label names the
 // surface you are standing on, and the tag names the component that produced a
 // particular piece of work. It answers "who did this", not "where am I" — so
 // it survives the rename unchanged, and it must not be mistaken for a heading.
 //
-// A THIRD VISUAL FAMILY. The screen already carries two labelled vocabularies
-// and this must not read as either:
+// A VISUAL FAMILY OF ITS OWN. The screen already carries a labelled
+// vocabulary and this must not read as it:
 //
 //   provenance  ProvenanceBadge — `chip`: 1px border, surface-1 background,
 //               a lucide icon, coloured by confidence.
-//   clearance   ClearanceChip — 1px border, a filled colour wash, an FTO
-//               stamp, a lock icon.
 //   attribution this — NO border, NO background, monospace, ink-soft.
 //
 // The distinction is structural rather than chromatic, so it survives both
-// themes and holds for a reader who cannot separate the hues: the other two
-// are enclosed and this one is not. Being unenclosed is also what makes it
+// themes and holds for a reader who cannot separate the hues: the badge is
+// enclosed and this is not. Being unenclosed is also what makes it
 // quiet enough to sit beside work without competing with it.
 import { cx } from './ui';
 
 /**
- * The eighteen. A union rather than a string so a typo is a compile error and
+ * The named components. A union rather than a string so a typo is a compile error and
  * the naming layer is real in the codebase rather than a convention people
  * remember. 'Guild' is the attribution short form of "Guild of Applied Life".
  */
@@ -40,12 +38,6 @@ export type ComponentName =
   | 'Audit'
   | 'Witness'
   | 'Common Seal'
-  | 'Claim Workbench'
-  | 'Priority Engine'
-  | 'Clearance'
-  | 'Dominion'
-  | 'Enablement'
-  | 'Notary'
   | 'Guild'
   | 'Runbook'
   | 'Deposition';
@@ -58,21 +50,15 @@ export type ComponentName =
 export const COMPONENT_ROLE: Record<ComponentName, string> = {
   Postdoc: 'The agent — plans, retrieves, and answers with its working shown',
   Intake: 'Evidence in — ingest and extraction of parameters from sources',
-  BioRepo: 'Evidence in — the corpus and everything retrieved from it',
+  BioRepo: 'Evidence in — the project\u2019s records, the decisions on them, and search over its documents',
   geneOS: 'The organism as an engineered system — host, parts, pathway, model, strain design',
-  fermOS: 'The reactor — kinetics, transport, operating mode, scale, control. None of it built',
+  fermOS: 'The reactor — kinetics, transport, operating mode and scale; control not built',
   pureOS: 'Downstream — harvest, capture, polish, recovery, formulation, storage',
-  Proforma: 'Computing — cost models, sweeps and scenario economics',
+  Proforma: 'Computing — plants and flowsheets on BioSTEAM, scenario economics and studies',
   Primer: 'Keeping it honest — the introductory text: the platform taught through itself',
   Audit: 'Keeping it honest — provenance, and what is held out of aggregates',
-  Witness: 'Keeping it honest — extractor validation against the gold set',
+  Witness: 'Keeping it honest — extractor validation against the values reviewers typed',
   'Common Seal': 'Keeping it honest — timestamping and attestation (not built)',
-  'Claim Workbench': 'Patents — claim drafting and analysis (not built)',
-  'Priority Engine': 'Patents — priority and filing strategy (not built)',
-  Dominion: 'Patents and clearance — what is fenced and what is open',
-  Clearance: 'Patents — freedom to operate, per jurisdiction',
-  Enablement: 'Patents — enablement and written description (not built)',
-  Notary: 'Patents — inventorship and conception records (not built)',
   Guild: 'People and permissions — review, roles and who decided what',
   Runbook: 'Assay — the outbound falsifiable claim',
   Deposition: 'Assay — the inbound account of what actually happened',

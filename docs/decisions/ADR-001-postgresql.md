@@ -1,0 +1,107 @@
+# ADR-001 — PostgreSQL with pgvector is the one database
+
+- **Status**: accepted (provisional choice; stage 2 implements it)
+- **Date**: 2026-10-30
+
+## Context
+
+At `alpha-1.0` every record lives in a JSON file under `core/data/` (`biorepo.json`,
+`artifacts/<hash>.json`, `guild.json`, `checks.json`, `practice.json`, `proposals.json`,
+`spend.json`, `audit.jsonl`, `candidates/`, `live/`, `pureos-trains.json`, `index/`), written through
+`atomic.write_text` under thread and file locks. A git merge driver reconciles `biorepo.json`
+between machines and an orphan branch (`openferment-data`) carries live-run output. Browser state
+(IndexedDB, `src/lib/durable.ts`) holds depositions, decisions, locks, overrides, fits, scenarios,
+runs, pins, trains and conversations, so two devices disagree about the same project.
+
+Sci RAG Kit (ADR-002) stores documents, chunks and its concept graph in PostgreSQL with pgvector.
+The owner's stated end state (one lab group first, cloud-ready, accounts, private work until
+published) needs a real database.
+
+## Options
+
+1. Keep the JSON stores and add PostgreSQL for the kit alone: two persistence models, the merge
+   driver stays, browser state stays unsynchronized.
+2. SQLite with a vector extension: one file per host; the kit does not support it.
+3. One PostgreSQL instance with pgvector, two schemas.
+
+## Decision
+
+Option 3. One PostgreSQL instance, two schemas: `sci_rag` (the kit's tables, migrated by the kit's
+alembic scripts) and `openferment` (ours, migrated by our alembic). SQLAlchemy 2 async for both.
+Local install on the always-on host (Homebrew or Postgres.app), a `pgvector/pgvector:pg17` service
+container in CI, `docker compose` as the developer default, and the distribution's packages where
+neither exists (this build container).
+
+Store modules keep their function names (`artifacts.compute`, `biorepo.write`,
+`guild.write_evidence`, …) and swap their bodies to sessions; row locks and transactions replace
+`_WRITE_LOCK`, file locks and atomic writes. `atomic.py` stays for export files. Artifact ids keep
+the sha256-of-canonical-inputs scheme so replay works unchanged.
+
+Schema separation (provisional, confirmed at stage 2): our tables declare `schema="openferment"`
+explicitly; the kit's models declare no schema, so the kit connects as a role whose `search_path`
+is `sci_rag, public`, which places its tables in `sci_rag` without patching the kit. The `vector`
+extension is created once in `public` by the migrate step.
+
+## Implementation (stage 2, 2026-10-30)
+
+- **One loop for every connection.** `core/openferment_core/db/` makes one async engine over
+  asyncpg, the kit's driver. The store functions keep their synchronous names and signatures
+  (§8.1), and everything that calls them is synchronous: routes FastAPI runs in its threadpool,
+  the tool registry, Postdoc's loop, the MCP server, the commands, the tests. They reach the engine
+  through `db.run(coro)`, which hands the coroutine to one event loop the module owns on its own
+  thread; an async caller awaits `db.arun`. asyncpg ties a connection to the loop that made it, so
+  one owned loop is what lets synchronous callers share one pool. Converting every caller to async
+  was the alternative: it touches every route, tool and test for no change in what is stored.
+- **One transaction per top-level call.** `db.session()` joins the transaction under way when there
+  is one, so a store that calls another commits once. `db.lock(session, *key)` is a
+  transaction-scoped advisory lock; it replaces `_WRITE_LOCK` and the file locks for a store's
+  read-check-write (eight concurrent writers lose no increment: `test_db.py`).
+- **Key columns and a JSON body.** Each table holds as columns the keys a store finds a row by
+  (`project_id`, `id`, the record or person a row belongs to, a state) plus `created_by` and
+  `created_at`; the rest of the row is `body`, the Pydantic model of `models.py` dumped as JSONB.
+  The Pydantic models stay the one description of content (ADR-007 generates the client's types
+  from them); the tables hold, scope and index it. Tables are SQLAlchemy Core.
+- **Tables beyond the list of §7.4**: `overrides`, `fits` and `trains` hold the browser state §5.5
+  moves to the server (parameter overrides, fits, pureOS trains), `practice_scenarios` holds
+  Primer's drafted scenarios beside `practice_sessions`, and `projects.settings` holds what a
+  project sets for itself (Guild's policy).
+- **The search path.** A role named `openferment` finds the `openferment` schema first
+  (`"$user"`), and SQLAlchemy reflects the first schema on the path as the default, unnamed. Every
+  engine of ours (`db.engine.make_engine`) puts `public` alone on its connections' search path, so
+  reflection names our schema as the table models do and autogenerate compares like with like.
+- **Migrations.** Our alembic history lives in `db/alembic/` with its version table in
+  `openferment`; `0001_initial` was autogenerated from the table models and `test_db.py` holds a
+  migrated database equal to them. `pnpm db:migrate` migrates our schema; stage 3 adds the kit's
+  head to the same command. `pnpm db:reset NAME` drops, recreates and migrates a database and
+  refuses `openferment`, the production name, and any name it would not make.
+- **Tests.** One database per test session, made on the server `OPENFERMENT_TEST_DATABASE_URL`
+  names when a test first needs it, migrated to head and dropped at the end; every test's sessions
+  are savepoints on one connection whose transaction is rolled back after the test.
+
+## Consequences
+
+- `pnpm verify` needs a reachable PostgreSQL; tests use a disposable database
+  (`OPENFERMENT_TEST_DATABASE_URL`) created per session with rollback per test.
+- The merge driver, `data-sync.sh`, `data-prepare.sh`, `decisions-push.sh`, `sync_decisions.sh`
+  and the `openferment-data` convention are deleted (ADR-010).
+- The browser's Durable tier keeps UI preferences only.
+- `ready.py` gains database, schema, pgvector and embedder rows; `install.sh` and `deploy.sh` gain
+  the PostgreSQL steps and the alembic upgrade. (Stage 2: the data row and both steps; pgvector
+  and the embedder arrive with the kit at stage 3.)
+- A live instance's alpha 1.0 files are carried into a new project by `pnpm db:import-alpha1`,
+  whole or not at all, the files left in place; `core/data/biorepo.json` stays tracked until the
+  owner has run it, because a pull that deleted it would take uncarried decisions with it.
+
+## Revisit condition
+
+Never for the store itself. The schema split, if the two migration trees fight.
+
+## Evidence
+
+- `core/openferment_core/atomic.py`, `biorepo.py` (`_WRITE_LOCK`), `scripts/host/merge_biorepo.py`,
+  `scripts/data-sync.sh` at `alpha-1.0`.
+- Measured 2026-10-30 in the build container: PostgreSQL 16.15 installed (`/usr/lib/postgresql/16`),
+  `postgresql-16-pgvector` 0.6.0 available from Ubuntu noble, no Docker daemon. The kit's
+  `chunks.embedding` HNSW index needs pgvector 0.5.0 or later.
+- Sci RAG Kit `src/sci_rag/db/engine.py`: one engine from `SCI_RAG_DATABASE_URL`, no connect
+  arguments, hence the role-level `search_path`.

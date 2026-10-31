@@ -2,7 +2,7 @@
 //
 // The simulator's status and the benchmark it reproduced. The service runs
 // BioSTEAM and keeps the benchmark as an artifact; with it down this says so,
-// and nothing stands in for a result (E.2). Shares lib/rag.ts's call.
+// and nothing stands in for a result (E.2). Shares lib/http.ts's call.
 import type {
   Artifact,
   BasisInput,
@@ -27,16 +27,15 @@ import type {
   ScenarioInput,
   StreamRow,
   TeaBreakdown,
-  ProgramId,
   TrainSummary,
   UnitRow,
   UtilityDuties,
   VesselSummary,
 } from '@/data/types';
 import { useStore } from '@/store';
-import { RagDown, RagRefused, call } from './rag';
+import { ServiceDown, ServiceRefused, call } from './http';
 
-export { RagDown as ProformaDown, RagRefused as ProformaRefused };
+export { ServiceDown as ProformaDown, ServiceRefused as ProformaRefused };
 
 export interface SimulatorStatus {
   status: 'cold' | 'starting' | 'ready' | 'failed';
@@ -57,11 +56,9 @@ export const proformaStatus = (signal?: AbortSignal) => call<SimulatorStatus>('/
 
 /**
  * The flowsheets a scenario can name, as `GET /api/proforma/shelf` serves
- * them. Archived programs' flowsheets come only when the switch is on; the
- * toy never comes.
+ * them. The toy never comes.
  */
-export const proformaShelf = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<FlowsheetInfo[]>(`/api/proforma/shelf${includeArchived ? '?includeArchived=true' : ''}`, { signal });
+export const proformaShelf = (signal?: AbortSignal) => call<FlowsheetInfo[]>('/api/proforma/shelf', { signal });
 
 // ── Reference runs (OF-BLD-019 §2.2, D3) ────────────────────────────────
 
@@ -86,12 +83,12 @@ export const referencePath = (id: string) => `/proforma/reference/${encodeURICom
 
 /**
  * Whether the service has no such endpoint, rather than no such run: FastAPI's
- * own 404 or 405, the built app's static mount answering a path no /api route
- * holds (a 404 with no JSON body), or the service double's 404.
+ * own 404 or 405, or the built app's static mount answering a path no /api
+ * route holds (a 404 with no JSON body).
  */
 const noEndpoint = (e: unknown) =>
-  (e instanceof RagRefused && (e.status === 405 || (e.status === 404 && /^(Not Found|not part of the smoke double)$/.test(e.message)))) ||
-  (e instanceof RagDown && /answered 40[45]\./.test(e.message));
+  (e instanceof ServiceRefused && (e.status === 405 || (e.status === 404 && e.message === 'Not Found'))) ||
+  (e instanceof ServiceDown && /answered 40[45]\./.test(e.message));
 
 /**
  * The newest stored run of a reference flowsheet, its shelf entry and its
@@ -136,7 +133,7 @@ export async function proformaReference(id: string, signal?: AbortSignal): Promi
 export const LEGACY_BENCHMARK_TOOL = 'proforma_benchmark';
 
 export const LEGACY_BENCHMARK_NOTE =
-  'This is the benchmark run this service kept when Proforma was first built on BioSTEAM (OF-BLD-014 §8.2): its price and settings, with no table and no check against the package’s test. Run makes the full reference run, with its tables and its checks.';
+  'This is the benchmark run kept before reference runs held their tables: its price and settings, with no table and no check against the package’s test. Run makes the full reference run, with its tables and its checks.';
 
 /** Run a reference flowsheet whole, on its package's defaults: `POST /api/proforma/reference/{id}`. */
 export async function runProformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {
@@ -145,7 +142,7 @@ export async function runProformaReference(id: string, signal?: AbortSignal): Pr
   } catch (e) {
     if (!noEndpoint(e)) throw e;
     if (id === BENCHMARK_FLOWSHEET) return runProformaBenchmark(signal);
-    throw new RagRefused(404, `This service cannot run ${id} yet: it has no reference endpoint.`);
+    throw new ServiceRefused(404, `This service cannot run ${id} yet: it has no reference endpoint.`);
   }
 }
 
@@ -234,8 +231,8 @@ export function runPrice(art: Artifact, shelf: FlowsheetInfo[]): PriceRead | nul
 
 /**
  * How a scenario's inputs stand, for its card on the index. With the
- * service's binding (`GET /api/proforma/scenarios` for a seed scenario, `GET
- * /api/proforma/bind` for one made here, as its page asks), an input is
+ * service's binding (`GET /api/proforma/bind` for the scenario's flowsheet,
+ * as its page asks), an input is
  * bound to records, assumed, or waiting; when the service could not be asked,
  * the shelf says which inputs can bind to records, and no more (OF-BLD-019
  * §2.R: the card once said four bound where the service bound three).
@@ -245,7 +242,7 @@ export interface InputCounts {
   /** Bound to records by the service, or, with no binding to read, inputs that can bind to records. */
   records: number;
   /**
-   * Inputs a person chose a fermOS fit for in this browser (OF-BLD-019 §5.1),
+   * Inputs a person chose a fermOS fit for in this project (OF-BLD-019 §5.1),
    * counted from the choice: the index binds without the fits, so it says
    * "with a fermOS fit chosen", never that the service bound one (§5.R).
    */
@@ -293,25 +290,6 @@ export function inputCounts(
   return c;
 }
 
-/** The program a new scenario starts in: its flowsheet's, when that is offered, else the first offered. */
-export function defaultProgram<T extends string>(flowsheet: FlowsheetInfo | null, offered: T[]): T | null {
-  const own = flowsheet?.program as T | null | undefined;
-  if (own && offered.includes(own)) return own;
-  return offered[0] ?? null;
-}
-
-/**
- * The programs a new scenario may be filed under (OF-BLD-019 §3.R, finding
- * 3): a flowsheet that belongs to a program files its scenarios there and
- * nowhere else (a PHA flowsheet filed under Yeast ethanol would bring an
- * archived program's content into the default view); a general flowsheet
- * may go under any program offered.
- */
-export function programsFor<T extends string>(flowsheet: { program?: string | null } | null, offered: T[]): T[] {
-  const own = flowsheet?.program as T | null | undefined;
-  return own ? offered.filter((p) => p === own) : offered;
-}
-
 export interface BenchmarkResponse {
   artifact: Artifact | null;
   simulator: SimulatorStatus;
@@ -338,29 +316,24 @@ export const proformaBenchmark = (signal?: AbortSignal) => call<BenchmarkRespons
 export const runProformaBenchmark = (signal?: AbortSignal) =>
   call<BenchmarkResponse>('/api/proforma/benchmark', { method: 'POST', signal });
 
-/** B.3: the price the package's defaults give for version 2.35.1, measured when this build was written. */
-export const BENCHMARK_EXPECTED = { usdPerGal: 1.968, tolerance: 0.005, package: 'biorefineries.cornstover@2.35.1' };
-
 // ── The BioSTEAM scenario (§8.4), and the scenario run contract ─────────
 //
 // OF-BLD-019 §3.2 is the browser's side of the contract §2.3 builds in the
 // service, names included:
 //
-//   (b) GET  /api/proforma/scenarios?includeArchived=&host=  every SEED
-//       scenario of kind 'biosteam' whose program the switch shows, bound
-//       (`ProformaScenarioInfo`, carrying its `flowsheet`);
-//   (c) GET  /api/proforma/bind?flowsheet=&includeArchived=&host=  the same
-//       shape for a flowsheet, id and name empty: what a scenario a person
-//       made here (D6) shows as its inputs; a reference flowsheet, the toy or
-//       an unknown id is a refusal in words;
-//   (d) POST /api/proforma/run  a seed scenario by its id; a scenario made
-//       here by its flowsheet, bound as (c) binds it, with the request's
-//       assumptions. Inputs that still wait are a 422 listing them.
+//   (b) GET  /api/proforma/scenarios?host=  every BioSTEAM scenario the
+//       project keeps, bound (`ProformaScenarioInfo`, carrying its `flowsheet`);
+//   (c) GET  /api/proforma/bind?flowsheet=&host=  the same
+//       shape for a flowsheet, id and name empty: what a scenario (D6) shows
+//       as its inputs; a reference flowsheet, the toy or an unknown id is a
+//       refusal in words;
+//   (d) POST /api/proforma/run  a scenario by its id and its flowsheet, bound
+//       as (c) binds it, with the request's overrides. Inputs that still wait
+//       are a 422 listing them.
 
-/** What a binding is asked with: the host filter, and the program switch as the page applies it. */
+/** What a binding is asked with: the host filter. */
 export interface BindAsk {
   host: string | null;
-  includeArchived: boolean;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1); sent to (c) alone. */
   fits?: Record<string, string>;
   /** OF-BLD-020 §6.1: a scenario on `custom_train_v1` names the vessel design and the train run it is built from. */
@@ -370,7 +343,6 @@ export interface BindAsk {
 
 const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
   const q = new URLSearchParams(extra);
-  q.set('includeArchived', ask.includeArchived ? 'true' : 'false');
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
   if (ask.vessel) q.set('vessel', ask.vessel);
@@ -378,7 +350,7 @@ const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
   return q.toString();
 };
 
-/** (b) The seed BioSTEAM scenarios the switch shows, each bound by the service. */
+/** (b) The project's BioSTEAM scenarios, each bound by the service. */
 export const proformaScenarios = (ask: BindAsk, signal?: AbortSignal) =>
   call<ProformaScenarioInfo[]>(`/api/proforma/scenarios?${bindQuery(ask)}`, { signal });
 
@@ -392,14 +364,14 @@ export async function proformaBind(flowsheet: string, ask: BindAsk, signal?: Abo
     return await call<ProformaScenarioInfo>(`/api/proforma/bind?${bindQuery(ask, { flowsheet })}`, { signal });
   } catch (e) {
     if (!noEndpoint(e)) throw e;
-    throw new RagRefused(404, 'This service has no bind endpoint, so it cannot bind the inputs of a scenario made here yet.');
+    throw new ServiceRefused(404, 'This service has no bind endpoint, so it cannot bind the inputs of a scenario made here yet.');
   }
 }
 
 /** What the page posts to run a scenario: `ProformaRunRequest`, and the flowsheet of a scenario made here. */
 export interface RunAsk {
   scenarioId: string;
-  /** Sent for a scenario made here alone: the service runs a seed scenario by its id. */
+  /** The scenario's flowsheet; the service holds a kept scenario to its own. */
   flowsheet?: string | null;
   /**
    * A person's changes in the parameter panel (OF-BLD-020 D3): the scope
@@ -413,14 +385,12 @@ export interface RunAsk {
   /** OF-BLD-020 §6.1: the vessel design and the train run a scenario on `custom_train_v1` is built from. */
   vessel?: string | null;
   trainRun?: string | null;
-  /** The program switch, for those parts (one of an archived program is refused unless it is on). */
-  includeArchived?: boolean;
 }
 
 /**
  * The overrides a run carries (OF-BLD-020 §2.2): the scenario's scope's
  * own, of the inputs its flowsheet takes; an override of an input the
- * flowsheet no longer takes stays in this browser and is not sent.
+ * flowsheet no longer takes stays with the project and is not sent.
  */
 export function runOverrides(scoped: Override[], keys: string[]): Override[] {
   const takes = new Set(keys);
@@ -457,8 +427,8 @@ export function runBody(ask: RunAsk): ProformaRunRequest {
     seed: 0,
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
     ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
-    // OF-BLD-020 §6.1: a composite's parts, and the switch they are held to.
-    ...(ask.vessel || ask.trainRun ? { vessel: ask.vessel ?? null, trainRun: ask.trainRun ?? null, includeArchived: Boolean(ask.includeArchived) } : {}),
+    // OF-BLD-020 §6.1: a composite's parts.
+    ...(ask.vessel || ask.trainRun ? { vessel: ask.vessel ?? null, trainRun: ask.trainRun ?? null } : {}),
   };
 }
 
@@ -478,21 +448,17 @@ export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
 // The fits fermOS keeps, each with what it can feed a flowsheet's titre,
 // yield and productivity and why not, as the service computes them from the
 // artifact: the browser shows them and keeps which artifact a person chose
-// for which input (`proformaFits`, Durable), and computes no value.
+// for which input (`proformaFits`, the project's rows), and computes no value.
 
 /**
  * Every kinetic fit, forecast and simulation fermOS keeps, with what it can feed `flowsheet`: `GET /api/fermos/fits`.
- * The program switch rides along (OF-BLD-020 §3.R): one of an archived program is left out unless it is on.
  */
-export async function fermosFits(flowsheet: string, includeArchived: boolean, signal?: AbortSignal): Promise<FermosFitInfo[]> {
+export async function fermosFits(flowsheet: string, signal?: AbortSignal): Promise<FermosFitInfo[]> {
   try {
-    return await call<FermosFitInfo[]>(
-      `/api/fermos/fits?flowsheet=${encodeURIComponent(flowsheet)}&includeArchived=${includeArchived ? 'true' : 'false'}`,
-      { signal },
-    );
+    return await call<FermosFitInfo[]>(`/api/fermos/fits?flowsheet=${encodeURIComponent(flowsheet)}`, { signal });
   } catch (e) {
     if (!noEndpoint(e)) throw e;
-    throw new RagRefused(404, 'This service has no fermOS fit list, so it cannot offer a fit to this scenario yet.');
+    throw new ServiceRefused(404, 'This service has no fermOS fit list, so it cannot offer a fit to this scenario yet.');
   }
 }
 
@@ -517,10 +483,9 @@ export const sendFitPath = (scenarioId: string, artifactId: string) =>
 /** What the check is asked with: the scenario as its page binds it. */
 export interface CeilingAsk {
   scenarioId: string;
-  /** Sent for a scenario made here alone: the service reads a seed scenario's own. */
+  /** The scenario's flowsheet; the service holds a kept scenario to its own. */
   flowsheet?: string | null;
   host: string | null;
-  includeArchived: boolean;
   /** The fermOS fits a person chose, by input key (§5.1). */
   fits?: Record<string, string>;
   /** The yield's override, when a person typed one (OF-BLD-020 D3); the rest do not bear on the check. */
@@ -529,7 +494,7 @@ export interface CeilingAsk {
 
 /** `GET /api/proforma/ceiling-check`: a service that predates it says so in words. */
 export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promise<CeilingCheck> {
-  const q = new URLSearchParams({ scenarioId: ask.scenarioId, includeArchived: ask.includeArchived ? 'true' : 'false' });
+  const q = new URLSearchParams({ scenarioId: ask.scenarioId });
   if (ask.flowsheet) q.set('flowsheet', ask.flowsheet);
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
@@ -538,7 +503,7 @@ export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promi
     return await call<CeilingCheck>(`/api/proforma/ceiling-check?${q.toString()}`, { signal });
   } catch (e) {
     if (!noEndpoint(e)) throw e;
-    throw new RagRefused(404, 'This service has no ceiling check, so it cannot read this scenario\u2019s yield against a geneOS ceiling yet.');
+    throw new ServiceRefused(404, 'This service has no ceiling check, so it cannot read this scenario\u2019s yield against a geneOS ceiling yet.');
   }
 }
 
@@ -661,6 +626,28 @@ export function runViewOfReference(art: Artifact): RunView | null {
     basis: { tool: art.tool, toolVersion: art.toolVersion, inputs: art.inputs, artifactId: art.id, at: art.createdAt, seed: art.seed },
   });
   return { ...view, basePrice: num(view.tables.tea?.productPrice) };
+}
+
+/** The tool every engine run of a library plant or a flowsheet is kept under (engine/library.py LIBRARY_RUN). */
+export const LIBRARY_RUN_TOOL = 'library.run';
+
+/**
+ * An engine run in the shape a scenario run reads (execution prompt §7.4):
+ * the same tables under the same keys, one case and no samples, as a
+ * reference run reads. Its base price is the price the run's TEA solved
+ * for (`price.solvedPrice`, USD/kg, BioSTEAM's), else the TEA's own product
+ * price; nothing is computed here.
+ */
+export function runViewOfRun(art: Artifact): RunView | null {
+  if (art.tool !== LIBRARY_RUN_TOOL) return null;
+  const view = viewOf(art.output, {
+    artifactId: art.id,
+    createdAt: art.createdAt,
+    durationMs: art.durationMs,
+    provenance: art.provenance,
+    basis: { tool: art.tool, toolVersion: art.toolVersion, inputs: art.inputs, artifactId: art.id, at: art.createdAt, seed: art.seed },
+  });
+  return { ...view, basePrice: num(rec<unknown>(art.output.price).solvedPrice) ?? num(view.tables.tea?.productPrice) };
 }
 
 /** One of a reference run's checks against its package's own test, as the service wrote it (`output.checks`). */
@@ -792,11 +779,8 @@ export const NO_DIAGRAM =
  */
 export const diagramSrc = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
-/** The words for an infeasible sample's reason (flowsheets/pha_sugar_v0.REASONS, ethanol_glucose_v0.REASONS and custom_train_v1.REASONS). */
+/** The words for an infeasible sample's reason (flowsheets/ethanol_glucose_v0.REASONS and custom_train_v1.REASONS). */
 export const INFEASIBLE_WORDS: Record<string, string> = {
-  carbon: 'left no sugar for respiration',
-  oxygen: 'asked for more oxygen than the aerated tank transfers',
-  balance: "left the fermenter's mass balance open",
   yield: 'asked for a yield above the theoretical yield of ethanol on glucose',
   concentration: 'asked for more glucose than a litre of feed can hold',
   convergence: 'did not converge in the simulator',
@@ -830,23 +814,12 @@ export function asResultGrid(modelId: string, g: ProformaGrid): ResultGrid {
 
 /**
  * The question a process modeller is asked about each input that rests on an
- * assumption, by flowsheet then input key (OF-BLD-019 §3.R, finding 5): two
- * flowsheets share keys (titre, yield, productivity) and a yeast page must
- * never ask PHA's questions. A flowsheet with no question of its own for an
- * input asks where it should come from.
+ * assumption, by flowsheet then input key (OF-BLD-019 §3.R, finding 5):
+ * flowsheets share keys (titre, yield, productivity), so each asks its own.
+ * A flowsheet with no question of its own for an input asks where it should
+ * come from.
  */
 export const QUESTIONS: Record<string, Record<string, string>> = {
-  pha_sugar_v0: {
-    recovery:
-      'What share of cell mass does a solids centrifuge recover from a PHA broth at this scale, and what does a second pass or a flocculant change?',
-    sugarPrice:
-      'What does a kilogram of fermentable sugar from this feedstock cost delivered to the fermenter, after pretreatment and hydrolysis?',
-    sugarFeed: 'What plant size, in sugar fed per hour, is a sensible first commercial train for this product?',
-    titre: 'What PHA titre at harvest is credible for a fed-batch on hydrolysate sugars in this host?',
-    yield: 'What PHA yield on sugar holds at scale, and how far below the network ceiling does a real culture sit?',
-    content: 'What PHA share of dry cell mass is reached at harvest without losing productivity?',
-    productivity: 'What volumetric productivity holds across a full batch, including the growth phase?',
-  },
   // OF-BLD-020 §6.1: a vessel and a train, priced. Its fermenter's inputs ask what the ethanol flowsheet's ask.
   custom_train_v1: {
     feed_glucose_conc:
@@ -952,13 +925,6 @@ const READ_BACK: Record<string, { case: string[]; setting: string[] }> = {
       'rateOfReturn', 'operatingDays', 'startYear', 'endYear', 'incomeTax', 'langFactor',
     ],
   },
-  pha_sugar_v0: {
-    case: [],
-    setting: [
-      'cakeMoisture', 'dryerMoisture', 'vesselLimitM3', 'oxygenTarget', 'temperatureK', 'rateOfReturn', 'operatingDays', 'startYear', 'endYear',
-      'incomeTax', 'ammoniaPriceUsdPerKg', 'packageGlucosePriceUsdPerKg',
-    ],
-  },
 };
 
 export function readBackRows(readBack: Record<string, unknown>, flowsheet: FlowsheetInfo | null, basis: BasisInput[] = []): ReadBackRow[] {
@@ -993,7 +959,7 @@ export function pinnedCard(pinned: Scenario[]): { prov: Provenance | null; words
   const authored = pinned.filter((s) => s.kind !== 'biosteam').length;
   const biosteam = pinned.length - authored;
   const head = `${pinned.length} pinned — open the comparison.`;
-  if (!biosteam) return { prov: 'demo', words: `${head} Cost model v0 — illustrative economics, not validated.` };
+  if (!biosteam) return { prov: 'assumed', words: `${head} Cost model v0 — illustrative economics, not validated.` };
   if (!authored) return { prov: null, words: `${head} Each is compared from its newest run, with the provenance that run computes.` };
   return {
     prov: null,
@@ -1021,8 +987,8 @@ export function questionsText(scenario: ProformaScenarioInfo, run: { sensitivity
 //
 // `custom_train_v1` is built from two kept artifacts a scenario names: a
 // fermOS vessel design (`fermos.vessel`) and a pureOS train run
-// (`pureos.train_run`). A scenario made on it keeps both (Durable
-// `createdScenarios`: `vessel`, `trainRun`), and every binding, panel read,
+// (`pureos.train_run`). A scenario made on it keeps both (its row's
+// `vessel` and `trainRun`), and every binding, panel read,
 // ceiling check and run carries them. The service refuses a pair that cannot
 // stand, in its words; the browser computes nothing.
 
@@ -1037,13 +1003,11 @@ export function partsOf(scenario: Pick<Scenario, 'vessel' | 'trainRun'> | null |
   return scenario?.vessel && scenario?.trainRun ? { vessel: scenario.vessel, trainRun: scenario.trainRun } : null;
 }
 
-/** Every vessel design the service keeps (`GET /api/fermos/vessels`), newest first; one of an archived program left out unless asked. */
-export const compositeVessels = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<VesselSummary[]>(`/api/fermos/vessels?includeArchived=${includeArchived ? 'true' : 'false'}`, { signal });
+/** Every vessel design the service keeps (`GET /api/fermos/vessels`), newest first. */
+export const compositeVessels = (signal?: AbortSignal) => call<VesselSummary[]>('/api/fermos/vessels', { signal });
 
-/** Every train run the service keeps (`GET /api/pureos/train-runs`), newest first; one of an archived program left out unless asked. */
-export const compositeTrainRuns = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<TrainSummary[]>(`/api/pureos/train-runs?includeArchived=${includeArchived ? 'true' : 'false'}`, { signal });
+/** Every train run the service keeps (`GET /api/pureos/train-runs`), newest first. */
+export const compositeTrainRuns = (signal?: AbortSignal) => call<TrainSummary[]>('/api/pureos/train-runs', { signal });
 
 /** A kept vessel design in one line, for a chooser. */
 export const vesselWords = (v: VesselSummary) =>
@@ -1059,13 +1023,13 @@ export const trainRunPath = (artifactId: string) => `/pureos/train/${encodeURICo
 
 /**
  * Make a scenario on `custom_train_v1` from a vessel design and a train run,
- * in the program the train run belongs to, and return its id: what pureOS's
+ * and return its id: what pureOS's
  * Builder's **Price this in Proforma** calls (OF-BLD-020 §6.2), and what the
- * New scenario dialog makes when both are chosen. Durable, time-based id, not
- * run; the scenario's page binds it and says what waits.
+ * New scenario dialog makes when both are chosen. One of the project's rows,
+ * time-based id, not run; the scenario's page binds it and says what waits.
  */
-export function scenarioFromVesselAndTrain(vesselId: string, trainRunId: string, program: ProgramId | null, name?: string): string {
+export function scenarioFromVesselAndTrain(vesselId: string, trainRunId: string, name?: string): string {
   return useStore
     .getState()
-    .createScenario(COMPOSITE_FLOWSHEET, name?.trim() || 'A vessel and a train, priced', program, { vessel: vesselId, trainRun: trainRunId });
+    .createScenario(COMPOSITE_FLOWSHEET, name?.trim() || 'A vessel and a train, priced', { vessel: vesselId, trainRun: trainRunId });
 }

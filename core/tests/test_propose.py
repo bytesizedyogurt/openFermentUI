@@ -4,8 +4,8 @@
 Offline, thermosteam's answer is a STAND-IN in the worker's shape with
 invented numbers (the boiling points and the azeotrope a test names), and
 Biopython's ProtParam runs for real on one published chain, cited by its
-accession, carried by a STAND-IN product in this file's own products seed and
-never in the repository's. The one `sim` test asks the real worker. Nothing
+accession, carried by a STAND-IN product in this file's own products catalogue
+and never in the repository's. The one `sim` test asks the real worker. Nothing
 here reads a key or the network.
 """
 from __future__ import annotations
@@ -14,13 +14,14 @@ import ast
 import json
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, intake, proforma, protparam, pureos, thermo, tools
 from openferment_core.models import Artifact, TrainProposal
-from openferment_core.pureos import proposer, train_spec
+from openferment_core.pureos import proposer
 from openferment_core.workers import WorkerError
 
 CORE = Path(__file__).resolve().parent.parent
@@ -60,30 +61,26 @@ class VolatilityStandIn:
                 "units": {"boilingPoint": "K"}, "how": STANDIN, "notes": []}
 
 
-# A products seed and a shelf of hosts in the projection's shape: STAND-IN
+# A products catalogue and the strains on file, in the corpus's shape: STAND-IN
 # entries beside real ids, so each rule is reached.
 MOLECULES = [
-    {"id": "insulin-b-chain", "name": "Insulin B chain (STAND-IN)", "category": "therapeutic_protein", "program": None,
+    {"id": "insulin-b-chain", "name": "Insulin B chain (STAND-IN)", "category": "therapeutic_protein",
      "location": "secreted"},
     {"id": "insulin-b-inside", "name": "Insulin B chain held in the cells (STAND-IN)", "category": "therapeutic_protein",
-     "program": None, "location": "intracellular"},
-    {"id": "protein-no-chain", "name": "A secreted protein with no chain (STAND-IN)", "category": "food_protein",
-     "program": None, "location": "secreted"},
-    {"id": "taq-dna-polymerase", "name": "Taq DNA polymerase", "category": "molecular_biology_enzyme", "program": None},
-    {"id": "valencene", "name": "Valencene", "category": "terpene", "program": None},
-    {"id": "granules", "name": "A stored polymer (STAND-IN)", "category": "biopolymer", "program": None,
      "location": "intracellular"},
-    {"id": "secreted-polymer", "name": "A secreted polymer (STAND-IN)", "category": "biopolymer", "program": None,
+    {"id": "protein-no-chain", "name": "A secreted protein with no chain (STAND-IN)", "category": "food_protein",
      "location": "secreted"},
-    {"id": "odd-category", "name": "A category no rule reads (STAND-IN)", "category": "a word of its own",
-     "program": None},
-    {"id": "phb", "name": "Polyhydroxybutyrate (PHB)", "category": "biopolymer", "program": "pha"},
-    {"id": "beta-lactoglobulin", "name": "β-lactoglobulin", "category": "food_protein", "program": "casein"},
+    {"id": "taq-dna-polymerase", "name": "Taq DNA polymerase", "category": "molecular_biology_enzyme"},
+    {"id": "valencene", "name": "Valencene", "category": "terpene"},
+    {"id": "granules", "name": "A stored polymer (STAND-IN)", "category": "biopolymer",
+     "location": "intracellular"},
+    {"id": "secreted-polymer", "name": "A secreted polymer (STAND-IN)", "category": "biopolymer",
+     "location": "secreted"},
+    {"id": "odd-category", "name": "A category no rule reads (STAND-IN)", "category": "a word of its own"},
 ]
 HOSTS = [
-    {"id": "s-cerevisiae-s288c", "name": "Saccharomyces cerevisiae S288C", "program": "yeast"},
-    {"id": "ecoli", "name": "Escherichia coli expression strains", "program": None},
-    {"id": "c-necator-h16", "name": "Cupriavidus necator H16", "program": "pha"},
+    {"id": "s-cerevisiae-s288c", "name": "Saccharomyces cerevisiae S288C"},
+    {"id": "ecoli", "name": "Escherichia coli expression strains"},
 ]
 SEQUENCES = [
     {"id": "insulin-b-chain", "name": "Insulin B chain", "sequence": INSULIN_B, "sequenceSource": INSULIN_B_SOURCE},
@@ -102,8 +99,7 @@ def store(monkeypatch, tmp_path):
 
 @pytest.fixture()
 def seed(monkeypatch):
-    monkeypatch.setattr(proposer, "_projection", lambda: {"dominion": {"molecules": MOLECULES},
-                                                         "geneos": {"hosts": HOSTS}})
+    monkeypatch.setattr(proposer, "_catalogue", lambda: SimpleNamespace(products=MOLECULES, strains=HOSTS))
     monkeypatch.setattr(protparam, "products", lambda: SEQUENCES)
     monkeypatch.setattr(thermo, "CHEMICALS", {**thermo.CHEMICALS, "methanol-product": "Methanol",
                                               "heavy-product": "Glycerol", "unsaid-product": "Unsaid",
@@ -255,8 +251,8 @@ def test_the_missing_words_are_the_property_functions_own(store, seed, worker):
     why = {m.property: m.why for m in p.missing}
     assert "carries no sequence" in why["sequence"] and "secreted or stays in the cells" in why["location"]
     assert "names no chemical of thermosteam's library" in pureos.propose("valencene", YEAST).missing[0].why
-    # Neither names a program: the active one's, said so.
-    assert p.program == "yeast" and any("active program" in n for n in p.notes)
+    # Neither names a chemical set: the one pureOS holds, said so.
+    assert p.program == "yeast" and any("built on the one it holds, yeast" in n for n in p.notes)
 
 
 @pytest.mark.parametrize("product", ["ethanol", "methanol-product", "heavy-product", "insulin-b-chain",
@@ -281,48 +277,15 @@ def test_an_unknown_product_is_unknown_and_an_unknown_host_refused(store, seed, 
             pureos.propose(product, host)
 
 
-def test_an_archived_program_is_refused_with_the_switch_off_and_proposed_with_it_on(store, seed, worker):
-    with pytest.raises(pureos.ProposeRefused, match="archived \\(hidden\\).*Settings → Programs"):
-        pureos.propose("phb", "c-necator-h16")
-    with pytest.raises(pureos.ProposeRefused, match="archived"):
-        pureos.propose("ethanol", "c-necator-h16")
-    p = pureos.propose("phb", "c-necator-h16", include_archived=True)
-    assert p.program == "pha" and p.train is None and [m.property for m in p.missing] == ["location"]
-
-
-def test_with_the_switch_off_a_hidden_product_or_host_is_said_hidden_before_anything_else(store, seed, worker):
-    """OF-BLD-020 §7.R: a product or host of an archived program, named with
-    the switch off, is refused as hidden, in the switch's words, whatever the
-    other names; never as two programs' train, which names the archived one."""
-    hidden = "belongs to PHA, archived \\(hidden\\)\\. Settings → Programs"
-    with pytest.raises(pureos.ProposeRefused, match=f"^product phb {hidden}"):
-        pureos.propose("phb", YEAST)
-    with pytest.raises(pureos.ProposeRefused, match=f"^host c-necator-h16 {hidden}"):
-        pureos.propose("ethanol", "c-necator-h16")
-    with pytest.raises(pureos.ProposeRefused, match="^product beta-lactoglobulin belongs to Casein, archived"):
-        pureos.propose("beta-lactoglobulin", "c-necator-h16")
-    assert worker.calls == [] and artifacts.all_artifacts() == []
-    # With the switch on, two programs are still two.
-    with pytest.raises(pureos.ProposeRefused, match="a train is one program's"):
-        pureos.propose("phb", YEAST, include_archived=True)
-
-
-def test_a_product_and_a_host_of_two_programs_are_refused(store, seed, worker):
-    with pytest.raises(pureos.ProposeRefused, match="a train is one program's"):
-        pureos.propose("beta-lactoglobulin", YEAST, include_archived=True)
-
-
 def _kept(store: Path, aid: str, tool: str, output: dict) -> Artifact:
     art = Artifact(id=aid, tool=tool, toolVersion="a test's", inputs=[], output=output, outputHash="0",
-                   provenance="demo", createdAt="2026-10-21T00:00:00Z", durationMs=0)
-    (store / "artifacts").mkdir(exist_ok=True)
-    (store / "artifacts" / f"{aid}.json").write_text(art.model_dump_json(), encoding="utf-8")
-    return art
+                   provenance="assumed", createdAt="2026-10-21T00:00:00Z", durationMs=0)
+    from standins import plant_artifact
+
+    return plant_artifact(art)
 
 
 def test_an_inlet_names_a_kept_simulation_or_a_runs_stream(store, seed, worker, monkeypatch):
-    from types import SimpleNamespace
-
     sim = _kept(store, "0123456789abcdef", "fermos.simulation", {"family": "batch_v1", "product": "ethanol"})
     p = pureos.propose("ethanol", YEAST, sim.id)
     assert p.train.inlet.kind == "simulation" and p.train.inlet.ref == sim.id and p.train.inlet.params == {}
@@ -332,10 +295,10 @@ def test_an_inlet_names_a_kept_simulation_or_a_runs_stream(store, seed, worker, 
     p = pureos.propose("ethanol", YEAST, f"{run.id}/beer")
     assert (p.train.inlet.kind, p.train.inlet.ref, p.train.inlet.streamId) == ("run-stream", run.id, "beer")
     assert pureos.validate(p.train) == []
-    other = _kept(store, "00000000000000aa", "fermos.simulation", {"family": "batch_v1", "product": "phb"})
+    other = _kept(store, "00000000000000aa", "fermos.simulation", {"family": "batch_v1", "product": "glycerol"})
     fit = _kept(store, "00000000000000bb", "kinetic_fit", {})
     for ref, words in (("not-an-id", "is neither"), ("abcdefabcdefabcd", "no kept artifact"),
-                       (other.id, "makes phb"), (run.id, "name the stream"), (f"{run.id}/mash", "no stream mash"),
+                       (other.id, "makes glycerol"), (run.id, "name the stream"), (f"{run.id}/mash", "no stream mash"),
                        (f"{sim.id}/beer", "by its id alone"), (fit.id, "kinetic_fit artifact")):
         with pytest.raises(pureos.ProposeRefused, match=words):
             pureos.propose("ethanol", YEAST, ref)
@@ -386,10 +349,6 @@ def test_post_proposes_and_says_what_is_unknown_refused_or_cannot_be_asked(clien
     assert client.post("/api/pureos/propose", json={"product": "nonesuch", "host": YEAST}).status_code == 404
     r = client.post("/api/pureos/propose", json={"product": "ethanol", "host": "nobody"})
     assert r.status_code == 422 and "no host 'nobody'" in r.json()["detail"]
-    r = client.post("/api/pureos/propose", json={"product": "phb", "host": "c-necator-h16"})
-    assert r.status_code == 422 and "archived" in r.json()["detail"]
-    r = client.post("/api/pureos/propose", json={"product": "phb", "host": "c-necator-h16", "includeArchived": True})
-    assert r.status_code == 200 and r.json()["program"] == "pha"
     r = client.post("/api/pureos/propose", json={"product": "odd-product", "host": YEAST})
     assert r.status_code == 503 and "where thermosteam runs" in r.json()["detail"]
     # Ids and words: a number, or a field the request does not take, is refused.
@@ -399,22 +358,21 @@ def test_post_proposes_and_says_what_is_unknown_refused_or_cannot_be_asked(clien
 
 
 def test_a_damaged_property_answer_is_a_409_in_words(client, store):
+    from standins import plant_damaged
+
     art = thermo.volatility("ethanol")
-    (artifacts.folder() / f"{art.id}.json").write_text("{trunc", encoding="utf-8")
+    plant_damaged(art.id)
     r = client.post("/api/pureos/propose", json={"product": "ethanol", "host": YEAST})
     assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"]
 
 
-def test_with_no_corpus_exported_the_endpoint_is_a_503(store, worker, monkeypatch):
-    from openferment_core import api, module_stores
+def test_with_no_strain_on_file_the_endpoint_refuses_in_words(store, worker):
+    # The catalogues are empty until a project's documents bring entries (alpha 2.0, ADR-010).
+    from openferment_core import api
 
-    def missing():
-        raise module_stores.ProjectionMissing("modules.json is missing; run `pnpm export:corpus`")
-
-    monkeypatch.setattr(proposer, "_projection", missing)
     r = TestClient(api.app, base_url="http://127.0.0.1").post("/api/pureos/propose",
                                                               json={"product": "ethanol", "host": YEAST})
-    assert r.status_code == 503 and "export:corpus" in r.json()["detail"]
+    assert r.status_code == 422 and f"there is no host {YEAST!r} among the strains on file" in r.json()["detail"]
 
 
 # ── the tool ─────────────────────────────────────────────────────────────
@@ -458,15 +416,10 @@ def test_the_tool_returns_the_proposal_as_data_its_summary_in_words_and_the_prop
         "location", "sequence"] and nothing.evidence == []
 
 
-def test_the_tool_refuses_a_number_an_unknown_product_and_an_archived_target(store, seed, worker):
+def test_the_tool_refuses_a_number_and_an_unknown_product(store, seed, worker):
     assert "a number was typed" in tools.run("pureos_propose", {"product": "ethanol", "host": YEAST, "inletRef": 5}).error
     assert "pureos_propose refused: there is no product" in tools.run(
         "pureos_propose", {"product": "nonesuch", "host": YEAST}).error
-    hidden = tools.run("pureos_propose", {"product": "phb", "host": "c-necator-h16"})
-    assert "archived (hidden)" in hidden.error and hidden.evidence == []
-    shown = tools.run("pureos_propose", {"product": "phb", "host": "c-necator-h16"},
-                      tools.ToolContext(include_archived=True))
-    assert shown.error is None and shown.summary["program"] == "pha"
     assert "could not ask thermosteam" in tools.run("pureos_propose", {"product": "odd-product", "host": YEAST}).error
 
 
@@ -485,8 +438,6 @@ def test_a_claim_that_copies_a_property_label_word_for_word_is_kept(store, seed,
     (thermosteam's answer here carries the real worker's library words, its
     name and version, and ProtParam's is Biopython's own)."""
     from importlib.metadata import version
-    from types import SimpleNamespace
-
     from openferment_core.validate import SeenSet, validate_plan
 
     monkeypatch.setattr(proforma, "call", VolatilityStandIn(library=f"thermosteam {version('thermosteam')}"))
@@ -509,6 +460,7 @@ def test_a_claim_that_copies_a_property_label_word_for_word_is_kept(store, seed,
 @pytest.mark.sim
 def test_ethanol_through_the_real_worker_is_distilled_then_sieved(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(proposer, "_catalogue", lambda: SimpleNamespace(products=[], strains=HOSTS))
     proforma.start(background=False)
     p = pureos.propose("ethanol", YEAST)
     [vol] = [a for a in artifacts.all_artifacts() if a.tool == "volatility"]

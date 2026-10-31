@@ -1,11 +1,11 @@
 """Whole-file writes that land whole or not at all (OF-BLD-012 §B.8).
 
-Every file the service keeps (biorepo.json, a fetch in fulltext/, a run in
-candidates/) used to be written with `Path.write_text`, which truncates first
-and fills second. A crash, a power cut or a full disk between the two leaves a
-half-written file. For biorepo.json, the committed record of who decided what,
-that would be the decisions themselves. A reader in another process (the
-nightly job writes while the server reads) could also catch a file mid-write.
+Every file the service still keeps (a genome-scale model in models/, an
+export) would be written with `Path.write_text`, which
+truncates first and fills second. A crash, a power cut or a full disk between
+the two leaves a half-written file. A reader in another process (the nightly
+job writes while the server reads) could also catch a file mid-write. The
+records themselves are kept in the database (ADR-001).
 
 `write_text` here (and `write_bytes`, for a file kept byte for byte as it was
 fetched) writes beside the target, flushes to disk, then renames over it. A

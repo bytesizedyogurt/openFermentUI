@@ -58,17 +58,20 @@ function tsFields(source, name) {
 
 const PAIRS = [
   ['Claim', 'Claim'],
+  ['ClaimValue', 'ClaimValue'],
   ['Usage', 'AnswerPlanUsage'],
   ['AnswerPlan', 'AnswerPlan'],
   // OF-BLD-015 §7.1 — the coverage map.
   ['CoverageHit', 'CoverageHit'],
   ['ModuleCoverage', 'ModuleCoverage'],
   ['CoverageMap', 'CoverageMap'],
-  ['ArchivedCoverage', 'ArchivedCoverage'],
   // OF-BLD-015 §7.2 — what a module's read tool returns.
   ['ModuleRow', 'ModuleRow'],
   // OF-BLD-015 §7.3, §7.4 — the audit log and the proposals.
   ['AuditEntry', 'AuditEntry'],
+  // alpha 2.0, ADR-005 — projects.
+  ['Project', 'Project'],
+  ['ProjectCreate', 'ProjectCreate'],
   ['Proposal', 'Proposal'],
   ['ProposalAction', 'ProposalAction'],
   // OF-BLD-012 §2.5 — Intake. The service's FetchedSection is the browser's
@@ -76,12 +79,20 @@ const PAIRS = [
   ['FetchedSection', 'PaperSection'],
   ['FetchLicense', 'FetchLicense'],
   ['FetchResult', 'FetchResult'],
-  ['IntakeStatus', 'IntakeStatus'],
+  // alpha 2.0, ADR-002 — collection into Sci RAG Kit.
+  ['CollectOutcome', 'CollectOutcome'],
+  ['CollectRequest', 'CollectRequest'],
+  ['PasteRequest', 'PasteRequest'],
+  ['LiteratureDocument', 'LiteratureDocument'],
+  ['SearchHit', 'SearchHit'],
+  ['SearchResponse', 'SearchResponse'],
+  ['LiteratureQuestion', 'LiteratureQuestion'],
   ['OverlayPaper', 'OverlayPaper'],
   ['Overlay', 'Overlay'],
   // OF-BLD-012 §2.5 — extraction and review. The service's names differ
   // from the browser's where the browser already had one.
   ['Quantity', 'Quantity'],
+  ['Origin', 'Origin'],
   ['Range', 'Range'],
   ['Candidate', 'Candidate'],
   ['ExtractRunResult', 'RunResult'],
@@ -143,19 +154,11 @@ const PAIRS = [
   ['DraftItem', 'DraftItem'],
   ['DraftMeasure', 'DraftMeasure'],
   ['RunbookDraft', 'RunbookDraft'],
+  // OF-BLD-006 §3 — a runbook, a person's or a study's (studies/runbooks.py).
+  ['RunbookStage', 'RunbookStage'],
+  ['Runbook', 'Runbook'],
   // OF-BLD-014 §4.1 — passages.
   ['Passage', 'Passage'],
-  ['RagLane', 'RagLane'],
-  ['RagStatus', 'RagStatus'],
-  ['PassageHit', 'PassageHit'],
-  // OF-BLD-014 §4.3 — the retrieval scorecard.
-  ['RagMetrics', 'RagMetrics'],
-  ['RagLaneReport', 'RagLaneReport'],
-  ['RagSetInfo', 'RagSetInfo'],
-  ['RagReport', 'RagReport'],
-  // OF-BLD-014 §4.4 — search from the browser.
-  ['RagSearchRequest', 'RagSearchRequest'],
-  ['RagSearchResponse', 'RagSearchResponse'],
   // OF-BLD-014 §5.1 — a plan cites sentences and computed values.
   ['PassageRef', 'PassageRef'],
   // OF-BLD-014 §6.3 — geneOS's shelf and its results.
@@ -208,8 +211,6 @@ const PAIRS = [
   // A follow-up carries its conversation's earlier turns in words.
   ['PriorTurn', 'PriorTurn'],
   ['AskRequest', 'AskRequest'],
-  // OF-BLD-016 §2.1 — a program is data.
-  ['Program', 'Program'],
   // OF-BLD-019 §4.1 — pureOS reads the train from the run Proforma priced.
   ['TrainUnit', 'TrainUnit'],
   ['Train', 'Train'],
@@ -289,6 +290,36 @@ const PAIRS = [
   ['TrainFromRunRequest', 'TrainFromRunRequest'],
   ['TrainUnmapped', 'TrainUnmapped'],
   ['TrainFromRun', 'TrainFromRun'],
+  // Execution prompt §7.5 — SFF flowsheet records (engine/sff.py).
+  ['SFFFinding', 'SFFFinding'],
+  ['SFFValidation', 'SFFValidation'],
+  ['SFFCriterion', 'SFFCriterion'],
+  ['SFFCompleteness', 'SFFCompleteness'],
+  ['SFFTag', 'SFFTag'],
+  ['SFFNode', 'SFFNode'],
+  ['SFFEdge', 'SFFEdge'],
+  ['SFFBoundary', 'SFFBoundary'],
+  ['SFFGraph', 'SFFGraph'],
+  ['SFFFlowsheet', 'SFFFlowsheet'],
+  // Execution prompt §7.4 — engine runs (engine/runs.py).
+  ['RunInput', 'RunInput'],
+  ['RunSFF', 'RunSFF'],
+  ['EngineRun', 'EngineRun'],
+  ['RunReport', 'RunReport'],
+  // Execution prompt §9.1 step 5 — studies (studies/).
+  ['ScenarioValue', 'ScenarioValue'],
+  ['ScenarioCreate', 'ScenarioCreate'],
+  ['StudyScenario', 'StudyScenario'],
+  ['StudyRequest', 'StudyRequest'],
+  ['ComparisonCreate', 'ComparisonCreate'],
+  ['StudyComparison', 'StudyComparison'],
+  ['ComparisonReport', 'ComparisonReport'],
+  ['PredictedOutput', 'PredictedOutput'],
+  ['RunbookCreate', 'RunbookCreate'],
+  // Execution prompt §4.8 — Postdoc's conversations, kept on the service (postdoc/conversations.py).
+  ['LiveTurn', 'LiveTurn'],
+  ['LiveConversation', 'LiveConversation'],
+  ['ToolCallRecord', 'ToolCallRecord'],
 ];
 
 let compared = 0;

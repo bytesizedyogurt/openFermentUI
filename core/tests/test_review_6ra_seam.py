@@ -29,6 +29,7 @@ from fastapi.testclient import TestClient
 import test_vessel as tv
 from openferment_core import artifacts, fermos, kinetics, proforma, pureos, vessel
 from openferment_core.models import Artifact, Override, TrainSpec, VesselRequest
+from standins import plant_artifact
 from test_train import (  # noqa: F401 (the fixtures, by name)
     AT,
     BY,
@@ -76,9 +77,7 @@ def states_of(h) -> dict[str, float]:
 def keep_copy(art: Artifact, aid: str, **output) -> Artifact:
     """A copy of a kept simulation written by hand under another id, its
     output changed as given (a STAND-IN artifact)."""
-    copy = art.model_copy(update={"id": aid, "output": {**art.output, **output}})
-    (artifacts.folder() / f"{aid}.json").write_text(copy.model_dump_json(), encoding="utf-8")
-    return copy
+    return plant_artifact(art.model_copy(update={"id": aid, "output": {**art.output, **output}}))
 
 
 def without_harvest_point(art: Artifact, aid: str) -> Artifact:
@@ -136,9 +135,9 @@ def test_an_older_simulation_with_no_point_at_its_harvest_hour_is_refused_there_
     near = fermos.harvest(old.id, sim.harvestH)
     assert not near.exact and "the nearest kept point" in near.read
     # pureOS's inlet and the vessel refuse it in the read's words.
-    with pytest.raises(pureos.TrainRefused, match=rf"simulation c{{16}} keeps no point at its own harvest hour"):
+    with pytest.raises(pureos.TrainRefused, match=r"simulation c{16} keeps no point at its own harvest hour"):
         pureos.inlet_stream(sim_inlet(old.id))
-    with pytest.raises(vessel.VesselRefused, match=rf"simulation c{{16}} keeps no point at its own harvest hour"):
+    with pytest.raises(vessel.VesselRefused, match=r"simulation c{16} keeps no point at its own harvest hour"):
         vessel.simulation_inputs(artifacts.get(old.id))
 
 

@@ -1,19 +1,18 @@
 // Single store (OF-DES-001 §13.3). All mutations flow through actions so
 // provenance-affecting changes fan out to derived views in one place.
-// No localStorage/sessionStorage anywhere — session-only by design (§9.5);
-// what must survive a reload goes to the Durable tier (src/lib/durable.ts).
-import { useCallback, useMemo } from 'react';
+// The scientific records live on the service, in the open project
+// (lib/projectState.ts and the service's own stores); what this browser keeps
+// is its preferences and the writes the service has not yet acknowledged
+// (src/lib/durable.ts), and localStorage holds the last-open project alone.
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import type {
+  Project,
   InputAssumption,
   Override,
   RunbookDraft,
-  AuditEvent,
-  Candidate,
   ReviewDecision,
   ActivityEvent,
-  ClearanceStateId,
-  Collection,
   LiveConversation,
   LiveTurn,
   TraceStep,
@@ -23,12 +22,12 @@ import type {
   Job,
   MeasuredEvidence,
   LearnModule,
+  OverlayPaper,
   Paper,
   Product,
   Protocol,
   Provenance,
   RecordStatus,
-  ResultGrid,
   Runbook,
   SeriesRole,
   FermosFitResponse,
@@ -36,14 +35,12 @@ import type {
   TrainFromRun,
   TrainRun,
   KeptTrain,
-  RunbookStage,
   RunOutput,
   RunState,
   Scenario,
   Strain,
   TimerState,
   Overlay,
-  FetchResult,
   Guild,
   GuildEvidence,
   GuildPerson,
@@ -56,21 +53,9 @@ import type {
   CheckNote,
   CheckResult,
   Checks,
-  Program,
-  ProgramId,
+  Skill,
   TrainSpec,
 } from '@/data/types';
-import { PAPERS } from '@/data/papers';
-import { RECORDS } from '@/data/records';
-import { RUN_OUTPUTS } from '@/data/runOutputs';
-import { STRAINS } from '@/data/strains';
-import { PRODUCTS } from '@/data/products';
-import { RUNBOOKS } from '@/data/runbooks';
-import { PROTOCOLS } from '@/data/protocols';
-import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
-import { MODULES } from '@/data/learn';
-import { PROGRAMS, PROGRAM_BY_ID, isArchived, programOfPaperId } from '@/data/programs';
-import { buildGrid } from '@/engine/grids';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
@@ -86,9 +71,20 @@ import {
   type DurableSnapshot,
   type TrainMade,
 } from '@/lib/durable';
-import { DecisionRefused, IntakeDown, extractPaper, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
-import { blocks, carryOverSpan, isNewCandidate, spanChangesNumber, writeRefusal, type ReviewAction } from '@/lib/review';
-import { postdocHealth } from '@/lib/postdoc';
+import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
+import { blocks, writeRefusal, type ReviewAction } from '@/lib/review';
+import { call } from '@/lib/http';
+import { openProjectId, projectSettled, setOpenProjectId } from '@/lib/project';
+import {
+  EMPTY_STATE,
+  applyEntries,
+  changes,
+  enqueue,
+  flush,
+  loadProjectState,
+  type OutboxEntry,
+  type ProjectState,
+} from '@/lib/projectState';
 import {
   EMPTY_GUILD,
   GuildRefused,
@@ -103,7 +99,6 @@ import {
 import { loadPractice as loadPracticeFromService } from '@/lib/practice';
 import { CheckRefused, loadChecks as loadChecksFromService, postBrief, postDismiss, postPropose, postRecord, postRequest, postSchedule, whyNot } from '@/lib/checks';
 import { competenceOf, localToday, mayCosign, statusOf } from '@/engine/competence';
-import { SKILL_BY_ID } from '@/data/skills';
 
 export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
@@ -131,7 +126,7 @@ export const nextId = (prefix: string) => `${prefix}-${++seq}`;
 /** An id that stays unique across reloads: the time, and a counter for ties. */
 export const timeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq}`;
 
-/** How many Live conversations the Durable tier keeps, newest first. */
+/** How many Live conversations the page holds, newest first; the project keeps every one. */
 const MAX_LIVE_CONVERSATIONS = 30;
 
 /** Deterministic clock-free timestamp label for audit entries. */
@@ -168,30 +163,25 @@ function decisionOf(
   };
 }
 
-const SEED_BY_ID = new Map(RECORDS.map((r) => [r.id, r]));
-
 /**
- * The span a promotion re-anchored a curated record to (§7.3), when it did:
- * the record's quote and section differ from the seed's. Null for a record on
- * its own quote, and for a candidate, whose quote anchored when it was
- * extracted and is never carried. What the Durable tier persists and what a
- * synced decision posts, so a carry-over made offline survives a reload and
- * reaches the service with the sentence it stands on — a decision posted
- * without it would be anchored on the seed quote, which is not in the paper.
+ * The span a decision re-anchored the record to (§7.3), when one did: the
+ * record's quote and section differ from the `original` stamped as it entered
+ * the store. Null for a record on its own quote, which is every candidate
+ * nobody re-anchored. What the Durable tier persists and what a synced
+ * decision posts, so the decision reaches the service with the sentence it
+ * stands on.
  */
 function reanchoredSpan(r: ExtractionRecord): { quote: string; sectionId: string } | null {
-  const was = r.original ?? SEED_BY_ID.get(r.id);
+  const was = r.original;
   if (!was || (r.quote === was.quote && r.sectionId === was.sectionId)) return null;
   return { quote: r.quote, sectionId: r.sectionId };
 }
 
 /**
- * What a record was published as, stamped once as it ENTERS the store
- * (OF-BLD-012.1 F7) and never touched by a decision. Answering "has this been
- * re-anchored?" by diffing against the seed module was right until a corpus
- * update moved the seed underneath a decided record: the record then looked
- * re-anchored and the sync posted the seed's new sentence as though a
- * reviewer had chosen it.
+ * What a record was extracted as, stamped once as it ENTERS the store
+ * (OF-BLD-012.1 F7) and never touched by a decision, so "has this been
+ * re-anchored?" and "what did the paper say before the correction?" are read
+ * from the record itself.
  */
 function stampOriginal(r: ExtractionRecord): ExtractionRecord {
   return r.original
@@ -277,7 +267,7 @@ function sameDecision(a: ExtractionRecord, b: ExtractionRecord): boolean {
 }
 
 export interface OFState {
-  // ── seeded data (session-mutable) ────────────────────────────────────
+  // ── the project's data, from the service (session-mutable) ───────────
   papers: Paper[];
   records: ExtractionRecord[];
   runOutputs: RunOutput[];
@@ -291,8 +281,10 @@ export interface OFState {
    */
   runbooks: Runbook[];
   /**
-   * The Durable tier (OF-BLD-006 §4.6). A deposition is a record, not a
-   * session: a fermentation at hour 14 cannot be lost to a page reload.
+   * The open project's depositions (OF-BLD-006 §4.6; lib/projectState.ts).
+   * A deposition is a record, not a session: a fermentation at hour 14
+   * cannot be lost to a page reload, so a change the service has not yet
+   * acknowledged waits in the outbox.
    */
   depositions: Deposition[];
   /**
@@ -303,9 +295,9 @@ export interface OFState {
   measuredEvidence: MeasuredEvidence[];
   protocols: Protocol[];
   scenarios: Scenario[];
-  grids: Record<string, ResultGrid>;
-  collections: Collection[];
   modules: LearnModule[];
+  /** A lab's skills (stage 2 serves them); none ship with the app. */
+  skills: Skill[];
   activity: ActivityEvent[];
   /**
    * Postdoc's Live conversations, newest first. Durable: a question asked
@@ -327,9 +319,9 @@ export interface OFState {
   /** Runbooks adopted from a Postdoc draft, by id (OF-BLD-014 §9.2). Durable. */
   adoptedRunbookIds: string[];
   /**
-   * Proforma scenarios a person made here from a shelf flowsheet, by id
-   * (OF-BLD-019 §3.1, D6). Durable: they live in `scenarios` beside the
-   * seeded ones and are saved whole, keyed by id.
+   * Proforma scenarios a person made from a shelf flowsheet, by id
+   * (OF-BLD-019 §3.1, D6): every scenario the project keeps. They live in
+   * `scenarios` and are saved whole as the project's rows, keyed by id.
    */
   createdScenarioIds: string[];
   /** A research runbook, unlocked, from a draft; returns its id. */
@@ -350,8 +342,8 @@ export interface OFState {
   clearProformaAssumption: (scenarioId: string, key: string) => void;
   /**
    * Every change a person made in the parameter panel, by scope
-   * (OF-BLD-020 D3): a named assumption this browser keeps and a run
-   * carries. Durable; the service keeps none. Read one scope with
+   * (OF-BLD-020 D3): a named assumption the project keeps and a run
+   * carries. Read one scope with
    * `useStore(overridesFor(scope))`.
    */
   parameterOverrides: Record<string, Override[]>;
@@ -380,16 +372,13 @@ export interface OFState {
   trainsMade: Record<string, TrainMade>;
   /** Save a train built in the Builder under a reviewer name, replacing the one saved by its id. */
   saveTrain: (train: TrainSpec, by: string) => void;
-  checkpointAnswers: Record<string, boolean>;
   exports: { name: string; at: string; rows: number }[];
 
   ui: {
     theme: Theme;
     density: Density;
-    simSpeed: number; // 1, 4, or Infinity (instant)
     reducedMotion: boolean;
     unitMode: UnitMode;
-    bannerDismissed: boolean;
     paletteOpen: boolean;
     jobsOpen: boolean;
     sessionsOpen: boolean;
@@ -419,13 +408,10 @@ export interface OFState {
 
   // jobs
   startJob: (job: Omit<Job, 'id' | 'stageIndex' | 'stageProgress' | 'status' | 'startedAt'>) => string;
-  tickJobs: (dtMs: number) => void;
   failJob: (id: string, reason: string) => void;
   clearJobs: () => void;
 
   // ingest
-  ingestPaper: (paperId: string, opts?: { force?: boolean }) => void;
-  setPaperIngest: (paperId: string, status: Paper['ingest']) => void;
 
   // protocols / runs
   startRun: (protocolId: string, version: string, scale: number) => string;
@@ -444,14 +430,6 @@ export interface OFState {
   addProtocolVersion: (protocolId: string, version: Protocol['versions'][number]) => void;
 
   // runbooks (OF-BLD-005 §7) — a slice of its own, never folded into jobs
-  /**
-   * Blocked → research handoff (§8). Builds a research runbook that enumerates
-   * around whatever fence the product is behind, and is honest when
-   * enumeration would not help: a claim reciting a functional class is not
-   * escaped by molecular diversity, and the runbook says so instead of
-   * spending compute to find out again.
-   */
-  handoffToResearchRunbook: (productId: string) => string | null;
   /** Research → industrial in one action, carrying the finding across. */
   promoteRunbook: (runbookId: string) => string | null;
   /**
@@ -482,12 +460,11 @@ export interface OFState {
   supersedeRunbook: (runbookId: string) => string | null;
 
   // scenarios
-  setScenarioPoint: (id: string, point: Record<string, number>) => void;
   togglePin: (id: string) => void;
   duplicateScenario: (id: string) => string;
   /**
    * A `biosteam` scenario on a shelf flowsheet (OF-BLD-019 §3.1): its name,
-   * its program (null for a general one), no inputs of its own, not run.
+   * no inputs of its own, not run.
    * Durable, under a time-based id; returns the id.
    */
   /**
@@ -497,7 +474,6 @@ export interface OFState {
   createScenario: (
     flowsheetId: string,
     name: string,
-    program: ProgramId | null,
     parts?: { vessel: string; trainRun: string } | null,
   ) => string;
   /** The newest run artifact of a scenario, as a run on its page returned it (D6). */
@@ -521,7 +497,6 @@ export interface OFState {
 
   // learn
   completeLesson: (lessonId: string) => void;
-  recordCheckpoint: (qid: string, correct: boolean) => void;
 
   // deposition (OF-BLD-006 §4)
   /**
@@ -571,7 +546,7 @@ export interface OFState {
   ) => void;
 
   // durable tier (OF-BLD-006 §4.6)
-  /** Re-apply a persisted snapshot over the seeded state. Idempotent. */
+  /** Re-apply a persisted snapshot over the state in memory. Idempotent. */
   hydrateDurable: () => Promise<void>;
   applyDurable: (snap: DurableSnapshot) => void;
   /** Whether this browser can persist at all — surfaced honestly in Settings. */
@@ -584,14 +559,42 @@ export interface OFState {
   reviewer: string;
   setReviewerName: (name: string) => void;
   /**
-   * Whether archived programs show (OF-BLD-016 §2.1, E.1′). Off by default:
-   * casein and PHA leave every list, count, prompt and evidence pool until a
-   * person turns this on in Settings → Programs. Durable, like the reviewer's
-   * name: a choice about what to see should survive a reload. Screens read
-   * it through `useProgramFilter()` / `programVisible`, never directly.
+   * The projects the service holds (alpha 2.0, ADR-005), oldest first; null
+   * until asked. Every record the service keeps belongs to one of them.
    */
-  showArchived: boolean;
-  setShowArchived: (on: boolean) => void;
+  projects: Project[] | null;
+  /** Why the projects could not be listed, in words; null when they were. */
+  projectsProblem: string | null;
+  /** The project this page acts in, named on every call to the service. */
+  projectId: string | null;
+  /**
+   * Ask the service for its projects. The project remembered here stays open
+   * while the service holds it; with none open and exactly one held, that one
+   * opens.
+   */
+  loadProjects: () => Promise<void>;
+  /** Open another project. The page reloads, so nothing of the last one is left showing. */
+  openProject: (id: string) => void;
+  /** Make a project, signed with the reviewer name, and open it. */
+  createProject: (asked: { name: string; description?: string }) => Promise<Project>;
+  /**
+   * What the open project holds of its pages, as last loaded or sent: the
+   * base the next change is compared with (lib/projectState.ts). Null until
+   * the project's rows have loaded, and nothing is sent before then.
+   */
+  stateSeen: ProjectState | null;
+  /** Project rows the service has not yet acknowledged, oldest first. */
+  stateOutbox: OutboxEntry[];
+  /** Rows this browser kept itself before alpha 2.0, until a project is open to carry them to. */
+  stateLegacy: ProjectState | null;
+  /** Why the open project's rows could not be loaded, in words; null when they were. */
+  stateProblem: string | null;
+  /** Load the open project's rows, lay the unsent ones over them, and send what is owed. */
+  hydrateProjectState: () => Promise<void>;
+  /** Put a project's rows in the page. */
+  applyProjectState: (state: ProjectState) => void;
+  /** Send the outbox; what the service does not answer stays for the next try. */
+  flushProjectState: () => Promise<void>;
   /**
    * The review decisions the Durable tier restored, with the snapshot's
    * savedAt — kept so a server decision for the same record can be compared
@@ -608,14 +611,10 @@ export interface OFState {
   serviceUp: boolean | null;
   /** The overlay as last received, merged. Later views (runs, candidates) read it here. */
   overlay: Overlay | null;
-  /** Apply an overlay over the seed. Idempotent; merges into any overlay already applied. */
+  /** Apply an overlay. Idempotent; merges into any overlay already applied. */
   applyOverlay: (overlay: Overlay) => void;
   /** Ask the service for its overlay and apply it. Silent when there is no service. */
   hydrateOverlay: () => Promise<void>;
-  /** Live fetch through the service. Called by `ingestPaper` when the service is up. */
-  ingestPaperLive: (paperId: string, force?: boolean) => Promise<void>;
-  /** The timer simulation. Called by `ingestPaper` when the service is down; labelled as such. */
-  ingestPaperScripted: (paperId: string) => void;
   /** One structured model response over a fetched paper, through the service (§6.3); then the overlay again. */
   extractPaperLive: (paperId: string) => Promise<void>;
   completeJob: (id: string) => void;
@@ -737,95 +736,9 @@ export interface OFState {
   // misc
   logActivity: (e: ActivityEvent) => void;
   logExport: (name: string, rows: number) => void;
-  addCollectionPapers: (collectionId: string, paperIds: string[]) => void;
   /** Settings → Clear this browser's data: the Durable tier, and the copies in memory it restores. */
   clearBrowserData: () => void;
 }
-
-/**
- * How a claim reads, per clearance state — the input to the blocked → research
- * handoff (OF-BLD-005 §8).
- *
- * The distinction that matters is what the claim RECITES. A claim reciting a
- * sequence or a structure fences a region you can walk around, and enumeration
- * is worth paying for. A claim reciting a function or an application fences the
- * job itself, and no amount of molecular diversity gets you out — the
- * cross-kingdom substitution that still infringed is the documented case. The
- * handoff therefore declines as readily as it accepts, and says which.
- */
-const CLAIM_READING: Record<
-  ClearanceStateId,
-  { reading: string; enumerable: boolean; stages: RunbookStage[] }
-> = {
-  blocked: {
-    reading: 'Structure-reciting — the claims name sequences, so the genus around them is enumerable',
-    enumerable: true,
-    stages: [
-      { name: 'Homolog retrieval', status: 'running', detail: 'Cross-genus sequence search', value: null },
-      { name: 'Identity-band mapping', status: 'pending', detail: 'Where the claimed band ends', value: null },
-      { name: 'Activity prediction', status: 'pending', detail: null, value: null },
-      { name: 'Enablement package', status: 'pending', detail: null, value: null },
-    ],
-  },
-  'watch-variant': {
-    reading: 'Core free, engineered variants fenced — the boundary is worth mapping precisely',
-    enumerable: true,
-    stages: [
-      { name: 'Boundary map', status: 'running', detail: 'Where the fenced variants start', value: null },
-      { name: 'Free-region candidates', status: 'pending', detail: null, value: null },
-      { name: 'Enablement package', status: 'pending', detail: null, value: null },
-    ],
-  },
-  'watch-process': {
-    reading:
-      'Process-reciting — the fence is on the route, not the molecule, so enumerating sequences would not move it',
-    enumerable: false,
-    stages: [
-      {
-        name: 'Recommendation',
-        status: 'done',
-        detail: 'Design around the process. Enumerating the molecule spends compute on the wrong axis.',
-        value: null,
-      },
-    ],
-  },
-  unknown: {
-    reading: 'Not yet assessed — classification has to happen before anything else is worth running',
-    enumerable: true,
-    stages: [
-      { name: 'Clearance sweep', status: 'running', detail: 'Claim classification first', value: null },
-      { name: 'Claim classification', status: 'pending', detail: null, value: null },
-      { name: 'Recommendation', status: 'pending', detail: null, value: null },
-    ],
-  },
-  'clear-none': {
-    reading: 'No blocking claims found — there is no fence here to enumerate around',
-    enumerable: false,
-    stages: [
-      {
-        name: 'Recommendation',
-        status: 'done',
-        detail: 'Proceed with counsel confirmation. Enumeration compute would buy nothing.',
-        value: null,
-      },
-    ],
-  },
-  'clear-expired': {
-    reading: 'Foundational IP expired — the region is open and the evidence trail is the deliverable',
-    enumerable: false,
-    stages: [
-      {
-        name: 'Recommendation',
-        status: 'done',
-        detail: 'Proceed and document the expiry evidence. Nothing to design around.',
-        value: null,
-      },
-    ],
-  },
-};
-
-const seedGrids = (): Record<string, ResultGrid> =>
-  Object.fromEntries(COST_MODELS.map((m) => [m.modelId, buildGrid(m)]));
 
 /**
  * Enforcement rather than convention (OF-BLD-006 §3.3).
@@ -849,21 +762,23 @@ function freezeLocked(runbooks: Runbook[]): Runbook[] {
   return runbooks;
 }
 
-const seedState = () => ({
-  papers: structuredClone(PAPERS),
-  records: structuredClone(RECORDS).map(stampOriginal),
-  runOutputs: structuredClone(RUN_OUTPUTS),
-  strains: structuredClone(STRAINS),
-  products: structuredClone(PRODUCTS),
-  runbooks: freezeLocked(structuredClone(RUNBOOKS)),
+// alpha 2.0 ships no seeded science (ADR-010): every list starts empty and is
+// filled from the service, a project's records from stage 2 on.
+const initialState = () => ({
+  papers: [] as Paper[],
+  records: [] as ExtractionRecord[],
+  runOutputs: [],
+  strains: [] as Strain[],
+  products: [] as Product[],
+  runbooks: freezeLocked([] as Runbook[]),
+  skills: [] as Skill[],
   depositions: [] as Deposition[],
   measuredEvidence: [] as MeasuredEvidence[],
-  protocols: structuredClone(PROTOCOLS),
-  scenarios: structuredClone(SCENARIOS),
-  // Collections and activity start empty: what lands in them is what a
-  // person did in this browser, never an authored history (OF-BLD-016 §3.1).
-  collections: [] as Collection[],
-  modules: structuredClone(MODULES),
+  protocols: [] as Protocol[],
+  scenarios: [] as Scenario[],
+  // Activity starts empty: what lands in it is what a person did in this
+  // browser, never an authored history (OF-BLD-016 §3.1).
+  modules: [] as LearnModule[],
   activity: [] as ActivityEvent[],
   liveConversations: [] as LiveConversation[],
   runs: {} as Record<string, RunState>,
@@ -882,7 +797,6 @@ const seedState = () => ({
   trainsMade: {} as Record<string, TrainMade>,
   adoptedRunbookIds: [] as string[],
   createdScenarioIds: [] as string[],
-  checkpointAnswers: {} as Record<string, boolean>,
   exports: [] as { name: string; at: string; rows: number }[],
 });
 
@@ -900,9 +814,45 @@ function initialTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'bench';
 }
 
+/** What kind of source a collector serves, for a paper made from the overlay. */
+const SOURCE_TYPES: Partial<Record<NonNullable<OverlayPaper['source']>, Paper['sourceType']>> = {
+  europepmc: 'journal-article',
+  osti: 'industry-report',
+  sgd: 'database-entry',
+};
+
+/**
+ * A document the project holds, as a paper (ADR-002): the citation the kit
+ * holds, its passages as its sections, its licence. Nothing is filled in
+ * that the kit does not hold; a year it does not know stays unset.
+ */
+function paperOf(id: string, o: OverlayPaper): Paper {
+  return {
+    id,
+    title: o.title ?? id,
+    authors: o.authors ?? [],
+    year: o.year ?? undefined,
+    venue: o.journal ?? '',
+    organisms: [],
+    topics: [],
+    abstract: '',
+    sections: o.sections,
+    ingest: o.ingest,
+    textSource: o.textSource,
+    openAccess: o.licenceClass === 'public' || o.licenceClass === 'open_commercial' || o.licenceClass === 'open_noncommercial',
+    doi: o.doi ?? undefined,
+    pmcid: o.pmcid ?? undefined,
+    sourceUrl: o.url ?? undefined,
+    sourceType: o.source ? SOURCE_TYPES[o.source] : undefined,
+    license: o.license ?? undefined,
+    licenceClass: o.licenceClass ?? undefined,
+    fetchedFrom: o.source,
+    held: true,
+  };
+}
+
 export const useStore = create<OFState>()((set, get) => ({
-  ...seedState(),
-  grids: seedGrids(),
+  ...initialState(),
   toasts: [],
   durableReady: false,
   durableReview: null as { savedAt: string; decisions: Record<string, DurableReviewDecision> } | null,
@@ -911,10 +861,8 @@ export const useStore = create<OFState>()((set, get) => ({
   ui: {
     theme: initialTheme(),
     density: 'comfortable',
-    simSpeed: 1,
     reducedMotion: false,
     unitMode: 'published',
-    bannerDismissed: false,
     paletteOpen: false,
     jobsOpen: false,
     sessionsOpen: true,
@@ -929,10 +877,140 @@ export const useStore = create<OFState>()((set, get) => ({
   reviewer: '',
   setReviewerName: (name) => set({ reviewer: name }),
 
-  // Outside seedState: a reset discards the session's work, not what the
+  projects: null,
+  projectsProblem: null,
+  projectId: openProjectId(),
+  stateSeen: null,
+  stateOutbox: [],
+  stateLegacy: null,
+  stateProblem: null,
+
+  loadProjects: async () => {
+    let listed: Project[];
+    try {
+      listed = await call<Project[]>('/api/projects');
+    } catch (e) {
+      set({ projectsProblem: e instanceof Error ? e.message : String(e) });
+      projectSettled();
+      return;
+    }
+    const open = get().projectId;
+    const keep = open && listed.some((p) => p.id === open) ? open : listed.length === 1 ? listed[0].id : null;
+    if (keep !== open) setOpenProjectId(keep);
+    set({ projects: listed, projectsProblem: null, projectId: keep });
+    projectSettled();
+  },
+
+  openProject: (id) => {
+    if (id === get().projectId) return;
+    setOpenProjectId(id);
+    set({ projectId: id });
+    window.location.reload();
+  },
+
+  createProject: async (asked) => {
+    const by = reviewerName();
+    if (!by) throw new Error('Set your reviewer name in Settings first: a project is made in a person\'s name.');
+    const made = await call<Project>('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: asked.name, description: asked.description ?? '', by }),
+    });
+    set((s) => ({ projects: [...(s.projects ?? []), made] }));
+    get().openProject(made.id);
+    return made;
+  },
+
+  hydrateProjectState: async () => {
+    const project = get().projectId;
+    if (!project) return;
+    let held: ProjectState;
+    try {
+      held = await loadProjectState();
+    } catch (e) {
+      set({ stateProblem: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    // Rows this browser kept before alpha 2.0 go to the open project, once.
+    const legacy = get().stateLegacy;
+    const outbox = legacy ? enqueue(get().stateOutbox, changes(EMPTY_STATE, legacy, project, decidedBy())) : get().stateOutbox;
+    // What this browser still owes the service stands over what it holds.
+    get().applyProjectState(applyEntries(held, outbox.filter((e) => e.project === project)));
+    set({ stateSeen: projectStateOf(get()), stateOutbox: outbox, stateLegacy: null, stateProblem: null });
+    if (legacy)
+      get().logActivity({
+        at: stamp(),
+        icon: 'upload',
+        text: 'The depositions, locks, scenarios, trains and conversations this browser kept itself are being sent to the open project',
+        href: '#/',
+        provenance: 'user',
+      });
+    void get().flushProjectState();
+  },
+
+  applyProjectState: (state) =>
+    set((s) => {
+      const adopted = new Set(state.runbooks.map((r) => r.id));
+      // Runbooks adopted from a draft first, then every lock laid on by id.
+      const runbooks = [...state.runbooks, ...s.runbooks.filter((r) => !adopted.has(r.id) && !s.adoptedRunbookIds.includes(r.id))].map(
+        (r) => {
+          const l = state.runbookLocks[r.id];
+          return l && !r.lockedAt ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
+        },
+      );
+      const made = new Set(state.scenarios.map((sc) => sc.id));
+      return {
+        depositions: state.depositions,
+        measuredEvidence: state.measuredEvidence,
+        runbooks: freezeLocked(runbooks),
+        adoptedRunbookIds: [...adopted],
+        parameterOverrides: state.overrides,
+        proformaAssumptions: assumptionsFromOverrides(state.overrides),
+        proformaFits: state.fits,
+        scenarios: [...s.scenarios.filter((sc) => !made.has(sc.id) && !s.createdScenarioIds.includes(sc.id)), ...state.scenarios],
+        createdScenarioIds: [...made],
+        trainsMade: state.trains,
+        // A turn the service reads as running is being answered there; the screen follows it.
+        liveConversations: mergeConversations(state.conversations, []),
+      };
+    }),
+
+  flushProjectState: async () => {
+    if (stateFlushing) return;
+    stateFlushing = true;
+    try {
+      for (;;) {
+        const pending = get().stateOutbox;
+        if (!pending.length) return;
+        const { left, sent, refused } = await flush(pending);
+        set((s) => ({ stateOutbox: [...left, ...s.stateOutbox.filter((e) => !pending.includes(e))] }));
+        for (const { entry, why } of refused)
+          get().logActivity({
+            at: stamp(),
+            icon: 'alert',
+            text: `The service refused ${entry.kind} ${entry.id} and it was dropped: ${why}`,
+            href: '#/',
+            provenance: 'user',
+          });
+        if (refused.length)
+          get().toast({ text: `The service refused ${refused.length} change${refused.length === 1 ? '' : 's'}: ${refused[0].why}`, kind: 'error' });
+        if (left.length) {
+          // The service did not answer; try again shortly, and on the next change.
+          if (stateRetry === null) stateRetry = setTimeout(() => {
+            stateRetry = null;
+            void get().flushProjectState();
+          }, STATE_RETRY_MS);
+          return;
+        }
+        if (!sent) return;
+      }
+    } finally {
+      stateFlushing = false;
+    }
+  },
+
+  // Outside initialState: a reset discards the session's work, not what the
   // person chose to see.
-  showArchived: false,
-  setShowArchived: (on) => set({ showArchived: on }),
 
   guild: EMPTY_GUILD,
   guildPending: [] as string[],
@@ -985,50 +1063,14 @@ export const useStore = create<OFState>()((set, get) => ({
     if (!before) return;
     // OF-BLD-012 §7.3 — what the service would say, said here first.
     const paper = s.papers.find((p) => p.id === before.paperId);
-    const candidates = s.overlay?.candidates ?? [];
-    // A refusal that blocks (no full text, no anchoring sentence) stops here.
-    // The one that does not — the paper has no identifier — lets the review
-    // go on in this browser and keeps the decision from the service.
-    const refusal =
-      action === 'skip' ? null : writeRefusal(action, before, paper, candidates, s.serviceUp, reviewerName());
+    // A refusal that blocks (no name, no text) stops here. The one that does
+    // not — the project does not hold the paper — lets the review go on in
+    // this browser and keeps the decision from the service.
+    const refusal = action === 'skip' ? null : writeRefusal(action, before, paper, s.serviceUp, reviewerName());
     if (blocks(refusal)) {
       get().toast({ text: refusal!.why, kind: 'error' });
       return;
     }
-    // A promotion on a curated record whose quote is not in the fetched text
-    // carries the extractor's agreeing span — and the paper's own number, as
-    // the correction — so the promoted record anchors in the paper's words
-    // and the service finds that number inside them (§2.4 rule 3).
-    const span = action === 'accept' || action === 'gold' ? carryOverSpan(before, paper, candidates) : null;
-    const reanchor = (r: ExtractionRecord, audit: AuditEvent[]): ExtractionRecord => {
-      if (!span) return r;
-      audit.push({
-        at: stamp(),
-        who: decidedBy(),
-        action: `span re-anchored to the extractor's quote (${span.candidateId})`,
-        from: r.quote,
-        to: span.quote,
-      });
-      if (!spanChangesNumber(r, span)) return { ...r, quote: span.quote, sectionId: span.sectionId };
-      audit.push({
-        at: stamp(),
-        who: decidedBy(),
-        action: 'value taken as the paper writes it',
-        from: `${r.value} ${r.unit}`,
-        to: `${span.value} ${span.unit}`,
-      });
-      // spanChangesNumber holds only for two numbers.
-      const corrected = { value: span.value as number, unit: span.unit };
-      return {
-        ...r,
-        quote: span.quote,
-        sectionId: span.sectionId,
-        corrected,
-        value: corrected.value,
-        unit: corrected.unit,
-        si: toSI(corrected.value, corrected.unit),
-      };
-    };
     const frame: UndoFrame = {
       records: structuredClone(s.records),
       recordIds: [id],
@@ -1042,7 +1084,7 @@ export const useStore = create<OFState>()((set, get) => ({
       if (action === 'accept') {
         audit.push({ at: stamp(), who: decidedBy(), action: 'verified' });
         stats.accepted++;
-        return { ...reanchor(r, audit), status: 'verified' as RecordStatus, reviewer: decidedBy(), audit };
+        return { ...r, status: 'verified' as RecordStatus, reviewer: decidedBy(), audit };
       }
       if (action === 'reject') {
         audit.push({ at: stamp(), who: decidedBy(), action: `rejected — ${payload?.reason ?? 'unspecified'}` });
@@ -1060,14 +1102,13 @@ export const useStore = create<OFState>()((set, get) => ({
       if (action === 'gold') {
         audit.push({ at: stamp(), who: decidedBy(), action: 'flagged for gold set' });
         stats.gold++;
-        // The gold value is the number the record carries AFTER re-anchoring:
-        // the paper's own, inside the sentence the service will anchor it in.
-        const re = reanchor(r, audit);
+        // The gold value is the number the record carries: a correction's
+        // when there is one, else the extractor's, inside its quote.
         return {
-          ...re,
+          ...r,
           status: 'verified' as RecordStatus,
           reviewer: decidedBy(),
-          gold: re.gold ?? { value: re.corrected?.value ?? re.value, unit: re.corrected?.unit ?? re.unit },
+          gold: r.gold ?? { value: r.corrected?.value ?? r.value, unit: r.corrected?.unit ?? r.unit },
           audit,
         };
       }
@@ -1088,7 +1129,7 @@ export const useStore = create<OFState>()((set, get) => ({
     // up it is posted too, and `biorepo.write` is what stores it there.
     if (action !== 'skip' && s.serviceUp && !refusal) {
       const after = get().records.find((r) => r.id === id);
-      if (after) void get().postReviewDecision(decisionOf(after, span, now));
+      if (after) void get().postReviewDecision(decisionOf(after, reanchoredSpan(after), now));
     }
   },
 
@@ -1136,7 +1177,7 @@ export const useStore = create<OFState>()((set, get) => ({
     if (s.serviceUp) {
       const after = get().records.find((r) => r.id === id);
       const paper = s.papers.find((p) => p.id === after?.paperId);
-      if (after && !writeRefusal(actionOf(after), after, paper, s.overlay?.candidates ?? [], true, reviewerName())) {
+      if (after && !writeRefusal(actionOf(after), after, paper, true, reviewerName())) {
         void get().postReviewDecision(decisionOf(after, reanchoredSpan(after), now));
       }
     }
@@ -1191,7 +1232,7 @@ export const useStore = create<OFState>()((set, get) => ({
     if (s.serviceUp) {
       for (const r of changed) {
         const paper = s.papers.find((p) => p.id === r.paperId);
-        if (writeRefusal(actionOf(r), r, paper, s.overlay?.candidates ?? [], true, reviewerName())) continue;
+        if (writeRefusal(actionOf(r), r, paper, true, reviewerName())) continue;
         void get().postReviewDecision(decisionOf(r, reanchoredSpan(r), now));
       }
     }
@@ -1214,52 +1255,6 @@ export const useStore = create<OFState>()((set, get) => ({
     return id;
   },
 
-  tickJobs: (dtMs) => {
-    const speed = get().ui.simSpeed;
-    const dt = speed === Infinity ? 1e9 : dtMs * speed;
-    const finishedJobs: Job[] = [];
-    set((s) => ({
-      jobs: s.jobs.map((j) => {
-        // A real job's progress is set by the fetch that owns it, never by
-        // the clock — at simSpeed ∞ a timed job completes on the next tick,
-        // which would mark a paper 'complete' while its fetch was still out.
-        if (j.status !== 'running' || j.real) return j;
-        let { stageIndex, stageProgress } = j;
-        let budget = dt;
-        while (budget > 0 && stageIndex < j.stages.length) {
-          const stage = j.stages[stageIndex];
-          const remaining = stage.ms * (1 - stageProgress);
-          if (budget >= remaining) {
-            budget -= remaining;
-            stageIndex += 1;
-            stageProgress = 0;
-          } else {
-            stageProgress += budget / stage.ms;
-            budget = 0;
-          }
-        }
-        if (stageIndex >= j.stages.length) {
-          const done: Job = { ...j, stageIndex: j.stages.length, stageProgress: 1, status: 'done' };
-          finishedJobs.push(done);
-          return done;
-        }
-        return { ...j, stageIndex, stageProgress };
-      }),
-    }));
-    for (const j of finishedJobs) {
-      get().toast({
-        text: `${j.title} — complete`,
-        kind: 'success',
-        href: j.href,
-        hrefLabel: j.href ? 'View' : undefined,
-      });
-      if (j.kind === 'ingest') {
-        const paperId = j.href?.split('/').pop() ?? '';
-        if (paperId) get().setPaperIngest(paperId, 'complete');
-      }
-    }
-  },
-
   failJob: (id, reason) =>
     set((s) => ({
       jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: 'failed', failReason: reason } : j)),
@@ -1276,35 +1271,13 @@ export const useStore = create<OFState>()((set, get) => ({
 
   // ── ingest ───────────────────────────────────────────────────────────
   //
-  // TWO PATHS, AND THE STORE SAYS WHICH ONE RAN (OF-BLD-012 §5.4). When
-  // openferment-core answers /api/health the paper is fetched for real from
-  // Europe PMC and its own text replaces the curation note. When it does not,
-  // the five-stage timer simulation runs as it always has and halts at Fetch
-  // with a reason that names the missing service. The offline path is kept as
-  // a fallback for the board, not for the corpus: nothing it does changes a
-  // paper's text, and the board labels it as a simulation.
-  ingestPaper: (paperId, opts) => {
-    if (!get().papers.some((p) => p.id === paperId)) return;
-    void (async () => {
-      let up = get().serviceUp;
-      if (up === null) {
-        try {
-          up = (await postdocHealth()).ok;
-        } catch {
-          up = false;
-        }
-        set({ serviceUp: up });
-      }
-      if (up) await get().ingestPaperLive(paperId, opts?.force);
-      else get().ingestPaperScripted(paperId);
-    })();
-  },
-
+  // When openferment-core answers /api/health the paper is fetched for real
+  // (OF-BLD-012 §5.4). When it does not, nothing is fetched, and the toast
+  // names the missing service and the command that starts it.
   extractPaperLive: async (paperId) => {
     const id = get().startJob({
       title: `Extract ${paperId}`,
       kind: 'ingest',
-      real: true,
       stages: [{ label: 'Extract', ms: 30000 }],
       href: `#/biorepo/witness`,
     });
@@ -1340,152 +1313,6 @@ export const useStore = create<OFState>()((set, get) => ({
     // ask for them again so Witness and Guild move.
     await get().hydrateOverlay();
   },
-
-  ingestPaperLive: async (paperId, force = false) => {
-    get().setPaperIngest(paperId, 'stage:fetch');
-    // Two real stages. Chunk, Embed and Extract are not run by a fetch — the
-    // board shows them as not built rather than ticking them off.
-    const id = get().startJob({
-      title: `Fetch ${paperId}`,
-      kind: 'ingest',
-      real: true,
-      stages: [
-        { label: 'Fetch', ms: 20000 },
-        { label: 'Parse', ms: 2000 },
-      ],
-      href: `#/biorepo/paper/${paperId}`,
-    });
-    get().logActivity({
-      at: stamp(),
-      icon: 'download',
-      text: `Fetching ${paperId} from Europe PMC`,
-      href: `#/intake/ingest`,
-      provenance: 'user',
-    });
-
-    let result: FetchResult;
-    try {
-      // Retry forces: the service caches a miss so the same paper is not
-      // asked twice by accident, and a retry is on purpose.
-      result = await fetchPaper(paperId, { force });
-    } catch (e) {
-      const message =
-        e instanceof IntakeDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
-      get().failJob(id, message);
-      get().setPaperIngest(paperId, 'failed:fetch');
-      if (e instanceof IntakeDown) set({ serviceUp: false });
-      get().toast({ text: `Fetch ${paperId} failed — ${message}`, kind: 'error' });
-      return;
-    }
-
-    if (result.status === 'complete') {
-      get().applyOverlay({
-        papers: {
-          [paperId]: {
-            ingest: 'complete',
-            textSource: 'full-text',
-            sections: result.sections,
-            license: result.license?.href ?? result.license?.text ?? null,
-            fetchedAt: result.fetchedAt,
-            reason: null,
-            source: result.source,
-          },
-        },
-        records: {},
-        // A fetch brings a paper, not an extractor run. `[]` here would say
-        // "the extractor produced nothing" (F3) and drop every undecided
-        // candidate in the store; `null` says nothing about them.
-        candidates: null,
-        runs: null,
-      });
-      get().completeJob(id);
-      get().toast({
-        text: `${paperId} fetched — ${result.sections.length} sections, the paper's own words`,
-        kind: 'success',
-        href: `#/biorepo/paper/${paperId}`,
-        hrefLabel: 'Open',
-      });
-      return;
-    }
-
-    // A real failure, with the service's reason. Persisted server-side, so
-    // the same paper is not asked again until somebody forces it.
-    get().applyOverlay({
-      papers: {
-        [paperId]: {
-          ingest: result.status,
-          textSource: 'curation-note',
-          sections: [],
-          license: null,
-          fetchedAt: result.fetchedAt,
-          reason: result.reason,
-        },
-      },
-      records: {},
-      candidates: null,
-      runs: null,
-    });
-    get().failJob(id, result.reason ?? 'The service reported a failure without a reason.');
-    get().toast({
-      text: `${paperId} halted at ${result.status === 'failed:parse' ? 'Parse' : 'Fetch'}`,
-      kind: 'error',
-      href: '#/intake/ingest',
-      hrefLabel: 'Open the board',
-    });
-  },
-
-  ingestPaperScripted: (paperId) => {
-    const paper = get().papers.find((p) => p.id === paperId);
-    if (!paper) return;
-    // The timer path halts at Fetch every time: with no service there is
-    // nothing to fetch with, and the pipeline says so rather than pretending
-    // to parse something it never got.
-    const fails = true;
-    get().setPaperIngest(paperId, 'stage:fetch');
-    const id = get().startJob({
-      title: `Ingest ${paperId}`,
-      kind: 'ingest',
-      stages: [
-        { label: 'Fetch', ms: 900 },
-        { label: 'Parse', ms: 1400 },
-        { label: 'Chunk', ms: 700 },
-        { label: 'Embed', ms: 1100 },
-        { label: 'Extract', ms: 1800 },
-      ],
-      href: `#/biorepo/paper/${paperId}`,
-    });
-    if (fails) {
-      // Scripted failure path (§8.5): halts at Parse with a specific reason.
-      const speed = get().ui.simSpeed;
-      const wait = speed === Infinity ? 50 : 900 / speed;
-      const reason = paper.openAccess
-        ? `Source not retrieved — ${paper.doi ? `DOI ${paper.doi}` : paper.pmcid ?? 'the record'} is open access, but the Intake service is not running, so no request was made. Start it with \`uv run uvicorn openferment_core.api:app --reload\` from \`core/\` and retry.`
-        : 'Source not retrieved — publisher requires institutional access, and the Intake service is not running. Fetch this one manually and re-run.';
-      setTimeout(() => {
-        get().failJob(id, reason);
-        get().setPaperIngest(paperId, 'failed:fetch');
-        get().toast({
-          text: `Ingest ${paperId} halted at Fetch`,
-          kind: 'error',
-          href: '#/intake/ingest',
-          // Not 'Review' — that word now names a screen this does not go to.
-          hrefLabel: 'Open the board',
-        });
-      }, wait);
-    }
-    get().logActivity({
-      at: stamp(),
-      icon: 'download',
-      text: `Ingest started for ${paperId}`,
-      href: `#/intake/ingest`,
-      provenance: 'demo',
-    });
-  },
-
-  setPaperIngest: (paperId, status) =>
-    set((s) => ({
-      papers: s.papers.map((p) => (p.id === paperId ? { ...p, ingest: status } : p)),
-    })),
 
   // ── runs ─────────────────────────────────────────────────────────────
   startRun: (protocolId, version, scale) => {
@@ -1675,93 +1502,6 @@ export const useStore = create<OFState>()((set, get) => ({
 
   // ── runbooks (OF-BLD-005 §7, §8) ─────────────────────────────────────
 
-  handoffToResearchRunbook: (productId) => {
-    const s = get();
-    const product = s.products.find((p) => p.id === productId);
-    if (!product) return null;
-
-    const id = nextId('rb');
-    const stages: RunbookStage[] = [
-      {
-        name: 'Claim classification',
-        status: 'done',
-        detail: CLAIM_READING[product.clearanceState].reading,
-        value: null,
-      },
-      ...CLAIM_READING[product.clearanceState].stages,
-    ];
-    const enumerable = CLAIM_READING[product.clearanceState].enumerable;
-
-    const runbook: Runbook = {
-      id,
-      kind: 'research',
-      title: `${product.name} — enumeration around the claim`,
-      // Nothing runs behind an enumeration yet, so it opens as a draft with no
-      // ETA, cost, progress or count (OF-BLD-016 §3.R).
-      status: enumerable ? 'draft' : 'complete',
-      stages,
-      note: enumerable
-        ? 'Handed off from the molecule catalogue. The industrial route is fenced, so this asks the question the fence does not cover: what else does the job, and does any of it fall outside the claim.'
-        : 'Handed off from the molecule catalogue and stopped immediately, on purpose. Claim architecture, not molecular diversity, decides whether enumeration is worth paying for — and here it is not. Recorded so nobody funds the same sweep next quarter.',
-      eta: null,
-      outputs: enumerable ? [] : ['Claim reading', 'Recommendation not to enumerate'],
-      productId: product.id,
-      progressPct: enumerable ? 0 : 100,
-      estCostUsd: null,
-      strainId: product.defaultStrainId,
-      // The prediction IS the claim being handed off. When the claim recites a
-      // function rather than a sequence the honest prediction is zero escapes
-      // — the same call rb-heme-calib records, reached the same way.
-      // An enumerable claim gets no count: nobody has one to predict yet.
-      predictions: enumerable
-        ? []
-        : [
-            {
-              id: `${id}-escapes`,
-              label: 'Candidates falling outside the claim',
-              value: 0,
-              unit: 'candidates',
-              confidence: 'high',
-              basis: 'The claim recites a functional class rather than a sequence, so molecular diversity does not escape it.',
-            },
-          ],
-      measurementSchema: [
-        {
-          id: `${id}-ms-escapes`,
-          label: 'Candidates outside the claim on counsel review',
-          unit: 'candidates',
-          timepoint: 'analysis',
-          predictionId: enumerable ? null : `${id}-escapes`,
-        },
-      ],
-      // The declined sweep's reasoning is locked at creation; a draft is not.
-      lockedAt: enumerable ? null : new Date().toISOString(),
-      lockHash: null,
-    };
-    if (runbook.lockedAt) runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
-
-    set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
-
-    get().logActivity({
-      at: stamp(),
-      icon: 'runbook',
-      text: enumerable
-        ? `Research runbook drafted — enumeration around the claims on ${product.name}`
-        : `Enumeration declined for ${product.name} — the claim recites a function, not a sequence`,
-      href: `#/runbooks/${id}`,
-      provenance: 'user',
-    });
-    get().toast({
-      text: enumerable
-        ? `Drafted a research runbook for ${product.name}. Nothing runs behind it yet; this is a research lead, not clearance.`
-        : `Enumeration would not help ${product.name} — opened the reasoning instead.`,
-      kind: enumerable ? 'info' : 'warn',
-      href: `#/runbooks/${id}`,
-      hrefLabel: 'Open',
-    });
-    return id;
-  },
-
   promoteRunbook: (runbookId) => {
     const s = get();
     const source = s.runbooks.find((r) => r.id === runbookId);
@@ -1788,10 +1528,10 @@ export const useStore = create<OFState>()((set, get) => ({
       status: 'draft',
       stages: [
         {
-          name: 'Clearance sweep',
+          name: 'Research findings',
           status: 'done',
           detail: carried || `Carried from ${source.id}`,
-          value: product?.clearanceState ?? null,
+          value: null,
         },
         {
           name: 'Host & construct selection',
@@ -2038,7 +1778,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // OF-BLD-014 §9.2 — a draft becomes a research runbook, unlocked, with the
   // predictions and measures the service wrote. The person reads it and locks
   // it on the runbook's page. Its id is unique across reloads, because the
-  // runbook outlives this page in the Durable tier.
+  // runbook outlives this page in the project's rows.
   adoptRunbookDraft: (draft) => {
     const id = `rb-draft-${Date.now().toString(36)}-${nextId('d').slice(2)}`;
     const runbook: Runbook = {
@@ -2314,11 +2054,6 @@ export const useStore = create<OFState>()((set, get) => ({
   },
 
   // ── scenarios ────────────────────────────────────────────────────────
-  setScenarioPoint: (id, point) =>
-    set((s) => ({
-      scenarios: s.scenarios.map((sc) => (sc.id === id ? { ...sc, point: { ...sc.point, ...point } } : sc)),
-    })),
-
   togglePin: (id) =>
     set((s) => ({
       scenarios: s.scenarios.map((sc) => (sc.id === id ? { ...sc, pinned: !sc.pinned } : sc)),
@@ -2334,7 +2069,6 @@ export const useStore = create<OFState>()((set, get) => ({
       return get().createScenario(
         src.flowsheetId,
         `${src.name} (copy)`,
-        src.program ?? null,
         src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
       );
     const copy: Scenario = {
@@ -2352,7 +2086,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // and this outlives one (as adopted runbooks and Live conversations do).
   // It holds no input value: the service binds records, and a named person
   // types an assumption on its page, kept in proformaAssumptions under its id.
-  createScenario: (flowsheetId, name, program, parts) => {
+  createScenario: (flowsheetId, name, parts) => {
     const id = timeId('sc');
     const made: Scenario = {
       id,
@@ -2366,7 +2100,6 @@ export const useStore = create<OFState>()((set, get) => ({
       point: {},
       assumptions: [],
       pinned: false,
-      ...(program ? { program } : {}),
       // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
       ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun } : {}),
       lastRunId: null,
@@ -2386,7 +2119,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // reload and these outlive one (the same reason adopted runbooks do).
   startLiveConversation: (title) => {
     const id = timeId('lc');
-    const conversation: LiveConversation = { id, title, startedAt: stamp(), turns: [] };
+    const conversation: LiveConversation = { id, title, startedAt: new Date().toISOString(), turns: [] };
     set((s) => ({ liveConversations: [conversation, ...s.liveConversations].slice(0, MAX_LIVE_CONVERSATIONS) }));
     return id;
   },
@@ -2477,23 +2210,11 @@ export const useStore = create<OFState>()((set, get) => ({
       return { proformaFits: { ...s.proformaFits, [scenarioId]: kept } };
     }),
 
-  recordCheckpoint: (qid, correct) =>
-    set((s) => ({ checkpointAnswers: { ...s.checkpointAnswers, [qid]: correct } })),
-
   // ── misc ─────────────────────────────────────────────────────────────
   logActivity: (e) => set((s) => ({ activity: [e, ...s.activity].slice(0, 40) })),
 
   logExport: (name, rows) =>
     set((s) => ({ exports: [{ name, at: stamp(), rows }, ...s.exports].slice(0, 30) })),
-
-  addCollectionPapers: (collectionId, paperIds) =>
-    set((s) => ({
-      collections: s.collections.map((c) =>
-        c.id === collectionId
-          ? { ...c, paperIds: Array.from(new Set([...c.paperIds, ...paperIds])) }
-          : c,
-      ),
-    })),
 
   reconcileDeposition: (depositionId, outcome, note) => {
     const s = get();
@@ -2582,17 +2303,11 @@ export const useStore = create<OFState>()((set, get) => ({
     get().applyDurable(snap);
   },
 
-  // The apply half of hydrate, on a snapshot already read; check:store
-  // round-trips a snapshot through it with no IndexedDB (§9.2).
+  // The apply half of hydrate, on a snapshot already read (§9.2).
   applyDurable: (snap) => {
     set((s) => {
-      // OF-BLD-020 §2.1 (D3) — the overrides typed here, the snapshot's
-      // older proformaAssumptions read once into `proforma:<id>` where it
-      // holds no entry for that scope; anything typed since load wins, by
-      // scope and key. proformaAssumptions is read from the result.
-      const parameterOverrides = mergeOverrides(overridesOfSnapshot(snap), s.parameterOverrides);
-      // Review decisions are re-applied over the seeded records rather than
-      // replacing them, so a corpus update ships new records without
+      // Review decisions are re-applied over the records rather than
+      // replacing them, so a new extraction brings new records without
       // discarding what a reviewer already decided.
       const decisionAt = { ...s.decisionAt };
       const records = s.records.map((r) => {
@@ -2607,38 +2322,13 @@ export const useStore = create<OFState>()((set, get) => ({
         decisionAt[r.id] = madeAt;
         return applyDecision(r, d);
       });
-      // Locks re-apply only to runbooks that still exist. A lock whose runbook
-      // was created in a previous session and is not in this one is dropped —
-      // a lock with nothing under it is not worth keeping.
-      // §9.2 — runbooks adopted from a draft come back first, then every
-      // lock (theirs included) is re-applied by id.
-      const adopted = (snap.adoptedRunbooks ?? []).filter((a) => !s.runbooks.some((r) => r.id === a.id));
-      const runbooks = [...adopted, ...s.runbooks].map((r) => {
-        const l = snap.runbookLocks[r.id];
-        return l ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
-      });
-      // OF-BLD-019 D6 — scenarios made here come back after the seeded ones,
-      // unless this page already holds one by the id (made since load wins);
-      // a seeded scenario takes back the newest run it had here.
-      const madeHere = Object.values(snap.createdScenarios ?? {}).filter((sc) => !s.scenarios.some((x) => x.id === sc.id));
-      const runs = snap.scenarioRuns ?? {};
-      // §3.3 — a seeded scenario pinned here is pinned again (Compare's pins survive a reload).
-      const pins = new Set(snap.pinnedScenarios ?? []);
-      const scenarios = [
-        ...s.scenarios.map((sc) => {
-          const run = runs[sc.id] && !sc.lastRunId ? { lastRunId: runs[sc.id] } : {};
-          const pin = pins.has(sc.id) && !sc.pinned && !s.createdScenarioIds.includes(sc.id) ? { pinned: true } : {};
-          return 'lastRunId' in run || 'pinned' in pin ? { ...sc, ...run, ...pin } : sc;
-        }),
-        ...madeHere,
-      ];
       return {
-        scenarios,
-        createdScenarioIds: [...new Set([...s.createdScenarioIds, ...madeHere.map((sc) => sc.id)])],
         records,
-        runbooks: freezeLocked(runbooks),
-        depositions: snap.depositions,
-        measuredEvidence: snap.measuredEvidence ?? [],
+        // The project rows still owed to the service, and the rows this
+        // browser kept itself before alpha 2.0, carried to the open project
+        // when its rows load (hydrateProjectState).
+        stateOutbox: enqueue(snap.outbox ?? [], s.stateOutbox),
+        stateLegacy: legacyStateOf(snap),
         durableReady: durableAvailable(),
         durableReview: { savedAt: snap.savedAt, decisions: snap.reviewDecisions },
         decisionAt,
@@ -2647,10 +2337,9 @@ export const useStore = create<OFState>()((set, get) => ({
         reviewer: snap.reviewerName ?? '',
         // OF-BLD-016 §2.1 — older snapshots predate the switch; the current
         // position (off unless changed since load) stands.
-        showArchived: snap.showArchived ?? s.showArchived,
-        // OF-BLD-013 §1.3 — the ledger as this browser last held it, and what
-        // it still owes the service. Older snapshots predate the field.
-        guild: snap.guild?.ledger ?? s.guild,
+        // OF-BLD-013 §1.3 — what Guild's ledger still owes the service, laid
+        // beside the ledger the page holds. Older snapshots predate the field.
+        guild: owedLedger(s.guild, snap.guild?.ledger),
         guildPending: snap.guild?.pending ?? [],
         guildPendingWithdrawals: snap.guild?.withdrawals ?? [],
         guildActingId: snap.guild?.actingId ?? s.guildActingId,
@@ -2658,19 +2347,6 @@ export const useStore = create<OFState>()((set, get) => ({
         // §3.2 — lessons finished in this browser. Anything finished since the
         // page loaded is kept beside what the snapshot remembers.
         learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
-        // §8.4 — assumptions typed here; anything typed since load wins.
-        // Since OF-BLD-020 §2.1 they are the overrides of each proforma scope.
-        parameterOverrides,
-        proformaAssumptions: assumptionsFromOverrides(parameterOverrides),
-        // OF-BLD-019 §5.1 — the fermOS fits chosen here; a scenario's choice
-        // made since load wins over the snapshot's.
-        proformaFits: { ...(snap.proformaFits ?? {}), ...s.proformaFits },
-        // OF-BLD-020 §5.3 — the trains built here; one saved since load wins by id.
-        trainsMade: { ...(snap.trainsMade ?? {}), ...s.trainsMade },
-        adoptedRunbookIds: [...new Set([...adopted.map((r) => r.id), ...s.adoptedRunbookIds])],
-        // Postdoc's Live conversations. A turn still running when the page
-        // went away has no stream to finish it, and says so.
-        liveConversations: mergeConversations(snap.liveConversations ?? [], s.liveConversations),
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -2699,7 +2375,15 @@ export const useStore = create<OFState>()((set, get) => ({
       // Papers, runs, decisions and new records. A decision here came through
       // `biorepo.write` on the service (§2.3); this is the only other place a
       // record's status moves, and only to what the service already stored.
-      const papers = s.papers.map((p) => {
+      // The documents the project holds (ADR-002) are papers made from the
+      // overlay, all of them every time: the service sends the project's
+      // whole set, so a paper the last project held and this one does not
+      // leaves with it.
+      const notHeld = s.papers.filter((p) => !p.held);
+      const held = Object.entries(overlay.papers)
+        .filter(([id, o]) => o.title != null && !notHeld.some((p) => p.id === id))
+        .map(([id, o]) => paperOf(id, o));
+      const papers = [...notHeld.map((p) => {
         const o = overlay.papers[p.id];
         if (!o) return p;
         const fetched = o.textSource === 'full-text' && o.sections.length > 0;
@@ -2707,23 +2391,22 @@ export const useStore = create<OFState>()((set, get) => ({
           ...p,
           ingest: o.ingest,
           textSource: fetched ? 'full-text' : p.textSource,
-          // A failed fetch keeps the curation note: the reader must show
-          // SOMETHING, and the curator's words labelled as such beat nothing.
+          // A fetch that brought no text keeps what the paper held.
           sections: fetched ? o.sections : p.sections,
           license: fetched ? (o.license ?? undefined) : p.license,
           fetchedFrom: fetched ? (o.source ?? 'europepmc') : p.fetchedFrom,
           ingestReason: o.reason ?? undefined,
         } as Paper;
-      });
-      // §6.4 — Witness reads runs from the store: the overlay's when present,
-      // the seed's RUN_OUTPUTS otherwise. An overlay run replaces a seed run
-      // of the same id; the seed keeps any run the overlay does not carry.
+      }), ...held];
+      // §6.4 — Witness reads runs from the store, and the overlay is where
+      // they come from: an overlay run replaces one of the same id, and a run
+      // the overlay does not carry stays.
       const runOutputs = currentRuns.length
         ? [...s.runOutputs.filter((r) => !currentRuns.some((o) => o.run === r.run)), ...currentRuns]
         : s.runOutputs;
 
-      // §7.3 — the service's decisions, over seed records and candidates
-      // alike. The later of the two wins, judged against the time of the
+      // §7.3 — the service's decisions, over the records. The later of the
+      // service's and this browser's wins, judged against the time of the
       // decision currently on the record — the live one, not the snapshot
       // this session loaded with, so a decision made a minute ago is not
       // overwritten by an older server one a fetch or an extraction brings
@@ -2738,18 +2421,15 @@ export const useStore = create<OFState>()((set, get) => ({
         decisionAt[r.id] = d.at;
         return applyDecision(r, d);
       };
-      // §7.3 — candidates for a field the seed has no record of join the
-      // records, after the seed, as unverified records extracted by claude-1.
-      // A candidate that matches a seed record's field stays in the overlay,
-      // beside that record on its review card. Idempotent: a candidate
-      // already here is not added twice, and a Durable decision on one that
-      // just arrived is applied to it.
+      // §7.3 — the project's candidates join the records as unverified
+      // records extracted by claude-1. Idempotent: a candidate already here is
+      // not added twice, and a Durable decision on one that just arrived is
+      // applied to it.
       const local = s.durableReview;
-      const seed = s.records.filter((r) => r.extractorRun !== 'claude-1');
       const present = new Set(s.records.map((r) => r.id));
       const arrivingIds: string[] = [];
       const arriving: ExtractionRecord[] = currentCandidates
-        .filter((c) => !present.has(c.id) && isNewCandidate(c, seed))
+        .filter((c) => !present.has(c.id))
         .map((c) => {
           arrivingIds.push(c.id);
           const record: ExtractionRecord = stampOriginal({ ...c, audit: [] });
@@ -2770,14 +2450,10 @@ export const useStore = create<OFState>()((set, get) => ({
       const surviving =
         overlay.candidates === null || overlay.candidates === undefined
           ? s.records
-          : s.records.filter((r) => r.extractorRun !== 'claude-1' || stillExtracted.has(r.id) || wasDecided(r.id));
+          : s.records.filter((r) => stillExtracted.has(r.id) || wasDecided(r.id));
       const records = [...surviving, ...arriving]
         .map(decide)
-        .map((r) =>
-          r.extractorRun !== 'claude-1' || overlay.candidates == null
-            ? r
-            : { ...r, absentFromRun: stillExtracted.has(r.id) ? undefined : true },
-        );
+        .map((r) => (overlay.candidates == null ? r : { ...r, absentFromRun: stillExtracted.has(r.id) ? undefined : true }));
       // New records still undecided join an open review queue after
       // everything already in it (§7.3). A queue seeded before the overlay
       // arrived would otherwise never see them.
@@ -2851,7 +2527,7 @@ export const useStore = create<OFState>()((set, get) => ({
       // What the service would refuse is not posted, and not posted again on
       // every load: an accept on an unfetched paper stays this browser's.
       const paper = s.papers.find((p) => p.id === record.paperId);
-      if (writeRefusal(actionOf(record), record, paper, s.overlay.candidates ?? [], true, reviewerName())) {
+      if (writeRefusal(actionOf(record), record, paper, true, reviewerName())) {
         kept++;
         continue;
       }
@@ -2864,7 +2540,7 @@ export const useStore = create<OFState>()((set, get) => ({
         icon: 'upload',
         text:
           `${pending.length} review decision${pending.length === 1 ? '' : 's'} made offline sent to the service` +
-          (kept ? `; ${kept} kept in this browser only (the service would refuse them — unfetched or unidentified papers)` : ''),
+          (kept ? `; ${kept} kept in this browser only (the service would refuse them — documents the project does not hold, or holds no text for)` : ''),
         href: '#/guild',
         provenance: 'user',
       });
@@ -3113,7 +2789,6 @@ export const useStore = create<OFState>()((set, get) => ({
       };
     }),
 
-
   practiceClosed: async (session) => {
     if (!session.closedAt) return;
     // A session the service named somebody on is theirs, whatever is shown
@@ -3163,7 +2838,7 @@ export const useStore = create<OFState>()((set, get) => ({
       runs: { ...x.runs, [runId]: { ...x.runs[runId], guildRecorded: { ...(x.runs[runId].guildRecorded ?? {}), [stepId]: true } } },
     }));
     const today = localToday();
-    const map = competenceOf(ledger.evidence, ledger.people, SKILL_BY_ID, today);
+    const map = competenceOf(ledger.evidence, ledger.people, skillById(s.skills), today);
     const chosen = run.cosigned?.[stepId] ?? null;
     const cosigner = canHold(chosen) ? chosen : null;
     const where = `${run.depositionId ? `Deposition ${run.depositionId}` : `Run ${runId}`}, step ${stepId}`;
@@ -3386,9 +3061,21 @@ export const useStore = create<OFState>()((set, get) => ({
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
-    // The shipped state hides archived programs, so the switch goes off too
-    // (it lives outside seedState so that nothing else resets it).
-    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {}, showArchived: false });
+    // The open project's rows are the service's, and survive a reset the way
+    // the overlay does: they are loaded again, and nothing is taken back on
+    // the service. What this browser still owed it goes with the browser's data.
+    set({
+      ...initialState(),
+      toasts: [],
+      serviceUp,
+      durableReview: null,
+      decisionAt: {},
+      refusedDecisions: {},
+      stateSeen: null,
+      stateOutbox: [],
+      stateLegacy: null,
+    });
+    void get().hydrateProjectState();
     if (overlay) get().applyOverlay(overlay);
     // Guild's ledger is the service's when there is one, and survives a reset
     // the way the overlay does; what was only ever in this browser goes.
@@ -3400,7 +3087,7 @@ export const useStore = create<OFState>()((set, get) => ({
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished, conversations, Proforma scenarios, the trains built here and the parameters changed here are gone, archived programs are hidden again, and the corpus is as it shipped',
+      text: 'This browser’s data is cleared: the lessons finished here and every change it had not yet sent to the service are gone; the project’s rows load again from the service',
       kind: 'info',
     });
   },
@@ -3493,26 +3180,10 @@ async function guildPost<T>(
 // collapsed panel that followed you across sessions would be a bug, not a
 // feature.
 
-/**
- * The snapshot's assumptions under those typed since load, merged by input
- * key within each scenario (§8.R: merging by scenario dropped the rest).
- */
-export function mergeAssumptions(
-  saved: Record<string, InputAssumption[]>,
-  since: Record<string, InputAssumption[]>,
-): Record<string, InputAssumption[]> {
-  const out: Record<string, InputAssumption[]> = { ...saved };
-  for (const [id, typed] of Object.entries(since)) {
-    const keys = new Set(typed.map((a) => a.key));
-    out[id] = [...(saved[id] ?? []).filter((a) => !keys.has(a.key)), ...typed];
-  }
-  return out;
-}
-
 // ── the parameter panel's overrides (OF-BLD-020 §2.1, D3) ────────────────
 //
-// An override is a person's change to one parameter of one scope, kept in
-// this browser and sent with the run; the service keeps none. Proforma's
+// An override is a person's change to one parameter of one scope, kept as
+// one of the project's rows and sent with the run. Proforma's
 // older `proformaAssumptions` is the same thing for one kind of scope: a
 // scenario's assumptions are the overrides of `proforma:<scenario id>`, and
 // the old field is derived from them. Since OF-BLD-020 §2.2 the scenario page
@@ -3597,22 +3268,15 @@ export function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverri
   return out;
 }
 
-/** The snapshot's overrides under those typed since load, merged by key within each scope (as `mergeAssumptions`). */
-export function mergeOverrides(saved: Record<string, Override[]>, since: Record<string, Override[]>): Record<string, Override[]> {
-  const out: Record<string, Override[]> = { ...saved };
-  for (const [scope, typed] of Object.entries(since)) {
-    const keys = new Set(typed.map((o) => o.key));
-    out[scope] = [...(saved[scope] ?? []).filter((o) => !keys.has(o.key)), ...typed];
-  }
-  return out;
-}
-
 export function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
   for (const r of s.records) {
-    // Only records a reviewer has actually touched. Persisting all 134 every
-    // time would write the seed back to disk on every keystroke.
+    // Only records a reviewer has actually touched.
     if (r.status === 'unverified' && !r.gold && !r.corrected && !r.reviewer) continue;
+    // And only decisions the service does not hold yet: one it holds at this
+    // time or later is its own, and loads with the overlay.
+    const server = s.overlay?.records[r.id];
+    if (server && s.decisionAt[r.id] && server.at >= s.decisionAt[r.id]) continue;
     reviewDecisions[r.id] = {
       status: r.status,
       provenance: r.provenance,
@@ -3625,90 +3289,152 @@ export function snapshotOf(s: OFState): DurableSnapshot {
       ...(reanchoredSpan(r) ?? {}),
     };
   }
-  const runbookLocks: DurableSnapshot['runbookLocks'] = {};
-  for (const r of s.runbooks) {
-    if (r.lockedAt && r.lockHash) runbookLocks[r.id] = { lockedAt: r.lockedAt, lockHash: r.lockHash };
-  }
+  const owed = new Set(s.guildPending);
+  const legacy = s.stateLegacy;
   return {
     ...EMPTY_SNAPSHOT,
     savedAt: new Date().toISOString(),
-    depositions: s.depositions,
-    measuredEvidence: s.measuredEvidence,
     reviewDecisions,
-    runbookLocks,
     reviewerName: s.reviewer,
-    showArchived: s.showArchived,
     guild: {
-      ledger: s.guild,
+      // Only what the service has not acknowledged; the ledger loads from it.
+      ledger: { ...s.guild, people: s.guild.people.filter((x) => owed.has(x.id)), evidence: s.guild.evidence.filter((x) => owed.has(x.id)) },
       pending: s.guildPending,
       withdrawals: s.guildPendingWithdrawals,
       actingId: s.guildActingId,
     },
     learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
-    proformaAssumptions: s.proformaAssumptions,
-    // OF-BLD-020 §2.1 (D3) — the parameter panel's overrides, by scope.
-    parameterOverrides: s.parameterOverrides,
-    proformaFits: s.proformaFits,
-    // Unlocked content as adopted; a lock rides in runbookLocks like any other.
-    adoptedRunbooks: s.runbooks
-      .filter((r) => s.adoptedRunbookIds.includes(r.id))
-      .map((r) => ({ ...structuredClone({ ...r, predictions: [...r.predictions], measurementSchema: [...r.measurementSchema] }), lockedAt: null, lockHash: null })),
-    liveConversations: s.liveConversations,
-    // OF-BLD-019 D6 — scenarios made here, whole and keyed by id; the newest
-    // run of each seeded scenario that ran here.
-    createdScenarios: Object.fromEntries(
-      s.scenarios.filter((sc) => s.createdScenarioIds.includes(sc.id)).map((sc) => [sc.id, structuredClone(sc)]),
-    ),
-    scenarioRuns: Object.fromEntries(
-      s.scenarios
-        .filter((sc) => !s.createdScenarioIds.includes(sc.id) && sc.lastRunId)
-        .map((sc) => [sc.id, sc.lastRunId as string]),
-    ),
-    // OF-BLD-019 §3.3 (D6) — the seeded scenarios pinned to compare here.
-    pinnedScenarios: s.scenarios.filter((sc) => !s.createdScenarioIds.includes(sc.id) && sc.pinned).map((sc) => sc.id),
-    // OF-BLD-020 §5.3 — pureOS's trains built here, whole, by id.
-    trainsMade: s.trainsMade,
+    outbox: s.stateOutbox,
+    // Rows kept here before alpha 2.0 stay until a project is open to take them.
+    ...(legacy
+      ? {
+          depositions: legacy.depositions,
+          measuredEvidence: legacy.measuredEvidence,
+          runbookLocks: legacy.runbookLocks,
+          adoptedRunbooks: legacy.runbooks,
+          parameterOverrides: legacy.overrides,
+          proformaFits: legacy.fits,
+          createdScenarios: Object.fromEntries(legacy.scenarios.map((sc) => [sc.id, sc])),
+          trainsMade: legacy.trains,
+          liveConversations: legacy.conversations,
+        }
+      : {}),
   };
 }
 
+/** The open project's rows as the page holds them (lib/projectState.ts). */
+export function projectStateOf(s: OFState): ProjectState {
+  const runbookLocks: ProjectState['runbookLocks'] = {};
+  for (const r of s.runbooks) if (r.lockedAt && r.lockHash) runbookLocks[r.id] = lockOf(r.id, r.lockedAt, r.lockHash);
+  return {
+    depositions: s.depositions,
+    measuredEvidence: s.measuredEvidence,
+    runbooks: s.runbooks.filter((r) => s.adoptedRunbookIds.includes(r.id)),
+    runbookLocks,
+    overrides: s.parameterOverrides,
+    fits: s.proformaFits,
+    scenarios: s.scenarios.filter((sc) => s.createdScenarioIds.includes(sc.id)),
+    trains: s.trainsMade,
+    conversations: s.liveConversations,
+  };
+}
+
+// One object per lock, so a runbook object that changes for another reason
+// does not read as a new lock (a lock is sent once, and kept as made).
+const LOCKS = new Map<string, { lockedAt: string; lockHash: string }>();
+function lockOf(id: string, lockedAt: string, lockHash: string): { lockedAt: string; lockHash: string } {
+  const key = `${id}\u0000${lockedAt}\u0000${lockHash}`;
+  let lock = LOCKS.get(key);
+  if (!lock) LOCKS.set(key, (lock = { lockedAt, lockHash }));
+  return lock;
+}
+
+/** The rows a snapshot from before alpha 2.0 kept in this browser, or null when it kept none. */
+function legacyStateOf(snap: DurableSnapshot): ProjectState | null {
+  const state: ProjectState = {
+    depositions: snap.depositions ?? [],
+    measuredEvidence: snap.measuredEvidence ?? [],
+    runbooks: snap.adoptedRunbooks ?? [],
+    runbookLocks: snap.runbookLocks ?? {},
+    overrides: overridesOfSnapshot(snap),
+    fits: snap.proformaFits ?? {},
+    scenarios: Object.values(snap.createdScenarios ?? {}),
+    trains: snap.trainsMade ?? {},
+    conversations: snap.liveConversations ?? [],
+  };
+  const held = Object.values(state).some((v) => (Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0));
+  return held ? state : null;
+}
+
+/** The ledger the page holds, with what a snapshot still owes the service laid beside it. */
+function owedLedger(ledger: Guild, owed: Guild | undefined): Guild {
+  if (!owed) return ledger;
+  const people = new Set(ledger.people.map((p) => p.id));
+  const evidence = new Set(ledger.evidence.map((e) => e.id));
+  return {
+    ...ledger,
+    people: [...ledger.people, ...owed.people.filter((p) => !people.has(p.id))],
+    evidence: [...ledger.evidence, ...owed.evidence.filter((e) => !evidence.has(e.id))],
+  };
+}
+
+let stateFlushing = false;
+let stateRetry: ReturnType<typeof setTimeout> | null = null;
+/** How long a project row the service did not answer waits before it is sent again. */
+const STATE_RETRY_MS = 15_000;
+
 /**
  * The Live conversations after a hydrate: those this page started since it
- * loaded, then the snapshot's, newest first, one per id. A turn the snapshot
- * left running was cut short by the reload and is marked so.
+ * loaded, then the service's (which it lists in the order they were made),
+ * newest first, one per id. Each turn's status is the service's: a turn it is
+ * answering reads `running`, and one nobody is answering any longer reads
+ * `interrupted` (postdoc/conversations.py).
  */
 function mergeConversations(saved: LiveConversation[], current: LiveConversation[]): LiveConversation[] {
   const ids = new Set(current.map((c) => c.id));
-  const restored = saved
-    .filter((c) => !ids.has(c.id))
-    .map((c) => ({
-      ...c,
-      turns: c.turns.map((t) => (t.status === 'running' ? { ...t, status: 'interrupted' as const } : t)),
-    }));
-  return [...current, ...restored].slice(0, MAX_LIVE_CONVERSATIONS);
+  return [...current, ...saved.filter((c) => !ids.has(c.id)).reverse()].slice(0, MAX_LIVE_CONVERSATIONS);
+}
+
+// Every change to the open project's rows goes to the outbox and is sent
+// (lib/projectState.ts); nothing is compared before the rows have loaded.
+if (typeof window !== 'undefined') {
+  useStore.subscribe((s, prev) => {
+    if (
+      !s.stateSeen ||
+      !s.projectId ||
+      (s.depositions === prev.depositions &&
+        s.measuredEvidence === prev.measuredEvidence &&
+        s.runbooks === prev.runbooks &&
+        s.adoptedRunbookIds === prev.adoptedRunbookIds &&
+        s.parameterOverrides === prev.parameterOverrides &&
+        s.proformaFits === prev.proformaFits &&
+        s.scenarios === prev.scenarios &&
+        s.createdScenarioIds === prev.createdScenarioIds &&
+        s.trainsMade === prev.trainsMade &&
+        s.liveConversations === prev.liveConversations)
+    )
+      return;
+    const now = projectStateOf(s);
+    const owed = changes(s.stateSeen, now, s.projectId, decidedBy());
+    useStore.setState(owed.length ? { stateSeen: now, stateOutbox: enqueue(s.stateOutbox, owed) } : { stateSeen: now });
+    if (owed.length) void useStore.getState().flushProjectState();
+  });
 }
 
 if (durableAvailable()) {
   useStore.subscribe((s, prev) => {
     if (
-      s.depositions === prev.depositions &&
       s.records === prev.records &&
-      s.runbooks === prev.runbooks &&
-      s.measuredEvidence === prev.measuredEvidence &&
+      s.decisionAt === prev.decisionAt &&
+      s.overlay === prev.overlay &&
       s.reviewer === prev.reviewer &&
-      s.showArchived === prev.showArchived &&
       s.guild === prev.guild &&
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
       s.guildActingId === prev.guildActingId &&
       s.learnProgress === prev.learnProgress &&
-      s.proformaAssumptions === prev.proformaAssumptions &&
-      s.parameterOverrides === prev.parameterOverrides &&
-      s.proformaFits === prev.proformaFits &&
-      s.trainsMade === prev.trainsMade &&
-      s.adoptedRunbookIds === prev.adoptedRunbookIds &&
-      s.liveConversations === prev.liveConversations &&
-      s.scenarios === prev.scenarios &&
-      s.createdScenarioIds === prev.createdScenarioIds
+      s.stateOutbox === prev.stateOutbox &&
+      s.stateLegacy === prev.stateLegacy
     )
       return;
     saveDurable(snapshotOf(s));
@@ -3717,15 +3443,6 @@ if (durableAvailable()) {
   window.addEventListener('pagehide', flushDurable);
 }
 
-// ── programs (OF-BLD-016 §2.1, E.1′) ───────────────────────────────────
-//
-// One question, asked one way: which program does this entity belong to, and
-// does it show? Every list a screen renders, every count on Home and every
-// suggested prompt filters through `programVisible` (or the hook below); no
-// screen reads `showArchived` or a `program` field itself. The service asks
-// the same of corpus.json and modules.json through `programs.py`.
-
-/** What `programOf` can be asked about. */
 /**
  * OF-BLD-020 §5.R — what pureOS's Builder showed of one train this session
  * (`builderShown`): each part absent until the page has shown it.
@@ -3741,248 +3458,28 @@ export interface BuilderShown {
   pricing?: boolean;
 }
 
-export type ProgramEntityKind =
-  | 'paper'
-  | 'record'
-  | 'strain'
-  | 'product'
-  | 'scenario'
-  | 'protocol'
-  | 'runbook'
-  | 'module'
-  | 'lesson'
-  | 'deposition';
-
-/**
- * The lists `programOf` reads, from the store's state or any part of it.
- * Each falls back to the seed when absent, so a check script or the corpus
- * export can ask with no store at all. `records` and `runbooks` are worth
- * passing from the store: the first holds the extractor's candidates, the
- * second the runbooks adopted from a draft. `depositions` exist nowhere else.
- */
-export type ProgramLookup = Partial<
-  Pick<OFState, 'records' | 'strains' | 'products' | 'scenarios' | 'protocols' | 'runbooks' | 'modules' | 'depositions'>
->;
-
-const idIndexes = new WeakMap<readonly { id: string }[], Map<string, { id: string }>>();
-/** An id → entity map per list, built once per list identity. */
-function indexById<T extends { id: string }>(list: readonly T[]): Map<string, T> {
-  let m = idIndexes.get(list) as Map<string, T> | undefined;
-  if (!m) {
-    m = new Map(list.map((x) => [x.id, x]));
-    idIndexes.set(list, m);
-  }
-  return m;
+/** Skills by id, for the competence engine: a lab's own skills (stage 2). */
+export function skillById(skills: readonly Skill[]): Record<string, Skill> {
+  return Object.fromEntries(skills.map((sk) => [sk.id, sk]));
 }
 
-const lessonIndexes = new WeakMap<readonly LearnModule[], Map<string, { lesson: ProgramId | undefined; module: ProgramId | undefined }>>();
-function lessonIndex(modules: readonly LearnModule[]) {
-  let m = lessonIndexes.get(modules);
-  if (!m) {
-    m = new Map(modules.flatMap((mod) => mod.lessons.map((l) => [l.id, { lesson: l.program, module: mod.program }] as const)));
-    lessonIndexes.set(modules, m);
-  }
-  return m;
+/** The lab's skills, for a component: none ship with the app (ADR-010). */
+export function useSkills(): Skill[] {
+  return useStore((s) => s.skills);
 }
 
-/** The programs that show by default: those whose status is active. */
-export function activePrograms(): Program[] {
-  return PROGRAMS.filter((p) => p.status === 'active');
+/** The lab's skills by id, for a component. */
+export function useSkillById(): Record<string, Skill> {
+  const skills = useSkills();
+  return useMemo(() => skillById(skills), [skills]);
 }
 
 /**
- * The program an entity belongs to, or null when it is general (and always
- * shows) or unknown.
- *
- *   paper       by its thread letter ('P12' → 'pha')
- *   record      by the paper it cites, candidates included
- *   strain, product, scenario, protocol, module
- *               by the entry's own `program` field
- *   lesson      its own field, else its module's
- *   runbook     its own field, else the product it names, else the strain
- *   deposition  the runbook it follows, else its protocol
- */
-export function programOf(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): ProgramId | null {
-  switch (kind) {
-    case 'paper':
-      return programOfPaperId(id);
-    case 'record': {
-      const r = indexById(s.records ?? RECORDS).get(id) ?? indexById(RECORDS).get(id);
-      return r ? programOfPaperId(r.paperId) : null;
-    }
-    case 'strain':
-      return indexById(s.strains ?? STRAINS).get(id)?.program ?? null;
-    case 'product':
-      return indexById(s.products ?? PRODUCTS).get(id)?.program ?? null;
-    case 'scenario':
-      return indexById(s.scenarios ?? SCENARIOS).get(id)?.program ?? null;
-    case 'protocol':
-      return indexById(s.protocols ?? PROTOCOLS).get(id)?.program ?? null;
-    case 'module':
-      return indexById(s.modules ?? MODULES).get(id)?.program ?? null;
-    case 'lesson': {
-      const l = lessonIndex(s.modules ?? MODULES).get(id);
-      return l?.lesson ?? l?.module ?? null;
-    }
-    case 'runbook': {
-      const rb = indexById(s.runbooks ?? RUNBOOKS).get(id);
-      if (!rb) return null;
-      return (
-        rb.program ??
-        (rb.productId ? programOf('product', rb.productId, s) : null) ??
-        (rb.strainId ? programOf('strain', rb.strainId, s) : null)
-      );
-    }
-    case 'deposition': {
-      const d = indexById(s.depositions ?? []).get(id);
-      if (!d) return null;
-      return programOf('runbook', d.runbookId, s) ?? programOf('protocol', d.protocolId, s);
-    }
-  }
-}
-
-const exampleLessonIndexes = new WeakMap<readonly LearnModule[], Map<string, boolean>>();
-function exampleLessonIndex(modules: readonly LearnModule[]) {
-  let m = exampleLessonIndexes.get(modules);
-  if (!m) {
-    m = new Map(modules.flatMap((mod) => mod.lessons.map((l) => [l.id, !!(l.example ?? mod.example)] as const)));
-    exampleLessonIndexes.set(modules, m);
-  }
-  return m;
-}
-
-/**
- * Whether an entity is an example (OF-BLD-016 §3.3, D3): a seed runbook,
- * protocol, scenario, module or lesson that describes a run nobody made. An
- * example is treated as archived — hidden by default, shown by the same
- * switch, opened under ArchivedBanner by a link — and is never deleted. A
- * lesson is an example when it or its module says so. A deposition is one
- * only by its own flag: a run a person starts from an example runbook is a
- * run someone made.
- */
-export function isExample(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): boolean {
-  switch (kind) {
-    case 'runbook':
-      return !!indexById(s.runbooks ?? RUNBOOKS).get(id)?.example;
-    case 'protocol':
-      return !!indexById(s.protocols ?? PROTOCOLS).get(id)?.example;
-    case 'scenario':
-      return !!indexById(s.scenarios ?? SCENARIOS).get(id)?.example;
-    case 'module':
-      return !!indexById(s.modules ?? MODULES).get(id)?.example;
-    case 'lesson':
-      return exampleLessonIndex(s.modules ?? MODULES).get(id) ?? false;
-    case 'deposition':
-      return !!indexById(s.depositions ?? []).get(id)?.example;
-    default:
-      return false;
-  }
-}
-
-/**
- * Whether an entity shows: it is general or its program is active, and it is
- * not an example — or the person has turned archived programs and examples
- * on. The one selector every screen calls (through `useProgramFilter` in a
- * component).
- */
-export function programVisible(
-  kind: ProgramEntityKind,
-  id: string,
-  s: ProgramLookup & Pick<OFState, 'showArchived'>,
-): boolean {
-  return s.showArchived || (!isArchived(programOf(kind, id, s)) && !isExample(kind, id, s));
-}
-
-/** The archived program an entity belongs to, or null — what ArchivedBanner names. */
-export function archivedProgramOf(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): Program | null {
-  const p = programOf(kind, id, s);
-  return p && isArchived(p) ? PROGRAM_BY_ID[p] : null;
-}
-
-/**
- * `programVisible` bound to the store, for a component: call it once per
- * render and filter with the predicate it returns —
- *
- *   const shows = useProgramFilter();
- *   const papers = allPapers.filter((p) => shows('paper', p.id));
- *
- * It re-renders the component when the switch moves, a candidate arrives,
- * a runbook is adopted, a scenario is copied or a deposition starts. Every
- * list `programOf` reads comes from the store, so a copy of an archived
- * scenario (which keeps its `program`) stays with its program.
- */
-export function useProgramFilter(): (kind: ProgramEntityKind, id: string) => boolean {
-  const showArchived = useStore((s) => s.showArchived);
-  const lookup = useProgramLookup();
-  return useCallback(
-    (kind: ProgramEntityKind, id: string) => programVisible(kind, id, { ...lookup, showArchived }),
-    [showArchived, lookup],
-  );
-}
-
-/**
- * The program filter as a page that names one entity applies it.
- *
- * Every list on the page filters through `useProgramFilter`, with one
- * widening: when the page's own entity belongs to an archived program (a deep
- * link to cw15's strain page, a runbook or lesson opened from an old link),
- * what belongs to that same program shows too, because the link opens what
- * it names and the page sits under ArchivedBanner saying so. Anything of
- * another archived program stays hidden. With no page entity, or a general
- * or active one, this is `useProgramFilter` itself.
- */
-export function useProgramScope(
-  page?: { kind: ProgramEntityKind; id: string | null | undefined } | null,
-): (kind: ProgramEntityKind, id: string) => boolean {
-  const shows = useProgramFilter();
-  const lookup = useProgramLookup();
-  const kind = page?.kind;
-  const id = page?.id;
-  const own = useMemo(
-    () => (kind && id ? archivedProgramOf(kind, id, lookup)?.id ?? null : null),
-    [kind, id, lookup],
-  );
-  // An example opened by link (§3.3) widens the same way: the other examples
-  // it names show beside it, unless their program is archived and not its own.
-  const ownExample = useMemo(() => (kind && id ? isExample(kind, id, lookup) : false), [kind, id, lookup]);
-  return useCallback(
-    (k: ProgramEntityKind, x: string) => {
-      if (shows(k, x)) return true;
-      const p = programOf(k, x, lookup);
-      if (own !== null && p === own) return true;
-      return ownExample && isExample(k, x, lookup) && (!isArchived(p) || p === own);
-    },
-    [shows, own, ownExample, lookup],
-  );
-}
-
-/**
- * The store's lists `programOf` reads, as one value that changes only when
- * one of them does: what `useProgramFilter` and `ArchivedBanner` ask with.
- */
-export function useProgramLookup(): ProgramLookup {
-  const records = useStore((s) => s.records);
-  const strains = useStore((s) => s.strains);
-  const products = useStore((s) => s.products);
-  const scenarios = useStore((s) => s.scenarios);
-  const protocols = useStore((s) => s.protocols);
-  const runbooks = useStore((s) => s.runbooks);
-  const modules = useStore((s) => s.modules);
-  const depositions = useStore((s) => s.depositions);
-  return useMemo(
-    () => ({ records, strains, products, scenarios, protocols, runbooks, modules, depositions }),
-    [records, strains, products, scenarios, protocols, runbooks, modules, depositions],
-  );
-}
-
-// ── derived selectors ──────────────────────────────────────────────────
-
-/**
- * A record's display provenance. The stored `provenance` field is
- * authoritative — a curated or industry-estimate record does not become
- * 'verified' just because someone accepted it in the queue without opening the
- * source. Review promotes 'curated' → 'verified'; nothing promotes
- * 'industry-estimate'.
+ * A record's display provenance, by the rule `biorepo.provenance_of`
+ * computes a decision's class with (ADR-006): a promoted record is gold with
+ * a gold value and verified without one, a rejected one unverified, and an
+ * undecided one keeps the class it arrived with. A measured or
+ * industry-estimate record keeps its class: review promotes neither.
  */
 export function provenanceOf(r: ExtractionRecord): Provenance {
   if (r.provenance === 'measured') return 'measured';
@@ -4004,7 +3501,7 @@ export function provenanceOf(r: ExtractionRecord): Provenance {
  * to the statistic only: the records stay visible in per-record tables and
  * plots, because they are real values, just not independent evidence.
  */
-export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'not-primary';
+export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'assumed' | 'not-primary';
 
 export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | null {
   if (r.status === 'rejected') return 'rejected';
@@ -4012,6 +3509,8 @@ export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | nu
   // A computed value is derived from inputs already counted on their own
   // (OF-BLD-014 E.4); counting it beside them counts them twice.
   if (r.provenance === 'computed') return 'computed';
+  // A person's assumption or a model's estimate is never evidence (ADR-006).
+  if (r.provenance === 'assumed') return 'assumed';
   if (r.isPrimary === false) return 'not-primary';
   return null;
 }
@@ -4026,6 +3525,7 @@ export const EXCLUSION_NOTE: Record<AggregateExclusion, string> = {
   rejected: 'rejected — excluded from statistics',
   'industry-estimate': 'industry estimate — excluded from statistics',
   computed: 'computed from other values — excluded from statistics',
+  assumed: 'an assumption or an estimate — excluded from statistics',
   'not-primary': 'reports another study\u2019s measurement — excluded from statistics',
 };
 
@@ -4044,7 +3544,7 @@ export const PROVENANCE_RANK: Record<Provenance, number> = {
   unverified: 5,
   user: 6,
   'industry-estimate': 7,
-  demo: 8,
+  assumed: 8,
 };
 
 export const tickClass = (p: Provenance | 'rejected'): string =>
@@ -4057,18 +3557,6 @@ export const tickClass = (p: Provenance | 'rejected'): string =>
     unverified: 'tick tick-unverified',
     user: 'tick tick-user',
     'industry-estimate': 'tick tick-industry-estimate',
-    demo: 'tick tick-demo',
+    assumed: 'tick tick-assumed',
     rejected: 'tick tick-rejected',
   })[p];
-
-export const PROVENANCE_LABEL: Record<Provenance, string> = {
-  measured: 'Measured · first-party',
-  gold: 'Curated · gold set',
-  verified: 'Verified against source',
-  curated: 'Curated · pending source check',
-  computed: 'Computed · basis attached',
-  unverified: 'Extracted · unverified',
-  user: 'User-entered',
-  'industry-estimate': 'Industry estimate · not evidence',
-  demo: 'Modeled · not measured',
-};

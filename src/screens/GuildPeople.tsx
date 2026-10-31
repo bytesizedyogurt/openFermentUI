@@ -4,7 +4,8 @@
 import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { useStore } from '@/store';
-import { FAMILIES, SKILLS } from '@/data/skills';
+import { FAMILIES } from '@/data/skillFamilies';
+import { useSkills } from '@/store';
 import type { GuildPerson, GuildRole } from '@/data/types';
 import { Button, Card, EmptyState, LinkButton, SectionTitle, cx } from '@/components/ui';
 import {
@@ -30,6 +31,7 @@ export default function GuildPeople({ personId }: { personId?: string }) {
 }
 
 function PeopleIndex({ ctx }: { ctx: GuildContext }) {
+  const SKILLS = useSkills();
   const [adding, setAdding] = useState(false);
   const isLead = ctx.acting?.role === 'lead';
   const quarter = quarterStart(ctx.today);
@@ -125,6 +127,7 @@ function PeopleIndex({ ctx }: { ctx: GuildContext }) {
 }
 
 function Ledger({ ctx, personId }: { ctx: GuildContext; personId: string }) {
+  const SKILLS = useSkills();
   const [pairSkill, setPairSkill] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const person = ctx.personById.get(personId);

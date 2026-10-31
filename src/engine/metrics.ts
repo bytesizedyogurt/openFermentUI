@@ -1,5 +1,6 @@
-// Validation metrics (OF-DES-001 §8.8): P/R/F1 against the gold set,
-// recomputed live from seeded per-run confusion data.
+// Validation metrics (OF-DES-001 §8.8): P/R/F1 of an extractor run against the
+// values reviewers typed (a gold value or a correction), as witness.py scores
+// it, recomputed live from the service's run.
 import type { ExtractionRecord, FieldId, RunOutput } from '@/data/types';
 
 export interface FieldMetrics {
@@ -37,16 +38,17 @@ const FAILURE_LABEL: Record<string, string> = {
 };
 
 /**
- * Compute metrics for one extractor run. A gold record counts TP when the
- * run's outcome is 'match'; mismatch outcomes count both FP and FN (the run
- * produced a wrong record AND missed the gold one); 'miss' counts FN only.
- * Seeded false positives (spurious extractions) add FP.
+ * Compute metrics for one extractor run. A record a reviewer typed a value for
+ * counts TP when the run's outcome is 'match'; mismatch outcomes count both FP
+ * and FN (the run produced a wrong record AND missed the typed one); 'miss'
+ * counts FN only. The run's false positives (candidates a reviewer rejected)
+ * add FP.
  */
 export function computeRunMetrics(
   run: RunOutput,
   records: ExtractionRecord[],
 ): RunMetrics {
-  const goldRecords = records.filter((r) => r.gold);
+  const goldRecords = records.filter((r) => r.gold || r.corrected);
   const byId = new Map(goldRecords.map((r) => [r.id, r]));
   const perFieldCounts = new Map<FieldId, { tp: number; fp: number; fn: number; failures: Map<string, number> }>();
   const ensure = (f: FieldId) => {

@@ -1,5 +1,5 @@
 // Minimal markdown renderer with first-class citation chips.
-// Chips are written [[SP-004]] or [[ex-0112]] in seed content and become the
+// Chips are written [[record-id]] in a text and become the
 // real CitationChip component — never post-hoc decoration (§4).
 import React, { type ReactNode } from 'react';
 import { CitationChip } from './Chip';

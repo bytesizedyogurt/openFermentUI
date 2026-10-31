@@ -5,8 +5,8 @@ Every series here is SYNTHETIC, built in the test from parameters chosen here
 (test_fermos's generating batch), and every record and assumption is a
 FIXTURE; none is a measurement and no value here is a result. The fits and
 forecasts go through the real fermOS code into a scratch artifact store; the
-runs go through the real binding and artifact code over demo.py's closed-form
-STAND-IN evaluator.
+runs go through the real binding and artifact code over the closed-form
+STAND-IN evaluator (standins.py).
 """
 from __future__ import annotations
 
@@ -17,7 +17,8 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, basis, demo, fermos, intake, proforma
+from openferment_core import artifacts, basis, fermos, intake, proforma
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.models import (
     ComputedBasis,
     FermosPoint,
@@ -28,6 +29,7 @@ from openferment_core.models import (
 
 ETHANOL = "ethanol_glucose_v0"
 BY = "openFerment test fixture"
+MADE_HERE = "sc-k3x9q-1"  # an id as the browser's createScenario makes them
 # The generating batch, chosen here (test_fermos's), not measured.
 TRUE = {"X0": 0.1, "mu": 0.35, "Xmax": 8.0, "P0": 0.05, "alpha": 0.4, "beta": 0.02, "S0": 60.0, "gamma": 4.5, "delta": 0.05}
 T = np.linspace(0, 30, 16)
@@ -71,9 +73,8 @@ def store(monkeypatch, tmp_path):
 
 @pytest.fixture()
 def standin(monkeypatch, store):
-    monkeypatch.setattr(proforma, "call", demo._standin_call)
-    monkeypatch.setattr(proforma, "yield_cap", lambda: None)
-    rs = demo._standin_records() + demo._standin_yeast_records()
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
+    rs = standins._standin_yeast_records()
     return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
 
 
@@ -81,7 +82,7 @@ def standin(monkeypatch, store):
 def client(monkeypatch, standin):
     from openferment_core import api, evidence_pool
 
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: standin)
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: standin)
     return TestClient(api.app, base_url="http://127.0.0.1")
 
 
@@ -181,7 +182,7 @@ def test_a_chosen_fit_binds_titre_yield_and_productivity_and_the_run_names_it(st
         assert by[k].records == [] and by[k].sampling == "triangular" and by[k].source.note
     assert "productivity" not in info.waiting and by["titre"].flags == ["chosen in place of the 3 records it bound"]
 
-    run = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=ASSUMED, fits=fits), pool=standin)
+    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, fits=fits), pool=standin)
     art = artifacts.get(run.artifactId)
     named = {i.name: i for i in art.inputs}
     for k in proforma.FIT_KEYS:
@@ -195,15 +196,15 @@ def test_a_chosen_fit_binds_titre_yield_and_productivity_and_the_run_names_it(st
     assert {s.key: s.sourceKind for s in run.sensitivity}.get("titre") == "artifact"
     # The fit's provenance enters through basis_provenance: alone, the fit's
     # inputs make the value computed (the fit rests on a deposition's
-    # measured readings); the assumptions make the whole run demo.
+    # measured readings); the assumptions make the whole run standins.
     fit_inputs = [i for i in art.inputs if i.source.kind == "artifact"]
     alone = ComputedBasis(tool="t", toolVersion="v", inputs=fit_inputs, artifactId="x", at="now")
     assert basis.basis_provenance(alone, {}, {fc.artifactId: artifacts.get(fc.artifactId)}) == "computed"
-    assert run.provenance == "demo"
-    # A forecast a person changed is an assumption, so a run fed by it is demo by its own inputs.
+    assert run.provenance == "assumed"
+    # A forecast a person changed is an assumption, so a run fed by it is assumed by its own inputs.
     changed = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=LONG_H,
                                   start=fermos.StartValues(S0=55.0), changed_by="Sean Creighton")
-    assert proforma.fit_info(artifacts.get(changed.artifactId), ETHANOL).provenance == "demo"
+    assert proforma.fit_info(artifacts.get(changed.artifactId), ETHANOL).provenance == "assumed"
 
 
 def test_a_fits_productivity_feeds_the_fermenter_only_beside_its_own_titre(standin):
@@ -225,7 +226,7 @@ def test_a_fits_productivity_feeds_the_fermenter_only_beside_its_own_titre(stand
         assert f"productivity from growth_forecast {fc.artifactId}" in words and said in words, words
         assert f"choose {fc.artifactId} for titre as well, or stop using it for productivity" in words, words
         with pytest.raises(proforma.ScenarioRefused, match="only beside titre from"):
-            proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=ASSUMED, fits=fits), pool=standin)
+            proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, fits=fits), pool=standin)
     # No stand-in record is of S288C, so there titre takes a person's assumption.
     with pytest.raises(proforma.ScenarioRefused, match="titre is a named person's assumption"):
         proforma.bind_flowsheet(ETHANOL, pool=standin, host="s-cerevisiae-s288c", fits={"productivity": fc.artifactId},
@@ -236,14 +237,6 @@ def test_a_fits_productivity_feeds_the_fermenter_only_beside_its_own_titre(stand
     assert {i.key: i.binding for i in ok.inputs}["productivity"] == "artifact"
 
 
-def test_a_fit_on_the_pha_draft_binds_through_the_same_rule(standin):
-    fit = kept_fit(dep="dep-pha", product="PHB", substrate="Glucose")
-    fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=LONG_H)
-    info = proforma.bind_flowsheet(proforma.FLOWSHEET, include_archived=True, pool=standin, fits={"titre": fc.artifactId})
-    by = {i.key: i for i in info.inputs}
-    assert by["titre"].binding == "artifact" and by["yield"].binding == "records"
-
-
 # ── refusals, in words naming the parameter ────────────────────────────
 
 
@@ -252,8 +245,9 @@ def _unidentify(aid: str, name: str) -> None:
     leave it, its interval reaching zero (as test_fermos does to a fit)."""
     art = artifacts.get(aid)
     params = [dict(p, low=-1.0, identified=False) if p["name"] == name else p for p in art.output["params"]]
-    changed = art.model_copy(update={"output": {**art.output, "params": params}})
-    (intake.DATA_DIR / "artifacts" / f"{aid}.json").write_text(changed.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    from standins import plant_artifact
+
+    plant_artifact(art.model_copy(update={"output": {**art.output, "params": params}}))
 
 
 def test_an_unidentified_mu_refuses_naming_mu(standin):
@@ -265,7 +259,7 @@ def test_an_unidentified_mu_refuses_naming_mu(standin):
     with pytest.raises(proforma.ScenarioRefused, match=r"cannot feed titre: μ \(mu\) is not identified"):
         proforma.bind_flowsheet(ETHANOL, pool=standin, fits={"titre": fit.kineticArtifactId})
     with pytest.raises(proforma.ScenarioRefused, match=r"μ \(mu\) is not identified"):
-        proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=ASSUMED,
+        proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED,
                                         fits={"yield": fit.kineticArtifactId}), pool=standin)
 
 
@@ -305,8 +299,9 @@ def test_one_unit_spelled_two_ways_is_one_unit_and_gives_the_yield(store):
     # (a STAND-IN: its file rewritten so), says so, never that they differ.
     kept = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=30.0)
     art = artifacts.get(kept.artifactId)
-    old = art.model_copy(update={"output": {**art.output, "yieldInterval": None}})
-    (intake.DATA_DIR / "artifacts" / f"{art.id}.json").write_text(old.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    from standins import plant_artifact
+
+    plant_artifact(art.model_copy(update={"output": {**art.output, "yieldInterval": None}}))
     said = feeds_of(proforma.fit_info(artifacts.get(art.id), ETHANOL))["yield"].refused
     assert "drawn before g L-1 and g/L were read as one unit" in said, said
     # Two mass units that are not one are refused, saying which.
@@ -316,10 +311,12 @@ def test_one_unit_spelled_two_ways_is_one_unit_and_gives_the_yield(store):
     assert "g L-1" in refused and "mg/L" in refused, refused
 
 
-def test_a_fit_of_another_products_series_is_refused_whole(standin):
-    fit = kept_fit(product="Polymer (PHB)")
+def test_a_fit_of_another_products_series_is_refused_whole(standin, monkeypatch):
+    # A STAND-IN product the words know, beside ethanol, the one the shelf makes.
+    monkeypatch.setattr(proforma, "PRODUCT_WORDS", {**proforma.PRODUCT_WORDS, "testone": ("testone",)})
+    fit = kept_fit(product="Testone")
     info = proforma.fit_info(artifacts.get(fit.kineticArtifactId), ETHANOL)
-    assert info.refused and "is phb, not ethanol" in info.refused
+    assert info.refused and "is testone, not ethanol" in info.refused
     with pytest.raises(proforma.ScenarioRefused, match="not ethanol"):
         proforma.bind_flowsheet(ETHANOL, pool=standin, fits={"titre": fit.kineticArtifactId})
     # A product series that names nothing is read as the scenario's, and says so.
@@ -335,8 +332,9 @@ def test_a_damaged_fit_file_refuses_what_rests_on_it_and_the_rest_still_lists(cl
     fit = kept_fit()
     fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=LONG_H)
     other = kept_fit(dep="dep-other", seed=5)
-    path = artifacts.folder() / f"{fit.kineticArtifactId}.json"
-    path.write_text(path.read_text(encoding="utf-8")[:200], encoding="utf-8")  # cut short, as a partial write
+    from standins import plant_damaged
+
+    plant_damaged(fit.kineticArtifactId)  # a row that no longer reads as an artifact
     listed = {i.artifactId: i for i in proforma.fermos_fits(ETHANOL)}
     assert set(listed) == {fc.artifactId, other.kineticArtifactId}
     assert listed[fc.artifactId].refused and "is damaged on disk" in listed[fc.artifactId].refused
@@ -380,6 +378,6 @@ def test_the_fits_endpoint_and_the_bind_endpoint_with_fits(client):
     refused = client.get("/api/proforma/bind", params={"flowsheet": ETHANOL, "fits": json.dumps({"productivity": fit.kineticArtifactId})})
     assert refused.status_code == 422 and "does not run out" in refused.json()["detail"]
 
-    ran = client.post("/api/proforma/run", json={"scenarioId": "sc-yeast-1", "fits": fits,
+    ran = client.post("/api/proforma/run", json={"scenarioId": MADE_HERE, "flowsheet": ETHANOL, "fits": fits,
                                                   "assumptions": [a.model_dump() for a in ASSUMED]})
     assert ran.status_code == 200 and {i["key"]: i["binding"] for i in ran.json()["inputs"]}["yield"] == "artifact"

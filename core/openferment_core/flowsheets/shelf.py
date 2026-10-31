@@ -50,15 +50,6 @@ def _pkg(dist: str) -> str:
 TABLE_UNITS = {"T": "K", "P": "Pa", "massFlow": "kg/hr", "price": "USD/kg", "cost": "USD", "duty": "kJ/hr",
                "power": "kW", "annual": "USD/yr", "perUnit": "USD per unit of the price's basis"}
 
-# What the PHA draft leaves out; proforma.LEAVES_OUT is this list.
-PHA_LEAVES_OUT = [
-    "feedstock pretreatment and hydrolysis",
-    "polymer extraction and purification",
-    "wastewater treatment",
-    "co-products",
-]
-PHA_PRICE_BASIS = "USD per kg of PHA contained in dried cell mass"
-
 _CORNSTOVER = FlowsheetInfo(
     id="cornstover_benchmark",
     title="Corn stover to ethanol, the NREL 2011 design",
@@ -143,45 +134,6 @@ _CORN = FlowsheetInfo(
     packageTest="biorefineries/tests/test_biorefineries.py::test_corn",
 )
 
-_PHA = FlowsheetInfo(
-    id="pha_sugar_v0",
-    title="PHA from fermentable sugar, draft v0",
-    description=(
-        "Fermentable sugar and ammonia into an aerated batch fermenter, a solids centrifuge and a drum dryer, "
-        "giving dried, PHA-rich cell mass. Chemicals and finance are the corn stover reference biorefinery's; "
-        "equipment and thermodynamics are BioSTEAM's own."
-    ),
-    source="this repository",
-    program="pha",
-    reference=False,
-    inputs=[
-        FlowsheetInput(key="titre", name="PHA titre at harvest", dimension="massConc", unit="g L-1",
-                       fields=["pha_titre"], kind="process",
-                       note="sets the water that dilutes the sugar to the harvest broth"),
-        FlowsheetInput(key="yield", name="PHA yield on sugar", dimension="yield", unit="g g-1",
-                       fields=["pha_yield_substrate"], kind="process",
-                       note="sets the polymer reaction's share of the sugar; clipped to the geneOS ceiling when one is stored"),
-        FlowsheetInput(key="content", name="PHA share of dry cell mass", dimension="fraction", unit="g g-1",
-                       fields=["pha_content_cdw"], kind="process",
-                       note="sets the cell-mass reaction's share; records in percent of dry mass become a share"),
-        FlowsheetInput(key="productivity", name="PHA volumetric productivity", dimension="volProd", unit="g L-1 h-1",
-                       fields=["pha_productivity"], kind="process",
-                       note="the batch time is the titre divided by it"),
-        FlowsheetInput(key="recovery", name="solids recovered at harvest", dimension="fraction", unit="",
-                       kind="process", note="a named person's assumption: the centrifuge's split of polymer and cells"),
-        FlowsheetInput(key="sugarPrice", name="price of fermentable sugar", dimension="costUSD", unit="USD kg-1",
-                       kind="economic", note="a named person's assumption; the sugar alone is priced, not its dilution water"),
-        FlowsheetInput(key="sugarFeed", name="sugar fed", dimension="massFlow", unit="kg h-1",
-                       kind="process", note="a named person's assumption; it sets the plant's size"),
-    ],
-    outputs=["pricePerKgPha", "phaKgPerH", "costLines", "readBack", "conversions"],
-    priceOutput="pricePerKgPha",
-    priceBasis=PHA_PRICE_BASIS,
-    leavesOut=PHA_LEAVES_OUT,
-    gridInputs=["titre", "yield", "sugarPrice"],
-    brothStream="broth",
-)
-
 # OF-BLD-019 §2.3: glucose to ethanol, ours. What it leaves out is
 # flowsheets/ethanol_glucose_v0.LEAVES_OUT, repeated here as data so the
 # service reads it without BioSTEAM (test_proforma_ethanol holds the two equal).
@@ -241,10 +193,9 @@ _ETHANOL = FlowsheetInfo(
     brothStream="beer",
 )
 
-# OF-BLD-020 §6.1 (D11): a vessel and a train, priced. Its scenarios are made
-# in the browser alone (no seed scenario names it: check:seed holds a seed's
-# modelId to BIOSTEAM_FLOWSHEETS, which leaves it out), each naming the kept
-# vessel design and train run it is built from (`builtFrom`). Its program is
+# OF-BLD-020 §6.1 (D11): a vessel and a train, priced. A scenario on it is made
+# with New scenario, naming the kept vessel design and train run it is built
+# from (`builtFrom`). Its program is
 # its train's; a train runs only on a program with a chemical set
 # (pureos/train_spec.PROGRAM_CHEMICALS, the yeast program's alone tonight), so
 # the entry is the yeast program's and a train of another program is refused
@@ -310,7 +261,7 @@ _CUSTOM_TRAIN = FlowsheetInfo(
     brothStream="beer",
 )
 
-SHELF: dict[str, FlowsheetInfo] = {f.id: f for f in (_CORNSTOVER, _CORN, _ETHANOL, _PHA, _CUSTOM_TRAIN)}
+SHELF: dict[str, FlowsheetInfo] = {f.id: f for f in (_CORNSTOVER, _CORN, _ETHANOL, _CUSTOM_TRAIN)}
 
 # The package module each reference biorefinery runs (OF-BLD-019 §2.2).
 REFERENCE_MODULES = {"cornstover_benchmark": "biorefineries.cornstover", "corn_drygrind": "biorefineries.corn"}
@@ -372,6 +323,15 @@ def package_regression(flowsheet_id: str) -> PackageRegression | None:
     if entry is None or not entry.packageTest:
         return None
     file, _, test = entry.packageTest.partition("::")
+    return regression_of(file, test)
+
+
+def regression_of(file: str, test: str) -> PackageRegression | None:
+    """The values one test of the installed biorefineries asserts (`file`
+    relative to the distribution, `test` a function in it), read as
+    `package_regression` reads them; None when the file or the test is not
+    found here. The library plant runner (engine/library.py) names a plant's
+    test this way."""
     path = _installed_file(file)
     if path is None:
         return None

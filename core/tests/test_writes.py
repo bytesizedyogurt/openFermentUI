@@ -4,35 +4,40 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import audit, extract, intake, module_stores, proposals, tools
-from openferment_core.models import Candidate, ExtractResponse, FetchResult, FetchedSection, Usage
+from openferment_core.models import FetchedSection
 from openferment_core.tools import gates, writes
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 
 WRITES = [f"{m}_write" for m in module_stores.MODULES]
 
 
+class _Store(type(Path())):
+    """tmp_path, with the documents the project holds (`held`)."""
+
+    held: dict[str, list[dict]]
+
+
 @pytest.fixture()
-def store(tmp_path, monkeypatch, pool):  # noqa: F811
-    """Every store the writes reach, under tmp_path."""
+def store(tmp_path, monkeypatch, pool, held_documents):  # noqa: F811
+    """Every file store the writes reach, under tmp_path; the audit log is
+    the test's rolled-back database; the documents the project holds in
+    `store.held`."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
-    return tmp_path
+    held = _Store(tmp_path)
+    held.held = held_documents
+    return held
 
 
 def ctx(pool_, ask="ask-test"):  # noqa: F811
-    c = tools.ToolContext(pool_factory=lambda: pool_, stores_factory=lambda: module_stores.Stores(module_stores.seed_sources(lambda: pool_)))
+    c = tools.ToolContext(pool_factory=lambda: pool_, stores_factory=lambda: module_stores.Stores(module_stores.fixture_sources(lambda: pool_)))
     c.ask_id = ask
     return c
 
@@ -48,9 +53,11 @@ def test_every_read_tool_has_its_write_tool_in_the_whitelist():
     names = {t.name for t in tools.infos()}
     for m in module_stores.MODULES:
         assert {f"{m}_read", f"{m}_write"} <= names
-    # A pair a module and no third module tool; the count of the whole
-    # registry is test_tools.NAMES' (OF-BLD-019 §6.1).
-    assert len([n for n in tools.WHITELIST if n.endswith(("_read", "_write"))]) == 2 * len(module_stores.MODULES)
+    # A pair a module and no third module tool (study_read is the studies'
+    # read, no module's); the count of the whole registry is test_tools.NAMES'
+    # (OF-BLD-019 §6.1).
+    module_tools = [n for n in tools.WHITELIST if n.endswith(("_read", "_write")) and n.rsplit("_", 1)[0] in module_stores.MODULES]
+    assert len(module_tools) == 2 * len(module_stores.MODULES)
 
 
 def test_a_write_tool_never_touches_a_store():
@@ -61,17 +68,13 @@ def test_a_write_tool_never_touches_a_store():
         assert forbidden not in src, forbidden
 
 
-@pytest.mark.parametrize("module", ["dominion", "pureos", "primer"])
+@pytest.mark.parametrize("module", ["pureos", "primer"])
 def test_a_module_with_no_write_function_refuses_in_words(pool, store, module):  # noqa: F811
     r = write(module, ctx(pool), "anything")
     assert r.error and "no write function" in r.error and "gaps" in r.error
     assert audit.read() == [] and proposals.read().proposals == []
-    # A gated action on a seed module is still a proposal (Dominion: publish).
     r = write(module, ctx(pool), "publish")
-    if module == "dominion":
-        assert r.error is None and r.summary["state"] == "proposed"
-    else:
-        assert "not an action" in r.error
+    assert "not an action" in r.error
 
 
 @pytest.mark.parametrize("module, action", [("runbooks", "revise_protocol"), ("fermos", "fit"), ("proforma", "bind"),
@@ -117,7 +120,7 @@ def test_a_gated_action_writes_nothing_and_comes_back_proposed(pool, store, modu
 def test_a_proposal_shows_on_home_read(pool, store):  # noqa: F811
     c = ctx(pool)
     write("home", c, "note", note="keep the fructose ceiling as the only bound")
-    seen = module_stores.Stores(module_stores.Sources(**{**vars(module_stores.seed_sources(lambda: pool)), "proposals": proposals.open_ones}))
+    seen = module_stores.Stores(module_stores.Sources(**{**vars(module_stores.fixture_sources(lambda: pool)), "proposals": proposals.open_ones}))
     rows = module_stores.find(seen, "home", kind="proposal")
     assert len(rows) == 1 and rows[0].state == "proposed" and rows[0].status == "notebook"
 
@@ -172,11 +175,8 @@ def test_a_check_proposal_is_asked_for_in_the_persons_name(pool, store, monkeypa
 
 
 def _fetched(store, paper_id="X1", text="The culture reached a titre of 7 g/L of PHB on day three. Growth was slow."):
-    f = FetchResult(paperId=paper_id, status="complete", sections=[FetchedSection(id="s1", heading="Results", text=text)],
-                    fetchedAt="2026-10-20T00:00:00Z", pmcid="PMC1")
-    (store / "fulltext").mkdir(parents=True, exist_ok=True)
-    (store / "fulltext" / f"{paper_id}.json").write_text(f.model_dump_json())
-    return f
+    """A document the project holds whose one passage says `text`."""
+    store.held[paper_id] = [FetchedSection(id="s1", heading="Results", text=text).model_dump()]
 
 
 def test_a_candidate_written_by_hand_is_anchored_and_marked(pool, store):  # noqa: F811
@@ -205,7 +205,7 @@ def test_a_candidate_whose_value_is_not_in_the_sentence_is_refused_on_the_rule(p
 def test_a_candidate_on_an_unfetched_paper_is_refused(pool, store):  # noqa: F811
     r = write("biorepo", ctx(pool), "candidate", fields={"paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "value": "7",
                                                        "unit": "g/L", "quote": "q"})
-    assert "no cached full text" in r.error
+    assert "holds no document X1" in r.error
 
 
 HAND = {"paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "value": "7", "unit": "g/L",
@@ -220,9 +220,8 @@ def test_a_candidate_written_by_hand_is_not_an_extraction(pool, store, monkeypat
     """OF-BLD-016 §1.R finding 3: a hand-written candidate never makes the
     extractor's file, so the extractor still runs on the paper and the
     evidence pool still reads the candidate."""
-    from openferment_core import biorepo, evidence_pool
+    from openferment_core import evidence_pool
 
-    monkeypatch.setattr(biorepo, "PATH", store / "biorepo.json")
     _fetched(store)
     r = write("biorepo", ctx(pool), "candidate", fields=HAND)
     assert r.error is None, r.error
@@ -257,7 +256,6 @@ def test_a_decision_on_a_candidate_written_by_hand_finds_it(pool, store, monkeyp
     from openferment_core import biorepo
     from openferment_core.models import ReviewDecision
 
-    monkeypatch.setattr(biorepo, "PATH", store / "biorepo.json")
     _fetched(store)
     cid = write("biorepo", ctx(pool), "candidate", fields=HAND).summary["candidateId"]
     assert biorepo._resolve(cid).id == cid
@@ -385,12 +383,11 @@ def test_the_endpoint_runs_a_write_tool_like_the_loop(pool, store, client):  # n
     assert [p.askId for p in proposals.open_ones()] == [None]
 
 
-def test_the_log_survives_a_damaged_line(store):
-    audit.append(agent="model", who="m", module="home", action="note", state="proposed")
-    with audit.PATH.open("a") as f:
-        f.write("{not json\n")
-    audit.append(agent="person", who="Ada", module="home", action="note", state="done")
-    assert [a.who for a in audit.read()] == ["m", "Ada"]
+def test_the_log_reads_its_newest_rows_newest_last(store):
+    for who in ("m", "Ada", "Grace"):
+        audit.append(agent="person", who=who, module="home", action="note", state="done")
+    assert [a.who for a in audit.read()] == ["m", "Ada", "Grace"]
+    assert [a.who for a in audit.read(limit=2)] == ["Ada", "Grace"]
 
 
 def test_the_audit_names_the_model_that_answered_not_the_chains_first(pool, store, monkeypatch):  # noqa: F811

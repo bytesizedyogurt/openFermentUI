@@ -4,12 +4,11 @@
 // unit tables (`core/openferment_core/pureos/__init__.py`); the browser shows it and
 // computes nothing of its own: every mass, recovery and cumulative share on
 // the page is a field the service sent. With the service down this says so,
-// and nothing stands in for a train (E.2). Shares lib/rag.ts's call.
+// and nothing stands in for a train (E.2). Shares lib/http.ts's call.
 import type {
   Artifact,
   KeptTrain,
   Override,
-  ProgramId,
   ProposeRequest,
   StreamRow,
   Train,
@@ -28,19 +27,13 @@ import type {
   UnitType,
   VesselSummary,
 } from '@/data/types';
-import { isArchived } from '@/data/programs';
-import { RagDown, RagRefused, call } from './rag';
+import { ServiceDown, ServiceRefused, call } from './http';
 import { proformaNewestRun, proformaReference, proformaScenarios, proformaShelf } from './proforma';
 
-export { RagDown as PureosDown, RagRefused as PureosRefused };
+export { ServiceDown as PureosDown, ServiceRefused as PureosRefused };
 
-/**
- * Every train on file. The page asks for archived programs' trains too and
- * filters them with the switch itself, so it can say what it hides and whose
- * (`HiddenByArchive`), as the other lists do.
- */
-export const pureosTrains = (signal?: AbortSignal) =>
-  call<TrainSummary[]>('/api/pureos/trains?includeArchived=true', { signal });
+/** Every train on file. */
+export const pureosTrains = (signal?: AbortSignal) => call<TrainSummary[]>('/api/pureos/trains', { signal });
 
 /** One train: the newest run of a scenario, or one run by its artifact id. */
 export const pureosTrain = (key: string, signal?: AbortSignal) =>
@@ -116,16 +109,15 @@ export const checkTrain = (req: TrainRunRequest, signal?: AbortSignal) => post<T
 /** Run the train (`POST /api/pureos/train/run`): one `pureos.train_run` artifact, read. */
 export const runTrain = (req: TrainRunRequest, signal?: AbortSignal) => post<TrainRun>('/api/pureos/train/run', req, signal);
 
-/** Every kept train run, newest first; the page filters an archived program's with the switch, so it can say what it hides. */
-export const pureosTrainRuns = (signal?: AbortSignal) => call<TrainSummary[]>('/api/pureos/train-runs?includeArchived=true', { signal });
+/** Every kept train run, newest first. */
+export const pureosTrainRuns = (signal?: AbortSignal) => call<TrainSummary[]>('/api/pureos/train-runs', { signal });
 
 /**
  * OF-BLD-020 §5.R — the trains a model built with `pureos_build` or
  * `pureos_write`, kept on the service (`GET /api/pureos/trains-kept`), the
- * most recently changed first. Asked for with archived programs' too: the
- * index filters them with the switch itself, so it can say what it hides.
+ * most recently changed first.
  */
-export const pureosTrainsKept = (signal?: AbortSignal) => call<KeptTrain[]>('/api/pureos/trains-kept?includeArchived=true', { signal });
+export const pureosTrainsKept = (signal?: AbortSignal) => call<KeptTrain[]>('/api/pureos/trains-kept', { signal });
 
 /** A kept run's units read into a train by the service (`POST /api/pureos/train/from-run`). */
 export const trainFromRun = (req: TrainFromRunRequest, signal?: AbortSignal) => post<TrainFromRun>('/api/pureos/train/from-run', req, signal);
@@ -261,7 +253,6 @@ export interface RunChoice {
   broth: string | null;
   tool: string;
   label: string;
-  program: string | null;
   createdAt: string;
   streams: StreamRow[];
 }
@@ -276,24 +267,16 @@ export function flowsheetOfRun(a: Artifact): string | null {
 
 /**
  * The kept runs a train can take a stream of, or be read from: pureOS's own
- * train runs of a program the switch shows, the newest run of every BioSTEAM
- * scenario the switch shows (the seed's and the ones made here, each made one
- * with its program), and every reference run on the shelf the switch shows,
- * each with its streams as its artifact or its train holds them.
+ * train runs, the newest run of every BioSTEAM scenario (the held ones and
+ * the ones made here), and every reference run on the shelf, each with its
+ * streams as its artifact or its train holds them.
  * Read, never made; a source the service cannot answer is said in words and
  * the rest still come back.
  */
 export async function runChoices(
-  includeArchived: boolean,
-  made: { id: string; name: string; program?: string | null }[],
+  made: { id: string; name: string }[],
   signal?: AbortSignal,
 ): Promise<{ choices: RunChoice[]; problems: string[] }> {
-  // OF-BLD-020 §5.R (finding 12): every source goes through the switch, as
-  // every list does. The train runs are asked for whole (the index says what
-  // it hides) and an archived program's left out here; a scenario made here
-  // carries its own program; the seed scenarios and the shelf are asked with
-  // the switch, so the service leaves an archived one out.
-  const shown = (program: string | null | undefined) => includeArchived || !isArchived((program ?? null) as ProgramId | null);
   const problems: string[] = [];
   const said = (what: string) => (e: unknown) => {
     if (signal?.aborted) return null;
@@ -302,16 +285,16 @@ export async function runChoices(
   };
   const choices: RunChoice[] = [];
   const runs = (await pureosTrainRuns(signal).catch(said('pureOS’s train runs'))) ?? [];
-  for (const r of runs.filter((x) => shown(x.program))) {
+  for (const r of runs) {
     const t = await pureosTrain(r.artifactId, signal).catch(said(`train run ${r.artifactId}`));
     if (t)
-      choices.push({ artifactId: r.artifactId, ref: r.artifactId, scenarioId: null, broth: null, tool: r.tool, label: `train run of ${r.trainName ?? r.trainId ?? r.artifactId}`, program: r.program, createdAt: r.createdAt, streams: t.streams });
+      choices.push({ artifactId: r.artifactId, ref: r.artifactId, scenarioId: null, broth: null, tool: r.tool, label: `train run of ${r.trainName ?? r.trainId ?? r.artifactId}`, createdAt: r.createdAt, streams: t.streams });
   }
-  // The shelf names each scenario flowsheet's broth (OF-BLD-020 §6.2); asked with the archive on, so a run of any flowsheet is named.
-  const shelf = (await proformaShelf(includeArchived, signal).catch(said('Proforma’s shelf'))) ?? [];
+  // The shelf names each scenario flowsheet's broth (OF-BLD-020 §6.2).
+  const shelf = (await proformaShelf(signal).catch(said('Proforma’s shelf'))) ?? [];
   const brothOf = new Map(shelf.map((f) => [f.id, f.brothStream ?? null]));
-  const seeds = (await proformaScenarios({ host: null, includeArchived }, signal).catch(said('Proforma’s scenarios'))) ?? [];
-  const scenarios = [...seeds.map((s) => ({ id: s.id, name: s.name, program: null as string | null })), ...made.filter((m) => shown(m.program))];
+  const held = (await proformaScenarios({ host: null }, signal).catch(said('Proforma’s scenarios'))) ?? [];
+  const scenarios = [...held.map((s) => ({ id: s.id, name: s.name })), ...made];
   for (const sc of scenarios) {
     const a = await proformaNewestRun(sc.id, signal).catch(said(`the runs of ${sc.id}`));
     if (!a) continue;
@@ -324,7 +307,6 @@ export async function runChoices(
       broth,
       tool: a.tool,
       label: `newest run of ${sc.name}${broth ? `, its broth ${broth}` : ''}`,
-      program: sc.program ?? null,
       createdAt: a.createdAt,
       streams: streamsOfArtifact(a),
     });
@@ -333,11 +315,10 @@ export async function runChoices(
     const ref = await proformaReference(f.id, signal).catch(said(`the reference run of ${f.id}`));
     const a = ref?.artifact;
     if (a && a.tool === 'proforma.reference')
-      choices.push({ artifactId: a.id, ref: a.id, scenarioId: null, broth: null, tool: a.tool, label: `reference run of ${f.title}`, program: f.program ?? null, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
+      choices.push({ artifactId: a.id, ref: a.id, scenarioId: null, broth: null, tool: a.tool, label: `reference run of ${f.title}`, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
   }
   return { choices, problems };
 }
 
 /** The vessels fermOS designed (`GET /api/fermos/vessels`): one of a simulation gives a train's broth flow. */
-export const fermosVessels = (includeArchived: boolean, signal?: AbortSignal) =>
-  call<VesselSummary[]>(`/api/fermos/vessels${includeArchived ? '?includeArchived=true' : ''}`, { signal });
+export const fermosVessels = (signal?: AbortSignal) => call<VesselSummary[]>('/api/fermos/vessels', { signal });

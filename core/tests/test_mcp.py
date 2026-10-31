@@ -41,9 +41,9 @@ def test_a_call_through_the_server_returns_what_the_registry_returns(store):
 
 def test_a_number_is_refused_at_this_boundary_as_at_the_others(store):
     server = mcp_server.build()
-    out = _text(asyncio.run(server.call_tool("selling_price", {"scenarioId": "sc-pha-1", "price": 4})))
+    out = _text(asyncio.run(server.call_tool("selling_price", {"scenarioId": "sc-nonesuch", "price": 4})))
     assert "a number was typed into price" in out["error"]
-    assert out["error"] == tools.run("selling_price", {"scenarioId": "sc-pha-1", "price": 4}).error
+    assert out["error"] == tools.run("selling_price", {"scenarioId": "sc-nonesuch", "price": 4}).error
 
 
 def test_get_artifact_reads_and_says_when_there_is_none(store):
@@ -110,8 +110,6 @@ def test_the_server_counts_every_module_tool_with_its_marks_and_gates():
 def test_a_gated_write_through_the_server_is_a_proposal_not_a_write(store, monkeypatch):
     from openferment_core import audit, proposals
 
-    monkeypatch.setattr(audit, "PATH", store / "audit.jsonl")
-    monkeypatch.setattr(proposals, "PATH", store / "proposals.json")
     monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
     server = mcp_server.build()
     out = _text(asyncio.run(server.call_tool("guild_write", {"action": "evidence", "target": "", "fields": {"personId": "p-1"}, "note": "n"})))
@@ -132,8 +130,8 @@ def test_the_server_offers_run_flowsheet_and_stream_table_as_the_registry_does(s
         assert listed[name].description == tools.REGISTRY[name].description
         assert listed[name].input_schema == tools.REGISTRY[name].info().inputSchema
     server = mcp_server.build()
-    for name, args in (("stream_table", {"artifactId": "0123456789abcdef"}), ("run_flowsheet", {"scenarioId": "sc-pha-1"}),
-                       ("run_flowsheet", {"scenarioId": "sc-pha-1", "samples": 9})):
+    for name, args in (("stream_table", {"artifactId": "0123456789abcdef"}), ("run_flowsheet", {"scenarioId": "sc-nonesuch"}),
+                       ("run_flowsheet", {"scenarioId": "sc-nonesuch", "samples": 9})):
         through = _text(asyncio.run(server.call_tool(name, args)))
         assert through == json.loads(tools.run(name, args).model_dump_json(exclude_none=True)) and through["error"]
 
@@ -178,3 +176,38 @@ def test_the_server_offers_pureos_propose_as_the_registry_does(store):
         through = _text(asyncio.run(server.call_tool("pureos_propose", args)))
         assert through == json.loads(tools.run("pureos_propose", args).model_dump_json(exclude_none=True))
         assert through["error"]
+
+
+# ── alpha 2.0 stage 6: one project, an outside assistant's estimates ──────
+
+
+def test_the_server_acts_in_the_project_it_was_started_in(monkeypatch):
+    from openferment_core import projects
+
+    monkeypatch.setattr(intake, "held", lambda project_id=None: {"doc-1": {"title": projects.current()}})
+    out = _text(asyncio.run(mcp_server.build("another-project").call_tool("literature_sources", {})))
+    assert out["summary"]["documents"] == [{"documentId": "doc-1", "title": "another-project"}]
+    assert mcp_server.named_project(["--project", "p-1"]) == "p-1"
+    monkeypatch.setenv(projects.ENV, "p-2")
+    assert mcp_server.named_project([]) == "p-2"
+
+
+def test_a_server_started_in_no_project_says_how_to_start_it_in_one(monkeypatch):
+    from openferment_core import projects
+
+    monkeypatch.delenv(projects.ENV)
+    server = mcp_server.build()
+    assert "--project" in _text(asyncio.run(server.call_tool("search_records", {"query": "x"})))["error"]
+    assert "--project" in _text(asyncio.run(server.call_tool("ask_postdoc", {"question": "q?"})))["declined"]
+    assert "--project" in _text(asyncio.run(server.call_tool("get_artifact", {"id": "0000000000000000"})))["error"]
+
+
+def test_an_outside_assistants_numbers_are_its_estimates(monkeypatch):
+    from openferment_core.engine import library, simulator
+    from test_tools_study import Priced, dearer_cane
+
+    monkeypatch.setattr(simulator, "call", Priced())
+    monkeypatch.setattr(library, "_PARAMETERS", {})
+    out = _text(asyncio.run(mcp_server.build().call_tool("study_scenario", dearer_cane())))
+    (value,) = out["summary"]["values"]
+    assert (value["origin"], value["by"]) == ("model-estimate", mcp_server.AUTHOR)

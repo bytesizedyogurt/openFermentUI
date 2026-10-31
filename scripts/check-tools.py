@@ -12,8 +12,11 @@ Fails when:
    constant may be named, a store module handed around bare or a dynamic
    import may not;
 2b. a tool file other than `tools/writes.py` reaches what keeps a Proforma
-   run, a simulation, a vessel or a train, or writes an audit line itself
-   (OF-BLD-019 §6.1, §6.R; OF-BLD-020 §3.4, §5.4): `run_flowsheet`,
+   run, a simulation, a vessel, a train, an engine run, a study scenario or a
+   comparison, or writes an audit line itself (OF-BLD-019 §6.1, §6.R;
+   OF-BLD-020 §3.4, §5.4; alpha 2.0 stage 6): `engine_run`, `study_scenario`
+   and `study_compare` keep through `writes.run_engine`, `make_scenario` and
+   `make_comparison`, as `run_flowsheet`,
    `fermos_simulate` and `pureos_build` are free, audited writes, and run
    through `writes.run_scenario`, `writes.run_simulation` and writes.py's
    train functions, so rule 2 reads their calls to `proforma.run`,
@@ -22,19 +25,22 @@ Fails when:
    every function of the service that calls `artifacts.compute` for a
    `proforma.run`, `proforma.reference`, `proforma_benchmark`,
    `fermos.simulation`, `fermos.vessel` or `pureos.train_run` artifact (or for
-   a tool it cannot name) or `audit.append`, or that writes through `atomic`
-   in a module naming a store a model's write keeps (`KEPT_STORES`: the trains
-   a model built, `pureos-trains.json`, OF-BLD-020 §5.4), and every function
-   that reaches one of those, to a fixed point, each name followed through its
-   import as rule 2 follows it. A tool file may reach none of them but through
-   writes.py, may not call `artifacts.compute` for a run, and, as in rule 2,
-   may not hand a store module around bare or import by name at run time.
-   OF-BLD-020 §5.R (finding 18): a function that writes through `atomic` and
-   names a kept store's file by a function or constant of the module that
-   names it (`kept.path()`, `kept.FILE`) is a writer wherever it lives, and a
-   tool file writes no file itself: it may not reach `atomic.write_text` or
-   `write_bytes`, nor call a path's or a handle's write, a dump, a file made,
-   moved or taken away, or `open` with a mode that writes;
+   a tool it cannot name) or `audit.append`, or that writes a row (`db.rows`'
+   `put` or `drop`, or SQLAlchemy's insert, update or delete) in a module
+   naming a store a model's write keeps (`KEPT_STORES`: the table of the
+   trains a model built, `trains`, OF-BLD-020 §5.4; ADR-001), and every
+   function that reaches one of those, to a fixed point, each name followed
+   through its import as rule 2 follows it. A tool file may reach none of them
+   but through writes.py, may not call `artifacts.compute` for a run, and, as
+   in rule 2, may not hand a store module around bare or import by name at run
+   time. OF-BLD-020 §5.R (finding 18): a function that writes a row and names
+   a kept store's table, through `db.models` or a constant of the module that
+   names it (`kept.TABLE`), is a writer wherever it lives; and a tool file
+   writes no row and no file itself: it may not reach `db.rows`' writes,
+   SQLAlchemy's insert, update or delete, `atomic.write_text` or
+   `write_bytes`, nor hold SQL that writes, nor call a path's or a handle's
+   write, a dump, a file made, moved or taken away, or `open` with a mode that
+   writes;
 3. a gated action can complete without a person's id on it: every (module,
    action) in `gates.GATES` comes back `proposed` with nothing written but
    the proposal, and carrying it out with no name, a placeholder or one
@@ -42,18 +48,19 @@ Fails when:
 4. the gate table in `docs/TOOLS.md` and `gates.GATES` name different gates:
    the list lives in both places, one row a gate, and a row dropped from one
    is a gate the other still promises;
-5. the registry is not the closed list: a name in `WHITELIST` with no tool
-   registered under it, or one `docs/TOOLS.md` never names in backticks
-   (OF-BLD-019 §4.2 added the thirtieth, `thermo_props`, §6.1
-   `run_flowsheet` and `stream_table`, and OF-BLD-020 §3.4 `fermos_simulate`,
-   §4.2 `fermos_vessel` and §5.4 `pureos_build`, by the build documents'
-   authority; a name added to the code alone is a tool nobody wrote down);
-6. a fermOS or pureOS tool's input schema holds a numeric field (E.4‴: a
-   model's parameter is a source, never a value): `number` or `integer`
-   anywhere in the schema of a tool named `fermos_*` or `pureos_*`, a
-   numeric `enum` or `const` included. The registry's two count fields, `k`
-   and `limit`, at the top of an input are not parameters and stand aside, as
-   `tools.numbers_in` lets them (the module reads take `limit`).
+5. the registry is not the closed list, or `docs/TOOLS.md` is not what the
+   registry writes: a name in `WHITELIST` with no tool registered under it,
+   or a file that differs from `tools.reference.render()` (alpha 2.0, A5:
+   the file is written by `pnpm gen:tools`, never by hand);
+6. a tool's input schema admits a number where `tools.numbers_in` refuses
+   one (ADR-006): `number` or `integer` anywhere in its schema, a numeric
+   `enum` or `const` included, outside the registry's two count fields `k`
+   and `limit` at the top of an input and the `value`, `low` and `high` of a
+   quantity (an object of `value` and a string `unit`); and a fermOS or
+   pureOS tool (E.4‴: a model's parameter is a source, never a value) takes
+   no quantity either;
+7. a tool carries no project scope (ADR-005, A5): every tool acts in one
+   project.
 
 Runs on a throwaway data directory with no key and no network, in a few
 seconds. Negative-tested on 2026-10-20: a module added with no tools,
@@ -78,9 +85,11 @@ nothing else is.
 from __future__ import annotations
 
 import ast
+import atexit
 import importlib
 import os
 import re
+import secrets
 import sys
 import tempfile
 import types
@@ -93,12 +102,36 @@ os.environ["OPENFERMENT_DATA_DIR"] = tempfile.mkdtemp(prefix="check-tools-")
 os.environ.setdefault("OPENFERMENT_MODEL", "claude-haiku-5-5")
 os.environ.setdefault("OPENFERMENT_FIXTURES", "1")
 
+# The audit log lives in PostgreSQL (alpha 2.0, ADR-001): the gated writes
+# below run against a database of this check's own, made on the tests'
+# server (OPENFERMENT_TEST_DATABASE_URL) and dropped on the way out, in a
+# project of its own.
+from openferment_core import migrations  # noqa: E402
+from openferment_core.db import migrate  # noqa: E402
+
+SERVER = os.environ.get("OPENFERMENT_TEST_DATABASE_URL", "").strip() or \
+    "postgresql://openferment:openferment@127.0.0.1:5432/openferment_test"
+DATABASE = f"check_tools_{os.getpid()}_{secrets.token_hex(3)}"
 try:
-    from openferment_core import audit, intake, module_stores, proposals, tools  # noqa: E402
+    _url = migrate.create(DATABASE, SERVER)
+except Exception as e:  # noqa: BLE001 (the server's own words go to the reader)
+    print(f"✗ check:tools  PostgreSQL did not answer ({type(e).__name__}: {e}). Start it with `pnpm db:up`, "
+          "or set OPENFERMENT_TEST_DATABASE_URL.")
+    sys.exit(1)
+atexit.register(migrate.drop, DATABASE, SERVER)
+migrations.upgrade(_url)
+os.environ["OPENFERMENT_DATABASE_URL"] = _url.render_as_string(hide_password=False)
+os.environ["OPENFERMENT_PROJECT"] = "check-tools"
+
+try:
+    from openferment_core import audit, intake, module_stores, projects, proposals, tools  # noqa: E402
     from openferment_core.tools import gates, writes  # noqa: E402
 except Exception as e:  # a module with no tool, or a tool outside WHITELIST, fails the registry's import
     print(f"✗ check:tools  the registry did not load: {type(e).__name__}: {e}")
     sys.exit(1)
+from openferment_core.models import ProjectCreate  # noqa: E402
+
+projects.create(ProjectCreate(id="check-tools", name="check:tools", by="check:tools"))
 
 # The write functions a write tool may call: each module's own, where its
 # rules live. A new free write adds its function here and in docs/TOOLS.md.
@@ -120,17 +153,26 @@ ALLOWED_WRITES = (
     "pureos.kept.keep_train",
     "pureos.train_spec.run_train",
     "extract.add_candidate",
-    "intake.fetch_paper",
+    "intake.collect",
     "extract.extract_paper",
     "proposals.propose",
     "audit.append",
+    # engine_run, study_scenario and study_compare (alpha 2.0 stage 6), each
+    # through its one function in writes.py: an engine run of a plant or of a
+    # scenario, a scenario kept, a comparison kept.
+    "engine.runs.run",
+    "studies.scenarios.run",
+    "studies.scenarios.make",
+    "studies.comparisons.make",
 )
 # The modules that keep a store: anything of theirs a write tool names is a
 # write function in ALLOWED_WRITES, an exception, or a constant.
 STORES = ("geneos", "fermos", "vessel", "proforma", "extract", "intake", "proposals", "audit", "checks", "guild",
-          "biorepo", "artifacts", "atomic", "pureos.kept", "pureos.train_spec")
+          "biorepo", "artifacts", "atomic", "db.rows", "pureos.kept", "pureos.train_spec", "engine.runs",
+          "studies.scenarios", "studies.comparisons")
 # What a write tool may never do itself.
-FORBIDDEN = ("write_text", "open(", "json.dump", ".write(", "atomic.", "_persist", "Path(", "write_bytes", "unlink(", "rename(")
+FORBIDDEN = ("write_text", "open(", "json.dump", ".write(", "atomic.", "_persist", "Path(", "write_bytes", "unlink(", "rename(",
+             "rows.put", "rows.drop", "db.session", "db.run")
 
 errors: list[str] = []
 
@@ -296,6 +338,8 @@ for fn in ALLOWED_WRITES:
 from openferment_core import fermos as _fermos_mod  # noqa: E402
 from openferment_core import proforma as _proforma_mod  # noqa: E402
 from openferment_core import vessel as _vessel_mod  # noqa: E402
+from openferment_core.engine import library as _library_mod  # noqa: E402
+from openferment_core.studies import comparisons as _comparisons_mod  # noqa: E402
 
 PACKAGE_DIR = Path(writes.__file__).resolve().parent.parent
 TOOLS_DIR = Path(writes.__file__).resolve().parent
@@ -303,15 +347,30 @@ WORKER_SIDE = ("workers", "flowsheets")
 # What a kept run is (OF-BLD-020 §3.4): a Proforma run, a simulation, a vessel
 # design, and pureOS's train run (night two names it; `pureos.train_run`).
 TRAIN_RUN = "pureos.train_run"
+# Alpha 2.0 stage 6: an engine run of a library plant or a flowsheet, and a
+# study's comparison of runs, which a model keeps through engine_run and
+# study_compare.
 RUN_KINDS = frozenset({_proforma_mod.RUN, _proforma_mod.REFERENCE, _proforma_mod.BENCHMARK, _fermos_mod.SIMULATION,
-                       _vessel_mod.TOOL, TRAIN_RUN})
+                       _vessel_mod.TOOL, TRAIN_RUN, _library_mod.LIBRARY_RUN, _comparisons_mod.COMPARISON})
 COMPUTE = "openferment_core.artifacts.compute"
 APPEND = "openferment_core.audit.append"
-# The stores a model's free write keeps beside the artifacts, by file name
-# (OF-BLD-020 §5.4: the trains a model built). A function of a module that
-# names one and writes through `atomic` keeps it.
-KEPT_STORES = frozenset({"pureos-trains.json"})
+# The same row inside a store's own transaction (ADR-001): a write and its
+# audit row commit together.
+ADD = "openferment_core.audit.add"
+# The stores a model's free write keeps beside the artifacts, by table
+# (OF-BLD-020 §5.4: the trains a model built; ADR-001). A function of a
+# module that names one and writes a row keeps it.
+KEPT_STORES = frozenset({"trains", "runs", "scenarios", "comparisons"})
 ATOMIC_WRITES = frozenset({"openferment_core.atomic.write_text", "openferment_core.atomic.write_bytes"})
+# A row written: the row helpers every store shares, and SQLAlchemy's own
+# statements that change rows, by the dotted name an import gives them.
+ROW_WRITES = frozenset({"openferment_core.db.rows.put", "openferment_core.db.rows.drop"})
+SQL_WRITES = frozenset({"sqlalchemy.insert", "sqlalchemy.update", "sqlalchemy.delete",
+                        "sqlalchemy.dialects.postgresql.insert", "sqlalchemy.sql.insert", "sqlalchemy.sql.update",
+                        "sqlalchemy.sql.delete", "sqlalchemy.sql.expression.insert", "sqlalchemy.sql.expression.update",
+                        "sqlalchemy.sql.expression.delete"})
+# SQL text that changes rows, held in a string.
+SQL_TEXT = re.compile(r"^\s*(insert\s+into|update\s+\S+\s+set|delete\s+from|truncate)\b", re.IGNORECASE)
 WRITES = f"{writes.__name__}."
 _UNKNOWN = object()
 
@@ -491,27 +550,55 @@ class _Module:
 
 service = [_Module(p) for p in sorted(PACKAGE_DIR.rglob("*.py"))
            if p.relative_to(PACKAGE_DIR).parts[0] not in WORKER_SIDE]
-# OF-BLD-020 §5.R (finding 18): the modules that name a kept store's file. A
-# function anywhere that writes through `atomic` and names that file, or
-# reaches a function of such a module (its `path()`, its `FILE` read as an
-# attribute), keeps the store as surely as one whose own module names it.
+# OF-BLD-020 §5.R (finding 18): the modules that name a kept store's table.
+# A function anywhere that writes a row and names that table (the table
+# itself, through `db.models`, or the name), or reaches a function or reads
+# a constant of such a module (its `TABLE`), keeps the store as surely as one
+# whose own module names it.
 STORE_MODULES = {mod.name for mod in service
                  if any(isinstance(v, str) and v in KEPT_STORES for v in mod.consts.values())}
 
 
 def _names_store(mod: _Module, fn_refs: list) -> bool:
+    from sqlalchemy import Table
+
     for _, r, a, _, t, lc in fn_refs:
         key, obj = mod.resolve(r, a, t, lc)
         if isinstance(obj, str) and obj in KEPT_STORES:
             return True
+        if isinstance(obj, Table) and obj.name in KEPT_STORES:
+            return True
         if key and any(key.startswith(f"{m}.") for m in STORE_MODULES):
+            return True
+        if not key and any(target.startswith(f"{m}.") or target == m for m in STORE_MODULES for target in t):
             return True
     return False
 
 
+def _sql_writes(refs: list) -> list[tuple[int, str]]:
+    """Each use of SQLAlchemy's insert, update or delete among `refs`:
+    (line, its dotted name)."""
+    found = []
+    for _, root, attrs, line, targets, local in refs:
+        if local:
+            continue
+        for target in targets:
+            dotted = ".".join([target, *attrs])
+            if dotted in SQL_WRITES or target in SQL_WRITES:
+                found.append((line, dotted if dotted in SQL_WRITES else target))
+    return found
+
+
+def _sql_text(mod: _Module) -> list[tuple[int, str]]:
+    """Every string in the file that is SQL changing rows: (line, its start)."""
+    return [(n.lineno, n.value.strip()[:24]) for n in ast.walk(mod.tree)
+            if isinstance(n, ast.Constant) and isinstance(n.value, str) and SQL_TEXT.match(n.value)]
+
+
 # A tool file's own file writes past atomic (OF-BLD-020 §5.R, finding 18): a
 # path's or a handle's write, a dump into a handle, a file made, moved or
-# taken away, and a file opened to write. A tool file reads; it writes nothing.
+# taken away, and a file opened to write. A tool file reads; it writes nothing,
+# file or row.
 FILE_WRITES = frozenset({"write_text", "write_bytes", "write", "writelines", "dump", "touch", "mkdir", "unlink",
                          "rename", "rmdir"})
 WRITE_MODES = frozenset("wax+")
@@ -534,17 +621,23 @@ def _raw_writes(mod: _Module, refs: list) -> list[tuple[int, str]]:
     return found
 
 
+def _sql_text_in(fn: ast.AST) -> bool:
+    return any(isinstance(n, ast.Constant) and isinstance(n.value, str) and SQL_TEXT.match(n.value)
+               for n in ast.walk(fn))
+
+
 # What each function reaches, and the ones that keep a run or append to the audit log themselves.
 edges: dict[str, set[str]] = {}
-WRITERS: set[str] = {APPEND}
+WRITERS: set[str] = {APPEND, ADD}
 for mod in service:
     keeps_store = mod.name in STORE_MODULES
     for key, fn in mod.functions():
         fn_refs = mod.refs(fn)
         reached = {k for _, r, a, _, t, lc in fn_refs for k in [mod.resolve(r, a, t, lc)[0]] if k}
         edges[key] = {k for k in reached if not k.startswith(WRITES)}
-        if APPEND in reached or mod.run_computes(fn, fn_refs) or (
-                reached & ATOMIC_WRITES and (keeps_store or _names_store(mod, fn_refs))):
+        writes = reached & (ATOMIC_WRITES | ROW_WRITES) or _sql_writes(fn_refs) or _sql_text_in(fn)
+        if reached & {APPEND, ADD} or mod.run_computes(fn, fn_refs) or (
+                writes and (keeps_store or _names_store(mod, fn_refs))):
             WRITERS.add(key)
 grew = True
 while grew:
@@ -555,9 +648,10 @@ while grew:
             grew = True
 if not {f"{_proforma_mod.__name__}.run", f"{_proforma_mod.__name__}.run_flowsheet", APPEND,
         f"{_fermos_mod.__name__}.simulate", f"{_vessel_mod.__name__}.design",
-        "openferment_core.pureos.kept.keep_train", "openferment_core.pureos.train_spec.run_train"} <= WRITERS:
+        "openferment_core.pureos.kept.keep_train", "openferment_core.pureos.train_spec.run_train",
+        "openferment_core.proposals.propose"} <= WRITERS:
     fail("rule 2b no longer finds proforma.run, proforma.run_flowsheet, fermos.simulate, vessel.design, "
-         "pureos.kept.keep_train, pureos.train_spec.run_train and audit.append among the writers: it has stopped "
+         "pureos.kept.keep_train, pureos.train_spec.run_train, proposals.propose and audit.append among the writers: it has stopped "
          "reading the service")
 
 for mod in service:
@@ -595,6 +689,12 @@ for mod in service:
             fail(f"{where} line {line} writes a file through {key} itself (as {spelled}): a tool file keeps "
                  "nothing; a write goes through tools/writes.py to its module's write function, where rule 2 "
                  "reads it")
+        elif key in ROW_WRITES:
+            # The same for a row: the store a model's write keeps is written by
+            # its module's write function, through writes.py.
+            fail(f"{where} line {line} writes a row through {key} itself (as {spelled}): a tool file keeps "
+                 "nothing; a write goes through tools/writes.py to its module's write function, where rule 2 "
+                 "reads it")
         elif key in WRITERS and key not in own and not key.startswith(WRITES):
             fail(f"{where} line {line} reaches {key} (as {spelled}), which keeps a Proforma run, a simulation, a "
                  "vessel, a train run or a train a model built, or writes an audit line: a tool that does goes through "
@@ -604,6 +704,9 @@ for mod in service:
              "through tools/writes.py, where rule 2 reads it")
     for line, how in _raw_writes(mod, tool_refs):
         fail(f"{where} line {line} writes a file itself ({how}): a tool file keeps nothing; a write goes through "
+             "tools/writes.py to its module's write function, where rule 2 reads it")
+    for line, how in _sql_writes(tool_refs) + _sql_text(mod):
+        fail(f"{where} line {line} writes a row itself ({how}): a tool file keeps nothing; a write goes through "
              "tools/writes.py to its module's write function, where rule 2 reads it")
 
 # 3. a gated action completes only with a person's name on it
@@ -623,7 +726,7 @@ for gate in gates.GATES:
             fail(f"{module}_write {action} did not come back proposed at gate {gate.id}: {r.error or r.summary}")
             continue
         after = {p.name for p in data.iterdir()}
-        extra = after - before - {"proposals.json", "proposals.json.lock", "audit.jsonl", "audit.jsonl.lock"}
+        extra = after - before
         if extra:
             fail(f"{module}_write {action} wrote {sorted(extra)} besides the proposal")
         pid = r.summary["proposalId"]
@@ -643,24 +746,33 @@ for missing in sorted(documented - coded):
     fail(f"docs/TOOLS.md names gate {missing!r} and gates.py has no such row")
 for missing in sorted(coded - documented):
     fail(f"gates.py has gate {missing!r} and docs/TOOLS.md has no row for it")
-# 5. the registry is the closed list, and every name of it is written down
+# 5. the registry is the closed list, and docs/TOOLS.md is what it writes
+from openferment_core.tools import reference  # noqa: E402
+
 for name in tools.WHITELIST:
     if name not in tools.REGISTRY:
         fail(f"{name} is in WHITELIST and no tool is registered under it")
-    if f"`{name}`" not in doc:
-        fail(f"{name} is in WHITELIST and docs/TOOLS.md never names it")
-# 6. E.4‴: a fermOS or pureOS tool takes ids and words; a model's parameter
-#    is a source, never a value. Its schema holds no numeric field but the
-#    registry's two count fields at the top of the input.
+if doc != reference.render():
+    fail("docs/TOOLS.md differs from what the registry writes: run `pnpm gen:tools` (the file is never edited by hand)")
+# 6. ADR-006: a number stands in a tool's input only inside a quantity, and
+#    E.4‴: a fermOS or pureOS tool takes ids and words, a model's parameter
+#    being a source, never a value. A schema admits a number at the top-level
+#    count fields, and at a quantity's value and range, and nowhere else.
 NUMERIC = frozenset({"number", "integer"})
 
 
-def _numeric(node: object, path: str, top: bool) -> list[str]:
+def _is_quantity(node: dict) -> bool:
+    props = node.get("properties")
+    return isinstance(props, dict) and "value" in props and (props.get("unit") or {}).get("type") == "string"
+
+
+def _numeric(node: object, path: str, top: bool, quantities: bool = True) -> list[str]:
     """Where a JSON schema admits a number: a `type` of number or integer
     (alone or in a list), or a numeric `enum` or `const`, anywhere below,
     `$defs` and `anyOf` included. A top-level count field stands aside only
     as a whole number, as `tools.numbers_in` lets one through: a `limit`
-    that holds numbers inside it is checked like any field."""
+    that holds numbers inside it is checked like any field. A quantity's
+    value and range stand aside when `quantities` allows them."""
     found: list[str] = []
     if isinstance(node, list):
         for n, child in enumerate(node):
@@ -673,26 +785,39 @@ def _numeric(node: object, path: str, top: bool) -> list[str]:
     values = list(node.get("enum") or []) + ([node["const"]] if "const" in node else [])
     if kinds & NUMERIC or any(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
         found.append(path or "input")
+    quantity = quantities and _is_quantity(node)
     for key, child in node.items():
         if key == "properties" and isinstance(child, dict):
             for name, prop in child.items():
                 if top and name in tools.COUNT_FIELDS and isinstance(prop, dict) and prop.get("type") == "integer":
                     continue
-                found += _numeric(prop, f"{path}.{name}" if path else name, False)
+                if quantity and name in tools.QUANTITY_FIELDS:
+                    continue
+                found += _numeric(prop, f"{path}.{name}" if path else name, False, quantities)
         elif key not in ("enum", "const", "default", "examples", "description", "title"):
-            found += _numeric(child, f"{path}.{key}" if path else key, False)
+            found += _numeric(child, f"{path}.{key}" if path else key, False, quantities)
     return found
 
 
 for name in tools.WHITELIST:
     tool = tools.REGISTRY.get(name)
-    if tool is None or not name.startswith(("fermos_", "pureos_")):
+    if tool is None:
         continue
-    for where in _numeric(tool.info().inputSchema, "", True):
-        fail(f"{name}'s input schema holds a numeric field at {where}: a fermOS or pureOS tool takes ids and words, "
-             "a model's parameter is a source and never a value (E.4‴)")
+    strict = name.startswith(("fermos_", "pureos_"))
+    for where in _numeric(tool.info().inputSchema, "", True, quantities=not strict):
+        if strict:
+            fail(f"{name}'s input schema holds a numeric field at {where}: a fermOS or pureOS tool takes ids and words, "
+                 "a model's parameter is a source and never a value (E.4‴)")
+        else:
+            fail(f"{name}'s input schema admits a number at {where}, outside a quantity and the count fields: "
+                 "tools.numbers_in refuses it there (ADR-006)")
+# 7. every tool acts in one project
+for name, tool in tools.REGISTRY.items():
+    if tool.scope != "project":
+        fail(f"{name} carries the scope {tool.scope!r}: every tool acts in one project (ADR-005, A5)")
 
-lines = audit.read()
+# The gated writes' rows; the first row is the check's project being made.
+lines = [a for a in audit.read() if a.action != "create_project"]
 if any(a.agent == "person" for a in lines):
     fail("a person's line entered the audit log with no person's name")
 if not lines or any(a.agent != "model" or not a.askId for a in lines):
@@ -704,6 +829,7 @@ if errors:
         print(f"  - {e}")
     sys.exit(1)
 print(f"✓ check:tools  {len(module_stores.MODULES)} modules with a read and a write tool; writes.py calls only "
-      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a run (Proforma's, a simulation, a vessel or a train), a train a model built, or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
-      f"{len(coded)} gates in gates.py and docs/TOOLS.md alike; {len(tools.WHITELIST)} tools, each registered and "
-      f"written down; no fermOS or pureOS tool takes a number")
+      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a run (Proforma's, a simulation, a vessel, a train, an engine run or a comparison), a train or a scenario a model made, or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
+      f"{len(coded)} gates in gates.py and docs/TOOLS.md alike; {len(tools.WHITELIST)} tools, each registered, each "
+      f"acting in one project, and docs/TOOLS.md as the registry writes it; a number stands only in a quantity or a "
+      f"count, and no fermOS or pureOS tool takes one")

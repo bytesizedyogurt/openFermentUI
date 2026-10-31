@@ -1,18 +1,17 @@
-// openFerment Sim — canonical entity types (OF-DES-001 §15)
+// openFerment — the client's entity types (OF-DES-001 §15), hand-kept beside
+// the generated src/api/types.gen.ts and held to the service by check:plan.
 
 /**
  * Provenance classes (OF-DES-001 §7.4, revised by OF-COR-001 §20).
  *
- * With a real corpus, 'demo' no longer means "this whole platform is fake" —
- * it is reserved for the three surfaces that remain modeled rather than
- * measured: simulation response grids, scripted agent answer text, and
- * anything derived from them.
+ * 'assumed' (alpha 1.0's 'demo', renamed by ADR-006) marks a value that rests
+ * on a named person's assumption or a model's estimate rather than a
+ * measurement: a simulation run on a typed value, a stand-in model's answer,
+ * and anything derived from them.
  *
- * 'curated' is new and load-bearing. It marks a value transcribed from the
- * curation document (OF-COR-001) rather than read off the source PDF. The
- * claim is real and attributable, but it has not yet been checked against the
- * paper itself, so it is weaker than 'verified' and must never silently pass
- * as a source-span extraction.
+ * 'curated' marks what is written by hand rather than read off a source: the
+ * fields' definitions and canonical units, a strain's description. It is
+ * weaker than 'verified' and never passes as a source-span extraction.
  *
  * 'industry-estimate' marks market and vendor figures (OF-COR-001 §16 O8).
  * They are useful for framing and useless as evidence: excluded from the gold
@@ -23,7 +22,7 @@ export type Provenance =
    * First-party experimental measurement (OF-BLD-006 §6). The strongest
    * evidence the system can hold, and the only class it produces itself: you
    * have the raw data and you know the conditions it was taken under. Ranks
-   * above 'gold', which is a hand-curated reading of somebody else's paper.
+   * above 'gold', which is a reviewer's reading of somebody else's paper.
    * Created by reconciling a Deposition against the Runbook that predicted it.
    */
   | 'measured'
@@ -42,28 +41,20 @@ export type Provenance =
   | 'unverified'
   | 'user'
   | 'industry-estimate'
-  | 'demo';
+  | 'assumed';
 
 export type ParameterFamily =
   | 'expression'
-  | 'ptm'
-  | 'functional'
   | 'cultivation'
   | 'downstream'
-  // OF-BLD-014 §2.1 — thread P's polyhydroxyalkanoates.
-  | 'polymer'
-  // The yeast-ethanol program (thread Q): growth, product and price kinetics.
   | 'kinetics';
 
 /**
- * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — the
- * polymer family OF-BLD-014 §2.1 adds, and the kinetics family the
- * yeast-ethanol program (thread Q) adds, with the oxygen and maintenance fields
- * fermOS's simulations read (OF-BLD-020 §3.2) and the downstream fields
- * pureOS's unit catalogue reads (§5.1): forty-nine fields in seven.
+ * The record fields (`core/openferment_core/schema/fields.yaml`, mirrored in
+ * data/ontology.ts): thirty-four fields in four families.
  */
 export type FieldId =
-  // Family 1 — expression performance
+  // Expression performance
   | 'expression_pct_tsp'
   | 'titer_intracellular'
   | 'titer_secreted'
@@ -71,40 +62,21 @@ export type FieldId =
   | 'fold_improvement'
   | 'transformation_efficiency'
   | 'time_to_colony'
-  // Family 2 — post-translational modification
-  | 'phosphate_count'
-  | 'phosphorylation_degree'
-  | 'phospho_site_position'
-  | 'glycan_species'
-  | 'kinase_identity'
-  // Family 3 — functional performance
-  | 'micelle_diameter'
-  | 'micellar_fraction'
-  | 'gelation_ph'
-  | 'calcium_binding'
-  | 'melt_stretch_length'
-  // Family 4 — cultivation
+  // Cultivation
   | 'growth_rate_mu'
   | 'final_biomass_density'
   | 'volumetric_productivity'
   | 'medium_component_conc'
-  // Family 5 — downstream and economics
+  // Downstream & economics
   | 'disruption_protein_yield'
   | 'disruption_energy'
   | 'minimum_selling_price'
-  // OF-BLD-020 §5.1: what pureOS's unit catalogue binds
   | 'step_recovery'
   | 'product_purity'
   | 'partition_coefficient'
   | 'sieving_coefficient'
   | 'cake_moisture'
-  // Family 6 — polymer (OF-BLD-014 §2.1)
-  | 'pha_content_cdw'
-  | 'pha_titre'
-  | 'pha_yield_substrate'
-  | 'pha_productivity'
-  | 'pha_mw'
-  // Family 7 — growth and product kinetics (thread Q)
+  // Growth and product kinetics
   | 'monod_ks'
   | 'biomass_yield_substrate'
   | 'ethanol_yield_substrate'
@@ -116,7 +88,6 @@ export type FieldId =
   | 'ethanol_lp_alpha'
   | 'ethanol_lp_beta'
   | 'ethanol_mesp'
-  // The oxygen and maintenance fields fermOS's simulations and vessels read (OF-BLD-020 §3.2)
   | 'maintenance_coefficient'
   | 'biomass_yield_oxygen'
   | 'specific_oxygen_uptake'
@@ -167,8 +138,6 @@ export interface ParameterDef {
   definition: string;
   /** '' for categorical fields (kinase_identity, glycan_species). */
   canonicalUnit: string;
-  range: [number, number];
-  notes: string;
   /** Categorical fields hold a string value, not a number. */
   categorical?: boolean;
   /** OF-COR-001 §17 Rule 1: a value without its method is not interpretable. */
@@ -185,49 +154,11 @@ export type IngestStage = 'fetch' | 'parse' | 'chunk' | 'embed' | 'extract';
 export type IngestStatus =
   /** Full text parsed into sections; spans anchor to the paper's own words. */
   | 'complete'
-  /**
-   * Bibliographically real, full text NOT yet ingested (OF-COR-001 §22.6).
-   * The reader shows the curation entry from OF-COR-001, clearly labelled as
-   * the curator's words rather than the paper's, with a DOI link out.
-   */
-  | 'catalogued'
   | `stage:${IngestStage}`
   /** The source document could not be retrieved at all. */
   | 'failed:fetch'
   | 'failed:parse'
   | 'shelf';
-
-/** Which corpus thread an entry belongs to (OF-COR-001 §1). */
-export type CorpusThread =
-  | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H'
-  | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O'
-  /** PHA from waste cellulosic sugars, program two (OF-BLD-014 §2.2). */
-  | 'P'
-  /** Ethanol from glucose by wild-type Saccharomyces cerevisiae, program three. */
-  | 'Q';
-
-// ── Programs (OF-BLD-016 §2.1, E.1′) ────────────────────────────────────
-//
-// A program is data: a set of thread letters, a name, and whether it is
-// active or archived. An archived program's papers, records, strains,
-// products, scenarios, protocols, runbooks and lessons stay in the
-// repository and leave every default view; Settings → Programs shows them
-// again. `src/data/programs.ts` declares them; `check:seed` holds every
-// thread letter to exactly one program. Mirrored by `Program` in models.py.
-
-export type ProgramId = 'casein' | 'pha' | 'yeast';
-export type ProgramStatus = 'active' | 'archived';
-
-export interface Program {
-  id: ProgramId;
-  /** As Settings lists it: "Yeast ethanol", "Casein", "PHA". */
-  name: string;
-  /** The corpus threads that are this program's papers. No letter is in two programs. */
-  letters: CorpusThread[];
-  status: ProgramStatus;
-  /** One line on what the program is, in words. */
-  summary: string;
-}
 
 export type SourceType =
   | 'journal-article'
@@ -251,44 +182,39 @@ export interface Paper {
   id: string;
   title: string;
   authors: string[];
-  year: number;
+  /** Unset when the source does not say. */
+  year?: number;
   venue: string;
   organisms: string[];
   topics: string[];
-  /**
-   * For 'catalogued' papers this is the curator's summary from OF-COR-001,
-   * NOT the publisher's abstract. `textSource` says which.
-   */
+  /** The publisher's abstract when the source gives one; empty otherwise. */
   abstract: string;
   sections: PaperSection[];
   ingest: IngestStatus;
 
-  // ── real-corpus identity (OF-COR-001) ──────────────────────────────
-  thread: CorpusThread;
-  sourceType: SourceType;
-  /** The authoritative record key — never the author string (OF-COR-001 header). */
+  // ── the document's identity ────────────────────────────────────────
+  sourceType?: SourceType;
+  /** The authoritative record key — never the author string. */
   doi?: string;
   pmcid?: string;
   pmid?: string;
   /**
    * Where Intake fetches the text of a source Europe PMC does not hold: an
    * OSTI report's purl, an SGD strain entry's address. Written by
-   * `pnpm thread:apply:q` from a person's include list; a strain entry has
+   * the collector from the source's identifier (`SGD:<id>`, an OSTI id); a strain entry has
    * no other identifier.
    */
   sourceUrl?: string;
-  /** Whether `sections` hold the paper's own text or the curator's notes. */
-  textSource: 'full-text' | 'curation-note';
-  /** Openly retrievable vs. needs institutional access (OF-COR-001 §19). */
+  /** `sections` hold the document's own text, as the project holds it. */
+  textSource: 'full-text';
+  /** Openly retrievable vs. needs institutional access, from its licence class. */
   openAccess: boolean;
-  /** Ingestion tranche: 1 = open-access core, 2 = remainder, 3 = v1.1. */
-  tranche: 1 | 2 | 3;
-  /** Author string not fully resolved — must be checked at ingest ([verify]). */
-  verifyNeeded?: boolean;
-  /** Why this entry earns its place, from the corpus document. */
-  corpusRole?: string;
 
-  // ── set by the service overlay (OF-BLD-012 §2.1), never by the seed ──
+  // ── set by the service overlay (OF-BLD-012 §2.1) ──────────────────
+  /** A document the open project holds in its literature (ADR-002), made from the overlay. */
+  held?: boolean;
+  /** Its licence class in the kit's taxonomy. */
+  licenceClass?: string;
   /** The licence the fetched full text carried, when `textSource` is 'full-text'. */
   license?: string;
   /** Who served the fetched full text, when `textSource` is 'full-text'. */
@@ -298,9 +224,8 @@ export interface Paper {
 }
 
 export type RecordStatus = 'unverified' | 'verified' | 'rejected';
-// 'claude-1' is the first run that actually ran (OF-BLD-012 §6). The three
-// before it are the seed's names for runs that never happened.
-export type ExtractorRun = 'v0.3' | 'v0.4' | 'v0.4r' | 'claude-1';
+// 'claude-1', the extractor that runs (OF-BLD-012 §6).
+export type ExtractorRun = 'claude-1';
 
 export interface AuditEvent {
   at: string;
@@ -323,15 +248,15 @@ export interface ExtractionRecord {
   confidence: number;
   status: RecordStatus;
   /**
-   * Explicit provenance. Extractor output is 'unverified' until reviewed;
-   * values transcribed from OF-COR-001 are 'curated'; market figures are
-   * 'industry-estimate' and never enter the gold set.
+   * Explicit provenance. Extractor output is 'unverified' until reviewed, and
+   * a decision gives it the class `biorepo.provenance_of` computes; market
+   * figures are 'industry-estimate' and never enter the gold set.
    */
   provenance: Provenance;
   /**
    * The strain id when the paper's wording names a known strain (OF-BLD-014
    * §2.1), which is what every screen matches on; otherwise the wording as
-   * the paper wrote it. Seed records carry a strain id.
+   * the paper wrote it.
    */
   organism?: string;
   /**
@@ -350,7 +275,7 @@ export interface ExtractionRecord {
   componentTag?: string;
   gold?: { value: number | string; unit: string };
   goldOnly?: boolean;
-  /** Absent for curated records — they did not come from an extractor run. */
+  /** The extractor run that produced the record. */
   extractorRun?: ExtractorRun;
   rejectReason?: string;
   corrected?: { value: number; unit: string };
@@ -376,7 +301,7 @@ export interface ExtractionRecord {
   method?: AnalysisMethod;
   /** Required on phospho_site_position — mature and precursor differ by 15. */
   numbering?: NumberingConvention;
-  /** Where in OF-COR-001 a 'curated' value was transcribed from, e.g. '§9 H4'. */
+  /** Where an alpha 1.0 curated value was transcribed from, kept on imported records. */
   curationRef?: string;
   /** A value the source states as a range rather than a point. */
   range?: Range;
@@ -390,8 +315,7 @@ export interface ExtractionRecord {
    * record onto the paper's own sentence and take the paper's own number;
    * this is what it was before that, so "has this been re-anchored?" and
    * "what do I restore when a correction is withdrawn?" are answered by the
-   * record itself rather than by diffing it against the seed it was loaded
-   * from — which a corpus update would silently change under it.
+   * record itself.
    */
   original?: { value: number | string; unit: string; quote: string; sectionId: string };
   /**
@@ -412,7 +336,7 @@ export interface ExtractionRecord {
 }
 
 /**
- * A value the source states as an interval. The curators record it; §2.4
+ * A value the source states as an interval. The record carries it; §2.4
  * rule 3 anchors a midpoint or an endpoint against the sentence that states
  * it. Mirrors `Range` in models.py.
  */
@@ -444,9 +368,37 @@ export type ValueBasis =
   | 'negation';
 
 /** A value and its unit. Categorical fields carry a string value. */
+/** Where a number came from (ADR-006). */
+export type OriginKind = 'record' | 'artifact' | 'person-assumption' | 'model-estimate' | 'library-default' | 'convention';
+/** The origins a value set for one run can have (an Override's origin). */
+export type OverrideOrigin = 'person-assumption' | 'model-estimate';
+
+export interface Origin {
+  kind: OriginKind;
+  /** The record, the artifact or the library entry it was read from. */
+  ref?: string | null;
+  /** The person who typed it, or the id of the model that estimated it. */
+  by?: string | null;
+  /** The day it was typed, or the moment it was estimated. */
+  at?: string | null;
+  /** What it rests on, in words. */
+  note?: string | null;
+}
+
+/**
+ * A value and its unit (ADR-006). A number a model, a person or a library
+ * supplies carries its origin; a value code derives from another (the SI
+ * form of a record's value) carries none, and the service leaves an absent
+ * basis, range or origin out.
+ */
 export interface Quantity {
   value: number | string;
   unit: string;
+  /** What the value is reckoned on, in words (dry basis, per litre of broth). */
+  basis?: string | null;
+  low?: number | null;
+  high?: number | null;
+  origin?: Origin | null;
 }
 
 /** One gold record scored against a run. */
@@ -472,11 +424,12 @@ export interface RunOutput {
   results: RunResult[];
   falsePositives: RunFalsePositive[];
   /** The models that answered the run's papers, from their usage records
-   *  (core/openferment_core/witness.py). Absent for the seed's runs. */
+   *  (core/openferment_core/witness.py). */
   models?: string[];
 }
 
-export interface CuratorNote {
+/** A note written by hand about a strain. */
+export interface StrainNote {
   at: string;
   who: string;
   text: string;
@@ -490,12 +443,7 @@ export interface Strain {
   description: string;
   badges: string[];
   bsl: 1 | 2;
-  notes: CuratorNote[];
-  /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
+  notes: StrainNote[];
 }
 
 export type ProtocolCategory =
@@ -528,7 +476,7 @@ export interface Step {
   refs?: string[]; // record or paper ids
   /**
    * The skills a person needs to perform this step (OF-BLD-013 §1.1), as ids
-   * from `src/data/skills.ts`. Guild's Matrix reads these to say who can run
+   * from Guild's skills (none ship with alpha 2.0). Guild's Matrix reads these to say who can run
    * a protocol, and the run-mode gate reads them to decide whether a step
    * needs a cosigner. A step with no skills needs no qualification. Versioned
    * with the protocol, so a new version that changes a step can change what
@@ -559,18 +507,6 @@ export interface Protocol {
   versions: ProtocolVersion[];
   currentVersion: string;
   provenanceNote: string;
-  /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
 }
 
 export interface Deviation {
@@ -656,10 +592,10 @@ export interface ScenarioAssumption {
 
 export interface Scenario {
   id: string;
-  /** An authored cost model's id (S1–S3), or a BioSTEAM flowsheet's (§8.4). */
+  /** The BioSTEAM flowsheet the scenario runs (§8.4). */
   modelId: string;
-  /** 'authored': a cost surface written by hand; 'biosteam': a flowsheet the service simulates. */
-  kind: 'authored' | 'biosteam';
+  /** A flowsheet the service simulates. */
+  kind: 'biosteam';
   name: string;
   description: string;
   product: string;
@@ -667,18 +603,6 @@ export interface Scenario {
   point: Record<string, number>;
   assumptions: ScenarioAssumption[];
   pinned: boolean;
-  /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
   /**
    * The shelf flowsheet a `biosteam` scenario runs (OF-BLD-019 D2): an id
    * from `GET /api/proforma/shelf`, and nothing else about its structure.
@@ -692,21 +616,16 @@ export interface Scenario {
    * price on Proforma's index is read from that artifact, never kept here.
    */
   lastRunId?: string | null;
-  /** When a person made the scenario here (ISO time); absent on a seeded one. */
+  /** When a person made the scenario (ISO time). */
   createdAt?: string;
   /**
    * OF-BLD-020 §6.1 (D11): what a scenario on `custom_train_v1` is built
-   * from, kept with it in the Durable tier (`createdScenarios`) and sent with
+   * from, kept with it in the project's rows (`scenarios`) and sent with
    * every binding and run: the kept `fermos.vessel` design (its artifact id)
    * and the kept `pureos.train_run` (its artifact id). Absent on any other.
    */
   vessel?: string;
   trainRun?: string;
-}
-
-export interface GridPointResult {
-  msp: number;
-  costLines: Record<CostLine, number>;
 }
 
 export interface SensitivityRow {
@@ -715,78 +634,13 @@ export interface SensitivityRow {
   hiPct: number;
 }
 
-/**
- * A cost model is authored once (spreadsheet-grade engine, §17.1) and swept
- * over its grid at load time. Cost lines are $/kg product and sum to MSP by
- * construction, so the waterfall always agrees with the headline.
- */
-export interface CostModel {
-  modelId: 'S1' | 'S2' | 'S3';
-  dims: ScenarioDim[];
-  referencePoint: Record<string, number>;
-  evaluate: (point: Record<string, number>) => Record<CostLine, number>;
-  sensitivity: SensitivityRow[];
-  /** Grid coordinates where the authored engine fails to converge (§17.3). */
-  nonConvergent?: (point: Record<string, number>) => boolean;
-}
-
-/** Precomputed sweep of a CostModel (§15 ResultGrid). */
+/** A sweep's prices over its grid (§15 ResultGrid). */
 export interface ResultGrid {
   modelId: string;
   dims: { key: string; values: number[] }[];
   msp: Float64Array;
   costLines: Record<CostLine, Float64Array>;
   sensitivity: SensitivityRow[];
-}
-
-export interface ChatRetrievalHit {
-  paperId: string;
-  sectionId: string;
-  score: number;
-  snippet: string;
-}
-
-export interface ChatToolCall {
-  name: string;
-  args: Record<string, unknown>;
-  durationMs: number;
-  retrieval?: ChatRetrievalHit[];
-}
-
-export interface ChatFlow {
-  id: string;
-  triggers: string[];
-  plan: string[];
-  toolCalls: ChatToolCall[];
-  answerMd: string; // chips as [[ex-0112]] / [[SP-004]]
-  followups: string[]; // may be "flow:F2|label"
-  clarify?: {
-    question: string;
-    options: { label: string; flowId: string }[];
-  };
-}
-
-export type ChatMessage =
-  | { kind: 'user'; id: string; text: string }
-  | { kind: 'plan'; id: string; steps: string[]; done: number; collapsed: boolean }
-  | { kind: 'tool'; id: string; call: ChatToolCall; expanded: boolean }
-  | { kind: 'answer'; id: string; md: string; streaming: boolean; flowId?: string; followups: string[] }
-  | { kind: 'clarify'; id: string; question: string; options: { label: string; flowId: string }[] }
-  | { kind: 'system'; id: string; text: string; retry?: boolean };
-
-export interface ChatSession {
-  id: string;
-  title: string;
-  startedAt: string;
-  scope?: { kind: 'paper' | 'collection'; id: string; label: string };
-  messages: ChatMessage[];
-  pinned: ChatRetrievalHit[];
-}
-
-export interface Collection {
-  id: string;
-  name: string;
-  paperIds: string[];
 }
 
 export interface CheckpointQuestion {
@@ -808,23 +662,11 @@ export interface Lesson {
   checkpoint: CheckpointQuestion[];
   /**
    * The skills this lesson teaches toward (OF-BLD-013 §3.1), as ids from
-   * `src/data/skills.ts`. Passing its checkpoint writes a knowledge entry for
+   * Guild's skills (none ship with alpha 2.0). Passing its checkpoint writes a knowledge entry for
    * each one on the learner's ledger, which puts them at Learning. Only an
    * assessor's training sign-off moves them to Supervised.
    */
   skills?: string[];
-  /**
-   * The program this lesson belongs to (OF-BLD-016 §2.1). Absent, it takes
-   * its module's; a module with none is general.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
 }
 
 export type LessonBlock =
@@ -834,7 +676,6 @@ export type LessonBlock =
       embed:
         | 'chip-demo'
         | 'record-card'
-        | 'unit-playground'
         | 'mini-queue'
         | 'metrics-tiles'
         | 'strip-plot'
@@ -852,18 +693,6 @@ export interface LearnModule {
   blurb: string;
   lessons: Lesson[];
   outline?: string[];
-  /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
 }
 
 export interface ActivityEvent {
@@ -895,12 +724,6 @@ export interface Job {
   failReason?: string;
   href?: string;
   startedAt: number;
-  /**
-   * A job whose progress is set by a real request rather than by the clock
-   * (OF-BLD-012 §5.4). `tickJobs` leaves these alone; the fetch that started
-   * one completes or fails it.
-   */
-  real?: boolean;
 }
 
 // ── OF-BLD-005 · molecules, vocabulary and runbooks ────────────────────
@@ -953,98 +776,6 @@ export interface UnitOperation {
   biosteamClasses?: string[];
 }
 
-export type GeneticElementKind =
-  | 'promoter'
-  | 'signal_peptide'
-  | 'fusion_tag'
-  | 'maintenance'
-  | 'sequence_design'
-  | 'dosage';
-
-export interface GeneticElement {
-  id: string;
-  label: string;
-  kind: GeneticElementKind;
-  /**
-   * Hosts the element is described for, as vocabulary labels — NOT `Strain`
-   * ids. The construct vocabulary predates the host catalogue and names
-   * organisms at a coarser grain ('e-coli-bl21' covers every BL21 derivative),
-   * so these must never be resolved against STRAINS.
-   */
-  hostFit?: string[];
-  induction?: string;
-  strength?: string;
-  purification?: string;
-  /** `true` needs a protease; 'autocatalytic' cleaves itself and costs nothing. */
-  cleavable?: boolean | 'autocatalytic';
-  stability?: string;
-  copy?: string;
-  tool?: string;
-  note?: string;
-}
-
-export interface Pathway {
-  id: string;
-  label: string;
-  products: string[];
-  /** The metabolic branch point flux has to be pushed through. */
-  fluxNode: string;
-  note?: string;
-}
-
-export type CostBand = 'low' | 'moderate' | 'high';
-
-export interface StorageFormat {
-  id: string;
-  label: string;
-  tempC: number;
-  shelfLife: string;
-  /** What shipping this format actually requires — the cold-chain question. */
-  logistics: string;
-  cost: CostBand;
-  note?: string;
-}
-
-export type RegulatoryBurden = 'low' | 'low-moderate' | 'moderate' | 'high' | 'very high';
-
-export interface RegulatoryPathway {
-  id: string;
-  label: string;
-  burden: RegulatoryBurden;
-  note?: string;
-}
-
-export interface ProcessScale {
-  id: string;
-  label: string;
-  volumeL: string;
-  role: string;
-}
-
-/**
- * Patent clearance is an ambient property of every molecule, never a separate
- * mode (OF-BLD-005 §8). Six states, each with the action it implies. None of
- * them is a legal opinion — every clearance surface carries the counsel
- * callout alongside.
- */
-export type ClearanceStateId =
-  | 'clear-expired'
-  | 'clear-none'
-  | 'watch-variant'
-  | 'watch-process'
-  | 'blocked'
-  | 'unknown';
-
-export type ClearanceRisk = 'low' | 'low-moderate' | 'moderate' | 'high' | 'unknown';
-
-export interface ClearanceState {
-  id: ClearanceStateId;
-  label: string;
-  risk: ClearanceRisk;
-  /** What a team should do next, in the platform's voice — not counsel's. */
-  action: string;
-}
-
 /**
  * A carbon source a value can be measured on (OF-BLD-014 §2.1): a name and
  * the spellings a paper uses for it, lower-case. Words only — no number, no
@@ -1068,9 +799,7 @@ export type ProductCategory =
   | 'terpene'
   | 'glycoside'
   | 'industrial_enzyme'
-  | 'therapeutic_protein'
-  /** Polymers a cell stores, PHA first (OF-BLD-014 §2.2). */
-  | 'biopolymer';
+  | 'therapeutic_protein';
 
 /**
  * Value per kilogram, banded rather than priced. A band is defensible from
@@ -1090,16 +819,13 @@ export interface Product {
   defaultStrainId: string;
   /** Ordered fermenter to vial. This array, not stage order, is the train. */
   unitOperationIds: string[];
-  storageIds: string[];
   regulatoryIds: string[];
-  clearanceState: ClearanceStateId;
-  scaleId: string;
   pathwayIds: string[];
   tags: string[];
   valueDensityBand: ValueDensityBand;
   /**
-   * Always 'demo' — every product record is modeled, not measured, and renders
-   * as "Modeled · not measured" through the existing provenance system.
+   * Always 'assumed' — every product record is modeled, not measured, and renders
+   * as "Assumed · not measured" through the existing provenance system.
    */
   provenance: Provenance;
   note: string | null;
@@ -1109,11 +835,6 @@ export interface Product {
    * class out of every median, range and count.
    */
   economicsProvenance: Provenance;
-  /**
-   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
-   * is general and shows whatever programs are archived.
-   */
-  program?: ProgramId;
   /**
    * The one-letter amino-acid sequence of the product's own chain
    * (OF-BLD-020 §7.1), from which Biopython's ProtParam computes its
@@ -1320,12 +1041,6 @@ export interface Deposition {
   sampleTimes?: Record<string, number>;
   /** What each measure's series is, by measure id, as a person assigned it. */
   seriesRoles?: Record<string, SeriesRole>;
-  /**
-   * An example deposition (OF-BLD-016 §3.3, D3): a run nobody made, hidden
-   * like an archived program's. The seed holds none; a deposition a person
-   * starts here is never one, whatever the runbook it follows.
-   */
-  example?: boolean;
 }
 
 export type SeriesRole = 'biomass' | 'product' | 'substrate';
@@ -1383,7 +1098,7 @@ export interface Runbook {
   title: string;
   status: RunbookStatus;
   stages: RunbookStage[];
-  /** Curator's framing — why this runbook is worth looking at. */
+  /** The runbook's framing — why it is worth looking at. */
   note: string;
   eta: string | null;
   /** Artifacts a complete runbook hands over. */
@@ -1416,19 +1131,6 @@ export interface Runbook {
    * ISO timestamp is what this build can honestly offer.
    */
   lockHash: string | null;
-  /**
-   * The program this runbook belongs to (OF-BLD-016 §2.1). Absent on every
-   * seed runbook: a runbook takes the program of the product it names, else
-   * of the strain, and is general when neither has one.
-   */
-  program?: ProgramId;
-  /**
-   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
-   * never deleted, and treated as archived: hidden from every list and count
-   * until Settings → Programs shows archived programs and examples, and
-   * opened under ArchivedBanner by a link. Never part of a lock digest.
-   */
-  example?: boolean;
 }
 
 // ── AnswerPlan (OF-BLD-007 §3) ─────────────────────────────────────────
@@ -1468,6 +1170,20 @@ export interface Claim {
   evidenceIds?: string[];
   /** OF-BLD-015 §7.2: module rows it rests on, as `<module>/<kind>/<id>`. Absent on older plans. */
   moduleRefs?: string[];
+  /** ADR-006: the numbers it states, each typed with its origin; its text holds none. Absent on older plans. */
+  values?: ClaimValue[];
+}
+
+/**
+ * A number a claim states (ADR-006): what it is, and the quantity with its
+ * origin, which the validator computed. A value read from a computed value or
+ * a record names it in `source`; a model's estimate carries `model-estimate`
+ * with the model's id, and the claim stating it is `assumed`.
+ */
+export interface ClaimValue {
+  label: string;
+  quantity: Quantity;
+  source?: string | null;
 }
 
 /** A sentence a claim quotes, and the passage it stands in. */
@@ -1499,7 +1215,6 @@ export interface TraceStep {
 /** The one state every module row reads as, computed by the service. */
 export type ModuleState = 'open' | 'fenced' | 'approved' | 'locked' | 'proposed' | 'retired';
 export type ModuleName =
-  | 'dominion'
   | 'runbooks'
   | 'geneos'
   | 'fermos'
@@ -1529,7 +1244,7 @@ export interface ModuleCoverage {
   hits: CoverageHit[];
   /** The question names the module itself. */
   named: boolean;
-  /** Set when part of the module lives only in a browser, in words. */
+  /** Set when a read leaves part of the module out, in words. */
   partial: string | null;
   /** Set when the module's store could not be read. */
   error: string | null;
@@ -1547,9 +1262,31 @@ export interface ModuleRow {
   state: ModuleState;
   /** The module's own word for where the row stands. */
   status: string;
-  /** Null for a seed row that carries no mark. */
+  /** Null for a row that carries no mark. */
   provenance: Provenance | null;
   detail: Record<string, unknown>;
+}
+
+/**
+ * A project (alpha 2.0, ADR-005): what scopes a lab's documents, records,
+ * flowsheets, runs, artifacts, runbooks, depositions, conversations and Guild
+ * entries. Every row the service keeps belongs to one.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+/** POST /api/projects. `id` is made from the name when left out. */
+export interface ProjectCreate {
+  name: string;
+  description?: string;
+  id?: string | null;
+  /** The person creating it, as the reviewer name they sign with. */
+  by: string;
 }
 
 /** One line of the audit log (OF-BLD-015 §7.3). */
@@ -1602,30 +1339,11 @@ export interface ProposalAction {
   actingId?: string | null;
 }
 
-/**
- * What the question names in one archived program, hidden from the sweep
- * while archived programs are hidden (OF-BLD-016 §2.3; models.py
- * ArchivedCoverage). The trace says "found in archived program PHA (hidden)".
- */
-export interface ArchivedCoverage {
-  /** The program's id and name, as `src/data/programs.ts` declares them. */
-  program: string;
-  name: string;
-  /** The question's own words that named it. */
-  entities: string[];
-  count: number;
-  modules: ModuleName[];
-}
-
 export interface CoverageMap {
   entities: string[];
   searched: number;
   found: number;
   modules: ModuleCoverage[];
-  /** Whether archived programs were swept: the browser's switch (OF-BLD-016 §2.3). Absent on a plan saved before it. */
-  includeArchived?: boolean;
-  /** What the question names in archived programs, left out. Absent on a plan saved before it. */
-  archived?: ArchivedCoverage[];
 }
 
 export interface AnswerPlanUsage {
@@ -1663,16 +1381,19 @@ export interface AnswerPlan {
   evidence?: Evidence[];
   /** Passages the claims quote. Absent on older plans. */
   passages?: Passage[];
-  /** The loop's steps. Absent on older plans and in single mode. */
+  /** The loop's steps. Absent on older plans. */
   trace?: TraceStep[];
   /** Why the loop stopped. */
   stopped?: StopReason;
   /** A runbook the agent drafted, its numbers written by the service (OF-BLD-014 §9.2). */
   runbookDraft?: RunbookDraft | null;
-  /** OF-BLD-015 §7.1: the modules swept before the first turn. Absent on older plans and in single mode. */
+  /** OF-BLD-015 §7.1: the modules swept before the first turn. Absent on older plans. */
   coverage?: CoverageMap | null;
   /** OF-BLD-015 §7.2: the module rows the claims cite. Absent on older plans. */
   rows?: ModuleRow[];
+  /** The conversation and turn the service kept this answer as; null when none was kept. */
+  conversationId?: string | null;
+  turnId?: string | null;
 }
 
 /**
@@ -1690,16 +1411,13 @@ export interface PriorTurn {
 /** What the browser posts to /api/ask and /api/ask/stream (models.py AskRequest). */
 export interface AskRequest {
   question: string;
-  maxEvidence: number;
-  mode: 'agent' | 'single';
-  /** The conversation's earlier turns, oldest first. */
+  /** The conversation's earlier turns, oldest first, for a caller that names no conversation; the service reads its own otherwise. */
   history: PriorTurn[];
-  /**
-   * The store's `showArchived` switch (OF-BLD-016 §2.3). Off, the service
-   * leaves archived programs out of the pool, the passages, the coverage pass
-   * and every read tool.
-   */
-  includeArchived: boolean;
+  /** The conversation this question continues or starts, and the turn it is, by the page's ids. */
+  conversationId?: string | null;
+  turnId?: string | null;
+  /** Who asks. */
+  by?: string;
 }
 
 /**
@@ -1717,16 +1435,36 @@ export interface LiveTurn {
   error: { message: string; remedy: string } | null;
   /** `running` until the plan or the failure arrives. A turn a reload cut short reads `interrupted`. */
   status: 'running' | 'answered' | 'failed' | 'stopped' | 'interrupted';
-  /** Set when the stream replayed a recording rather than running (OF-BLD-014 §10.3). */
-  replay?: { recordedAt: string; standIn: boolean } | null;
+  /** Who asked, as the service kept the turn. */
+  by?: string | null;
+  /** The artifacts the turn's tool calls produced or read, as the service kept it. */
+  artifactIds?: string[];
 }
 
-/** A Live-mode conversation: its turns, oldest first. Durable. */
+/** A Live-mode conversation: its turns, oldest first. Kept by the service (postdoc/conversations.py). */
 export interface LiveConversation {
   id: string;
   title: string;
   startedAt: string;
   turns: LiveTurn[];
+}
+
+/** One tool call a turn made (GET /api/conversations/{id}/turns/{turn}/calls). */
+export interface ToolCallRecord {
+  seq: number;
+  turnId: string;
+  tool: string;
+  input: Record<string, unknown>;
+  /** What the tool answered the model. */
+  summary: Record<string, unknown>;
+  error: string | null;
+  /** What it offered to cite, by id. */
+  evidenceIds: string[];
+  recordIds: string[];
+  passageIds: string[];
+  artifactIds: string[];
+  by: string;
+  at: string;
 }
 
 // ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
@@ -1752,7 +1490,7 @@ export type FetchStatus = Extract<IngestStatus, 'complete' | 'failed:fetch' | 'f
  * Saccharomyces Genome Database strain entry. Absent from what an older
  * service sent, which was always Europe PMC.
  */
-export type FetchSource = 'europepmc' | 'osti' | 'sgd';
+export type FetchSource = 'europepmc' | 'osti' | 'sgd' | 'upload' | 'paste';
 
 /**
  * What one fetch produced. A failure is a result with a reason rather than an
@@ -1771,39 +1509,123 @@ export interface FetchResult {
   source?: FetchSource;
 }
 
-/** One row of GET /api/intake/status. */
-export interface IntakeStatus {
-  paperId: string;
-  pmcid: string | null;
-  ingest: IngestStatus;
-  textSource: 'full-text' | 'curation-note';
+/**
+ * What Intake did with one document (ADR-002): `ingested`, stored in the kit
+ * for the first time; `linked`, the kit held the same text already and the
+ * project now holds it too; `held`, the project held it before; `failed`,
+ * nothing stored, and `reason` says why. `transient` marks a failure that was
+ * the network's condition, worth asking again. Mirrors models.py
+ * `CollectOutcome`.
+ */
+export interface CollectOutcome {
+  status: 'ingested' | 'linked' | 'held' | 'failed';
+  documentId: string | null;
+  collector: string;
+  identifier: string;
+  title: string;
+  licenceClass: string;
+  licence: FetchLicense | null;
   sections: number;
   tables: number;
-  license: string | null;
-  fetchedAt: string | null;
+  chunks: number;
   reason: string | null;
-  source?: FetchSource;
+  transient: boolean;
+}
+
+/** POST /api/intake/collect. Mirrors models.py `CollectRequest`. */
+export interface CollectRequest {
+  identifier: string;
+  by: string;
+  reason?: string;
+}
+
+/** POST /api/intake/paste. Mirrors models.py `PasteRequest`. */
+export interface PasteRequest {
+  title: string;
+  text: string;
+  by: string;
+  url?: string;
+  licenceClass?: string;
+  licence?: string;
+  reason?: string;
+}
+
+/** One passage a search found (GET /api/literature/search). Mirrors models.py `SearchHit`. */
+export interface SearchHit {
+  documentId: string;
+  passageId: string;
+  title: string;
+  text: string;
+  sectionPath: string | null;
+  citation: string | null;
+  licenceClass: string;
+  year: number | null;
+  score: number;
+  layers: string[];
+  isTable: boolean;
+}
+
+/** GET /api/literature/search. Mirrors models.py `SearchResponse`. */
+export interface SearchResponse {
+  query: string;
+  profile: string;
+  hits: SearchHit[];
+  degradedStages: string[];
+}
+
+/** POST /api/literature/answer. Mirrors models.py `LiteratureQuestion`. */
+export interface LiteratureQuestion {
+  question: string;
+  topK?: number;
+}
+
+/** One document a project holds (GET /api/literature/documents). Mirrors models.py `LiteratureDocument`. */
+export interface LiteratureDocument {
+  documentId: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  doi: string | null;
+  journal: string | null;
+  citation: string | null;
+  source: string;
+  sourceRef: string | null;
+  licenceClass: string;
+  chunks: number;
+  collector: string | null;
+  selection: Record<string, unknown>;
+  linkedBy: string;
+  linkedAt: string;
 }
 
 /**
- * What the overlay says about one paper (§2.1). A failed fetch is here too,
- * with its reason and no sections — the store keeps the seed's curation note
- * for it and the ingest board says why it halted.
+ * What the overlay says about one document the project holds (§2.1): its
+ * passages as its sections, its citation and its licence.
  */
 export interface OverlayPaper {
   ingest: IngestStatus;
-  textSource: 'full-text' | 'curation-note';
+  textSource: 'full-text';
   sections: PaperSection[];
   license: string | null;
   fetchedAt: string | null;
   reason: string | null;
   /** Who served the text, so the reader names it rather than assuming Europe PMC. */
   source?: FetchSource;
+  // The citation the kit holds for a document the project holds (ADR-002),
+  // from which the store makes its paper, and its licence class.
+  title?: string | null;
+  authors?: string[];
+  year?: number | null;
+  journal?: string | null;
+  doi?: string | null;
+  pmcid?: string | null;
+  url?: string | null;
+  licenceClass?: string | null;
 }
 
 /**
- * GET /api/biorepo/overlay. Applied over the seed in one action at load when
- * the service answers; with the service down the app is exactly the seed.
+ * GET /api/biorepo/overlay. Applied in one action when the service answers;
+ * a project's papers, records and runs reach the page through it.
  * `records`, `candidates` and `runs` are typed loosely until §7 and §6 define
  * their shapes — the field names are fixed now so the shape does not move.
  */
@@ -1879,8 +1701,9 @@ export interface BioRepo {
 
 /**
  * A candidate anchoring refused (OF-BLD-012 §2.4), kept beside the survivors
- * so the run can be scored honestly (§6.2): one whose value agreed with the
- * seed and whose quote failed is a span_error in Witness. Never a record.
+ * so the run can be scored honestly (§6.2): one whose value agreed with a
+ * value a reviewer typed and whose quote failed is a span_error in Witness.
+ * Never a record.
  */
 export interface DroppedCandidate {
   paperId: string;
@@ -1952,8 +1775,8 @@ export const CandidateMirror: [
  * fields are exactly DurableReviewDecision in src/lib/durable.ts — the shape
  * the Durable tier already persists — so a decision made offline and one
  * posted to the service are the same object. The rest say which record, when,
- * and, for a promotion that re-anchors a curated quote to the paper's own
- * words, the replacement span.
+ * and, for a decision that re-anchors the record to another sentence of
+ * the paper, the replacement span.
  */
 export interface ReviewDecision {
   status: RecordStatus;
@@ -1970,8 +1793,8 @@ export interface ReviewDecision {
 
 // ── Guild: skills and competence (OF-BLD-013) ──────────────────────────
 //
-// The workforce layer. A Skill is reference data, like a protocol: it lives
-// in src/data/skills.ts and changes by commit. Protocol steps name the skills
+// The workforce layer. A Skill is reference data, like a protocol; no skills
+// ship with alpha 2.0, and the tests hand theirs in. Protocol steps name the skills
 // they need (`Step.skills`). Everything a person has done to earn a skill is
 // an entry in Guild's ledger, and their level on that skill is computed from
 // those entries by `src/engine/competence.ts`. Nothing stores a level.
@@ -2254,7 +2077,7 @@ export interface CheckReason {
   text: string;
 }
 
-/** One of a skill's mastery criteria, by its place in src/data/skills.ts. */
+/** One of a skill's mastery criteria, by its place in the skill's list (Guild's skills; none ship with alpha 2.0). */
 export interface CheckCriterion {
   skillId: string;
   index: number;
@@ -2342,7 +2165,8 @@ export interface CheckRecord {
 // where it came from. Its provenance is what the service's `basis_provenance`
 // computed; the browser shows it and keeps no copy of the rule.
 
-export type BasisSourceKind = 'record' | 'deposition' | 'artifact' | 'model' | 'convention' | 'assumption';
+/** `assumption` is a named person's value; `model-estimate` a model's, its id in `by` (ADR-006). */
+export type BasisSourceKind = 'record' | 'deposition' | 'artifact' | 'model' | 'convention' | 'assumption' | 'model-estimate';
 
 export interface BasisSource {
   kind: BasisSourceKind;
@@ -2350,7 +2174,7 @@ export interface BasisSource {
   id: string | null;
   /** What the convention is, or what the assumption rests on. */
   note: string | null;
-  /** The named person, for an assumption. */
+  /** The named person, for an assumption; the model's id, for an estimate. */
   by: string | null;
 }
 
@@ -2412,6 +2236,13 @@ export interface ReplayDifference {
   replayed: unknown;
 }
 
+/** How near a replayed number must come to the stored one: within atol + rtol·|stored|. */
+export interface ReplayTolerance {
+  rtol: number;
+  atol: number;
+  why: string;
+}
+
 export interface ReplayResult {
   artifactId: string;
   identical: boolean;
@@ -2419,6 +2250,10 @@ export interface ReplayResult {
   replayedHash: string;
   differences: ReplayDifference[];
   durationMs: number;
+  /** The precision the tool's basis states, when it states one. */
+  tolerance?: ReplayTolerance | null;
+  /** Every difference a number within the tolerance; true for an identical replay. */
+  withinTolerance?: boolean;
 }
 
 // ── tools (OF-BLD-014 §3.4, E.6) ───────────────────────────────────────
@@ -2680,110 +2515,6 @@ export interface Passage {
   end: number;
 }
 
-export interface RagLane {
-  name: string;
-  available: boolean;
-  /** Why it is unavailable, or what it needs, in words. */
-  why: string | null;
-}
-
-export interface RagStatus {
-  papersIndexed: number;
-  passages: number;
-  lanes: RagLane[];
-  chosenLane: string;
-  /** The index's manifest, so a scorecard made on another index shows it. */
-  manifestHash: string;
-}
-
-/** One passage a search returned (OF-BLD-014 §4.2). */
-export interface PassageHit {
-  passage: Passage;
-  /** The fused score: the sum over lanes of 1 / (60 + rank). */
-  score: number;
-  /** Where each lane ranked it, 1 for first: "bm25", "dense", "phrasing-1", … */
-  lanes: Record<string, number>;
-  /** The grading reader's grade, when a rerank lane ran. */
-  grade: number | null;
-  /** The sentence it copied, checked verbatim against the passage. */
-  sentence: string | null;
-}
-
-// ── retrieval scorecard (OF-BLD-014 §4.3) ──────────────────────────────
-
-/** One lane on one question set. */
-export interface RagMetrics {
-  questions: number;
-  recall5: number;
-  recall10: number;
-  recall20: number;
-  mrr10: number;
-  ndcg10: number;
-  medianSeconds: number;
-  costPerQuestion: number;
-}
-
-export interface RagLaneReport {
-  lane: string;
-  available: boolean;
-  why: string | null;
-  paid: boolean;
-  /** Mean nDCG@10 over K and S (the sets present); null when it did not run. */
-  score: number | null;
-  sets: Record<string, RagMetrics>;
-  /** Questions left unscored because the helper model declined them. */
-  refused?: number;
-}
-
-export interface RagSetInfo {
-  name: string;
-  questions: number;
-  /** How the set was built and what it holds, in words. */
-  note: string;
-}
-
-export interface RagReport {
-  date: string;
-  manifestHash: string;
-  papersIndexed: number;
-  passages: number;
-  sets: RagSetInfo[];
-  lanes: RagLaneReport[];
-  chosenLane: string;
-  /** The rule that chose it, in words. */
-  rule: string;
-  totalCostUsd: number;
-  /** The thread the questions were drawn from (OF-BLD-016 §4.1), or null for
-   *  every paper. Every search ran over the whole index either way. */
-  thread?: string | null;
-  /** The lane search runs on now (core/data/index/config.json), which a person
-   *  may hold apart from the rule's choice; the API fills it when it serves the
-   *  report (OF-BLD-016 §4.1). */
-  laneInUse?: string | null;
-}
-
-export interface RagSearchRequest {
-  question: string;
-  k: number;
-  /** A lane by name, or null for the chosen one. */
-  lane: string | null;
-  /** The store's `showArchived` switch; off leaves archived programs' passages out (OF-BLD-016 §2.3). */
-  includeArchived: boolean;
-}
-
-/** What `POST /api/rag/search` returns (OF-BLD-014 §4.4). */
-export interface RagSearchResponse {
-  lane: string;
-  hits: PassageHit[];
-  /** The other phrasings the expand lane searched, when it ran. */
-  phrasings: string[];
-  /** Sentences the grading reader returned that were not in their passage. */
-  unverifiedSentences: number;
-  costUsd: number;
-  /** Why another lane ran in place of the chosen one, when it did. */
-  note: string | null;
-}
-
 // ── Proforma's BioSTEAM scenario (OF-BLD-014 §8.3) ──────────────────────
 // Mirrors of core/openferment_core/models.py; check:plan diffs the fields.
 
@@ -2864,9 +2595,9 @@ export interface ProformaRunRequest {
   /** Latin hypercube samples to draw (OF-BLD-019 D7); the service defaults it and caps it. */
   samples?: number;
   /**
-   * The shelf flowsheet a scenario made in this browser runs (OF-BLD-019
-   * §2.3, D6). A seed scenario runs its own and sends none; any other id runs
-   * this flowsheet, bound as `GET /api/proforma/bind` binds it.
+   * The shelf flowsheet the scenario runs (OF-BLD-019 §2.3, D6). A scenario
+   * the project keeps runs its own; one not yet saved runs this flowsheet,
+   * bound as `GET /api/proforma/bind` binds it.
    */
   flowsheet?: string | null;
   /**
@@ -2882,8 +2613,6 @@ export interface ProformaRunRequest {
    */
   vessel?: string | null;
   trainRun?: string | null;
-  /** The program switch, for those parts: one of an archived program is refused unless it is on. */
-  includeArchived?: boolean;
 }
 
 /**
@@ -2979,7 +2708,7 @@ export interface CeilingCheck {
   substrate: string;
   sugarWords: string;
   host: string | null;
-  /** The scenario's organism: its host filter, else its yield's records' strains, else its program's one species. */
+  /** The scenario's organism: its host filter, else its yield's records' strains. */
   strains: string[];
   species: string[];
   organismWords: string;
@@ -3084,7 +2813,7 @@ export interface FlowsheetInfo {
   description: string;
   /** The package and version ('biorefineries 2.35.1, cornstover'), or 'this repository'. */
   source: string;
-  /** A program id from programs.ts; null for a general flowsheet. */
+  /** The chemical-set key (`yeast`); null for a general flowsheet. */
   program: string | null;
   /** A published reference biorefinery, run whole on its package's defaults. */
   reference: boolean;
@@ -3452,17 +3181,17 @@ export interface Volatility {
 // Every model family, vessel design, catalogue unit and shelf flowsheet
 // declares its parameters once, in Python (`core/openferment_core/params.py`);
 // `GET /api/params/{scope}` serves a scope's specs with each value and where
-// it came from. A person's change is an `Override`: a named assumption this
-// browser keeps in the Durable tier (`parameterOverrides`, D3) and a run
-// carries; the basis names it as an `assumption`, so the result is `demo`.
+// it came from. A person's change is an `Override`: a named assumption the
+// project keeps in its rows (`parameterOverrides`, D3) and a run
+// carries; the basis names it as an `assumption`, so the result is `assumed`.
 // Bounds are conventions with a written reason (D4): a value outside them is
 // kept and flagged in words, never clamped. A model never sets one.
 
 /** The chip a value shows: finer than `BasisSourceKind` (a fit and a simulation are artifacts; a library default is a model source). */
-export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'convention' | 'library-default' | 'waiting' | 'not-read';
+export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'model-estimate' | 'convention' | 'library-default' | 'waiting' | 'not-read';
 
 /** What a scope parameterises. */
-export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'fermos-forecast' | 'pureos-unit' | 'proforma';
+export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'fermos-forecast' | 'pureos-unit' | 'proforma' | 'library';
 
 /** One parameter as its model, unit or flowsheet declares it. */
 export interface ParameterSpec {
@@ -3530,6 +3259,8 @@ export interface Override {
   by: string;
   at: string;
   note: string | null;
+  /** A person's assumption unless it says otherwise; a model's estimate names the model in `by` (ADR-006). */
+  origin?: OverrideOrigin;
 }
 
 /** `GET /api/params/{scope}`: a scope's specs with their current values. */
@@ -3547,7 +3278,7 @@ export interface ParamScope {
 /** `POST /api/params/{scope}/resolve`. Runs nothing. */
 export interface ParamResolveRequest {
   overrides: Override[];
-  /** A Proforma scenario made in this browser names the shelf flowsheet it runs. */
+  /** A Proforma scenario not yet saved names the shelf flowsheet it runs. */
   flowsheet?: string | null;
   /** A strain filter on the records, as `/api/proforma/bind` takes it. */
   host?: string | null;
@@ -3557,10 +3288,10 @@ export interface ParamResolveRequest {
   vesselType?: 'stirred-tank' | 'bubble-column' | null;
   /**
    * fermOS's family scope (OF-BLD-020 §3.2), bound as a simulation binds: the
-   * strain whose records bind (null: every strain of the program's organism),
+   * strain whose records bind (null: every strain the evidence pool holds),
    * the product, the sugar the records must name, the fit a person chose, where
-   * the simulation starts ('records', 'fit', 'simulation:<artifact id>'), the
-   * run-length preset, and the program switch.
+   * the simulation starts ('records', 'fit', 'simulation:<artifact id>'), and
+   * the run-length preset.
    */
   strain?: string | null;
   product?: string | null;
@@ -3568,7 +3299,6 @@ export interface ParamResolveRequest {
   fit?: string | null;
   startFrom?: string | null;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
-  includeArchived?: boolean;
   /** pureOS's unit scope (OF-BLD-020 §5.1): the unit's catalogue type, when no train is sent. */
   unitType?: string | null;
   /**
@@ -3609,7 +3339,6 @@ export interface VesselRequest {
   klaMethod?: string | null;
   /** A person's changes, each a named assumption, scope `fermos:vessel:<id>`. */
   overrides: Override[];
-  includeArchived?: boolean;
 }
 
 /** One line of the design table, read from BioSTEAM's objects. */
@@ -3730,7 +3459,7 @@ export interface VesselSummary {
 // `ParameterSpec`s; a simulation resolves them with their sources, integrates
 // on scipy, and keeps one `fermos.simulation` artifact whose basis names
 // every parameter, start value and override. A person's override makes it
-// `demo`; nothing here is computed in the browser.
+// `assumed`; nothing here is computed in the browser.
 
 /** `GET /api/fermos/families`: a model family as the panel shows it. */
 export interface FamilyInfo {
@@ -3748,8 +3477,6 @@ export interface FamilyInfo {
   specs: ParameterSpec[];
   /** The panel's groups this family's specs fall into, in order. */
   groups: string[];
-  /** The program the family is archived with (storage_v1: 'pha'), or null for a general one. */
-  program: string | null;
 }
 
 /** `POST /api/fermos/simulate`. */
@@ -3764,7 +3491,6 @@ export interface SimulationRequest {
   /** 'records', 'fit', or 'simulation:<artifact id>'. */
   startFrom?: string;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length';
-  includeArchived?: boolean;
   /**
    * A parameter bound to exactly these records of the evidence pool, by spec
    * key (OF-BLD-020 §3.4, D13): each must be in the pool, carry a field the
@@ -3785,7 +3511,7 @@ export interface FermosBinding {
   waiting: string[];
   /** What the family would refuse these values for though nothing waits (§8.R), else null. */
   refused: string | null;
-  /** What bound from where: the program's papers, whose records, the sugar, the fit, the kept simulation. */
+  /** What bound from where: the evidence pool's papers, whose records, the sugar, the fit, the kept simulation. */
   notes: string[];
 }
 
@@ -4097,7 +3823,7 @@ export interface TrainUnitSpec {
   readFrom?: TrainUnitReadFrom | null;
 }
 
-/** A train as data (D9), kept whole in this browser and sent with a run. */
+/** A train as data (D9), kept whole in the project's rows and sent with a run. */
 export interface TrainSpec {
   id: string;
   name: string;
@@ -4122,7 +3848,6 @@ export interface TrainRunRequest {
   /** Overrides of `pureos:unit:<train id>:<unit id | inlet>`, each replacing the train's value of its key. */
   overrides?: Override[];
   by?: string | null;
-  includeArchived?: boolean;
 }
 
 export interface StreamImpurity {
@@ -4222,7 +3947,6 @@ export interface TrainFromRunRequest {
   artifactId: string;
   /** The id the train takes; by default `from-<artifact id>`. */
   trainId?: string | null;
-  includeArchived?: boolean;
 }
 
 /** A unit of the run the train does not take, and why. */
@@ -4242,8 +3966,9 @@ export interface TrainFromRun {
 
 /**
  * A train a model built with `pureos_build` or `pureos_write` (OF-BLD-020
- * §5.4), kept on the service in `core/data/pureos-trains.json`:
- * `GET /api/pureos/trains-kept`. A person's trains stay in this browser.
+ * §5.4), kept on the service as rows of `trains` marked `kept`:
+ * `GET /api/pureos/trains-kept`. A person's trains are the project's rows the
+ * Builder keeps (`trains` marked `made`).
  */
 export interface KeptTrain {
   spec: TrainSpec;
@@ -4268,22 +3993,21 @@ export interface KeptTrains {
 
 /** `POST /api/pureos/propose`: ids and words, never a number. */
 export interface ProposeRequest {
-  /** A products seed id, or a product thermosteam's library is asked about by name (ethanol). */
+  /** A products catalogue id, or a product thermosteam's library is asked about by name (ethanol). */
   product: string;
   /** A geneOS host (strain) id: the cells the product is made in. */
   host: string;
   /** A kept fermOS simulation's id, or `<run artifact id>/<stream id>`; none, and the inlet is typed. */
   inletRef?: string | null;
-  includeArchived?: boolean;
 }
 
 /** Why one unit of a proposal is there: its rule, the property it read and the artifact that holds it. */
 export interface ProposalReason {
   unitId: string;
   rule: string;
-  /** boilingPoint, azeotrope, molecularWeight, isoelectricPoint (an artifact's), or class, location (the products seed's). */
+  /** boilingPoint, azeotrope, molecularWeight, isoelectricPoint (an artifact's), or class, location (the products catalogue's). */
   property: string;
-  /** Null when the products seed states the property. */
+  /** Null when the products catalogue states the property. */
   artifactId: string | null;
   /** Words, with no number in them. */
   words: string;
@@ -4313,4 +4037,251 @@ export interface TrainProposal {
   /** The property artifacts read (volatility, protparam), by id. */
   artifacts: string[];
   notes: string[];
+}
+
+// ── SFF flowsheet records (execution prompt §7.5; ADR-003) ─────────────
+//
+// Mirrored from core/openferment_core/models.py; `pnpm check:plan` pairs
+// each. Stage 7 generates these from the Pydantic models.
+
+/** How a record came: a run of this project, one of the toolkit's reference files, or any other file. */
+export type SFFOrigin = 'run' | 'library' | 'imported';
+
+/** One result of the toolkit's validator that did not pass. */
+export interface SFFFinding {
+  checkId: string;
+  severity: string;
+  status: string;
+  message: string;
+  path: string;
+}
+
+/** The toolkit's verdict against the schema it ships. */
+export interface SFFValidation {
+  valid: boolean;
+  schemaVersion: string;
+  summary: Record<string, Record<string, number>>;
+  findings: SFFFinding[];
+}
+
+/** One criterion of the toolkit's completeness registry, as it scored. */
+export interface SFFCriterion {
+  id: string;
+  category: string;
+  criticality: string;
+  weight: number;
+  representable: boolean;
+  status: string;
+  score: number | null;
+  message: string;
+  missing: string[];
+}
+
+/** How much of what BioSTEAM needs to rebuild, simulate and cost the plant the file states. */
+export interface SFFCompleteness {
+  score: number | null;
+  representableScore: number | null;
+  categories: Record<string, number | null>;
+  criticalities: Record<string, number | null>;
+  criteria: SFFCriterion[];
+  sffVersion: string | null;
+  recipe: Record<string, unknown>;
+  report: string;
+}
+
+/** One of the toolkit's tags: earned (null: not evaluated), declared, and what blocks it. */
+export interface SFFTag {
+  earned: boolean | null;
+  declared: boolean;
+  blocking: string[];
+}
+
+/** A unit operation: a node of the graph, `rank` its column counted from the feeds. */
+export interface SFFNode {
+  id: string;
+  type: string;
+  method: string | null;
+  rank: number;
+}
+
+/** A stream from one unit to another. */
+export interface SFFEdge {
+  id: string;
+  source: string;
+  sink: string;
+  massFlow: number | null;
+}
+
+/** A stream crossing the plant's boundary: a feed entering `unit`, or a product leaving it. */
+export interface SFFBoundary {
+  id: string;
+  unit: string;
+  name: string | null;
+  massFlow: number | null;
+  price: number | null;
+}
+
+/** The flowsheet as the UI draws it, read from the file's units and streams. */
+export interface SFFGraph {
+  nodes: SFFNode[];
+  edges: SFFEdge[];
+  feeds: SFFBoundary[];
+  products: SFFBoundary[];
+  dangling: string[];
+  massFlowUnit: string;
+}
+
+/** An SFF flowsheet record (GET /api/flowsheets/{id}); `graph` is left out of a listing. */
+export interface SFFFlowsheet {
+  id: string;
+  title: string;
+  origin: SFFOrigin;
+  source: string;
+  sffVersion: string | null;
+  sha256: string;
+  bytes: number;
+  simulator: string | null;
+  runArtifactId: string | null;
+  libraryId: string | null;
+  units: number;
+  streams: number;
+  validation: SFFValidation;
+  completeness: SFFCompleteness;
+  tags: Record<string, SFFTag>;
+  graph: SFFGraph | null;
+  toolkit: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+// ── Engine runs (execution prompt §7.4; engine/runs.py) ────────────────
+
+export type RunStatus = 'done' | 'refused';
+
+/** One input of an engine run: its name, and its value as a quantity with its origin (ADR-006). */
+export interface RunInput {
+  name: string;
+  quantity: Quantity;
+}
+
+/** The SFF file a run wrote: its flowsheet record and what the toolkit said of it. */
+export interface RunSFF {
+  recordId: string;
+  valid: boolean;
+  score: number | null;
+  tags: string[];
+}
+
+/** One engine run in a project: a row of `runs` (GET /api/runs). */
+export interface EngineRun {
+  /** Its computation's id: the artifact id of its basis. */
+  id: string;
+  plant: string;
+  configuration: string | null;
+  status: RunStatus;
+  tool: string;
+  toolVersion: string;
+  inputs: RunInput[];
+  /** The artifact's, computed on its basis; null for a refused run. */
+  provenance: Provenance | null;
+  artifactId: string | null;
+  /** The price, a flowsheet's own outputs, and how the package's test held it. */
+  outputs: Record<string, unknown>;
+  versions: Record<string, string>;
+  sff: RunSFF | null;
+  /** Why no SFF file could be written, in the toolkit's or the worker's words. */
+  sffRefused: string | null;
+  /** The plant's own words, for a refused run. */
+  refused: string | null;
+  /** The study scenario that asked for it first. */
+  scenarioId: string | null;
+  by: string;
+  at: string;
+  durationMs: number | null;
+}
+
+/** GET /api/runs/{id}: a run, its computation, its SFF record, and its parameters as the panel reads them. */
+export interface RunReport {
+  run: EngineRun;
+  artifact: Artifact | null;
+  flowsheet: SFFFlowsheet | null;
+  /** Each value the run's own, with its origin; null for a refused run. */
+  parameters: ParamScope | null;
+}
+
+// ── Studies (execution prompt §7.2, §9.1 step 5; studies/) ─────────────
+
+/** One value a scenario sets: the parameter's key, and a quantity whose origin is a person's assumption or a model's estimate. */
+export interface ScenarioValue {
+  key: string;
+  quantity: Quantity;
+}
+
+/** POST /api/studies/scenarios. */
+export interface ScenarioCreate {
+  title: string;
+  plant: string;
+  configuration?: string | null;
+  values: ScenarioValue[];
+  note?: string | null;
+  by: string;
+}
+
+/** A study's scenario: a plant, its configuration and the values it sets, and the engine runs made of it. */
+export interface StudyScenario {
+  id: string;
+  kind: 'engine';
+  title: string;
+  plant: string;
+  configuration: string | null;
+  values: ScenarioValue[];
+  note: string | null;
+  /** Oldest first; a refused run's receipt among them. */
+  runIds: string[];
+  by: string;
+  at: string;
+}
+
+/** Who asks: a run of a scenario, a lock. */
+export interface StudyRequest {
+  by: string;
+}
+
+/** POST /api/studies/comparisons: the runs in the order the comparison reads them (each change is reckoned from the first). */
+export interface ComparisonCreate {
+  title: string;
+  runIds: string[];
+  by: string;
+}
+
+/** A comparison of engine runs, under the id of the `study.comparison` artifact that computes it. */
+export interface StudyComparison {
+  id: string;
+  title: string;
+  runIds: string[];
+  artifactId: string;
+  /** The weakest of the runs' (ADR-006). */
+  provenance: Provenance;
+  by: string;
+  at: string;
+}
+
+/** GET /api/studies/comparisons/{id}: the comparison and its artifact (runs, rows, values). */
+export interface ComparisonReport {
+  comparison: StudyComparison;
+  artifact: Artifact;
+}
+
+/** One output of an engine run a runbook predicts: `outputs.<key>` or `price.<key>`, and what the bench calls it. */
+export interface PredictedOutput {
+  output: string;
+  label: string;
+}
+
+/** POST /api/studies/runbooks: a runbook predicting outputs of one engine run, in its units, measured at harvest. */
+export interface RunbookCreate {
+  title: string;
+  runId: string;
+  predict: PredictedOutput[];
+  by: string;
 }

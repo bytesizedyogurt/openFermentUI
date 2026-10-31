@@ -12,20 +12,17 @@ the network even by accident.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
-from openferment_core import intake
-from openferment_core.intake import (
+from openferment_core.literature import collectors
+from openferment_core.literature.collectors import (
     NetworkRefused,
-    cached,
+    NotCollected,
     fetch_fulltext,
-    fetch_paper,
     resolve_pmcid,
     split_jats,
-    status_of,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "jats"
@@ -34,10 +31,8 @@ REAL = FIXTURES / "PMC8471596.xml"
 
 
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path):
+def _offline(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    # Persist under a temp directory so a test never writes into core/data/.
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
 
 
 def _structural():
@@ -171,45 +166,6 @@ def test_fixture_mode_refuses_the_network():
         fetch_fulltext("PMC0000000")
 
 
-# ── persistence: fetch, cache, status ──────────────────────────────────
-
-
-def test_fetch_paper_persists_and_is_idempotent():
-    paper = {"id": "X1", "pmcid": "structural"}
-    first = fetch_paper(paper)
-    assert first.status == "complete"
-    path = intake.FULLTEXT_DIR / "X1.json"
-    assert path.exists()
-    stored = json.loads(path.read_text())
-    assert stored["paperId"] == "X1" and stored["pmcid"] == "structural"
-    assert stored["license"]["href"].startswith("https://creativecommons.org/")
-
-    again = fetch_paper(paper)
-    assert again.fetchedAt == first.fetchedAt, "a cached result is returned, not re-fetched"
-    assert cached("X1") is not None
-
-
-def test_a_miss_is_cached_as_a_miss():
-    # No fixture for this PMCID, so the fetch fails — and the failure is
-    # persisted, which is what stops the batch asking again next run.
-    r = fetch_paper({"id": "X2", "pmcid": "PMC0000000"})
-    assert r.status == "failed:fetch"
-    assert r.reason and "no fixture" in r.reason
-    assert cached("X2") is not None
-    assert cached("X2").status == "failed:fetch"
-
-
-def test_status_summarises_a_fetch():
-    fetch_paper({"id": "X1", "pmcid": "structural"})
-    s = status_of("X1")
-    assert s is not None
-    assert s.ingest == "complete" and s.textSource == "full-text"
-    assert s.sections == 7  # abstract, s1–s4, t1, f1
-    assert s.tables == 1
-    assert s.license and "creativecommons" in s.license
-    assert status_of("nope") is None
-
-
 # ── the real article, when it is here ──────────────────────────────────
 
 needs_real = pytest.mark.skipif(
@@ -298,7 +254,7 @@ def test_a_linked_citation_is_dropped_and_an_unlinked_superscript_on_a_number_is
     assert "2 × 10^6 cells mL-1" in s1 and "10^-3 M" in s1, "a superscript on a ten is still a power"
 
 
-# ── what the first real fetch taught (OF-BLD-014 §1.5, docs/build/JATS-AUDIT.md) ──
+# ── what the first real fetch taught (OF-BLD-014 §1.5, docs/history/build-2026-10-21/JATS-AUDIT.md) ──
 
 
 def _doc(body: str, *, front: str = "", after_body: str = "") -> str:
@@ -582,11 +538,9 @@ def test_no_placeholder_survives_anywhere():
 # ── §6.9 — an outage is not a miss ──────────────────────────────────────
 
 
-def test_a_transient_failure_is_not_cached_as_a_miss(monkeypatch):
-    # A timeout or a 5xx is the network's condition, not the paper's. Cached
-    # as failed:fetch it read exactly like "no open-access text", and the
-    # batch never asked again without --force; the board showed every paper
-    # a brief outage touched as halted.
+def test_an_outage_is_transient_and_a_definitive_answer_is_not(monkeypatch):
+    # A timeout or a 5xx is the network's condition, not the paper's: the
+    # reader is told to try again. A 404 is the paper's answer.
     import httpx
 
     request = httpx.Request("GET", "https://www.ebi.ac.uk/europepmc/x")
@@ -594,39 +548,38 @@ def test_a_transient_failure_is_not_cached_as_a_miss(monkeypatch):
     def slow(pmcid):
         raise httpx.ReadTimeout("slow", request=request)
 
-    monkeypatch.setattr(intake, "fetch_fulltext", slow)
-    r = fetch_paper({"id": "X3", "pmcid": "PMC1"})
-    assert r.status == "failed:fetch" and "slow" in (r.reason or "")
-    assert cached("X3") is None, "not persisted: the next run asks again"
+    monkeypatch.setattr(collectors, "fetch_fulltext", slow)
+    with pytest.raises(NotCollected) as e:
+        collectors.europepmc("PMC1")
+    assert e.value.transient and "slow" in str(e.value)
 
     def down(pmcid):
-        raise intake.Transient("Europe PMC returned 503 for PMC1")
+        raise collectors.Transient("Europe PMC returned 503 for PMC1")
 
-    monkeypatch.setattr(intake, "fetch_fulltext", down)
-    r = fetch_paper({"id": "X3", "pmcid": "PMC1"})
-    assert r.status == "failed:fetch" and "503" in (r.reason or "")
-    assert cached("X3") is None
+    monkeypatch.setattr(collectors, "fetch_fulltext", down)
+    with pytest.raises(NotCollected) as e:
+        collectors.europepmc("PMC1")
+    assert e.value.transient and "503" in str(e.value)
 
-    # A definitive answer — a 404, a document with nothing in it — IS cached.
     def gone(pmcid):
         raise httpx.HTTPStatusError(
             "Europe PMC returned 404 for PMC1", request=request, response=httpx.Response(404, request=request)
         )
 
-    monkeypatch.setattr(intake, "fetch_fulltext", gone)
-    r = fetch_paper({"id": "X3", "pmcid": "PMC1"})
-    assert r.status == "failed:fetch" and cached("X3") is not None
+    monkeypatch.setattr(collectors, "fetch_fulltext", gone)
+    with pytest.raises(NotCollected) as e:
+        collectors.europepmc("PMC1")
+    assert not e.value.transient and "404" in str(e.value)
 
 
-def test_a_5xx_from_the_lookup_is_transient_too(monkeypatch):
+def test_a_5xx_from_the_lookup_raises_transient(monkeypatch):
     # A DOI-only paper resolves through a search; a 503 there is not "no
     # open-access full text", which is what a None answer means.
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "0")
     import httpx
 
     request = httpx.Request("GET", "https://www.ebi.ac.uk/europepmc/search")
-    monkeypatch.setattr(intake, "_get", lambda *a, **k: httpx.Response(503, request=request))
-    with pytest.raises(intake.Transient):
-        intake.resolve_pmcid({"id": "X4", "doi": "10.1/x"})
-    r = fetch_paper({"id": "X4", "doi": "10.1/x"})
-    assert r.status == "failed:fetch" and cached("X4") is None
+    monkeypatch.setattr(collectors, "_get", lambda *a, **k: httpx.Response(503, request=request))
+    with pytest.raises(collectors.Transient):
+        resolve_pmcid({"id": "X4", "doi": "10.1/x"})
+

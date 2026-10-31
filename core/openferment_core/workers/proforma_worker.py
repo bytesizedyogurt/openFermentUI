@@ -61,6 +61,27 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 (`flowsheets/train.py`), simulated whole with its recycles,
                 and read: stream, unit and utility tables, the diagram or
                 the unit list, each unit's costs, the inlet as built
+    sff_export  a run's base case written as an SFF file (alpha 2.0,
+                ADR-003): a reference biorefinery built afresh inside
+                `package_defaults()` as its reference run builds it, or a
+                shelf flowsheet's warm plant set to the run's base values
+                (its solved price on the product while it is written, as
+                its tables are read); then validated, scored and tagged by
+                the vendored toolkit (`sff_toolkit.export_checked`)
+    sff_validate, sff_score  a file the service wrote, checked by the
+                vendored toolkit (`sff_toolkit`)
+    library_discover  every subpackage of the installed `biorefineries`,
+                read without building anything (`library_plants.discover`)
+    library_parameters  a library plant built afresh inside
+                `package_defaults()` and every parameter read back
+    library_run one library plant built afresh, a person's values set
+                through each parameter's accessor, simulated, priced and
+                read back, its tables read; numbers rounded to the digits
+                the basis states. `sff_export` with `library` writes the
+                plant a library run built (ADR-004). openFerment's composed
+                flowsheets (flowsheets/cellulosic_ethanol_v0.py) run here too
+    library_cases  cases one after another on one warm build, each set to
+                the library defaults and then its own values (A→B→A)
 
 NO WORKER STOPS IN A DEBUGGER. BioSTEAM 2.54.0's AeratedBioreactor answers a
 failure of its bubble-column correlation with a bare `breakpoint()`, which
@@ -114,8 +135,15 @@ from thermosteam.utils import chemical_cache
 
 from .. import flowsheets
 from ..flowsheets.shelf import TABLE_UNITS
-from . import serve
+from . import library_plants, serve, sff_toolkit
 from .dot_names import stable_names
+
+# BioSTEAM's stream utility prices as it imports them (process water, natural
+# gas, ash disposal, ...). `bst.process_tools.default()` leaves them as the last
+# plant set them, and a package's process settings set some (sugarcane's set
+# process water to 0.000254 USD/kg, which a composed flowsheet built after it
+# then paid): every build starts from these.
+DEFAULT_STREAM_PRICES = dict(bst.settings.stream_prices)
 
 _BUILT: dict[str, Any] = {}
 
@@ -243,7 +271,7 @@ def montecarlo(name: str, specs: dict[str, dict[str, Any]], n: int, seed: int, b
 # ── the run's tables (OF-BLD-019 §2.1) ─────────────────────────────────
 
 # The units of what the tables hold are BioSTEAM's, written into every run
-# as `tableUnits` (flowsheets/shelf.py's TABLE_UNITS; demo.py's stand-in
+# as `tableUnits` (flowsheets/shelf.py's TABLE_UNITS; the tests' stand-in
 # claims the same). D8's words when the diagram cannot be drawn here:
 NO_GRAPHVIZ = ("Graphviz was not on the host that made this run, so it has no diagram; a host that has it "
                "(brew install graphviz on the Mini) draws its own run of the same inputs. The units are listed in run order.")
@@ -282,12 +310,59 @@ def _sid(s: Any) -> str:
     return "unnamed"
 
 
+def units_in_order(system: Any) -> list[Any]:
+    """The system's units in the order they run. BioSTEAM orders facilities
+    by network priority over a set (`Facility.ordered_facilities`), so
+    facilities it ranks alike come in an order one build does not repeat;
+    each such run of facilities is put in the order of their IDs, and every
+    other unit stays where BioSTEAM ran it, so a table reads the same build
+    after build (a replay compares like with like)."""
+    units = list(system.units)
+    out: list[Any] = []
+    n = 0
+    while n < len(units):
+        rank = getattr(units[n], "network_priority", None) if isinstance(units[n], bst.Facility) else None
+        m = n + 1
+        if rank is not None:
+            while m < len(units) and isinstance(units[m], bst.Facility) and \
+                    getattr(units[m], "network_priority", None) == rank:
+                m += 1
+        out.extend(sorted(units[n:m], key=lambda u: u.ID) if m - n > 1 else units[n:m])
+        n = m
+    return out
+
+
+def inlets_in_order(u: Any) -> list[Any]:
+    """A unit's inlets in port order. A Mixer's inlets are alike, and a
+    package may build one from a set, so its inlets are put in the order of
+    their IDs (two builds of cornstover gave M601 and slurry_mixer their two
+    inlets in either order); every other unit keeps its ports' order."""
+    if isinstance(u, bst.Mixer):
+        return sorted((s for s in u._ins if s), key=_sid) + [s for s in u._ins if not s]
+    return list(u._ins)
+
+
+def streams_in_order(system: Any) -> list[Any]:
+    """The system's streams in the order BioSTEAM lists them (each where its
+    first unit, in run order, takes it in or sends it out), over the units
+    in the order `units_in_order` gives and their inlets in the order
+    `inlets_in_order` gives."""
+    at = {u: n for n, u in enumerate(units_in_order(system))}
+
+    def first(s: Any) -> tuple[int, int]:
+        seen = [(at[u], next((i for i, x in enumerate([*inlets_in_order(u), *u._outs]) if x is s), 0))
+                for u in (s.sink, s.source) if u is not None and u in at]
+        return min(seen) if seen else (len(at), 0)
+
+    return sorted(system.streams, key=first)
+
+
 def stream_table(system: Any) -> list[dict[str, Any]]:
     """Every stream of the system, in the order its units run: where it comes
     from and goes, its phase, temperature, pressure, total mass flow and the
     mass flow of each component that flows."""
     rows = []
-    for s in system.streams:
+    for s in streams_in_order(system):
         ids = s.chemicals.IDs
         flows = {i: float(m) for i, m in zip(ids, s.mass) if m}
         rows.append({
@@ -313,12 +388,12 @@ def unit_table(system: Any) -> list[dict[str, Any]]:
     """Every unit operation in run order, with its BioSTEAM class, its costs,
     and its duties and power where it has them."""
     rows = []
-    for n, u in enumerate(system.units):
+    for n, u in enumerate(units_in_order(system)):
         heating, cooling = _duties(u.heat_utilities)
         power = _num(u.power_utility.rate)
         rows.append({
             "id": u.ID, "unitClass": type(u).__name__, "line": getattr(u, "line", None) or None, "order": n,
-            "ins": [_sid(s) for s in u.ins if s], "outs": [_sid(s) for s in u.outs if s],
+            "ins": [_sid(s) for s in inlets_in_order(u) if s], "outs": [_sid(s) for s in u.outs if s],
             "installedCost": float(u.installed_cost), "purchaseCost": float(u.purchase_cost),
             "heatingDuty": heating, "coolingDuty": cooling, "power": power or None,
         })
@@ -454,7 +529,7 @@ def tables(module: Any, b: Any, draw: bool | None = None) -> dict[str, Any]:
             "units": unit_table(system),
             "utilities": utility_duties(units, "the units the TEA costs" if tea is not None else "every unit of the system"),
             **diagram(system, draw),
-            "unitOrder": [u.ID for u in system.units],
+            "unitOrder": [u.ID for u in units_in_order(system)],
             "tableUnits": TABLE_UNITS,
         }
     finally:
@@ -529,8 +604,9 @@ def package_defaults() -> Iterator[None]:
     package's own test runs it (`default_settings` in
     biorefineries/tests/test_biorefineries.py calls
     `bst.process_tools.default()`, which also clears the tickets and
-    thermosteam's chemical cache), and every package's chemicals made anew
-    from empty caches (OF-BLD-019 §2.R). Afterwards what the worker held
+    thermosteam's chemical cache), the stream utility prices BioSTEAM
+    imports with (which `default()` leaves as the last plant set them), and
+    every package's chemicals made anew from empty caches (OF-BLD-019 §2.R). Afterwards what the worker held
     before is put back, not the defaults, because the worker keeps other
     plants warm whose costs read these globals (a PowerUtility's cost reads
     the class's price when it is asked); a chemicals cache first filled
@@ -539,6 +615,7 @@ def package_defaults() -> Iterator[None]:
     saved = {
         "cachedChemicals": {k: _cache_of(fn).cell_contents for k, fn in cached.items()},
         "CE": bst.CE,
+        "streamPrices": dict(bst.settings.stream_prices),
         "power": bst.PowerUtility.price,
         "powerFactors": dict(bst.PowerUtility.characterization_factors),
         "heating": bst.HeatUtility.heating_agents,
@@ -551,6 +628,9 @@ def package_defaults() -> Iterator[None]:
     for fn in cached.values():
         _fresh_cache(fn)
     bst.process_tools.default()
+    # One dict, which bst.stream_utility_prices names too: set in place.
+    bst.settings.stream_prices.clear()
+    bst.settings.stream_prices.update(DEFAULT_STREAM_PRICES)
     try:
         yield
     finally:
@@ -560,6 +640,8 @@ def package_defaults() -> Iterator[None]:
             else:  # a module first imported inside: its cache holds this plant's chemicals
                 _fresh_cache(fn)
         bst.CE = saved["CE"]
+        bst.settings.stream_prices.clear()
+        bst.settings.stream_prices.update(saved["streamPrices"])
         bst.PowerUtility.price = saved["power"]
         bst.PowerUtility.characterization_factors.clear()
         bst.PowerUtility.characterization_factors.update(saved["powerFactors"])
@@ -1114,12 +1196,105 @@ def _op_train_run(args):
         }
 
 
+def _op_sff_export(args):
+    """A run's base case written as an SFF file at the path the service names,
+    with openFerment's block in its metadata, then checked (ADR-003). A
+    reference biorefinery is built afresh inside `package_defaults()`, as
+    its reference run builds it; a shelf flowsheet's warm plant is set to
+    the run's base values and simulated, as `run` sets its base case, and
+    its solved price stands on the product while the file is written."""
+    path = str(args["path"])
+    meta = args.get("metadata") or None
+    title = args.get("title") or None
+    if args.get("library"):
+        try:
+            return library_plants.export(str(args["library"]), args.get("configuration"),
+                                         dict(args.get("overrides") or {}), path, defaults=package_defaults,
+                                         metadata=meta, title=title)
+        except library_plants.Refused as e:
+            raise Refused(str(e)) from e
+    name = str(args["flowsheet"])
+    try:
+        module = flowsheets.load(name)
+    except KeyError as e:
+        raise Refused(str(e)) from e
+    if hasattr(module, "load"):
+        with package_defaults():
+            b = module.load()
+            parts = module.parts(b)
+            return sff_toolkit.export_checked(parts["system"], parts.get("tea"), path, metadata=meta,
+                                              process_title=title)
+    structure = args.get("structure")
+    module, b = built(name, structure)
+    evaluate(name, {k: float(v) for k, v in (args.get("base") or {}).items()}, structure)
+    parts = module.parts(b) if hasattr(module, "parts") else {"system": b}
+    product, price = parts.get("product"), parts.get("price")
+    before = product.price if product is not None else None
+    try:
+        if product is not None and price is not None:
+            product.price = price
+        return sff_toolkit.export_checked(parts["system"], parts.get("tea"), path, metadata=meta, process_title=title)
+    finally:
+        if product is not None:
+            product.price = before
+
+
+def _library(fn):
+    """A library op, its refusals said as the worker's own."""
+    def op(args):
+        try:
+            return fn(args)
+        except library_plants.Refused as e:
+            raise Refused(str(e)) from e
+    op.__doc__ = fn.__doc__
+    return op
+
+
+@_library
+def _op_library_discover(args):
+    found = library_plants.discover()
+    return library_plants.check_builds(found, defaults=package_defaults) if args.get("builds") else found
+
+
+@_library
+def _op_library_parameters(args):
+    return library_plants.parameters_of(str(args["plant"]), args.get("configuration"), defaults=package_defaults)
+
+
+@_library
+def _op_library_run(args):
+    digits = int(args.get("digits", 10))
+    if not 1 <= digits <= 17:
+        raise Refused("a library run keeps between 1 and 17 significant digits")
+    out = rounded(library_plants.run(str(args["plant"]), args.get("configuration"), dict(args.get("overrides") or {}),
+                                     defaults=package_defaults, read_tables=tables,
+                                     test_quantities=package_test_quantities), digits)
+    if isinstance(out.get("price"), dict):
+        out["price"] = library_plants.npv_to_capital(out["price"], digits)
+    return out
+
+
+@_library
+def _op_library_cases(args):
+    digits = int(args.get("digits", 10))
+    if not 1 <= digits <= 17:
+        raise Refused("library cases keep between 1 and 17 significant digits")
+    out = rounded(library_plants.cases(str(args["plant"]), args.get("configuration"),
+                                       [dict(c) for c in args.get("cases") or []], defaults=package_defaults), digits)
+    return [{**c, "price": library_plants.npv_to_capital(c["price"], digits)} if isinstance(c.get("price"), dict) else c
+            for c in out]
+
+
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
             "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
             "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design,
             "catalogue_specs": _op_catalogue_specs, "catalogue_unit_check": _op_catalogue_unit_check}
 
 HANDLERS["volatility"] = _op_volatility  # OF-BLD-020 §7.1
+HANDLERS.update(sff_export=_op_sff_export, sff_validate=sff_toolkit.op_validate,
+                sff_score=sff_toolkit.op_score)  # alpha 2.0, ADR-003
+HANDLERS.update(library_discover=_op_library_discover, library_parameters=_op_library_parameters,
+                library_run=_op_library_run, library_cases=_op_library_cases)  # alpha 2.0, ADR-004
 HANDLERS.update(train_specs=_op_train_specs, flowsheet_unit_values=_op_flowsheet_unit_values,
                 train_run=_op_train_run)  # OF-BLD-020 §5.2
 

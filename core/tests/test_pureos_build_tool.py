@@ -4,8 +4,8 @@ model built, and `pureos_read`'s kinds `train` and `train-run` (OF-BLD-020
 
 Offline, the Proforma worker is test_train's stand-in (`TrainWorker`: STAND-IN
 tables, every unit sends all on but a share of the product); the evidence pool
-is a STAND-IN of records written here on a thread Q paper id, none a paper's
-value. A model's train takes its inlet from a stream of a train run a STAND-IN
+is a STAND-IN of records written here on a placeholder paper id, none a
+paper's value. A model's train takes its inlet from a stream of a train run a STAND-IN
 person kept with typed values (test_train's `spec_of`), since a model types no
 value. Marked `sim`: the same build runs through the real worker.
 
@@ -16,16 +16,14 @@ from __future__ import annotations
 
 import ast
 import json
-import sys
 import threading
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, audit, intake, module_stores, proposals, pureos, tools
-from openferment_core.models import TrainSpec
 from openferment_core.pureos import build, kept, train_spec
 from openferment_core.validate import SeenSet, validate_plan
 from test_module_tools import ctx_for, read
@@ -40,13 +38,12 @@ def _record(rid, field, value, unit, words, paper="Q1"):
             "method": None, "conditions": None, "provenance": "unverified", "status": "unverified"}
 
 
-# STAND-IN records: two of a centrifugation step's recovery on a thread Q paper,
-# one naming another step, one on an archived program's paper.
+# STAND-IN records: two of a centrifugation step's recovery on one paper, one
+# naming another step.
 RECORDS = [
     _record("r-st-1", "step_recovery", 90.0, "%", "after centrifugation the broth kept"),
     _record("r-st-2", "step_recovery", 80.0, "%", "after centrifugation the broth kept"),
     _record("r-st-3", "step_recovery", 50.0, "%", "after the chromatography column"),
-    _record("r-st-4", "step_recovery", 70.0, "%", "after centrifugation", paper="A1"),
     _record("r-cm-1", "cake_moisture", 60.0, "%", "the centrifuge cake held"),
 ]
 
@@ -70,19 +67,18 @@ def worker(monkeypatch):
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch, worker):
-    """A throwaway data directory with the audit log and the proposals in it,
-    the stand-in pool as the run's, and the model the writes are marked with."""
+    """A throwaway data directory (the audit log and the proposals are the
+    test's own rolled-back database), the stand-in pool as the run's, and the
+    model the writes are marked with."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())
     monkeypatch.setenv("OPENFERMENT_MODEL", MODEL)
     monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
     return tmp_path
 
 
-def ctx(archived=False, pool=None):
-    c = tools.ToolContext(pool_factory=lambda: pool or stand_in_pool(), include_archived=archived)
+def ctx(pool=None):
+    c = tools.ToolContext(pool_factory=lambda: pool or stand_in_pool())
     c.ask_id, c.model = "ask-54", MODEL
     return c
 
@@ -146,7 +142,7 @@ def test_new_keeps_a_train_for_the_product_from_a_runs_stream_marked_as_the_mode
     assert s["program"] == "yeast" and s["inlet"] == {"kind": "run-stream", "ref": aid, "streamId": "F1_liquid",
                                                       "vessel": None}
     assert s["units"] == [] and s["toRun"] == ["a train holds at least one unit"]
-    assert any("the program is yeast: the program pureos.train_run" in w for w in s["read"])
+    assert any("the program is yeast: the one chemical set pureOS holds" in w for w in s["read"])
     [k] = kept.read().trains
     assert (k.spec.id, k.agent, k.madeBy, k.effort, k.askId) == (s["trainId"], "model", MODEL, "medium", "ask-54")
     assert k.at == k.updatedAt
@@ -180,7 +176,7 @@ def test_units_are_added_in_order_named_by_type_and_taken_out(store, inlet):
     ({"action": "new", "product": "ethanol", "inletRef": "beer"}, "'beer' is not an artifact id"),
     ({"action": "new", "product": "ethanol", "inletRef": "0123456789abcdef"},
      "there is no kept artifact 0123456789abcdef here"),
-    ({"action": "new", "product": "phb", "inletRef": "@run/F1_liquid"}, "phb is none of them"),
+    ({"action": "new", "product": "nothing", "inletRef": "@run/F1_liquid"}, "nothing is none of them"),
     ({"action": "new", "product": "", "inletRef": "@run/F1_liquid"}, "name the product the train recovers"),
     ({"action": "new", "product": "ethanol", "inletRef": "@run"}, "name its stream as"),
     ({"action": "new", "product": "ethanol", "inletRef": "@run/beer"}, "holds no stream 'beer'"),
@@ -201,7 +197,7 @@ def test_a_step_that_cannot_be_taken_is_refused_in_words_and_changes_nothing(sto
     assert kept.read() == before and len(audit.read()) == lines and r.evidence == []
 
 
-def test_an_inlet_of_another_kind_or_an_archived_program_is_refused(store, inlet, monkeypatch):
+def test_an_inlet_of_another_kind_is_refused(store, inlet, monkeypatch):
     from test_train import real_simulation
 
     sim = real_simulation()
@@ -209,7 +205,7 @@ def test_an_inlet_of_another_kind_or_an_archived_program_is_refused(store, inlet
     assert from_sim.error is None and from_sim.summary["product"] == "ethanol"
     assert from_sim.summary["inlet"]["kind"] == "simulation"
     assert any("the product is the simulation's own, ethanol" in w for w in from_sim.summary["read"])
-    assert "makes ethanol; a train recovering" in b(action="new", product="phb", inletRef=sim.artifactId).error
+    assert "makes ethanol; a train recovering glycerol" in b(action="new", product="glycerol", inletRef=sim.artifactId).error
     assert "names no stream" in b(action="new", product="ethanol", inletRef=f"{sim.artifactId}/beer").error
     # An artifact of another kind is not an inlet (a STAND-IN: the simulation's file read as a ceiling's).
     real_get = artifacts.get
@@ -217,12 +213,6 @@ def test_an_inlet_of_another_kind_or_an_archived_program_is_refused(store, inlet
     monkeypatch.setattr(artifacts, "get", lambda aid: ceiling if aid == "f" * 16 else real_get(aid))
     other = b(action="new", product="ethanol", inletRef="f" * 16).error
     assert "is a geneos.ceiling artifact; a train's inlet is a kept simulation's harvest" in other
-    # With the switch off, an inlet of an archived program is refused, naming the switch.
-    monkeypatch.setattr(module_stores, "artifact_program", lambda a, *x, **k: "pha")
-    off = b(action="new", product="ethanol", inletRef=inlet)
-    assert "belongs to PHA, archived (hidden)" in off.error and "Settings → Programs" in off.error
-    on = tools.run("pureos_build", {"action": "new", "product": "ethanol", "inletRef": inlet}, ctx(archived=True))
-    assert "pureOS builds a train on" in on.error and "program pha has no chemical set here" in on.error
 
 
 # ── records named for a parameter ──────────────────────────────────────
@@ -246,7 +236,6 @@ def test_set_from_record_binds_exactly_the_records_named_and_the_run_reads_them(
     ({"split.Ethanol": ["r-zz"]}, "record r-zz is not in the evidence pool here"),
     ({"split.Ethanol": ["r-cm-1"]}, "record r-cm-1 is of cake_moisture, not step_recovery"),
     ({"split.Ethanol": ["r-st-3"]}, "record r-st-3: naming another step or none"),
-    ({"split.Ethanol": ["r-st-4"]}, "record r-st-4: not on the yeast program's papers"),
     ({"split.Water": ["r-st-1"]}, "binds the product's split alone (Ethanol)"),
     ({"split.Ethanol": []}, "recordsByParam names no record for split.Ethanol"),
     ({"split.Ethanol": ["r-st-1", "r-st-1"]}, "record r-st-1 is named twice for split.Ethanol"),
@@ -262,14 +251,6 @@ def test_set_from_record_refuses_a_record_that_cannot_bind_naming_it_and_why(sto
     r = b(action="set_from_record", trainId=tid, unitId="C1", recordsByParam=named)
     assert r.error and r.error.startswith("pureos_build refused: ") and words in r.error, r.error
     assert kept.read() == before and len(audit.read()) == lines
-
-
-def test_with_the_switch_off_a_record_of_an_archived_program_is_not_in_the_pool(store, inlet):
-    tid = built(inlet, "centrifugation")
-    shown = stand_in_pool([r for r in RECORDS if r["paperId"] != "A1"])
-    r = tools.run("pureos_build", {"action": "set_from_record", "trainId": tid, "unitId": "C1",
-                                   "recordsByParam": {"split.Ethanol": ["r-st-4"]}}, ctx(pool=shown))
-    assert "record r-st-4 is not in the evidence pool here" in r.error
 
 
 # ── the run ────────────────────────────────────────────────────────────
@@ -446,7 +427,7 @@ def test_propose_refuses_in_words_naming_what_is_missing_when_nothing_is_propose
     from openferment_core import pureos
     from openferment_core.models import ProposalMissing
 
-    def propose(product, host, inlet_ref, *, include_archived=False):
+    def propose(product, host, inlet_ref):
         return SimpleNamespace(train=None, reasons=[], missing=[
             ProposalMissing(property="sequence", why="STAND-IN: the product's entry carries no sequence")])
 
@@ -460,7 +441,7 @@ def test_propose_refuses_in_words_naming_what_is_missing_when_nothing_is_propose
 def test_propose_passes_the_host_and_refuses_in_the_proposers_words(store, monkeypatch):
     from openferment_core import pureos
 
-    def propose(product, host, inlet_ref, *, include_archived=False):
+    def propose(product, host, inlet_ref):
         raise pureos.ProposeRefused(f"there is no host {host!r} among geneOS's hosts")
 
     monkeypatch.setattr(pureos, "propose", propose)
@@ -471,14 +452,13 @@ def test_propose_passes_the_host_and_refuses_in_the_proposers_words(store, monke
 
 def test_propose_keeps_the_proposers_train_under_an_id_of_its_own(store, inlet, monkeypatch):
     """A STAND-IN proposer (§7.2's shape: `pureos.propose(product, host,
-    inlet_ref, include_archived=...)` returns a `TrainProposal`); its train
-    is kept as the model's."""
+    inlet_ref)` returns a `TrainProposal`); its train is kept as the model's."""
     from openferment_core import pureos
 
     asked = []
 
-    def propose(product, host, inlet_ref, *, include_archived=False):
-        asked.append((product, host, inlet_ref, include_archived))
+    def propose(product, host, inlet_ref):
+        asked.append((product, host, inlet_ref))
         spec = spec_of(id="proposed", units=[{"id": "D1", "type": "distillation"}],
                        inlet={"kind": "run-stream", "ref": inlet.split("/")[0], "streamId": "F1_liquid"})
         return SimpleNamespace(train=spec, reasons=["STAND-IN reason: the product is volatile"], missing=[])
@@ -486,7 +466,7 @@ def test_propose_keeps_the_proposers_train_under_an_id_of_its_own(store, inlet, 
     monkeypatch.setattr(pureos, "propose", propose)
     r = b(action="propose", product="ethanol", host="s-cerevisiae-s288c", inletRef=inlet)
     assert r.error is None, r.error
-    assert asked == [("ethanol", "s-cerevisiae-s288c", inlet, False)]
+    assert asked == [("ethanol", "s-cerevisiae-s288c", inlet)]
     assert r.summary["trainId"].startswith(build.ID_PREFIX) and r.summary["trainId"] != "proposed"
     assert r.summary["reasons"] == ["STAND-IN reason: the product is volatile"]
     [k] = kept.read().trains
@@ -518,34 +498,44 @@ def test_the_store_is_written_by_one_function_under_its_locks_and_keeps_every_ch
     units = kept.kept_train(tid).spec.units
     assert len(units) == 20 and len({u.id for u in units}) == 20
     # A person's train is never kept here, and a change keeps its train's id.
-    with pytest.raises(kept.KeptTrainRefused, match="a person's trains live in their browser"):
+    with pytest.raises(kept.KeptTrainRefused, match="a person's trains are the project's rows"):
         kept.keep_train(tid, lambda cur: cur, "Stand-In Person", agent="person")
     with pytest.raises(kept.KeptTrainRefused, match="a change keeps the train's id"):
         kept.keep_train(tid, lambda cur: cur.model_copy(update={"id": "tr-other"}), MODEL)
     with pytest.raises(kept.KeptTrainRefused, match="names the model that made it"):
         kept.keep_train(None, lambda _: spec_of(), " ")
-    # The file is the service's data directory's, and no file but its own is written.
-    assert kept.path() == store / kept.FILE and kept.path().exists()
-    assert sorted(p.name for p in store.iterdir() if p.name.startswith("pureos-trains")) == [
-        "pureos-trains.json", "pureos-trains.json.lock"]
+    # The store is the project's rows of the trains table, of kind kept: the
+    # one train, and no other row.
+    from sqlalchemy import select
+
+    from openferment_core import db, projects
+    from openferment_core.db import models as t
+
+    async def held() -> list[tuple[str, str]]:
+        async with db.session() as s:
+            return [tuple(r) for r in await s.execute(select(t.trains.c.id, t.trains.c.kind))]
+
+    assert db.run(held()) == [(tid, kept.KIND)] and projects.current() == "test-project"
 
 
-def test_kept_py_writes_only_through_atomic_and_holds_no_process_number():
+def test_kept_py_writes_only_its_table_under_the_lock_and_holds_no_process_number():
     for rel in ("pureos/kept.py", "pureos/build.py"):
         src = (PKG / rel).read_text(encoding="utf-8")
         tree = ast.parse(src)
-        named = {"ID_HEX", "SUMMARY_DIGITS", "MAX_LINE_CHARS", "JSON_INDENT"}
+        named = {"ID_HEX", "SUMMARY_DIGITS", "MAX_LINE_CHARS"}
         allowed = {id(n.value) for n in tree.body if isinstance(n, ast.Assign)
                    and any(isinstance(t, ast.Name) and t.id in named for t in n.targets)}
         found = [(n.lineno, n.value) for n in ast.walk(tree) if isinstance(n, ast.Constant)
                  and isinstance(n.value, (int, float)) and not isinstance(n.value, bool)
                  and n.value not in (0, 1) and id(n) not in allowed]
         assert found == [], (rel, found)
-        assert ".write_text(" not in src.replace("atomic.write_text(", ""), rel
-    assert "atomic.write_text(" in (PKG / "pureos/kept.py").read_text(encoding="utf-8")
+        assert ".write_text(" not in src and "atomic" not in src, rel
+    # One write, a row of the trains table, made under the store's lock.
+    src = (PKG / "pureos/kept.py").read_text(encoding="utf-8")
+    assert src.count("rows.put(") == 1 and "await db.lock(s, TABLE, project_id)" in src
 
 
-def test_the_trains_kept_endpoint_lists_them_newest_first_and_honours_the_switch(store, inlet, monkeypatch):
+def test_the_trains_kept_endpoint_lists_them_newest_first(store, inlet):
     from openferment_core import api
 
     client = TestClient(api.app, base_url="http://127.0.0.1")
@@ -555,10 +545,6 @@ def test_the_trains_kept_endpoint_lists_them_newest_first_and_honours_the_switch
     assert [k["spec"]["id"] for k in body] == [second, first]
     assert body[0]["madeBy"] == MODEL and body[0]["agent"] == "model" and body[0]["at"]
     assert [u["type"] for u in body[0]["spec"]["units"]] == ["tank"]
-    # A train of an archived program hides unless asked for.
-    kept.keep_train(first, lambda cur: cur.model_copy(update={"program": "pha"}), MODEL)
-    assert [k["spec"]["id"] for k in client.get("/api/pureos/trains-kept").json()] == [second]
-    assert {k["spec"]["id"] for k in client.get("/api/pureos/trains-kept?includeArchived=true").json()} == {first, second}
     assert client.post("/api/pureos/trains-kept").status_code == 405
 
 
@@ -662,8 +648,6 @@ def real(monkeypatch, tmp_path):
     proforma.start(background=False)
     assert proforma.status()["status"] == "ready", proforma.status()
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(train_spec, "_SPECS", {})
     monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())
     monkeypatch.setenv("OPENFERMENT_MODEL", MODEL)

@@ -7,7 +7,6 @@ chain, cited by its accession. Nothing here reads a key or the network.
 """
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -36,8 +35,8 @@ def store(monkeypatch, tmp_path):
 
 @pytest.fixture()
 def seed(monkeypatch):
-    """A products seed as corpus.json carries it, with one entry holding the
-    cited chain and others that do not, or hold what ProtParam cannot read."""
+    """A products catalogue as the corpus carries it, with one entry holding
+    the cited chain and others that do not, or hold what ProtParam cannot read."""
     entries = [
         {"id": "insulin-b-chain", "name": "Insulin B chain", "sequence": INSULIN_B, "sequenceSource": INSULIN_B_SOURCE},
         {"id": "taq-dna-polymerase", "name": "Taq DNA polymerase"},
@@ -170,15 +169,6 @@ def test_a_product_with_no_sequence_is_missing_and_a_bad_one_refused(store, seed
     assert artifacts.all_artifacts() == []
 
 
-def test_the_seed_carries_no_sequence_without_its_source_and_none_it_cannot_read():
-    """Whatever entries carry a sequence (none on 2026-10-21: none is
-    invented), each names where it was read and is one ProtParam reads."""
-    for p in protparam.products():
-        if "sequence" in p:
-            assert p.get("sequenceSource"), f"product {p['id']} carries a sequence and names no source"
-            protparam.check(p["sequence"])
-
-
 def test_evidence_is_one_value_a_property_with_the_artifacts_basis(store):
     art = protparam.protparam(INSULIN_B, source=SOURCE)
     ev = protparam.evidence_of(art)
@@ -243,8 +233,10 @@ def test_the_endpoints_say_what_is_missing_and_what_is_refused(store, seed, clie
 
 
 def test_a_damaged_answer_is_a_409_in_words(store, seed, client):
+    from standins import plant_damaged
+
     art = protparam.of_product("insulin-b-chain")
-    (artifacts.folder() / f"{art.id}.json").write_text("{trunc", encoding="utf-8")
+    plant_damaged(art.id)
     for r in (client.get("/api/protparam", params={"product": "insulin-b-chain"}),
               client.post("/api/protparam", json={"product": "insulin-b-chain"})):
         assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"], r.text
@@ -260,9 +252,10 @@ def test_both_tools_are_registered_when_the_service_starts_and_biopython_waits()
     assert lines[-2].startswith("protparam 1 · biopython ") and lines[-1].startswith("thermo volatility 1 · thermosteam ")
 
 
-def test_the_products_seed_reaches_python_through_corpus_json():
-    """`pnpm export:corpus` (run by test:core) writes each product's id and
-    name, and its sequence and source only when its entry carries one."""
-    raw = json.loads((CORE / "openferment_core" / "data" / "corpus.json").read_text(encoding="utf-8"))
-    assert raw["products"] and all({"id", "name"} <= set(p) for p in raw["products"])
-    assert all(set(p) in ({"id", "name"}, {"id", "name", "sequence", "sequenceSource"}) for p in raw["products"])
+def test_no_product_is_catalogued_and_a_product_it_lacks_is_missing_in_words():
+    """No store holds a product catalogue yet, so the service ships none: a
+    product's properties are missing, said in words, and nothing is
+    computed."""
+    assert protparam.products() == []
+    with pytest.raises(protparam.ProtParamMissing, match="there is no product 'insulin-b-chain' in the products catalogue"):
+        protparam.of_product("insulin-b-chain")

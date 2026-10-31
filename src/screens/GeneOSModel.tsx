@@ -4,22 +4,17 @@
 // on the shelf that names a route to the product, the most of it the network
 // can make from the sugar (flux balance analysis, kept as an artifact), and
 // the view draws each as a dotted rule beside every reported yield of that
-// product in the store: curated, verified, and the extractor's undecided
+// product in the store: gold, verified, and the extractor's undecided
 // candidates as hollow marks. A point above a rule is ringed and listed for a
 // reviewer to check its basis. Below sit the chosen model's production
 // envelope and its sugar-mix line. A model the service cannot compute is
 // named in words and the others still draw; with the service down this says
 // so; nothing stands in for a result (E.2).
 //
-// PROGRAMS (OF-BLD-016 §2.2). The product chooser, the models (the chooser,
-// the ceilings drawn and the shelf list) and the reported yields pass the
-// program selector: a model shows when its host and one of its products do,
-// and with archived programs hidden the view opens on the first product that
-// shows, not on PHB. A URL naming a product, or a model whose product it is
-// (a strain page's card links so), opens that product under ArchivedBanner
-// with its own program's models and records (`useProgramScope`). When nothing
-// on the shelf shows, the view says what is hidden and where the switch is.
-// With the switch on, all as before.
+// THE PRODUCT. A URL naming a product, or a model whose product it is (a
+// strain page's card links so), opens that product; with none named, the
+// view opens on the first product the shelf computes for. When the shelf
+// names no product, the view says so.
 //
 // SCENARIOS ABOVE A CEILING (OF-BLD-019 §5.2, D11). Under the chosen model
 // and sugar, each Proforma scenario in view whose yield, as it binds it, is
@@ -30,12 +25,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Calculator } from 'lucide-react';
 import type { CeilingCheck, ExtractionRecord, GeneosModelInfo, GeneosResult, Scenario } from '@/data/types';
-import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, proformaScope, useProgramFilter, useProgramLookup, useStore, type ProgramEntityKind, useProgramScope } from '@/store';
+import { proformaScope, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
-import { Callout, EmptyState, LinkButton } from '@/components/ui';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
-import { HiddenByArchive, archivedProgramsOf } from '@/components/HiddenByArchive';
+import { Callout, EmptyState } from '@/components/ui';
 import { EvidenceCard } from '@/components/EvidenceCard';
 import { CeilingGap, Frontier, MixLine, stripPoints, type Ceiling } from '@/components/figures';
 import {
@@ -74,10 +66,7 @@ const productsOf = (shelf: GeneosModelInfo[]) => [...new Set(shelf.flatMap((m) =
 
 export default function GeneOSModel() {
   const route = useRoute();
-  const allRecords = useStore((s) => s.records);
-  const runbooks = useStore((s) => s.runbooks);
-  const depositions = useStore((s) => s.depositions);
-  const shows = useProgramFilter();
+  const records = useStore((s) => s.records);
   const [shelf, setShelf] = useState<GeneosModelInfo[] | null>(null);
   const [down, setDown] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
@@ -88,20 +77,14 @@ export default function GeneOSModel() {
   // OF-BLD-020 §2.2: a person's changes to a scenario's inputs are its scope's overrides.
   const parameterOverrides = useStore((s) => s.parameterOverrides);
   const proformaFits = useStore((s) => s.proformaFits);
-  const showArchived = useStore((s) => s.showArchived);
-  const lookup = useProgramLookup();
   const [aboveCeiling, setAboveCeiling] = useState<{ scenario: Scenario; check: CeilingCheck }[]>([]);
 
   const substrate = route.query.get('substrate') ?? 'glucose';
   const modelId = route.query.get('model') ?? '';
-  // A link to one model opens on that model's own product, shown or archived.
+  // A link to one model opens on that model's own product.
   const named = route.query.get('product') ?? shelf?.find((m) => m.id === modelId)?.product ?? null;
-  // With no product named, the view opens on PHB while it shows, else on the
-  // first product on the shelf that does (OF-BLD-016 §2.2), else on none.
-  const firstShown = productsOf(shelf ?? []).find((p) => shows('product', p)) ?? '';
-  const product = named ?? (shows('product', 'phb') ? 'phb' : firstShown);
-  const inView = useProgramScope(named ? { kind: 'product', id: named } : null);
-  const records = useMemo(() => allRecords.filter((r) => inView('record', r.id)), [allRecords, inView]);
+  // With no product named, the view opens on the first product on the shelf, else on none.
+  const product = named ?? productsOf(shelf ?? [])[0] ?? '';
   const words = productWords(product);
   const set = (patch: Record<string, string>) => {
     const q = new URLSearchParams(route.query);
@@ -117,22 +100,8 @@ export default function GeneOSModel() {
     return () => ctrl.abort();
   }, []);
 
-  // A model shows when its host does (a model with none is general) and one of its products does.
-  const shownShelf = useMemo(
-    () =>
-      (shelf ?? []).filter(
-        (m) => (!m.host || inView('strain', m.host)) && m.products.some((p) => inView('product', p)),
-      ),
-    [shelf, inView],
-  );
-  const products = useMemo(() => productsOf(shelf ?? []).filter((p) => inView('product', p)), [shelf, inView]);
-  // Which models' hosts show, as a key that changes only when one does, so a
-  // candidate arriving in the store does not ask for every ceiling again.
-  const hostsShown = (shelf ?? []).map((m) => (!m.host || inView('strain', m.host) ? '1' : '0')).join('');
-  const forProduct = useMemo(
-    () => (shelf ?? []).filter((m, i) => m.products.includes(product) && hostsShown[i] === '1'),
-    [shelf, product, hostsShown],
-  );
+  const products = useMemo(() => productsOf(shelf ?? []), [shelf]);
+  const forProduct = useMemo(() => (shelf ?? []).filter((m) => m.products.includes(product)), [shelf, product]);
   const usable = useMemo(() => forProduct.filter((m) => !m.unavailable), [forProduct]);
   const chosen = usable.find((m) => m.id === modelId) ?? usable[0] ?? null;
 
@@ -178,26 +147,25 @@ export default function GeneOSModel() {
     return () => ctrl.abort();
   }, [shelf, chosen?.id, substrate, product, usable]);
 
-  // OF-BLD-019 §5.2 — the Proforma scenarios in view, each asked of the
+  // OF-BLD-019 §5.2 — the Proforma scenarios, each asked of the
   // service once the ceilings above are computed and kept: the yield as the
   // scenario binds it (its flowsheet when made here, its fermOS fits, the
   // yield's override when typed), against the newest stored ceilings.
   const scenarioAsks = useMemo(
     () =>
       scenarios
-        .filter((s) => s.kind === 'biosteam' && inView('scenario', s.id))
+        .filter((s) => s.kind === 'biosteam')
         .map((s) => ({
           scenario: s,
           ask: {
             scenarioId: s.id,
             flowsheet: createdScenarioIds.includes(s.id) ? (s.flowsheetId ?? s.modelId) : null,
             host: null,
-            includeArchived: showArchived || archivedProgramOf('scenario', s.id, lookup) !== null,
             fits: proformaFits[s.id] ?? {},
             overrides: (parameterOverrides[proformaScope(s.id)] ?? []).filter((o) => o.key === 'yield'),
           },
         })),
-    [scenarios, inView, createdScenarioIds, showArchived, lookup, proformaFits, parameterOverrides],
+    [scenarios, createdScenarioIds, proformaFits, parameterOverrides],
   );
   const asksKey = JSON.stringify(scenarioAsks.map((x) => x.ask));
   useEffect(() => {
@@ -248,8 +216,7 @@ export default function GeneOSModel() {
   }
 
   if (shelf && product === '') {
-    // Nothing on the shelf shows: every product it computes is archived.
-    const hidden = productsOf(shelf);
+    // The shelf names no product to compute a ceiling for.
     return (
       <div className="space-y-4" data-testid="geneos-model">
         <Callout kind="info" title="Stoichiometry, not a forecast">
@@ -257,22 +224,12 @@ export default function GeneOSModel() {
         </Callout>
         <EmptyState
           icon={<Calculator size={28} />}
-          title={shelf.length === 0 ? 'No model on the shelf' : 'No model on the shelf computes for an active program'}
+          title="No model on the shelf"
           body={
-            shelf.length === 0 ? (
-              'The service lists no reaction network on geneOS\'s shelf.'
-            ) : (
-              <HiddenByArchive
-                subject={`The ${shelf.length === 1 ? 'one model' : `${shelf.length} models`} on the shelf, for ${hidden.map((p) => productWords(p).short).join(' and ')},`}
-                plural={shelf.length !== 1}
-                programs={archivedProgramsOf(
-                  hidden.map((p) => ['product', p] as [ProgramEntityKind, string]),
-                  { records: allRecords, runbooks, depositions },
-                )}
-              />
-            )
+            shelf.length === 0
+              ? 'The service lists no reaction network on geneOS\'s shelf.'
+              : 'No reaction network on geneOS\'s shelf names a product to compute a ceiling for.'
           }
-          action={shelf.length > 0 ? <LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton> : undefined}
         />
       </div>
     );
@@ -280,8 +237,6 @@ export default function GeneOSModel() {
 
   return (
     <div className="space-y-4" data-testid="geneos-model">
-      <ArchivedBanner kind="product" id={product} />
-
       <Callout kind="info" title="Stoichiometry, not a forecast">
         {NOT_A_VESSEL}
       </Callout>
@@ -329,7 +284,7 @@ export default function GeneOSModel() {
           unit={UNIT}
           quantity={words.quantity}
           ceilings={ceilings}
-          csvName={product === 'phb' ? `ceiling-gap-${substrate}` : `ceiling-gap-${product}-${substrate}`}
+          csvName={`ceiling-gap-${product}-${substrate}`}
         />
       )}
 
@@ -349,7 +304,7 @@ export default function GeneOSModel() {
           {flagged.map((p) => (
             <div key={p.record.id} className="rounded-card border border-signal-warn/45 bg-signal-warn/[0.06] p-2 text-body">
               <span className="font-num">{p.record.id}</span> ({p.group}) is {p.above}. A reported yield above a network's
-              ceiling may rest on a different basis (another sugar counted, the {product === 'phb' ? 'dry weight' : 'product'} measured
+              ceiling may rest on a different basis (another sugar counted, the product measured
               otherwise).{' '}
               <a className="text-accent hover:underline" href={href(`/guild?record=${p.record.id}`)}>
                 Ask a reviewer to check its basis
@@ -435,7 +390,7 @@ export default function GeneOSModel() {
         <section aria-label="The shelf">
           <h3 className="font-medium text-reading mb-1">The shelf</h3>
           <ul className="space-y-1 text-body">
-            {shownShelf.map((m) => (
+            {shelf.map((m) => (
               <li key={m.id}>
                 <span className="font-num">{m.id}</span> — {m.name}, {m.scope}. {m.route}. Source: {m.source}; {m.licence}.
               </li>
@@ -454,13 +409,8 @@ export default function GeneOSModel() {
  * others. With the service down, or no model of this host, it draws nothing.
  */
 export function HostCeilingCard({ strainId }: { strainId: string }) {
-  const [allModels, setModels] = useState<GeneosModelInfo[]>([]);
+  const [models, setModels] = useState<GeneosModelInfo[]>([]);
   const [results, setResults] = useState<Record<string, GeneosResult | string>>({});
-  // OF-BLD-016 §2.2 — a model of this host shows when its product does, or
-  // when the product belongs to the host's own archived program (the page
-  // opened under ArchivedBanner).
-  const inView = useProgramScope({ kind: 'strain', id: strainId });
-  const models = allModels.filter((m) => inView('product', m.product));
   useEffect(() => {
     const ctrl = new AbortController();
     setModels([]);

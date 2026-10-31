@@ -5,10 +5,8 @@
 // SILENT DROPPING ENDS HERE (OF-BLD-012 §5.4). `locateSpans` finds each
 // record's quote with indexOf and, until this increment, a quote that failed
 // to anchor simply vanished from the text and sank to the bottom of the rail.
-// That was tolerable while every section was a curation note the quotes were
-// transcribed from. It is not tolerable once a section is the paper's own
-// text: a curated quote that is not in the paper is exactly the record a
-// reviewer needs to look at. So on a fetched paper the rail lists those
+// A section is the paper's own text, so a quote that is not in the paper is
+// exactly the record a reviewer needs to look at. So on a fetched paper the rail lists those
 // records under their own heading — pending verification — with a link to
 // the review card, and the count is in the heading where nobody can miss it.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -18,12 +16,10 @@ import {
   ArrowRight,
   Loader2,
   MessageSquare,
-  RefreshCw,
 } from 'lucide-react';
 import type { ExtractionRecord, FieldId, Job, Paper } from '@/data/types';
 import { fieldName } from '@/data/ontology';
-import { useProgramFilter, useStore, provenanceOf, tickClass } from '@/store';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
+import { useStore, provenanceOf, tickClass } from '@/store';
 import { href, navigate } from '@/router';
 import { Quantity } from '@/components/QuantityField';
 import { ProvenanceLegend, provMeta, type ProvKind } from '@/components/Provenance';
@@ -118,15 +114,10 @@ export default function PaperReader({
 }) {
   const paper = useStore((s) => s.papers.find((p) => p.id === paperId));
   const records = useStore((s) => s.records);
-  // OF-BLD-016 §2.2: a link opens any paper, and one in an archived program
-  // opens under the banner that names it.
-  const shows = useProgramFilter();
   const jobs = useStore((s) => s.jobs);
   const unitMode = useStore((s) => s.ui.unitMode);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
   const setUI = useStore((s) => s.setUI);
-  const ingestPaper = useStore((s) => s.ingestPaper);
-  const toast = useStore((s) => s.toast);
 
   const [activeId, setActiveId] = useState<string | null>(spanId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -240,7 +231,7 @@ export default function PaperReader({
         <Card className="p-6">
           <EmptyState
             title="No such paper"
-            body={`${paperId} is not in this session's corpus. It may have been a link from an older session — session state resets on refresh.`}
+            body={`${paperId} is not a document this project holds.`}
             action={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
             icon={<AlertTriangle size={22} />}
           />
@@ -268,7 +259,7 @@ export default function PaperReader({
   const ingesting = paper.ingest.startsWith('stage:');
   const onShelf = paper.ingest === 'shelf';
   const fullText = paper.textSource === 'full-text';
-  /** On a fetched paper: the records whose curated quote the text does not contain. */
+  /** On a fetched paper: the records whose quote the text does not contain. */
   const pending = fullText ? railRecords.filter((x) => !x.located) : [];
 
   const totalChars = paper.sections.reduce((n, s) => n + s.text.length, 0) || 1;
@@ -375,7 +366,6 @@ export default function PaperReader({
 
   const article = (
     <article className="flex-1 min-w-0 max-w-[760px]">
-      <ArchivedBanner kind="paper" id={paper.id} />
       <div className="mb-3 flex items-center gap-2 text-caption text-ink-soft">
         <a href={href('/biorepo')} className="inline-flex items-center gap-1 hover:text-accent">
           <ArrowLeft size={12} /> Library
@@ -386,13 +376,17 @@ export default function PaperReader({
 
       <h1 className="font-serif text-page-title font-semibold leading-snug">{paper.title}</h1>
 
-      <div className="mt-2 text-body text-ink-soft">
-        {paper.authors.join(', ')}
-        {' · '}
-        <span className="font-num">{paper.year}</span>
-        {' · '}
-        <span className="italic">{paper.venue}</span>
-      </div>
+      {(paper.authors.length > 0 || paper.year || paper.venue) && (
+        <div className="mt-2 text-body text-ink-soft">
+          {[
+            paper.authors.length > 0 ? <span key="authors">{paper.authors.join(', ')}</span> : null,
+            paper.year ? <span key="year" className="font-num">{paper.year}</span> : null,
+            paper.venue ? <span key="venue" className="italic">{paper.venue}</span> : null,
+          ]
+            .filter((part) => part !== null)
+            .flatMap((part, i) => (i === 0 ? [part] : [<span key={`sep-${i}`}>{' · '}</span>, part]))}
+        </div>
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {paper.organisms.map((o) => (
@@ -407,31 +401,14 @@ export default function PaperReader({
         ))}
       </div>
 
-      {paper.textSource === 'curation-note' && (
-        <div className="mt-2 text-caption text-signal-warn flex items-start gap-1.5">
-          <span
-            className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px]"
-            style={{
-              backgroundImage:
-                'repeating-linear-gradient(to bottom, rgb(var(--signal-warn)) 0 3px, transparent 3px 6px)',
-            }}
-            aria-hidden
-          />
-          <span>
-            Catalogued from OF-COR-001: a real, citable paper whose full text has not been ingested.
-            The abstract and the highlighted spans below are the curator&rsquo;s note, not the
-            paper&rsquo;s own words.
-          </span>
-        </div>
-      )}
-
       {paper.textSource === 'full-text' && (
         <div className="mt-2 text-caption text-accent flex items-start gap-1.5">
           <span className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px] bg-accent" aria-hidden />
           <span>
-            Full text from {fetchSourceName(paper.fetchedFrom)}{paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
-            The sections below are the paper&rsquo;s own words; a record whose curated quote is not
-            found in them is listed in the rail as pending verification, not hidden.
+            {paper.fetchedFrom === 'paste' ? 'The full text as it was pasted' : `Full text from ${fetchSourceName(paper.fetchedFrom)}`}
+            {paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
+            The sections below are the document&rsquo;s own words; a record whose quote is not found in
+            them is listed in the rail as pending verification.
           </span>
         </div>
       )}
@@ -444,20 +421,6 @@ export default function PaperReader({
               the searchable corpus and carries no extractions.
             </p>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => {
-                  ingestPaper(paper.id);
-                  toast({
-                    text: `Ingest started for ${paper.id}`,
-                    kind: 'info',
-                    href: '#/intake/ingest',
-                    hrefLabel: 'Board',
-                  });
-                }}
-              >
-                Ingest this paper
-              </Button>
               <LinkButton to="/intake/ingest" size="sm">
                 Open ingest board
               </LinkButton>
@@ -486,20 +449,6 @@ export default function PaperReader({
               The abstract below is the raw-text fallback.
             </p>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => {
-                  ingestPaper(paper.id);
-                  toast({
-                    text: `Retrying ingest for ${paper.id}`,
-                    kind: 'info',
-                    href: '#/intake/ingest',
-                    hrefLabel: 'Board',
-                  });
-                }}
-              >
-                <RefreshCw size={12} /> Retry ingest
-              </Button>
               <LinkButton to="/intake/ingest" size="sm">
                 Open ingest board
               </LinkButton>
@@ -521,7 +470,7 @@ export default function PaperReader({
           {quote && sectionId && !paper.sections.some((s) => s.id === sectionId) && (
             <p className="mt-4 text-caption text-signal-warn" data-testid="quote-missing">
               The passage from the search is in section {sectionId} of the fetched text, which this
-              reader does not hold{fullText ? '' : ': it shows the curator\u2019s note in its place'}.
+              reader does not hold.
               Fetch the paper in Intake to read it here.
             </p>
           )}
@@ -549,7 +498,11 @@ export default function PaperReader({
                 }}
                 className="mt-6 scroll-mt-4"
               >
-                <h2 className="font-serif text-section-title font-semibold mb-1">{s.heading}</h2>
+                {/* A passage with no heading of its own carries the document's
+                    title as one (literature/kit.py); the page's title says it already. */}
+                {s.heading !== paper.title && (
+                  <h2 className="font-serif text-section-title font-semibold mb-1">{s.heading}</h2>
+                )}
                 {quote && s.id === sectionId && !quoted && (
                   <p className="text-caption text-signal-warn mb-1" data-testid="quote-missing">
                     The sentence from the search is not in this section&rsquo;s text as shown here. The
@@ -689,9 +642,9 @@ export default function PaperReader({
                   <span className="font-num ml-auto">{pending.length}</span>
                 </h3>
                 <p className="text-caption text-ink-soft mb-2">
-                  These quotes were transcribed from the curation document and do not appear verbatim in
-                  the fetched text. Each stays unverified until a reviewer anchors it to the paper&rsquo;s
-                  words or rejects it.
+                  These quotes do not appear verbatim in the document&rsquo;s text as the project holds it.
+                  Each stays unverified until a reviewer anchors it to the paper&rsquo;s words or rejects
+                  it.
                 </p>
                 {pending.map(({ record: r }) => {
                   const p = provOf(r);

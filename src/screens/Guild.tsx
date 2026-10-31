@@ -17,26 +17,20 @@ import {
   Undo2,
   AlertTriangle,
 } from 'lucide-react';
-import type { Candidate, DecisionCheck, ExtractionRecord, Paper } from '@/data/types';
+import type { DecisionCheck, ExtractionRecord } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, useProgramFilter, useStore, provenanceOf, reviewerName } from '@/store';
+import { useStore, provenanceOf, reviewerName } from '@/store';
 import {
-  bestCandidate,
   blocks,
-  carryOverSpan,
   decisionToCheck,
   locateQuote,
-  paperFetched,
-  paperIdentified,
+  paperHeld,
   refusalOf,
-  spanChangesNumber,
   writeRefusal,
   type Refusal,
 } from '@/lib/review';
 import { useRoute, href } from '@/router';
 import { checkDecision } from '@/lib/intake';
-import { rejoinQueue } from '@/lib/programShows';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { ProvenanceBadge, Tick, type ProvKind } from '@/components/Provenance';
@@ -55,7 +49,6 @@ import {
 import { DISCLOSURE, exportText } from '@/lib/csv';
 import { SubsystemShelf } from '@/components/ReferenceView';
 import { GuildTabs } from '@/components/GuildBits';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
 
 // ── reject reasons (numbered so they are one keystroke away) ────────────
 
@@ -157,28 +150,8 @@ function Hint({ k, faded }: { k: string; faded: boolean }) {
   );
 }
 
-const NO_CANDIDATES: Candidate[] = [];
 
 // ── screen ─────────────────────────────────────────────────────────────
-
-/**
- * The records the program filter hid the last time this screen looked, and
- * the review session that was open then (its start time), kept across visits
- * for this page's life: the switch lives in Settings, so it moves while Guild
- * is not mounted, and an open queue learns what came back by comparing
- * against this on return. A session started since (from Extract, or seeded
- * afresh) was built from the filter as it stands, and compares with nothing
- * (OF-BLD-016 §2.2).
- */
-let lastSeen: { hidden: Set<string>; session: number } | null = null;
-
-/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
-function archivedNames(paperIds: string[]): string {
-  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
-  return PROGRAMS.filter((p) => hit.has(p.id))
-    .map((p) => p.name)
-    .join(' and ');
-}
 
 export default function Guild() {
   const records = useStore((s) => s.records);
@@ -194,17 +167,12 @@ export default function Guild() {
   const advanceReview = useStore((s) => s.advanceReview);
   const focusReview = useStore((s) => s.focusReview);
   const toast = useStore((s) => s.toast);
-  // OF-BLD-012 §7.3 — the extractor's candidates and whether the service is
-  // up, for the block beside a curated record on a fetched paper.
+  // Whether the service is up, which decides what the queue is for.
   const serviceUp = useStore((s) => s.serviceUp);
-  const candidates = useStore((s) => s.overlay?.candidates ?? NO_CANDIDATES);
   // OF-BLD-012 §5.4 — the reader's "pending verification" rail links here
   // with ?record=<id>, and the card it names must be the one on screen.
   const route = useRoute();
   const focusId = route.query.get('record');
-  // OF-BLD-016 §2.2 — Extract, scoped by a link to one paper of an archived
-  // program, sends its review session here with ?paper=<id>.
-  const scopePaperId = route.query.get('paper');
 
   const [origin, setOrigin] = useState<'extract' | 'session'>('extract');
   const [usedKeyboard, setUsedKeyboard] = useState(false);
@@ -219,13 +187,13 @@ export default function Guild() {
   const lastAt = useRef(Date.now());
   const timings = useRef<number[]>([]);
 
-  // OF-BLD-012.1 F9 — 73 of the 132 seed papers carry no PMCID, DOI or PMID,
-  // and `biorepo.write` refuses every decision about them, so 52 unverified
-  // records can be reviewed here and never reach the committed file. A
-  // reviewer working towards that file should not be shown them: with the
+  // OF-BLD-012.1 F9 — `biorepo.write` refuses every decision about a record on
+  // a document the project does not hold, so such a record can be reviewed
+  // here and never reach the service. A reviewer working towards the
+  // project's decisions should not be shown them: with the
   // service up this filter is ON, and the strip says how many it is hiding
   // and why. Off, the queue is everything, and those records are still
-  // reviewable in this browser — the Durable tier keeps them.
+  // reviewable in this browser, which keeps the decisions in its outbox.
   //
   // `null` until the reviewer touches the box: the default FOLLOWS the
   // service rather than being copied out of it once, because `serviceUp` is
@@ -236,33 +204,11 @@ export default function Guild() {
   const keepableOnly = filterChoice ?? serviceUp === true;
 
   const keepable = useCallback(
-    (r: ExtractionRecord) => paperIdentified(papers.find((p) => p.id === r.paperId)),
+    (r: ExtractionRecord) => paperHeld(papers.find((p) => p.id === r.paperId)),
     [papers],
   );
 
-  // OF-BLD-016 §2.2 — the queue holds only records whose program shows: it
-  // seeds from them, and a record that reaches an open queue some other way
-  // (a candidate the overlay joins to it, or the switch in Settings hiding a
-  // program while a queue is open) leaves it in the effect below. A link is
-  // the exception: `?record=` names one record and `?paper=` one paper's
-  // records, and those stay, under the banner that names their program.
-  const shows = useProgramFilter();
-  const linked = useCallback(
-    (r: ExtractionRecord) => r.id === focusId || (scopePaperId !== null && r.paperId === scopePaperId),
-    [focusId, scopePaperId],
-  );
-  const queueable = useCallback(
-    (r: ExtractionRecord) => linked(r) || shows('record', r.id),
-    [linked, shows],
-  );
-  const waiting = useMemo(
-    () => records.filter((r) => r.status === 'unverified' && queueable(r)),
-    [records, queueable],
-  );
-  const hiddenWaiting = useMemo(
-    () => records.filter((r) => r.status === 'unverified' && !queueable(r)),
-    [records, queueable],
-  );
+  const waiting = useMemo(() => records.filter((r) => r.status === 'unverified'), [records]);
   const hiddenByFilter = useMemo(
     () => (keepableOnly ? waiting.filter((r) => !keepable(r)).length : 0),
     [keepableOnly, waiting, keepable],
@@ -291,13 +237,13 @@ export default function Guild() {
       setFilterChoice(only);
       const ids = useStore
         .getState()
-        .records.filter((r) => r.status === 'unverified' && queueable(r))
+        .records.filter((r) => r.status === 'unverified')
         .filter((r) => !only || keepable(r))
         .map((r) => r.id);
       startReview(ids);
       setOrigin('session');
     },
-    [keepable, queueable, startReview],
+    [keepable, startReview],
   );
 
   // Declared after the seeding effect above so it runs after it in the same
@@ -311,57 +257,6 @@ export default function Guild() {
     focused.current = focusId;
     focusReview(focusId);
   }, [focusId, focusReview, queue.length]);
-
-  // OF-BLD-016 §2.2 — keep an open queue to the records whose program shows.
-  // Declared after the focus effect, so a deep link has put its record in
-  // front before this looks. A record the program filter hides leaves the
-  // queue, and the card under review is followed the way the overlay follows
-  // it (store.ts): the same record if it stays, else the next one that does.
-  // Records the switch brings back, still undecided, take their seed places
-  // while no card of the session has been passed (the order a session begun
-  // with the switch on would have), and after that join after everything
-  // already queued, as new candidates do (an empty queue seeds afresh above,
-  // in the seed's order). Nothing is decided or reset: the session's counters
-  // and the records themselves are untouched.
-  const hiddenIds = useMemo(
-    () => new Set(records.filter((r) => !queueable(r)).map((r) => r.id)),
-    [records, queueable],
-  );
-  useEffect(() => {
-    const s = useStore.getState();
-    const session = s.reviewStats.startedAt;
-    const before = lastSeen && lastSeen.session === session ? lastSeen.hidden : hiddenIds;
-    lastSeen = { hidden: hiddenIds, session };
-    if (s.reviewQueue.length === 0) return;
-    const stays = (id: string) => !hiddenIds.has(id);
-    const kept = s.reviewQueue.filter(stays);
-    const queued = new Set(kept);
-    const joining = s.records
-      .filter(
-        (r) =>
-          before.has(r.id) &&
-          !hiddenIds.has(r.id) &&
-          r.status === 'unverified' &&
-          !r.gold &&
-          !queued.has(r.id) &&
-          (!keepableOnly || keepable(r)),
-      )
-      .map((r) => r.id);
-    if (kept.length === s.reviewQueue.length && joining.length === 0) return;
-    // Before any card is passed, returning records take their seed places.
-    const untouched = s.reviewIndex === 0;
-    const reviewQueue = rejoinQueue(kept, joining, s.records.map((r) => r.id), untouched);
-    const under = s.reviewQueue[s.reviewIndex];
-    const reviewIndex = untouched
-      ? 0
-      : under !== undefined && stays(under)
-        ? reviewQueue.indexOf(under)
-        : Math.min(s.reviewQueue.slice(0, s.reviewIndex).filter(stays).length, reviewQueue.length);
-    useStore.setState({ reviewQueue, reviewIndex });
-    // `queue` too: a deep link to a decided record rebuilds the queue from
-    // every unverified record (focusReview), and the overlay joins arriving
-    // candidates to it, each without asking the program filter.
-  }, [hiddenIds, keepable, keepableOnly, queue]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
@@ -408,20 +303,20 @@ export default function Guild() {
   });
   // Read inside the effect rather than depended on: these change identity on
   // every store update, and the question only changes when gateKey does.
-  const asking = useRef({ record, paper: undefined as Paper | undefined, candidates });
-  asking.current = { record, paper: papers.find((p) => p.id === record?.paperId), candidates };
+  const asking = useRef({ record });
+  asking.current = { record };
   useEffect(() => {
     if (!serviceUp || !gateKey) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      const { record: r, paper: pp, candidates: cs } = asking.current;
+      const { record: r } = asking.current;
       const who = reviewerName();
       // Nothing to ask while nobody has said who is deciding: the fallback
       // already says so, and the service would refuse on 'reviewer' anyway.
       if (!r || !who) return;
       void Promise.all([
-        checkDecision(decisionToCheck('accept', r, pp, cs, who), controller.signal),
-        checkDecision(decisionToCheck('gold', r, pp, cs, who), controller.signal),
+        checkDecision(decisionToCheck('accept', r, who), controller.signal),
+        checkDecision(decisionToCheck('gold', r, who), controller.signal),
       ])
         .then(([accept, gold]) => setChecked({ key: gateKey, accept, gold }))
         // The service went away mid-question. The predicate in review.ts is
@@ -624,9 +519,7 @@ export default function Guild() {
       lines.push(
         r.extractorRun
           ? `  origin: extractor run ${r.extractorRun}`
-          : `  origin: transcribed from the curation document${
-              r.curationRef ? ` ${r.curationRef}` : ''
-            } — no extractor produced it`,
+          : '  origin: no extractor run recorded',
       );
       lines.push(`  quote: “${r.quote}”`);
       for (const a of r.audit) {
@@ -638,9 +531,9 @@ export default function Guild() {
       }
     }
     lines.push('');
-    lines.push('End of log. The literature entries are real and citable; the values were');
-    lines.push('transcribed from the curation document and not yet checked against the');
-    lines.push('source PDF. These are one session of review decisions, not a validated result.');
+    lines.push('End of log. The documents are the ones the project holds; each value is a');
+    lines.push("candidate the extractor read from one of them, with the reviewers' decisions on");
+    lines.push('it. These are one session of review decisions, not a validated result.');
     exportText('openferment-review-session.txt', lines.join('\n'));
   };
 
@@ -650,7 +543,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow="Who may verify"
           title="Guild"
           subtitle="The Guild of Applied Life is who may verify. Accept, correct, or reject each extraction against the span it came from."
         />
@@ -659,22 +552,7 @@ export default function Guild() {
           <EmptyState
             icon={<ClipboardCheck size={22} />}
             title="Nothing waiting for review"
-            body={
-              hiddenWaiting.length > 0 ? (
-                <>
-                  Nothing in the programs showing is waiting. {hiddenWaiting.length} unverified record
-                  {hiddenWaiting.length === 1 ? '' : 's'} on papers in{' '}
-                  {archivedNames(hiddenWaiting.map((r) => r.paperId))}{' '}
-                  {hiddenWaiting.length === 1 ? 'is' : 'are'} hidden, because archived programs are.{' '}
-                  <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
-                    Settings → Programs
-                  </a>{' '}
-                  shows them.
-                </>
-              ) : (
-                'Every extraction in this session has already been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue.'
-              )
-            }
+            body="Every extraction in this session has already been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue."
             action={
               <div className="flex gap-2">
                 <LinkButton to="/intake" variant="primary">
@@ -717,7 +595,7 @@ export default function Guild() {
         <div className="min-w-[220px] flex-1">
           <div className="text-caption uppercase tracking-wide text-ink-soft">This queue</div>
           <div className="text-body">
-            <span className="font-num">{queue.length}</span> records ·{' '}
+            <span className="font-num">{queue.length}</span> record{queue.length === 1 ? '' : 's'} ·{' '}
             <span className="font-num">{papersInQueue}</span> paper{papersInQueue === 1 ? '' : 's'} ·{' '}
             <span className="font-num">{fieldsInQueue}</span> field{fieldsInQueue === 1 ? '' : 's'}
           </div>
@@ -797,7 +675,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow="Who may verify"
           title="Guild — queue complete"
           subtitle="Every record in this queue has been through the reviewer. The tallies below separate what you did from where the records ended up."
         />
@@ -937,7 +815,7 @@ export default function Guild() {
   if (!record) {
     return (
       <>
-        <PageHeader eyebrow="Module 0 · Evidence" title="Review queue" />
+        <PageHeader eyebrow="Guild" title="Review queue" />
         <GuildTabs />
         {topStrip}
         <Card className="p-4 max-w-2xl">
@@ -965,20 +843,12 @@ export default function Guild() {
   const prov = provOf(record);
   const draftSI = draft ? toSI(draft.value, draft.unit) : null;
 
-  // §7.3 — beside a curated record on a fetched paper: what the extractor
-  // read for the same field, whether it agrees, and what a promotion carries.
-  const fromExtractor = record.extractorRun === 'claude-1';
-  const fetched = paperFetched(paper);
-  const best = fetched && !fromExtractor ? bestCandidate(record, candidates) : null;
-  const bestSection = best ? paper?.sections.find((s) => s.id === best.candidate.sectionId) : undefined;
-  const bestCtx = best && bestSection ? spanContext(bestSection.text, best.candidate.quote) : null;
-  const carry = fetched && !fromExtractor ? carryOverSpan(record, paper, candidates) : null;
   // §2.3 — what the service would refuse. The predicate in review.ts is the
   // fallback; while the service is up the card asks it directly (F1.5), so
   // the screen is gated on the rules themselves rather than on a copy.
-  const localAccept = writeRefusal('accept', record, paper, candidates, serviceUp, reviewer);
-  const rejectBlocked = writeRefusal('reject', record, paper, candidates, serviceUp, reviewer);
-  const localGold = writeRefusal('gold', record, paper, candidates, serviceUp, reviewer);
+  const localAccept = writeRefusal('accept', record, paper, serviceUp, reviewer);
+  const rejectBlocked = writeRefusal('reject', record, paper, serviceUp, reviewer);
+  const localGold = writeRefusal('gold', record, paper, serviceUp, reviewer);
   const asked = checked.key === gateKey ? checked : null;
   const acceptBlocked = asked ? refusalOf(asked.accept, localAccept) : localAccept;
   const goldBlocked = asked ? refusalOf(asked.gold, localGold) : localGold;
@@ -987,7 +857,7 @@ export default function Guild() {
   return (
     <>
       <PageHeader
-        eyebrow="Module 0 · Evidence"
+        eyebrow="Guild"
         title="Review queue"
         subtitle="Judge each extraction against the sentence it was pulled from. Accept, correct, or reject — the audit trail keeps both the original and your correction."
         actions={
@@ -1016,9 +886,6 @@ export default function Guild() {
 
       {topStrip}
 
-      {/* OF-BLD-016 §2.2 — a link opened a record the program filter hides. */}
-      {!shows('record', record.id) && <ArchivedBanner kind="record" id={record.id} />}
-
       <p className="sr-only" aria-live="polite">
         {`Record ${index + 1} of ${queue.length}. ${fieldName(record.field)}, ${fmt(record.value)} ${
           record.unit
@@ -1039,11 +906,7 @@ export default function Guild() {
           <h2 className="font-serif text-section-title font-semibold">{def.name}</h2>
           <p className="text-body text-ink-soft mt-1 max-w-2xl">{def.definition}</p>
           <p className="text-caption text-ink-soft mt-1">
-            Ontology range{' '}
-            <span className="font-num">
-              {def.range[0]}–{def.range[1]} {def.canonicalUnit || '(dimensionless)'}
-            </span>
-            {def.notes ? ` · ${def.notes}` : ''}
+            Canonical unit <span className="font-num">{def.canonicalUnit || '(dimensionless)'}</span>
           </p>
 
           {/* value block */}
@@ -1140,7 +1003,7 @@ export default function Guild() {
                 <CitationChip paperId={record.paperId} />
                 <span className="text-caption text-ink-soft">
                   {paper ? paper.title : 'Source unavailable'}
-                  {section ? ` · ${section.heading}` : ''}
+                  {section && section.heading !== paper?.title ? ` · ${section.heading}` : ''}
                 </span>
               </div>
               <a
@@ -1181,105 +1044,6 @@ export default function Guild() {
             )}
           </div>
 
-          {/* §7.3 — what the extractor read, beside a curated record on a fetched paper */}
-          {fetched && !fromExtractor && (
-            <div className="mt-5 pt-4 border-t border-line" data-testid="extractor-span">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <div className="text-caption uppercase tracking-wide text-ink-soft">
-                  What the extractor read
-                </div>
-                {best && (
-                  <a
-                    href={href(`/biorepo/paper/${record.paperId}?section=${best.candidate.sectionId}`)}
-                    className="text-caption text-accent hover:underline"
-                  >
-                    Open in the reader at {bestSection ? bestSection.heading : `§${best.candidate.sectionId}`}
-                  </a>
-                )}
-              </div>
-              {best ? (
-                <>
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="font-num text-section-title">
-                      {fmt(best.candidate.value)}
-                      {best.candidate.unit && (
-                        <span className="text-body text-ink-soft ml-1">{best.candidate.unit}</span>
-                      )}
-                    </span>
-                    <span className="text-caption text-ink-soft">
-                      claude-1 · {bestSection ? bestSection.heading : `§${best.candidate.sectionId}`} ·
-                      confidence <span className="font-num">{best.candidate.confidence.toFixed(2)}</span>
-                    </span>
-                    {best.agrees ? (
-                      <span className="text-caption text-accent inline-flex items-center gap-1">
-                        <Check size={12} aria-hidden /> Agrees with the curated value within 2 %
-                      </span>
-                    ) : (
-                      <span className="text-caption text-signal-warn">
-                        Disagrees — extractor{' '}
-                        <span className="font-num">
-                          {fmt(best.candidate.value)} {best.candidate.unit}
-                        </span>{' '}
-                        vs curated{' '}
-                        <span className="font-num">
-                          {fmt(record.value)} {record.unit}
-                        </span>
-                        {best.deltaPct !== null && (
-                          <span className="font-num">
-                            {' '}
-                            ({best.deltaPct > 0 ? '+' : ''}
-                            {best.deltaPct.toFixed(0)} %)
-                          </span>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <div className="prose-reading mt-2">
-                    {bestCtx ? (
-                      <p style={{ whiteSpace: 'pre-line' }}>
-                        {bestCtx.clippedStart && <span className="text-ink-soft">… </span>}
-                        {bestCtx.before}
-                        <mark className="span-unverified">{bestCtx.quote}</mark>
-                        {bestCtx.after}
-                        {bestCtx.clippedEnd && <span className="text-ink-soft"> …</span>}
-                      </p>
-                    ) : (
-                      <p className="font-serif italic">“{best.candidate.quote}”</p>
-                    )}
-                  </div>
-                  {carry ? (
-                    <p className="text-caption text-ink-soft mt-2">
-                      The curated quote is not in the fetched text. Accept or gold carries this span
-                      onto the record, so it anchors in the paper&rsquo;s own words
-                      {spanChangesNumber(record, carry) ? (
-                        <>
-                          , and takes the paper&rsquo;s own number,{' '}
-                          <span className="font-mono">
-                            {fmt(carry.value)} {carry.unit}
-                          </span>
-                          , as the correction.
-                        </>
-                      ) : (
-                        '.'
-                      )}
-                    </p>
-                  ) : (
-                    ctx === null && (
-                      <p className="text-caption text-ink-soft mt-2">
-                        The curated quote is not in the fetched text and this span disagrees, so a
-                        promotion carries nothing: accept proceeds without a span; gold needs one.
-                      </p>
-                    )
-                  )}
-                </>
-              ) : (
-                <p className="text-body text-ink-soft">
-                  No extractor candidate for {fieldName(record.field)} on this paper. Accept proceeds
-                  without a span; gold needs one.
-                </p>
-              )}
-            </div>
-          )}
         </Card>
 
         {/* ── right rail: audit + origin ─────────────────────────────── */}
@@ -1287,7 +1051,7 @@ export default function Guild() {
           <SectionTitle>Audit trail</SectionTitle>
           {record.audit.length === 0 ? (
             <p className="text-body text-ink-soft">
-              Nothing has happened to this record beyond the transcription that created it.
+              Nothing has happened to this record beyond the extraction that made it.
             </p>
           ) : (
             <ol className="space-y-2.5 max-h-[42vh] overflow-y-auto pr-1">
@@ -1319,15 +1083,12 @@ export default function Guild() {
             <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
               Where this record came from
             </div>
-            {fromExtractor ? (
-              <>
-                <Tick
-                  p={provOf(record)}
-                  title="Extracted by claude-1 from the fetched full text (OF-BLD-012 §6)"
-                >
-                  <div className="text-body">Extracted by claude-1 — new to the corpus</div>
+            <>
+                <Tick p={provOf(record)} title="Extracted by the extractor from the document's text">
+                  <div className="text-body">Extracted from the project&rsquo;s document</div>
                   <div className="font-num text-caption text-ink-soft">
                     field {record.field} · confidence {record.confidence.toFixed(2)}
+                    {record.extractorRun ? ` · run ${record.extractorRun}` : ''}
                   </div>
                 </Tick>
                 {record.absentFromRun && (
@@ -1340,28 +1101,9 @@ export default function Guild() {
                 <p className="text-caption text-ink-soft mt-2">
                   One structured model response over the paper&rsquo;s own text produced this candidate, and
                   anchoring checked that its quote is verbatim in the section and holds the value.
-                  No curated record covers this field on this paper: accepting makes it a record,
-                  rejecting makes it a false positive in Witness.
+                  Accepting makes it a record; rejecting makes it a false positive in Witness.
                 </p>
-              </>
-            ) : (
-              <>
-                <Tick
-                  p={provOf(record)}
-                  title="Transcribed from the curation document — no extractor produced it"
-                >
-                  <div className="text-body">Hand-transcribed from the corpus document</div>
-                  <div className="font-num text-caption text-ink-soft">
-                    {record.curationRef ? `${record.curationRef} · ` : ''}field {record.field}
-                  </div>
-                </Tick>
-                <p className="text-caption text-ink-soft mt-2">
-                  {fetched
-                    ? 'The value was typed in from the curation document; the extractor\u2019s reading of the same paper is shown beside the span. Confidence is authored, not inferred.'
-                    : 'No extractor has read this paper, so what you are reviewing is a transcription, not an extraction: the value was typed in from the curation document and has not yet been checked against the source PDF. Confidence is authored, not inferred.'}
-                </p>
-              </>
-            )}
+            </>
           </div>
 
           {(record.organism || record.carbonSource) && (
@@ -1443,7 +1185,7 @@ export default function Guild() {
               <Button
                 onClick={() => decide('gold')}
                 disabled={blocks(goldBlocked)}
-                title={goldBlocked?.why ?? 'Verify and promote this record into the curated gold set — shortcut g'}
+                title={goldBlocked?.why ?? 'Verify and promote this record into the gold set — shortcut g'}
               >
                 <Award size={14} /> Flag for gold
                 <Hint k="g" faded={usedKeyboard} />

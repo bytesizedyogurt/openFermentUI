@@ -1,5 +1,6 @@
 // Home (OF-DES-001 §8.1) — orient any persona in five seconds: what is in the
 // corpus, where you left off, and what to do next. Three bands plus a rail.
+import { HomeStart } from '@/components/HomeStart';
 import React, { useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
@@ -27,28 +28,17 @@ import {
   Upload,
   type LucideIcon,
 } from 'lucide-react';
-import { useStore, provenanceOf, useProgramFilter, useProgramLookup, isExample, type ProgramEntityKind } from '@/store';
+import { useStore, provenanceOf } from '@/store';
 import { ProposalsCard } from '@/components/ProposalsCard';
-import { conversationShows } from '@/lib/programShows';
 import { pinnedCard } from '@/lib/proforma';
 import { href } from '@/router';
-import { RUNBOOK_STATUS_LABEL, RUNBOOKS } from '@/data/runbooks';
-import { ELEVEN } from '@/data/nav';
-import { PAPERS } from '@/data/papers';
-import { RECORDS } from '@/data/records';
-import { STRAINS } from '@/data/strains';
-import { PRODUCTS } from '@/data/products';
-import { PROTOCOLS } from '@/data/protocols';
+import { RUNBOOK_STATUS_LABEL } from '@/data/labels';
+import { DESTINATIONS } from '@/data/nav';
 import { UNIT_OPERATIONS } from '@/data/vocabulary';
-import { MODULES } from '@/data/learn';
-import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle, cx } from '@/components/ui';
-import { ProvDot, ProvenanceLegend, Tick, provMeta, type ProvKind } from '@/components/Provenance';
-import type { ActivityEvent, ExtractionRecord, Paper, Program, ProgramId } from '@/data/types';
+import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 import { WorkforceCard } from '@/components/GuildBits';
 import { HIT_RATE_MIN_TESTED, ledgerCounts } from '@/engine/ledger';
-import { livePrompts, subjectsShow, type OfferedPrompt } from '@/data/livePrompts';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH, THREAD_LETTER_CLASS } from '@/data/programs';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -96,115 +86,6 @@ class TileBoundary extends React.Component<
   }
 }
 
-/**
- * The research programs the corpus serves (OF-BLD-014 §2.2), declared in
- * src/data/programs.ts (OF-BLD-016 §2.1): each a set of thread letters and a
- * status. The strip shows a tile for each program whose papers the program
- * selector shows — the active ones, and the archived ones while the switch is
- * on — in thread order, and names the archived ones it hides on one muted
- * line. The counts are read from the store, so they follow the overlay: a
- * fetch or a decision moves them.
- */
-const PROGRAM_TITLE: Record<ProgramId, ReactNode> = {
-  casein: (
-    <>
-      β-casein in <i>C. reinhardtii</i> cw15
-    </>
-  ),
-  pha: 'PHA from waste cellulosic sugars',
-  yeast: (
-    <>
-      Yeast ethanol: <i>S. cerevisiae</i> on glucose
-    </>
-  ),
-};
-
-/** "threads A to O", "thread P": a program's letters as the strip writes them. */
-function threadsLabel(program: Program): string {
-  const l = [...program.letters].sort();
-  return l.length === 1 ? `thread ${l[0]}` : `threads ${l[0]} to ${l[l.length - 1]}`;
-}
-
-/** The programs in thread order (A first), the order the strip has always drawn them in. */
-const STRIP_ORDER: Program[] = [...PROGRAMS].sort((a, b) =>
-  [...a.letters].sort()[0].localeCompare([...b.letters].sort()[0]),
-);
-
-/** "Casein", "Casein and PHA", "Casein, PHA and X". */
-function joinNames(names: string[]): string {
-  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
-
-/** The link to the switch, as every hidden-things line on Home writes it. */
-function SwitchLink() {
-  return (
-    <a className="text-accent hover:underline" href={href(PROGRAMS_SETTINGS_PATH)}>
-      Settings → Programs
-    </a>
-  );
-}
-
-function ProgramTile({
-  program,
-  papers,
-  records,
-}: {
-  program: Program;
-  papers: Paper[];
-  records: ExtractionRecord[];
-}) {
-  const mine = papers.filter((p) => program.letters.includes(p.thread));
-  const ids = new Set(mine.map((p) => p.id));
-  const fullText = mine.filter((p) => p.textSource === 'full-text').length;
-  const byProv = new Map<ProvKind, number>();
-  for (const r of records) {
-    if (!ids.has(r.paperId)) continue;
-    const k = provenanceOf(r) as ProvKind;
-    byProv.set(k, (byProv.get(k) ?? 0) + 1);
-  }
-  const provs = [...byProv.entries()].sort((a, b) => b[1] - a[1]);
-  return (
-    <a
-      href={href('/intake')}
-      className="card p-3 block transition-colors hover:border-accent/45 hover:bg-accent-wash/40"
-      data-program={program.id}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="font-serif text-section-title font-semibold leading-snug">
-            {PROGRAM_TITLE[program.id] ?? program.name}
-          </div>
-          <div className="text-caption uppercase tracking-wide text-ink-soft">
-            {threadsLabel(program)}
-            {program.status === 'archived' && ' · archived'}
-          </div>
-        </div>
-        <ArrowUpRight size={13} className="text-ink-soft shrink-0" aria-hidden />
-      </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-body">
-        <span>
-          <span className="font-num">{mine.length}</span> papers
-        </span>
-        <span>
-          <span className="font-num">{fullText}</span> with full text
-        </span>
-      </div>
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-ink-soft">
-        {provs.length === 0 ? (
-          <span>No records yet. Values arrive through Intake and a Guild decision.</span>
-        ) : (
-          provs.map(([k, n]) => (
-            <span key={k} className="inline-flex items-center gap-1.5">
-              <ProvDot p={k} />
-              {provMeta(k).label} <span className="font-num">{n}</span>
-            </span>
-          ))
-        )}
-      </div>
-    </a>
-  );
-}
-
 function VitalTile({
   to,
   label,
@@ -240,16 +121,8 @@ function VitalTile({
 function PredictionsCard() {
   const runbooks = useStore((s) => s.runbooks);
   const depositions = useStore((s) => s.depositions);
-  // Counted over the runbooks and depositions whose program shows (§2.2),
-  // as the ledger page counts them.
-  const shows = useProgramFilter();
-  const c = ledgerCounts(runbooks, depositions, shows);
-  // The seed's locked runbooks are examples (OF-BLD-016 §3.3): say they are
-  // left out, so a row of zeros never reads as "nothing was ever locked".
-  const lookup = useProgramLookup();
-  const exampleLocks = runbooks.filter(
-    (r) => r.lockedAt && r.predictions.length > 0 && !shows('runbook', r.id) && isExample('runbook', r.id, lookup),
-  ).length;
+  // Counted as the ledger page counts them.
+  const c = ledgerCounts(runbooks, depositions);
   return (
     <Card className="p-4" data-testid="home-predictions">
       <div className="grid grid-cols-2 gap-y-1 text-body">
@@ -265,12 +138,6 @@ function PredictionsCard() {
           : `Hit rate ${Math.round(c.hitRate * 100)} % of ${c.tested} tested.`}{' '}
         <a className="text-accent hover:underline" href={href('/runbooks/ledger')}>Open the ledger</a>
       </p>
-      {c.locked === 0 && exampleLocks > 0 && (
-        <p className="text-caption text-ink-soft mt-1" data-testid="home-predictions-examples">
-          {exampleLocks === 1 ? 'One locked runbook is an example' : `${exampleLocks} locked runbooks are examples`} of runs
-          nobody made and are left out. Draft one in Postdoc and lock it to start the count.
-        </p>
-      )}
     </Card>
   );
 }
@@ -363,31 +230,34 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
 // first-time reader meets them. The verb is what they came to do; the name is
 // what they will type next time.
 /**
- * What each of the eleven actually has, right now (§7).
+ * What each destination actually has, right now (§7).
  *
- * Counted from the seed where there is something to count, and stated as
- * "nothing" where there is not. `built` drives the greying: a destination with
- * no code renders dimmed rather than being quietly indistinguishable from one
- * that works, because "I clicked fermOS and it was empty" should be something
- * Home told you first.
+ * Counted from the store's lists where there is something to count, and
+ * stated as "nothing" where there is not. `built` drives the greying: a
+ * destination with no code renders dimmed, because "I clicked fermOS and it
+ * was empty" should be something Home told you first.
  */
-type Shows = (kind: ProgramEntityKind, id: string) => boolean;
+interface Counted {
+  records: number;
+  papers: number;
+  strains: number;
+  scenarios: number;
+  runbooks: number;
+  protocols: number;
+  modules: number;
+}
 
-/** The seed lists counted below, each through the program selector (OF-BLD-016 §2.2). */
-function stateOf(shows: Shows): Record<string, { now: string; built: boolean }> {
-  const n = <T extends { id: string }>(list: readonly T[], kind: ProgramEntityKind) =>
-    list.filter((x) => shows(kind, x.id)).length;
+function stateOf(n: Counted): Record<string, { now: string; built: boolean }> {
   return {
-    Intake: { now: `${n(RECORDS, 'record')} extraction records`, built: true },
-    BioRepo: { now: `${n(PAPERS, 'paper')} papers · gold set not yet annotated`, built: true },
+    Intake: { now: `${n.records} extraction records`, built: true },
+    BioRepo: { now: `${n.papers} papers · gold set not yet annotated`, built: true },
     Postdoc: { now: 'live through openferment-core, on the model it is configured with', built: true },
-    geneOS: { now: `${n(STRAINS, 'strain')} hosts · no sequence tooling`, built: true },
+    geneOS: { now: `${n.strains} hosts · no sequence tooling`, built: true },
     fermOS: { now: 'empty — no kinetics, no transport, no scale-up', built: false },
     pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },
-    Proforma: { now: `${n(SCENARIOS, 'scenario')} scenarios over ${COST_MODELS.length} cost models`, built: true },
-    Runbooks: { now: `${n(RUNBOOKS, 'runbook')} runbooks · ${n(PROTOCOLS, 'protocol')} protocols`, built: true },
-    Dominion: { now: `${n(PRODUCTS, 'product')} molecules · clearance modelled, not searched`, built: true },
-    Primer: { now: `${n(MODULES, 'module')} modules`, built: true },
+    Proforma: { now: `${n.scenarios} scenarios`, built: true },
+    Runbooks: { now: `${n.runbooks} runbooks · ${n.protocols} protocols`, built: true },
+    Primer: { now: `${n.modules} modules`, built: true },
     Guild: { now: 'review queue and roles', built: true },
   };
 }
@@ -424,15 +294,8 @@ const ENTRY_CARDS: {
     to: '/proforma',
     title: 'Model a process',
     where: 'Proforma',
-    desc: 'Sweep a scenario and see where the cost per kilogram actually goes.',
+    desc: 'Run a scenario on BioSTEAM and see where the cost per kilogram goes.',
     Icon: LineChart,
-  },
-  {
-    to: '/dominion/molecules',
-    title: 'Browse molecules',
-    where: 'Molecules',
-    desc: 'What could be made, in which host, on which train — and who already owns it.',
-    Icon: Boxes,
   },
   {
     to: '/runbooks',
@@ -443,114 +306,41 @@ const ENTRY_CARDS: {
   },
 ];
 
-/**
- * Asked when fewer than three live questions show. Each names what it is
- * about, as the live ones do, so it passes the same program selector: the
- * first stands on the Chlorella vulgaris disruption values of J11, the third
- * on O7's harvesting assessment, and the second asks of whatever the corpus
- * holds.
- */
-const COLD_START_QUESTIONS: OfferedPrompt[] = [
-  {
-    text: 'What specific growth rate does Chlorella vulgaris reach in mixotrophic culture?',
-    about: [{ kind: 'paper', id: 'J11' }],
-  },
-  {
-    text: 'Which strain in the corpus has the highest reported protein content, and how was it measured?',
-    about: [],
-  },
-  {
-    text: 'How does harvest recovery differ between centrifugation and membrane filtration?',
-    about: [{ kind: 'paper', id: 'O7' }],
-  },
-];
-
-/**
- * The entities an activity line names: what its link opens (a paper, a span
- * on one, a strain, a molecule, a scenario, a protocol, a deposition, a
- * runbook, a lesson) and every paper or record id its text writes. A line
- * shows when every one of them shows (§2.2); a line naming none is general.
- */
-const TEXT_IDS = new RegExp(`\\b(r-${THREAD_LETTER_CLASS}\\d+[a-z]*-\\d+|${THREAD_LETTER_CLASS}\\d+[a-z]*)\\b`, 'g');
-function activityShows(e: ActivityEvent, shows: Shows): boolean {
-  const subjects: { kind: ProgramEntityKind; id: string }[] = [];
-  if (e.href) {
-    const [path, query] = e.href.replace(/^#/, '').split('?');
-    const [a, b, c] = path.split('/').filter(Boolean);
-    if (a === 'biorepo' && b === 'paper' && c) subjects.push({ kind: 'paper', id: c });
-    if (a === 'geneos' && b === 'hosts' && c) subjects.push({ kind: 'strain', id: c });
-    if (a === 'dominion' && b === 'molecules' && c) subjects.push({ kind: 'product', id: c });
-    if (a === 'proforma' && b === 'scenario' && c) subjects.push({ kind: 'scenario', id: c });
-    if (a === 'runbooks' && b === 'protocols' && c) subjects.push({ kind: 'protocol', id: c });
-    else if (a === 'runbooks' && b === 'depositions' && c) subjects.push({ kind: 'deposition', id: c });
-    else if (a === 'runbooks' && b && b !== 'ledger') subjects.push({ kind: 'runbook', id: b });
-    if (a === 'primer' && b && b !== 'path' && b !== 'practice') {
-      if (MODULES.some((m) => m.id === b)) subjects.push({ kind: 'module', id: b });
-      const lesson = c ?? b;
-      if (MODULES.some((m) => m.lessons.some((l) => l.id === lesson))) subjects.push({ kind: 'lesson', id: lesson });
-    }
-    const span = query ? new URLSearchParams(query).get('span') : null;
-    if (span) subjects.push({ kind: 'record', id: span });
-  }
-  for (const m of e.text.matchAll(TEXT_IDS)) subjects.push({ kind: m[1].startsWith('r-') ? 'record' : 'paper', id: m[1] });
-  return subjects.every((x) => shows(x.kind, x.id));
-}
-
 // ── screen ─────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const allPapers = useStore((s) => s.papers);
-  const allRecords = useStore((s) => s.records);
-  const allProtocols = useStore((s) => s.protocols);
-  const allScenarios = useStore((s) => s.scenarios);
-  const allProducts = useStore((s) => s.products);
-  const allRunbooks = useStore((s) => s.runbooks);
+  const papers = useStore((s) => s.papers);
+  const records = useStore((s) => s.records);
+  const protocols = useStore((s) => s.protocols);
+  const scenarios = useStore((s) => s.scenarios);
+  const runbooks = useStore((s) => s.runbooks);
+  const strains = useStore((s) => s.strains);
+  const modules = useStore((s) => s.modules);
   const liveConversations = useStore((s) => s.liveConversations);
-  const allActivity = useStore((s) => s.activity);
+  const activity = useStore((s) => s.activity);
   const runs = useStore((s) => s.runs);
   const activeRunId = useStore((s) => s.activeRunId);
-  const fullQueue = useStore((s) => s.reviewQueue);
-  const fullIndex = useStore((s) => s.reviewIndex);
+  const reviewQueue = useStore((s) => s.reviewQueue);
+  const reviewIndex = useStore((s) => s.reviewIndex);
 
   const [showAllActivity, setShowAllActivity] = useState(false);
 
-  // ── programs (OF-BLD-016 §2.2) ───────────────────────────────────────
-  // Every list, count and card below reads these, never the store's lists:
-  // with archived programs hidden (the default) nothing of theirs is counted
-  // or offered, and with the switch on each is the whole list, in its order.
-  const shows = useProgramFilter();
-  const papers = useMemo(() => allPapers.filter((p) => shows('paper', p.id)), [allPapers, shows]);
-  const records = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
-  const protocols = useMemo(() => allProtocols.filter((p) => shows('protocol', p.id)), [allProtocols, shows]);
-  const scenarios = useMemo(() => allScenarios.filter((x) => shows('scenario', x.id)), [allScenarios, shows]);
-  const products = useMemo(() => allProducts.filter((p) => shows('product', p.id)), [allProducts, shows]);
-  const runbooks = useMemo(() => allRunbooks.filter((r) => shows('runbook', r.id)), [allRunbooks, shows]);
-  const activity = useMemo(() => allActivity.filter((e) => activityShows(e, shows)), [allActivity, shows]);
-  // The review queue as it stands, less the records whose program is hidden:
-  // the position is the count of shown records before the reviewer's place.
-  const reviewQueue = useMemo(() => fullQueue.filter((id) => shows('record', id)), [fullQueue, shows]);
-  const reviewIndex = useMemo(
-    () => fullQueue.slice(0, fullIndex).filter((id) => shows('record', id)).length,
-    [fullQueue, fullIndex, shows],
+  const STATE = useMemo(
+    () =>
+      stateOf({
+        records: records.length,
+        papers: papers.length,
+        strains: strains.length,
+        scenarios: scenarios.length,
+        runbooks: runbooks.length,
+        protocols: protocols.length,
+        modules: modules.length,
+      }),
+    [records, papers, strains, scenarios, runbooks, protocols, modules],
   );
-  const STATE = useMemo(() => stateOf(shows), [shows]);
-  // Something is hidden from this page: a line under a tile says so and
-  // where the switch is, without counting what it hides.
-  const papersHidden = papers.length < allPapers.length;
-  const recordsHidden = records.length < allRecords.length;
-
-  // The program tiles: each program whose papers show, in thread order. An
-  // active program always has its tile, papers or none.
-  const programTiles = useMemo(
-    () => STRIP_ORDER.filter((p) => p.status === 'active' || papers.some((x) => p.letters.includes(x.thread))),
-    [papers],
-  );
-  const archivedPrograms = PROGRAMS.filter((p) => p.status === 'archived');
-  const archivedHidden = archivedPrograms.filter((p) => !programTiles.includes(p));
 
   // ── band 1 numbers ───────────────────────────────────────────────────
-  const ingested = useMemo(() => papers.filter((p) => p.ingest === 'complete'), [papers]);
-  const shelved = papers.length - ingested.length;
+  const passages = useMemo(() => papers.reduce((n, p) => n + p.sections.length, 0), [papers]);
 
   const status = useMemo(() => {
     let verified = 0;
@@ -581,32 +371,25 @@ export default function Home() {
   );
 
   // Protocols inherit the provenance of the records their materials are bound to.
-  // The lookup reads every record: a shown protocol bound to a record in an
-  // archived program still has that record's provenance.
   const protocolProv = useMemo(() => {
-    const byId = new Map(allRecords.map((r) => [r.id, r]));
+    const byId = new Map(records.map((r) => [r.id, r]));
     const provs: ProvKind[] = [];
     for (const p of protocols) {
       const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
       if (!v) continue;
       for (const m of v.materials) {
         const rec = m.sourceRecordId ? byId.get(m.sourceRecordId) : undefined;
-        provs.push(rec ? (provenanceOf(rec) as ProvKind) : 'demo');
+        provs.push(rec ? (provenanceOf(rec) as ProvKind) : 'assumed');
       }
     }
-    return dominant(provs, 'demo');
-  }, [protocols, allRecords]);
+    return dominant(provs, 'assumed');
+  }, [protocols, records]);
 
   // ── catalogue numbers (OF-BLD-005) ───────────────────────────────────
   //
-  // Deliberately not folded into Corpus vitals. Those tiles count real
-  // literature; these count a modeled catalogue. Putting them in one row would
-  // quietly imply the same standard of evidence stands behind both, which is
-  // the one thing this page is built not to do.
-  const blockedProducts = useMemo(
-    () => products.filter((p) => p.clearanceState === 'blocked').length,
-    [products],
-  );
+  // Kept out of the project vitals: those tiles count real literature, and these
+  // count runbooks, which are modeled. One row for both would imply the same
+  // standard of evidence stands behind each.
   const runbooksWaiting = useMemo(
     () =>
       runbooks.filter((r) =>
@@ -622,13 +405,10 @@ export default function Home() {
   // ── band 2 state ─────────────────────────────────────────────────────
   // The last conversation somebody actually had with Postdoc. An empty one
   // is not work to resume.
-  // One that cites an archived program waits until the switch shows it.
-  const lastLive = liveConversations.find((c) => c.turns.length > 0 && conversationShows(c, shows)) ?? null;
+  const lastLive = liveConversations.find((c) => c.turns.length > 0) ?? null;
   const pinnedScenarios = useMemo(() => scenarios.filter((x) => x.pinned), [scenarios]);
   const pinned = useMemo(() => pinnedCard(pinnedScenarios), [pinnedScenarios]);
-  // A run in progress shows while its protocol's program does (§2.2).
-  const runInProgress = activeRunId ? (runs[activeRunId] ?? null) : null;
-  const activeRun = runInProgress && shows('protocol', runInProgress.protocolId) ? runInProgress : null;
+  const activeRun = activeRunId ? (runs[activeRunId] ?? null) : null;
   const activeProtocol = activeRun
     ? (protocols.find((p) => p.id === activeRun.protocolId) ?? null)
     : null;
@@ -651,67 +431,51 @@ export default function Home() {
 
   const shownActivity = showAllActivity ? activity : activity.slice(0, 12);
 
-  // Three questions for a first visit: the live ones whose program shows,
-  // else the cold-start ones that do (§2.2).
-  const firstQuestions = useMemo(() => {
-    const live = livePrompts(shows);
-    return live.length >= 3
-      ? live.slice(0, 3)
-      : COLD_START_QUESTIONS.filter((q) => subjectsShow(q.about, shows)).map((q) => q.text);
-  }, [shows]);
-
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-w-0">
         <PageHeader
           eyebrow="openFerment"
           title="Bioprocess literature you can operate on"
-          subtitle="Ask Postdoc against a curated corpus, verify every extracted number against the span it came from, turn verified parameters into runnable protocols, and model what they cost at scale."
+          subtitle="Ask Postdoc about the documents your project holds, verify every extracted number against the span it came from, turn verified parameters into runnable protocols, and model what they cost at scale."
         />
 
-        {/* ── Band 1 · Corpus vitals ─────────────────────────────────── */}
+        <HomeStart />
+
+        {/* ── Band 1 · Project vitals ────────────────────────────────── */}
         <section aria-labelledby="home-vitals" className="mb-7">
           <SectionTitle
             right={
               <Explain label="What do the tick marks mean?">
                 Every number in openFerment carries a provenance tick: a solid gold bar for
-                curated gold-set values, green for human-verified extractions, grey for
-                unverified machine output, and a dashed amber bar for demonstration data with
-                no literature ancestry. The tiles below wear the dominant tick of the data
+                gold values a reviewer typed, green for human-verified extractions, grey for
+                unverified machine output, and a dashed amber bar for a value that rests on an
+                assumption or an estimate. The tiles below wear the dominant tick of the data
                 behind them.
               </Explain>
             }
           >
-            <span id="home-vitals">Corpus vitals</span>
+            <span id="home-vitals">Project vitals</span>
           </SectionTitle>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <TileBoundary label="Papers catalogued">
+            <TileBoundary label="Documents held">
               <VitalTile
-                to="/biorepo"
-                label="Papers catalogued"
-                prov="curated"
-                tickTitle="Real literature, curated by hand — metadata and a curator note, no full text retrieved"
+                to="/intake/ingest"
+                label="Documents held"
+                prov="user"
+                tickTitle="Documents a person added to the project through Intake"
                 sub={
                   papers.length === 0 ? (
-                    papersHidden ? (
-                      'Every paper belongs to an archived program, and archived programs are hidden'
-                    ) : (
-                      'No corpus loaded'
-                    )
+                    'No documents yet: they arrive through Intake'
                   ) : (
                     <>
-                      <span className="font-num">{shelved}</span> awaiting full-text ingest
+                      <span className="font-num">{passages}</span> passages, each searchable and quotable
                     </>
                   )
                 }
               >
-                <div className="font-num text-display leading-tight">
-                  {ingested.length}
-                  <span className="text-section-title text-ink-soft ml-1.5">
-                    / {papers.length}
-                  </span>
-                </div>
+                <div className="font-num text-display leading-tight">{papers.length}</div>
               </VitalTile>
             </TileBoundary>
 
@@ -721,12 +485,6 @@ export default function Home() {
                 label="Extraction records"
                 prov={recordProv}
                 sub={
-                  status.total === 0 && recordsHidden ? (
-                    <span data-testid="home-records-hidden">
-                      No values for the active programs yet: they arrive through Intake and a Guild
-                      decision. Values in archived programs are hidden.
-                    </span>
-                  ) : (
                   <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                     <span className="inline-flex items-center gap-1.5">
                       <ProvDot p="verified" />
@@ -741,7 +499,6 @@ export default function Home() {
                       rejected <span className="font-num">{status.rejected}</span>
                     </span>
                   </span>
-                  )
                 }
               >
                 <div className="font-num text-display leading-tight">{status.total}</div>
@@ -777,11 +534,7 @@ export default function Home() {
                 prov="gold"
                 sub={
                   goldRecords.length === 0 ? (
-                    recordsHidden ? (
-                      'None in the active programs yet — flag records with g in review. Archived programs are hidden.'
-                    ) : (
-                      'No curated values yet — flag records with g in review'
-                    )
+                    'No gold values yet — promote a record with g in review'
                   ) : (
                     <>
                       across <span className="font-num">{goldPapers}</span>{' '}
@@ -816,58 +569,15 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Band 1a · Programs (OF-BLD-014 §2.2) ────────────────────── */}
-        <section aria-labelledby="home-programs" className="mb-7">
-          <SectionTitle
-            right={
-              <Explain label="What is a program?">
-                A program is one research question and the papers gathered for it. Thread P's
-                and thread Q's papers are proposed by a fixed search rule and enter the corpus
-                only when a person approves them; none of their values is typed by hand. Every
-                count here is read from the corpus as it stands now. An archived program is kept
-                whole and leaves every default view; the switch in Settings → Programs brings it
-                back.
-              </Explain>
-            }
-          >
-            <span id="home-programs">Programs</span>
-          </SectionTitle>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {programTiles.map((program) => (
-              <TileBoundary key={program.id} label={threadsLabel(program)}>
-                <ProgramTile program={program} papers={papers} records={records} />
-              </TileBoundary>
-            ))}
-          </div>
-          {archivedPrograms.length > 0 && (
-            <p className="text-caption text-ink-soft mt-2" data-testid="home-programs-archived">
-              {archivedHidden.length > 0 ? (
-                <>
-                  Archived: {joinNames(archivedHidden.map((p) => `${p.name} (${threadsLabel(p)})`))}.{' '}
-                  {archivedHidden.length === 1 ? 'It is' : 'They are'} kept, and hidden from every list,
-                  count and suggested question. <SwitchLink /> shows archived programs again.
-                </>
-              ) : (
-                <>
-                  {joinNames(archivedPrograms.map((p) => p.name))}{' '}
-                  {archivedPrograms.length === 1 ? 'is an archived program' : 'are archived programs'},
-                  shown because the switch in <SwitchLink /> is on.
-                </>
-              )}
-            </p>
-          )}
-        </section>
-
         {/* ── Band 1b · Catalogue (OF-BLD-005) ───────────────────────── */}
         <section aria-labelledby="home-catalogue" className="mb-7">
           <SectionTitle
             right={
-              <Explain label="Why these are a separate band">
+              <Explain label="Why this is a separate band">
                 The tiles above count real literature: papers with DOIs, records that resolve to a
-                span, protocols bound to those records. These two count a modeled catalogue —
-                molecules assembled from a facet vocabulary and runbooks synthesised from them.
-                Both are useful and only one is evidence, so they wear the dashed amber tick and
-                sit in their own row rather than blurring into the corpus count.
+                span, protocols bound to those records. This one counts runbooks, synthesised
+                answers modeled throughout. A runbook is useful and is no evidence, so it wears the
+                dashed amber tick and sits in its own row.
               </Explain>
             }
           >
@@ -875,32 +585,11 @@ export default function Home() {
           </SectionTitle>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TileBoundary label="Molecules catalogued">
-              <VitalTile
-                to="/dominion/molecules"
-                label="Molecules catalogued"
-                prov="demo"
-                tickTitle="Modeled — a map of the option space, not a set of measurements"
-                sub={
-                  <>
-                    <span className="font-num text-signal-error">{blockedProducts}</span> behind
-                    live blocking claims ·{' '}
-                    <span className="font-num">
-                      {new Set(products.map((p) => p.processCode)).size}
-                    </span>{' '}
-                    process families
-                  </>
-                }
-              >
-                <div className="font-num text-display leading-tight">{products.length}</div>
-              </VitalTile>
-            </TileBoundary>
-
             <TileBoundary label="Runbooks">
               <VitalTile
                 to="/runbooks"
                 label="Runbooks"
-                prov="demo"
+                prov="assumed"
                 tickTitle="Synthesised answers — modeled throughout, and never a clearance opinion"
                 sub={
                   <>
@@ -930,7 +619,7 @@ export default function Home() {
 
         <section aria-labelledby="home-work" className="mb-7">
           <SectionTitle>
-            <span id="home-work">{hasWork ? 'Your work' : 'Three good first questions'}</span>
+            <span id="home-work">Your work</span>
           </SectionTitle>
 
           {hasWork ? (
@@ -964,20 +653,12 @@ export default function Home() {
                 <ResumeCard
                   to="/guild"
                   kicker="Review queue"
-                  title={
-                    records.length === 0 && recordsHidden
-                      ? 'No values in the active programs yet'
-                      : unverifiedCount === 0
-                        ? 'Nothing left unverified'
-                        : `${unverifiedCount} unverified records waiting`
-                  }
+                  title={unverifiedCount === 0 ? 'Nothing left unverified' : `${unverifiedCount} unverified records waiting`}
                   prov="unverified"
                   meta={
-                    records.length === 0 && recordsHidden
-                      ? 'Values in archived programs are hidden. New values arrive through Intake and wait here for a decision.'
-                      : unverifiedCount === 0
-                        ? 'Every extraction has been decided. Open the queue to re-check any of them.'
-                        : 'Start a queue and triage them one span at a time.'
+                    unverifiedCount === 0
+                      ? 'Every extraction has been decided. Open the queue to re-check any of them.'
+                      : 'Start a queue and triage them one span at a time.'
                   }
                 />
               )}
@@ -1014,7 +695,7 @@ export default function Home() {
                       ? runbooksWaiting[0].title
                       : `${runbooksWaiting.length} runbooks need a decision`
                   }
-                  prov="demo"
+                  prov="assumed"
                   meta={runbooksWaiting
                     .map((r) => RUNBOOK_STATUS_LABEL[r.status])
                     .join(' · ')}
@@ -1041,60 +722,41 @@ export default function Home() {
             </div>
           ) : (
             <>
-              <p className="text-body text-ink-soft mb-3 max-w-2xl">
-                Nothing is in progress yet. These three questions each land on evidence the
-                corpus can actually answer, and every number in the answer resolves to a source
-                span.
+              <p className="text-body text-ink-soft mb-3 max-w-2xl" data-testid="home-no-work">
+                Nothing is in progress yet. Ask{' '}
+                <a className="text-accent hover:underline" href={href('/postdoc')}>
+                  Postdoc
+                </a>{' '}
+                a question, or bring a paper in through{' '}
+                <a className="text-accent hover:underline" href={href('/intake/ingest')}>
+                  Intake
+                </a>
+                ; what you start lands here.
               </p>
-              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {firstQuestions.map((q) => (
-                  <li key={q}>
-                    <a
-                      href={href(`/postdoc?q=${encodeURIComponent(q)}`)}
-                      className="card p-3 h-full flex flex-col gap-2 transition-colors hover:border-accent/45 hover:bg-accent-wash/40"
-                    >
-                      <MessagesSquare size={15} className="text-accent shrink-0" aria-hidden />
-                      <span className="font-serif text-reading leading-snug">{q}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-              {firstQuestions.length === 0 && (
-                <p className="text-body text-ink-soft" data-testid="home-questions-hidden">
-                  The suggested questions are about archived programs, which are hidden.{' '}
-                  <SwitchLink /> shows them again, or ask your own in{' '}
-                  <a className="text-accent hover:underline" href={href('/postdoc')}>
-                    Postdoc
-                  </a>
-                  .
-                </p>
-              )}
             </>
           )}
         </section>
 
-        {/* ── Band 3 · The eleven ────────────────────────────────────── */}
+        {/* ── Band 3 · The destinations ──────────────────────────────── */}
         {/* OF-BLD-008 §7 — the whole navigation, laid out once with an honest
             current state per entry. "Empty" is a legitimate state and is shown
-            as one: geneOS says it has nothing, and a reader who wants sequence
-            work learns that here rather than by clicking through to find out. */}
-        <section aria-labelledby="home-eleven">
+            as one: a reader who wants sequence work learns here that geneOS
+            has none, before clicking through. */}
+        <section aria-labelledby="home-destinations">
           <SectionTitle
             right={
               <span className="font-num text-caption text-ink-soft">
-                {ELEVEN.filter((d) => STATE[d.label]?.built).length}/{ELEVEN.length} with something behind them
+                {DESTINATIONS.filter((d) => STATE[d.label]?.built).length}/{DESTINATIONS.length} with something behind them
               </span>
             }
           >
-            <span id="home-eleven">The eleven</span>
+            <span id="home-destinations">The destinations</span>
           </SectionTitle>
           <p className="text-body text-ink-soft mb-3 max-w-3xl">
-            Everything this platform does lives inside one of these. The list is closed — when
-            something new is built the question is which of the eleven owns it, never whether to
-            add a twelfth.
+            Everything this platform does lives inside one of these {DESTINATIONS.length}.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {ELEVEN.map((d) => {
+            {DESTINATIONS.map((d) => {
               const state = STATE[d.label];
               return (
                 <a
@@ -1176,8 +838,8 @@ export default function Home() {
               What is this platform?
             </button>
             {/* The full map, one click from Home. The grid above names the
-                eleven; this is where every component each one owns is laid out,
-                including the seven with nothing under them yet. */}
+                destinations; this is where every component each one owns is
+                laid out, including the ones with nothing under them yet. */}
             <a
               href={href('/settings/architecture')}
               className="inline-flex items-center gap-1.5 text-body text-ink-soft hover:text-accent"
@@ -1211,22 +873,14 @@ export default function Home() {
         <Card className="overflow-hidden">
           {activity.length === 0 ? (
             <EmptyState
-              title={allActivity.length > 0 ? 'Nothing to show here' : 'Nothing has happened in this browser yet'}
+              title="Nothing has happened in this browser yet"
               body={
-                allActivity.length > 0 ? (
-                  <>
-                    Activity about archived programs is hidden. <SwitchLink /> shows it again. What a
-                    person does here is listed as it happens: a paper fetched, a record reviewed, a run
-                    deposited, a runbook adopted.
-                  </>
-                ) : (
-                  <>
-                    What a person does here is listed as it happens: a paper fetched, a record
-                    reviewed, a run deposited, a runbook adopted. To start, review the next record
-                    in <a href={href('/guild')} className="text-accent hover:underline">Guild</a> or
-                    fetch a paper in <a href={href('/intake/ingest')} className="text-accent hover:underline">Intake</a>.
-                  </>
-                )
+                <>
+                  What a person does here is listed as it happens: a paper fetched, a record
+                  reviewed, a run deposited, a runbook adopted. To start, review the next record
+                  in <a href={href('/guild')} className="text-accent hover:underline">Guild</a> or
+                  fetch a paper in <a href={href('/intake/ingest')} className="text-accent hover:underline">Intake</a>.
+                </>
               }
               icon={<Clock size={20} aria-hidden />}
             />

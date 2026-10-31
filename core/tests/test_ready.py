@@ -11,11 +11,11 @@ from pathlib import Path
 
 import anthropic
 import httpx
-import json
 
 import pytest
 
-from openferment_core import api, biorepo, extract, intake, llm, ready
+from openferment_core import api, db, llm, projects, ready
+from openferment_core.db import migrate
 
 # Shaped like a key, so check_key accepts it; random, so no piece of it turns
 # up in the report by coincidence. Built from parts so check:secrets, which
@@ -56,11 +56,12 @@ class FakeClient:
 
 
 @pytest.fixture(autouse=True)
-def _scratch(monkeypatch, tmp_path):
+def _scratch(monkeypatch, tmp_path, test_database):
     monkeypatch.delenv("OPENFERMENT_FIXTURES", raising=False)
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
+    # The data row reads the database at the address set: the session's own,
+    # migrated to head.
+    test_database.open()
+    monkeypatch.setenv(db.URL_SETTING, test_database.url.render_as_string(hide_password=False))
 
 
 # ── the key ────────────────────────────────────────────────────────────
@@ -144,12 +145,24 @@ def test_model_waits_for_a_key_and_for_the_network():
     assert ready.check_model(False).mark == "skip"
 
 
+def test_a_routing_table_that_cannot_route_fails_before_any_call(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"effort": "huge"}}')
+    check = ready.check_model(False)
+    assert check.mark == "fail" and "OPENFERMENT_ROUTES.plan.effort" in check.detail
+
+
+def test_a_route_to_a_provider_that_waits_is_named(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"index": {"models": ["openai-compatible:qwen3-32b"]}}')
+    check = ready.check_model(True, client_factory=FakeClient)
+    assert check.mark == "warn" and "openai-compatible:qwen3-32b" in check.detail, check.detail
+    assert "waits for the owner" in check.detail
+
+
 def test_network_checks_skip_in_fixture_mode(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     assert ready.check_model(True, client_factory=FakeClient).mark == "skip"
     assert ready.check_europe_pmc().mark == "skip"
     assert ready.check_huggingface().mark == "skip"
-    assert ready.check_backup().mark == "skip"
 
 
 # ── Hugging Face, the optional row (OF-BLD-014 §1.3) ───────────────────
@@ -182,11 +195,10 @@ def test_huggingface_warns_when_blocked_and_never_fails(monkeypatch, outcome, ma
 def test_a_blocked_huggingface_leaves_the_exit_code_alone(monkeypatch, capsys):
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
-    for name in ("check_model", "check_roles", "check_europe_pmc", "check_backup"):
+    for name in ("check_model", "check_roles", "check_europe_pmc"):
         row = name.removeprefix("check_").replace("_", "")
         monkeypatch.setattr(ready, name, lambda *a, row=row, **k: ready.Check(row, "ok", "stand-in"))
     monkeypatch.setattr(ready, "check_service", lambda *a, **k: ready.Check("service", "ok", "stand-in"))
-    monkeypatch.setattr(ready, "check_corpus", lambda: ready.Check("corpus", "ok", "stand-in"))
     _hf_answers(monkeypatch, httpx.ConnectError("blocked"))
     assert ready.main([]) == 0
     out = capsys.readouterr().out
@@ -212,11 +224,10 @@ def test_a_missing_graphviz_leaves_the_exit_code_and_the_lane_alone(monkeypatch,
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
-    for name in ("check_model", "check_roles", "check_europe_pmc", "check_backup", "check_huggingface"):
+    for name in ("check_model", "check_roles", "check_europe_pmc", "check_huggingface"):
         row = name.removeprefix("check_").replace("_", "")
         monkeypatch.setattr(ready, name, lambda *a, row=row, **k: ready.Check(row, "ok", "stand-in"))
     monkeypatch.setattr(ready, "check_service", lambda *a, **k: ready.Check("service", "ok", "stand-in"))
-    monkeypatch.setattr(ready, "check_corpus", lambda: ready.Check("corpus", "ok", "stand-in"))
     monkeypatch.setattr(shutil, "which", lambda name: None)
     assert ready.main([]) == 0
     out = capsys.readouterr().out
@@ -262,41 +273,87 @@ def test_the_lane_is_the_last_line_of_every_report(monkeypatch):
 # ── what is on disk ────────────────────────────────────────────────────
 
 
-def test_intake_counts_what_was_fetched_and_extracted(monkeypatch):
-    assert ready.check_intake().mark == "warn", "nothing fetched is worth knowing"
-    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    intake.fetch_paper({"id": "B5", "pmcid": "structural"})
+def test_intake_counts_the_documents_held_and_extracted():
+    assert ready.check_intake().mark == "warn", "nothing held is worth knowing"
+
+    async def link() -> None:
+        from sqlalchemy import insert
+
+        from openferment_core.db import models as t
+
+        async with db.session() as s:
+            await s.execute(insert(t.documents_link).values(
+                project_id="test-project", document_id="0" * 32, selection={}, created_by="test"))
+
+    db.run(link())
     check = ready.check_intake()
-    assert check.mark == "ok" and check.detail.startswith("1 papers fetched with full text")
+    assert check.mark == "ok" and check.detail == "1 document held (1 link to projects), 0 extracted"
 
 
-def test_a_damaged_fetch_is_named_and_the_rest_still_run(monkeypatch):
-    intake.FULLTEXT_DIR.mkdir(parents=True)
-    (intake.FULLTEXT_DIR / "A1.json").write_text('{"paperId": "A1", "sta', encoding="utf-8")
-    check = ready.check_intake()
-    assert check.mark == "warn" and "1 damaged (A1.json)" in check.detail
+def test_a_row_that_cannot_be_checked_says_so_and_the_rest_still_run(monkeypatch):
+    def broken():
+        raise OSError("the cache directory is not readable")
+
+    monkeypatch.setattr(ready, "check_embedder", broken)
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    names = [c.name for c in ready.run(no_network=True, port=1)]
-    assert names[-1] == "service", "a damaged file must not stop the checks after it"
+    checks = ready.run(no_network=True, port=1)
+    [embedder] = [c for c in checks if c.name == "embedder"]
+    assert embedder.mark == "warn" and "could not be checked" in embedder.detail
+    assert checks[-1].name == "service", "a row that fails must not stop the checks after it"
 
 
-def test_a_damaged_corpus_is_a_failure_with_the_fix(monkeypatch):
-    def damaged():
-        raise ValueError("Expecting value: line 1 column 1")
-
-    monkeypatch.setattr(ready, "load_corpus", damaged)
-    check = ready.check_corpus()
-    assert check.mark == "fail" and "pnpm export:corpus" in check.detail
+def test_the_literature_row_reads_the_kits_schema():
+    check = ready.check_literature()
+    assert check.mark in ("ok", "warn"), check.detail
+    assert check.detail.startswith("pgvector ") and "revision 0006" in check.detail
 
 
-def test_data_reports_a_file_that_does_not_parse():
-    biorepo.PATH.write_text("{ not json", encoding="utf-8")
-    assert ready.check_data().mark == "fail"
+def test_the_embedder_row_says_when_the_model_file_is_not_cached(monkeypatch, tmp_path):
+    import openferment_core.literature as literature
+
+    monkeypatch.setattr(literature, "EMBEDDING_CACHE", tmp_path / "empty")
+    check = ready.check_embedder()
+    assert check.mark == "warn" and "huggingface.co" in check.detail
 
 
-def test_data_counts_decisions():
+def test_the_rag_row_says_whether_a_key_is_set(monkeypatch):
+    from openferment_core.literature import kit
+
+    monkeypatch.delenv(kit.RAG_KEY, raising=False)
+    assert ready.check_rag().mark == "warn"
+    monkeypatch.setenv(kit.RAG_KEY, "a-key")
+    assert ready.check_rag().mark == "ok"
+
+
+def test_data_names_the_setting_when_no_database_is_set(monkeypatch):
+    monkeypatch.delenv(db.URL_SETTING, raising=False)
     check = ready.check_data()
-    assert check.mark == "ok" and check.detail.startswith("0 review decisions")
+    assert check.mark == "fail" and db.URL_SETTING in check.detail
+
+
+def test_data_reports_a_database_that_does_not_answer(monkeypatch):
+    monkeypatch.setenv(db.URL_SETTING, "postgresql://nobody:nothing@127.0.0.1:9/none")
+    check = ready.check_data()
+    assert check.mark == "fail" and "did not answer" in check.detail and "nothing@" not in check.detail
+
+
+def test_data_reports_a_database_behind_the_newest_schema(monkeypatch, test_database):
+    test_database.open()
+    name = f"{test_database.name}_bare"
+    bare = migrate.create(name, test_database.server)
+    try:
+        monkeypatch.setenv(db.URL_SETTING, bare.render_as_string(hide_password=False))
+        check = ready.check_data()
+        assert check.mark == "fail" and "pnpm db:migrate" in check.detail
+    finally:
+        migrate.drop(name, test_database.server)
+
+
+def test_data_counts_projects_and_decisions(monkeypatch, test_database):
+    test_database.open()
+    monkeypatch.setenv(db.URL_SETTING, test_database.url.render_as_string(hide_password=False))
+    check = ready.check_data()
+    assert check.mark == "ok" and check.detail.startswith("1 project, 0 review decisions, at revision")
 
 
 def test_dist_dir_is_the_one_the_service_mounts():
@@ -320,6 +377,18 @@ def test_exit_code_follows_the_failures(monkeypatch, capsys):
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     assert ready.main(["--no-network"]) == 0
     assert ready.main(["--bogus"]) == 2
+
+
+def test_an_offline_run_asks_for_no_key_and_no_network(monkeypatch, capsys):
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    monkeypatch.setenv("OPENFERMENT_PORT", "1")
+    monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert ready.main(["--offline"]) == 0
+    out = capsys.readouterr().out
+    assert "· key" in out and "makes no model call" in out and "✗" not in out
+    marks = {c.name: c.mark for c in ready.run(offline=True, port=1)}
+    assert marks["key"] == "skip" and all(marks[n] == "skip" for n in ("model", "roles", "europepmc", "huggingface"))
 
 
 def test_service_address_comes_from_the_installed_job(tmp_path, monkeypatch):
@@ -391,21 +460,9 @@ def test_the_new_rows_are_listed_and_change_no_lane(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     checks = ready.run(no_network=True, port=1)
     names = [c.name for c in checks]
-    for n in ("index", "models", "artifacts", "spend", "workers", "graphviz"):
+    for n in ("models", "artifacts", "spend", "workers", "graphviz"):
         assert n in names
     assert ready.lane(checks) == "none"
-
-
-def test_index_warns_when_fewer_papers_are_indexed_than_fetched(monkeypatch):
-    from openferment_core import passages
-    from openferment_core.models import RagStatus
-
-    monkeypatch.setattr(passages, "status", lambda: RagStatus(papersIndexed=3, passages=40, lanes=[], chosenLane="bm25"))
-    monkeypatch.setattr(ready, "_fetched_complete", lambda: 5)
-    c = ready.check_index()
-    assert c.mark == "warn" and "3 papers indexed of 5 fetched" in c.detail and "lane bm25" in c.detail
-    monkeypatch.setattr(ready, "_fetched_complete", lambda: 3)
-    assert ready.check_index().mark == "ok"
 
 
 def test_a_model_file_that_is_missing_or_changed_is_named(monkeypatch):
@@ -413,31 +470,41 @@ def test_a_model_file_that_is_missing_or_changed_is_named(monkeypatch):
 
     monkeypatch.setattr(shelf, "available", lambda m: f"{m.id}'s file is not on this machine: run pnpm geneos:fetch" if m.fetched else None)
     c = ready.check_models()
-    assert c.mark == "warn" and "RehMBEL1391's file is not on this machine" in c.detail and "e_coli_core bundled" in c.detail
+    assert c.mark == "warn" and "iMM904's file is not on this machine" in c.detail and "Yeast9's file" in c.detail
 
 
-def test_artifacts_are_counted(monkeypatch, tmp_path):
-    from openferment_core import artifacts
+def test_artifacts_are_counted_across_every_project():
+    from openferment_core.db import models as t
+    from openferment_core.db import rows
 
-    monkeypatch.setattr(artifacts, "folder", lambda: tmp_path)
-    (tmp_path / "a.json").write_text("{}")
-    (tmp_path / "b.json").write_text("{}")
+    async def keep() -> None:
+        async with db.session() as s:
+            for aid in ("a" * 16, "b" * 16):
+                await rows.put(s, t.artifacts, projects.current(), aid, {}, by="test", tool="t", version="1", output_hash="h")
+
+    db.run(keep())
     assert ready.check_artifacts().detail == "2 kept"
 
 
-def test_spend_reads_today_against_the_cap_and_a_damaged_file_fails(monkeypatch, tmp_path):
+def test_spend_reads_today_against_the_cap_and_unknown_spend_fails(monkeypatch):
     from openferment_core import spend
+    from openferment_core.db.engine import make_engine
 
-    f = tmp_path / "spend.json"
-    monkeypatch.setattr(spend, "path", lambda: f)
     monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "2")
-    f.write_text(json.dumps({"day": spend.today(), "byRole": {"answer": 1.5, "index": 0.25}, "calls": 3, "reservations": {}}))
+    spend.charge("answer", 1.5)
+    spend.charge("index", 0.25)
     c = ready.check_spend()
     assert c.mark == "ok" and "$1.75 of the $2.00 daily cap" in c.detail
-    f.write_text(json.dumps({"day": spend.today(), "byRole": {"answer": 2.0}, "calls": 3, "reservations": {}}))
+    spend.charge("answer", 0.25)
     assert ready.check_spend().mark == "warn"
-    f.write_text("{not json")
-    assert ready.check_spend().mark == "fail"
+    down = make_engine("postgresql://nobody:nothing@127.0.0.1:9/none")
+    previous_binding, previous_engine = db.bind(None), db.use_engine(down)
+    try:
+        assert ready.check_spend().mark == "fail"
+    finally:
+        db.use_engine(previous_engine)
+        db.bind(previous_binding)
+        db.run(down.dispose())
 
 
 def test_a_worker_that_does_not_answer_is_said(monkeypatch):
@@ -461,15 +528,13 @@ def test_a_worker_that_does_not_answer_is_said(monkeypatch):
 
 
 def test_r2_a_row_that_crashes_reads_as_a_warning_and_the_rest_still_run(monkeypatch):
-    from openferment_core import passages
-
     def broken():
         raise AttributeError("'list' object has no attribute 'get'")
 
-    monkeypatch.setattr(passages, "status", broken)
+    monkeypatch.setattr(ready, "check_models", broken)
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     checks = ready.run(no_network=True, port=1)
-    row = next(c for c in checks if c.name == "index")
+    row = next(c for c in checks if c.name == "models")
     assert row.mark == "warn" and "could not be checked" in row.detail and checks[-1].name == "service"
 
 

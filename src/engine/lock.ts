@@ -14,7 +14,7 @@
 // detect a determined rewrite of both the content and the hash.
 //
 // Real attestation — a timestamp somebody else can vouch for — belongs to
-// Common Seal, which is not built (COMPONENTS.md). Naming that gap is more
+// Common Seal, which is not built (Settings → Architecture). Naming that gap is more
 // useful than dressing FNV-1a up as tamper-proofing.
 import type { Measure, Prediction } from '@/data/types';
 
@@ -27,7 +27,7 @@ import type { Measure, Prediction } from '@/data/types';
 function canonical(predictions: Prediction[], schema: Measure[]): string {
   // §9.1: the four fields an interval or a bound carries are appended only
   // when a prediction has one, so every point serialises exactly as before
-  // and no lock taken earlier changes (scripts/fixtures/seed-lock-digests.json).
+  // and no lock taken earlier changes (core/tests/fixtures/lock-digests.json, written by export-lock-fixtures).
   const p = predictions.map((x) => {
     const base: unknown[] = [x.id, x.label, x.value, x.unit, x.confidence, x.basis];
     if (x.kind === undefined && x.interval === undefined && x.artifactId === undefined && x.recordIds === undefined) return base;
@@ -74,14 +74,4 @@ export function lockIntact(runbook: {
 }): boolean {
   if (!runbook.lockedAt || !runbook.lockHash) return true;
   return runbookLockHash(runbook.predictions, runbook.measurementSchema) === runbook.lockHash;
-}
-
-/**
- * Predictions freeze once a runbook has done anything. Draft and
- * awaiting-budget runbooks have not started, so theirs are still editable;
- * everything else has consumed compute against them and must be frozen.
- */
-export function shouldBeLocked(status: string, progressPct: number): boolean {
-  if (status === 'draft' || status === 'awaiting_budget') return false;
-  return progressPct > 0 || status !== 'draft';
 }

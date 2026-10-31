@@ -130,8 +130,8 @@ body {
     transparent 3px 6px
   );
 }
-/* Demo/synthetic — now only simulation grids and scripted agent text (§20) */
-.tick-demo::before {
+/* Assumed: a result resting on a person's assumption or a model's estimate (ADR-006) */
+.tick-assumed::before {
   background: repeating-linear-gradient(
     to bottom,
     rgb(var(--signal-warn)) 0 3px,
@@ -161,6 +161,20 @@ td.tick-cell::before {
   outline: 2px solid rgb(var(--accent));
   outline-offset: 1px;
   border-radius: 3px;
+}
+
+/* ── Disclosures ─────────────────────────────────────────────────────── */
+/* A summary laid out as flex loses the browser's marker, so it is given one
+   back, turned down while its details are open. A `list-none` summary draws
+   its own. */
+details > summary.inline-flex:not(.list-none)::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.35em;
+  transition: transform 120ms ease-out;
+}
+details[open] > summary.inline-flex:not(.list-none)::before {
+  transform: rotate(90deg);
 }
 
 /* ── Typography helpers ──────────────────────────────────────────────── */

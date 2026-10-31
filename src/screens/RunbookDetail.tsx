@@ -1,27 +1,18 @@
 // Runbook detail (OF-BLD-005 §6, §7) — one synthesised answer, and whatever it
 // is currently waiting on.
 //
-// The page leads with the state, because for seven of the ten seeded runbooks
-// the state IS the content: a halted input, an unauthorised spend, a boundary
-// a person should rule on. Only then the stages, the train, the cost and the
-// clearance summary.
+// The page leads with the state, because for a runbook that is waiting the
+// state IS the content: a halted input, an unauthorised spend, a boundary a
+// person should rule on. Only then the stages, the train and the cost.
 //
 // The blocked-input panel deliberately borrows the tone of `explainRefusal()`
 // in engine/units.ts. That function refuses to convert %TSP into g/L and then
 // says exactly why and what would make the conversion possible, rather than
 // throwing. A stage that halts on a number with no source is the same shape of
 // event: not an error, a guardrail, with two honest ways forward.
-//
-// PROGRAMS (OF-BLD-016 §2.2). A runbook in an archived program has left the
-// board, but its link still opens it here, under the banner that names the
-// program and the switch. The protocol chooser, the depositions listed and
-// counted, the ledger figure and the host chip read through the program
-// filter, widened on an archived runbook to its own program (`useRunbookScope`),
-// so a link into the archive still shows that runbook's own runs.
 import { useMemo, useState } from 'react';
 import {
   ArrowRight,
-  Boxes,
   CircleDollarSign,
   Clock,
   FileCheck2,
@@ -31,29 +22,17 @@ import {
   Target,
   GitBranch,
   Link2,
-  Sparkles,
   Wallet,
 } from 'lucide-react';
 import type { Runbook } from '@/data/types';
-import { useProgramScope, useStore, type ProgramEntityKind } from '@/store';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
+import { useStore } from '@/store';
 import { href, navigate } from '@/router';
-import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE } from '@/data/runbooks';
-import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
-import { STRAINS_BY_ID } from '@/data/strains';
-import { CLEARANCE_STATES_BY_ID } from '@/data/vocabulary';
+import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE } from '@/data/labels';
 import { enumerationFunnel, funnelSummary, funnelWidest } from '@/engine/geneos/enumeration';
 import { lockIntact } from '@/engine/lock';
 import { ledgerRows } from '@/engine/ledger';
 import { IntervalLedger } from '@/components/figures';
 import { Dossier } from '@/components/Dossier';
-import { matrixCoverage, territorialityNote } from '@/engine/clearance';
-import {
-  ClearanceChip,
-  ClearanceStrip,
-  CounselCallout,
-  JurisdictionMatrix,
-} from '@/components/Clearance';
 import { ProcessTrain } from '@/components/ProcessTrain';
 import { RunbookStatusIcon, StageIcon, stageMeta } from '@/components/RunbookBits';
 import { ComponentTag } from '@/components/ComponentTag';
@@ -83,26 +62,13 @@ function looksLikeVocabularyId(value: string): boolean {
   return /^[a-z]+(-[a-z]+)+$/.test(value);
 }
 
-/**
- * The program filter as this page applies it (`useProgramScope`): whatever
- * `useProgramFilter` shows, and, when the runbook itself is in an archived
- * program (a link into the archive), the rest of that program too. Anything
- * of another archived program stays hidden. With the switch on, everything
- * shows.
- */
-function useRunbookScope(runbookId: string): (kind: ProgramEntityKind, id: string) => boolean {
-  return useProgramScope({ kind: 'runbook', id: runbookId });
-}
-
 // ── the state panel — what this runbook is waiting on ──────────────────
 
 function StatePanel({ runbook }: { runbook: Runbook }) {
-  const products = useStore((s) => s.products);
   const resolveInput = useStore((s) => s.resolveRunbookInput);
   const authorise = useStore((s) => s.authoriseRunbookBudget);
   const resolveReview = useStore((s) => s.resolveRunbookReview);
   const promote = useStore((s) => s.promoteRunbook);
-  const product = runbook.productId ? products.find((p) => p.id === runbook.productId) : undefined;
 
   const blockedStage = runbook.stages.find((s) => s.status === 'blocked');
   const reviewStage = runbook.stages.find((s) => s.status === 'review');
@@ -140,7 +106,6 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
   }
 
   if (runbook.status === 'awaiting_budget') {
-    const blockedByClaims = product?.clearanceState === 'blocked';
     return (
       <Card className="p-4 border-signal-warn/40">
         <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
@@ -155,27 +120,8 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
           Enumeration is the one input somebody authorises before it is spent, so the board has a
           state for it rather than a footnote. Nothing runs until you say yes.
         </p>
-        {blockedByClaims && (
-          <p className="text-body text-signal-warn mt-2 max-w-3xl">
-            Worth reading the clearance first: {product?.name} has live blocking claims, so the
-            industrial route below cannot proceed as written. Authorising this spend buys a process
-            definition for a molecule you may not be free to make. The research handoff asks the
-            cheaper question — whether there is anything outside the fence that does the same job.
-          </p>
-        )}
         <div className="flex flex-wrap gap-2 mt-3">
-          {blockedByClaims && product && (
-            <Button
-              variant="primary"
-              onClick={() => navigate(`/runbooks?handoff=${product.id}`)}
-            >
-              <Sparkles size={14} /> Enumerate around the fence instead
-            </Button>
-          )}
-          <Button
-            variant={blockedByClaims ? 'default' : 'primary'}
-            onClick={() => authorise(runbook.id)}
-          >
+          <Button variant="primary" onClick={() => authorise(runbook.id)}>
             <Wallet size={14} /> Authorise
             {runbook.estCostUsd === null ? '' : ` $${runbook.estCostUsd}`}
           </Button>
@@ -213,11 +159,6 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
           >
             Exclude the near-boundary candidates
           </Button>
-          {product && (
-            <LinkButton to={`/dominion/molecules/${product.id}`}>
-              Read the clearance <ArrowRight size={14} />
-            </LinkButton>
-          )}
         </div>
       </Card>
     );
@@ -382,7 +323,23 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
                       : `tested at ${tests.map((m) => m.timepoint).join(', ')}`}
                   </span>
                 </div>
-                <div className="text-caption text-ink-soft mt-0.5">{p.basis}</div>
+                <div className="text-caption text-ink-soft mt-0.5">
+                  {p.basis}
+                  {p.artifactId && (
+                    <>
+                      {' '}
+                      ·{' '}
+                      {/* A study's runbook predicts an engine run's outputs, and the run's id is its artifact's. */}
+                      <a
+                        className="font-num underline underline-offset-2 hover:text-accent"
+                        href={href(runbook.id.startsWith('rb-study-') ? `/proforma/runs/${p.artifactId}` : `/biorepo/artifacts/${p.artifactId}`)}
+                        data-testid="prediction-artifact"
+                      >
+                        {runbook.id.startsWith('rb-study-') ? 'the run' : 'its artifact'} {p.artifactId}
+                      </a>
+                    </>
+                  )}
+                </div>
               </li>
             );
           })}
@@ -528,15 +485,13 @@ function EnumerationFunnel({ runbook }: { runbook: Runbook }) {
  * a run has nothing to be reconciled against. The protocol supplies the steps.
  */
 function StartDeposition({ runbook }: { runbook: Runbook }) {
-  const allProtocols = useStore((s) => s.protocols);
+  const protocols = useStore((s) => s.protocols);
   const depositions = useStore((s) => s.depositions);
   const openDeposition = useStore((s) => s.openDeposition);
-  const inScope = useRunbookScope(runbook.id);
   const [pick, setPick] = useState(false);
   const [scale, setScale] = useState(1);
 
-  const protocols = allProtocols.filter((p) => inScope('protocol', p.id));
-  const mine = depositions.filter((d) => d.runbookId === runbook.id && inScope('deposition', d.id));
+  const mine = depositions.filter((d) => d.runbookId === runbook.id);
   const blocked = runbook.lockedAt === null;
 
   return (
@@ -599,10 +554,9 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
           onChange={(e) => setScale(Math.max(0.1, Number(e.target.value) || 1))}
           aria-label="Scale multiplier"
         />
-        {protocols.length === 0 && allProtocols.length > 0 && (
-          <p className="text-body text-ink-soft mb-2" data-testid="hidden-by-archive">
-            Every protocol on file is in an archived program, so none is offered here. Settings → Programs shows
-            archived programs again.
+        {protocols.length === 0 && (
+          <p className="text-body text-ink-soft mb-2" data-testid="no-protocols">
+            No protocol is on file yet, so none is offered here.
           </p>
         )}
         <ul className="space-y-1.5 max-h-[320px] overflow-y-auto">
@@ -634,10 +588,7 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
 /** §9.3 — this runbook's predictions drawn against what its runs measured. */
 function RunbookLedgerFigure({ runbook }: { runbook: Runbook }) {
   const depositions = useStore((s) => s.depositions);
-  const inScope = useRunbookScope(runbook.id);
-  const tested = new Map(
-    ledgerRows([runbook], depositions, inScope).map((r) => [r.prediction.id, r]),
-  );
+  const tested = new Map(ledgerRows([runbook], depositions).map((r) => [r.prediction.id, r]));
   return (
     <div className="mb-4">
       <IntervalLedger
@@ -659,13 +610,13 @@ function RunbookLedgerFigure({ runbook }: { runbook: Runbook }) {
 export default function RunbookDetail({ runbookId }: { runbookId: string }) {
   const runbooks = useStore((s) => s.runbooks);
   const products = useStore((s) => s.products);
-  const inScope = useRunbookScope(runbookId);
+  const strains = useStore((s) => s.strains);
 
   const runbook = runbooks.find((r) => r.id === runbookId);
   const product = runbook?.productId
     ? products.find((p) => p.id === runbook.productId)
     : undefined;
-  const strain = runbook?.strainId && inScope('strain', runbook.strainId) ? STRAINS_BY_ID[runbook.strainId] : undefined;
+  const strain = runbook?.strainId ? strains.find((s) => s.id === runbook.strainId) : undefined;
 
   if (!runbook) {
     return (
@@ -673,7 +624,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         <PageHeader
           eyebrow="Runbooks"
           title="Runbook not found"
-          subtitle="Session state resets on refresh, so a deep link from an earlier session can point at nothing."
+          subtitle="This project holds no runbook with this id."
         />
         <Card>
           <EmptyState
@@ -688,7 +639,6 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
   }
 
   const done = runbook.stages.filter((s) => s.status === 'done').length;
-  const territoriality = product ? territorialityNote(product) : null;
 
   return (
     <>
@@ -697,20 +647,11 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         title={runbook.title}
         subtitle={RUNBOOK_STATUS_NOTE[runbook.status]}
         actions={
-          <>
-            {product && (
-              <LinkButton to={`/dominion/molecules/${product.id}`}>
-                <Boxes size={14} /> {product.name}
-              </LinkButton>
-            )}
-            <LinkButton to="/runbooks">
-              <ArrowRight size={14} className="rotate-180" /> All runbooks
-            </LinkButton>
-          </>
+          <LinkButton to="/runbooks">
+            <ArrowRight size={14} className="rotate-180" /> All runbooks
+          </LinkButton>
         }
       />
-
-      <ArchivedBanner kind="runbook" id={runbook.id} />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="chip inline-flex items-center gap-1.5">
@@ -725,7 +666,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         >
           {runbook.kind}
         </span>
-        {product && <ClearanceChip state={product.clearanceState} compact />}
+        {product && <span className="chip text-ink-soft">{product.name}</span>}
         {strain && (
           <a href={href(`/geneos/hosts/${strain.id}`)} className="chip text-ink-soft hover:border-accent/45">
             <FlaskConical size={12} aria-hidden />
@@ -764,7 +705,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
             </div>
             <div className="font-num text-section-title">{runbook.eta ?? '—'}</div>
           </div>
-          <Tick p="demo">
+          <Tick p="assumed">
             <div className="text-caption uppercase tracking-wide text-ink-soft inline-flex items-center gap-1.5">
               <CircleDollarSign size={12} aria-hidden /> Compute
             </div>
@@ -783,7 +724,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
       </div>
 
       <Card className="p-4 mb-6">
-        <Tick p="demo" title="Curator framing — modeled, not measured">
+        <Tick p="assumed" title="The runbook's note — modeled, not measured">
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
             Why this runbook is here
           </div>
@@ -843,21 +784,15 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
                       )}
                       {s.value && (
                         <div className="mt-1">
-                          {CLEARANCE_STATES_BY_ID[s.value] ? (
-                            <ClearanceChip
-                              state={CLEARANCE_STATES_BY_ID[s.value].id}
-                              compact
-                              title={`Stage verdict — ${CLEARANCE_STATES_BY_ID[s.value].label}`}
-                            />
-                          ) : looksLikeVocabularyId(s.value) ? (
+                          {looksLikeVocabularyId(s.value) ? (
                             // A hyphenated lowercase token that resolves to
                             // nothing is a term this build does not carry, not
                             // a finding. Showing it as one would dress an
                             // unresolved reference up as an answer, so it is
-                            // labelled instead — and check-seed warns about it.
+                            // labelled instead.
                             <span
                               className="chip text-ink-soft font-num text-[11px] py-0"
-                              title="This stage recorded a term that is not in the clearance vocabulary. Shown as written rather than mapped onto a state it may not mean."
+                              title="This stage recorded a term that is in no vocabulary this build carries. It is shown as written."
                             >
                               {s.value} · not in the vocabulary
                             </span>
@@ -924,86 +859,19 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           <ProcessTrain
             unitOperationIds={product?.unitOperationIds ?? []}
             strainId={runbook.strainId ?? product?.defaultStrainId ?? null}
-            storageIds={product?.storageIds ?? []}
-            scaleId={product?.scaleId ?? null}
             processCode={product?.processCode}
             emptyBody={
               product
-                ? 'This molecule declares no unit operations, so there is no train to draw yet.'
-                : 'This runbook is not attached to a molecule — it asks a cross-cutting question, and a cross-cutting question does not have one train. Attaching a product would give it one.'
+                ? 'This product declares no unit operations, so there is no train to draw yet.'
+                : 'This runbook names no product, so it has no process train to draw.'
             }
           />
         </Card>
       </section>
 
-      {/* ── clearance summary ──────────────────────────────────────────── */}
-      <section className="mb-4" aria-labelledby="band-clearance">
-        <SectionTitle>
-          <span id="band-clearance">Clearance summary</span>
-        </SectionTitle>
-
-        {product ? (
-          <>
-            <div
-              className={cx(
-                'grid grid-cols-1 gap-4',
-                matrixCoverage(product).assessed === 0 &&
-                  'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]',
-              )}
-            >
-              <Card className="p-4">
-                <ClearanceStrip state={product.clearanceState} />
-                {territoriality ? (
-                  <div className="mt-3 pt-3 border-t border-line text-body text-ink-soft">
-                    {territoriality}
-                  </div>
-                ) : (
-                  // No note is NOT agreement between offices. Saying "they all
-                  // read the same" from an unassessed matrix would be the same
-                  // fabrication the matrix itself was rebuilt to avoid.
-                  <div className="mt-3 pt-3 border-t border-line text-body text-ink-soft">
-                    No divergence has been established between offices, because the offices have
-                    not been compared. That is an absence of work, not an agreement.
-                  </div>
-                )}
-                <div className="mt-3">
-                  <a
-                    href={href(`/dominion/molecules/${product.id}`)}
-                    className="text-caption text-accent hover:underline"
-                  >
-                    Full clearance on {product.name} ({PRODUCT_CATEGORY_LABEL[product.category]})
-                  </a>
-                </div>
-              </Card>
-              <Card className="p-4">
-                <JurisdictionMatrix product={product} />
-              </Card>
-            </div>
-            <div className="mt-3">
-              <CounselCallout scope={product.name} />
-            </div>
-          </>
-        ) : (
-          <>
-            <Card>
-              <EmptyState
-                title="No molecule attached"
-                body="Clearance attaches to a molecule, and this runbook asks a question that spans several. There is nothing here to clear until it is pointed at one."
-                action={<LinkButton to="/dominion/molecules">Open the catalogue</LinkButton>}
-              />
-            </Card>
-            <div className="mt-3">
-              <CounselCallout />
-            </div>
-          </>
-        )}
-      </section>
-
       <Callout kind="info" title="What this runbook is claiming">
-        Everything here is synthesised from a catalogue of modeled molecules and a facet
-        vocabulary — nothing in it was measured, and no stage output has been checked against a
-        source document. A runbook is a defensible starting point and a record of what was
-        assumed; it is not a validated process and it is not a clearance opinion.
+        Everything here is synthesised, and no stage output has been checked against a source
+        document. A runbook is a defensible starting point and a record of what was assumed.
       </Callout>
     </>
   );

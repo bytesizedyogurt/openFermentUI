@@ -7,8 +7,8 @@
 // marker rather than a tick, and says what it is for rather than promising a
 // date.
 //
-// Shared across geneOS, pureOS and Dominion so the three read as one decision
-// rather than three separate apologies.
+// Shared across the modules so every unbuilt part reads as one decision
+// rather than separate apologies.
 import { CircleDashed } from 'lucide-react';
 import { Card, SectionTitle } from './ui';
 

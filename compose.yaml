@@ -1,0 +1,25 @@
+# The developer's PostgreSQL (ADR-001): `pnpm db:up`, then `pnpm db:migrate`.
+#
+# pgvector's image of PostgreSQL 17, the same CI runs. The port answers on
+# loopback alone, like the service. The role and password are for this local
+# database only; core/.env names it:
+#   OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: openferment
+      POSTGRES_PASSWORD: openferment
+      POSTGRES_DB: openferment_dev
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - openferment-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openferment -d openferment_dev"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  openferment-db:

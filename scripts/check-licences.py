@@ -46,7 +46,7 @@ SRC = REPO / "src"
 SELF = "openferment-core"
 # Which part of openFerment an extra serves. An extra missing here is named
 # as itself.
-EXTRA_PART = {"dev": "tests", "sim": "the geneOS worker"}
+EXTRA_PART = {"dev": "tests", "sim": "the simulation workers"}
 
 
 def canonical(name: str) -> str:
@@ -82,10 +82,30 @@ DATA_FIELDS = ("licence", "source", "revision", "sha256", "by", "date", "why")
 
 
 @dataclass(frozen=True)
+class VendoredCode:
+    """Source copied into the repository at a pinned commit (ADR-003): where
+    it comes from, the commit, the directory it lives in with its LICENSE,
+    what was left out, and why it is vendored. Its licence must be one the
+    ledger allows."""
+
+    id: str
+    licence: str
+    source: str
+    revision: str
+    path: str
+    left_out: str
+    why: str
+
+
+VENDORED_FIELDS = ("licence", "source", "revision", "path", "left_out", "why")
+
+
+@dataclass(frozen=True)
 class Policy:
     allowed: frozenset[str]
     accepted: dict[str, Acceptance]  # canonical package name → its acceptance
     data: tuple[DataFile, ...] = ()
+    vendored: tuple[VendoredCode, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -130,7 +150,31 @@ def load_policy(path: Path = POLICY) -> Policy:
             raise ValueError(f"{path.name}: [data.{name}] lacks {', '.join(missing)}; "
                              "a model file names its licence, source, revision, hash, who accepted it, the date and why")
         data.append(DataFile(name, *(str(entry[k]) for k in DATA_FIELDS)))
-    return Policy(frozenset(allowed), accepted, tuple(sorted(data, key=lambda d: d.id)))
+    vendored = []
+    for name, entry in (raw.get("vendored") or {}).items():
+        missing = [k for k in VENDORED_FIELDS if not str(entry.get(k, "")).strip()]
+        if missing:
+            raise ValueError(f"{path.name}: [vendored.{name}] lacks {', '.join(missing)}; "
+                             "vendored code names its licence, source, revision, directory, what was left out and why")
+        vendored.append(VendoredCode(name, *(str(entry[k]) for k in VENDORED_FIELDS)))
+    return Policy(frozenset(allowed), accepted, tuple(sorted(data, key=lambda d: d.id)),
+                  tuple(sorted(vendored, key=lambda v: v.id)))
+
+
+def vendored_faults(policy: Policy, repo: Path = REPO) -> list[str]:
+    """What is wrong with each vendored entry: a licence the ledger does not
+    allow, or a directory or LICENSE that is not where the entry says."""
+    faults = []
+    for v in policy.vendored:
+        if v.licence not in policy.allowed:
+            faults.append(f"[vendored.{v.id}] is under {v.licence}, which `allowed` does not list; vendored code "
+                          "carries a permissive licence")
+        where = repo / v.path
+        if not where.is_dir():
+            faults.append(f"[vendored.{v.id}] names {v.path}, which is not a directory")
+        elif not (where / "LICENSE").is_file():
+            faults.append(f"[vendored.{v.id}]: {v.path} holds no LICENSE file")
+    return faults
 
 
 # What an acceptance names for a package whose metadata states no licence.
@@ -389,6 +433,18 @@ def render(python: list[Package], javascript: list[Package], policy: Policy) -> 
         ]
         lines += [f"| {d.id} | {d.licence} | {_cell(d.source)} | {d.revision} | {d.sha256} | {d.by} | {d.date} | {_cell(d.why)} |"
                   for d in policy.data]
+    if policy.vendored:
+        lines += [
+            "",
+            "## Vendored source",
+            "",
+            "Copied into the repository unmodified at a pinned commit, with its LICENSE beside it.",
+            "",
+            "| Code | Licence | Source | Revision | Directory | Left out | Why |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        lines += [f"| {v.id} | {v.licence} | {_cell(v.source)} | {v.revision} | `{v.path}` | {_cell(v.left_out)} | {_cell(v.why)} |"
+                  for v in policy.vendored]
     return "\n".join(lines) + "\n"
 
 
@@ -427,9 +483,15 @@ def check(python: list[Package], javascript: list[Package], policy: Policy,
     report += [f"  accepted     {a.package} ({a.licence}): not installed here"
                for key, a in sorted(policy.accepted.items()) if key not in installed]
     report += [f"  data         {d.id} ({d.licence}): accepted by {d.by} on {d.date}" for d in policy.data]
+    report += [f"  vendored     {v.id} ({v.licence}) at {v.revision[:12]} in {v.path}" for v in policy.vendored]
     report.append(f"  listing      {listing.name} " + (
         "is current" if not stale else "left as it was while a package fails" if failed
         else "was stale and has been rewritten"))
+    faults = vendored_faults(policy)
+    if faults:
+        report += ["", "✗ The vendored code does not stand as the ledger says:"]
+        report += [f"  - {f}" for f in faults]
+        return 1, report
     if failed:
         report += ["", f"✗ {len(failed)} package(s) carry a licence the ledger neither allows nor accepts:"]
         report += [f"  - {p.side} {p.name} {p.version}: {p.verdict.how}" for p in failed]

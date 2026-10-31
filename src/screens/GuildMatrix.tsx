@@ -5,15 +5,14 @@
 // somewhere, and who cannot run it yet. A cell opens the sign-off sheet.
 import { useMemo, useState } from 'react';
 import { ChevronDown, Users } from 'lucide-react';
-import { FAMILIES, SKILLS } from '@/data/skills';
-import { PROTOCOLS } from '@/data/protocols';
+import { FAMILIES } from '@/data/skillFamilies';
+import { useSkills, useStore } from '@/store';
 import type { Protocol } from '@/data/types';
 import { Card, EmptyState, cx } from '@/components/ui';
 import { AddPersonForm, GuildHeader, SignoffSheet, useGuild } from '@/components/GuildBits';
 import { LevelGlyph, LevelLegend, levelLabel } from '@/components/LevelGlyph';
 import { statusOf, verdictFor } from '@/engine/competence';
 import { href } from '@/router';
-import { useProgramFilter } from '@/store';
 
 const VERDICT = {
   alone: { dot: 'bg-accent', text: 'Runs it alone' },
@@ -21,17 +20,17 @@ const VERDICT = {
   blocked: { dot: 'bg-signal-error', text: 'Cannot run it yet' },
 } as const;
 
-/** Protocols whose current version tags at least one step. */
-const TAGGED: Protocol[] = PROTOCOLS.filter((p) =>
-  (p.versions.find((v) => v.version === p.currentVersion) ?? p.versions[0]).steps.some((s) => (s.skills ?? []).length > 0),
-);
-
 const stepsOf = (p: Protocol) => (p.versions.find((v) => v.version === p.currentVersion) ?? p.versions[0]).steps;
 
+/** Protocols whose current version tags at least one step. */
+const taggedOf = (protocols: readonly Protocol[]): Protocol[] =>
+  protocols.filter((p) => stepsOf(p).some((s) => (s.skills ?? []).length > 0));
+
 export default function GuildMatrix() {
+  const SKILLS = useSkills();
   const ctx = useGuild();
-  const shows = useProgramFilter();
-  const tagged = TAGGED.filter((p) => shows('protocol', p.id));
+  const protocols = useStore((s) => s.protocols);
+  const tagged = useMemo(() => taggedOf(protocols), [protocols]);
   const [protocolId, setProtocolId] = useState<string>(tagged[0]?.id ?? 'all');
   const [pair, setPair] = useState<{ p: string; s: string } | null>(null);
   const protocol = tagged.find((p) => p.id === protocolId) ?? null;
@@ -42,7 +41,7 @@ export default function GuildMatrix() {
       family: f,
       skills: SKILLS.filter((s) => s.family === f.id && (!needed || needed.has(s.id))),
     })).filter((g) => g.skills.length > 0);
-  }, [protocol]);
+  }, [protocol, SKILLS]);
   const flat = columns.flatMap((g) => g.skills);
 
   const header = (

@@ -15,9 +15,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, intake, proforma, pureos
+from openferment_core import artifacts, proforma, pureos
 from openferment_core.models import Artifact, BasisInput, BasisSource, InputAssumption, Override, TrainSpec
-from openferment_core.pureos import from_run as fr
 from test_train import (  # noqa: F401 (the fixtures, by name)
     AT,
     BY,
@@ -182,7 +181,7 @@ def _tea(basis_flow=48.0):
 
 
 def _keep(aid=RUN_ID, *, tool="proforma.run", flowsheet="ethanol_glucose_v0", streams=STREAMS, units=UNITS,
-          tea="default", scenario="sc-yeast-1") -> Artifact:
+          tea="default", scenario="sc-k3x9q-1") -> Artifact:
     """A run written by hand into this test's store, as the service keeps one."""
     out = {"flowsheet": flowsheet, "tablesSource": "tables written for this test",
            "tea": _tea() if tea == "default" else tea, "streams": streams, "units": units, "utilities": None,
@@ -193,10 +192,9 @@ def _keep(aid=RUN_ID, *, tool="proforma.run", flowsheet="ethanol_glucose_v0", st
         inputs.append(BasisInput(name="scenario", value=scenario, unit="", source=BasisSource(kind="convention")))
     art = Artifact(id=aid, tool=tool, toolVersion="test", output=out, outputHash="0" * 64, provenance="computed",
                    createdAt="2026-10-21T10:00:00Z", durationMs=0, inputs=inputs)
-    folder = artifacts.folder()
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{aid}.json").write_text(art.model_dump_json(), encoding="utf-8")
-    return art
+    from standins import plant_artifact
+
+    return plant_artifact(art)
 
 
 def test_a_runs_train_takes_every_unit_the_product_passes_through_by_its_class(store, monkeypatch):
@@ -261,24 +259,14 @@ def test_a_run_no_train_is_read_from_is_refused_in_words(store, monkeypatch):
     _keep("ddddddddddddddd2", units=[dict(u, unitClass="StandIn") for u in UNITS])
     with pytest.raises(pureos.TrainRefused, match="no unit of run ddddddddddddddd2 that its product passes through"):
         pureos.from_run("ddddddddddddddd2")
-    phb = [dict(s, massFlows={("PHB" if k == "Ethanol" else k): v for k, v in s["massFlows"].items()}) for s in STREAMS]
-    _keep("ddddddddddddddd3", streams=phb, tea=_tea())
-    with pytest.raises(pureos.TrainRefused, match="traces PHB, which no product a train traces here is"):
+    elsewhere = [dict(s, massFlows={("Unobtainium" if k == "Ethanol" else k): v for k, v in s["massFlows"].items()})
+                 for s in STREAMS]
+    _keep("ddddddddddddddd3", streams=elsewhere, tea=_tea())
+    with pytest.raises(pureos.TrainRefused, match="traces Unobtainium, which no product a train traces here is"):
         pureos.from_run("ddddddddddddddd3")
     other = _keep("ddddddddddddddd4", tool="convert_units")
     with pytest.raises(pureos.TrainRefused, match="is a convert_units artifact"):
         pureos.from_run(other.id)
-
-
-def test_an_archived_programs_run_is_refused_with_the_switch_off(store, monkeypatch):
-    from openferment_core import programs
-
-    _keep()
-    monkeypatch.setattr(programs, "hides", lambda program, include_archived: program == "yeast" and not include_archived)
-    monkeypatch.setattr(programs, "program_by_id", lambda pid, path=None: None)
-    with pytest.raises(pureos.TrainRefused, match="belongs to yeast, archived"):
-        pureos.from_run(RUN_ID)
-    assert pureos.from_run(RUN_ID, include_archived=True).train.program == "yeast"
 
 
 def test_the_from_run_endpoint_answers_200_404_and_422_and_starts_no_simulator(client, store, monkeypatch):
@@ -324,7 +312,9 @@ def test_a_composite_runs_train_reads_no_unit_of_the_composite_and_takes_its_tra
     composite = _keep(flowsheet="custom_train_v1", scenario=None)
     composite.inputs.append(BasisInput(name="train run", value=train_run.artifactId, unit="", source=BasisSource(
         kind="artifact", id=train_run.artifactId)))
-    (artifacts.folder() / f"{RUN_ID}.json").write_text(composite.model_dump_json(), encoding="utf-8")
+    from standins import plant_artifact
+
+    plant_artifact(composite)
     got = pureos.from_run(RUN_ID)
     by = {u.id: u for u in got.train.units}
     assert not [u.id for u in got.train.units if u.readFrom is not None and u.readFrom.flowsheet == "custom_train_v1"]

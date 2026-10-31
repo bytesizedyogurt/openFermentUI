@@ -1,12 +1,12 @@
-"""Units — the browser's engine, read as a table (OF-BLD-012 §5.3).
+"""Units — the engine's tables and the record fields (OF-BLD-012 §5.3).
 
-`src/engine/units.ts` is the reference implementation. Its four tables — the
-unit definitions, the alias map, the per-family SI twin, and the refusals that
-carry a reason — cross the boundary inside `corpus.json`, and every function
-here works from those tables rather than from a second copy somebody typed.
-This is the split OF-BLD-002 §0 asked for: on this side `units.ts` is data; on
-that side it is code, proven by the fixture `scripts/export-unit-fixtures.ts`
-records from it and `tests/test_units.py` asserts against pair by pair.
+The four tables — the unit definitions, the alias map, the per-family SI
+twin, and the refusals that carry a reason — live in `schema/units.json`, and
+the record fields in `schema/fields.yaml` (alpha 2.0 moved both out of the
+TypeScript seed's projection, ADR-010). `src/engine/units.ts` runs the same
+tables in the browser until the client takes its conversions from the
+service (stage 7); the fixture `scripts/export-unit-fixtures.ts` records from
+it and `tests/test_units.py` asserts against pair by pair.
 
 THE FUNCTIONS MIRROR THE TYPESCRIPT LINE FOR LINE, including the order of
 operations in `convert` and the sequence of replacements in `_strip`. That is
@@ -34,7 +34,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-DATA = Path(__file__).parent / "data" / "corpus.json"
+SCHEMA = Path(__file__).parent / "schema"
+UNITS = SCHEMA / "units.json"
+FIELDS = SCHEMA / "fields.yaml"
 
 
 class UnitError(ValueError):
@@ -55,32 +57,28 @@ class UnitError(ValueError):
 
 @lru_cache(maxsize=4)
 def tables(path: str | None = None) -> dict[str, Any]:
-    """The unit tables and the ontology, as the browser exported them.
+    """The unit tables and the record fields.
 
-    Cached per path. Raises when the file is missing or predates §5.3, for
-    the same reason `corpus.load_corpus` does: a unit engine with no table is
-    not an engine that knows nothing, it is one that would have to guess.
+    With no path, the schema files this package ships. A path names a JSON
+    file holding `units` and `ontology` (a list of fields) in one, which is
+    how a test hands the engine a table of its own.
     """
-    target = Path(path) if path else DATA
-    if not target.exists():
-        raise FileNotFoundError(
-            f"{target} not found. Generate it with `pnpm export:corpus` from the "
-            "repository root — the unit table lives in src/engine/units.ts and "
-            "this is a projection of it."
-        )
-    raw = json.loads(target.read_text())
-    if "units" not in raw or "ontology" not in raw:
-        raise ValueError(
-            f"{target} carries no `units` or `ontology` key. It predates OF-BLD-012 "
-            "§5.3 — regenerate it with `pnpm export:corpus`."
-        )
-    units = raw["units"]
+    if path:
+        raw = json.loads(Path(path).read_text())
+        if "units" not in raw or "ontology" not in raw:
+            raise ValueError(f"{path} carries no `units` or `ontology` key")
+        units, fields = raw["units"], raw["ontology"]
+    else:
+        import yaml
+
+        units = json.loads(UNITS.read_text(encoding="utf-8"))
+        fields = yaml.safe_load(FIELDS.read_text(encoding="utf-8"))["fields"]
     return {
         "table": units["table"],
         "aliases": units["aliases"],
         "si": units["si"],
         "refusals": units["refusals"],
-        "ontology": {d["id"]: d for d in raw["ontology"]},
+        "ontology": {d["id"]: d for d in fields},
     }
 
 
@@ -257,12 +255,3 @@ def to_canonical(value: float, unit: str, field_id: str) -> float:
     if f["categorical"]:
         raise UnitError(f"{field_id} is categorical; it has no unit to convert to")
     return convert(value, unit, f["canonicalUnit"])
-
-
-def in_range(value_canonical: float, field_id: str) -> bool:
-    """Rule 5 of §2.4: inside the field's stated range, inclusive."""
-    f = field(field_id)
-    if f is None:
-        raise UnitError(f"Unknown field: {field_id}")
-    low, high = f["range"]
-    return low <= value_canonical <= high

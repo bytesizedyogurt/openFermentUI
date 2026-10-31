@@ -5,13 +5,14 @@ BioSTEAM class, or one of three in-house `bst.Unit` subclasses BioSTEAM lacks
 (pureos/inhouse.py: ultrafiltration and diafiltration, cell disruption, a
 chromatography step), with every parameter its constructor takes either
 declared as a `ParameterSpec` or named in `notOffered` with why. An entry's
-id is the vocabulary's (src/data/vocabulary.ts `UNIT_OPERATIONS`); its stage
+id is the vocabulary's (schema/vocabulary.yaml `unitOperations`, read by
+`validate.unit_operations`); its stage
 is one of `STAGES`; `insOuts` says what each inlet and outlet is, in words,
 and which outlet goes on with the product by default.
 
 THIS MODULE IS DATA, AND IMPORTS NO BIOSTEAM AT ITS TOP (E.3‴). The service
 lists the catalogue from it (`listing`, GET /api/pureos/catalogue) and reads
-every declaration statically (`static_specs`, which `params --check` holds to
+every declaration statically (`static_specs`, which `params.check()` holds to
 a written bounds reason). What only BioSTEAM knows — each class's defaults,
 the choices its cost tables list, what its setters refuse — is read by the
 functions under "the worker side", which import BioSTEAM inside themselves
@@ -41,7 +42,7 @@ keys and the reflux of a column, the evaporator's pressures, the number of
 extraction stages) waits for a record of its ontology field where Appendix 2
 §B names one, or a person. The ontology fields this step adds for that are
 `step_recovery`, `product_purity`, `partition_coefficient`,
-`sieving_coefficient` and `cake_moisture` (src/data/ontology.ts). Binding a
+`sieving_coefficient` and `cake_moisture` (schema/fields.yaml). Binding a
 record to a unit of a train, by the train's product and chemicals, is §5.2's
 (`kwargs_of` and `expand` are what its builder calls); here the specs say
 where a value would come from.
@@ -58,9 +59,7 @@ class's own.
 """
 from __future__ import annotations
 
-import json
 import re
-import sys
 import threading
 from dataclasses import dataclass
 from itertools import combinations
@@ -85,7 +84,7 @@ from ..models import (
 STAGES = ("harvest", "disruption", "clarification", "concentration", "capture", "polish", "formulation", "drying",
           "utility")
 # The chromatography placeholder's modes, as words, and the vocabulary id each
-# stands for (src/data/vocabulary.ts): `mode` maps them.
+# stands for (schema/vocabulary.yaml): `mode` maps them.
 MODES = ("iex", "hic", "imac", "affinity", "sec", "mixed-mode")
 MODE_VOCABULARY = {"iex": "iex", "hic": "hic", "imac": "imac", "affinity": "affinity-custom", "sec": "sec",
                    "mixed-mode": "mixed-mode"}
@@ -1327,7 +1326,6 @@ def _choices_of(cls: Any, p: Param, chemicals: list[str], source: str) -> list[s
         items = list(obj.keys()) if hasattr(obj, "keys") else list(obj)
         return [str(i) for i in items if i]
     if c == "setter":
-        import inspect
 
         for k in cls.__mro__:
             prop = k.__dict__.get(p.bst)
@@ -1474,20 +1472,3 @@ def unit_report(unit: Any, keys: Iterable[str]) -> dict[str, Any]:
         "utilityCost": float(unit.utility_cost or 0.0), "power": float(unit.power_utility.rate),
         "heatDuties": [float(h.duty) for h in unit.heat_utilities], "held": held,
     }
-
-
-# ── the guard's reading (check:seed) ───────────────────────────────────
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = sys.argv[1:] if argv is None else argv
-    if args != ["--ids"]:
-        print("usage: python -m openferment_core.pureos.catalogue --ids", file=sys.stderr)
-        return 1
-    print(json.dumps([{"id": e.id, "biosteamClass": e.biosteam, "inhouseClass": e.inhouse, "maps": list(e.maps)}
-                      for e in UNIT_TYPES] + [{"id": vid, "leftOut": cls} for cls, (vid, _) in LEFT_OUT.items()]))
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

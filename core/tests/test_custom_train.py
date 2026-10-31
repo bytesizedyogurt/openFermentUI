@@ -1,12 +1,11 @@
 """The seam: a vessel and a train become a flowsheet Proforma prices, and every
 reader reads the one run (OF-BLD-020 §6.1; D11, D3, E.2‴, E.3‴).
 
-Offline: `custom_train_v1` is on the shelf, the yeast program's (the one
-program with a chemical set), built from a vessel design and a train run;
-its file holds no number but zero and one; a run, a binding and the panel
-refuse in words a part that is missing, of another tool, not on file,
-damaged, of another or an archived program, or whose unit id the fermenter
-takes; the vessel design binds the plant scale it was designed at (a
+Offline: `custom_train_v1` is on the shelf, built on the yeast chemical set
+(the one pureOS holds) from a vessel design and a train run; its file holds
+no number but zero and one; a run, a binding and the panel refuse in words a
+part that is missing, of another tool, not on file, damaged, built on another
+chemical set, or whose unit id the fermenter takes; the vessel design binds the plant scale it was designed at (a
 person's value wins); the panel serves the group Finance, each parameter the
 package's own default read from its file, a person's value their named
 assumption; a run hands the worker the fermenter as the design holds it, the
@@ -34,7 +33,8 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, composite, demo, intake, proforma, pureos, vessel
+from openferment_core import artifacts, composite, intake, proforma, pureos, vessel
+import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
 from openferment_core.models import Override, ProformaRunRequest, VesselRequest
 from openferment_core.pureos import catalogue, train_spec
@@ -78,7 +78,7 @@ class Worker:
             return self.vessel(op, args)
         if op in ("catalogue_specs", "train_specs", "flowsheet_unit_values", "train_run"):
             return self.train(op, args)
-        return demo._standin_call(op, args)
+        return standins._standin_call(op, args)
 
 
 @pytest.fixture()
@@ -132,14 +132,14 @@ def request(parts, **kw) -> ProformaRunRequest:
 def test_the_shelf_holds_the_composite_the_yeast_programs_built_from_a_vessel_and_a_train():
     info = shelf.info(FLOWSHEET)
     assert not info.reference and info.builtFrom == ["fermos.vessel", "pureos.train_run"]
-    # Its program is its train's: a train runs only on a program with a chemical set, the yeast program's alone.
+    # Its program is the chemical set its train builds on, the one pureOS holds.
     assert set(train_spec.PROGRAM_CHEMICALS) == {info.program} == {"yeast"}
     assert [i.key for i in info.inputs] == ["feed_glucose_conc", "titre", "yield", "productivity", "plant_scale",
                                            "glucose_price"]
     assert set(info.gridInputs) <= {i.key for i in info.inputs} and info.priceOutput in info.outputs
     assert "the fermenter's beer is its inlet" in info.description
     # No seed scenario names it: a scenario on it is made in the browser alone.
-    assert all(s.get("modelId") != FLOWSHEET for s in proforma.seed_scenarios())
+    assert all(s.get("modelId") != FLOWSHEET for s in proforma.held_scenarios())
     # The worker loads it by its id; its module is that id's (the tree's rule for every shelf flowsheet).
     assert (PKG / "flowsheets" / f"{FLOWSHEET}.py").is_file()
 
@@ -152,11 +152,9 @@ def test_no_process_number_in_the_composites_file():
     assert found == [], found
 
 
-def test_the_shelf_endpoint_lists_it_with_the_switch_off_and_on(client):
-    off = [f["id"] for f in client.get("/api/proforma/shelf").json()]
-    on = client.get("/api/proforma/shelf?includeArchived=true").json()
-    assert FLOWSHEET in off and next(f for f in on if f["id"] == FLOWSHEET)["builtFrom"] == ["fermos.vessel",
-                                                                                              "pureos.train_run"]
+def test_the_shelf_endpoint_lists_it(client):
+    served = client.get("/api/proforma/shelf").json()
+    assert next(f for f in served if f["id"] == FLOWSHEET)["builtFrom"] == ["fermos.vessel", "pureos.train_run"]
 
 
 # ── the parts, refused in words (offline) ──────────────────────────────
@@ -186,28 +184,21 @@ def test_a_part_of_another_tool_not_on_file_or_damaged_is_refused_in_words(parts
     with pytest.raises(proforma.ScenarioRefused, match="there is no kept artifact aaaaaaaaaaaaaaaa here for the vessel "
                                                        "design: fermOS → Vessel designs one"):
         composite.parts_of("a" * 16, parts.train)
-    (store / "artifacts" / ("b" * 16 + ".json")).write_text("{ not json", encoding="utf-8")
+    from standins import plant_damaged
+
+    plant_damaged("b" * 16)
     with pytest.raises(proforma.ScenarioRefused, match="the train run, artifact bbbbbbbbbbbbbbbb is damaged on disk"):
         composite.parts_of(parts.vessel, "b" * 16)
 
 
-def test_a_part_of_another_or_an_archived_program_is_refused(parts, monkeypatch):
-    from openferment_core import module_stores
-
-    with monkeypatch.context() as m:
-        m.setattr(train_spec, "program_of_run", lambda a, r=None: "pha")
-        with pytest.raises(proforma.ScenarioRefused, match=rf"train run {parts.train} belongs to PHA, archived \(hidden\)"):
-            composite.parts_of(parts.vessel, parts.train)
-        with pytest.raises(proforma.ScenarioRefused, match="program PHA, which has no chemical set here"):
-            composite.parts_of(parts.vessel, parts.train, include_archived=True)
-    real = module_stores.artifact_program
-    monkeypatch.setattr(module_stores, "artifact_program",
-                        lambda a, *x, **k: "casein" if a.tool == "fermos.vessel" else real(a, *x, **k))
-    with pytest.raises(proforma.ScenarioRefused, match=rf"vessel design {parts.vessel} belongs to Casein, archived"):
+def test_a_train_run_of_another_chemical_set_is_refused(parts, monkeypatch):
+    monkeypatch.setattr(train_spec, "program_of_run", lambda a, r=None: "another-set")
+    with pytest.raises(proforma.ScenarioRefused, match=rf"train run {parts.train} is built on the chemical set another-set, "
+                                                       "which pureOS does not hold"):
         composite.parts_of(parts.vessel, parts.train)
-    with pytest.raises(proforma.ScenarioRefused, match="is of Casein and train run .* of Yeast ethanol: a composite is "
-                                                       "one program's vessel and train"):
-        composite.parts_of(parts.vessel, parts.train, include_archived=True)
+    monkeypatch.setattr(train_spec, "program_of_run", lambda a, r=None: None)
+    with pytest.raises(proforma.ScenarioRefused, match=rf"train run {parts.train} names no chemical set it was built on"):
+        composite.parts_of(parts.vessel, parts.train)
 
 
 def test_a_train_unit_the_fermenter_takes_is_refused(store, worker):
@@ -331,7 +322,7 @@ def test_a_run_hands_the_worker_the_vessels_fermenter_the_trains_units_and_the_p
     assert asked["base"]["plant_scale"] == PLANT_STANDIN
     # Nothing carried of the parts is sampled.
     assert not [k for k in asked["specs"] if "." in k]
-    assert r.provenance == "demo" and r.basePrice is not None
+    assert r.provenance == "assumed" and r.basePrice is not None
 
 
 def test_the_basis_names_both_artifacts_and_every_finance_parameters_source(parts, worker):
@@ -428,7 +419,7 @@ def test_a_vessel_and_a_three_unit_train_price_and_converge_and_every_reader_rea
     y = 0.12 if aerobic else INPUTS_STANDIN["yield"]
     r = proforma.run(request(p, overrides=[*inputs_typed(**{"yield": y}), over("IRR", 0.1)], samples=4), pool=POOL)
     assert r.baseInfeasible is None and r.feasible == r.samples == 4 and r.basePrice > 0
-    assert r.provenance == "demo"
+    assert r.provenance == "assumed"
     # The stream table's units: the feed mixer, the vessel's class, the train's types.
     classes = [u.unitClass for u in r.units]
     assert classes == ["Mixer", p.design.unitClass, "SolidsCentrifuge", "Flash", "DrumDryer"]

@@ -1,23 +1,15 @@
 // The navigation vocabulary (OF-BLD-006 §2.2 as reversed, OF-BLD-008 §1).
 //
 // ═══════════════════════════════════════════════════════════════════════
-// THE LIST IS CLOSED. Home plus eleven destinations. Twelve rail entries,
-// exactly. It does not grow.
+// THE RAIL. Home plus ten destinations:
 //
 //     Home
 //     Intake · BioRepo · Postdoc · geneOS · fermOS · pureOS · Proforma
-//     Runbooks · Dominion · Primer · Guild
+//     Runbooks · Primer · Guild
 //
-// Everything that exists now, and everything built later, lives INSIDE one of
-// the eleven. When something new appears and does not obviously belong, the
-// question is which of the eleven owns it — never whether to add a twelfth.
-// That constraint is the point: a rail that grows with the codebase stops
-// being a map and becomes an index, and an index of a system nobody can hold
-// in their head is not navigation.
-//
-// If a thirteenth entry ever seems necessary, the honest options are to find
-// its owner among the eleven, or to argue that the eleven are wrong. Adding
-// one is not an option. `check:seed` fails the build if RAIL is not twelve.
+// alpha 2.0 retired the closed-map rule and Dominion with its seeded
+// catalogue (ADR-000, ADR-010). Projects become the organizing object at
+// stage 7 (ADR-005), and these destinations become views inside a project.
 // ═══════════════════════════════════════════════════════════════════════
 //
 // THE NAMES ARE THE VOCABULARY. OF-BLD-006 §2.2 originally held that these
@@ -32,7 +24,6 @@
 //   - an alias, so typing the old word in the palette still finds the thing;
 //   - a redirect, so an old link lands on the new screen instead of a 404.
 import {
-  Boxes,
   Dna,
   FlaskConical,
   Filter,
@@ -53,7 +44,7 @@ export interface NavSurface {
   label: string;
   to: string;
   /**
-   * One line of gloss. Eleven invented words with no explanation is friction
+   * One line of gloss. Ten invented words with no explanation is friction
    * the names do not earn on first contact, and this is the cheapest possible
    * fix: the descriptor sits under the label in the rail and in the title
    * attribute when the rail is collapsed.
@@ -71,13 +62,12 @@ export interface NavSurface {
 }
 
 /**
- * THE TWELVE. Home, then the eleven destinations, in order.
+ * THE RAIL. Home, then the ten destinations, in order.
  *
- * Five things that used to be here are now views inside their owner, and none
- * of their screens were deleted: the strain catalogue is geneOS's default view
- * (as Hosts), Molecules is Dominion's, Protocols and Depositions are Runbooks
- * tabs, and Witness is a BioRepo tab. A catalogue of strains is not a
- * destination — it is what one of the eleven happens to hold.
+ * Four things that used to be here are views inside their owner: the strain
+ * catalogue is geneOS's default view (as Hosts), Protocols and Depositions are
+ * Runbooks tabs, and Witness is a BioRepo tab. A catalogue of strains is not a
+ * destination — it is what one of them happens to hold.
  *
  * OF-BLD-011 §1 corrected which one. The catalogue sat under fermOS until the
  * three OS components were re-cut along the three stages of making something —
@@ -213,15 +203,6 @@ export const RAIL: (NavSurface & { key: string })[] = [
     key: 'r',
   },
   {
-    label: 'Dominion',
-    to: '/dominion',
-    descriptor: 'what is fenced, what is open',
-    aliases: ['molecules', 'products', 'clearance', 'patents', 'freedom to operate', 'fto'],
-    icon: Boxes,
-    component: 'Dominion',
-    key: 'd',
-  },
-  {
     label: 'Primer',
     to: '/primer',
     descriptor: 'how the system works',
@@ -253,13 +234,13 @@ export const RAIL: (NavSurface & { key: string })[] = [
   },
 ];
 
-/** Home is the twelfth entry, not one of the eleven. */
-export const ELEVEN = RAIL.filter((r) => r.to !== '/');
+/** The ten destinations: the rail, less Home. */
+export const DESTINATIONS = RAIL.filter((r) => r.to !== '/');
 
 /**
  * Sub-views worth naming in search but which are not destinations.
  *
- * Each belongs to one of the eleven and is reached from inside it. They are
+ * Each belongs to one destination and is reached from inside it. They are
  * here so the palette can take somebody who types "organisms" straight to the
  * catalogue rather than to fermOS's front door.
  */
@@ -297,8 +278,8 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'fermOS',
   },
   {
-    // OF-BLD-020 §3.3 — 'simulate' and 'vessel' are reserved under /fermos
-    // (check-seed's RESERVED): a model family integrated from its sources,
+    // OF-BLD-020 §3.3 — 'simulate' and 'vessel' are reserved under /fermos:
+    // a model family integrated from its sources,
     // and (§4.2) the fermenter a simulation needs.
     label: 'Simulate',
     to: '/fermos/simulate',
@@ -350,23 +331,6 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     aliases: ['benchmark', 'corn stover', 'nrel 2011', 'reference run'],
     icon: LineChart,
     owner: 'Proforma',
-  },
-  {
-    label: 'Molecules',
-    to: '/dominion/molecules',
-    descriptor: 'targets and markets',
-    aliases: ['molecules', 'products', 'targets'],
-    icon: Boxes,
-    owner: 'Dominion',
-  },
-  {
-    label: 'Clearance',
-    to: '/dominion/clearance',
-    descriptor: 'freedom to operate, per jurisdiction',
-    aliases: ['clearance', 'fto', 'patents', 'blocked'],
-    icon: Boxes,
-    owner: 'Dominion',
-    component: 'Clearance',
   },
   {
     label: 'Protocols',
@@ -495,16 +459,16 @@ export const DESCRIPTOR: Record<string, string> = Object.fromEntries(
 /**
  * Old path → new path.
  *
- * Deep-linked demo scripts, bookmarks, corpus prose, `learn.ts` content and
- * the guided tour all point at paths that have moved — some of them twice, as
+ * Bookmarks, old links and the guided tour point at paths that have moved —
+ * some of them twice, as
  * `/library/papers/H4` became `/biorepo/papers/H4` and is now
  * `/biorepo/paper/H4`. A reorganisation that 404s them punishes the people who
  * used the thing most.
  *
  * ENTRIES POINT AT THE FINAL DESTINATION, NEVER AT ANOTHER REDIRECT. Chaining
  * would work in the browser and would be invisible when one link in the chain
- * later changed; `check:seed` fails the build on a redirect whose target is
- * itself redirected.
+ * later changed. Nothing checks this at build time (ADR-011): keep each
+ * entry pointing at a screen.
  */
 export const REDIRECTS: Record<string, string> = {
   // ── OF-BLD-011: the strain catalogue moved from fermOS to geneOS ────
@@ -515,11 +479,14 @@ export const REDIRECTS: Record<string, string> = {
 
   // ── OF-BLD-008: five destinations became views ──────────────────────
   '/organisms': '/geneos/hosts',
-  '/molecules': '/dominion/molecules',
+  // alpha 2.0 (ADR-010): Dominion left with its seeded catalogue; its paths
+  // land on Home, which says what the platform holds.
+  '/molecules': '/',
+  '/dominion': '/',
   '/protocols': '/runbooks/protocols',
   '/depositions': '/runbooks/depositions',
   '/witness': '/biorepo/witness',
-  '/clearance': '/dominion/clearance',
+  '/clearance': '/',
 
   // ── OF-BLD-008: paths that moved between owners ─────────────────────
   '/biorepo/papers': '/biorepo/paper',
@@ -558,8 +525,10 @@ export const REDIRECTS: Record<string, string> = {
  */
 const PATTERN_REDIRECTS: [RegExp, string][] = [
   // /proforma/sc-s1 → /proforma/scenario/sc-s1 (but not /proforma/scenario/…,
-  // nor the reserved /proforma/reference, OF-BLD-019 §3.3)
-  [/^\/proforma\/(?!(?:scenario|reference)(?:\/|$))([^/]+)$/, '/proforma/scenario/$1'],
+  // nor the reserved /proforma/reference, OF-BLD-019 §3.3, nor the studies'
+  // /proforma/studies, /proforma/runs and /proforma/comparisons, execution
+  // prompt §9.1 step 5)
+  [/^\/proforma\/(?!(?:scenario|reference|studies|runs|comparisons)(?:\/|$))([^/]+)$/, '/proforma/scenario/$1'],
   // /simulate/sc-s1 → /proforma/scenario/sc-s1. The `compare` exclusion is
   // redundant now that exact entries run first, and is kept so the pattern is
   // still correct on its own if that entry is ever removed.

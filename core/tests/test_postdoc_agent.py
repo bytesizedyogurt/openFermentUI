@@ -10,10 +10,11 @@ import json
 
 import pytest
 
-from openferment_core import llm, postdoc_agent, retrieve, tools
-from openferment_core.models import Passage, PassageHit, PriorTurn, Usage
+from openferment_core import llm, postdoc_agent, tools
+from openferment_core.models import Passage, PriorTurn, Usage
+from openferment_core.tools import passages as passages_tool
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
-from test_tools import _a_person_kept_assumptions, proforma_store  # noqa: F401  (OF-BLD-019 §6.1's stand-in run)
+from test_tools import proforma_store  # noqa: F401  (OF-BLD-019 §6.1's stand-in run)
 from test_tools import fermos_store  # noqa: F401  (OF-BLD-020 §3.4's stand-in pool)
 
 SENTENCE = "Polyhydroxybutyrate accumulated in cells fed xylose hydrolysate."
@@ -29,11 +30,11 @@ def passages_found(monkeypatch):
     """`search_passages` finds the one stand-in passage for any question."""
     calls: list[str] = []
 
-    def search_detail(question, k=8, lane=None, ask=None, include_archived=False):
+    def search(question, k):
         calls.append(question)
-        return retrieve.Detail(hits=[PassageHit(passage=PASSAGE, score=1 / 61, lanes={"bm25": 1})], lane="bm25")
+        return passages_tool.Found(passages=[PASSAGE], engine="stand-in")
 
-    monkeypatch.setattr(retrieve, "search_detail", search_detail)
+    monkeypatch.setattr(passages_tool, "search", search)
     return calls
 
 
@@ -168,11 +169,24 @@ def test_rounds_end_the_loop(pool):  # noqa: F811
     assert out.stopped == "rounds" and script.calls[-1]["tool_choice"] == "none"
 
 
-def test_the_cost_budget_ends_the_loop(pool, monkeypatch):  # noqa: F811
-    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.002")
+def test_the_cost_budget_ends_the_loop_keeping_back_what_the_final_turn_could_cost(pool, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.003")
+    monkeypatch.setattr(postdoc_agent, "_final_turn_usd", lambda model, messages, defs: 0.0015)
     script = Script([records()], [records("again")], [records("third")], plan())
     out = ask(script, pool)
-    assert out.stopped == "cost" and len(script.calls) == 3
+    assert out.stopped == "cost" and len(script.calls) == 3, "two rounds, then the final turn the budget kept back"
+    monkeypatch.setattr(postdoc_agent, "_final_turn_usd", lambda model, messages, defs: 0.0)
+    script = Script([records()], [records("again")], [records("third")], [records("fourth")], plan())
+    assert ask(script, pool).stopped == "cost" and len(script.calls) == 4, "nothing kept back, a round more"
+
+
+def test_the_final_turns_worst_case_is_its_conversation_and_every_output_token():
+    said = [{"role": "user", "content": "q?"}]
+    held = postdoc_agent._final_turn_usd(llm.DEFAULT_PRIMARY, said, [])
+    assert held == llm.worst_case_usd(llm.DEFAULT_PRIMARY, {"system": postdoc_agent.AGENT_SYSTEM, "messages": said,
+                                                            "tools": []}, postdoc_agent.MAX_TOKENS) > 0
+    assert postdoc_agent._final_turn_usd(f"anthropic:{llm.DEFAULT_PRIMARY}", said, []) == held
+    assert postdoc_agent._final_turn_usd("an-unpriced-model", said, []) == 0.0
 
 
 def test_wall_time_ends_the_loop(pool):  # noqa: F811
@@ -416,70 +430,31 @@ def test_one_run_sweeps_first_offers_every_tool_and_opens_with_the_earlier_turns
     assert cmap["text"].startswith("COVERAGE MAP")
 
 
-# ── the program switch (OF-BLD-016 §2.3) ──────────────────────────────────
-
-
-ARCHIVED_QUESTION = "What PHB yield did Cupriavidus necator H16 reach on glucose?"
-
-
-def test_with_the_switch_off_an_archived_name_gets_the_line_and_a_gap_naming_the_switch(pool):  # noqa: F811
-    script = Script(plan(claim(support="unsupported")))
-    out = postdoc_agent.ask(ARCHIVED_QUESTION, converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
-    assert out.coverage is not None and out.coverage.includeArchived is False
-    assert [a.name for a in out.coverage.archived] == ["PHA"]
-    # The coverage line, in the trace and in the map round one carries.
-    assert out.trace[0].summary.endswith("found in archived program PHA (hidden)")
-    assert out.trace[0].input["modules"][-1] == "PHA · found in archived program PHA (hidden)"
-    _, cmap = script.calls[0]["messages"][0]["content"]
-    assert "found in archived program PHA (hidden)" in cmap["text"]
-    # A gap, written by code, names the program and the switch.
-    switch = [g for g in out.gaps if "Settings → Programs" in g]
-    assert len(switch) == 1 and "PHA is an archived program" in switch[0]
-
-
-def test_with_the_switch_on_the_same_question_is_swept_as_before(pool):  # noqa: F811
-    script = Script(plan(claim(support="unsupported")))
-    out = postdoc_agent.ask(ARCHIVED_QUESTION, converse=script,
-                            ctx=tools.ToolContext(pool_factory=lambda: pool, include_archived=True))
-    assert out.coverage is not None and out.coverage.includeArchived is True and out.coverage.archived == []
-    assert "archived" not in out.trace[0].summary
-    assert not [g for g in out.gaps if "Settings → Programs" in g]
-    assert "c-necator-h16" in [h.id for m in out.coverage.modules for h in m.hits]
-
-
-def test_a_question_naming_nothing_archived_gets_no_line_and_no_gap(pool):  # noqa: F811
-    out = postdoc_agent.ask("How much ethanol from glucose?", converse=Script(plan(claim(support="unsupported"))),
-                            ctx=tools.ToolContext(pool_factory=lambda: pool))
-    assert out.coverage is not None and out.coverage.archived == [] and out.gaps == []
-
-
 # ── a flowsheet run is cited like any computed value (OF-BLD-019 §6.1) ──
 
 
-def test_a_claim_citing_the_run_the_loops_run_flowsheet_returned_is_kept_and_one_never_returned_is_dropped(
-        proforma_store, monkeypatch):  # noqa: F811
+def test_a_claim_citing_the_run_the_loops_stream_table_returned_is_kept_and_one_never_returned_is_dropped(
+        proforma_store):  # noqa: F811
     from openferment_core import proforma
-    from openferment_core.models import ProformaRunRequest
 
-    _a_person_kept_assumptions(monkeypatch)
-    # The run's artifact id is fixed by its basis, so it is known before the
-    # loop asks for it; a reference run is kept too, and no tool returns it.
-    aid = proforma.run(ProformaRunRequest(scenarioId="sc-pha-1"), pool=proforma_store).artifactId
-    other = proforma.run_reference("corn_drygrind").id
-    price = "The draft flowsheet's run gives a minimum selling price for dried cell mass rich in polymer."
+    # Two reference runs are kept; the loop reads one of them, and no tool returns the other.
+    aid = proforma.run_reference("corn_drygrind").id
+    other = proforma.run_reference("cornstover_benchmark").id
     script = Script(
-        [("run_flowsheet", {"scenarioId": "sc-pha-1"})],
-        plan(claim("c1", text=price, evidence=[aid]),
-             claim("c2", text="The reference corn plant prices its ethanol on the package's own defaults.", evidence=[other])),
+        [("stream_table", {"artifactId": aid})],
+        plan(claim("c1", text="The reference corn plant's run prices its ethanol on the package's own defaults.",
+                   evidence=[aid]),
+             claim("c2", text="The reference stover plant prices its ethanol on the package's own defaults.",
+                   evidence=[other])),
     )
-    out = postdoc_agent.ask("What does the PHA draft flowsheet's run price its product at?", converse=script,
-                            ctx=tools.ToolContext(pool_factory=lambda: proforma_store, include_archived=True))
+    out = postdoc_agent.ask("What does the reference corn plant's run price its ethanol at?", converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: proforma_store))
     [kept] = out.claims
-    assert kept.id == "c1" and kept.evidenceIds == [aid] and kept.provenance == "demo"
+    assert kept.id == "c1" and kept.evidenceIds == [aid]
     assert out.rejected == 1 and any(r.startswith("c2: cites what no tool returned") and other in r for r in out.rejectionReasons)
     assert [e.id for e in out.evidence] == [aid]
-    step = next(s for s in out.trace if s.tool == "run_flowsheet")
-    assert step.ok and step.summary == f"Ran the flowsheet of sc-pha-1 · kept run {aid}"
+    step = next(s for s in out.trace if s.tool == "stream_table")
+    assert step.ok
 
 
 def test_a_claim_citing_a_run_stream_table_read_is_kept(proforma_store, monkeypatch):  # noqa: F811
@@ -526,7 +501,7 @@ def test_a_stand_in_run_asks_for_a_simulation_cites_its_artifact_and_a_claim_sta
     out = postdoc_agent.ask("Simulate a glucose batch from the extracted kinetics.", converse=script,
                             ctx=tools.ToolContext(pool_factory=lambda: fermos_store))
     [kept] = out.claims
-    assert kept.id == "c1" and kept.evidenceIds == [aid] and kept.provenance == "demo"
+    assert kept.id == "c1" and kept.evidenceIds == [aid] and kept.provenance == "assumed"
     assert out.rejected == 2
     assert any(r.startswith("c2: claim text contains a number") for r in out.rejectionReasons), out.rejectionReasons
     assert any(r.startswith("c3: cites what no tool returned") and other in r for r in out.rejectionReasons)
@@ -552,7 +527,7 @@ def train_inlet(tmp_path, monkeypatch):
     STAND-IN records as the pool, and a stream a STAND-IN person's train run
     kept, which a model's train takes as its inlet. Imported here, inside the
     fixture: test_train reaches test_module_tools, which imports this file."""
-    from openferment_core import audit, intake, proforma, proposals, pureos
+    from openferment_core import intake, proforma, pureos
     from openferment_core.pureos import catalogue, train_spec
     from test_pureos_build_tool import stand_in_pool
     from test_train import TrainWorker, spec_of
@@ -561,8 +536,6 @@ def train_inlet(tmp_path, monkeypatch):
     for mod, name in ((catalogue, "_SPECS"), (train_spec, "_SPECS"), (train_spec, "_UNITS")):
         monkeypatch.setattr(mod, name, {})
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(audit, "PATH", tmp_path / "audit.jsonl")
-    monkeypatch.setattr(proposals, "PATH", tmp_path / "proposals.json")
     monkeypatch.setattr(train_spec, "_pool", lambda: stand_in_pool())
     run = pureos.run_train(spec_of())
     return f"{run.artifactId}/F1_liquid", stand_in_pool()
@@ -702,3 +675,115 @@ def test_a_read_after_the_model_changed_its_train_reads_the_train_as_it_stands_n
     [third] = rows(made["third"])
     assert third["ref"] == f"pureos/train-run/{made['run']}" and third["detail"]["trainId"] == made["train"]
     assert [c.id for c in out.claims] == ["c1"]
+
+
+# ── a study, its estimates labelled (alpha 2.0 stage 6; ADR-006) ────────
+
+
+class Reading(Script):
+    """The stand-in, whose entries may be read off what the tools returned: a
+    callable entry is handed the conversation so far and gives the entry."""
+
+    def __call__(self, **kw):
+        if self.turns and callable(self.turns[0]):
+            self.turns[0] = self.turns[0](kw["messages"])
+        return super().__call__(**kw)
+
+
+def returned(messages, key):
+    """The newest tool result's `key`, as the model read it."""
+    for m in reversed(messages):
+        if m["role"] == "user" and isinstance(m["content"], list):
+            for b in m["content"]:
+                if b.get("type") == "tool_result" and not b.get("is_error"):
+                    found = json.loads(b["content"]).get(key)
+                    if found is not None:
+                        return found
+    raise AssertionError(f"no tool returned {key}")
+
+
+def valued(c, *values):
+    return {**c, "values": list(values)}
+
+
+def read_from(label, evidence_id):
+    return {"label": label, "evidenceId": evidence_id, "recordId": "", "estimate": None}
+
+
+def estimated(label, value, unit, basis, low=None, high=None):
+    return {"label": label, "evidenceId": "", "recordId": "",
+            "estimate": {"value": value, "unit": unit, "low": low, "high": high, "basis": basis}}
+
+
+def test_a_study_proposes_a_scenario_of_labelled_estimates_runs_it_and_explains_by_artifact_id(pool, monkeypatch):  # noqa: F811
+    from openferment_core.engine import library, simulator
+    from test_tools_study import Priced, dearer_cane
+
+    monkeypatch.setattr(simulator, "call", Priced())
+    monkeypatch.setattr(library, "_PARAMETERS", {})
+
+    def explained(messages):
+        price = f"{returned(messages, 'artifactId')}:price.solvedPrice"
+        return plan(
+            valued(claim("c1", "The scenario's run solves a selling price for the ethanol on a dearer cane.",
+                         support="inferred"),
+                   read_from("the selling price the run solves", price),
+                   estimated("the cane's price the scenario sets", 0.05, "USD/kg",
+                             "a delivered price above the package's", low=0.04, high=0.06)),
+            valued(claim("c2", "The run solves a selling price of 0.9 dollars a kilogram.", evidence=[price])),
+            valued(claim("c3", "The run's selling price stands beside the package's own.", evidence=[price]),
+                   estimated("the package's price", 0.8, "USD/kg", "the package's own price, as written")),
+        )
+
+    script = Reading(
+        [("engine_plants", {"words": "sugarcane"})],
+        [("study_scenario", dearer_cane())],
+        lambda m: [("engine_run", {"scenario": returned(m, "scenarioId")})],
+        explained,
+    )
+    out = ask(script, pool, question="What does a dearer cane do to the ethanol's selling price?")
+    assert [t.tool for t in out.trace if t.kind == "tool"] == ["engine_plants", "study_scenario", "engine_run"]
+    assert [c.id for c in out.claims] == ["c1", "c3"] and out.rejected == 1
+    assert "c2: claim text contains a number" in out.rejectionReasons[0]
+    c1 = out.claims[0]
+    read, guessed = c1.values
+    assert read.quantity.origin.kind == "artifact" and read.source in c1.evidenceIds, "a value read is cited"
+    assert (read.quantity.value, read.quantity.unit) == (0.9, "USD/kg")
+    assert read.quantity.origin.ref == read.source.split(":")[0]
+    assert guessed.quantity.origin.kind == "model-estimate" and guessed.quantity.origin.by == script.calls[-1]["model"]
+    assert (guessed.quantity.low, guessed.quantity.high, guessed.quantity.origin.note) == (
+        0.04, 0.06, "a delivered price above the package's")
+    assert c1.provenance == "assumed" and out.claims[1].provenance == "assumed"
+    assert [e.id for e in out.evidence] == [read.source]
+    assert out.evidence[0].basis.artifactId == read.quantity.origin.ref
+
+
+@pytest.mark.parametrize("values, why", [
+    ([{"label": "a price", "evidenceId": "ev-never-returned", "recordId": "", "estimate": None}], "which no tool returned"),
+    ([{"label": "a price", "evidenceId": "", "recordId": "", "estimate": None}], "names no source"),
+    ([{"label": "a price", "evidenceId": "", "recordId": "r-X1-1",
+       "estimate": {"value": 1, "unit": "g L-1", "low": None, "high": None, "basis": "a guess"}}], "names recordId and estimate"),
+    ([{"label": "the price in 2021", "evidenceId": "", "recordId": "r-X1-1", "estimate": None}], "label holds a number"),
+    ([{"label": "a titre", "evidenceId": "", "recordId": "",
+       "estimate": {"value": 3, "unit": "", "low": None, "high": None, "basis": "a guess"}}], "names its unit"),
+    ([{"label": "a titre", "evidenceId": "", "recordId": "",
+       "estimate": {"value": 3, "unit": "g L-1", "low": 4, "high": 5, "basis": "a guess"}}], "inside its own range"),
+    ([{"label": "a titre", "evidenceId": "", "recordId": "",
+       "estimate": {"value": 3, "unit": "g L-1", "low": None, "high": None, "basis": ""}}], "what it rests on"),
+    ([{"label": "a titre", "evidenceId": "", "recordId": "",
+       "estimate": {"value": 3, "unit": "g L-1", "low": None, "high": None, "basis": "the 2019 run"}}], "basis holds a number"),
+])
+def test_a_value_that_cannot_stand_drops_its_claim(pool, values, why):  # noqa: F811
+    script = Script([records()], plan(valued(claim(records=["r-X1-1"]), *values)))
+    out = ask(script, pool)
+    assert out.claims == [] and out.rejected == 1 and why in out.rejectionReasons[0], out.rejectionReasons
+
+
+def test_a_records_value_is_read_from_the_record_and_cited(pool):  # noqa: F811
+    script = Script([records()], plan(valued(claim(text="Polyhydroxybutyrate titre was reported on xylose hydrolysate."),
+                                             {"label": "the secreted titre", "evidenceId": "", "recordId": "r-X1-1",
+                                              "estimate": None})))
+    (c,) = ask(script, pool).claims
+    (v,) = c.values
+    assert (v.quantity.value, v.quantity.unit, v.quantity.origin.kind, v.source) == (2.5, "g L-1", "record", "r-X1-1")
+    assert c.recordIds == ["r-X1-1"] and c.provenance == "curated"

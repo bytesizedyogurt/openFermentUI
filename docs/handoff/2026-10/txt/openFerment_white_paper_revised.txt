@@ -1,0 +1,1001 @@
+
+
+===== page 1 =====
+
+openFerment  |  1
+openFerment
+A white paper on an open engineering platform
+October 22 2026
+Version 0.3
+Overview
+openFerment is a proposed open-source engineering platform for work people can inspect, test, build, 
+operate, and improve. Its first flagship is cellulosic ethanol from characterized biomass, with batch 
+conversion and explicitly described recovery. Its wider purpose is transferable productive knowledge 
+across manufacturing disciplines.
+Postdoc is an AI research coordinator directed by the user. It uses a hosted API, installed tools, and 
+curated, versioned evidence. Independent internet research is disabled by default; user-requested 
+acquisition uses a controlled import. The user sets goals and limits. Postdoc plans, delegates, 
+calculates, proposes ideas, and explains results.
+Lasting records distinguish measurements, quotations, calculations, estimates, and assumptions. 
+Uncertainty may use justified distributions, bounds, alternative explanations, or unquantified 
+unknowns. Postdoc may estimate and generate ideas without a traceable publication, preserving their 
+generated origin and limits. Ideas are hypotheses to examine.
+The intended advantage is testable: can this environment help an equally capable AI produce more 
+dependable answers with less measured work? Compare the simplest useful workflow against a 
+competent general agent. Specialist coordination must earn its cost.
+The scope includes the machines that make the product: editable designs, fabrication, controls, 
+commissioning, cleaning, maintenance, and operating experience. Another team needs both the 
+design and practical knowledge to reproduce production.
+Projects may be private, shared, or published. Public contributions need usable rights to study, 
+modify, reproduce, manufacture, and sell the work. Commercial participation belongs in a platform 
+independent of any one business.1
+A nonprofit steward and sustainable budget are proposed to maintain the platform, hold entrusted 
+assets, and support its public terms.
+Status of this paper The repository contains a prototype. The connected platform and flagship 
+integration remain proposals. Section 13 distinguishes inspected code from demonstrated behavior. 
+Sections 16 and 17 define the flagship and comparative evaluation. April 2027 is an internal handoff 
+target, not public release or a promise of a complete optimized ethanol plant.
+1 The founder intends to establish a company in Rwanda that uses openFerment and publishes its own technical work. Its 
+product is undecided. It would be one commercial example of the approach, with the same public rights as other users. The 
+platform and its public purpose should remain independent of that business.
+
+===== page 2 =====
+
+openFerment  |  2
+Reading guide
+Sections 1 through 3 explain the purpose, lab model, and connected workflow. Sections 4 through 6 
+explain records, uncertainty, hypotheses, and Postdoc. Sections 7 through 12 cover engineering, 
+equipment, real work, the commons, people, and architecture. Sections 13 through 15 cover 
+development and stewardship. Sections 16 and 17 define the cellulosic-ethanol flagship and how to 
+test whether specialization earns its cost.
+The glossary defines the main terms. The module reference connects software names to 
+responsibilities. Sources distinguish project intentions, inspected implementation, and external legal or 
+hardware references.
+1 Purpose and scope.............................................................................................................................. 3
+2 The lab model.......................................................................................................................................3
+3 One complete investigation..................................................................................................................4
+4 The lasting project record.....................................................................................................................5
+5 Evidence estimates and uncertainty.................................................................................................... 7
+6 Postdoc agents and model routing.......................................................................................................9
+7 Process design and economics......................................................................................................... 11
+8 Open equipment and manufacturing knowledge................................................................................12
+9 Physical work and learning from results.............................................................................................13
+10 The commons and public rights....................................................................................................... 14
+11 People workspaces and learning..................................................................................................... 15
+12 Technical architecture...................................................................................................................... 16
+13 Prototype and development............................................................................................................. 17
+14 Stewardship and operating costs..................................................................................................... 18
+15 Success and open decisions............................................................................................................19
+16 The cellulosic ethanol flagship......................................................................................................... 19
+17 Test whether specialization earns its cost........................................................................................21
+Glossary................................................................................................................................................ 23
+Module reference.................................................................................................................................. 24
+Sources and further reading..................................................................................................................25
+
+===== page 3 =====
+
+openFerment  |  3
+1 Purpose and scope
+Make productive knowledge transferable
+openFerment aims to increase people's ability to make useful things. A good result may be a better 
+experiment, a working machine, a more reliable process, a trained operator, or a production method 
+another team can reproduce.
+Public information can still be difficult to use. A paper may omit a detail needed to repeat an 
+experiment. A simulation may hide an important assumption. A drawing may leave out how a 
+fabricator solved a difficult joint. A successful batch may never return to the model that predicted it. 
+openFerment should preserve the relationships that make these pieces understandable together.
+The economic aim is to create useful wealth and share the means to create it. People can earn 
+money by producing goods, building machines, and providing skilled services using public knowledge. 
+Openness should make independent work possible, including commercial competition. A useful 
+platform does not need to own every activity it helps create.
+Start with bioprocess engineering
+The initial domain is the use of organisms, cells, or biological materials to make products. The first 
+reference case is cellulosic ethanol, starting with one documented corn-stover process and a declared 
+batch-conversion boundary. Switchgrass is a candidate extension after its evidence and conditions 
+are checked. Neither this choice nor the broader architecture establishes support for arbitrary 
+feedstocks.
+Much of the supporting work is general: managing projects, tracing inputs, recording predictions, 
+organizing agents, identifying machines, and preserving results. These shared capabilities can 
+support chemical processing and other manufacturing. Each new domain still needs appropriate 
+models, tools, terminology, evaluations, and people who understand its limits.
+The platform should integrate established scientific and engineering software where suitable. It should 
+not attempt to replace every specialized design package, instrument system, or production 
+application. Its responsibility is to connect the work and preserve enough context to inspect and 
+repeat it.
+2 The lab model
+The user directs the work
+The useful part of the lab metaphor is the division of responsibility. The user acts as project lead, like 
+a principal investigator setting a lab's direction. They define the question, constraints, budget, and 
+decision to be made. Postdoc coordinates the work within that authority.
+Calling the user the principal investigator does not grant a professional qualification or authority over 
+other people. A real organization may divide responsibility among a project owner, spending approver, 
+qualified engineer, operator, reviewer, and publication approver. openFerment should support that 
+division explicitly.
+A user should be able to delegate routine work without approving every step. Searching within an 
+agreed budget, running an allowed simulation, and preparing a draft can have standing permission. 
+
+===== page 4 =====
+
+openFerment  |  4
+Changing an authoritative record, spending beyond a limit, releasing a public report, and operating 
+equipment need their own permissions. Approval should fit the action and its consequences.
+Postdoc coordinates the research
+Postdoc is the main point of contact for the project. It should understand the question, find what is 
+already known, identify missing information, choose useful analyses, assign specialist work, and 
+report what follows from the results.
+The name describes a working relationship. A researcher assists a project lead by doing research and 
+exercising judgment within a defined role. The software borrows that relationship without claiming to 
+be a trained human, to possess professional authority, or to be reliable simply because of its name.
+The Home page should therefore open into a conversation with Postdoc in a chosen project. 
+Alongside the conversation, users should be able to see the plan, current tasks, spending, important 
+assumptions, pending decisions, and results. They should be able to open the underlying sources, 
+designs, and runs directly. Conversation is the entry point; saved project records hold the work.
+Specialists and task workers do bounded jobs
+Specialist agents can handle retrieval from the approved library, metabolic modeling, kinetics, 
+recovery, equipment, and costing. Smaller task workers can extract a table, match a quotation, 
+normalize units, or inspect a file. A worker may be an AI model or ordinary software. In the flagship, 
+workers have installed tools and approved evidence; they do not acquire independent browsing 
+authority.
+The metaphor of graduate students and technicians helps explain delegation. It does not require a 
+fixed model hierarchy. A simple calculation should usually use a checked calculation tool. A difficult 
+research decision may need a capable model and independent review. Fine-tuned models are an 
+option when evidence shows that they improve a task.
+Postdoc can distribute work across many instances. Continuity must therefore live in shared records: 
+the notebook, task history, sources, decisions, versions, and calibration results. The platform should 
+retain what is needed to explain the work, with appropriate privacy and retention rules. A long chat 
+transcript alone is an unreliable lab memory.
+3 One complete investigation
+Move from a question to a testable decision
+A first investigation asks: given this characterized corn-stover lot and a supported conversion route, 
+which assumptions most affect ethanol output, what limited alternatives can be compared, and what 
+should be measured next? It uses a batch conversion model and declares the operating mode of each 
+connected stage. A historical reference process is preserved separately from any modified candidate.
+Postdoc should clarify the intended product, conditions, scale, available resources, and decision. It 
+should then propose a plan that the user can understand and change. The plan may need literature 
+research, biological constraints, a process model, a recovery train, an equipment design, and a 
+preliminary cost estimate.
+
+===== page 5 =====
+
+openFerment  |  5
+The workflow is connected but can branch and return to earlier questions:
+1. Define the goal, constraints, permissions, budget, and criteria for a useful answer.
+2. Gather relevant sources and existing project work, keeping their origins and reuse rights.
+3. Identify inputs, missing information, estimates, and assumptions.
+4. Compare process options using suitable models and specialist tools.
+5. Connect a selected option to equipment requirements, operating conditions, and economics.
+6. Record predictions and prepare a versioned procedure for a real test.
+7. Perform the work with appropriate people and capture the actual conditions and results.
+8. Compare predictions with outcomes and explain what the test supports.
+9. Revise the relevant records and prepare a deliberate, permitted release of useful work.
+Research need not always end in a physical run. A literature review, a failed feasibility calculation, or 
+a useful equipment comparison can be a complete result for a particular question. The record should 
+explain what was established and what remains untested.
+Keep the whole investigation understandable
+A Study is the proposed record of an investigation, linking its question, sources, input choices, 
+calculations, designs, predictions, and results. A project may contain many Studies. A process design 
+may be tested in several runs. A physical machine may serve several projects over time.
+Suppose a growth model predicts the time needed to reach a target concentration. A vessel 
+calculation then uses that result, and a recovery model uses the expected harvest stream. The 
+economic estimate depends on all three. The Study should preserve those connections, the units and 
+assumptions at each transfer, and the versions used.
+If a later experiment shows a different growth rate, the platform should identify which later results may 
+need review. It should preserve the old results rather than silently rewriting the history. Re-running 
+selected work can then produce a new, linked version.
+4 The lasting project record
+Store work as more than conversation
+Postdoc needs records it can retrieve and check. The user needs records they can inspect, export, 
+and hand to another team. The core record types should have clear identities and relationships.
+
+===== page 6 =====
+
+openFerment  |  6
+Record What it preserves
+Project and Study Goals, decisions, tasks, permissions, and the connected investigation
+Source A paper, dataset, manual, supplier statement, or earlier work with its location and rights
+Claim or value What is asserted, its origin, units, conditions, uncertainty, and review history
+Computed result Inputs, tool and model versions, assumptions, outputs, and execution information
+Process and equipment 
+design Intended behavior, editable files, requirements, and revisions
+Physical asset A particular machine or instrument, its construction, configuration, and history
+Procedure and run Instructions, predictions, people, actual execution, observations, and deviations
+Release The exact work published, by whose authority, with which rights and later corrections
+People, organizations, materials, samples, costs, and tasks also need identities where they affect 
+interpretation. A sample should be traceable to the run and collection conditions that produced it. A 
+calculation should identify the material or stream it represents.
+The final schema should be developed against actual workflows. These responsibilities do not imply 
+that every concept needs a separate service or database.
+Preserve versions and useful lineage
+An important result should explain which inputs and methods produced it. A changed value, design, 
+procedure, or interpretation should create an attributable revision. Raw observations and later 
+corrections should remain distinguishable.
+Content hashes can identify exact files and results. They do not prove that the contents are true. A 
+replay can help test whether a calculation is repeatable under its saved conditions. Some software, 
+model services, or hardware cannot be reproduced exactly; the record should state those limits.
+An amendment should not erase the original observation. Equally, a responsible record system needs 
+retention, privacy, and deletion policies. Traceability does not require publishing personal information 
+or retaining every file forever.
+Preserve connections between tools
+A result passed between modules needs a defined meaning. Units, composition, time basis, scale, 
+and process conditions must agree. A stream should identify what flows, how much flows, and the 
+basis of that amount.
+The Study should identify which calculation is responsible for each material or energy balance. 
+Transfers should expose losses, missing components, and unsupported conversions. A numerical 
+result is not reliable merely because every individual tool ran successfully.
+
+===== page 7 =====
+
+openFerment  |  7
+5 Evidence estimates and uncertainty
+Distinguish origin from applicability
+Origin explains how information entered the project. It may be quoted from a source, measured in a 
+run, calculated by software, estimated by a model, assumed by a person, or adopted as a convention. 
+A supplier specification is another useful source with its own conditions.
+Applicability asks whether that information fits the present question. In bioprocess work, strain, 
+medium, temperature, operating mode, equipment, scale, and measurement method can matter. A 
+genuine measurement can be unsuitable for another system. A literature value can be useful when its 
+transfer is explained.
+When information is transferred between conditions, the platform should record the reasoning, 
+method, and additional uncertainty. Origin, applicability, review, and permission are separate 
+properties. They should not be collapsed into a single status such as trusted.
+Allow estimates with a clear basis
+Postdoc should be able to offer a preliminary estimate when that helps a decision. It should identify 
+the estimate, explain the basis available, give relevant conditions, and state how it could be checked. 
+It should not invent a citation or imply that a remembered pattern is a measured result.
+A useful answer can be a range, an order of magnitude, or a statement that the available information 
+does not support an estimate. Numerical uncertainty needs a basis too. An invented confidence 
+interval can mislead as much as an invented exact value.
+An AI estimate of a growth parameter may help plan an experiment. It should remain an estimate 
+while the project uses it. If a later run measures that parameter, the measurement becomes a new 
+linked record. If the run measures only final output, it may test the overall prediction without identifying 
+that parameter separately.
+Numeric validation should preserve origin and limitations, and match the evidence to the decision. A 
+blanket ban on estimates would prevent useful preliminary work. Exact validation rules need task-
+specific design and evaluation.
+Make confidence inspectable
+Confidence may depend on source quality, measurement quality, applicability, independent 
+agreement, review, and past predictive performance. These components can have different methods 
+and meanings. A score is useful only when its interpretation and limits are clear.
+Several models agreeing is weak evidence if they repeat the same source or share the same failure. 
+Several outputs derived from one measurement are not several independent measurements. The 
+platform should preserve these dependencies where they matter.
+Some decisions require a combined ranking. The method should be explicit and tested against the 
+actual decision. There is no reason to impose one universal confidence score across literature 
+extraction, equipment readiness, biological prediction, and legal review.
+
+===== page 8 =====
+
+openFerment  |  8
+Carry uncertainty into the result
+Important uncertainty should survive calculations, charts, exports, and reports. Where the available 
+information supports it, tools can examine ranges, sensitivity, and alternative scenarios. Correlated 
+inputs should not be treated as independent without justification.
+Sensitivity analysis asks which uncertain inputs most affect the answer. It can help Postdoc 
+recommend the next measurement or experiment. The best next test may be the one that changes a 
+decision, rather than the one that produces the largest amount of data.
+Represent incomplete knowledge honestly
+For openFerment, uncertainty is the structured record of incomplete knowledge, genuine variability, or 
+unresolved alternatives affecting a claim, model, prediction, hypothesis, or decision. The record 
+explains its origin, evidence, applicable conditions, representation, dependencies, and possible 
+consequences. Quantification is not compulsory when it has no defensible basis.
+Useful distinctions include measurement limitations, variation between material lots, uncertain 
+parameters, alternative model structures, extrapolation, unknown mechanisms, and uncertainty about 
+which decision to take. These are overlapping descriptions of a problem, not seven independent 
+random variables or a universal ranking of evidence.
+Representation When it is justified
+Probability distribution Evidence supports the distribution and relevant dependencies
+Bounded interval Defensible limits exist without a justified probability model
+Alternative scenarios or 
+models Different conditions or explanations must be examined separately
+Unquantified unknown There is insufficient information even for meaningful numerical limits
+Measurement uncertainty needs its method and interpretation. A reported plus-or-minus range should 
+say what it represents. NIST's Type A and Type B distinguish methods of evaluating measurement 
+uncertainty; they are not names for material variability and missing scientific knowledge. The broader 
+project record also needs model and decision limits beyond measurement uncertainty. [10]
+An absent contaminant measurement is not evidence of no contaminant effect. A bounded scenario is 
+not automatically a probability interval. Biomass composition fractions and other dependent inputs 
+must respect their shared basis and constraints; independently sampling all fractions can create 
+impossible material. A narrow calculated interval remains conditional on the chosen model and what it 
+leaves out.
+Begin with a useful ledger of origins, missing information, conditions and alternative explanations. Add 
+propagation where the inputs justify it. Later, compare predictions with appropriate observations and 
+evaluate interval behavior across relevant cases. A single favorable result does not establish 
+calibration. Formal value-of-information calculations require justified probability and decision models; 
+a plainly reasoned recommendation for a discriminating measurement can be useful before those 
+exist.
+
+===== page 9 =====
+
+openFerment  |  9
+6 Postdoc agents and model routing
+Give Postdoc a clear working method
+Postdoc should begin with the user's goal and project record. It should identify what can be answered 
+from existing evidence, which tasks need tools, and where the user must decide. Its plan should 
+remain visible and revisable.
+Each delegated task needs enough context to be meaningful: the question, relevant inputs, expected 
+result, allowed tools, budget, time limit, privacy constraints, and action permissions. The returned 
+work should identify sources, computed results, assumptions, uncertainty, failures, and cost as 
+applicable.
+Postdoc reviews the returned work for relevance, consistency, and missing support. It may ask for 
+corrections or an independent check. Review by another AI is useful only to the extent that it adds 
+effective scrutiny. It does not establish truth by itself.
+The final response should connect conclusions to the underlying records and explain what action they 
+support. A concise answer can sit above a detailed record without losing the evidence needed to 
+inspect it.
+Make scientific variation a deliberate capability
+Postdoc should have a bounded variation role: propose alternatives, use analogies, question 
+assumptions, and offer competing explanations when the installed evidence is incomplete. Its 
+pretrained associations can inspire an idea even when no particular training source can be identified. 
+Numerical estimates remain allowed with their generated origin, basis and limitations visible. Missing 
+citations must not be repaired by inventing a source.
+Creative sampling and physical uncertainty have different meanings. The probability of generating a 
+sentence is not the probability that its proposed mechanism is true. More randomness does not 
+establish more useful or novel science. Evaluate whether ideas are distinct, physically plausible, 
+relevant to the decision, and capable of being tested.
+A hypothesis record should preserve the proposal, generating model and relevant context, cited 
+support where available, extrapolations, assumptions, proposed mechanism, necessary tests, and 
+evaluation history. Keep the generated text and actual evaluation results; do not use hidden model 
+reasoning as experimental evidence. A seed may help replay, but hosted models need not reproduce 
+an identical idea.
+An idea can be retained, screened, translated into a supported candidate, evaluated conditionally, 
+tested physically later, or rejected with a reason. A proposal requiring a new scientific model stays in 
+the hypothesis collection until that model exists. It must not enter the evaluated design ranking 
+through invented response coefficients. Screening should preserve unconventional ideas without 
+granting them the status of checked designs.
+Route tasks using measured performance
+Routing means choosing the model or software worker, effort, tools, budget, timeout, and fallback for 
+a job. It belongs in the initial architecture, alongside the evaluations needed to guide it.
+Postdoc needs sufficient capability for planning and reviewing difficult work. That does not imply one 
+permanently assigned model. A specialist can use a different model when it performs the task better. 
+
+===== page 10 =====
+
+openFerment  |  10
+Small workers can handle narrow, well-tested jobs cheaply. Ordinary code should perform defined 
+calculations and transformations where it is suitable.
+The choice should account for task quality, cost, latency, available context, privacy, tool behavior, and 
+failure rate. A cheap answer that needs repeated repair may cost more overall. An expensive answer 
+still needs evaluation.
+Start with a small number of useful task families and tested routes. Expand to many simultaneous 
+agents when the work and measured benefits justify it. Hundreds of workers are a capacity ambition, 
+not a requirement for every question. Unbounded delegation could spend money without resolving the 
+project.
+Evaluate the router as well as the models
+Evaluation sets should represent the work the platform actually performs. They can test extraction 
+against source text, calculations against suitable references, retrieval against useful evidence, and 
+recommendations against stated criteria. Independent test cases should remain separate from 
+examples used to tune a route or model.
+Record model and tool versions, task conditions, quality, cost, time, and failure modes. Compare the 
+complete route, including checking and retries, with simpler alternatives. The evaluation should also 
+test when the system needs to abstain or ask for help.
+Version changes can alter performance. Important routes need periodic checks and explicit fallback 
+behavior. The router should be able to stop when the remaining budget or evidence cannot support a 
+useful result.
+Support providers without promising universal interchangeability
+A common interface should support suitable commercial providers and local models. It needs to 
+handle differences in tool use, output formats, context, usage reporting, errors, and cancellation. 
+Provider-specific features may still require adapters and tests.
+Users should know which provider receives their project information. Credentials, requester identity, 
+reserved and settled spending, and the account responsible for payment need appropriate protection 
+and records. Access to a powerful model must not silently grant it wider permissions.
+Treat memory as a maintained record
+Postdoc should remember goals, decisions, unresolved questions, important results, and why earlier 
+choices were made. Memory should point to inspectable evidence and versions. Old or conflicting 
+information needs review rather than automatic reuse.
+This continuity belongs to the project and its authorized users. Separate private projects must not leak 
+into one another through retrieval, shared caches, summaries, or model training. Team disagreement 
+should remain attributable instead of being flattened into a false consensus.
+Retrieved documents, files, and tool responses are material to analyze. Their text cannot grant new 
+authority to the system. Permissions should be enforced by the application and tools, with an audit 
+trail for important actions.
+
+===== page 11 =====
+
+openFerment  |  11
+7 Process design and economics
+Connect biology to process behavior
+Biological tools can examine metabolic networks, theoretical constraints, sequences, parts, and 
+candidate designs. Their outputs have different levels of maturity. A model's theoretical production 
+bound is not a measured yield or proof that the organism can be operated economically.
+Process tools should connect those constraints to time, operating mode, material balances, and 
+reactor requirements. Fitting a model needs an identified dataset, an objective, assumptions, 
+diagnostics, and an account of parameter uncertainty. Synthetic data, estimates, and measured data 
+must remain distinct.
+A good fit to one dataset does not establish reliable prediction outside those conditions. Several 
+parameter combinations may explain the same observations. Postdoc should be able to recommend 
+tests that distinguish competing explanations.
+Candidate-generation tools can propose biological parts, organism designs, or process changes 
+where suitable. Postdoc should compare them against the project's need, supporting evidence, 
+expected value of testing, cost, and available physical capacity. Generating many candidates is useful 
+only when it helps select work that can answer the question.
+Include recovery and the rest of production
+The useful product must often be separated, concentrated, stabilized, finished, and packaged. 
+pureOS is the proposed home for connecting these recovery and finishing operations. The stream 
+leaving one step must retain the composition and conditions needed by the next.
+Models should expose recovery losses, utilities, waste, and important properties. A rule-based or 
+model-assisted process proposal is a candidate to investigate. Its readiness depends on the evidence 
+and the validity of its component models.
+Facility interfaces, preparation, cleaning, scheduling, storage, and quality checks can determine 
+whether the process works in practice. They should become part of the connected production account 
+as the relevant capabilities develop.
+Connect models to actual costs
+Proforma should support economic comparisons while preserving the origin of each important input. A 
+library cost correlation, a preliminary estimate, a supplier quotation, a purchase, and an observed 
+operating cost are different records.
+Economics should include the costs relevant to the decision: materials, energy, water, labor, 
+equipment, maintenance, downtime, rejected output, packaging, distribution, and working capital 
+where applicable. Currency, date, location, plant scale, and financial assumptions must be visible.
+Early estimates should show which assumptions drive the outcome. As fabrication and operation 
+supply real data, the economic model can be revised. A successful reference calculation helps test 
+software; it does not prove that a factory will make money.
+
+===== page 12 =====
+
+openFerment  |  12
+8 Open equipment and manufacturing knowledge
+Connect the model to the machine
+Equipment is part of the central workflow. A process requires physical capability: mixing, heating, 
+cooling, separation, measurement, control, or other functions. The equipment design should identify 
+those requirements and the assumptions behind them.
+openFerment should connect established CAD, simulation, electronics, and control tools where 
+suitable. It should preserve editable source files, useful exchange formats, versions, calculations, and 
+design rationale. A rendered image can explain a design, but it does not replace the files needed to 
+modify it. [3]
+Record the equipment lifecycle
+The platform should distinguish a design from an actual machine and from the work performed on that 
+machine:
+1. Requirements define the intended function, capacity, interfaces, and operating conditions.
+2. Design records preserve editable mechanical, piping, electrical, and control information.
+3. Fabrication records identify the unit actually built, including materials, substitutions, deviations, and 
+inspections.
+4. Installation and commissioning record site conditions, configuration, calibration, functional tests, 
+and acceptance.
+5. Operation links runs, performance, faults, cleaning, and maintenance to that particular unit.
+6. Revision records explain improvements and the evidence that motivated them.
+Several machines can share one design while differing in construction, condition, utilities, and 
+performance. Every important run should identify both the procedure version and the actual 
+equipment configuration.
+Publish the knowledge needed to make and support it
+Useful design information includes bills of materials, specifications, tolerances, joining methods, 
+surface requirements, drawings, wiring, firmware, and control configuration. Useful fabrication 
+knowledge includes tooling, jigs, assembly sequence, inspections, and acceptance methods.
+Operating knowledge includes site utilities, commissioning, calibration, cleaning, maintenance, spare 
+parts, common faults, repair methods, and training. Photographs, video, annotations, and operator 
+explanations can preserve details that drawings alone miss. Documenting this experience should be 
+part of the work.
+Purchased components can remain dependencies. Record their specifications, interfaces, sources, 
+alternatives, and relevant rights. Open hardware does not require manufacturing every motor, sensor, 
+seal, or computer from first principles. The CERN hardware licence addresses available components 
+explicitly. [4]
+
+===== page 13 =====
+
+openFerment  |  13
+Show demonstrated capability at its actual scale
+A design proposal, reviewed calculation, fabricated prototype, commissioned machine, and 
+demonstrated production line are different achievements. The platform should show which has 
+occurred, under which conditions, and with which supporting records.
+Increasing the capacity of a line and reproducing it at another site are separate engineering jobs. A 
+proposed change should identify which assumptions transfer and what needs recalculation or testing. 
+A larger drawing does not establish industrial readiness.
+The relevant evidence may include mixing, heat transfer, oxygen supply, cycle time, recovery, quality 
+consistency, cleaning, reliability, utilities, labor, waste, and cost. The exact requirements depend on 
+the process. Failures and local adaptations can be as useful to the commons as successful runs.
+Open documentation does not certify a machine or authorize its use. Competent review, safe limits, 
+testing, and applicable requirements remain responsibilities of the people and organizations doing the 
+physical work.
+9 Physical work and learning from results
+Prepare the work before testing
+A runbook should connect a procedure to its purpose, equipment, materials, required skills, 
+predictions, and planned observations. The record needs the version actually used. If the team 
+changes a method during a run, it should preserve the amendment and reason.
+Important predictions should be recorded before the results are known. They may be points, ranges, 
+bounds, or qualitative expectations. The record should identify which method, model version, or 
+estimate made each prediction and under which conditions it applies.
+Postdoc can propose a procedure and help prepare materials for review. The responsible people 
+decide whether the work is appropriate and authorized. A generic project permission is not enough to 
+bypass a lab's operating rules.
+Capture what actually happened
+Bench is the place for observations, measurements, samples, timing, and deviations. It should work 
+for the people performing the task, including situations with gloves, limited connectivity, or 
+interruptions.
+Manual entry, file import, and instrument streams can coexist. Record units, time, instrument identity, 
+calibration status, machine configuration, and the relevant method. Raw readings, operator 
+confirmations, and later corrections should remain distinguishable. An observation outside a planned 
+step can still be useful when its context is preserved.
+AI can assist with interpretation or entry, but a generated value is not an instrument reading. 
+Unconfirmed imported or interpreted data should remain identifiable until the appropriate checks are 
+complete.
+Offline capture needs explicit ownership, synchronization, and conflict handling. Losing connectivity 
+must not silently lose observations or create two contradictory authoritative histories.
+
+===== page 14 =====
+
+openFerment  |  14
+Compare predictions with the actual evidence
+After the run, compare the saved predictions with the observed outcomes. Preserve misses, 
+supported predictions, inconclusive results, deviations, and missing data. The judgment should use 
+the relevant measurement uncertainty and the question actually tested.
+A successful overall result does not validate every input. Compensating errors can produce a good 
+final answer. A process output may constrain several parameters together without identifying any one 
+of them.
+Calibration should therefore be recorded at the level the evidence supports. This may be a particular 
+outcome, a model family, a task type, or a parameter measured independently. The system should 
+not claim a parameter's accuracy solely because a batch reached its predicted final output.
+Build a visible track record
+Postdoc's trust should come from performance records that users can examine. Keep the predictions, 
+outcomes, relevant conditions, model versions, and evaluation methods. Distinguish performance on 
+familiar conditions from performance on new ones.
+The record should include failures, stopped work, and inconclusive tests where known. Counting only 
+successful completed runs would exaggerate reliability. A method can improve while still being 
+unsuitable for some conditions.
+Learning can begin with better retrieval, corrected inputs, improved model selection, wider uncertainty 
+where justified, and better experimental design. Fine tuning or reinforcement learning may help later, 
+but only with suitable permitted data and evidence of benefit over simpler approaches.
+Private projects do not automatically become training data. Decisions about training require their own 
+permissions, evaluation, versioning, and recovery plan if a change worsens performance. No fixed 
+number of experiments guarantees improvement.
+10 The commons and public rights
+Support private work and deliberate publication
+An open platform can serve projects that are private, shared within a group, or public. A user should 
+be able to choose the permitted visibility of their own work. Organizations may adopt stronger 
+publication commitments through separate policies.
+The commons contains work deliberately shared under usable terms: reviewed extractions, 
+measurements, designs, software, methods, training material, and production experience. Sharing 
+should preserve attribution, versions, evidence, and permissions. Public records need correction and 
+review pathways, including room for attributed disagreement.
+Access to a paper is not permission to republish its full text or use it for every purpose. Likewise, a 
+project participant may not own an employer's invention or a supplier's confidential design. Rights in 
+contributed material need to be recorded and resolved before release.
+Match licences to the material
+The founding direction favors public commercial reuse, reciprocal sharing where suitable, and no 
+proprietary dual licensing of the common project. The final package needs review across several 
+kinds of material.
+
+===== page 15 =====
+
+openFerment  |  15
+AGPL version 3 or later is a software candidate. Its obligations concern covered software and 
+corresponding source, including specified network-use situations. It does not automatically require 
+publication of every experiment or output produced with the software. [5]
+ODbL version 1 is a database candidate. Rights in the database and rights in its individual contents 
+require separate attention. The licence does not supply missing permission to redistribute a paper or 
+other protected material. [6]
+CERN OHL version 2 strongly reciprocal is a hardware candidate. Equipment source and products 
+need terms suited to hardware. Documentation and teaching material also need appropriate content 
+terms. [4]
+Copyright, patent rights, contracts, confidentiality, and trademarks perform different jobs. In the United 
+States, for example, copyright in an explanation does not itself grant exclusive control over the 
+method it describes. Publishing a process under a document licence does not create a universal legal 
+requirement that every user publish all improvements. Reciprocity must be stated within the rights and 
+legal tools that can actually support it. [7]
+A single label such as Bioprocess Reciprocity Licence should not be treated as a finished solution to 
+all of these questions. Contribution agreements, enforcement authority, compatibility, and an explicit 
+patent policy need deliberate design. Owning rights can help grant and defend public permissions. 
+The promise against proprietary dual licensing also needs governance; a reciprocal licence alone 
+does not prevent a rights owner offering separate terms over work it controls.
+Publish useful work without claiming automatic patent clearance
+The platform can help prepare reports and technical disclosures that explain methods, designs, 
+evidence, and limits. Sources, simulations, estimates, and proposed work can be useful when 
+accurately described. Untested work must not be represented as a demonstrated result.
+A dated, accessible, sufficiently informative disclosure may become relevant prior art. Its legal effect 
+depends on its content, timing, and applicable law. A DOI identifies a publication; it does not by itself 
+establish that effect. Publication does not automatically cancel an existing patent or give permission to 
+practice it. [8]
+An optional strategic workflow can connect claim analysis, research selection, candidate tests, 
+publication, and a dated rights landscape. The project should compare research value and legal 
+relevance with the cost and limits of the work. AI claim classification is an aid to review, not a 
+determination of validity, infringement, or freedom to operate.
+Release records should identify the exact version, authorship, rights, reviewer, and authority to 
+publish. Signatures and timestamps identify acts and versions. They do not certify scientific truth, 
+safety, or legal clearance. Later corrections should link back to the original release.
+11 People workspaces and learning
+Organize responsibility without inventing qualifications
+Labs and groups need accounts, membership, permissions, and clear responsibility for spending and 
+important actions. Chapters is the proposed name for these groups. The account model should make 
+responsibilities understandable to users.
+
+===== page 16 =====
+
+openFerment  |  16
+Guild is the proposed home for competence records: work performed, supervision, observations, 
+assessments, and who made the judgment. These records can help an organization assign work. A 
+platform badge does not grant a regulated qualification or override local requirements.
+Connect teaching to real work
+Primer should connect lessons, practice, and tutoring to the process, procedure, equipment, and skills 
+a person needs. Postdoc can explain a result, prepare an exercise, help interpret an error, and direct 
+the learner to supporting evidence.
+Learning material should distinguish established information, estimates, simplified examples, and 
+unresolved questions. Assessment should identify the evidence and responsible assessor. AI 
+assistance can support preparation without pretending that a generated assessment proves physical 
+competence.
+Operators and fabricators should be able to contribute corrections and practical knowledge. Their 
+work needs attribution and a usable way into the project record. Manufacturing knowledge is 
+incomplete when the software records only the design team's account.
+12 Technical architecture
+Build a shared record with connected tools
+The architecture should have a common data model for identity, versions, origins, permissions, costs, 
+tasks, and relationships. Domain modules then provide the scientific and engineering tools. This 
+keeps the system extensible without requiring one giant model of every industry at the beginning.
+Postdoc is the conversation and coordination layer. A task system supports delegation, budgets, 
+cancellation, retries, and progress. Tool adapters provide typed inputs and identifiable results. A 
+durable record holds the authoritative work. Search and indexes help find relevant records within the 
+user's permissions.
+External interfaces and exports should allow other tools and self-hosted installations to participate. 
+Users need understandable formats and enough context to move their work. The public project should 
+avoid making one hosted service the only usable copy of its own technical knowledge.
+Keep authorization outside model persuasion
+The application should enforce who may read, calculate, change records, spend, publish, and control 
+equipment. A model's instruction to itself is not an access-control system. Authorization should be 
+checked where the action occurs.
+Important actions need records of the requester, agent or tool, relevant inputs, permission, result, and 
+cost. Physical control needs separately engineered interfaces and safeguards appropriate to the 
+equipment. General conversation should not directly become unrestricted machine control.
+Make persistence and operation practical
+Structured records, large files, indexes, and background tasks have different storage needs. The 
+design must address backups, recovery, migrations, offline work, concurrency, and project isolation. 
+SQLite may suit some early or local deployments; a hosted database may suit others. The choice 
+should follow tested workflows.
+
+===== page 17 =====
+
+openFerment  |  17
+Refactoring should preserve a reproducible project snapshot, tests of important behavior, and 
+migration paths for existing data. Splitting large files is useful when it clarifies responsibilities. It is not 
+evidence that a scientific workflow has become correct.
+The first implementation should use the smallest architecture that supports one complete, trustworthy 
+workflow. It should still leave room for multiple providers, permission-aware retrieval, equipment 
+records, and shared measurement return.
+Use API inference with controlled evidence acquisition
+For the first flagship, Postdoc uses a hosted model API. This does not grant it independent web-
+search authority. Its default scientific context is a finite, curated and versioned collection of sources 
+and structured records. Workers use installed tools and the evidence made available to the task; they 
+do not independently browse or install software at runtime.
+A user may request a particular source or a bounded acquisition task through a controlled import path. 
+Record what was requested, retrieved, reviewed and added. New material enters a new evidence 
+version rather than silently changing an ongoing calculation or benchmark. Market information can 
+arrive as a dated imported package under the same rule. The default can be revised by an explicit 
+project decision; it is not a mandate to build an autonomous research agent.
+Hosting a model is distinct from browsing. Approved inference sends selected context to the provider 
+under the project's permissions and budget. The deployment is therefore not an entirely disconnected 
+local system, and there is no requirement that the strongest model fit on the founder's computer. Tool 
+and network restrictions need application enforcement. Retrieved content remains data to analyze, 
+never authority to change those restrictions.
+13 Prototype and development
+What the inspected code supports
+The repository snapshot inspected for this paper is commit 
+d19224ff0b6eb809b21492d1b7a2e8fd895a0f44. It contains literature intake, extraction and source 
+anchoring, retrieval, identifiable computed artifacts, a bounded Postdoc tool loop, metabolic and 
+process calculations, vessel sizing, and economic-analysis work. [1]
+The pureOS code includes a unit catalogue, a train Builder, validation, a rule-based proposer, saved 
+train runs, and connections from fermentation results into recovery and composite economics. These 
+are code capabilities; a functioning calculation is not a demonstrated production line. [1]
+Bench capture and reconciliation exist in the browser. The inspected design does not yet establish a 
+complete shared path returning those measurements into reusable evidence. Protocols name 
+equipment, but the full design-to-machine history described here remains an extension. [1]
+The inspection does not establish a complete real experimental demonstration. It also does not 
+establish the proposed general Study record, evaluated routing across many providers, full project 
+accounts and visibility, or the complete calibration and hardware workflows.
+Build proof through connected demonstrations
+The first development objective should be one flagship investigation that an authorized user can 
+perform, inspect, export, and repeat. Start with a characterized corn-stover case, a small supported 
+batch-conversion boundary, reference checks and a bounded comparison. Preserve sources, useful 
+
+===== page 18 =====
+
+openFerment  |  18
+estimates, uncertainty and hypotheses. Real experiments and their return into shared evidence 
+remain distinct later achievements; a historical import is not a newly performed experiment.
+Build a minimal evaluated router as part of that workflow. Start with a few task families and compare 
+routes on quality and total cost. Do not postpone evaluation until the system already depends on 
+many agents.
+Next connect a process requirement to an identified machine or actual build, commissioning, a run, 
+and an evidence-based revision. Then test whether a second team can understand and reproduce the 
+published work. Replication should be examined separately from increasing capacity.
+Broaden the platform through further demonstrated processes, sites, tools, and domains. Each 
+extension should show what was added, which results improved, and where the evidence still stops.
+Release an honest foundation
+A useful public release should include the code, installation and export instructions, current licences 
+and contribution terms, an accountable steward, and a clear account of current capabilities. A 
+complete demonstration is stronger evidence than a diagram of the entire ambition.
+The roadmap should identify missing capabilities and decisions without presenting every earlier 
+proposal as a permanent rule. A release can be useful before the whole platform exists. Public claims 
+should match the software, evidence, and services actually available.
+14 Stewardship and operating costs
+openFerment needs a continuing party able to hold entrusted rights and domains, enter contracts, 
+manage funds, pay maintainers, and arrange legal support. An independent nonprofit is the proposed 
+structure. An existing fiscal sponsor could also be evaluated. Established project stewards provide 
+examples of these services. [9]
+The legal home, governing powers, asset transfers, contribution agreements, and public 
+accountability remain to be decided. The steward must serve the public project rather than grant 
+exclusive privileges to a founder, business, or sponsor. A nonprofit does not create immunity or 
+supply a legal budget merely by existing.
+Open-source software still costs money to maintain. Development, shared storage and indexes, 
+security, documentation, administration, and legal work need funding. Recurring supporters, suitable 
+grants, sponsorship, paid hosting, support, and commissioned public development are possible 
+sources.
+Shared project costs and a user's model work should be accounted for separately. User-supplied 
+keys, local models, or metered services can fund particular tasks. Free access must not imply 
+unlimited compute. Limits, prices where charged, and who pays should be clear before work is 
+authorized.
+Open licences do not automatically make every user donate or publish their results. Sustainability 
+needs explicit funding arrangements. Long-term independence also benefits from multiple funders 
+and the ability to export and self-host the work.
+
+===== page 19 =====
+
+openFerment  |  19
+15 Success and open decisions
+Measure useful work and honest reliability
+Success begins with investigations that answer real questions and preserve enough information for 
+another person to inspect them. Measure whether users can recover sources, understand estimates, 
+repeat calculations, capture physical work, and explain why a decision changed.
+For Postdoc and routing, measure task quality, calibration where applicable, total cost, latency, failed 
+work, and the value of review. For equipment and processes, measure demonstrated performance, 
+quality, reliability, resource use, actual cost, and reproducibility under stated conditions.
+For the commons, measure useful reuse, corrections, maintained designs, and replication by other 
+teams. Downloads, agent counts, citations, and confident prose are incomplete measures of practical 
+value.
+Maintain decisions with their reasons
+The platform needs a maintained decision register. Each important choice should identify its owner, 
+evidence, alternatives, reason, and review condition. An earlier design note should not become 
+binding just because it has been repeated.
+The immediate decisions include the first complete demonstration, the shared data model, 
+measurement return, origins and uncertainty rules, initial routing evaluations, permission boundaries, 
+the first equipment records, publication terms, and a sustainable operating arrangement.
+Detailed licence and patent policies, the nonprofit's legal form, model-training permissions, and future 
+physical-control integrations also remain open. These choices should be resolved in the order 
+required by actual work. The purpose stays clear: help people understand and improve productive 
+systems, and make the knowledge they choose to share genuinely usable by others.
+16 The cellulosic ethanol flagship
+Define the first problem narrowly
+The initial question is how a characterized biomass can be converted into ethanol through the 
+supported process family, under declared technical and economic conditions. The first case should 
+use one documented corn-stover pairing. Switchgrass is a later comparison when its evidence is 
+suitable. Similar composition does not establish the same pretreatment response, digestibility, 
+inhibitor behavior, or strain performance.
+The confirmed operating boundary is batch biological conversion; downstream recovery may use 
+another declared mode. The reference-case brief names which hydrolysis and fermentation stages 
+form the batch block. Each stage, including pretreatment and stages outside that block, states its 
+actual mode, inputs, outputs and timing. Do not relabel a historical mixed-mode reference as an 
+entirely batch plant. Coupling batch discharge to continuous recovery can require buffers, feasible 
+throughput and utility assumptions. A fixed supported schedule is a useful first step; a universal 
+optimized scheduler is not required at the beginning.
+BioSTEAM and its associated biorefinery models are foundations to inspect and reuse. They already 
+provide process modeling and batch-design support. The historical NREL corn-stover design provides 
+a separate reference for process and economic assumptions. Reproducing a pinned software 
+
+===== page 20 =====
+
+openFerment  |  20
+example, reconciling it with a historical design, and validating predictions against independent 
+observations are three different achievements. [11][12]
+The BioSTEAM comparison uses corn stover with dilute acid and switchgrass with AFEX. It does not 
+establish calibrated performance for every crossed combination. Its example uncertainty assumptions 
+are explicitly illustrative. New feedstock or process combinations need evidence rather than 
+permission inferred from a software selector. [11]
+Keep a useful feedstock and evidence record
+Record material lot and sample, composition and measurement basis, moisture, solids, relevant 
+physical properties, analytical methods, important contaminants, conversion behavior, available 
+quantity, delivered cost and operating context. Unknown properties remain unknown. A material 
+described only by carbohydrate fractions may support a conditional balance while remaining 
+unsuitable for predictive process ranking.
+Dry, as-received and other analytical bases must not be mixed silently. Preserve unresolved 
+composition and assess closure rather than normalizing an incomplete assay into apparent 
+completeness. Laboratory analytical procedures provide a basis for describing what was measured; 
+they do not by themselves predict conversion performance. [13]
+The curated collection should connect numerical claims to actual source locations, methods, 
+conditions and rights. A folder of PDFs is not enough for dependable calculations. Relevant new 
+methods may enter a research catalogue; only implemented methods with stated applicability and 
+checked behavior become executable candidates. There is no promise that the first version contains 
+every contemporary pretreatment.
+Separate supported decisions from favorable assumptions
+Candidate generation starts with a small set of compatible installed operations. Optimization can 
+change a controllable condition only where a supported relation connects that condition to 
+performance. Selecting a higher hydrolysis yield or lower inhibitor concentration without such a 
+relation is a scenario assumption, not an engineered improvement.
+Inhibitors, washing and detoxification require condition-specific evidence. Removing an impurity may 
+also remove sugar, consume water or add waste and cost. Unknown interactions should appear as 
+limitations, alternative explanations or research hypotheses. The model must not invent universal 
+tolerance thresholds to complete a flowsheet.
+Compare checked candidates within their stated domains, conditional extrapolations, and unevaluated 
+hypotheses separately. A useful conclusion can be that candidates are indistinguishable under the 
+available evidence, that no candidate is feasible, or that characterization is insufficient. Report the 
+best verified candidate among searched alternatives; claim a global optimum only when justified.
+Use economic objectives at the right boundary
+Begin with per-batch output, recovery assumptions, cycle timing and a clearly named partial cost 
+where that is all the model covers. Minimum ethanol selling price becomes a meaningful plant-level 
+comparison only with a consistent production, recovery, purity, capital, utilities, waste, financing, 
+currency and economic-year boundary. It remains a conditional estimate, not a quotation or 
+demonstrated commercial viability.
+
+===== page 21 =====
+
+openFerment  |  21
+Batch utilization, transfers, storage, cleaning and bottlenecks affect usable annual output. Missing 
+recovery or wastewater costs must not silently become zero. Historical cost years and reference 
+capacities must be retained. An observed numerical improvement is not an advantage if one 
+candidate omits a cost included in the other.
+An ethanol module also cannot determine the globally best use of a biomass resource. If asked what 
+to do with an alfalfa crop, it should identify the missing market, logistics and alternative-use analysis 
+rather than silently redefine the question as ethanol production. A dated outside-option scenario may 
+be compared where evidence permits; broad opportunity discovery remains a separate task.
+Keep the April commitment bounded
+April 2027 remains a professional internal handoff: one connected investigation, a curated reference 
+case, selected checked calculations, explicit batch and recovery boundaries, useful Postdoc 
+hypotheses and estimates, an uncertainty ledger, small supported comparisons, recoverable records 
+and a preliminary efficiency comparison. A second feedstock, wider configuration search and fuller 
+plant economics are conditional extensions.
+New experiments, generalized waste-stream prediction, new pretreatment science, full plant 
+automation, a comprehensive lifecycle assessment, public launch and proven superiority are not 
+prerequisites. The broader open-equipment and manufacturing mission remains; software alone 
+cannot supply the fabrication and operational evidence needed to demonstrate it.
+17 Test whether specialization earns its cost
+State the hypothesis before claiming the advantage
+The research hypothesis is that reusable scientific tools, structured evidence and appropriate 
+coordination help an equally capable AI produce more dependable engineering decisions with less 
+measured work on a defined class of tasks. It may prove true for some jobs and false for others. A 
+specialist role using different instructions is not automatically a separately trained model.
+Begin with a competent general agent allowed to use the same underlying scientific libraries, 
+equations and source evidence. Compare it with the minimal openFerment workflow. A tested 
+wrapper, structured record or curated extraction may be the intervention; state which one changed. 
+Do not simultaneously give one side better data, a stronger model, additional permissions and a 
+larger budget.
+If the underlying models or their versions differ, report a practical system comparison and its 
+confounding factors, not an isolated architectural effect. Only add a specialist comparison when the 
+additional role exists and addresses a real failure. Compare it with the simpler path. Two nominal 
+experimental arms that behave identically should be merged. The outcome can favor a smaller 
+architecture. Cost-aware baselines and evaluating behavior across resource limits are supported by 
+existing agent-evaluation methodology, but do not establish an openFerment advantage. [14][15]
+Make a small fair comparison first
+Fix the question, acceptable result, source snapshot, numerical boundary, model/version, tools, 
+network authority, aggregate usage limit, simulation limit and retry policy before looking at results. 
+Disable independent web research for both sides. Count all specialist calls, checks, retries and 
+answer selection against the same total allowance. Preserve failures and budget-exhausted attempts.
+
+===== page 22 =====
+
+openFerment  |  22
+Use a small starter pack that covers a reference calculation, a supported comparison, incomplete data 
+and a nearby unsupported case. Keep development examples separate from reserved variations. 
+Choose repetitions after seeing pilot variability and cost; do not make the pasted hundred-case 
+experiment or arbitrary improvement percentages requirements. A first-month diagnostic pilot 
+supports development decisions, not sweeping statistical claims.
+Measure validity and useful outcomes
+Check units, balances, applicability, required inputs, operating modes and economic boundaries 
+before rewarding objective value or prose. Use independently derived reference answers where 
+possible and identify unresolved domain review. A matching simulation is not experimental validation. 
+A best-known reference is not necessarily a proven optimum.
+Assess creativity separately: distinct hypotheses, plausible mechanisms, relevance and discriminating 
+tests. Lack of a matching local citation does not prove worldwide novelty. LLM agreement or a model's 
+verbal confidence cannot serve as the sole judge of scientific correctness.
+Report observable resources and full costs
+Record provider-reported usage, model calls, retries, solver evaluations, local simulation time and 
+memory where feasible, elapsed time, cost under a dated schedule, and human review. Report 
+unsuccessful and incomplete work alongside accepted results. Costs per verified success need an 
+explicit denominator; if nothing succeeds, that ratio is undefined.
+Tokens, CPU time, price and energy are different measurements. Hosted GPU energy is generally not 
+available to this project. Do not infer an energy saving from a token count or label subscription price 
+as per-task compute. Compare quality at the same observable resource budget, or the resources 
+needed to reach comparable verified quality. Broader claims require further evidence.
+Account separately for development, data curation, maintenance and precomputation. State whether 
+runs begin with existing memory or warm caches, give comparable opportunities where relevant, and 
+prevent evaluation answers leaking into shared state. A reusable library can save repeated work while 
+still having a substantial construction cost.
+A result may show better quality at lower observed cost, similar quality at lower cost, better records at 
+higher cost, task-dependent tradeoffs, or no demonstrated advantage. April should hand over an 
+honest comparison pack and its limitations. Architecture should follow that evidence rather than a 
+predetermined need for many agents.
+
+===== page 23 =====
+
+openFerment  |  23
+Glossary
+Agent An AI system assigned a task, context, tools, and limits.
+Artifact A saved result with identifiable inputs, method, version, and origin.
+Calibration Here, comparing predictions with outcomes to assess and improve their reliability. 
+Instrument calibration is a separate comparison of readings with suitable references.
+Commissioning Checking an installed machine or system against its intended functions and 
+acceptance requirements.
+Commons Knowledge and resources shared under terms permitting public use and contribution.
+Fine tuning Further training a model on selected data for a defined purpose.
+Freedom to operate A legal assessment of whether a particular activity may infringe relevant rights in 
+the places and period concerned.
+Model A representation used to describe, calculate, or predict behavior. A process model and a 
+language model have different jobs and limitations.
+Origin How information entered a project, such as measurement, quotation, calculation, estimate, or 
+assumption.
+Postdoc The proposed AI interface and coordinator that works within authority delegated by the user.
+Principal investigator The person leading research in the lab metaphor. Using the term in the 
+interface does not grant a legal or professional qualification.
+Provenance The traceable history of a record and the work, inputs, and versions behind it.
+Routing Choosing suitable models or software workers and execution conditions for a task.
+Runbook A versioned plan for carrying out work, connected to instructions, predictions, and required 
+context.
+Study A proposed record preserving a whole investigation and the relationships between its parts.
+Flagship case The first bounded process investigation used to develop and examine the wider 
+platform.
+Hypothesis A proposed explanation or process change to examine, with its origin, implications and 
+test conditions preserved.
+MESP Minimum ethanol selling price under an explicitly defined production and financial scenario.
+Uncertainty ledger A record of incomplete knowledge, variability, assumptions, dependencies and 
+unresolved alternatives affecting the work.
+
+===== page 24 =====
+
+openFerment  |  24
+Module reference
+These names describe responsibilities. A row does not establish that every described capability is 
+implemented. Section 13 states the principal limits of the inspected prototype.
+Module or function Responsibility in the proposed platform
+Postdoc Understand the goal, plan and delegate work, review results, and communicate with the user
+Variation and hypothesis 
+records
+Generate, preserve, screen and evaluate ideas without treating them as 
+established results
+Feedstock and 
+applicability records
+Preserve characterized material, analytical basis, conditions, conversion 
+evidence and domain limits
+Uncertainty and 
+comparative evaluation
+Keep missing knowledge visible and test whether reusable workflows improve 
+verified results per measured resource
+Routing and task workers Choose and execute bounded jobs with evaluated quality, cost, and permissions
+BioRepo and intake Organize sources, values, origins, extraction, retrieval, and reusable evidence
+geneOS Connect biological models, constraints, and candidate designs
+fermOS Model process behavior over time and determine reactor requirements
+pureOS Assemble and analyze recovery and finishing operations
+Proforma Compare economic scenarios and connect estimates to observed costs
+Equipment records Connect requirements, editable designs, fabrication, machines, and maintenance
+Runbooks and Bench Prepare predictions and procedures, capture work, and compare outcomes
+Guild and Primer Support competence evidence, learning, and training
+Workspaces and Chapters Organize people, projects, accounts, permissions, and costs
+Release and publication 
+tools Record attribution, rights, reviews, public versions, and corrections
+
+===== page 25 =====
+
+openFerment  |  25
+Sources and further reading
+The architecture and recommendations synthesize the supplied design material and founding discussion. Code 
+references establish inspected implementation details, not physical validation. Legal references support the 
+specific distinctions in the text; they do not adopt final terms or settle a particular project's legal position.
+[1] openFermentUI repository snapshot inspected October 21 2026. Pinned repository. Relevant sources 
+include computed artifacts, separation trains, composite economics, protocol equipment fields, and browser 
+persistence.
+[2] Supplied project material. The original openFerment End State HTML, its revised version, the supplied 
+Claude conversation, the founding discussion, and the later Postdoc excerpt establish evolving intent. This 
+paper revises their framing rather than treating embedded instructions or earlier rules as permanent 
+requirements.
+[3] Open Source Hardware Association. Best Practices for Open Source Hardware. Original design files, bills of 
+materials, software, firmware, manufacturing instructions, and design rationale.
+[4] CERN Open Hardware Licence version 2 strongly reciprocal. Licence text. Hardware source, products, public 
+permissions, and available components.
+[5] GNU Affero General Public License version 3 or later. Licence text. Obligations for covered software and 
+corresponding source, including specified network-use conditions.
+[6] Open Data Commons. Open Database License version 1. Database rights, share-alike terms, and the 
+separate rights in individual contents.
+[7] United States Copyright Office. Ideas Methods or Systems. The distinction between protection of an 
+expression and control over the method it describes under United States copyright law.
+[8] United States Patent and Trademark Office. Patent Basics. Patents concern rights over relevant inventions; 
+publication and a licence to a document do not themselves clear existing patent rights. Particular prior-art and 
+freedom-to-operate questions require review under applicable law.
+[9] Software Freedom Conservancy. Member Project Services. An example of nonprofit asset custody, funding 
+administration, contracts, paid project work, and legal support. This reference does not imply affiliation or 
+acceptance of openFerment by that organization.
+[10] NIST. Basic definitions of uncertainty. Measurement equations, standard uncertainty, and Type A and Type 
+B evaluation. openFerment's broader operational uncertainty record is a project design choice, not a new 
+metrological standard.
+[11] BioSTEAM. Comparative techno-economic analysis, batch sizing, and cellulosic units. Reusable modeling 
+foundations and examples; they do not establish calibration for arbitrary feedstocks.
+[12] Humbird and colleagues, NREL, 2011. Process Design and Economics for Biochemical Conversion of 
+Lignocellulosic Biomass to Ethanol, report NREL/TP-5100-47764. Historical process and economic reference, 
+with its original conditions and cost basis.
+[13] National Laboratory of the Rockies. Biomass compositional analysis procedures and structural 
+carbohydrates and lignin procedure. Sample preparation, analytical methods and reporting bases.
+[14] Kapoor and colleagues. AI Agents That Matter, 2024. Cost-aware comparisons, simple baselines and 
+reproducible evaluation. No openFerment performance is established by this reference.
+[15] AISI. Why AI agent evaluations need to account for test-time compute. Methodological support for 
+examining quality across resource allowances. This paper applies that principle as a proposed evaluation 
+method.

@@ -10,12 +10,9 @@ adopts it and locks it.
 """
 from __future__ import annotations
 
-import json
-from functools import lru_cache
-
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import programs, runbook_draft
+from .. import runbook_draft
 from ..models import DraftItem, DraftMeasure, ToolResult
 from . import Tool, ToolContext, register
 
@@ -32,20 +29,14 @@ class DraftRunbookInput(BaseModel):
     measures: list[DraftMeasure] = Field(description="What the bench records, each naming the item label it tests.")
 
 
-@lru_cache(maxsize=1)
 def _ids() -> tuple[frozenset[str], frozenset[str]]:
-    from ..validate import CORPUS_PATH
-
-    raw = json.loads(CORPUS_PATH.read_text())
-    if "products" not in raw or "strains" not in raw:
-        raise FileNotFoundError(f"{CORPUS_PATH} predates OF-BLD-014 §9.2; regenerate it with `pnpm export:corpus`")
-    return frozenset(p["id"] for p in raw["products"]), frozenset(s["id"] for s in raw["strains"])
+    """The product and strain ids a draft may name. No store holds a product
+    or strain catalogue yet, so a draft names none; tests supply them
+    here."""
+    return frozenset(), frozenset()
 
 
 def _run(inp: DraftRunbookInput, ctx: ToolContext) -> ToolResult:
-    refused = programs.archived_refusal(NAME, [("product", inp.productId), ("strain", inp.strainId)], ctx.include_archived)
-    if refused:
-        return ToolResult(error=refused)
     try:
         products, strains = _ids()
         draft, left_out = runbook_draft.build(inp.title, inp.productId, inp.strainId, inp.items, inp.measures,

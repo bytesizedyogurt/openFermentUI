@@ -22,107 +22,79 @@
 // measures. A reader who does not know where that line falls will look for
 // titre here and conclude the platform lost it.
 //
-// PROGRAMS (OF-BLD-016 §2.2). The Hosts badge and count, and every molecule
-// count on the Pathway view, pass the program selector; a route that only
-// archived molecules declare leaves the Pathway list with them, while a route
-// nobody declares still reads "on none". With the switch on, all as before.
+// HOSTS AND ROUTES (alpha 2.0, ADR-010). The Hosts badge counts the strains
+// the store holds, and the Pathway view lists the routes the products on file
+// declare. Both are empty: no store holds a strain or product catalogue yet.
 import { useMemo } from 'react';
-import { STRAINS } from '@/data/strains';
-import { PATHWAYS } from '@/data/vocabulary';
-import { PRODUCTS } from '@/data/products';
-import { useProgramFilter } from '@/store';
+import { useStore } from '@/store';
 import { href, useRoute } from '@/router';
-import { Callout, Card, PageHeader, SectionTitle, cx } from '@/components/ui';
+import { Callout, Card, EmptyState, PageHeader, SectionTitle } from '@/components/ui';
 import GeneOSModel from './GeneOSModel';
 import { OwnerTabs, activeTab, type OwnerTab } from '@/components/OwnerTabs';
 import { ComponentTag } from '@/components/ComponentTag';
-import { SubsystemReference, SubsystemShelf } from '@/components/ReferenceView';
+import { SubsystemShelf } from '@/components/ReferenceView';
 import Organisms from './Organisms';
 
+/** Each route the products on file declare, with how many declare it, most first. */
+function useRoutes(): [string, number][] {
+  const products = useStore((s) => s.products);
+  return useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const product of products) {
+      for (const id of product.pathwayIds ?? []) counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [products]);
+}
+
 /**
- * Pathway — the biosynthetic vocabulary, and who declares each route.
+ * Pathway — the routes the products on file declare.
  *
- * A LIST, NOT A MODEL. Every entry is a route that already exists in
- * `vocabulary.ts` and is already cited by molecules in the catalogue; the
- * counts are derived from `PRODUCTS` rather than declared, so a route nobody
- * uses reads as zero instead of being quietly dropped. Nothing here balances a
- * pathway, checks it against a host, or computes a flux — those are the parts
- * that have no code, and they are named on the shelf below.
+ * A LIST, NOT A MODEL. Every entry is a route id a product names, and its
+ * count is derived from the products rather than declared. Nothing here
+ * balances a pathway, checks it against a host, or computes a flux — those are
+ * the parts that have no code, and they are named on the shelf below.
  */
 function PathwayView() {
-  const shows = useProgramFilter();
-  const { usage, hiddenUsage } = useMemo(() => {
-    const counts = new Map<string, number>();
-    const hidden = new Map<string, number>();
-    for (const product of PRODUCTS) {
-      const into = shows('product', product.id) ? counts : hidden;
-      for (const id of product.pathwayIds ?? []) {
-        into.set(id, (into.get(id) ?? 0) + 1);
-      }
-    }
-    return { usage: counts, hiddenUsage: hidden };
-  }, [shows]);
-
-  // A route only archived molecules declare belongs to them and is hidden
-  // with them; a route nobody declares stays, and reads "on none".
-  const routes = PATHWAYS.filter((p) => usage.has(p.id) || !hiddenUsage.has(p.id));
-  const unused = routes.filter((p) => !usage.has(p.id)).length;
-
+  const routes = useRoutes();
   return (
     <>
-      <Callout kind="info" title="A vocabulary of routes, not a pathway model">
-        Each row names a metabolic route and the branch point flux has to be pushed through.
-        Nothing here balances a pathway, sizes a precursor pool, or checks a route against the
-        host that would carry it. What exists is the shared language the molecule catalogue
-        describes a route in, which is worth surfacing because it is real.
+      <Callout kind="info" title="The routes products declare, without a pathway model">
+        Each row names a metabolic route a product on file declares. Nothing here balances a pathway, sizes a
+        precursor pool, or checks a route against the host that would carry it.
       </Callout>
 
       <section aria-labelledby="pathway-routes" className="mt-5">
-        <SectionTitle
-          right={
-            <span className="font-num text-caption text-ink-soft">
-              {routes.length} routes
-              {unused > 0 ? ` · ${unused} on no molecule` : ''}
-            </span>
-          }
-        >
-          <span id="pathway-routes">Routes in the vocabulary</span>
+        <SectionTitle right={<span className="font-num text-caption text-ink-soft">{routes.length} routes</span>}>
+          <span id="pathway-routes">Routes products declare</span>
         </SectionTitle>
-        <Card className="px-4 py-1">
-          <ul>
-            {routes.map((pathway) => {
-              const used = usage.get(pathway.id) ?? 0;
-              return (
-                <li key={pathway.id} className="py-2.5 border-b border-line/70 last:border-0">
+        {routes.length === 0 ? (
+          <Card className="py-0">
+            <EmptyState
+              title="No route is declared yet"
+              body="A route shows here once a product on file declares it. Products arrive with the documents that report them, through Intake."
+            />
+          </Card>
+        ) : (
+          <Card className="px-4 py-1">
+            <ul>
+              {routes.map(([id, used]) => (
+                <li key={id} className="py-2.5 border-b border-line/70 last:border-0">
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="font-num text-body text-ink">{pathway.label}</span>
-                    <span className="text-caption text-ink-soft">{pathway.fluxNode}</span>
+                    <span className="font-num text-body text-ink">{id}</span>
                     <span
-                      className={cx(
-                        'ml-auto font-num text-caption shrink-0',
-                        used > 0 ? 'text-ink-soft' : 'text-ink-soft/55',
-                      )}
-                      title={
-                        used > 0
-                          ? `${used} molecule${used === 1 ? '' : 's'} in the catalogue declare this route`
-                          : 'no molecule in the catalogue declares this route'
-                      }
+                      className="ml-auto font-num text-caption shrink-0 text-ink-soft"
+                      title={`${used} product${used === 1 ? '' : 's'} on file declare this route`}
                     >
-                      {used > 0 ? `on ${used}` : 'on none'}
+                      on {used}
                     </span>
                   </div>
-                  <div className="text-body text-ink-soft mt-0.5">
-                    {pathway.products.join(', ')}
-                    {pathway.note ? ` — ${pathway.note}` : ''}
-                  </div>
                 </li>
-              );
-            })}
-          </ul>
-        </Card>
+              ))}
+            </ul>
+          </Card>
+        )}
       </section>
-
-      <SubsystemReference id="geneos.pathway" />
     </>
   );
 }
@@ -155,17 +127,8 @@ function StoichiometryToDynamics() {
 
 export default function GeneOS() {
   const route = useRoute();
-  const shows = useProgramFilter();
-  // OF-BLD-016 §2.2 — the counts the program switch lets show.
-  const hosts = useMemo(() => STRAINS.filter((s) => shows('strain', s.id)).length, [shows]);
-  const routeCount = useMemo(() => {
-    const declared = new Map<string, boolean>();
-    for (const product of PRODUCTS) {
-      const shown = shows('product', product.id);
-      for (const id of product.pathwayIds ?? []) declared.set(id, (declared.get(id) ?? false) || shown);
-    }
-    return PATHWAYS.filter((p) => declared.get(p.id) !== false).length;
-  }, [shows]);
+  const hosts = useStore((s) => s.strains.length);
+  const routeCount = useRoutes().length;
   const tabs: OwnerTab[] = useMemo(
     () => [
       { label: 'Hosts', to: '/geneos/hosts', badge: hosts },
@@ -194,9 +157,10 @@ export default function GeneOS() {
         <PathwayView />
       ) : (
         <>
-          <Callout kind="info" title="Hosts is the built part of geneOS">
-            The catalogue and its strain pages are real: hosts, lineages, and the extraction
-            records anchored to each. Choosing a chassis is a genetic design decision — it sets
+          <Callout kind="info" title="Hosts">
+            The strain catalogue and its pages: hosts, lineages, and the extraction records
+            anchored to each, as a project's records name them. Choosing a chassis is a genetic
+            design decision — it sets
             whether the product is secreted, whether endotoxin clearance is mandatory, and what
             the entire downstream train will have to be — which is why it lives here rather than
             with the reactor.
@@ -204,7 +168,6 @@ export default function GeneOS() {
           <div className="mt-5">
             <Organisms embedded />
           </div>
-          <SubsystemReference id="geneos.hosts" />
         </>
       )}
 

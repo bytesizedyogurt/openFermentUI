@@ -13,41 +13,41 @@ CORE = Path(__file__).resolve().parents[1]
 
 
 # R1 — the toy network is a stand-in: refused through the API and the tool,
-# and modeled (demo) wherever a fixture uses it.
+# and assumed wherever a fixture uses it.
 def test_the_public_paths_refuse_the_toy():
     with pytest.raises(geneos.GeneosUnavailable, match="no model toy"):
-        geneos.ceiling("toy", "phb", "glucose", keep=False)
-    r = tools.run("yield_ceiling", {"modelId": "toy", "product": "phb", "substrate": "glucose"})
+        geneos.ceiling("toy", "ethanol", "glucose", keep=False)
+    r = tools.run("yield_ceiling", {"modelId": "toy", "product": "ethanol", "substrate": "glucose"})
     assert r.error and "no model toy" in r.error and r.evidence == []
 
 
 def test_the_toy_in_a_fixture_is_modeled_never_computed():
-    r = geneos.ceiling("toy", "phb", "glucose", keep=False, allow_toy=True)
-    assert r.evidence.provenance == "demo"
+    r = geneos.ceiling("toy", "ethanol", "glucose", keep=False, allow_toy=True)
+    assert r.evidence.provenance == "assumed"
     assert next(i for i in r.evidence.basis.inputs if i.name == "model").source.kind == "assumption"
 
 
 # R2 — a mix is of two different sugars.
 def test_a_mix_of_a_sugar_with_itself_is_refused():
     with pytest.raises(geneos.GeneosUnavailable, match="two different sugars"):
-        geneos.mix("iJO1366", "phb", "glucose", "glucose", keep=False)
+        geneos.mix("Yeast9", "ethanol", "glucose", "glucose", keep=False)
 
 
 # R3 — the hash is checked where the file is used, not only where it is fetched.
 def test_a_changed_model_file_is_not_used(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    f = shelf.SHELF["RehMBEL1391"].fetched
+    f = shelf.SHELF["Yeast9"].fetched
     f.local.parent.mkdir(parents=True)
     f.local.write_text("<sbml>not the pinned file</sbml>", encoding="utf-8")
-    why = shelf.available(shelf.SHELF["RehMBEL1391"])
+    why = shelf.available(shelf.SHELF["Yeast9"])
     assert why and "does not match" in why
     with pytest.raises(geneos.GeneosUnavailable, match="does not match"):
-        geneos.model_args("RehMBEL1391")
+        geneos.model_args("Yeast9")
 
 
 def test_fetch_on_a_present_file_checks_it_and_skips_git(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    model = shelf.SHELF["RehMBEL1391"]
+    model = shelf.SHELF["Yeast9"]
     model.fetched.local.parent.mkdir(parents=True)
     model.fetched.local.write_text("changed", encoding="utf-8")
     calls = []
@@ -63,8 +63,13 @@ def test_fetch_on_a_present_file_checks_it_and_skips_git(monkeypatch, tmp_path):
 
 
 # R9 — the sugar-mix line carries its basis.
-def test_a_mix_carries_evidence_with_its_basis():
-    r = geneos.mix("iJO1366", "phb", "glucose", "xylose", keep=False)
+def test_a_mix_carries_evidence_with_its_basis(monkeypatch):
+    # On a stand-in network with two sugars, run in this process: the toy
+    # takes up glucose alone, and a published model needs its fetched file.
+    from test_geneos import InProcessWorker, two_sugar_toy
+
+    monkeypatch.setattr(geneos, "worker", lambda: InProcessWorker(two_sugar_toy))
+    r = geneos.mix("toy", "ethanol", "glucose", "xylose", keep=False, allow_toy=True)
     assert r.evidence is not None and r.evidence.figure == "mix"
     assert {i.name for i in r.evidence.basis.inputs} >= {"model", "substrate a", "substrate b", "uptake"}
     assert r.evidence.value == pytest.approx(min(p["gPerG"] for p in r.output["points"]))
@@ -87,5 +92,5 @@ def test_the_licence_ledger_pins_the_file_the_shelf_fetches(model_id):
 
 def test_every_fetched_model_is_on_the_ledger():
     data = tomllib.loads((CORE / "licences.toml").read_text(encoding="utf-8"))["data"]
-    assert {m.id for m in shelf.SHELF.values() if m.fetched} == {"RehMBEL1391", "iMM904", "Yeast9"}
+    assert {m.id for m in shelf.SHELF.values() if m.fetched} == {"iMM904", "Yeast9"}
     assert {m.id for m in shelf.SHELF.values()} <= set(data), "a model on the shelf has no licence line"

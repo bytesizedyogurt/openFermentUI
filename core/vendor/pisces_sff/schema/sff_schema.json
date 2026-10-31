@@ -1,0 +1,941 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Standard Flowsheet Format (SFF)",
+  "version": "0.2.4",
+  "description": "A standardized, machine-readable representation of a process flowsheet designed for interoperability and data exchange. It represents the process as a directed graph with rich data attached to both nodes (units) and edges (streams).",
+  "type": "object",
+  "definitions": {
+    "quantity_unit_entry": {
+      "type": "object",
+      "description": "A quantity-unit registry entry: the field names a quantity appears under, and its unit string.",
+      "properties": {
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Field names this quantity appears under in the flowsheet (so a consumer can resolve, e.g., 'T' or 'total_mass_flow' to this quantity)."
+        },
+        "quantity_units": {
+          "type": "string",
+          "description": "Unit string for this quantity (BioSTEAM default)."
+        }
+      },
+      "required": ["aliases", "quantity_units"]
+    },
+    "stream_phase": {
+      "type": "object",
+      "description": "One phase of a stream: its own total flows and its molar/mass composition, with all fractions taken relative to this phase. The phase symbol ('l' = liquid, 'g' = gas, 's' = solid, ...) is the key under stream_properties.phases.",
+      "properties": {
+        "total_mass_flow": {
+          "type": "number",
+          "description": "Total mass flow rate of this phase. Quantity units: quantity_units_global 'mass_flow' (default 'kg/hr')."
+        },
+        "total_molar_flow": {
+          "type": "number",
+          "description": "Total molar flow rate of this phase. Quantity units: quantity_units_global 'molar_flow' (default 'kmol/hr'). Required unless metadata.tags contains an 'extracted-from-*' tag (optional for extracted flowsheets from v0.2.2; enforced by the root-level if/else)."
+        },
+        "total_volumetric_flow": {
+          "type": "number",
+          "description": "Total volumetric flow rate of this phase. Quantity units: quantity_units_global 'volumetric_flow' (default 'm3/hr')."
+        },
+        "composition": {
+          "description": "An array detailing the chemical components present in this phase. All fractions are relative to this phase.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "component_name": {
+                "type": "string",
+                "description": "Chemical component ID, cross-referencing the 'chemicals' array."
+              },
+              "mol_fraction": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Mole fraction of this component within this phase."
+              },
+              "mass_fraction": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Mass fraction of this component within this phase."
+              }
+            },
+            "required": [
+              "component_name",
+              "mol_fraction"
+            ]
+          }
+        }
+      },
+      "required": [
+        "composition"
+      ]
+    }
+  },
+  "properties": {
+    "quantity_units_global": {
+      "description": "Global default quantity units for widely-used quantities, keyed by canonical quantity name. 'aliases' lists the field names each quantity appears under across this flowsheet (so a consumer can resolve, e.g., 'T' or 'total_mass_flow' to its quantity units); 'quantity_units' is the unit string. Values of these quantities appear as bare numbers elsewhere in the flowsheet and take their units from here. Note: 'units' in this schema always means unit operations; unit-of-measure information is always called 'quantity units'.",
+      "type": "object",
+      "properties": {
+        "temperature":             { "$ref": "#/definitions/quantity_unit_entry" },
+        "pressure":                { "$ref": "#/definitions/quantity_unit_entry" },
+        "mass_flow":               { "$ref": "#/definitions/quantity_unit_entry" },
+        "molar_flow":              { "$ref": "#/definitions/quantity_unit_entry" },
+        "volumetric_flow":         { "$ref": "#/definitions/quantity_unit_entry" },
+        "molar_mass":              { "$ref": "#/definitions/quantity_unit_entry" },
+        "price":                   { "$ref": "#/definitions/quantity_unit_entry" },
+        "electrical_energy_price": { "$ref": "#/definitions/quantity_unit_entry" },
+        "regeneration_price":      { "$ref": "#/definitions/quantity_unit_entry" },
+        "heat_transfer_price":     { "$ref": "#/definitions/quantity_unit_entry" },
+        "enthalpy_flow":           { "$ref": "#/definitions/quantity_unit_entry" }
+      },
+      "additionalProperties": { "$ref": "#/definitions/quantity_unit_entry" }
+    },
+    "metadata": {
+      "description": "Information about the source, context, and version of the flowsheet.",
+      "type": "object",
+      "properties": {
+        "sff_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Version of the SFF schema used, in semantic versioning notation; e.g., '1.0.0'."
+        },
+        "TEA_currency": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Currency used to report all cost results; e.g., 'USD'.",
+          "default": "USD"
+        },
+        "TEA_year": {
+          "type": "number",
+          "description": "TEA year used to report cost results."
+        },
+        "source_doi": {
+          "type": "string",
+          "description": "Digital Object Identifier (DOI) of the source publication, if any."
+        },
+        "feedstocks": {
+          "type": "array",
+          "description": "Feedstock material streams for this flowsheet (distinct from raw material streams).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "display_name": { "type": "string", "description": "Human-interpretable display name for this stream." },
+              "stream_id": { "type": "string", "description": "Stream ID as used in the rest of this flowsheet." }
+            },
+            "required": ["stream_id"]
+          }
+        },
+        "products": {
+          "type": "array",
+          "description": "Product and co-product material streams for this flowsheet (distinct from waste streams).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "display_name": { "type": "string", "description": "Human-interpretable display name for this stream." },
+              "stream_id": { "type": "string", "description": "Stream ID as used in the rest of this flowsheet." }
+            },
+            "required": ["stream_id"]
+          }
+        },
+        "microorganisms": {
+          "description": "Microbial hosts used in this flowsheet for conversions, if applicable. Modeled as a list rather than a single string so that co-cultures, sequential bioconversion systems, and other multi-organism processes can each be represented as a distinct, machine-readable entry instead of being packed into one delimited string. From v0.2.2 on, one of the strings 'not_reported' (the source names no microbial host, e.g., a flowsheet extracted from literature that does not state one) or 'not_applicable' (the process uses no microbial host, e.g., an abiotic process) may be given instead of a list, stating that absence explicitly. null and 'None' are not accepted.",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the microbial host (e.g., a species or engineered-strain name).",
+                    "minLength": 1
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Optional display label or qualifier for the microbial host (e.g., 'co-culture host', 'primary producer')."
+                  }
+                },
+                "required": ["name"]
+              },
+              "minItems": 1
+            },
+            { "enum": ["not_reported", "not_applicable"] }
+          ]
+        },
+        "process_title": {
+          "type": "string",
+          "description": "A descriptive title for the process."
+        },
+        "process_simulator": {
+          "description": "The process simulator in which this flowsheet was originally modeled. From v0.2.2 on, one of the strings 'not_reported' (the source names no simulator, e.g., a paper that does not state the tool used) or 'not_applicable' (the flowsheet was never simulated, e.g., one extracted from a patent) may be given instead of an object, stating that absence explicitly. null and 'None' are not accepted. The key itself remains required.",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the process simulator."
+                },
+                "version": {
+                  "type": "string",
+                  "description": "Version number of the process simulator."
+                }
+              },
+              "required": [
+              "name",
+              "version"
+              ]
+            },
+            { "enum": ["not_reported", "not_applicable"] }
+          ]
+        },
+        "flowsheet_designers": {
+          "type": "string",
+          "description": "Name(s) of the authors who designed this flowsheet."
+        },
+        "relevant_patents": {
+          "type": "array",
+          "description": "Any patents associated with this flowsheet.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string", "description": "Patent number or title." },
+              "url": { "type": "string", "description": "Web link to the patent or application." }
+            },
+            "required": ["label"]
+          }
+        },
+        "reproducibility": {
+          "type": "object",
+          "description": "Everything needed to rebuild the environment and re-run the model that produced this flowsheet. Optional: flowsheets exported without a reproducibility recipe omit this block entirely.",
+          "properties": {
+            "environment": {
+              "type": "object",
+              "description": "The environment specification used to build the environment this flowsheet was exported from.",
+              "properties": {
+                "format": { "type": "string", "description": "Specification format; e.g., 'conda-environment-yaml'." },
+                "filename": { "type": "string", "description": "File name of the environment specification." },
+                "path": { "type": "string", "description": "Path of the source file relative to the repository root, when known." },
+                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 hex digest of the verbatim file bytes." },
+                "content": { "type": "string", "description": "Full text of the environment specification, embedded so this flowsheet is reproducible on its own." }
+              },
+              "required": ["format", "filename", "sha256", "content"]
+            },
+            "load_script": {
+              "type": "object",
+              "description": "The script that loads and simulates the model exported here.",
+              "properties": {
+                "format": { "type": "string", "description": "Script format; e.g., 'python'." },
+                "filename": { "type": "string", "description": "File name of the load script." },
+                "path": { "type": "string", "description": "Path of the source file relative to the repository root, when known." },
+                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 hex digest of the verbatim file bytes." },
+                "content": { "type": "string", "description": "Full text of the load script, embedded so this flowsheet is reproducible on its own." },
+                "entry_point": { "type": "string", "description": "Name of the callable in the script that returns the simulated model; e.g., 'load'." }
+              },
+              "required": ["format", "filename", "sha256", "content"]
+            },
+            "simulator_package": {
+              "type": "object",
+              "description": "The process simulator package, pinned. Restates a pin that also appears in the embedded environment specification, so that provenance can be indexed and queried without parsing that text.",
+              "properties": {
+                "name": { "type": "string", "description": "Distribution name of the package." },
+                "url": { "type": "string", "description": "Repository URL; required when 'commit' is given." },
+                "commit": { "type": "string", "description": "Full VCS commit SHA the package was installed from." },
+                "branch": { "type": "string", "description": "Branch the commit is reachable from, when known." },
+                "version": { "type": "string", "description": "Release version, when installed from a package index." }
+              },
+              "required": ["name"],
+              "anyOf": [
+                { "required": ["commit"] },
+                { "required": ["version"] }
+              ],
+              "allOf": [
+                {
+                  "if": { "required": ["commit"] },
+                  "then": { "required": ["url"] }
+                }
+              ]
+            },
+            "flowsheet_model_package": {
+              "type": "object",
+              "description": "The package providing the flowsheet model itself, pinned. Restates a pin that also appears in the embedded environment specification, so that provenance can be indexed and queried without parsing that text.",
+              "properties": {
+                "name": { "type": "string", "description": "Distribution name of the package." },
+                "url": { "type": "string", "description": "Repository URL; required when 'commit' is given." },
+                "commit": { "type": "string", "description": "Full VCS commit SHA the package was installed from." },
+                "branch": { "type": "string", "description": "Branch the commit is reachable from, when known." },
+                "version": { "type": "string", "description": "Release version, when installed from a package index." }
+              },
+              "required": ["name"],
+              "anyOf": [
+                { "required": ["commit"] },
+                { "required": ["version"] }
+              ],
+              "allOf": [
+                {
+                  "if": { "required": ["commit"] },
+                  "then": { "required": ["url"] }
+                }
+              ]
+            },
+            "resolved": {
+              "type": "object",
+              "description": "Observed inside the environment at export time, distinguishing what actually ran from what was declared.",
+              "properties": {
+                "python_version": { "type": "string", "description": "Python version the export ran under." },
+                "platform": { "type": "string", "description": "Platform identifier the export ran on." },
+                "env_key": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 hex digest of the canonicalized environment specification; identifies the environment the export ran in." },
+                "exported_at": { "type": "string", "description": "UTC timestamp of the export, ISO-8601." },
+                "package_versions": {
+                  "type": "object",
+                  "description": "Installed versions of relevant packages, keyed by distribution name.",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            }
+            ,
+            "comparison_rtol": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Relative tolerance at which this file asserts the 'reproducible' tag holds: re-running the embedded reproducibility recipe reproduces every numeric field within this bound. Required when metadata.tags contains 'reproducible'. See sff_checks.md section 8 / TAG-01."
+            }
+          },
+          "required": ["environment", "load_script"]
+        }
+        ,
+        "tags": {
+          "type": "array",
+          "description": "Machine-verified provenance/quality tags. Each value asserts the file passed that tag's associated subset of SFF checks without warning-severity findings (see sff_checks.md section 8). A tag present here that the file does not actually earn is a TAG-01 error (non-conforming). Optional; a file may claim the tags it earns, fewer, or none.",
+          "items": {
+            "type": "string",
+            "enum": ["exported-from-simulator", "extracted-from-prose", "extracted-from-image", "extracted-from-table", "reproducible"]
+          },
+          "uniqueItems": true
+        },
+        "prose_type": {
+          "type": "string",
+          "enum": ["journal_article", "patent", "thesis", "technical_report", "conference_paper", "book", "other"],
+          "description": "Type of literature source this flowsheet was extracted from. Added in v0.2.2 as literature_type; renamed prose_type in v0.2.4 for consistency with image_type and the extracted-from-prose tag. Required when metadata.tags contains 'extracted-from-prose' or 'extracted-from-table' (sff_checks.md TAG-01, schema part)."
+        },
+        "image_type": {
+          "type": "string",
+          "enum": ["process_flow_diagram", "block_flow_diagram", "piping_and_instrumentation_diagram", "other"],
+          "description": "Type of image this flowsheet was extracted from. Added in v0.2.2; required when metadata.tags contains 'extracted-from-image' (sff_checks.md TAG-01, schema part)."
+        },
+        "extraction_method": {
+          "description": "How this flowsheet was extracted from its source (e.g., the extraction pipeline, model, or manual procedure used). Any JSON type is allowed, so a producer may record a plain string or a structured object. Added in v0.2.2; required when metadata.tags contains any 'extracted-from-*' tag (sff_checks.md TAG-01, schema part)."
+        }
+      },
+      "required": [
+        "sff_version",
+        "TEA_currency",
+        "TEA_year",
+        "process_simulator",
+        "feedstocks",
+        "products"
+      ],
+      "additionalProperties": true
+      ,
+      "if": {
+        "required": ["tags"],
+        "properties": { "tags": { "contains": { "const": "reproducible" } } }
+      },
+      "then": {
+        "required": ["reproducibility"],
+        "properties": {
+          "reproducibility": { "required": ["comparison_rtol"] }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["tags"],
+            "properties": { "tags": { "contains": { "enum": ["extracted-from-prose", "extracted-from-table"] } } }
+          },
+          "then": { "required": ["prose_type"] }
+        },
+        {
+          "if": {
+            "required": ["tags"],
+            "properties": { "tags": { "contains": { "const": "extracted-from-image" } } }
+          },
+          "then": { "required": ["image_type"] }
+        },
+        {
+          "if": {
+            "required": ["tags"],
+            "properties": { "tags": { "contains": { "enum": ["extracted-from-prose", "extracted-from-image", "extracted-from-table"] } } }
+          },
+          "then": { "required": ["extraction_method"] }
+        }
+      ]
+    },
+    "units": {
+      "description": "An array of all unit operations, representing the nodes of the process graph.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A unique identifier for this unit operation."
+          },
+          "unit_type": {
+            "type": "string",
+            "description": "A short description of the type of unit operation (e.g., 'Distillation', 'Solids centrifugation')."
+          },
+          "design_input_specs": {
+            "type": "object",
+            "description": "Design input specifications for the unit operation. If provided, these specifications -- combined with the provided compositions of streams entering this unit operation and the method described in 'design_simulation_method' -- should be sufficient to generate all design results, cost results, utility results, and compositions of all streams effluent from this unit operation."
+          },
+          "design_simulation_method": {
+            "type": "string",
+            "description": "Design and simulation method for the unit operation, (e.g., for distillation, this could be 'McCabe-Thiele', 'Fenske-Underwood-Gilliland', or 'MESH'). If provided, this method -- combined with the provided 'design_input_specs' and compositions of streams entering this unit operation -- should be sufficient to generate all design results, cost results, utility results, and compositions of all streams effluent from this unit operation."
+          },
+          "thermo_property_package": {
+            "type": "object",
+            "description": "A thermodynamic property package, with qualitative descriptions of property estimation methods.",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "mixture": {
+                "type": "string",
+                "description": "Method for computing mixture properties (e.g., 'ideal mixture').",
+                "default": "Ideal"
+              },
+              "gamma": {
+                "type": "string",
+                "description": "Method for computing activity coefficients (e.g., 'UNIFAC').",
+                "default": "Ideal"
+              },
+              "phi": {
+                "type": "string",
+                "description": "Method for computing fugacity coefficients (e.g., 'Ideal').",
+                "default": "Ideal"
+              },
+              "PCF": {
+                "type": "string",
+                "description": "Method for computing Poynting correction factors (e.g., 'None').",
+                "default": "None"
+              }
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "reactions": {
+            "type": "array",
+            "description": "Reactions occurring in this unit operation, each with the index (determining the order in which reactions occur, with identical index for parallel reactions), conversion, the reactant for conversion, and either an equation string based on the IDs or a stoichiometry vector/object based on the indices in the 'chemicals' object.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "equation": {
+                  "type": "string"
+                },
+                "reactant": {
+                  "type": "string"
+                },
+                "conversion": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "stoichiometry": {
+                "type": ["array", "object"],
+                "description": "An array of reaction stoichiometries ordered based on the indices in the 'chemicals' object, OR an object with keys corresponding to chemical indices or IDs and values corresponding to stoichiometries. (If the stoichiometry vector is lengthy, consider using the object format for brevity.)"
+                }
+              },
+              "anyOf": [
+                { "required": ["equation"] },
+                { "required": ["stoichiometry"] }
+              ]
+            }
+          },
+          "design_results": {
+            "type": "object",
+            "description": "Design results for this unit operation. This object, combined with design_input_specs, should provide a full design description for this unit operation (to the highest level of detail modeled)."
+          },
+          "quantity_units_for_design_results": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Quantity units for each key in 'design_results', by the same key. Sourced from the simulator's per-design-result unit strings (BioSTEAM '_units'). A key mapped to '' is dimensionless or has no declared unit."
+          },
+          "purchase_costs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Equipment purchase cost results for this unit operation. These may be for the entire unit operation or for individual unit operations (depending on the level of detail modeled)."
+          },
+          "installed_costs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Equipment installed (purchase + installation) cost results for this unit operation. These may be for the entire unit operation or for individual unit operations (depending on the level of detail modeled)."
+          },
+          "purchase_cost_correlations": {
+            "type": "object",
+            "description": "Parametric purchase-cost correlations for this unit, keyed by the same item IDs as 'purchase_costs'/'installed_costs'. Optional and sparse -- present only for items produced by a parametric correlation (e.g. BioSTEAM @cost-decorated units). Records an exponential ('six-tenths rule') correlation so a consumer can re-derive equipment cost at a different design size or cost-year index (CEPCI): purchase_cost = (CE_target / reference_CE_index) * reference_cost * (size / reference_size)^exponent, then installed_cost = installation_factor * purchase_cost. See sff_checks.md UNIT-08/UNIT-09.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "correlation_type": {
+                  "type": "string",
+                  "enum": ["power_law", "custom_function"],
+                  "description": "Discriminator. 'power_law': re-derivable via the exponential formula above. 'custom_function': the correlation is an opaque model; reference_cost/exponent are absent and a consumer must fall back to the recorded purchase_costs value. Cites UNIT-09."
+                },
+                "basis": {
+                  "type": "string",
+                  "description": "Name of the size parameter that drives scaling; names a key in this unit's 'design_results'."
+                },
+                "basis_units": {
+                  "type": "string",
+                  "description": "Units of the basis size (e.g. 'kJ/hr'). Inline so the item is self-contained even if 'basis' is absent from 'design_results'."
+                },
+                "reference_size": {
+                  "type": "number",
+                  "not": { "const": 0 },
+                  "description": "Reference size S (in basis_units) at which reference_cost applies. Any non-zero number: the power law scales by size / reference_size, and a basis with a sign convention (e.g. a cooling duty, negative in BioSTEAM) has a negative reference size. Zero is rejected (UNIT-09)."
+                },
+                "reference_cost": {
+                  "type": "number",
+                  "description": "Purchase cost at reference_size, in metadata.TEA_currency. Present for 'power_law'; omitted for 'custom_function'."
+                },
+                "exponent": {
+                  "type": "number",
+                  "description": "Exponential scaling factor n. Present for 'power_law'; omitted for 'custom_function'."
+                },
+                "reference_CE_index": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Chemical Engineering Plant Cost Index (CEPCI, dimensionless) of the reference year."
+                },
+                "installation_factor": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Bare-module / installation factor; installed_cost = installation_factor * purchase_cost. Legitimately 1.0 in many cases."
+                },
+                "power_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Electricity demand rate at reference_size, in kW."
+                },
+                "size_lower_bound": {
+                  "type": "number",
+                  "description": "Lower size bound; the size is clamped up to it. Omitted when unset."
+                },
+                "size_upper_bound": {
+                  "type": "number",
+                  "description": "Upper size bound; above it the item parallelizes into ceil(size/bound) units. Omitted when unset."
+                },
+                "lifetime": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "description": "Equipment lifetime in years. Omitted when unset for this item."
+                },
+                "magnitude": {
+                  "type": "boolean",
+                  "description": "Take abs(size) before scaling. Omitted when false."
+                },
+                "conditional": {
+                  "type": "boolean",
+                  "description": "True if the item is evaluated only under a model condition and so may be inactive (and absent from purchase_costs) at this design point. Omitted when false."
+                }
+              },
+              "required": [
+                "correlation_type", "basis", "basis_units", "reference_size",
+                "reference_CE_index", "installation_factor", "power_rate"
+              ],
+              "if": { "properties": { "correlation_type": { "const": "power_law" } } },
+              "then": { "required": ["reference_cost", "exponent"] },
+              "additionalProperties": false
+            }
+          },
+          "utility_consumption_results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Heating, cooling, and power utility demand results for this unit operation. These must refer to the same utility IDs as those detailed in the heat_utilities or power_utilities properties for this flowsheet."
+          },
+          "utility_production_results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Heating, cooling, and power utility production results for this unit operation. These must refer to the same utility IDs as those detailed in the heat_utilities or power_utilities properties for this flowsheet."
+          }
+        },
+        "required": [
+          "id",
+          "unit_type"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "streams": {
+      "description": "An array of process streams that connect the units, representing the edges of the process graph.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A unique identifier for this stream."
+          },
+          "source_unit_id": {
+            "type": "string",
+            "description": "The ID of the unit operation from which this stream originates."
+          },
+          "sink_unit_id": {
+            "type": "string",
+            "description": "The ID of the unit operation that this stream enters."
+          },
+          "stream_description": {
+            "type": "string",
+            "description": "A qualitative description of the stream from the perspective of either the source (e.g., 'Centrifugate') or sink unit operation (e.g., 'Make-up solvent')."
+          },
+          "price": {
+            "type": "number",
+            "description": "Price per unit mass of the stream material. Quantity units are declared in the top-level 'quantity_units_global' under 'price' (default 'USD/kg')."
+          },
+          "roles": {
+            "type": "array",
+            "description": "The roles this stream plays in the flowsheet. A stream always carries exactly one base topology role (input | output | internal) and may additionally carry designation roles (purchased_raw_material, feedstock, product). Emitted from schema v0.0.10 on; optional, so files written against earlier versions remain valid.",
+            "items": {
+              "type": "string",
+              "enum": ["input", "output", "purchased_raw_material", "feedstock", "product", "internal"]
+            },
+            "uniqueItems": true,
+            "minItems": 1
+          },
+          "stream_properties": {
+            "description": "Structured object specifying the properties of the stream.",
+            "type": "object",
+            "properties": {
+              "total_mass_flow": {
+                "type": "number",
+                "description": "Total mass flow rate. Quantity units: quantity_units_global 'mass_flow' (default 'kg/hr')."
+              },
+              "total_volumetric_flow": {
+                "type": "number",
+                "description": "Total volumetric flow rate. Quantity units: quantity_units_global 'volumetric_flow' (default 'm3/hr')."
+              },
+              "total_molar_flow": {
+                "type": "number",
+                "description": "Total molar flow rate. Quantity units: quantity_units_global 'molar_flow' (default 'kmol/hr')."
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Temperature. Quantity units: quantity_units_global 'temperature' (default 'K')."
+              },
+              "pressure": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Pressure. Quantity units: quantity_units_global 'pressure' (default 'Pa')."
+              },
+              "enthalpy_flow": {
+                "type": "number",
+                "description": "Total enthalpy flow rate of the stream (relative to the simulator's reference state). Optional; emitted from schema v0.0.11 on. Quantity units: quantity_units_global 'enthalpy_flow' (default 'kJ/hr')."
+              },
+              "phases": {
+                "description": "The phases present in this stream, keyed by phase symbol ('l' = liquid, 'g' = gas, 's' = solid, ...). Each value details that phase's own total flows and composition.",
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/definitions/stream_phase"
+                },
+                "minProperties": 1
+              }
+            },
+            "required": [
+              "total_mass_flow",
+              "total_molar_flow",
+              "temperature",
+              "pressure",
+              "phases"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "source_unit_id",
+          "sink_unit_id"
+        ]
+      }
+    },
+    "chemicals": {
+      "description": "An array of all chemicals involved in this process flowsheet.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A unique identifier for this chemical, used to reference this chemical in the 'composition' property of stream objects and in the 'reactions' property of unit objects."
+          },
+          "included_in_thermo_equilibria": {
+            "type": "boolean",
+            "description": "Whether or not this chemical is included when simulating thermodynamic equilibria. If 'true', 'registry_id' must be provided. If 'false', 'molar_mass' must be provided. Renamed from 'included_in_thermo' in v0.2.3. Required unless metadata.tags contains an 'extracted-from-*' tag (optional for extracted flowsheets from v0.2.3; enforced by the root-level if/else)."
+          },
+          "registry_id": {
+            "type": "string",
+            "description": "CAS number or SMILES string."
+          },
+          "index": {
+            "type": "number",
+            "description": "A unique index for this chemical; must be provided if 'reactions' include 'stoichiometry' and do not include 'equation'. Must match the ordering of 'stoichiometry'."
+          },
+          "formula": {
+            "type": "string",
+            "description": "Chemical formula (molecular or empirical; in either case, one mole of the substance must have been modeled to contain the number moles of each atom as stated in this formula)."
+          },
+          "molar_mass": {
+            "type": "number",
+            "description": "Molar mass (in grams)."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": true,
+        "allOf": [
+          {
+            "if": {
+              "properties": { "included_in_thermo_equilibria": { "const": true } },
+              "required": ["included_in_thermo_equilibria"]
+            },
+            "then": { "required": ["registry_id"] }
+          },
+          {
+            "if": {
+              "properties": { "included_in_thermo_equilibria": { "const": false } },
+              "required": ["included_in_thermo_equilibria"]
+            },
+            "then": { "required": ["molar_mass"] }
+          }
+        ]
+      }
+    },
+    "utilities": {
+        "description": "An array of all heating, cooling, power, and other utility types involved in this flowsheet.",
+        "type": "object",
+        "properties": {
+            "heat_utilities": {
+              "description": "An array of all heating and cooling utility types involved in this process flowsheet. Combustion-based utility types (e.g., natural gas) should not be specified here and should instead be specified in 'other_utilities'.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "A unique identifier for this utility type (e.g., high-pressure steam)."
+                  },
+                  "temperature": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Temperature. Quantity units: quantity_units_global 'temperature' (default 'K')."
+                  },
+                  "pressure": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Pressure. Quantity units: quantity_units_global 'pressure' (default 'Pa')."
+                  },
+                  "regeneration_price": {
+                    "type": "number",
+                    "default": 0,
+                    "description": "Regeneration price. Quantity units: quantity_units_global 'regeneration_price' (default 'USD/kmol')."
+                  },
+                  "heat_transfer_price": {
+                    "type": "number",
+                    "default": 0,
+                    "description": "Heat-transfer price. Quantity units: quantity_units_global 'heat_transfer_price' (default 'USD/kJ')."
+                  },
+                  "heat_transfer_efficiency": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "temperature_limit": {
+                    "type": "number",
+                    "description": "Temperature limit. Quantity units: quantity_units_global 'temperature' (default 'K')."
+                  },
+                  "composition": {
+                    "description": "An array detailing the chemical components of the heating or cooling utility.",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "phase": {
+                          "type": "string",
+                          "default": "l"
+                        },
+                        "component_name": {
+                          "type": "string"
+                        },
+                        "mol_fraction": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": [
+                        "component_name",
+                        "mol_fraction"
+                      ]
+                    }
+                  },
+                  "quantity_units_for_utility_results": {
+                    "type": "string",
+                    "description": "Quantity units (e.g., 'kJ/hr') for this utility's per-unit-operation values in 'utility_consumption_results'/'utility_production_results'."
+                  }
+                },
+                "required": [
+                  "id",
+                  "temperature",
+                  "pressure",
+                  "composition",
+                  "quantity_units_for_utility_results"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "power_utilities": {
+              "description": "An array of all power utility types involved in this process flowsheet.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "A unique identifier for this power utility type (e.g., 'marginal electricity')."
+                  },
+                  "electrical_energy_price": {
+                    "type": "number",
+                    "default": 0,
+                    "description": "Electrical energy price. Quantity units: quantity_units_global 'electrical_energy_price' (default 'USD/kWh')."
+                  },
+                  "quantity_units_for_utility_results": {
+                    "type": "string",
+                    "description": "Quantity units (e.g., 'kW') for this utility's per-unit-operation values in 'utility_consumption_results'/'utility_production_results'."
+                  }
+                },
+                "required": [
+                  "id",
+                  "quantity_units_for_utility_results"
+                ],
+                "additionalProperties": {
+                  "type": "number"
+                }
+              }
+            },
+            "other_utilities": {
+              "description": "An array of all other utility types involved in this process flowsheet. Combustion-based utility types (e.g., natural gas) may be specified here.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "A unique identifier for this utility type (e.g., natural gas)."
+                  },
+                  "temperature": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Temperature. Quantity units: quantity_units_global 'temperature' (default 'K')."
+                  },
+                  "pressure": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Pressure. Quantity units: quantity_units_global 'pressure' (default 'Pa')."
+                  },
+                  "price": {
+                    "type": "number",
+                    "default": 0,
+                    "description": "Price per unit mass. Quantity units: quantity_units_global 'price' (default 'USD/kg')."
+                  },
+                  "composition": {
+                    "description": "An array detailing the chemical components of the utility.",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "phase": {
+                          "type": "string",
+                          "default": "l"
+                        },
+                        "component_name": {
+                          "type": "string"
+                        },
+                        "mol_fraction": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": [
+                        "component_name",
+                        "mol_fraction"
+                      ]
+                    }
+                  },
+                  "quantity_units_for_utility_results": {
+                    "type": "string",
+                    "description": "Quantity units (e.g., 'kg/hr') for this utility's per-unit-operation values in 'utility_consumption_results'/'utility_production_results'."
+                  }
+                },
+                "required": [
+                  "id",
+                  "temperature",
+                  "pressure",
+                  "composition",
+                  "quantity_units_for_utility_results"
+                ],
+                "additionalProperties": true
+              }
+            }
+    }
+  }
+},
+  "required": [
+    "metadata",
+    "units",
+    "streams",
+    "utilities"
+  ],
+  "if": {
+    "required": ["metadata"],
+    "properties": {
+      "metadata": {
+        "required": ["tags"],
+        "properties": { "tags": { "contains": { "enum": ["extracted-from-prose", "extracted-from-image", "extracted-from-table"] } } }
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "streams": {
+        "items": {
+          "properties": {
+            "stream_properties": {
+              "properties": {
+                "phases": {
+                  "additionalProperties": { "required": ["total_molar_flow"] }
+                }
+              }
+            }
+          }
+        }
+      },
+      "chemicals": {
+        "items": { "required": ["included_in_thermo_equilibria"] }
+      }
+    }
+  }
+}

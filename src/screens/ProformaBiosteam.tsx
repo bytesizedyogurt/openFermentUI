@@ -16,9 +16,9 @@
 // artifact through `runViewOfReference`, one case and no samples.
 import { useMemo, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
-import type { CostLine, FlowsheetInfo, ScenarioInput } from '@/data/types';
+import type { CostLine, FlowsheetInfo, ResultGrid, ScenarioInput } from '@/data/types';
 import { href } from '@/router';
-import { evaluateGrid, COST_LINES } from '@/engine/grids';
+import { clampPoint, interpolate, type Grid } from '@/engine/interp';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
 import { Card } from '@/components/ui';
@@ -41,6 +41,7 @@ import {
 export const SOURCE_WORDS: Record<string, string> = {
   record: 'records',
   assumption: 'assumption',
+  'model-estimate': 'a model’s estimate',
   model: 'reference model',
   artifact: 'artifact',
   convention: 'convention',
@@ -140,7 +141,7 @@ export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; pri
               </>
             )}
             . Provenance {view.provenance}
-            {view.provenance === 'demo' ? ': it rests on at least one named person’s assumption.' : '.'}
+            {view.provenance === 'assumed' ? ': it rests on at least one named person’s assumption or a model’s estimate.' : '.'}
           </div>
         </Tick>
       ) : (
@@ -235,7 +236,7 @@ export function costBreakdownEmpty(view: RunView): { what: string; where: string
       what: `the base case could not run: ${baseCaseRefusal(view.baseInfeasible)}.`,
       where: 'Every input at its value is a case the flowsheet cannot hold, so it has no TEA to break down; change the input the reason names, then run it.',
     };
-  return { what: 'this run kept no TEA breakdown.', where: 'A run of a flowsheet with a TEA keeps one from OF-BLD-019 on; run the scenario again.' };
+  return { what: 'this run kept no TEA breakdown.', where: 'A flowsheet with a TEA keeps its breakdown with every run; run the scenario again to make one.' };
 }
 
 // ── Sensitivity, the distribution, the sliders ──────────────────────────
@@ -289,7 +290,22 @@ export const SLIDER_LINE_LABEL: Record<CostLine, string> = {
   other: 'Other fixed operating cost',
 };
 
-/** Three inputs moved over the run's grid, with the interpolation the authored scenarios use. */
+/** The grid's cost lines, in the order the label table lists them. */
+const SLIDER_LINES = Object.keys(SLIDER_LINE_LABEL) as CostLine[];
+
+/**
+ * One point of the run's grid: each cost line interpolated between the cases
+ * the service simulated, and the price their sum, so the two never disagree.
+ * A line touching a case that could not run is NaN, and so is the price.
+ */
+function atPoint(grid: ResultGrid, point: Record<string, number>): { msp: number; costLines: Record<CostLine, number> } {
+  const [p] = clampPoint(grid.dims, point);
+  const asGrid = (data: Float64Array): Grid => ({ dims: grid.dims, data });
+  const costLines = Object.fromEntries(SLIDER_LINES.map((l) => [l, interpolate(asGrid(grid.costLines[l]), p)])) as Record<CostLine, number>;
+  return { msp: SLIDER_LINES.reduce((sum, l) => sum + costLines[l], 0), costLines };
+}
+
+/** Three inputs moved over the run's grid, interpolated between its cases (engine/interp). */
 export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunView; labels: Record<string, string>; priceBasis: string; scenarioId: string }) {
   const g = view.grid;
   const grid = useMemo(() => (g ? asResultGrid(scenarioId, g) : null), [g, scenarioId]);
@@ -297,7 +313,7 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
     Object.fromEntries((g?.dims ?? []).map((d) => [d.key, d.values[Math.floor(d.values.length / 2)]])),
   );
   if (!g || !grid) return null;
-  const r = evaluateGrid(grid, point);
+  const r = atPoint(grid, point);
   return (
     <Card className="p-4" data-testid="proforma-sliders">
       <h2 className="font-serif text-section-title font-semibold mb-1">Move three inputs over the run's grid</h2>
@@ -333,7 +349,7 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
       {Number.isFinite(r.msp) && (
         <table className="w-full text-caption mt-2">
           <tbody>
-            {COST_LINES.map((l) => (
+            {SLIDER_LINES.map((l) => (
               <tr key={l} className="border-t border-line/50">
                 <td className="py-0.5">{SLIDER_LINE_LABEL[l]}</td>
                 <td className="py-0.5 text-right font-num">{fmt(r.costLines[l], 3)}</td>
@@ -596,6 +612,8 @@ export function inputLabels(inputs: ScenarioInput[] | null, flowsheet: Flowsheet
  * the cost breakdown, the sensitivity, the distribution, the sliders when
  * the run walked a grid, the streams, the equipment, the utilities, the
  * diagram, and what the run read back, each value credited to whoever set it.
+ * A run of one case (an engine run, execution prompt §7.4) has no samples, so
+ * it has no sensitivity, distribution or sliders, and shows none.
  */
 export function RunReport({
   view,
@@ -605,6 +623,7 @@ export function RunReport({
   scenarioId,
   csvName,
   flowsheet = null,
+  oneCase = false,
 }: {
   view: RunView;
   priceBasis: string;
@@ -615,14 +634,20 @@ export function RunReport({
   csvName: string;
   /** The run's flowsheet as the shelf lists it: which read-back value each input or setting gave. */
   flowsheet?: FlowsheetInfo | null;
+  /** The run is one case, sampled nowhere. */
+  oneCase?: boolean;
 }) {
   return (
     <div className="space-y-4" data-testid="run-report">
       <RunResult view={view} priceBasis={priceBasis} scenarioId={scenarioId} />
       <CostBreakdown view={view} priceBasis={priceBasis} csvName={csvName} />
-      <Sensitivity view={view} labels={labels} csvName={csvName} />
-      <PriceDistribution view={view} priceBasis={priceBasis} csvName={csvName} />
-      <Sliders key={view.artifactId} view={view} labels={unitLabels} priceBasis={priceBasis} scenarioId={scenarioId} />
+      {!oneCase && (
+        <>
+          <Sensitivity view={view} labels={labels} csvName={csvName} />
+          <PriceDistribution view={view} priceBasis={priceBasis} csvName={csvName} />
+          <Sliders key={view.artifactId} view={view} labels={unitLabels} priceBasis={priceBasis} scenarioId={scenarioId} />
+        </>
+      )}
       <StreamsTable view={view} csvName={csvName} />
       <EquipmentTable view={view} csvName={csvName} />
       <UtilitiesCard view={view} csvName={csvName} />

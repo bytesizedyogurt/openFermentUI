@@ -5,8 +5,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ClipboardCheck, Download, Gauge, Table2 } from 'lucide-react';
 import type { ExtractionRecord } from '@/data/types';
 import { fieldName } from '@/data/ontology';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, useProgramFilter, useStore, provenanceOf } from '@/store';
+import { useStore, provenanceOf } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { unitFamily } from '@/engine/units';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
@@ -27,7 +26,6 @@ import { exportCSV } from '@/lib/csv';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { INTAKE_TABS } from '@/data/tabs';
 import { SubsystemShelf } from '@/components/ReferenceView';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
 
 // ── row model ──────────────────────────────────────────────────────────
 
@@ -106,7 +104,7 @@ function StatusCell({ r }: { r: ExtractionRecord }) {
   }
   if (r.gold) {
     return (
-      <span className="chip text-gold border-gold/45" title="Curated gold-set annotation">
+      <span className="chip text-gold border-gold/45" title="Gold: a value a reviewer typed against the sentence">
         Gold
       </span>
     );
@@ -123,14 +121,6 @@ function StatusCell({ r }: { r: ExtractionRecord }) {
       Unverified
     </span>
   );
-}
-
-/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
-function archivedNames(paperIds: string[]): string {
-  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
-  return PROGRAMS.filter((p) => hit.has(p.id))
-    .map((p) => p.name)
-    .join(' and ');
 }
 
 // ── screen ─────────────────────────────────────────────────────────────
@@ -154,22 +144,12 @@ export default function Intake() {
 
   const scopedPaper = paperParam ? papers.find((p) => p.id === paperParam) : undefined;
 
-  // OF-BLD-016 §2.2: the table, its facets, its counts and the review session
-  // it starts hold only records whose program shows. A `?paper=` link names a
-  // paper, and opens its records whatever its program, under the banner that
-  // names the program and the switch; every record of a paper shares the
-  // paper's program, so the scope needs no second filter.
-  const shows = useProgramFilter();
-  const hiddenRecords = useMemo(
-    () => (paperParam ? [] : records.filter((r) => !shows('record', r.id))),
-    [records, shows, paperParam],
-  );
-  const hiddenPaperIds = useMemo(() => [...new Set(hiddenRecords.map((r) => r.paperId))], [hiddenRecords]);
-
+  // The table, its facets, its counts and the review session it starts hold
+  // every record; a `?paper=` link names a paper and holds its records alone.
   const allRows = useMemo<ExRow[]>(
     () =>
       records
-        .filter((rec) => (paperParam ? rec.paperId === paperParam : shows('record', rec.id)))
+        .filter((rec) => !paperParam || rec.paperId === paperParam)
         .map((rec) => ({
         rec,
         prov: provOf(rec),
@@ -177,7 +157,7 @@ export default function Intake() {
         band: bandOf(rec.confidence),
         updated: lastAudit(rec),
       })),
-    [records, shows, paperParam],
+    [records, paperParam],
   );
 
   // ?paper=SP-004 narrows the whole table before the facets ever see it.
@@ -185,19 +165,6 @@ export default function Intake() {
     () => (paperParam ? allRows.filter((r) => r.rec.paperId === paperParam) : allRows),
     [allRows, paperParam],
   );
-
-  const hiddenLine =
-    hiddenRecords.length > 0 ? (
-      <>
-        <span className="font-num">{hiddenRecords.length}</span> record{hiddenRecords.length === 1 ? '' : 's'} on
-        papers in {archivedNames(hiddenPaperIds)} {hiddenRecords.length === 1 ? 'is' : 'are'} hidden, because
-        archived programs are.{' '}
-        <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
-          Settings → Programs
-        </a>{' '}
-        shows them.
-      </>
-    ) : null;
 
   // Identity-stable so DataTable's effect never drives a render loop.
   const handleFiltered = useCallback((next: ExRow[]) => {
@@ -224,9 +191,7 @@ export default function Intake() {
       href: '#/guild',
       provenance: 'user',
     });
-    // A paper the program filter hides was opened by a link; the queue keeps
-    // its records only while Guild is told which paper (OF-BLD-016 §2.2).
-    navigate(paperParam && !shows('paper', paperParam) ? `/guild?paper=${encodeURIComponent(paperParam)}` : '/guild');
+    navigate('/guild');
   };
 
   const exportBoth = () => {
@@ -554,31 +519,22 @@ export default function Intake() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow="Documents in, anchored to source"
           title="Intake"
           subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from."
           actions={headerActions}
         />
         <OwnerTabs tabs={INTAKE_TABS} />
-        {paperParam && <ArchivedBanner kind="paper" id={paperParam} />}
         <Card>
           <EmptyState
             icon={<Table2 size={22} />}
-            title={
-              paperParam
-                ? `No records for ${paperParam}`
-                : hiddenLine
-                  ? 'Every record here is in an archived program'
-                  : 'No extraction records yet'
-            }
+            title={paperParam ? `No records for ${paperParam}` : 'No extraction records yet'}
             body={
-              !paperParam && hiddenLine ? (
-                <>{hiddenLine} Nothing was deleted.</>
-              ) : paperParam
+              paperParam
                 ? scopedPaper
                   ? `${scopedPaper.title} is in the corpus but nothing has been extracted from it in this session. Run the extractor from the paper reader to stage candidate records.`
-                  : `${paperParam} is not a paper in this session's corpus. Session state resets on refresh, so a link from an older session can point at nothing.`
-                : 'Nothing has been extracted in this session. Fetch a paper from the ingest queue, then run the extractor to stage candidate records here.'
+                  : `${paperParam} is not a document this project holds.`
+                : 'Documents arrive through Intake. Fetch a paper from the ingest queue, then run the extractor to stage candidate records here.'
             }
             action={
               paperParam ? (
@@ -588,16 +544,14 @@ export default function Intake() {
                     <LinkButton to={`/biorepo/paper/${scopedPaper.id}`}>Open the paper</LinkButton>
                   )}
                 </div>
-              ) : hiddenLine ? (
-                <LinkButton to={PROGRAMS_SETTINGS_PATH}>Show archived programs in Settings</LinkButton>
               ) : (
                 <LinkButton to="/intake/ingest">Open the ingest board</LinkButton>
               )
             }
           />
         </Card>
-        {/* The subsystems stand whatever the table holds: with every record
-            archived (OF-BLD-016 §2.2) the shelf still says what is built. */}
+        {/* The subsystems stand whatever the table holds: with no record yet
+            the shelf still says what is built. */}
         <SubsystemShelf owner="Intake" />
       </>
     );
@@ -609,13 +563,12 @@ export default function Intake() {
   return (
     <>
       <PageHeader
-        eyebrow="Module 0 · Evidence"
+        eyebrow="Documents in, anchored to source"
         title="Intake"
         subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from. Nothing here is trusted until a reviewer says so."
         actions={headerActions}
       />
       <OwnerTabs tabs={INTAKE_TABS} />
-      {paperParam && <ArchivedBanner kind="paper" id={paperParam} />}
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3 text-caption text-ink-soft">
         <span>
@@ -628,7 +581,6 @@ export default function Intake() {
           <span className="font-num text-gold">{goldCount}</span> in the gold set
         </span>
         <ProvenanceLegend />
-        {hiddenLine && <span data-testid="archived-hidden">{hiddenLine}</span>}
       </div>
 
       {scopedPaper && (

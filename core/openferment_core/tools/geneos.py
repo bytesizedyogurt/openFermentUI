@@ -1,9 +1,8 @@
 """`yield_ceiling`: the most product a published reaction network can make
 from a feed (OF-BLD-014 §6.3).
 
-Ids and words in: a model on geneOS's shelf, the product (PHB from the
-E. coli and C. necator models, ethanol from the two yeast models), the
-sugar. One `Evidence` out, figure hint `ceiling`, whose basis names the model
+Ids and words in: a model on geneOS's shelf, the product (ethanol from the
+two yeast models), the sugar. One `Evidence` out, figure hint `ceiling`, whose basis names the model
 file, the add-on route and the uptake convention; the model reads a short
 description of the model beside it. A sugar the model cannot take up, or a
 product it has no route to, is a finding, said in words, and carries no
@@ -13,7 +12,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import geneos, geneos_models as shelf, programs
+from .. import geneos, geneos_models as shelf
 from ..models import ToolResult
 from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 from . import Tool, ToolContext, register
@@ -21,12 +20,9 @@ from . import Tool, ToolContext, register
 NAME = "yield_ceiling"
 
 
-# What the schema names: the shelf models and products no archived program
-# holds (OF-BLD-016 §2.R). An archived one is refused in `_run` with the
-# switch off, and accepted with it on; the description never names it.
-_PRODUCTS = programs.offered("product", shelf.PRODUCTS)
-_MODELS = [(m.id, [p for p in m.products if p in _PRODUCTS]) for m in shelf.SHELF.values()
-           if m.id in programs.offered("model", [m.id])]
+# What the schema names: the shelf's models and the products they name.
+_PRODUCTS = list(shelf.PRODUCTS)
+_MODELS = [(m.id, [p for p in m.products if p in _PRODUCTS]) for m in shelf.SHELF.values()]
 _MODELS = [(mid, ps) for mid, ps in _MODELS if ps]
 
 
@@ -40,13 +36,7 @@ class YieldCeilingInput(BaseModel):
 
 
 def _run(inp: YieldCeilingInput, ctx: ToolContext) -> ToolResult:
-    # A model off the shelf (the toy among them) is refused for that, below;
-    # one on it is refused first when an archived program holds it or the
-    # product, with the switch off (OF-BLD-016 §2.R).
-    refused = inp.modelId in shelf.SHELF and programs.archived_refusal(
-        NAME, [("model", inp.modelId), ("product", inp.product)], ctx.include_archived)
-    if refused:
-        return ToolResult(error=refused)
+    # A model off the shelf (the toy among them) is refused for that, below.
     try:
         result = geneos.ceiling(inp.modelId, inp.product, inp.substrate)
     except geneos.GeneosUnavailable as e:
@@ -80,9 +70,8 @@ TOOL = register(
         description=(
             "The most product a published reaction network can make from one sugar, by flux balance analysis, kept as "
             "a computed value with its basis. Returns one evidence id to cite, the value in g per g and mol per mol, "
-            "and the model it came from; the core model gives the central-carbon ceiling, a genome-scale model the "
-            "full network's. A sugar the model cannot take up, or a product it has no route to, comes back as a "
-            "finding with no number."
+            "and the model it came from, a genome-scale network whose ceiling is the full network's. A sugar the "
+            "model cannot take up, or a product it has no route to, comes back as a finding with no number."
         ),
         input_model=YieldCeilingInput,
         run=_run,
