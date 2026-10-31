@@ -251,9 +251,8 @@ export interface Paper {
 }
 
 export type RecordStatus = 'unverified' | 'verified' | 'rejected';
-// 'claude-1' is the first run that actually ran (OF-BLD-012 §6). The three
-// before it are the seed's names for runs that never happened.
-export type ExtractorRun = 'v0.3' | 'v0.4' | 'v0.4r' | 'claude-1';
+// 'claude-1', the extractor that runs (OF-BLD-012 §6).
+export type ExtractorRun = 'claude-1';
 
 export interface AuditEvent {
   at: string;
@@ -662,22 +661,7 @@ export interface SensitivityRow {
   hiPct: number;
 }
 
-/**
- * A cost model is authored once (spreadsheet-grade engine, §17.1) and swept
- * over its grid at load time. Cost lines are $/kg product and sum to MSP by
- * construction, so the waterfall always agrees with the headline.
- */
-export interface CostModel {
-  modelId: 'S1' | 'S2' | 'S3';
-  dims: ScenarioDim[];
-  referencePoint: Record<string, number>;
-  evaluate: (point: Record<string, number>) => Record<CostLine, number>;
-  sensitivity: SensitivityRow[];
-  /** Grid coordinates where the authored engine fails to converge (§17.3). */
-  nonConvergent?: (point: Record<string, number>) => boolean;
-}
-
-/** Precomputed sweep of a CostModel (§15 ResultGrid). */
+/** A sweep's prices over its grid (§15 ResultGrid). */
 export interface ResultGrid {
   modelId: string;
   dims: { key: string; values: number[] }[];
@@ -685,28 +669,6 @@ export interface ResultGrid {
   costLines: Record<CostLine, Float64Array>;
   sensitivity: SensitivityRow[];
 }
-
-export interface ChatRetrievalHit {
-  paperId: string;
-  sectionId: string;
-  score: number;
-  snippet: string;
-}
-
-export interface ChatToolCall {
-  name: string;
-  args: Record<string, unknown>;
-  durationMs: number;
-  retrieval?: ChatRetrievalHit[];
-}
-
-export type ChatMessage =
-  | { kind: 'user'; id: string; text: string }
-  | { kind: 'plan'; id: string; steps: string[]; done: number; collapsed: boolean }
-  | { kind: 'tool'; id: string; call: ChatToolCall; expanded: boolean }
-  | { kind: 'answer'; id: string; md: string; streaming: boolean; flowId?: string; followups: string[] }
-  | { kind: 'clarify'; id: string; question: string; options: { label: string; flowId: string }[] }
-  | { kind: 'system'; id: string; text: string; retry?: boolean };
 
 export interface CheckpointQuestion {
   id: string;
@@ -840,27 +802,6 @@ export interface UnitOperation {
    */
   biosteamClasses?: string[];
 }
-
-export type GeneticElementKind =
-  | 'promoter'
-  | 'signal_peptide'
-  | 'fusion_tag'
-  | 'maintenance'
-  | 'sequence_design'
-  | 'dosage';
-
-export interface Pathway {
-  id: string;
-  label: string;
-  products: string[];
-  /** The metabolic branch point flux has to be pushed through. */
-  fluxNode: string;
-  note?: string;
-}
-
-export type CostBand = 'low' | 'moderate' | 'high';
-
-export type RegulatoryBurden = 'low' | 'low-moderate' | 'moderate' | 'high' | 'very high';
 
 /**
  * A carbon source a value can be measured on (OF-BLD-014 §2.1): a name and

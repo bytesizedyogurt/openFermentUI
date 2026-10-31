@@ -27,7 +27,7 @@ import type { Measure, Prediction } from '@/data/types';
 function canonical(predictions: Prediction[], schema: Measure[]): string {
   // §9.1: the four fields an interval or a bound carries are appended only
   // when a prediction has one, so every point serialises exactly as before
-  // and no lock taken earlier changes (scripts/fixtures/seed-lock-digests.json).
+  // and no lock taken earlier changes (core/tests/fixtures/lock-digests.json, written by export-lock-fixtures).
   const p = predictions.map((x) => {
     const base: unknown[] = [x.id, x.label, x.value, x.unit, x.confidence, x.basis];
     if (x.kind === undefined && x.interval === undefined && x.artifactId === undefined && x.recordIds === undefined) return base;

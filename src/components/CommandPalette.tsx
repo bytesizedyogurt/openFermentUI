@@ -18,7 +18,6 @@ import {
   Search,
   Sparkles,
   CornerDownLeft,
-  Layers,
   type LucideIcon,
 } from 'lucide-react';
 import { useStore } from '@/store';

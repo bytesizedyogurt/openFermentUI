@@ -499,7 +499,7 @@ export default function BioRepo() {
         exportNote="CSV exports carry the provenance disclosure header — the citations are real, and a per-class note says what each provenance value is worth."
         emptyTitle="No papers match"
         emptyBody="Nothing in the corpus matches the current filters."
-        bulkActions={(selected, clear) => (
+        bulkActions={(selected) => (
           <>
             <Button size="sm" onClick={() => exportSelected(selected)}>
               <Download size={13} /> Export metadata

@@ -83,11 +83,11 @@ export const referencePath = (id: string) => `/proforma/reference/${encodeURICom
 
 /**
  * Whether the service has no such endpoint, rather than no such run: FastAPI's
- * own 404 or 405, the built app's static mount answering a path no /api route
- * holds (a 404 with no JSON body), or the service double's 404.
+ * own 404 or 405, or the built app's static mount answering a path no /api
+ * route holds (a 404 with no JSON body).
  */
 const noEndpoint = (e: unknown) =>
-  (e instanceof ServiceRefused && (e.status === 405 || (e.status === 404 && /^(Not Found|not part of the smoke double)$/.test(e.message)))) ||
+  (e instanceof ServiceRefused && (e.status === 405 || (e.status === 404 && e.message === 'Not Found'))) ||
   (e instanceof ServiceDown && /answered 40[45]\./.test(e.message));
 
 /**
@@ -779,11 +779,8 @@ export const NO_DIAGRAM =
  */
 export const diagramSrc = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
-/** The words for an infeasible sample's reason (flowsheets/pha_sugar_v0.REASONS, ethanol_glucose_v0.REASONS and custom_train_v1.REASONS). */
+/** The words for an infeasible sample's reason (flowsheets/ethanol_glucose_v0.REASONS and custom_train_v1.REASONS). */
 export const INFEASIBLE_WORDS: Record<string, string> = {
-  carbon: 'left no sugar for respiration',
-  oxygen: 'asked for more oxygen than the aerated tank transfers',
-  balance: "left the fermenter's mass balance open",
   yield: 'asked for a yield above the theoretical yield of ethanol on glucose',
   concentration: 'asked for more glucose than a litre of feed can hold',
   convergence: 'did not converge in the simulator',
@@ -926,13 +923,6 @@ const READ_BACK: Record<string, { case: string[]; setting: string[] }> = {
     setting: [
       'theoreticalYieldGPerG', 'denaturantFraction', 'vesselLimitM3', 'workingVolumeFraction', 'cleaningTimeH', 'temperatureK', 'operatingHours',
       'rateOfReturn', 'operatingDays', 'startYear', 'endYear', 'incomeTax', 'langFactor',
-    ],
-  },
-  pha_sugar_v0: {
-    case: [],
-    setting: [
-      'cakeMoisture', 'dryerMoisture', 'vesselLimitM3', 'oxygenTarget', 'temperatureK', 'rateOfReturn', 'operatingDays', 'startYear', 'endYear',
-      'incomeTax', 'ammoniaPriceUsdPerKg', 'packageGlucosePriceUsdPerKg',
     ],
   },
 };

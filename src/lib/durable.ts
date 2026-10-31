@@ -153,10 +153,6 @@ export interface DurableSnapshot {
   liveConversations?: LiveConversation[];
   /** LEGACY, read once: Proforma scenarios made here (OF-BLD-019 D6), keyed by id. */
   createdScenarios?: Record<string, Scenario>;
-  /** LEGACY: the newest run of each seeded scenario; no scenario ships seeded since alpha 2.0. */
-  scenarioRuns?: Record<string, string>;
-  /** LEGACY: the seeded scenarios pinned here; no scenario ships seeded since alpha 2.0. */
-  pinnedScenarios?: string[];
   /** LEGACY, read once: pureOS's trains built here (OF-BLD-020 §5.3), by train id. */
   trainsMade?: Record<string, TrainMade>;
 }

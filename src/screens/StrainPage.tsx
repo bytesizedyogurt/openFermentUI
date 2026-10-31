@@ -862,7 +862,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       width: '130px',
       numeric: true,
       priority: 1,
-      render: ({ rec, canonical }) =>
+      render: ({ canonical }) =>
         canonical === null ? (
           <span className="text-signal-warn" title="Unit does not convert to the canonical unit">
             n/a

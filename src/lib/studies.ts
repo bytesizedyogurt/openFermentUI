@@ -56,7 +56,6 @@ export const compareRuns = (asked: ComparisonCreate) => call<ComparisonReport>('
 export const listStudyRunbooks = (signal?: AbortSignal) => call<Runbook[]>('/api/studies/runbooks', { signal });
 export const getFlowsheet = (recordId: string, signal?: AbortSignal) =>
   call<SFFFlowsheet>(`/api/flowsheets/${id(recordId)}`, { signal });
-export const listFlowsheets = (signal?: AbortSignal) => call<SFFFlowsheet[]>('/api/flowsheets', { signal });
 export const makeRunbook = (asked: RunbookCreate) => call<Runbook>('/api/studies/runbooks', post(asked));
 
 /** A file the service answers, fetched with the open project named and handed to the person; its name as the service gave it. */

@@ -18,7 +18,6 @@ import {
   ArrowRight,
   Loader2,
   MessageSquare,
-  RefreshCw,
 } from 'lucide-react';
 import type { ExtractionRecord, FieldId, Job, Paper } from '@/data/types';
 import { fieldName } from '@/data/ontology';
@@ -121,7 +120,6 @@ export default function PaperReader({
   const unitMode = useStore((s) => s.ui.unitMode);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
   const setUI = useStore((s) => s.setUI);
-  const toast = useStore((s) => s.toast);
 
   const [activeId, setActiveId] = useState<string | null>(spanId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);

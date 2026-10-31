@@ -24,7 +24,6 @@
 //   - an alias, so typing the old word in the palette still finds the thing;
 //   - a redirect, so an old link lands on the new screen instead of a 404.
 import {
-  Boxes,
   Dna,
   FlaskConical,
   Filter,

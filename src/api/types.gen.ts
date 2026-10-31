@@ -2743,9 +2743,9 @@ export interface components {
             /**
              * Extractorrun
              * @default claude-1
-             * @enum {string}
+             * @constant
              */
-            extractorRun: "v0.3" | "v0.4" | "v0.4r" | "claude-1";
+            extractorRun: "claude-1";
             /** Field */
             field: string;
             /** Goldonly */
@@ -3350,9 +3350,9 @@ export interface components {
             /**
              * Run
              * @default claude-1
-             * @enum {string}
+             * @constant
              */
-            run: "v0.3" | "v0.4" | "v0.4r" | "claude-1";
+            run: "claude-1";
             /** Truncatedsections */
             truncatedSections?: string[];
             usage?: components["schemas"]["Usage"];
@@ -3370,9 +3370,9 @@ export interface components {
             results?: components["schemas"]["ExtractRunResult"][];
             /**
              * Run
-             * @enum {string}
+             * @constant
              */
-            run: "v0.3" | "v0.4" | "v0.4r" | "claude-1";
+            run: "claude-1";
         };
         /**
          * ExtractRunFalsePositive

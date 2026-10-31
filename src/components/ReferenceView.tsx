@@ -50,9 +50,9 @@ export function SubsystemBlock({
  * has, so the part that is not built reads as such wherever the owner's live
  * views stand.
  *
- * `stubsFor` lists the stubs alone (OF-BLD-011 §2): a seeded subsystem has its
- * own view, and listing it here under "no implementation" would contradict that
- * view.
+ * `stubsFor` lists the unbuilt subsystems alone (OF-BLD-011 §2): a built one has
+ * its own view, and listing it here under "no implementation" would contradict
+ * that view.
  */
 export function SubsystemShelf({ owner }: { owner: SubsystemOwner }) {
   const stubs = stubsFor(owner);

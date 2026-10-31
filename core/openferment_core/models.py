@@ -623,7 +623,7 @@ class Overlay(BaseModel):
 RecordStatus = Literal["unverified", "verified", "rejected"]
 # Mirrors ExtractorRun in types.ts. 'claude-1' is the first run that runs for
 # real: Claude Opus 5.5, with Claude Sonnet 5.5 where Opus declined (llm.py).
-ExtractorRun = Literal["v0.3", "v0.4", "v0.4r", "claude-1"]
+ExtractorRun = Literal["claude-1"]
 Outcome = Literal["match", "value_mismatch", "unit_error", "span_error", "miss"]
 
 

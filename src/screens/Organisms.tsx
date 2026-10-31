@@ -11,7 +11,6 @@ import { useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, FlaskConical, LineChart, BookOpen, ShieldCheck } from 'lucide-react';
 import type { ExtractionRecord, Paper, Strain } from '@/data/types';
 import { useStore } from '@/store';
-import { href } from '@/router';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 import {
   Bar,

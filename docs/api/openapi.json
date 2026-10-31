@@ -683,13 +683,8 @@
             "title": "Curationref"
           },
           "extractorRun": {
+            "const": "claude-1",
             "default": "claude-1",
-            "enum": [
-              "v0.3",
-              "v0.4",
-              "v0.4r",
-              "claude-1"
-            ],
             "title": "Extractorrun",
             "type": "string"
           },
@@ -2170,13 +2165,8 @@
             "type": "object"
           },
           "run": {
+            "const": "claude-1",
             "default": "claude-1",
-            "enum": [
-              "v0.3",
-              "v0.4",
-              "v0.4r",
-              "claude-1"
-            ],
             "title": "Run",
             "type": "string"
           },
@@ -2223,12 +2213,7 @@
             "type": "array"
           },
           "run": {
-            "enum": [
-              "v0.3",
-              "v0.4",
-              "v0.4r",
-              "claude-1"
-            ],
+            "const": "claude-1",
             "title": "Run",
             "type": "string"
           }

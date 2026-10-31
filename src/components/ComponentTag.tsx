@@ -40,12 +40,6 @@ export type ComponentName =
   | 'Audit'
   | 'Witness'
   | 'Common Seal'
-  | 'Claim Workbench'
-  | 'Priority Engine'
-  | 'Clearance'
-  | 'Dominion'
-  | 'Enablement'
-  | 'Notary'
   | 'Guild'
   | 'Runbook'
   | 'Deposition';
@@ -67,12 +61,6 @@ export const COMPONENT_ROLE: Record<ComponentName, string> = {
   Audit: 'Keeping it honest — provenance, and what is held out of aggregates',
   Witness: 'Keeping it honest — extractor validation against the gold set',
   'Common Seal': 'Keeping it honest — timestamping and attestation (not built)',
-  'Claim Workbench': 'Patents — claim drafting and analysis (not built)',
-  'Priority Engine': 'Patents — priority and filing strategy (not built)',
-  Dominion: 'Patents and clearance — what is fenced and what is open',
-  Clearance: 'Patents — freedom to operate, per jurisdiction',
-  Enablement: 'Patents — enablement and written description (not built)',
-  Notary: 'Patents — inventorship and conception records (not built)',
   Guild: 'People and permissions — review, roles and who decided what',
   Runbook: 'Assay — the outbound falsifiable claim',
   Deposition: 'Assay — the inbound account of what actually happened',

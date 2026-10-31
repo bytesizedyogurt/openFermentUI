@@ -8,7 +8,6 @@ import {
   ArrowUp,
   Download,
   FileWarning,
-  Gauge,
   Minus,
   ScrollText,
   Send,
@@ -43,13 +42,9 @@ import { BIOREPO_TABS } from '@/data/tabs';
 
 // ── run identity ───────────────────────────────────────────────────────
 
-// claude-1 last: it is the only run that actually ran (OF-BLD-012 §6), and it
-// arrives through the service overlay rather than the seed.
-const RUN_ORDER: ExtractorRun[] = ['v0.3', 'v0.4', 'v0.4r', 'claude-1'];
+// claude-1, the run that runs (OF-BLD-012 §6), arriving through the service's overlay.
+const RUN_ORDER: ExtractorRun[] = ['claude-1'];
 const RUN_LABEL: Record<ExtractorRun, string> = {
-  'v0.3': 'v0.3',
-  'v0.4': 'v0.4',
-  'v0.4r': 'v0.4 + rules',
   'claude-1': 'claude-1',
 };
 
@@ -60,9 +55,6 @@ const PROVISIONAL_LABEL =
 const NO_CANDIDATES: Candidate[] = [];
 const NO_DECISIONS: Record<string, ReviewDecision> = {};
 const RUN_BLURB: Record<ExtractorRun, string> = {
-  'v0.3': 'Baseline pass — span retrieval plus a single extraction prompt.',
-  'v0.4': 'Adds unit normalisation against the ontology before scoring.',
-  'v0.4r': 'v0.4 with hand-written guard rules for the fields that failed most.',
   'claude-1': 'One structured response per paper over fetched full text; every candidate anchored to a verbatim quote (OF-BLD-012 §2.4).',
 };
 

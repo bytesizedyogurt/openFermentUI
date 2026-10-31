@@ -30,7 +30,7 @@
  *
  * Runs with no service and no network: the service is a stub `fetch` here.
  */
-import { useStore, guildView, actingIdOf, checksView } from '../src/store';
+import { useStore, guildView, actingIdOf } from '../src/store';
 import { TEST_PROTOCOLS, TEST_SKILLS as SKILLS, TEST_SKILL_BY_ID as SKILL_BY_ID } from './lib/guild-test-skills';
 import { sampleGuild, SAMPLE_LEAD } from './lib/guild-ladder';
 import { offlineRefusal } from '../src/lib/guild';
@@ -43,13 +43,12 @@ import {
   holdFor,
   policyOf,
   isAssessor,
-  localToday,
   readyForCheck,
   statusOf,
   verdictFor,
 } from '../src/engine/competence';
-import type { Check, CheckResult, Checks, Guild, GuildEvidence, GuildPerson, LiveConversation, Proposal } from '../src/data/types';
-import { mayQueue, proposeChecks, shownTo } from '../src/engine/checks';
+import type { Checks, Guild, GuildEvidence, GuildPerson, Proposal } from '../src/data/types';
+import { mayQueue, proposeChecks } from '../src/engine/checks';
 import { needsActing, shownProposals } from '../src/lib/proposals';
 
 let fails = 0;

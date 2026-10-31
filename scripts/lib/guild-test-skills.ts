@@ -5,41 +5,8 @@
 // ladder's policy are kept; every summary and criterion is a placeholder, the
 // authored text having left with the seed (alpha 2.0, ADR-010). The app ships
 // with no skill: a lab adds its own (stage 2). Never imported under src/.
-import type { Protocol, Skill, SkillFamily } from '../../src/data/types';
+import type { Protocol, Skill } from '../../src/data/types';
 import guildProjection from '../../core/tests/fixtures/guild-projection.json';
-
-export const TEST_FAMILIES: SkillFamily[] = [
-  {
-    "id": "contamination",
-    "name": "Contamination control",
-    "short": "Contamination"
-  },
-  {
-    "id": "vessel",
-    "name": "Vessel operation",
-    "short": "Vessel"
-  },
-  {
-    "id": "monitoring",
-    "name": "Process monitoring",
-    "short": "Monitoring"
-  },
-  {
-    "id": "qc",
-    "name": "Sampling and QC",
-    "short": "Sampling and QC"
-  },
-  {
-    "id": "records",
-    "name": "Batch records",
-    "short": "Records"
-  },
-  {
-    "id": "safety",
-    "name": "Safety and troubleshooting",
-    "short": "Safety"
-  }
-];
 
 export const TEST_SKILLS: Skill[] = [
   {

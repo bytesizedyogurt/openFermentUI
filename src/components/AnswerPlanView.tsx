@@ -113,8 +113,6 @@ const SUPPORT_NOTE: Record<Claim['support'], string | null> = {
 /** OF-BLD-015 §7.2 — where a module row lives in the app, when it has a page. */
 function rowHref(row: ModuleRow): string {
   const at: Record<string, string> = {
-    'dominion/molecule': `/dominion/molecules/${row.id}`,
-    'dominion/finding': '/dominion/clearance',
     'runbooks/runbook': `/runbooks/${row.id}`,
     'runbooks/protocol': `/runbooks/protocols/${row.id}`,
     'geneos/host': `/geneos/hosts/${row.id}`,

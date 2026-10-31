@@ -26,7 +26,7 @@ type Valued = Pick<ExtractionRecord, 'value' | 'unit'>;
 // a superscript on a unit to '-1', a superscript on a number to '^6',
 // whitespace runs to one space. The browser must look the same way, or a
 // candidate the service anchored renders as "quote not located" here and a
-// curated quote the service would accept is refused by goldRefusal below.
+// curated quote the service would accept is refused by writeRefusal below.
 // Kept in step with validate.py by hand; the smoke test's candidate quotes
 // and test_anchor's cases are the shared examples.
 
@@ -411,15 +411,4 @@ export function decisionToCheck(
 /** A refusal that stops the action, as opposed to one that only keeps it out of the service. */
 export function blocks(refusal: Refusal | null): boolean {
   return !!refusal && !refusal.browserOnly;
-}
-
-/** Kept for callers that only ask about gold. */
-export function goldRefusal(
-  record: ExtractionRecord,
-  paper: Paper | undefined,
-  candidates: Candidate[],
-  serviceUp: boolean | null,
-  reviewer: string | null,
-): Refusal | null {
-  return writeRefusal('gold', record, paper, candidates, serviceUp, reviewer);
 }
