@@ -1327,8 +1327,8 @@ export interface paths {
          * Params Scope
          * @description A scope's parameters (`ParamScope`): every spec with its bounds and
          *     their reason, and its value as the service binds it now, with its
-         *     source. `proforma:<scenario id>` is a seed scenario, or with
-         *     `?flowsheet=` a scenario made in a browser; `?host=` and `?fits=` (JSON)
+         *     source. `proforma:<scenario id>` is a scenario the project keeps, or
+         *     with `?flowsheet=` one not yet saved; `?host=` and `?fits=` (JSON)
          *     bind as `/api/proforma/bind` does. Binding only: it starts no worker,
          *     integrates nothing and keeps nothing. `fermos:vessel:<id>` (with
          *     `?vesselType=`) reads its class's defaults through the Proforma worker,
@@ -1340,7 +1340,7 @@ export interface paths {
          *     through the Proforma worker as the vessel's do (§5.1); with no type it is
          *     a 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is
          *     the train's own, its per-component keys expanded over the train's
-         *     chemicals and its records bound by the train's program and product, and
+         *     chemicals and its records bound from the evidence pool by each parameter's field, and
          *     `pureos:unit:<train>:inlet` is the train's inlet. A `proforma:` scope on
          *     `custom_train_v1` names its vessel design and train run (`?vessel=`,
          *     `?trainRun=`; OF-BLD-020 §6.1) and serves the group Finance, read from
@@ -1497,8 +1497,8 @@ export interface paths {
         };
         /**
          * Proforma Bind
-         * @description A shelf flowsheet's inputs bound, as a scenario a person made in the
-         *     browser shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
+         * @description A shelf flowsheet's inputs bound, as a scenario not yet saved to the
+         *     project shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
          *     lays on the fermOS fits a person chose (§5.1), a JSON object of input
          *     key to artifact id, and `?overrides=` a person's overrides of one
          *     scenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet
@@ -1530,8 +1530,8 @@ export interface paths {
          * Proforma Ceiling Check
          * @description A scenario's fermenter yield read against the newest stored geneOS
          *     ceiling of each shelf model of its organism, on its flowsheet's sugar
-         *     (OF-BLD-019 §5.2, D11): `CeilingCheck`. A seed scenario by its id, one
-         *     made in the browser by the flowsheet it names; `?fits=` and
+         *     (OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by
+         *     its id, one not yet saved by the flowsheet it names; `?fits=` and
          *     `?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,
          *     and `?assumptions=`, the older field, is read as overrides for one
          *     release. A yield above a ceiling is flagged, never clamped. A read: it
@@ -1587,7 +1587,7 @@ export interface paths {
         put?: never;
         /**
          * Proforma Run
-         * @description Run a seed scenario by its id, or a scenario made in the browser by
+         * @description Run a scenario the project keeps by its id, or one not yet saved by
          *     the shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any
          *     other case, and listing every input waiting for a source.
          */
@@ -1610,8 +1610,8 @@ export interface paths {
          * @description A scenario's newest run on this service (OF-BLD-019 §3.R): the newest
          *     stored `proforma.run` whose basis names the scenario (`latest_run`, the
          *     one pureOS and selling_price read), or none. A read: it runs nothing and
-         *     starts no simulator. The scenario is named by id, so no program filter
-         *     applies (a link opens what it names).
+         *     starts no simulator. The scenario is named by id, and a link opens what
+         *     it names.
          */
         get: operations["proforma_runs_api_proforma_runs_get"];
         put?: never;
@@ -1631,9 +1631,8 @@ export interface paths {
         };
         /**
          * Proforma Scenarios
-         * @description The seed's BioSTEAM scenarios with their inputs bound to records
-         *     (§8.3; OF-BLD-019 §2.3), none since alpha 2.0 deleted the seed. A read:
-         *     it starts no simulator.
+         * @description The project's BioSTEAM scenarios with their inputs bound to records
+         *     (§8.3; OF-BLD-019 §2.3). A read: it starts no simulator.
          */
         get: operations["proforma_scenarios_api_proforma_scenarios_get"];
         put?: never;
@@ -2029,8 +2028,8 @@ export interface paths {
          * Pureos Train
          * @description One train: the newest run of the scenario `key` names, the newest run
          *     of the pureOS train it names (OF-BLD-020 §5.2), or the run whose artifact
-         *     id it is. 404 says how a run gets there; a deep link opens whatever
-         *     program it belongs to, and the page names it.
+         *     id it is. 404 says how a run gets there; a deep link opens what it
+         *     names.
          */
         get: operations["pureos_train_api_pureos_train__key__get"];
         put?: never;
@@ -2075,8 +2074,8 @@ export interface paths {
          * @description The trains a model built with `pureos_build` or `pureos_write`
          *     (`KeptTrain`: the train as data, `madeBy` the model, `at` and
          *     `updatedAt`), the most recently changed first (OF-BLD-020 §5.4). A
-         *     person's trains stay in their browser. A read: it writes nothing and starts
-         *     no simulator.
+         *     person's trains are the project's rows (`GET /api/state`). A read: it
+         *     writes nothing and starts no simulator.
          */
         get: operations["pureos_trains_kept_api_pureos_trains_kept_get"];
         put?: never;
@@ -2869,7 +2868,8 @@ export interface components {
         };
         /**
          * CheckCriterion
-         * @description One of a skill's mastery criteria, by its place in src/data/skills.ts.
+         * @description One of a skill's mastery criteria, by its place in the skill's list
+         *     (Guild's skills; none ship with alpha 2.0).
          */
         CheckCriterion: {
             /** Index */
@@ -3188,8 +3188,9 @@ export interface components {
         /**
          * DroppedCandidate
          * @description A candidate anchoring refused (§2.4), kept beside the survivors so the
-         *     run can be scored honestly (§6.2): a candidate whose value agreed with the
-         *     seed and whose quote failed is a `span_error` in Witness — the extractor
+         *     run can be scored honestly (§6.2): a candidate whose value agreed with a
+         *     value a reviewer typed and whose quote failed is a `span_error` in
+         *     Witness — the extractor
          *     produced it, and dropping it from BioRepo does not undo that. Never enters
          *     BioRepo; never repaired.
          */
@@ -3391,7 +3392,7 @@ export interface components {
         };
         /**
          * ExtractRunResult
-         * @description One seed record scored against a run (§6.2).
+         * @description One reference, a value a reviewer typed, scored against a run (§6.2).
          */
         ExtractRunResult: {
             extracted?: components["schemas"]["Quantity-Output"] | null;
@@ -4236,8 +4237,8 @@ export interface components {
         };
         /**
          * Overlay
-         * @description GET /api/biorepo/overlay (§2.1). The store applies it in one action on
-         *     top of the seed; with the service down the app is exactly the seed.
+         * @description GET /api/biorepo/overlay (§2.1). The browser's store applies it in one
+         *     action when it arrives; a project's records reach the page through it.
          *
          *     `papers`, the documents the project holds in the kit (ADR-002); `runs`
          *     and `candidates` recomputed from the project's candidates against the
@@ -4300,9 +4301,9 @@ export interface components {
             source: "europepmc" | "osti" | "sgd" | "upload" | "paste";
             /**
              * Textsource
-             * @enum {string}
+             * @constant
              */
-            textSource: "full-text" | "curation-note";
+            textSource: "full-text";
             /** Title */
             title?: string | null;
             /** Url */
@@ -4577,8 +4578,9 @@ export interface components {
         };
         /**
          * PracticeDeposition
-         * @description A Deposition as the browser sends it for drafting: Depositions live in
-         *     the browser's Durable tier, so the service sees the ones it is shown.
+         * @description A Deposition as the page sends it for drafting: the project keeps its
+         *     depositions as rows (project_state.py), and a draft reads the ones the
+         *     page sends.
          */
         PracticeDeposition: {
             /** Entries */
@@ -5098,8 +5100,8 @@ export interface components {
          *     The first six fields are exactly the browser's DurableReviewDecision — the
          *     shape the Durable tier already persists — so a decision made offline and a
          *     decision posted to the service are the same object. The rest say which
-         *     record, when, and, for a promotion that re-anchors a curated quote to the
-         *     paper's own words, the replacement span.
+         *     record, when, and, for a decision that re-anchors the record to another
+         *     sentence of the paper, the replacement span.
          */
         "ReviewDecision-Input": {
             /** At */
@@ -5134,8 +5136,8 @@ export interface components {
          *     The first six fields are exactly the browser's DurableReviewDecision — the
          *     shape the Durable tier already persists — so a decision made offline and a
          *     decision posted to the service are the same object. The rest say which
-         *     record, when, and, for a promotion that re-anchors a curated quote to the
-         *     paper's own words, the replacement span.
+         *     record, when, and, for a decision that re-anchors the record to another
+         *     sentence of the paper, the replacement span.
          */
         "ReviewDecision-Output": {
             /** At */
@@ -5994,8 +5996,9 @@ export interface components {
         };
         /**
          * TrainSpec
-         * @description A train as data (D9): the browser keeps it whole and sends it with a
-         *     run; the service keeps the runs.
+         * @description A train as data (D9): the project keeps a person's train as a row
+         *     (pureOS's Builder), and the page sends it whole with a run; the service
+         *     keeps the runs.
          */
         TrainSpec: {
             /** Id */

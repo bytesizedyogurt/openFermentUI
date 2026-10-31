@@ -1088,7 +1088,7 @@
         "type": "object"
       },
       "CheckCriterion": {
-        "description": "One of a skill's mastery criteria, by its place in src/data/skills.ts.",
+        "description": "One of a skill's mastery criteria, by its place in the skill's list\n(Guild's skills; none ship with alpha 2.0).",
         "properties": {
           "index": {
             "title": "Index",
@@ -1761,7 +1761,7 @@
         "type": "object"
       },
       "DroppedCandidate": {
-        "description": "A candidate anchoring refused (§2.4), kept beside the survivors so the\nrun can be scored honestly (§6.2): a candidate whose value agreed with the\nseed and whose quote failed is a `span_error` in Witness — the extractor\nproduced it, and dropping it from BioRepo does not undo that. Never enters\nBioRepo; never repaired.",
+        "description": "A candidate anchoring refused (§2.4), kept beside the survivors so the\nrun can be scored honestly (§6.2): a candidate whose value agreed with a\nvalue a reviewer typed and whose quote failed is a `span_error` in\nWitness — the extractor\nproduced it, and dropping it from BioRepo does not undo that. Never enters\nBioRepo; never repaired.",
         "properties": {
           "detail": {
             "default": "",
@@ -2258,7 +2258,7 @@
         "type": "object"
       },
       "ExtractRunResult": {
-        "description": "One seed record scored against a run (§6.2).",
+        "description": "One reference, a value a reviewer typed, scored against a run (§6.2).",
         "properties": {
           "extracted": {
             "anyOf": [
@@ -4477,7 +4477,7 @@
         "type": "object"
       },
       "Overlay": {
-        "description": "GET /api/biorepo/overlay (§2.1). The store applies it in one action on\ntop of the seed; with the service down the app is exactly the seed.\n\n`papers`, the documents the project holds in the kit (ADR-002); `runs`\nand `candidates` recomputed from the project's candidates against the\nvalues reviewers typed by `witness.py` (§6.2); `records` from the\nproject's decisions (§7).\n\n`candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service\nalways sends the full list, so an empty list means the extractor produced\nnothing and the store drops what it had. `None` means \"not supplied\" and\nthe store keeps what it had — nothing here sends it, and it exists so that\n\"empty\" and \"unknown\" can never be the same value again.",
+        "description": "GET /api/biorepo/overlay (§2.1). The browser's store applies it in one\naction when it arrives; a project's records reach the page through it.\n\n`papers`, the documents the project holds in the kit (ADR-002); `runs`\nand `candidates` recomputed from the project's candidates against the\nvalues reviewers typed by `witness.py` (§6.2); `records` from the\nproject's decisions (§7).\n\n`candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service\nalways sends the full list, so an empty list means the extractor produced\nnothing and the store drops what it had. `None` means \"not supplied\" and\nthe store keeps what it had — nothing here sends it, and it exists so that\n\"empty\" and \"unknown\" can never be the same value again.",
         "properties": {
           "candidates": {
             "anyOf": [
@@ -4636,10 +4636,7 @@
             "type": "string"
           },
           "textSource": {
-            "enum": [
-              "full-text",
-              "curation-note"
-            ],
+            "const": "full-text",
             "title": "Textsource",
             "type": "string"
           },
@@ -5470,7 +5467,7 @@
         "type": "object"
       },
       "PracticeDeposition": {
-        "description": "A Deposition as the browser sends it for drafting: Depositions live in\nthe browser's Durable tier, so the service sees the ones it is shown.",
+        "description": "A Deposition as the page sends it for drafting: the project keeps its\ndepositions as rows (project_state.py), and a draft reads the ones the\npage sends.",
         "properties": {
           "entries": {
             "items": {
@@ -6842,7 +6839,7 @@
         "type": "object"
       },
       "ReviewDecision-Input": {
-        "description": "What a reviewer decided about one record (§7.1).\n\nThe first six fields are exactly the browser's DurableReviewDecision — the\nshape the Durable tier already persists — so a decision made offline and a\ndecision posted to the service are the same object. The rest say which\nrecord, when, and, for a promotion that re-anchors a curated quote to the\npaper's own words, the replacement span.",
+        "description": "What a reviewer decided about one record (§7.1).\n\nThe first six fields are exactly the browser's DurableReviewDecision — the\nshape the Durable tier already persists — so a decision made offline and a\ndecision posted to the service are the same object. The rest say which\nrecord, when, and, for a decision that re-anchors the record to another\nsentence of the paper, the replacement span.",
         "properties": {
           "at": {
             "title": "At",
@@ -6951,7 +6948,7 @@
         "type": "object"
       },
       "ReviewDecision-Output": {
-        "description": "What a reviewer decided about one record (§7.1).\n\nThe first six fields are exactly the browser's DurableReviewDecision — the\nshape the Durable tier already persists — so a decision made offline and a\ndecision posted to the service are the same object. The rest say which\nrecord, when, and, for a promotion that re-anchors a curated quote to the\npaper's own words, the replacement span.",
+        "description": "What a reviewer decided about one record (§7.1).\n\nThe first six fields are exactly the browser's DurableReviewDecision — the\nshape the Durable tier already persists — so a decision made offline and a\ndecision posted to the service are the same object. The rest say which\nrecord, when, and, for a decision that re-anchors the record to another\nsentence of the paper, the replacement span.",
         "properties": {
           "at": {
             "title": "At",
@@ -9117,7 +9114,7 @@
       },
       "TrainSpec": {
         "additionalProperties": false,
-        "description": "A train as data (D9): the browser keeps it whole and sends it with a\nrun; the service keeps the runs.",
+        "description": "A train as data (D9): the project keeps a person's train as a row\n(pureOS's Builder), and the page sends it whole with a run; the service\nkeeps the runs.",
         "properties": {
           "id": {
             "title": "Id",
@@ -13152,7 +13149,7 @@
     },
     "/api/params/{scope}": {
       "get": {
-        "description": "A scope's parameters (`ParamScope`): every spec with its bounds and\ntheir reason, and its value as the service binds it now, with its\nsource. `proforma:<scenario id>` is a seed scenario, or with\n`?flowsheet=` a scenario made in a browser; `?host=` and `?fits=` (JSON)\nbind as `/api/proforma/bind` does. Binding only: it starts no worker,\nintegrates nothing and keeps nothing. `fermos:vessel:<id>` (with\n`?vesselType=`) reads its class's defaults through the Proforma worker,\nwhich a read starts when it is cold (OF-BLD-020 §4.1). `fermos:family:<id>`\nbinds as GET /api/fermos/bind does, from `?strain=`, `?product=`,\n`?sugar=`, `?fit=`, `?startFrom=` and `?durationPreset=` (OF-BLD-020\n§3.2). `pureos:unit:<train>:<unit>` takes\nthe unit's catalogue type as `?unitType=` and reads its class's defaults\nthrough the Proforma worker as the vessel's do (§5.1); with no type it is\na 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is\nthe train's own, its per-component keys expanded over the train's\nchemicals and its records bound by the train's program and product, and\n`pureos:unit:<train>:inlet` is the train's inlet. A `proforma:` scope on\n`custom_train_v1` names its vessel design and train run (`?vessel=`,\n`?trainRun=`; OF-BLD-020 §6.1) and serves the group Finance, read from\nthe installed package with no worker. 404 for a scope no provider here\nknows; 422 in words for a malformed one or a refused binding; 409 for an\nartifact the scope names that is damaged on disk, as the vessel's own route\nanswers it (§2.R, finding 17); 503 when the worker cannot answer.",
+        "description": "A scope's parameters (`ParamScope`): every spec with its bounds and\ntheir reason, and its value as the service binds it now, with its\nsource. `proforma:<scenario id>` is a scenario the project keeps, or\nwith `?flowsheet=` one not yet saved; `?host=` and `?fits=` (JSON)\nbind as `/api/proforma/bind` does. Binding only: it starts no worker,\nintegrates nothing and keeps nothing. `fermos:vessel:<id>` (with\n`?vesselType=`) reads its class's defaults through the Proforma worker,\nwhich a read starts when it is cold (OF-BLD-020 §4.1). `fermos:family:<id>`\nbinds as GET /api/fermos/bind does, from `?strain=`, `?product=`,\n`?sugar=`, `?fit=`, `?startFrom=` and `?durationPreset=` (OF-BLD-020\n§3.2). `pureos:unit:<train>:<unit>` takes\nthe unit's catalogue type as `?unitType=` and reads its class's defaults\nthrough the Proforma worker as the vessel's do (§5.1); with no type it is\na 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is\nthe train's own, its per-component keys expanded over the train's\nchemicals and its records bound from the evidence pool by each parameter's field, and\n`pureos:unit:<train>:inlet` is the train's inlet. A `proforma:` scope on\n`custom_train_v1` names its vessel design and train run (`?vessel=`,\n`?trainRun=`; OF-BLD-020 §6.1) and serves the group Finance, read from\nthe installed package with no worker. 404 for a scope no provider here\nknows; 422 in words for a malformed one or a refused binding; 409 for an\nartifact the scope names that is damaged on disk, as the vessel's own route\nanswers it (§2.R, finding 17); 503 when the worker cannot answer.",
         "operationId": "params_scope_api_params__scope__get",
         "parameters": [
           {
@@ -13737,7 +13734,7 @@
     },
     "/api/proforma/bind": {
       "get": {
-        "description": "A shelf flowsheet's inputs bound, as a scenario a person made in the\nbrowser shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`\nlays on the fermOS fits a person chose (§5.1), a JSON object of input\nkey to artifact id, and `?overrides=` a person's overrides of one\nscenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet\nbuilt from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1) names its\nvessel design and its train run (`?vessel=`, `?trainRun=`). A reference\nbiorefinery, the toy, an unknown id, a fit that cannot feed its input,\nan override that cannot stand, or a composite's part that cannot\n(missing, another tool's, damaged, of another chemical set) is a 422 in\nwords. A read:\nit starts no simulator.",
+        "description": "A shelf flowsheet's inputs bound, as a scenario not yet saved to the\nproject shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`\nlays on the fermOS fits a person chose (§5.1), a JSON object of input\nkey to artifact id, and `?overrides=` a person's overrides of one\nscenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet\nbuilt from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1) names its\nvessel design and its train run (`?vessel=`, `?trainRun=`). A reference\nbiorefinery, the toy, an unknown id, a fit that cannot feed its input,\nan override that cannot stand, or a composite's part that cannot\n(missing, another tool's, damaged, of another chemical set) is a 422 in\nwords. A read:\nit starts no simulator.",
         "operationId": "proforma_bind_api_proforma_bind_get",
         "parameters": [
           {
@@ -13869,7 +13866,7 @@
     },
     "/api/proforma/ceiling-check": {
       "get": {
-        "description": "A scenario's fermenter yield read against the newest stored geneOS\nceiling of each shelf model of its organism, on its flowsheet's sugar\n(OF-BLD-019 §5.2, D11): `CeilingCheck`. A seed scenario by its id, one\nmade in the browser by the flowsheet it names; `?fits=` and\n`?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,\nand `?assumptions=`, the older field, is read as overrides for one\nrelease. A yield above a ceiling is flagged, never clamped. A read: it\nkeeps nothing, starts no worker and changes no binding or run. Refused\nin words (422) as the binding is.",
+        "description": "A scenario's fermenter yield read against the newest stored geneOS\nceiling of each shelf model of its organism, on its flowsheet's sugar\n(OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by\nits id, one not yet saved by the flowsheet it names; `?fits=` and\n`?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,\nand `?assumptions=`, the older field, is read as overrides for one\nrelease. A yield above a ceiling is flagged, never clamped. A read: it\nkeeps nothing, starts no worker and changes no binding or run. Refused\nin words (422) as the binding is.",
         "operationId": "proforma_ceiling_check_api_proforma_ceiling_check_get",
         "parameters": [
           {
@@ -14103,7 +14100,7 @@
     },
     "/api/proforma/run": {
       "post": {
-        "description": "Run a seed scenario by its id, or a scenario made in the browser by\nthe shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any\nother case, and listing every input waiting for a source.",
+        "description": "Run a scenario the project keeps by its id, or one not yet saved by\nthe shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any\nother case, and listing every input waiting for a source.",
         "operationId": "proforma_run_api_proforma_run_post",
         "parameters": [
           {
@@ -14156,7 +14153,7 @@
     },
     "/api/proforma/runs": {
       "get": {
-        "description": "A scenario's newest run on this service (OF-BLD-019 §3.R): the newest\nstored `proforma.run` whose basis names the scenario (`latest_run`, the\none pureOS and selling_price read), or none. A read: it runs nothing and\nstarts no simulator. The scenario is named by id, so no program filter\napplies (a link opens what it names).",
+        "description": "A scenario's newest run on this service (OF-BLD-019 §3.R): the newest\nstored `proforma.run` whose basis names the scenario (`latest_run`, the\none pureOS and selling_price read), or none. A read: it runs nothing and\nstarts no simulator. The scenario is named by id, and a link opens what\nit names.",
         "operationId": "proforma_runs_api_proforma_runs_get",
         "parameters": [
           {
@@ -14209,7 +14206,7 @@
     },
     "/api/proforma/scenarios": {
       "get": {
-        "description": "The seed's BioSTEAM scenarios with their inputs bound to records\n(§8.3; OF-BLD-019 §2.3), none since alpha 2.0 deleted the seed. A read:\nit starts no simulator.",
+        "description": "The project's BioSTEAM scenarios with their inputs bound to records\n(§8.3; OF-BLD-019 §2.3). A read: it starts no simulator.",
         "operationId": "proforma_scenarios_api_proforma_scenarios_get",
         "parameters": [
           {
@@ -15113,7 +15110,7 @@
     },
     "/api/pureos/train/{key}": {
       "get": {
-        "description": "One train: the newest run of the scenario `key` names, the newest run\nof the pureOS train it names (OF-BLD-020 §5.2), or the run whose artifact\nid it is. 404 says how a run gets there; a deep link opens whatever\nprogram it belongs to, and the page names it.",
+        "description": "One train: the newest run of the scenario `key` names, the newest run\nof the pureOS train it names (OF-BLD-020 §5.2), or the run whose artifact\nid it is. 404 says how a run gets there; a deep link opens what it\nnames.",
         "operationId": "pureos_train_api_pureos_train__key__get",
         "parameters": [
           {
@@ -15201,7 +15198,7 @@
     },
     "/api/pureos/trains-kept": {
       "get": {
-        "description": "The trains a model built with `pureos_build` or `pureos_write`\n(`KeptTrain`: the train as data, `madeBy` the model, `at` and\n`updatedAt`), the most recently changed first (OF-BLD-020 §5.4). A\nperson's trains stay in their browser. A read: it writes nothing and starts\nno simulator.",
+        "description": "The trains a model built with `pureos_build` or `pureos_write`\n(`KeptTrain`: the train as data, `madeBy` the model, `at` and\n`updatedAt`), the most recently changed first (OF-BLD-020 §5.4). A\nperson's trains are the project's rows (`GET /api/state`). A read: it\nwrites nothing and starts no simulator.",
         "operationId": "pureos_trains_kept_api_pureos_trains_kept_get",
         "parameters": [
           {

@@ -48,7 +48,7 @@ no field of its schema is numeric (E.4‴, `check:tools` rule 6), and a number
 anywhere refuses the call as the registry does for every tool. The service
 reads the product's class and the properties its class's rule splits on
 (`pureos.proposer`: thermosteam's volatility, ProtParam on the entry's
-sequence, where the products seed says the product is) and proposes a
+sequence, where the products catalogue says the product is) and proposes a
 `TrainSpec` whose units are catalogue types in order, every parameter at its
 library default or waiting for a person, each unit with one reason naming the
 rule, the property it read and the artifact that holds it; or none, naming
@@ -180,8 +180,8 @@ class PureosProposeInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     product: str = Field(description=(
-        "The product's id: a products seed entry (Dominion's molecules), or a product thermosteam's library is asked "
-        "about by name (ethanol)."))
+        "The product's id: an entry of the products catalogue, or a product thermosteam's library is asked about "
+        "by name (ethanol)."))
     host: str = Field(description="The host strain's id on geneOS's shelf of hosts: the cells the product is made in.")
     inletRef: str = Field(default="", description=(
         "The train's inlet: a kept fermOS simulation's artifact id (its broth at harvest), or a kept run's artifact id "

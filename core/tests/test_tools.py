@@ -20,7 +20,7 @@ FIXTURE = {
     "_fixture": STAND_IN,
     "papers": [
         {"id": "X1", "title": "Polyhydroxybutyrate from xylose hydrolysate", "year": 2020, "textSource": "full-text", "sections": [{"id": "s1", "heading": "Results"}]},
-        {"id": "X2", "title": "Casein expression in algae", "year": 2019, "textSource": "curation-note", "sections": [{"id": "s1", "heading": "Results"}]},
+        {"id": "X2", "title": "Casein expression in algae", "year": 2019, "textSource": "full-text", "sections": [{"id": "s1", "heading": "Results"}]},
     ],
     "records": [
         {"id": "r-X1-1", "paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "fieldLabel": "Secreted titer", "value": 2.5, "unit": "g L-1", "quote": "polyhydroxybutyrate titre on xylose hydrolysate", "provenance": "curated", "status": "unverified", "primary": True, "strainId": "c-necator-h16", "conditions": None, "source": "fixture"},
@@ -247,8 +247,8 @@ def test_the_request_guard_covers_the_tool_endpoint(client):
 # ── selling_price (§8.5) ───────────────────────────────────────────────
 
 
-# A seed scenario written for these tests (the seed's went with it, alpha 2.0
-# ADR-010): a BioSTEAM scenario on the glucose-to-ethanol flowsheet.
+# A scenario the project keeps, written for these tests: a BioSTEAM scenario
+# on the glucose-to-ethanol flowsheet.
 TEST_SEED = [{"id": "sc-test-ethanol", "kind": "biosteam", "modelId": "ethanol_glucose_v0", "name": "Test ethanol scenario"}]
 
 
@@ -317,10 +317,10 @@ def test_selling_price_with_no_run_of_a_seed_scenario_names_what_waits_and_how_a
     assert "plant_scale" in every.error and "productivity" not in every.error
 
 
-def test_selling_price_refuses_what_is_no_seed_biosteam_scenario_in_words(proforma_store, test_seed):
+def test_selling_price_refuses_what_is_no_scenario_the_project_keeps_in_words(proforma_store, test_seed):
     c = _pcx(_yeast_pool())
-    made_here = tools.run("selling_price", {"scenarioId": "sc-mg2k1-1"}, c).error
-    assert "is not a scenario this service holds" in made_here and test_seed in made_here
+    elsewhere = tools.run("selling_price", {"scenarioId": "sc-mg2k1-1"}, c).error
+    assert "is not a BioSTEAM scenario this project keeps" in elsewhere and test_seed in elsewhere
     assert "name the scenario" in tools.run("selling_price", {"scenarioId": " "}, c).error
     # A reference biorefinery's run is read where it is kept, and the words say where.
     corn = tools.run("selling_price", {"scenarioId": "corn_drygrind"}, c).error
@@ -405,24 +405,57 @@ def test_run_flowsheet_with_an_input_waiting_returns_the_422s_words_and_keeps_no
     assert w.error == r.error.replace("run_flowsheet", "proforma_write", 1)
 
 
-def test_run_flowsheet_refuses_a_scenario_it_does_not_hold_in_words(proforma_store, monkeypatch):
-    from openferment_core import audit, pureos
+def test_run_flowsheet_refuses_a_scenario_the_project_does_not_keep_in_words(proforma_store, test_seed):
+    from openferment_core import audit
 
-    seed = TEST_SEED
-    monkeypatch.setattr(pureos, "held_scenarios", lambda: seed)
     c = _pcx(proforma_store)
-    made_here = tools.run("run_flowsheet", {"scenarioId": "sc-mg2k1-1"}, c).error
-    assert "is not a scenario this service holds" in made_here and "the browser that made it" in made_here
-    assert "sc-test-ethanol" in made_here
+    elsewhere = tools.run("run_flowsheet", {"scenarioId": "sc-mg2k1-1"}, c).error
+    assert "is not a BioSTEAM scenario this project keeps" in elsewhere and "New scenario" in elsewhere
+    assert test_seed in elsewhere
     assert "name the scenario" in tools.run("run_flowsheet", {"scenarioId": " "}, c).error
-    # With no projection to read, proforma.run's own words refuse it.
-    monkeypatch.setattr(pureos, "held_scenarios", lambda: [])
-    # (§2.3's flowsheet_of writes them: a seed id runs its own flowsheet, and
-    # an id the seed lacks names no flowsheet to run.)
-    assert "there is no held scenario sc-nonesuch" in tools.run("run_flowsheet", {"scenarioId": "sc-nonesuch"}, c).error
     # An empty target is refused too: proforma_write runs no scenario unnamed.
     assert "name the scenario" in tools.run("proforma_write", {"action": "run", "target": "", "fields": {}, "note": ""}, c).error
     assert audit.read() == []
+
+
+def _kept_scenario(sid: str) -> dict:
+    """A scenario as New scenario keeps it in the project's rows."""
+    return {**TEST_SEED[0], "id": sid, "flowsheetId": TEST_SEED[0]["modelId"], "description": "", "product": "",
+            "dims": [], "point": {}, "assumptions": [], "pinned": False, "lastRunId": None}
+
+
+def test_proforma_tools_run_a_scenario_the_project_keeps_as_its_page_runs_it(proforma_store):
+    """A scenario made with New scenario is one of the project's rows
+    (project_state.py): run_flowsheet names it and reads the assumptions a
+    person set on its page, runs it once they bind every input, and
+    selling_price cites that run."""
+    from openferment_core import audit, project_state
+
+    sid, scope, who, at = "sc-kept-1", "proforma:sc-kept-1", "Ada Moreno", "2026-10-31T00:00:00Z"
+    project_state.put("scenarios", sid, _kept_scenario(sid), who)
+    c = _pcx(_yeast_pool())
+    waits = tools.run("run_flowsheet", {"scenarioId": sid}, c).error
+    assert waits.startswith("run_flowsheet refused: these inputs wait for a source")
+    assert "plant_scale" in waits and "glucose_price" in waits
+    price = tools.run("selling_price", {"scenarioId": sid}, c).error
+    assert f"no run of {sid} is on file" in price and "glucose_price" in price
+    # The person's assumptions, set on the scenario's page, are kept with the
+    # project: the binding reads them, and a run reads them.
+    project_state.put("overrides", scope, [
+        {"scope": scope, "key": "glucose_price", "value": 0.4, "low": 0.3, "high": 0.5, "by": who, "at": at}], who)
+    price = tools.run("selling_price", {"scenarioId": sid}, c).error
+    assert "plant_scale" in price and "glucose_price" not in price
+    project_state.put("overrides", scope, [
+        {"scope": scope, "key": "plant_scale", "value": 100000.0, "by": who, "at": at},
+        {"scope": scope, "key": "glucose_price", "value": 0.4, "low": 0.3, "high": 0.5, "by": who, "at": at}], who)
+    r = tools.run("run_flowsheet", {"scenarioId": sid}, c)
+    assert r.error is None, r.error
+    (ev,) = r.evidence
+    assert r.summary["scenarioId"] == sid and r.summary["provenance"] == "assumed" == ev.provenance
+    assert any(a.action == "run" and a.target == sid and a.agent == "model" for a in audit.read())
+    cited = tools.run("selling_price", {"scenarioId": sid}, c)
+    assert cited.error is None, cited.error
+    assert cited.evidence[0].id == ev.id == r.summary["artifactId"] == cited.summary["evidenceId"]
 
 
 @pytest.mark.parametrize("name, raw", [

@@ -27,8 +27,8 @@ named in the note, never offered). `tau`, the reacting time, is the
 simulation's harvest hour (or the fit's batch time) and the peak and
 batch-average oxygen uptake are the simulation's, each source `simulation`
 and overridable. `plant_scale` and `batch_volume` wait for a named person;
-one of the two is needed. `check:seed` holds every declaration to a bounds
-reason through `params.check()`, which reads them here with no worker; a sim
+one of the two is needed. `params.check()`, run by test_params.py, holds
+every declaration to a bounds reason, reading them here with no worker; a sim
 test holds the declarations to the class (every key one the class takes).
 
 THE DEMAND. BioSTEAM's aerated class takes no oxygen demand: it sizes the
@@ -103,8 +103,8 @@ from .models import (
 )
 
 TOOL = "fermos.vessel"
-# The program whose chemicals the vessel is built on (its cells Yeast, its
-# product ethanol), by its id in programs.ts (§8.R, finding 6).
+# The chemical set the vessel is built on (its cells Yeast, its product
+# ethanol), by its key in pureos/train_spec.PROGRAM_CHEMICALS (§8.R, finding 6).
 YEAST_PROGRAM = "yeast"
 # 2 since §4.R: the cross-check's oxygen, the scale at every size, the
 # duty's words and the stated peak changed what a design computes. 3 since
@@ -613,7 +613,7 @@ def _held(kind: str, ws: dict[str, Any], overrides: Iterable[Override]) -> None:
 
 
 def _static() -> Iterable[tuple[str, list[ParameterSpec]]]:
-    """Every declaration, read with no worker (check:seed): each kind's specs
+    """Every declaration, read with no worker (params.check()): each kind's specs
     as declared, a choice's offered words left to the worker."""
     for kind in (AEROBIC, ANAEROBIC):
         yield f"fermos vessel ({kind})", [_spec(d, [] if d.choice else None) for d in _decls(kind)]

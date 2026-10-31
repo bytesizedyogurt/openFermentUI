@@ -40,8 +40,8 @@ a `TrainSpec` the Builder opens, as data, and never computes a quantity:
     the product   the chemical the run traced (pureOS's reading of the run) and
                   the product id `thermo.CHEMICALS` names for it; a run whose
                   product no id names here, or that names no product, is refused
-                  in words, as is one naming no program, of an archived program
-                  with the switch off, or with no unit to take
+                  in words, as is one naming no chemical set, or with no unit
+                  to take
 
 The train's structure is held to `validate` and its refusals are returned
 beside it, for a person to settle in the Builder. Nothing is kept: the

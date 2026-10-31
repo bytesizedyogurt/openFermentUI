@@ -104,7 +104,7 @@ function StatusCell({ r }: { r: ExtractionRecord }) {
   }
   if (r.gold) {
     return (
-      <span className="chip text-gold border-gold/45" title="Curated gold-set annotation">
+      <span className="chip text-gold border-gold/45" title="Gold: a value a reviewer typed against the sentence">
         Gold
       </span>
     );
@@ -533,7 +533,7 @@ export default function Intake() {
               paperParam
                 ? scopedPaper
                   ? `${scopedPaper.title} is in the corpus but nothing has been extracted from it in this session. Run the extractor from the paper reader to stage candidate records.`
-                  : `${paperParam} is not a paper in this session's corpus. Session state resets on refresh, so a link from an older session can point at nothing.`
+                  : `${paperParam} is not a document this project holds.`
                 : 'Documents arrive through Intake. Fetch a paper from the ingest queue, then run the extractor to stage candidate records here.'
             }
             action={

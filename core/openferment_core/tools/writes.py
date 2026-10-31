@@ -10,10 +10,9 @@ module's own write function, where the module's rules already live:
 `extract.add_candidate` (anchoring, §2.4), `intake.collect`,
 `extract.extract_paper`, and `checks.request` in a person's name. A module
 with no write function on the service refuses in words with the reason
-(Primer is curated, as pureOS's vocabulary and unit catalogue are;
-protocols and depositions are written in the browser), and
-that refusal is a result Postdoc reports
-in `gaps`. `check:tools` greps this file for a store write and fails on one.
+(Primer holds no lessons yet; pureOS's vocabulary and unit catalogue are
+curated; a person writes protocols and depositions on their pages), and that
+refusal is a result Postdoc reports in `gaps`. `check:tools` greps this file for a store write and fails on one.
 
 THE MARK. Every write that goes through carries `agent: model`, the model
 id, the effort and the ask id into the audit log (`audit.py`), and what it
@@ -148,29 +147,29 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
 }
 
 NO_WRITE = {
-    "primer": "Primer's lessons are curated seed (src/data/learn.ts); the service has no write function for them",
+    "primer": "Primer holds no lessons yet, and the service has no write function for them",
 }
-# What a module that writes some things keeps as seed beside them, said when an
+# What a module that writes some things keeps curated beside them, said when an
 # action is not one of its own (OF-BLD-020 §5.4: pureOS keeps a model's train,
 # and its vocabulary and catalogue stay curated).
-SEED_NOTE = {
-    "pureos": "pureOS's unit operations and its unit catalogue are curated (src/data/vocabulary.ts, "
+CURATED_NOTE = {
+    "pureos": "pureOS's unit operations and its unit catalogue are curated (schema/vocabulary.yaml, "
               "core/openferment_core/pureos/catalogue.py); the service has no write function for them",
 }
 NO_WRITE_ACTION = {
-    ("runbooks", "revise_protocol"): "protocols are curated seed (src/data/protocols.ts) and revised in the browser's "
-                                     "editor by a person; the service has no write function for them",
+    ("runbooks", "revise_protocol"): "a protocol is revised by a person in the protocol editor; the service has no "
+                                     "write function for protocols",
     ("runbooks", "draft"): "use the draft_runbook tool: it takes the evidence ids and record ids this run returned and "
                            "writes every number from them",
-    ("fermos", "fit"): "a deposition's series lives in the browser, which sends it to POST /api/fermos/fit; the service "
-                       "holds no deposition to fit",
-    ("proforma", "bind"): "an assumption is a named person's and is kept in the browser's Durable tier; the service has no "
-                          "store for one, and a model's number would be one from its weights",
+    ("fermos", "fit"): "a person fits a deposition's series on fermOS's fit page, which sends it to POST /api/fermos/fit; "
+                       "no tool fits a kept deposition",
+    ("proforma", "bind"): "a Proforma scenario's assumptions are a named person's, set on its page; a model's estimate "
+                          "enters a study scenario through study_scenario, with its origin",
     ("biorepo", "decide"): "a review decision is a person's (biorepo.write refuses any other reviewer); say in gaps what "
                            "you would decide and why",
     ("intake", "add"): "a document enters the project's literature through intake_write fetch, by its identifier; "
                        "a file or pasted text is added by a person on Intake",
-    ("primer", "lesson"): "Primer's lessons are curated seed (src/data/learn.ts); the service has no write function for them",
+    ("primer", "lesson"): "Primer holds no lessons yet, and the service has no write function for them",
     ("guild", "record_check"): "a check is run by an assessor at the bench (/guild/checks/:id/run), one criterion at a "
                                "time, and its entries are written in their name; a model may propose a check and never "
                                "record one",
@@ -316,10 +315,10 @@ def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_me
     model's (OF-BLD-020 §4.2, D13). `fermos_vessel` and `fermos_write`'s
     `design_vessel` both run here, so the one call to `vessel.design` stays
     in this file. Ids and words in: the artifact, the vessel type, the kLa
-    correlation by BioSTEAM's name. The service holds no person's plant scale
-    or batch volume (they are typed in the panel, in a browser), so none is
-    passed, and the design is refused in vessel.design's own words until a
-    person's design is asked for on the screen."""
+    correlation by BioSTEAM's name. A person's plant scale or batch volume is
+    an override typed in the panel, and this call reads none, so the design
+    is refused in vessel.design's own words until a person's design is asked
+    for on the screen."""
     from .. import artifacts, vessel
     from ..models import VesselRequest
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
@@ -477,29 +476,25 @@ def make_comparison(tool: str, title: str, run_ids: list[str], ctx: ToolContext)
 
 
 def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> ToolResult:
-    """Run one BioSTEAM scenario as the service binds it, keep the run and
-    mark it as the model's (OF-BLD-019 §6.1). The service holds no person's
-    assumption (they live in the browser's Durable tier), so none is passed:
-    an input with no record waits, and the refusal is proforma.run's own
-    words (what `POST /api/proforma/run` answers with a 422)."""
-    from .. import proforma, pureos
-    from ..models import ProformaRunRequest
+    """Run one of the project's BioSTEAM scenarios as its page runs it, keep
+    the run and mark it as the model's (OF-BLD-019 §6.1): the overrides a
+    person set on its page and the fits chosen for it are read from the
+    project's rows (`project_state.run_request`), and the model adds no value. An
+    input nothing binds waits, and the refusal is proforma.run's own words
+    (what `POST /api/proforma/run` answers with a 422)."""
+    from .. import proforma, project_state, pureos
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 
     sid = (scenario_id or "").strip()
     if not sid:
         return ToolResult(error=f"{tool} refused: name the scenario to run by its id (proforma_read lists them)")
-    seed = {s["id"]: s for s in pureos.held_scenarios()}
-    if seed and sid not in seed:
-        held = ", ".join(sorted(k for k, s in seed.items() if s.get("kind") == "biosteam"))
-        return ToolResult(error=f"{tool} refused: {sid} is not a scenario this service holds. A scenario made with New "
-                                f"scenario lives in the browser that made it, and a person runs it on its page in "
-                                f"Proforma; the service's BioSTEAM scenarios are {held or 'none'}")
-    if seed and seed[sid].get("kind") != "biosteam":
-        return ToolResult(error=f"{tool} refused: {sid} is an authored cost surface, not a BioSTEAM flowsheet; "
-                                "nothing runs it")
+    held = {s["id"]: s for s in pureos.held_scenarios()}
+    if sid not in held:
+        kept = ", ".join(sorted(held)) or "none"
+        return ToolResult(error=f"{tool} refused: {sid} is not a BioSTEAM scenario this project keeps; its BioSTEAM "
+                                f"scenarios are {kept}, and a person makes one with New scenario in Proforma")
     try:
-        r = proforma.run(ProformaRunRequest(scenarioId=sid), pool=ctx.pool)
+        r = proforma.run(project_state.run_request(held[sid]), pool=ctx.pool)
     except proforma.ScenarioRefused as e:
         waits = f" {RUN_WAITS}" if "wait for a source" in str(e) else ""
         return ToolResult(error=f"{tool} refused: {e}.{waits}")
@@ -629,10 +624,10 @@ def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResu
     """Simulate one model family as the service binds it, keep it and mark it
     as the model's (OF-BLD-020 §3.4). The request carries ids and words: a
     family, a strain, a product, a sugar, the records named for a parameter,
-    a fit, a start and a run-length preset; the service holds no person's
-    assumption (they live in the browser's Durable tier), so none is passed:
-    a parameter nothing binds waits, and the refusal is fermos.simulate's own
-    words (what `POST /api/fermos/simulate` answers with a 422)."""
+    a fit, a start and a run-length preset. A person's assumptions are the
+    project's overrides, and this call reads none: a parameter nothing binds
+    waits, and the refusal is fermos.simulate's own words (what
+    `POST /api/fermos/simulate` answers with a 422)."""
     from .. import fermos, kinetics
 
     family = (req.family or "").strip()
@@ -1033,7 +1028,7 @@ def _runner(module: str) -> Callable[[ModuleWriteInput, ToolContext], ToolResult
     def run(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
         action = inp.action.strip()
         if action not in actions:
-            seed = f" {NO_WRITE[module]}." if module in NO_WRITE else f" {SEED_NOTE[module]}." if module in SEED_NOTE else ""
+            seed = f" {NO_WRITE[module]}." if module in NO_WRITE else f" {CURATED_NOTE[module]}." if module in CURATED_NOTE else ""
             listed = f"the actions are {', '.join(actions)}" if actions else "it has no action"
             return ToolResult(error=f"{name} refused: {action!r} is not an action; {listed}.{seed} Say so in gaps.")
         # A gate is checked first: an action at one is a proposal whatever
@@ -1083,7 +1078,7 @@ def _description(module: str) -> str:
                 else " [at the budget, gated: becomes a spend proposal a person carries out on Home]" if g else "")
         lines.append(f"{action}: {what}" + (f" (fields: {', '.join(fields)})" if fields else "") + tail)
     seed = (f" {NO_WRITE[module]}: every other call is refused in words." if module in NO_WRITE else
-            f" {SEED_NOTE[module]}: every other call is refused in words." if module in SEED_NOTE else "")
+            f" {CURATED_NOTE[module]}: every other call is refused in words." if module in CURATED_NOTE else "")
     return (f"Write to {label}, through the module's own write function. Actions — " + "; ".join(lines) + f".{seed} "
             "Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane "
             "marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.")

@@ -157,7 +157,7 @@ function Screen() {
     );
   }
 
-  // ── the eleven, and what each one owns (OF-BLD-008 §3) ──────────────
+  // ── the destinations, and what each one owns (OF-BLD-008 §3) ────────
   // Sub-views are paths UNDER their owner, so a URL says where a thing lives:
   // /geneos/hosts/cw15 rather than /organisms/cw15. Nothing was deleted —
   // every screen below is the same file it was, mounted somewhere else.
@@ -524,8 +524,8 @@ export default function App() {
                       {/* §7 — the gloss. Eight invented words with no
                           explanation is friction the names have not earned
                           yet, and this is the cheapest possible fix. */}
-                      {/* Wraps to two lines rather than truncating. Twelve
-                          entries at two lines still fits the shortest rail
+                      {/* Wraps to two lines rather than truncating. Eleven
+                          entries at two lines still fit the shortest rail
                           this ships on. */}
                       <span
                         className={cx(

@@ -721,7 +721,7 @@ function CorpusSection() {
         <SectionTitle
           right={
             <span className="text-caption text-gold inline-flex items-center gap-1.5">
-              <Award size={13} aria-hidden /> curated
+              <Award size={13} aria-hidden /> reviewer-typed
             </span>
           }
         >
@@ -903,13 +903,13 @@ function ExportSection() {
           exportName="openferment-export-log"
           maxHeight="420px"
           emptyTitle="Nothing exported yet"
-          emptyBody="Session state lives in memory and disappears on refresh — export is how anything leaves this build. Any table with a CSV button writes a row here."
+          emptyBody="Any table with a CSV button writes a row here when it exports."
         />
         <Callout kind="warn" title="Every file is stamped">
           Every CSV opens with the same <span className="font-num">{DISCLOSURE.length}</span>-line
           disclosure header. It names the literature entries as real, then defines each provenance
-          class that can appear in the file — including that a curated row was transcribed from the
-          curation document and not yet checked against the source PDF, that an industry estimate
+          class that can appear in the file — including that an unverified row is the extractor&rsquo;s
+          reading no reviewer has checked against its sentence, that an industry estimate
           has no source document behind it, and that simulation outputs are modeled rather than
           measured. The text and markdown exports — run logs, review sessions, materials
           checklists, agent answers — carry their own headers saying the same thing in the shape

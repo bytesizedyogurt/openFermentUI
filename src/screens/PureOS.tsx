@@ -30,8 +30,8 @@
 // PUREOS BUILDS A TRAIN (OF-BLD-020 §5.3, D9). **New train** opens the
 // Builder (/pureos/build/new, PureOSBuilder.tsx), where a person puts units
 // from the catalogue in order with every parameter in hand and the service
-// runs them on BioSTEAM. This page lists the trains built in this browser
-// (the Durable tier's `trainsMade`), the train runs the service keeps
+// runs them on BioSTEAM. This page lists the trains built in the Builder
+// (the project's `trainsMade`), the train runs the service keeps
 // (`GET /api/pureos/train-runs`), and the trains read from Proforma's runs.
 //
 // A MODEL'S TRAINS ARE LISTED (OF-BLD-020 §5.R). Postdoc builds a train with
@@ -152,7 +152,7 @@ function TrainsOnFile() {
 const TRAIN_RUN_TOOL = 'pureos.train_run';
 
 /**
- * The trains built in this browser (OF-BLD-020 §5.3): the Durable tier's
+ * The trains built in pureOS's Builder (OF-BLD-020 §5.3): the project's
  * `trainsMade`, each with when and by whom it was saved, and the newest run
  * the service keeps of it.
  */
@@ -166,7 +166,7 @@ function TrainsBuiltHere({ runs, problem }: { runs: TrainSummary[] | null; probl
       </SectionTitle>
       {listed.length === 0 ? (
         <Card className="p-4" data-testid="pureos-built-empty">
-          <p className="text-body text-ink">No train is saved in this browser yet.</p>
+          <p className="text-body text-ink">No train is saved in this project yet.</p>
           <p className="text-body text-ink-soft mt-1">
             <strong>New train</strong> opens the Builder: choose where the broth comes from, add units from the catalogue in order, give each what it
             needs, run it, and Save.

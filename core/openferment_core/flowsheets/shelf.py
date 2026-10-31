@@ -193,10 +193,9 @@ _ETHANOL = FlowsheetInfo(
     brothStream="beer",
 )
 
-# OF-BLD-020 §6.1 (D11): a vessel and a train, priced. Its scenarios are made
-# in the browser alone (no seed scenario names it: check:seed holds a seed's
-# modelId to BIOSTEAM_FLOWSHEETS, which leaves it out), each naming the kept
-# vessel design and train run it is built from (`builtFrom`). Its program is
+# OF-BLD-020 §6.1 (D11): a vessel and a train, priced. A scenario on it is made
+# with New scenario, naming the kept vessel design and train run it is built
+# from (`builtFrom`). Its program is
 # its train's; a train runs only on a program with a chemical set
 # (pureos/train_spec.PROGRAM_CHEMICALS, the yeast program's alone tonight), so
 # the entry is the yeast program's and a train of another program is refused

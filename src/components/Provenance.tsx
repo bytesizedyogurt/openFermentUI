@@ -15,10 +15,10 @@ const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string;
     color: 'text-gold',
     tick: 'tick-measured',
   },
-  gold: { label: 'Curated · gold set', Icon: Award, color: 'text-gold', tick: 'tick-gold' },
+  gold: { label: 'Gold · a value a reviewer typed', Icon: Award, color: 'text-gold', tick: 'tick-gold' },
   verified: { label: 'Verified against source', Icon: ShieldCheck, color: 'text-accent', tick: 'tick-verified' },
   curated: {
-    label: 'Curated · pending source check',
+    label: 'Curated · written by hand',
     Icon: BookMarked,
     color: 'text-accent/70',
     tick: 'tick-curated',

@@ -132,22 +132,31 @@ def _checked(kind: str, item_id: str, value: Any) -> Any:
 # ── reads ──────────────────────────────────────────────────────────────
 
 
+async def _locks(s: AsyncSession, project_id: str) -> dict[str, dict[str, str]]:
+    locks = (await s.execute(
+        select(t.runbook_locks).where(t.runbook_locks.c.project_id == project_id).order_by(t.runbook_locks.c.created_at)
+    )).all()
+    return {r.runbook_id: {"lockedAt": r.locked_at.isoformat().replace("+00:00", "Z"), "lockHash": r.lock_hash}
+            for r in locks}
+
+
+async def _overrides(s: AsyncSession, project_id: str, scope: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    q = select(t.overrides).where(t.overrides.c.project_id == project_id)
+    if scope is not None:
+        q = q.where(t.overrides.c.scope == scope)
+    out: dict[str, list[dict[str, Any]]] = {}
+    for r in (await s.execute(q.order_by(t.overrides.c.created_at, t.overrides.c.key))).all():
+        out.setdefault(r.scope, []).append(r.body)
+    return out
+
+
 async def _load(project_id: str) -> dict[str, Any]:
     out: dict[str, Any] = {}
     async with db.session() as s:
         for name, kind in KINDS.items():
             out[name] = await rows.bodies(s, kind.table, project_id, *kind.where())
-        locks = (await s.execute(
-            select(t.runbook_locks).where(t.runbook_locks.c.project_id == project_id).order_by(t.runbook_locks.c.created_at)
-        )).all()
-        out[LOCKS] = {r.runbook_id: {"lockedAt": r.locked_at.isoformat().replace("+00:00", "Z"), "lockHash": r.lock_hash}
-                      for r in locks}
-        overrides: dict[str, list[dict[str, Any]]] = {}
-        for r in (await s.execute(
-            select(t.overrides).where(t.overrides.c.project_id == project_id).order_by(t.overrides.c.created_at, t.overrides.c.key)
-        )).all():
-            overrides.setdefault(r.scope, []).append(r.body)
-        out[OVERRIDES] = overrides
+        out[LOCKS] = await _locks(s, project_id)
+        out[OVERRIDES] = await _overrides(s, project_id)
     out[CONVERSATIONS] = [c.model_dump(mode="json") for c in await _conversations._listed(project_id)]
     # Fits and trains are keyed in the page by scenario and by train.
     out["fits"] = {f["id"]: f["byInput"] for f in out["fits"]}
@@ -158,6 +167,52 @@ async def _load(project_id: str) -> dict[str, Any]:
 def load() -> dict[str, Any]:
     """Everything the current project keeps of its pages, keyed as the page keeps it."""
     return db.run(_load(projects.current()))
+
+
+async def _kept(project_id: str, kind: str) -> list[Any]:
+    k = KINDS[kind]
+    async with db.session() as s:
+        out = await rows.bodies(s, k.table, project_id, *k.where())
+        if kind == "runbooks":
+            frozen = await _locks(s, project_id)
+            out = [{**b, **frozen.get(b.get("id"), {})} for b in out]
+    return out
+
+
+def kept(kind: str) -> list[Any]:
+    """The rows of one kind the current project keeps, oldest first, as its
+    pages keep them; a runbook with its lock when it has one. What the
+    service's own readers see of a project's work: Proforma's scenarios, the
+    fits chosen for them, and the module reads."""
+    if kind not in KINDS:
+        raise StateRefused(f"{kind!r} is not a kind of row the project keeps; the kinds are {', '.join(KINDS)}")
+    return db.run(_kept(projects.current(), kind))
+
+
+async def _scope_overrides(project_id: str, scope: str) -> list[dict[str, Any]]:
+    async with db.session() as s:
+        return (await _overrides(s, project_id, scope)).get(scope, [])
+
+
+def overrides_of(scope: str) -> list[dict[str, Any]]:
+    """The overrides the current project keeps for one scope
+    (`proforma:<scenario id>`), each a person's assumption or a model's
+    estimate as the parameter panel wrote it."""
+    return db.run(_scope_overrides(projects.current(), scope))
+
+
+def run_request(scenario: dict[str, Any]) -> Any:
+    """A run of a Proforma scenario the project keeps, as its page sends it:
+    the flowsheet and the parts a composite is built from, the overrides a
+    person set on its page, and the fermOS fits chosen for its inputs, each
+    read from the project's rows. No value is typed here."""
+    from .models import Override, ProformaRunRequest
+
+    sid = scenario["id"]
+    overrides = [Override.model_validate(o) for o in overrides_of(f"proforma:{sid}")]
+    fits = next((dict(f.get("byInput") or {}) for f in kept("fits") if f.get("id") == sid), {})
+    return ProformaRunRequest(scenarioId=sid, flowsheet=scenario["modelId"], overrides=overrides, fits=fits,
+                              vessel=scenario.get("vessel"), trainRun=scenario.get("trainRun"))
 
 
 # ── writes ─────────────────────────────────────────────────────────────

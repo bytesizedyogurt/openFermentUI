@@ -7,8 +7,8 @@ type (pureos/catalogue.py), the values a person typed for it (Override-shaped,
 D3), record ids named for a parameter, where each outlet goes (`onward`,
 `waste`, or `recycle:<an earlier unit>`; an outlet not named takes the
 catalogue's default), and optionally a shelf flowsheet's own unit to read its
-values from (`readFrom`). The browser keeps a train whole and sends it with a
-run; the service keeps the runs.
+values from (`readFrom`). The project keeps a person's train whole as a row,
+and the page sends it with a run; the service keeps the runs.
 
     validate(spec)           every refusal at once, in words; runs nothing
     inlet_stream(spec, overrides=None, by=None)
@@ -38,8 +38,8 @@ run; the service keeps the runs.
                              flowsheets/train.py), and nothing here imports
                              BioSTEAM (E.3‴)
     train_runs()  every kept train run, newest first
-    program_of_run(art)      a train run's program: the train's, its inlet's
-                             and what its records name, an archived one winning
+    program_of_run(art)      a train run's chemical set: the train's, its
+                             inlet's and what its records name
 
 THE INLET'S OWN PANEL is the pseudo-unit `inlet`, scope
 `pureos:unit:<train id>:inlet`: `broth_flow` (m³ h⁻¹: a `fermos.vessel` design
@@ -54,8 +54,8 @@ WHERE A UNIT'S VALUE COMES FROM, IN ORDER: a person's override (the train's
 typed value, or the run request's override of the same key); a shelf
 flowsheet's own unit the train reads (`readFrom`: the value the built unit
 holds, a `model` source naming the package's version, first in the rule);
-records of the parameter's ontology field (catalogue.py's source rules) on the
-train's program's papers through the aggregate gate (binding.py), each named,
+records of the parameter's ontology field (catalogue.py's source rules) in the
+evidence pool through the aggregate gate (binding.py), each named,
 the per-component key of the product's chemical alone, a step's recovery and
 purity only where the record's words name the step, a percentage turned into
 a share (a named step, `PER_CENT`), and a split to an outlet the product does
@@ -149,7 +149,7 @@ PROGRAM_CHEMICALS = {"yeast": "the yeast program's chemicals, as the ethanol flo
 def chemical_set(program: str | None) -> str:
     """The chemical set a train builds on, by its key: the program the train
     names when pureOS holds that set; else, while pureOS holds one set, that
-    one, as `build._program` reads a run's (a train made in the browser names
+    one, as `build._program` reads a run's (a train made in the Builder names
     none). `program` is the key until stage 4 reads the set from the train's
     flowsheet."""
     if program in PROGRAM_CHEMICALS:

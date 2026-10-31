@@ -5,11 +5,10 @@
 // what happened when a runbook's claim was tested, and it is launched from the
 // runbook that predicted it.
 //
-// THIS LIST IS USUALLY EMPTY, AND SAYS SO HONESTLY. Depositions live in the
-// Durable tier — they are written at the bench and survive a reload, but a
-// fresh session has none. An empty list here means nobody has run anything in
-// this browser, not that the feature is missing, and the two read very
-// differently if the screen does not say which.
+// THIS LIST IS OFTEN EMPTY, AND SAYS SO HONESTLY. Depositions are written at
+// the bench and kept with the project on the service; one written while the
+// service is away waits in this browser until it is sent. An empty list means
+// nobody in this project has run anything yet, and the screen says so.
 import { ClipboardList } from 'lucide-react';
 import { useStore } from '@/store';
 import { href } from '@/router';
@@ -47,8 +46,8 @@ export default function Depositions() {
         <Card>
           <EmptyState
             icon={<ClipboardList size={22} />}
-            title="No depositions in this browser"
-            body="Depositions are written at the bench and kept in the durable tier, so they survive a reload, and a fresh browser has none. Open a runbook and stage a run against one of its protocols, and the record appears here. With no runbook on the board yet, ask Postdoc to draft one and turn it into a runbook."
+            title="No depositions in this project yet"
+            body="Depositions are written at the bench and kept with the project on the service; one written while the service is away waits in this browser until it is sent. Open a runbook and stage a run against one of its protocols, and the record appears here. With no runbook on the board yet, ask Postdoc to draft one and turn it into a runbook."
             action={
               <div className="flex flex-wrap gap-2 justify-center">
                 <LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>
@@ -93,7 +92,7 @@ export default function Depositions() {
       <div className="mt-5">
         <ComponentTag
           component="Deposition"
-          action={`${depositions.length} in this browser`}
+          action={`${depositions.length} in this project`}
         />
       </div>
     </>

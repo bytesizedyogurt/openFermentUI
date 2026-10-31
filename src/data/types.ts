@@ -1,4 +1,5 @@
-// openFerment Sim — canonical entity types (OF-DES-001 §15)
+// openFerment — the client's entity types (OF-DES-001 §15), hand-kept beside
+// the generated src/api/types.gen.ts and held to the service by check:plan.
 
 /**
  * Provenance classes (OF-DES-001 §7.4, revised by OF-COR-001 §20).
@@ -8,11 +9,9 @@
  * measurement: a simulation run on a typed value, a stand-in model's answer,
  * and anything derived from them.
  *
- * 'curated' is new and load-bearing. It marks a value transcribed from the
- * curation document (OF-COR-001) rather than read off the source PDF. The
- * claim is real and attributable, but it has not yet been checked against the
- * paper itself, so it is weaker than 'verified' and must never silently pass
- * as a source-span extraction.
+ * 'curated' marks what is written by hand rather than read off a source: the
+ * fields' definitions and canonical units, a strain's description. It is
+ * weaker than 'verified' and never passes as a source-span extraction.
  *
  * 'industry-estimate' marks market and vendor figures (OF-COR-001 §16 O8).
  * They are useful for framing and useless as evidence: excluded from the gold
@@ -23,7 +22,7 @@ export type Provenance =
    * First-party experimental measurement (OF-BLD-006 §6). The strongest
    * evidence the system can hold, and the only class it produces itself: you
    * have the raw data and you know the conditions it was taken under. Ranks
-   * above 'gold', which is a hand-curated reading of somebody else's paper.
+   * above 'gold', which is a reviewer's reading of somebody else's paper.
    * Created by reconciling a Deposition against the Runbook that predicted it.
    */
   | 'measured'
@@ -155,26 +154,11 @@ export type IngestStage = 'fetch' | 'parse' | 'chunk' | 'embed' | 'extract';
 export type IngestStatus =
   /** Full text parsed into sections; spans anchor to the paper's own words. */
   | 'complete'
-  /**
-   * Bibliographically real, full text NOT yet ingested (OF-COR-001 §22.6).
-   * The reader shows the curation entry from OF-COR-001, clearly labelled as
-   * the curator's words rather than the paper's, with a DOI link out.
-   */
-  | 'catalogued'
   | `stage:${IngestStage}`
   /** The source document could not be retrieved at all. */
   | 'failed:fetch'
   | 'failed:parse'
   | 'shelf';
-
-/** Which corpus thread an entry belongs to (OF-COR-001 §1). */
-export type CorpusThread =
-  | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H'
-  | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O'
-  /** PHA from waste cellulosic sugars, program two (OF-BLD-014 §2.2). */
-  | 'P'
-  /** Ethanol from glucose by wild-type Saccharomyces cerevisiae, program three. */
-  | 'Q';
 
 export type SourceType =
   | 'journal-article'
@@ -203,41 +187,30 @@ export interface Paper {
   venue: string;
   organisms: string[];
   topics: string[];
-  /**
-   * For 'catalogued' papers this is the curator's summary from OF-COR-001,
-   * NOT the publisher's abstract. `textSource` says which.
-   */
+  /** The publisher's abstract when the source gives one; empty otherwise. */
   abstract: string;
   sections: PaperSection[];
   ingest: IngestStatus;
 
-  // ── real-corpus identity (OF-COR-001) ──────────────────────────────
-  /** The seed corpus's thread; a document a project collected has none. */
-  thread?: CorpusThread;
+  // ── the document's identity ────────────────────────────────────────
   sourceType?: SourceType;
-  /** The authoritative record key — never the author string (OF-COR-001 header). */
+  /** The authoritative record key — never the author string. */
   doi?: string;
   pmcid?: string;
   pmid?: string;
   /**
    * Where Intake fetches the text of a source Europe PMC does not hold: an
    * OSTI report's purl, an SGD strain entry's address. Written by
-   * `pnpm thread:apply:q` from a person's include list; a strain entry has
+   * the collector from the source's identifier (`SGD:<id>`, an OSTI id); a strain entry has
    * no other identifier.
    */
   sourceUrl?: string;
-  /** Whether `sections` hold the paper's own text or the curator's notes. */
-  textSource: 'full-text' | 'curation-note';
-  /** Openly retrievable vs. needs institutional access (OF-COR-001 §19). */
+  /** `sections` hold the document's own text, as the project holds it. */
+  textSource: 'full-text';
+  /** Openly retrievable vs. needs institutional access, from its licence class. */
   openAccess: boolean;
-  /** Ingestion tranche: 1 = open-access core, 2 = remainder, 3 = v1.1. */
-  tranche?: 1 | 2 | 3;
-  /** Author string not fully resolved — must be checked at ingest ([verify]). */
-  verifyNeeded?: boolean;
-  /** Why this entry earns its place, from the corpus document. */
-  corpusRole?: string;
 
-  // ── set by the service overlay (OF-BLD-012 §2.1), never by the seed ──
+  // ── set by the service overlay (OF-BLD-012 §2.1) ──────────────────
   /** A document the open project holds in its literature (ADR-002), made from the overlay. */
   held?: boolean;
   /** Its licence class in the kit's taxonomy. */
@@ -275,15 +248,15 @@ export interface ExtractionRecord {
   confidence: number;
   status: RecordStatus;
   /**
-   * Explicit provenance. Extractor output is 'unverified' until reviewed;
-   * values transcribed from OF-COR-001 are 'curated'; market figures are
-   * 'industry-estimate' and never enter the gold set.
+   * Explicit provenance. Extractor output is 'unverified' until reviewed, and
+   * a decision gives it the class `biorepo.provenance_of` computes; market
+   * figures are 'industry-estimate' and never enter the gold set.
    */
   provenance: Provenance;
   /**
    * The strain id when the paper's wording names a known strain (OF-BLD-014
    * §2.1), which is what every screen matches on; otherwise the wording as
-   * the paper wrote it. Seed records carry a strain id.
+   * the paper wrote it.
    */
   organism?: string;
   /**
@@ -302,7 +275,7 @@ export interface ExtractionRecord {
   componentTag?: string;
   gold?: { value: number | string; unit: string };
   goldOnly?: boolean;
-  /** Absent for curated records — they did not come from an extractor run. */
+  /** The extractor run that produced the record. */
   extractorRun?: ExtractorRun;
   rejectReason?: string;
   corrected?: { value: number; unit: string };
@@ -328,7 +301,7 @@ export interface ExtractionRecord {
   method?: AnalysisMethod;
   /** Required on phospho_site_position — mature and precursor differ by 15. */
   numbering?: NumberingConvention;
-  /** Where in OF-COR-001 a 'curated' value was transcribed from, e.g. '§9 H4'. */
+  /** Where an alpha 1.0 curated value was transcribed from, kept on imported records. */
   curationRef?: string;
   /** A value the source states as a range rather than a point. */
   range?: Range;
@@ -342,8 +315,7 @@ export interface ExtractionRecord {
    * record onto the paper's own sentence and take the paper's own number;
    * this is what it was before that, so "has this been re-anchored?" and
    * "what do I restore when a correction is withdrawn?" are answered by the
-   * record itself rather than by diffing it against the seed it was loaded
-   * from — which a corpus update would silently change under it.
+   * record itself.
    */
   original?: { value: number | string; unit: string; quote: string; sectionId: string };
   /**
@@ -364,7 +336,7 @@ export interface ExtractionRecord {
 }
 
 /**
- * A value the source states as an interval. The curators record it; §2.4
+ * A value the source states as an interval. The record carries it; §2.4
  * rule 3 anchors a midpoint or an endpoint against the sentence that states
  * it. Mirrors `Range` in models.py.
  */
@@ -452,11 +424,12 @@ export interface RunOutput {
   results: RunResult[];
   falsePositives: RunFalsePositive[];
   /** The models that answered the run's papers, from their usage records
-   *  (core/openferment_core/witness.py). Absent for the seed's runs. */
+   *  (core/openferment_core/witness.py). */
   models?: string[];
 }
 
-export interface CuratorNote {
+/** A note written by hand about a strain. */
+export interface StrainNote {
   at: string;
   who: string;
   text: string;
@@ -470,7 +443,7 @@ export interface Strain {
   description: string;
   badges: string[];
   bsl: 1 | 2;
-  notes: CuratorNote[];
+  notes: StrainNote[];
 }
 
 export type ProtocolCategory =
@@ -503,7 +476,7 @@ export interface Step {
   refs?: string[]; // record or paper ids
   /**
    * The skills a person needs to perform this step (OF-BLD-013 §1.1), as ids
-   * from `src/data/skills.ts`. Guild's Matrix reads these to say who can run
+   * from Guild's skills (none ship with alpha 2.0). Guild's Matrix reads these to say who can run
    * a protocol, and the run-mode gate reads them to decide whether a step
    * needs a cosigner. A step with no skills needs no qualification. Versioned
    * with the protocol, so a new version that changes a step can change what
@@ -621,7 +594,7 @@ export interface Scenario {
   id: string;
   /** The BioSTEAM flowsheet the scenario runs (§8.4). */
   modelId: string;
-  /** A flowsheet the service simulates; the authored cost surfaces left with the seed (ADR-010). */
+  /** A flowsheet the service simulates. */
   kind: 'biosteam';
   name: string;
   description: string;
@@ -643,7 +616,7 @@ export interface Scenario {
    * price on Proforma's index is read from that artifact, never kept here.
    */
   lastRunId?: string | null;
-  /** When a person made the scenario here (ISO time); absent on a seeded one. */
+  /** When a person made the scenario (ISO time). */
   createdAt?: string;
   /**
    * OF-BLD-020 §6.1 (D11): what a scenario on `custom_train_v1` is built
@@ -689,7 +662,7 @@ export interface Lesson {
   checkpoint: CheckpointQuestion[];
   /**
    * The skills this lesson teaches toward (OF-BLD-013 §3.1), as ids from
-   * `src/data/skills.ts`. Passing its checkpoint writes a knowledge entry for
+   * Guild's skills (none ship with alpha 2.0). Passing its checkpoint writes a knowledge entry for
    * each one on the learner's ledger, which puts them at Learning. Only an
    * assessor's training sign-off moves them to Supervised.
    */
@@ -1125,7 +1098,7 @@ export interface Runbook {
   title: string;
   status: RunbookStatus;
   stages: RunbookStage[];
-  /** Curator's framing — why this runbook is worth looking at. */
+  /** The runbook's framing — why it is worth looking at. */
   note: string;
   eta: string | null;
   /** Artifacts a complete runbook hands over. */
@@ -1271,7 +1244,7 @@ export interface ModuleCoverage {
   hits: CoverageHit[];
   /** The question names the module itself. */
   named: boolean;
-  /** Set when part of the module lives only in a browser, in words. */
+  /** Set when a read leaves part of the module out, in words. */
   partial: string | null;
   /** Set when the module's store could not be read. */
   error: string | null;
@@ -1289,7 +1262,7 @@ export interface ModuleRow {
   state: ModuleState;
   /** The module's own word for where the row stands. */
   status: string;
-  /** Null for a seed row that carries no mark. */
+  /** Null for a row that carries no mark. */
   provenance: Provenance | null;
   detail: Record<string, unknown>;
 }
@@ -1408,17 +1381,17 @@ export interface AnswerPlan {
   evidence?: Evidence[];
   /** Passages the claims quote. Absent on older plans. */
   passages?: Passage[];
-  /** The loop's steps. Absent on older plans and in single mode. */
+  /** The loop's steps. Absent on older plans. */
   trace?: TraceStep[];
   /** Why the loop stopped. */
   stopped?: StopReason;
   /** A runbook the agent drafted, its numbers written by the service (OF-BLD-014 §9.2). */
   runbookDraft?: RunbookDraft | null;
-  /** OF-BLD-015 §7.1: the modules swept before the first turn. Absent on older plans and in single mode. */
+  /** OF-BLD-015 §7.1: the modules swept before the first turn. Absent on older plans. */
   coverage?: CoverageMap | null;
   /** OF-BLD-015 §7.2: the module rows the claims cite. Absent on older plans. */
   rows?: ModuleRow[];
-  /** The conversation and turn the service kept this answer as; null on the single-call path. */
+  /** The conversation and turn the service kept this answer as; null when none was kept. */
   conversationId?: string | null;
   turnId?: string | null;
 }
@@ -1626,13 +1599,12 @@ export interface LiteratureDocument {
 }
 
 /**
- * What the overlay says about one paper (§2.1). A failed fetch is here too,
- * with its reason and no sections — the store keeps the seed's curation note
- * for it and the ingest board says why it halted.
+ * What the overlay says about one document the project holds (§2.1): its
+ * passages as its sections, its citation and its licence.
  */
 export interface OverlayPaper {
   ingest: IngestStatus;
-  textSource: 'full-text' | 'curation-note';
+  textSource: 'full-text';
   sections: PaperSection[];
   license: string | null;
   fetchedAt: string | null;
@@ -1652,8 +1624,8 @@ export interface OverlayPaper {
 }
 
 /**
- * GET /api/biorepo/overlay. Applied over the seed in one action at load when
- * the service answers; with the service down the app is exactly the seed.
+ * GET /api/biorepo/overlay. Applied in one action when the service answers;
+ * a project's papers, records and runs reach the page through it.
  * `records`, `candidates` and `runs` are typed loosely until §7 and §6 define
  * their shapes — the field names are fixed now so the shape does not move.
  */
@@ -1729,8 +1701,9 @@ export interface BioRepo {
 
 /**
  * A candidate anchoring refused (OF-BLD-012 §2.4), kept beside the survivors
- * so the run can be scored honestly (§6.2): one whose value agreed with the
- * seed and whose quote failed is a span_error in Witness. Never a record.
+ * so the run can be scored honestly (§6.2): one whose value agreed with a
+ * value a reviewer typed and whose quote failed is a span_error in Witness.
+ * Never a record.
  */
 export interface DroppedCandidate {
   paperId: string;
@@ -1802,8 +1775,8 @@ export const CandidateMirror: [
  * fields are exactly DurableReviewDecision in src/lib/durable.ts — the shape
  * the Durable tier already persists — so a decision made offline and one
  * posted to the service are the same object. The rest say which record, when,
- * and, for a promotion that re-anchors a curated quote to the paper's own
- * words, the replacement span.
+ * and, for a decision that re-anchors the record to another sentence of
+ * the paper, the replacement span.
  */
 export interface ReviewDecision {
   status: RecordStatus;
@@ -1820,8 +1793,8 @@ export interface ReviewDecision {
 
 // ── Guild: skills and competence (OF-BLD-013) ──────────────────────────
 //
-// The workforce layer. A Skill is reference data, like a protocol: it lives
-// in src/data/skills.ts and changes by commit. Protocol steps name the skills
+// The workforce layer. A Skill is reference data, like a protocol; no skills
+// ship with alpha 2.0, and the tests hand theirs in. Protocol steps name the skills
 // they need (`Step.skills`). Everything a person has done to earn a skill is
 // an entry in Guild's ledger, and their level on that skill is computed from
 // those entries by `src/engine/competence.ts`. Nothing stores a level.
@@ -2104,7 +2077,7 @@ export interface CheckReason {
   text: string;
 }
 
-/** One of a skill's mastery criteria, by its place in src/data/skills.ts. */
+/** One of a skill's mastery criteria, by its place in the skill's list (Guild's skills; none ship with alpha 2.0). */
 export interface CheckCriterion {
   skillId: string;
   index: number;
@@ -2622,9 +2595,9 @@ export interface ProformaRunRequest {
   /** Latin hypercube samples to draw (OF-BLD-019 D7); the service defaults it and caps it. */
   samples?: number;
   /**
-   * The shelf flowsheet a scenario made in this browser runs (OF-BLD-019
-   * §2.3, D6). A seed scenario runs its own and sends none; any other id runs
-   * this flowsheet, bound as `GET /api/proforma/bind` binds it.
+   * The shelf flowsheet the scenario runs (OF-BLD-019 §2.3, D6). A scenario
+   * the project keeps runs its own; one not yet saved runs this flowsheet,
+   * bound as `GET /api/proforma/bind` binds it.
    */
   flowsheet?: string | null;
   /**
@@ -2735,7 +2708,7 @@ export interface CeilingCheck {
   substrate: string;
   sugarWords: string;
   host: string | null;
-  /** The scenario's organism: its host filter, else its yield's records' strains, else its program's one species. */
+  /** The scenario's organism: its host filter, else its yield's records' strains. */
   strains: string[];
   species: string[];
   organismWords: string;
@@ -2840,7 +2813,7 @@ export interface FlowsheetInfo {
   description: string;
   /** The package and version ('biorefineries 2.35.1, cornstover'), or 'this repository'. */
   source: string;
-  /** A program id from programs.ts; null for a general flowsheet. */
+  /** The chemical-set key (`yeast`); null for a general flowsheet. */
   program: string | null;
   /** A published reference biorefinery, run whole on its package's defaults. */
   reference: boolean;
@@ -3305,7 +3278,7 @@ export interface ParamScope {
 /** `POST /api/params/{scope}/resolve`. Runs nothing. */
 export interface ParamResolveRequest {
   overrides: Override[];
-  /** A Proforma scenario made in this browser names the shelf flowsheet it runs. */
+  /** A Proforma scenario not yet saved names the shelf flowsheet it runs. */
   flowsheet?: string | null;
   /** A strain filter on the records, as `/api/proforma/bind` takes it. */
   host?: string | null;
@@ -3315,10 +3288,10 @@ export interface ParamResolveRequest {
   vesselType?: 'stirred-tank' | 'bubble-column' | null;
   /**
    * fermOS's family scope (OF-BLD-020 §3.2), bound as a simulation binds: the
-   * strain whose records bind (null: every strain of the program's organism),
+   * strain whose records bind (null: every strain the evidence pool holds),
    * the product, the sugar the records must name, the fit a person chose, where
-   * the simulation starts ('records', 'fit', 'simulation:<artifact id>'), the
-   * run-length preset, and the program switch.
+   * the simulation starts ('records', 'fit', 'simulation:<artifact id>'), and
+   * the run-length preset.
    */
   strain?: string | null;
   product?: string | null;
@@ -3538,7 +3511,7 @@ export interface FermosBinding {
   waiting: string[];
   /** What the family would refuse these values for though nothing waits (§8.R), else null. */
   refused: string | null;
-  /** What bound from where: the program's papers, whose records, the sugar, the fit, the kept simulation. */
+  /** What bound from where: the evidence pool's papers, whose records, the sugar, the fit, the kept simulation. */
   notes: string[];
 }
 
@@ -4020,7 +3993,7 @@ export interface KeptTrains {
 
 /** `POST /api/pureos/propose`: ids and words, never a number. */
 export interface ProposeRequest {
-  /** A products seed id, or a product thermosteam's library is asked about by name (ethanol). */
+  /** A products catalogue id, or a product thermosteam's library is asked about by name (ethanol). */
   product: string;
   /** A geneOS host (strain) id: the cells the product is made in. */
   host: string;
@@ -4032,9 +4005,9 @@ export interface ProposeRequest {
 export interface ProposalReason {
   unitId: string;
   rule: string;
-  /** boilingPoint, azeotrope, molecularWeight, isoelectricPoint (an artifact's), or class, location (the products seed's). */
+  /** boilingPoint, azeotrope, molecularWeight, isoelectricPoint (an artifact's), or class, location (the products catalogue's). */
   property: string;
-  /** Null when the products seed states the property. */
+  /** Null when the products catalogue states the property. */
   artifactId: string | null;
   /** Words, with no number in them. */
   words: string;

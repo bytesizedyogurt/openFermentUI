@@ -43,7 +43,7 @@ function ChipDemo({ paperId }: { paperId: string }) {
     return (
       <Frame label="Live component — citation chip">
         <p className="text-body text-ink-soft">
-          No catalogued record for {paperId} in this session — it may have been reset.
+          This project holds no record from {paperId}.
         </p>
       </Frame>
     );
@@ -75,7 +75,7 @@ function RecordCard({ recordId }: { recordId: string }) {
     return (
       <Frame label="Extraction record">
         <p className="text-body text-ink-soft">
-          Record {recordId} is not in this session — it may have been reset.
+          This project holds no record {recordId}.
         </p>
       </Frame>
     );

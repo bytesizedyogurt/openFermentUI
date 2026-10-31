@@ -292,7 +292,7 @@ export function fitFigureSeries(series: FermosSeries[], fit: KineticFit | null):
 // The vessel a kept simulation (or, anaerobic, a kept fit) needs, designed by
 // BioSTEAM in the service's Proforma worker. The browser asks and shows: the
 // scope's parameters come from `GET /api/params/fermos:vessel:<id>` through
-// the panel, a person's changes are the scope's overrides (Durable), and
+// the panel, a person's changes are the scope's overrides (the project's rows), and
 // `POST /api/fermos/vessel` designs. Nothing here computes a value.
 
 /** The flowsheet a fit is read through for a vessel: its titre, yield and batch time, as the ethanol flowsheet reads them (vessel.FIT_FLOWSHEET). */

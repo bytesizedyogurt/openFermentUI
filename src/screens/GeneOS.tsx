@@ -24,8 +24,7 @@
 //
 // HOSTS AND ROUTES (alpha 2.0, ADR-010). The Hosts badge counts the strains
 // the store holds, and the Pathway view lists the routes the products on file
-// declare. Both start empty: strains and products arrive with the documents
-// that report them, through Intake.
+// declare. Both are empty: no store holds a strain or product catalogue yet.
 import { useMemo } from 'react';
 import { useStore } from '@/store';
 import { href, useRoute } from '@/router';

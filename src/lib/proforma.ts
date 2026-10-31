@@ -231,8 +231,8 @@ export function runPrice(art: Artifact, shelf: FlowsheetInfo[]): PriceRead | nul
 
 /**
  * How a scenario's inputs stand, for its card on the index. With the
- * service's binding (`GET /api/proforma/scenarios` for a seed scenario, `GET
- * /api/proforma/bind` for one made here, as its page asks), an input is
+ * service's binding (`GET /api/proforma/bind` for the scenario's flowsheet,
+ * as its page asks), an input is
  * bound to records, assumed, or waiting; when the service could not be asked,
  * the shelf says which inputs can bind to records, and no more (OF-BLD-019
  * §2.R: the card once said four bound where the service bound three).
@@ -321,15 +321,15 @@ export const runProformaBenchmark = (signal?: AbortSignal) =>
 // OF-BLD-019 §3.2 is the browser's side of the contract §2.3 builds in the
 // service, names included:
 //
-//   (b) GET  /api/proforma/scenarios?host=  every SEED scenario of kind
-//       'biosteam', bound (`ProformaScenarioInfo`, carrying its `flowsheet`);
+//   (b) GET  /api/proforma/scenarios?host=  every BioSTEAM scenario the
+//       project keeps, bound (`ProformaScenarioInfo`, carrying its `flowsheet`);
 //   (c) GET  /api/proforma/bind?flowsheet=&host=  the same
-//       shape for a flowsheet, id and name empty: what a scenario a person
-//       made here (D6) shows as its inputs; a reference flowsheet, the toy or
-//       an unknown id is a refusal in words;
-//   (d) POST /api/proforma/run  a seed scenario by its id; a scenario made
-//       here by its flowsheet, bound as (c) binds it, with the request's
-//       assumptions. Inputs that still wait are a 422 listing them.
+//       shape for a flowsheet, id and name empty: what a scenario (D6) shows
+//       as its inputs; a reference flowsheet, the toy or an unknown id is a
+//       refusal in words;
+//   (d) POST /api/proforma/run  a scenario by its id and its flowsheet, bound
+//       as (c) binds it, with the request's overrides. Inputs that still wait
+//       are a 422 listing them.
 
 /** What a binding is asked with: the host filter. */
 export interface BindAsk {
@@ -350,7 +350,7 @@ const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
   return q.toString();
 };
 
-/** (b) The seed BioSTEAM scenarios, each bound by the service. */
+/** (b) The project's BioSTEAM scenarios, each bound by the service. */
 export const proformaScenarios = (ask: BindAsk, signal?: AbortSignal) =>
   call<ProformaScenarioInfo[]>(`/api/proforma/scenarios?${bindQuery(ask)}`, { signal });
 
@@ -371,7 +371,7 @@ export async function proformaBind(flowsheet: string, ask: BindAsk, signal?: Abo
 /** What the page posts to run a scenario: `ProformaRunRequest`, and the flowsheet of a scenario made here. */
 export interface RunAsk {
   scenarioId: string;
-  /** Sent for a scenario made here alone: the service runs a seed scenario by its id. */
+  /** The scenario's flowsheet; the service holds a kept scenario to its own. */
   flowsheet?: string | null;
   /**
    * A person's changes in the parameter panel (OF-BLD-020 D3): the scope
@@ -390,7 +390,7 @@ export interface RunAsk {
 /**
  * The overrides a run carries (OF-BLD-020 §2.2): the scenario's scope's
  * own, of the inputs its flowsheet takes; an override of an input the
- * flowsheet no longer takes stays in this browser and is not sent.
+ * flowsheet no longer takes stays with the project and is not sent.
  */
 export function runOverrides(scoped: Override[], keys: string[]): Override[] {
   const takes = new Set(keys);
@@ -448,7 +448,7 @@ export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
 // The fits fermOS keeps, each with what it can feed a flowsheet's titre,
 // yield and productivity and why not, as the service computes them from the
 // artifact: the browser shows them and keeps which artifact a person chose
-// for which input (`proformaFits`, Durable), and computes no value.
+// for which input (`proformaFits`, the project's rows), and computes no value.
 
 /**
  * Every kinetic fit, forecast and simulation fermOS keeps, with what it can feed `flowsheet`: `GET /api/fermos/fits`.
@@ -483,7 +483,7 @@ export const sendFitPath = (scenarioId: string, artifactId: string) =>
 /** What the check is asked with: the scenario as its page binds it. */
 export interface CeilingAsk {
   scenarioId: string;
-  /** Sent for a scenario made here alone: the service reads a seed scenario's own. */
+  /** The scenario's flowsheet; the service holds a kept scenario to its own. */
   flowsheet?: string | null;
   host: string | null;
   /** The fermOS fits a person chose, by input key (§5.1). */
@@ -987,8 +987,8 @@ export function questionsText(scenario: ProformaScenarioInfo, run: { sensitivity
 //
 // `custom_train_v1` is built from two kept artifacts a scenario names: a
 // fermOS vessel design (`fermos.vessel`) and a pureOS train run
-// (`pureos.train_run`). A scenario made on it keeps both (Durable
-// `createdScenarios`: `vessel`, `trainRun`), and every binding, panel read,
+// (`pureos.train_run`). A scenario made on it keeps both (its row's
+// `vessel` and `trainRun`), and every binding, panel read,
 // ceiling check and run carries them. The service refuses a pair that cannot
 // stand, in its words; the browser computes nothing.
 
@@ -1025,8 +1025,8 @@ export const trainRunPath = (artifactId: string) => `/pureos/train/${encodeURICo
  * Make a scenario on `custom_train_v1` from a vessel design and a train run,
  * and return its id: what pureOS's
  * Builder's **Price this in Proforma** calls (OF-BLD-020 §6.2), and what the
- * New scenario dialog makes when both are chosen. Durable, time-based id, not
- * run; the scenario's page binds it and says what waits.
+ * New scenario dialog makes when both are chosen. One of the project's rows,
+ * time-based id, not run; the scenario's page binds it and says what waits.
  */
 export function scenarioFromVesselAndTrain(vesselId: string, trainRunId: string, name?: string): string {
   return useStore

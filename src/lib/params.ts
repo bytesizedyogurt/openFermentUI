@@ -20,8 +20,8 @@
 // starts that worker and waits for it. With the
 // service down these say so (ServiceDown), and a refusal comes back in the
 // service's words (ServiceRefused); nothing stands in for an answer (E.2). The
-// overrides themselves live in the store's Durable tier
-// (`parameterOverrides`); the service keeps none.
+// overrides themselves are the project's rows (`parameterOverrides`), and a
+// write the service has not acknowledged waits in the outbox.
 import type { Override, ParamResolveRequest, ParamResolveResult, ParamScope, TrainSpec } from '@/data/types';
 import { ServiceDown, ServiceRefused, call } from './http';
 
@@ -34,9 +34,9 @@ export interface ParamAsk {
   fits?: Record<string, string>;
   vesselType?: 'stirred-tank' | 'bubble-column' | null;
   // fermOS's family scope (OF-BLD-020 §3.2–§3.3), bound as a simulation
-  // binds: the strain whose records bind (none: every strain of the
-  // program), the product, the sugar, the fit a person chose, where the
-  // simulation starts, the run-length preset and the program switch.
+  // binds: the strain whose records bind (none: every strain the evidence
+  // pool holds), the product, the sugar, the fit a person chose, where the
+  // simulation starts and the run-length preset.
   strain?: string | null;
   product?: string | null;
   sugar?: string | null;

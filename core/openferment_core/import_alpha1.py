@@ -13,8 +13,11 @@ instance moves to PostgreSQL:
 (`pnpm db:import-alpha1 --name … --by …`.) Every file is read and checked
 before anything is written, and everything is written in one transaction: an
 import lands whole or not at all. The stores' rules are not run again on old
-records (the seed several of them cite is gone); each ran when its record was
-written. The files are left where they are, to be moved aside by a person.
+records (several cite records alpha 2.0 does not hold); each ran when its
+record was written. A decision's provenance is the one thing computed again,
+as `biorepo.write` computes it from what the decision is (ADR-006); the label
+alpha 1.0's browser sent goes. The files are left where they are, to be moved
+aside by a person.
 The day's spend (`spend.json`) is not carried: the cap starts again the day
 the instance moves.
 """
@@ -31,7 +34,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import insert, update
 
-from . import artifacts, db, projects
+from . import artifacts, biorepo, db, projects
 from .db import models as t
 from .db import rows
 from .models import (
@@ -154,8 +157,9 @@ async def _write(found: Found, asked: ProjectCreate) -> str:
         records = {c.id: c for c in found.repo.records}
         for record_id, decision in found.repo.decisions.items():
             copy = records.get(record_id)
+            computed = decision.model_copy(update={"provenance": biorepo.provenance_of(decision)})
             await s.execute(insert(t.decisions).values(
-                project_id=pid, record_id=record_id, body=decision.model_dump(mode="json", exclude_none=True),
+                project_id=pid, record_id=record_id, body=computed.model_dump(mode="json", exclude_none=True),
                 record=copy.model_dump(mode="json", exclude_none=True) if copy is not None else None,
                 created_by=(decision.reviewer or "").strip() or "alpha 1.0",
             ))

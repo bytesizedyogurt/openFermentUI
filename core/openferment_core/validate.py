@@ -181,7 +181,7 @@ def _blank_prose_counts(text: str) -> str:
 
 
 # The names of kinetic models and their constants that carry a number word
-# (thread Q, 2026-10-20): "the half-saturation constant" is Ks's name, and
+# (ethanol kinetics papers, 2026-10-20): "the half-saturation constant" is Ks's name, and
 # "first-order kinetics" names a model, neither a quantity. The list is closed
 # and each entry is a whole hyphenated term, so "half the titre", "first of
 # the strains" and "a half-saturating dose" still trip the rule.
@@ -685,9 +685,9 @@ def parse_numbers(text: str) -> list[float]:
 # ── the quantities a sentence states (OF-BLD-012.1 F1.2) ───────────────
 #
 # Rule 3 asks whether the sentence says this number. Read as bare numbers it
-# cannot see three things the curators recorded and the papers write plainly:
+# cannot see three things a record carries and the papers write plainly:
 # a number in another unit ("15 mg/L" for 0.015 g/L), a range ("7-10 days",
-# whose midpoint the curator recorded), and a number written in words ("all
+# whose midpoint the record holds), and a number written in words ("all
 # eight sites"). So the quote is parsed into QUANTITIES — a number, and the
 # unit token the sentence attached to it — and into the RANGES those
 # quantities form. Both lists below are closed: adding to either is a commit
@@ -718,9 +718,9 @@ _WORD_QUANTITY = re.compile(
 # are left alone; '-fold' is the one compound that IS a number.
 _NOT_COUNTING = re.compile(r"\s+of(?![A-Za-z])|-(?!fold(?![A-Za-z]))[A-Za-z]", re.IGNORECASE)
 
-# An absence is a measurement the paper made. A curator who recorded
-# negativeResult recorded that this sentence states one; these are the
-# spellings the corpus uses for it. Closed, and matched case-insensitively.
+# An absence is a measurement the paper made. A record marked
+# negativeResult says this sentence states one; these are the spellings
+# papers use for it. Closed, and matched case-insensitively.
 NEGATION_MARKERS = (
     "no detectable", "not detected", "not phosphorylated", "non-phosphorylated",
     "unphosphorylated", "dephosphorylated", "did not", "no ", "none", "absent",
@@ -877,7 +877,7 @@ def _close(a: float, b: float) -> bool:
 
 
 def recorded_range(raw: Any) -> tuple[float, float] | None:
-    """The range the curators recorded, from a dict or a Range."""
+    """The range a record carries, from a dict or a Range."""
     r = raw.get("range") if isinstance(raw, dict) else getattr(raw, "range", None)
     if r is None:
         return None
@@ -902,7 +902,7 @@ def value_basis(
     output and no reviewer sets it."""
     norm = normalize_text(quote)
 
-    # A range the curators recorded, stated by the sentence in whatever units
+    # A range the record carries, stated by the sentence in whatever units
     # the paper used. The value is then the midpoint or an endpoint of it.
     if recorded_range is not None:
         low, high = recorded_range
@@ -918,8 +918,8 @@ def value_basis(
             if _close(number, b):
                 return "range-high"
 
-    # An absence the curators recorded. Zero is the reading; the sentence has
-    # to say the absence in one of the words the corpus uses for it.
+    # An absence the record carries. Zero is the reading; the sentence has
+    # to say the absence in one of the words papers use for it.
     if negative_result and number == 0 and _NEGATION.search(norm):
         return "negation"
 
@@ -1139,7 +1139,7 @@ def anchor_candidate(
         return None, "quote", f"quote is not in section {section_id} after normalisation"
 
     # 3. The value is inside the quote — as the sentence states it (F1.2):
-    #    in the units the paper used, as the range the curators recorded, as
+    #    in the units the paper used, as the range the record carries, as
     #    the absence it reports, or written in words.
     value = raw.get("value")
     categorical = bool(spec.get("categorical"))

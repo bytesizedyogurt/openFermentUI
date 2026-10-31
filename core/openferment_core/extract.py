@@ -18,16 +18,17 @@ value is in range survives. The rest are dropped and counted per rule. The
 model's `status` and `provenance`, if it offered any, are ignored: both are
 'unverified' by construction.
 
-What this module does NOT do. It does not score the run against the seed —
-`match_run` (§6.2) does that. It does not decide which candidates are new
+What this module does NOT do. It does not score the run against the values
+reviewers typed — `witness.match_run` (§6.2) does that. It does not decide which candidates are new
 records — that is the same function's job. It does not loop: one call per
 document, no retries on content, no follow-ups. And it does not fetch: a
 document the project does not hold is refused, because there is nothing to
 anchor to; Intake collects it first.
 
 Fixture mode (`OPENFERMENT_FIXTURES=1`) reads a saved response from
-`tests/fixtures/extract/{paperId}.json` and refuses the API — §8.1's offline
-demo replays the loop that way, and the tests here stub the call directly.
+`tests/fixtures/extract/{paperId}.json` and refuses the API — the offline
+proof (`pnpm prove`) replays the loop that way, and the tests here stub the
+call directly.
 """
 from __future__ import annotations
 
@@ -222,12 +223,10 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
                                 "minimum": 0,
                                 "maximum": 1,
                             },
-                            # What the curators can record, the model can say
-                            # too (OF-BLD-012.1 F1.4). Without these it has to
-                            # invent a point for "7-10 days" and something
-                            # arbitrary for "not phosphorylated", and then
-                            # disagrees with the seed on exactly the records
-                            # the curators handled most carefully.
+                            # A range or a negative a paper states, the model
+                            # can say too (OF-BLD-012.1 F1.4). Without these it
+                            # has to invent a point for "7-10 days" and
+                            # something arbitrary for "not phosphorylated".
                             "range": {
                                 "type": "object",
                                 "description": (
@@ -276,7 +275,7 @@ def ontology_for_prompt() -> list[dict[str, Any]]:
     """The ontology as the model sees it (§6.1): id, name, definition,
     canonicalUnit, categorical, requiresMethod. Not the range — a range in
     front of an extractor is an invitation to find a number that fits it —
-    and not the curator's notes, which carry example values."""
+    and not the fields' notes, which carry example values."""
     return [
         {
             "id": f["id"],

@@ -17,19 +17,15 @@ import {
   Undo2,
   AlertTriangle,
 } from 'lucide-react';
-import type { Candidate, DecisionCheck, ExtractionRecord, Paper } from '@/data/types';
+import type { DecisionCheck, ExtractionRecord } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf, reviewerName } from '@/store';
 import {
-  bestCandidate,
   blocks,
-  carryOverSpan,
   decisionToCheck,
   locateQuote,
-  paperFetched,
-  paperIdentified,
+  paperHeld,
   refusalOf,
-  spanChangesNumber,
   writeRefusal,
   type Refusal,
 } from '@/lib/review';
@@ -154,7 +150,6 @@ function Hint({ k, faded }: { k: string; faded: boolean }) {
   );
 }
 
-const NO_CANDIDATES: Candidate[] = [];
 
 // ── screen ─────────────────────────────────────────────────────────────
 
@@ -172,10 +167,8 @@ export default function Guild() {
   const advanceReview = useStore((s) => s.advanceReview);
   const focusReview = useStore((s) => s.focusReview);
   const toast = useStore((s) => s.toast);
-  // OF-BLD-012 §7.3 — the extractor's candidates and whether the service is
-  // up, for the block beside a curated record on a fetched paper.
+  // Whether the service is up, which decides what the queue is for.
   const serviceUp = useStore((s) => s.serviceUp);
-  const candidates = useStore((s) => s.overlay?.candidates ?? NO_CANDIDATES);
   // OF-BLD-012 §5.4 — the reader's "pending verification" rail links here
   // with ?record=<id>, and the card it names must be the one on screen.
   const route = useRoute();
@@ -195,12 +188,12 @@ export default function Guild() {
   const timings = useRef<number[]>([]);
 
   // OF-BLD-012.1 F9 — `biorepo.write` refuses every decision about a record on
-  // a paper with no PMCID, DOI or PMID, so such a record can be reviewed here
-  // and never reach the committed file. A
-  // reviewer working towards that file should not be shown them: with the
+  // a document the project does not hold, so such a record can be reviewed
+  // here and never reach the service. A reviewer working towards the
+  // project's decisions should not be shown them: with the
   // service up this filter is ON, and the strip says how many it is hiding
   // and why. Off, the queue is everything, and those records are still
-  // reviewable in this browser — the Durable tier keeps them.
+  // reviewable in this browser, which keeps the decisions in its outbox.
   //
   // `null` until the reviewer touches the box: the default FOLLOWS the
   // service rather than being copied out of it once, because `serviceUp` is
@@ -211,7 +204,7 @@ export default function Guild() {
   const keepableOnly = filterChoice ?? serviceUp === true;
 
   const keepable = useCallback(
-    (r: ExtractionRecord) => paperIdentified(papers.find((p) => p.id === r.paperId)),
+    (r: ExtractionRecord) => paperHeld(papers.find((p) => p.id === r.paperId)),
     [papers],
   );
 
@@ -310,20 +303,20 @@ export default function Guild() {
   });
   // Read inside the effect rather than depended on: these change identity on
   // every store update, and the question only changes when gateKey does.
-  const asking = useRef({ record, paper: undefined as Paper | undefined, candidates });
-  asking.current = { record, paper: papers.find((p) => p.id === record?.paperId), candidates };
+  const asking = useRef({ record });
+  asking.current = { record };
   useEffect(() => {
     if (!serviceUp || !gateKey) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      const { record: r, paper: pp, candidates: cs } = asking.current;
+      const { record: r } = asking.current;
       const who = reviewerName();
       // Nothing to ask while nobody has said who is deciding: the fallback
       // already says so, and the service would refuse on 'reviewer' anyway.
       if (!r || !who) return;
       void Promise.all([
-        checkDecision(decisionToCheck('accept', r, pp, cs, who), controller.signal),
-        checkDecision(decisionToCheck('gold', r, pp, cs, who), controller.signal),
+        checkDecision(decisionToCheck('accept', r, who), controller.signal),
+        checkDecision(decisionToCheck('gold', r, who), controller.signal),
       ])
         .then(([accept, gold]) => setChecked({ key: gateKey, accept, gold }))
         // The service went away mid-question. The predicate in review.ts is
@@ -526,9 +519,7 @@ export default function Guild() {
       lines.push(
         r.extractorRun
           ? `  origin: extractor run ${r.extractorRun}`
-          : `  origin: transcribed from the curation document${
-              r.curationRef ? ` ${r.curationRef}` : ''
-            } — no extractor produced it`,
+          : '  origin: no extractor run recorded',
       );
       lines.push(`  quote: “${r.quote}”`);
       for (const a of r.audit) {
@@ -540,9 +531,9 @@ export default function Guild() {
       }
     }
     lines.push('');
-    lines.push('End of log. The literature entries are real and citable; the values were');
-    lines.push('transcribed from the curation document and not yet checked against the');
-    lines.push('source PDF. These are one session of review decisions, not a validated result.');
+    lines.push('End of log. The documents are the ones the project holds; each value is a');
+    lines.push("candidate the extractor read from one of them, with the reviewers' decisions on");
+    lines.push('it. These are one session of review decisions, not a validated result.');
     exportText('openferment-review-session.txt', lines.join('\n'));
   };
 
@@ -852,20 +843,12 @@ export default function Guild() {
   const prov = provOf(record);
   const draftSI = draft ? toSI(draft.value, draft.unit) : null;
 
-  // §7.3 — beside a curated record on a fetched paper: what the extractor
-  // read for the same field, whether it agrees, and what a promotion carries.
-  const fromExtractor = record.extractorRun === 'claude-1';
-  const fetched = paperFetched(paper);
-  const best = fetched && !fromExtractor ? bestCandidate(record, candidates) : null;
-  const bestSection = best ? paper?.sections.find((s) => s.id === best.candidate.sectionId) : undefined;
-  const bestCtx = best && bestSection ? spanContext(bestSection.text, best.candidate.quote) : null;
-  const carry = fetched && !fromExtractor ? carryOverSpan(record, paper, candidates) : null;
   // §2.3 — what the service would refuse. The predicate in review.ts is the
   // fallback; while the service is up the card asks it directly (F1.5), so
   // the screen is gated on the rules themselves rather than on a copy.
-  const localAccept = writeRefusal('accept', record, paper, candidates, serviceUp, reviewer);
-  const rejectBlocked = writeRefusal('reject', record, paper, candidates, serviceUp, reviewer);
-  const localGold = writeRefusal('gold', record, paper, candidates, serviceUp, reviewer);
+  const localAccept = writeRefusal('accept', record, paper, serviceUp, reviewer);
+  const rejectBlocked = writeRefusal('reject', record, paper, serviceUp, reviewer);
+  const localGold = writeRefusal('gold', record, paper, serviceUp, reviewer);
   const asked = checked.key === gateKey ? checked : null;
   const acceptBlocked = asked ? refusalOf(asked.accept, localAccept) : localAccept;
   const goldBlocked = asked ? refusalOf(asked.gold, localGold) : localGold;
@@ -1061,105 +1044,6 @@ export default function Guild() {
             )}
           </div>
 
-          {/* §7.3 — what the extractor read, beside a curated record on a fetched paper */}
-          {fetched && !fromExtractor && (
-            <div className="mt-5 pt-4 border-t border-line" data-testid="extractor-span">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <div className="text-caption uppercase tracking-wide text-ink-soft">
-                  What the extractor read
-                </div>
-                {best && (
-                  <a
-                    href={href(`/biorepo/paper/${record.paperId}?section=${best.candidate.sectionId}`)}
-                    className="text-caption text-accent hover:underline"
-                  >
-                    Open in the reader at {bestSection ? bestSection.heading : `§${best.candidate.sectionId}`}
-                  </a>
-                )}
-              </div>
-              {best ? (
-                <>
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="font-num text-section-title">
-                      {fmt(best.candidate.value)}
-                      {best.candidate.unit && (
-                        <span className="text-body text-ink-soft ml-1">{best.candidate.unit}</span>
-                      )}
-                    </span>
-                    <span className="text-caption text-ink-soft">
-                      claude-1 · {bestSection ? bestSection.heading : `§${best.candidate.sectionId}`} ·
-                      confidence <span className="font-num">{best.candidate.confidence.toFixed(2)}</span>
-                    </span>
-                    {best.agrees ? (
-                      <span className="text-caption text-accent inline-flex items-center gap-1">
-                        <Check size={12} aria-hidden /> Agrees with the curated value within 2 %
-                      </span>
-                    ) : (
-                      <span className="text-caption text-signal-warn">
-                        Disagrees — extractor{' '}
-                        <span className="font-num">
-                          {fmt(best.candidate.value)} {best.candidate.unit}
-                        </span>{' '}
-                        vs curated{' '}
-                        <span className="font-num">
-                          {fmt(record.value)} {record.unit}
-                        </span>
-                        {best.deltaPct !== null && (
-                          <span className="font-num">
-                            {' '}
-                            ({best.deltaPct > 0 ? '+' : ''}
-                            {best.deltaPct.toFixed(0)} %)
-                          </span>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <div className="prose-reading mt-2">
-                    {bestCtx ? (
-                      <p style={{ whiteSpace: 'pre-line' }}>
-                        {bestCtx.clippedStart && <span className="text-ink-soft">… </span>}
-                        {bestCtx.before}
-                        <mark className="span-unverified">{bestCtx.quote}</mark>
-                        {bestCtx.after}
-                        {bestCtx.clippedEnd && <span className="text-ink-soft"> …</span>}
-                      </p>
-                    ) : (
-                      <p className="font-serif italic">“{best.candidate.quote}”</p>
-                    )}
-                  </div>
-                  {carry ? (
-                    <p className="text-caption text-ink-soft mt-2">
-                      The curated quote is not in the fetched text. Accept or gold carries this span
-                      onto the record, so it anchors in the paper&rsquo;s own words
-                      {spanChangesNumber(record, carry) ? (
-                        <>
-                          , and takes the paper&rsquo;s own number,{' '}
-                          <span className="font-mono">
-                            {fmt(carry.value)} {carry.unit}
-                          </span>
-                          , as the correction.
-                        </>
-                      ) : (
-                        '.'
-                      )}
-                    </p>
-                  ) : (
-                    ctx === null && (
-                      <p className="text-caption text-ink-soft mt-2">
-                        The curated quote is not in the fetched text and this span disagrees, so a
-                        promotion carries nothing: accept proceeds without a span; gold needs one.
-                      </p>
-                    )
-                  )}
-                </>
-              ) : (
-                <p className="text-body text-ink-soft">
-                  No extractor candidate for {fieldName(record.field)} on this paper. Accept proceeds
-                  without a span; gold needs one.
-                </p>
-              )}
-            </div>
-          )}
         </Card>
 
         {/* ── right rail: audit + origin ─────────────────────────────── */}
@@ -1167,7 +1051,7 @@ export default function Guild() {
           <SectionTitle>Audit trail</SectionTitle>
           {record.audit.length === 0 ? (
             <p className="text-body text-ink-soft">
-              Nothing has happened to this record beyond the transcription that created it.
+              Nothing has happened to this record beyond the extraction that made it.
             </p>
           ) : (
             <ol className="space-y-2.5 max-h-[42vh] overflow-y-auto pr-1">
@@ -1199,13 +1083,12 @@ export default function Guild() {
             <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
               Where this record came from
             </div>
-            {fromExtractor ? (
-              <>
+            <>
                 <Tick
                   p={provOf(record)}
-                  title="Extracted by claude-1 from the fetched full text (OF-BLD-012 §6)"
+                  title="Extracted by claude-1 from the document's text (OF-BLD-012 §6)"
                 >
-                  <div className="text-body">Extracted by claude-1 — new to the corpus</div>
+                  <div className="text-body">Extracted by claude-1 from the project&rsquo;s document</div>
                   <div className="font-num text-caption text-ink-soft">
                     field {record.field} · confidence {record.confidence.toFixed(2)}
                   </div>
@@ -1220,28 +1103,9 @@ export default function Guild() {
                 <p className="text-caption text-ink-soft mt-2">
                   One structured model response over the paper&rsquo;s own text produced this candidate, and
                   anchoring checked that its quote is verbatim in the section and holds the value.
-                  No curated record covers this field on this paper: accepting makes it a record,
-                  rejecting makes it a false positive in Witness.
+                  Accepting makes it a record; rejecting makes it a false positive in Witness.
                 </p>
-              </>
-            ) : (
-              <>
-                <Tick
-                  p={provOf(record)}
-                  title="Transcribed from the curation document — no extractor produced it"
-                >
-                  <div className="text-body">Hand-transcribed from the corpus document</div>
-                  <div className="font-num text-caption text-ink-soft">
-                    {record.curationRef ? `${record.curationRef} · ` : ''}field {record.field}
-                  </div>
-                </Tick>
-                <p className="text-caption text-ink-soft mt-2">
-                  {fetched
-                    ? 'The value was typed in from the curation document; the extractor\u2019s reading of the same paper is shown beside the span. Confidence is authored, not inferred.'
-                    : 'No extractor has read this paper, so what you are reviewing is a transcription, not an extraction: the value was typed in from the curation document and has not yet been checked against the source PDF. Confidence is authored, not inferred.'}
-                </p>
-              </>
-            )}
+            </>
           </div>
 
           {(record.organism || record.carbonSource) && (
@@ -1323,7 +1187,7 @@ export default function Guild() {
               <Button
                 onClick={() => decide('gold')}
                 disabled={blocks(goldBlocked)}
-                title={goldBlocked?.why ?? 'Verify and promote this record into the curated gold set — shortcut g'}
+                title={goldBlocked?.why ?? 'Verify and promote this record into the gold set — shortcut g'}
               >
                 <Award size={14} /> Flag for gold
                 <Hint k="g" faded={usedKeyboard} />

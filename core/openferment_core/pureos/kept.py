@@ -1,7 +1,7 @@
 """The trains a model built, kept on the service (OF-BLD-020 §5.4).
 
-A person's trains live in their browser (D9: `trainsMade` in the Durable tier)
-and travel whole with a run. A model builds a train across tool calls
+A person's trains are the project's rows, saved from pureOS's Builder
+(project_state.py), and travel whole with a run. A model builds a train across tool calls
 (`pureos_build`: new, add a unit, bind a parameter to records, run), and an
 outside assistant over MCP has no ask to hold its draft between calls, so the
 service holds a model's train here: rows of the `trains` table of kind
@@ -71,12 +71,12 @@ def keep_train(train_id: str | None, change: Callable[[TrainSpec | None], TrainS
     the lock and returns it changed, its id unchanged. `change` is a function
     of the train alone: it runs inside the store's transaction, on the
     database's own thread, where a call to another store is refused. `by` is
-    the model's id; `agent` is `model`, always (a person's trains live in
-    their browser). A refusal from `change` (any ValueError) leaves the store
+    the model's id; `agent` is `model`, always (a person's trains are the
+    project's rows from the Builder). A refusal from `change` (any ValueError) leaves the store
     as it was. Returns the train as kept."""
     if agent != "model":
-        raise KeptTrainRefused("a kept train is a model's: a person's trains live in their browser and travel with "
-                               "a run")
+        raise KeptTrainRefused("a kept train is a model's: a person's trains are the project's rows, saved from "
+                               "pureOS's Builder, and travel with a run")
     who = (by or "").strip()
     if not who:
         raise KeptTrainRefused("a kept train names the model that made it")

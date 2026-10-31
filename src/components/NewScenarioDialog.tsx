@@ -20,8 +20,8 @@
 // designs the service keeps (`GET /api/fermos/vessels`) and one over its
 // train runs (`GET /api/pureos/train-runs`). An empty list says why in words
 // and where one is made, and Make the scenario waits, saying what for;
-// nothing is silent. The scenario keeps both ids (Durable
-// `createdScenarios`). fermOS → Vessel's **Price this in Proforma** opens
+// nothing is silent. The scenario keeps both ids in its row (`vessel`,
+// `trainRun`). fermOS → Vessel's **Price this in Proforma** opens
 // this with its design chosen (`initialVessel`).
 import { useEffect, useMemo, useState } from 'react';
 import type { FlowsheetInfo, TrainSummary, VesselSummary } from '@/data/types';

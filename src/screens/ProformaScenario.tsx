@@ -12,7 +12,6 @@ import { Download, GitCompare, Pin, PinOff, Play, Route } from 'lucide-react';
 import { overrideEnds, overridesFor, proformaScope, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import type { Artifact, BasisInput, CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, ParamScope, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
-import { durableAvailable } from '@/lib/durable';
 import {
   FIT_TOOL_WORDS,
   ProformaDown,
@@ -69,10 +68,10 @@ import { RunReport, inputLabels } from './ProformaBiosteam';
 //                   out, and the questions for a modeller read it;
 //   the inputs      OF-BLD-020 §2.2: the parameter panel over scope
 //                   `proforma:<scenario id>` (GET /api/params/{scope}, a
-//                   scenario made here naming its flowsheet), every input
-//                   with its value and source, a slider inside its bounds,
-//                   Reset to source and Why. A person's change is an
-//                   Override in this browser under the reviewer name, the
+//                   scenario naming its flowsheet), every input with its
+//                   value and source, a slider inside its bounds, Reset to
+//                   source and Why. A person's change is an Override the
+//                   project keeps under the reviewer name, the
 //                   one thing a run carries of a person (`overrides`), and it
 //                   wins over the records and any fermOS fit for its input,
 //                   here and in the service alike;
@@ -149,7 +148,7 @@ function BasisAssumptions({ inputs, labels }: { inputs: BasisInput[]; labels: Re
  * run each was fitted to and what each can feed this flowsheet's titre,
  * yield and productivity, each value as the service computed it from the
  * artifact, or why not, in its words. Choosing one keeps which artifact
- * feeds which input (`proformaFits`, Durable, like assumptions), and the
+ * feeds which input (`proformaFits`, the project's rows), and the
  * binding then names it as the inputs' source. A fit sent from fermOS →
  * Forecast arrives as `?fit=` and is attached here, once, for the inputs it
  * can feed. With no fit on file it says how one gets made. A value a person
@@ -546,7 +545,7 @@ function StatusLine({ status, problem, running, elapsed }: { status: SimulatorSt
 
 function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere: boolean }) {
   // OF-BLD-020 §2.2 (D3): a person's changes to this scenario's inputs, kept
-  // in this browser under the scenario's scope and sent with the run.
+  // with the project under the scenario's scope and sent with the run.
   const scope = proformaScope(scenario.id);
   const overrides = useStore(overridesFor(scope));
   const chosenFits = useStore((s) => s.proformaFits[scenario.id]) ?? EMPTY_FITS;
@@ -827,7 +826,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
           Flowsheet: <span className="text-ink">{flowsheet ? flowsheet.title : flowsheetId}</span>
           {flowsheet && <>, from {flowsheet.source}</>}
         </span>
-        <span>· {madeHere ? `made in this browser${scenario.createdAt ? ` ${stamp(scenario.createdAt)}` : ''}` : 'shipped with openFerment'}</span>
+        <span>· made in this project{scenario.createdAt ? ` ${stamp(scenario.createdAt)}` : ''}</span>
         {view ? <ProvenanceBadge p={view.provenance} /> : <span className="chip">not run yet</span>}
       </div>
       {parts && (
@@ -858,10 +857,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
           <Card className="p-4" data-testid="scenario-not-run">
             <h2 className="font-serif text-section-title font-semibold mb-1">This scenario has not run yet</h2>
             <p className="text-body text-ink-soft">
-              {madeHere
-                ? `Made in this browser${scenario.createdAt ? ` on ${stamp(scenario.createdAt)}` : ''}. `
-                : ''}
-              Neither this browser nor the service holds a run of it. It holds no input value of its own: a run binds its process inputs to
+              {`Made in this project${scenario.createdAt ? ` on ${stamp(scenario.createdAt)}` : ''}. `}
+              The service holds no run of it. It holds no input value of its own: a run binds its process inputs to
               records and takes every other input from a named person&rsquo;s assumption. Give every input that waits a source, then run it.
             </p>
           </Card>
@@ -1072,12 +1069,10 @@ const FIT_INPUTS = ['titre', 'yield', 'productivity'];
 export default function ProformaScenario({ scenarioId }: { scenarioId: string }) {
   const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
   const madeHere = useStore((s) => s.createdScenarioIds.includes(scenarioId));
-  const durableReady = useStore((s) => s.durableReady);
-  // A scenario made here lives in this browser's Durable tier, which is read
-  // just after the page loads: a deep link waits for it rather than say the
-  // scenario does not exist.
-  if (!scenario && !durableReady && durableAvailable())
-    return <p className="text-body text-ink-soft">Reading the scenarios kept in this browser…</p>;
+  const stateLoaded = useStore((s) => s.stateSeen !== null || s.stateProblem !== null);
+  // The project's scenarios arrive with its rows, just after the page loads:
+  // a deep link waits for them rather than say the scenario does not exist.
+  if (!scenario && !stateLoaded) return <p className="text-body text-ink-soft">Reading the project&rsquo;s scenarios…</p>;
   if (scenario?.kind !== 'biosteam')
     return (
       <EmptyState

@@ -49,7 +49,7 @@ const OUT_FIELDS = 'core/tests/fixtures/fields.json';
 // ── normalise: raw notation → table key, and its family ────────────────
 const NORMALIZE_INPUTS = [
   'g/L', // the commonest alias
-  // Thread Q's spellings: separators, and grams per gram with labelled grams.
+  // Ethanol papers' spellings: separators, and grams per gram with labelled grams.
   'g.L−1',
   'g L-1h-1',
   'g/L hr',
@@ -107,7 +107,7 @@ const NORMALIZE_INPUTS = [
   'h\u22121',
   'g L\u22121 h\u22121',
   'g L\u20131',
-  // Thread Q — a price per gallon and per kilogram, every alias it adds …
+  // A price per gallon and per kilogram, every alias the tables add …
   'USD gal⁻¹', // the key itself
   '$/gal',
   'USD/gal',
@@ -161,7 +161,7 @@ const CONVERT_INPUTS: [number, string, string][] = [
   [250000, 'Da', 'kDa'],
   [40, '% CDW', 'g/L'], // a share of dry cells is not a titre — must throw
   [40, '% CDW', '%'], // nor a bare percentage — must throw
-  // Thread Q — a price per gallon is not a price per kilogram.
+  // A price per gallon is not a price per kilogram.
   [2.5, '$/gal', 'USD gal⁻¹'],
   [2.5, '$/gal', 'USD/kg'], // needs the product's density — must throw
   [0.4, 'g/g/h', 'g g⁻¹ h⁻¹'],
@@ -183,7 +183,7 @@ const SI_INPUTS: [number, string][] = [
   [5, 'unknownunit'], // passes through untouched
   [62, 'wt%'], // OF-BLD-014 §2.1
   [450000, 'g mol⁻¹'],
-  [2.5, '$/gal'], // thread Q
+  [2.5, '$/gal'], // a techno-economic price
 ];
 const si = SI_INPUTS.map(([value, unit]) => ({ value, unit, si: toSI(value, unit) }));
 
@@ -201,7 +201,7 @@ const REFUSAL_INPUTS: [string, string][] = [
   ['mg/L', 'wt%'], // symmetric, through the aliases
   ['% CDW', '% DW'], // another family, no recorded trap → null
   ['kDa', 'g/L'], // incompatible but no recorded trap → null
-  // Thread Q — the conversion needs the product's density.
+  // The conversion needs the product's density.
   ['USD gal⁻¹', 'USD kg⁻¹'],
   ['$/kg', '$/gal'], // symmetric, through the aliases
   ['USD gal⁻¹', 'EUR kg⁻¹'], // another family, no recorded trap → null

@@ -438,7 +438,7 @@ export default function Home() {
         <PageHeader
           eyebrow="openFerment"
           title="Bioprocess literature you can operate on"
-          subtitle="Ask Postdoc against a curated corpus, verify every extracted number against the span it came from, turn verified parameters into runnable protocols, and model what they cost at scale."
+          subtitle="Ask Postdoc about the documents your project holds, verify every extracted number against the span it came from, turn verified parameters into runnable protocols, and model what they cost at scale."
         />
 
         <HomeStart />
@@ -449,7 +449,7 @@ export default function Home() {
             right={
               <Explain label="What do the tick marks mean?">
                 Every number in openFerment carries a provenance tick: a solid gold bar for
-                curated gold-set values, green for human-verified extractions, grey for
+                gold values a reviewer typed, green for human-verified extractions, grey for
                 unverified machine output, and a dashed amber bar for a value that rests on an
                 assumption or an estimate. The tiles below wear the dominant tick of the data
                 behind them.
@@ -540,7 +540,7 @@ export default function Home() {
                 prov="gold"
                 sub={
                   goldRecords.length === 0 ? (
-                    'No curated values yet — flag records with g in review'
+                    'No gold values yet — promote a record with g in review'
                   ) : (
                     <>
                       across <span className="font-num">{goldPapers}</span>{' '}

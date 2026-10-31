@@ -105,7 +105,7 @@ export function SendToProforma({ artifactId, tool }: { artifactId: string; tool:
               <span className="text-caption text-ink-soft font-num">{sc.flowsheetId ?? sc.modelId}</span>
             </li>
           ))}
-          {offered.length === 0 && <li className="text-caption text-ink-soft">No Proforma scenario is in this browser yet.</li>}
+          {offered.length === 0 && <li className="text-caption text-ink-soft">No Proforma scenario is in this project yet.</li>}
           <li>
             <Button onClick={() => setMaking(true)}>New scenario…</Button>
           </li>

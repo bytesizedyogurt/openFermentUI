@@ -4,9 +4,8 @@
 // actually stands behind each strain: each card counts its papers, verified
 // records, protocols and scenarios, and says plainly when a class is empty.
 //
-// The catalogue is the store's strains, which arrive with the documents that
-// report them through Intake (alpha 2.0, ADR-010); with none on file the
-// page says so and points there.
+// The catalogue is the store's strains. No store holds a strain catalogue yet
+// (alpha 2.0, ADR-010), so the page says so.
 import { useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, FlaskConical, LineChart, BookOpen, ShieldCheck } from 'lucide-react';
 import type { ExtractionRecord, Paper, Strain } from '@/data/types';
@@ -135,7 +134,7 @@ function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }
         className="mt-auto pt-1"
         title={
           c.prov === 'gold'
-            ? 'This strain has records in the curated gold set'
+            ? 'This strain has records in the gold set'
             : c.prov === 'verified'
               ? 'This strain has reviewer-verified records'
               : 'Nothing for this strain has been reviewed yet'
@@ -316,7 +315,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
   );
 
   const subtitle =
-    'One page per organism, holding every parameter the corpus records for it. The coverage counts below describe the corpus as curated here — not the published literature.';
+    'One page per organism, holding every parameter this project\'s records give for it. The coverage counts below describe this project\'s records, not the published literature.';
 
   if (strains.length === 0) {
     return (
@@ -326,8 +325,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           <EmptyState
             icon={<FlaskConical size={22} />}
             title="No strain is on file yet"
-            body="Strains arrive with the documents that report them, through Intake. Each one gets a card here, counting the papers, records, protocols and scenarios that stand behind it."
-            action={<LinkButton to="/intake">Open Intake</LinkButton>}
+            body="No store holds a strain catalogue yet. When one does, each strain gets a card here, counting the papers, records, protocols and scenarios that stand behind it."
           />
         </Card>
       </>

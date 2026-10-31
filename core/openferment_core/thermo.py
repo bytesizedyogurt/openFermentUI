@@ -384,8 +384,7 @@ VOLATILITY_WORDS = "thermo volatility 1"
 # The library's own name for each product thermosteam is asked about, by the
 # product id fermOS, geneOS and Proforma use (the shelf's products). A product
 # not named here is missing: its volatility is not computed, and nothing is
-# guessed from its name. The products seed carries no small molecule with a
-# library name yet, and no ethanol entry.
+# guessed from its name.
 CHEMICALS: dict[str, str] = {"ethanol": ETHANOL}
 # An azeotrope is asked with water, the solvent a broth mostly is.
 PARTNER = WATER

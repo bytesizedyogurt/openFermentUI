@@ -1048,9 +1048,8 @@ def study_export(by: str = "") -> Response:
 
 @app.get("/api/proforma/scenarios")
 def proforma_scenarios(host: str | None = None) -> list[dict]:  # noqa: N803 (the wire name)
-    """The seed's BioSTEAM scenarios with their inputs bound to records
-    (§8.3; OF-BLD-019 §2.3), none since alpha 2.0 deleted the seed. A read:
-    it starts no simulator."""
+    """The project's BioSTEAM scenarios with their inputs bound to records
+    (§8.3; OF-BLD-019 §2.3). A read: it starts no simulator."""
     from . import proforma
 
     return [s.model_dump(mode="json") for s in proforma.scenarios(host=host)]
@@ -1060,8 +1059,8 @@ def proforma_scenarios(host: str | None = None) -> list[dict]:  # noqa: N803 (th
 def proforma_bind(flowsheet: str, host: str | None = None,  # noqa: N803
                   fits: str | None = None, overrides: str | None = None, vessel: str | None = None,
                   trainRun: str | None = None) -> dict:  # noqa: N803 (the wire name)
-    """A shelf flowsheet's inputs bound, as a scenario a person made in the
-    browser shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
+    """A shelf flowsheet's inputs bound, as a scenario not yet saved to the
+    project shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
     lays on the fermOS fits a person chose (§5.1), a JSON object of input
     key to artifact id, and `?overrides=` a person's overrides of one
     scenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet
@@ -1098,8 +1097,8 @@ def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: 
                            assumptions: str | None = None, overrides: str | None = None) -> dict:
     """A scenario's fermenter yield read against the newest stored geneOS
     ceiling of each shelf model of its organism, on its flowsheet's sugar
-    (OF-BLD-019 §5.2, D11): `CeilingCheck`. A seed scenario by its id, one
-    made in the browser by the flowsheet it names; `?fits=` and
+    (OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by
+    its id, one not yet saved by the flowsheet it names; `?fits=` and
     `?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,
     and `?assumptions=`, the older field, is read as overrides for one
     release. A yield above a ceiling is flagged, never clamped. A read: it
@@ -1119,7 +1118,7 @@ def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: 
 
 @app.post("/api/proforma/run")
 def proforma_run(req: ProformaRunRequest) -> dict:
-    """Run a seed scenario by its id, or a scenario made in the browser by
+    """Run a scenario the project keeps by its id, or one not yet saved by
     the shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any
     other case, and listing every input waiting for a source."""
     from . import proforma
@@ -1138,8 +1137,8 @@ def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
     """A scenario's newest run on this service (OF-BLD-019 §3.R): the newest
     stored `proforma.run` whose basis names the scenario (`latest_run`, the
     one pureOS and selling_price read), or none. A read: it runs nothing and
-    starts no simulator. The scenario is named by id, so no program filter
-    applies (a link opens what it names)."""
+    starts no simulator. The scenario is named by id, and a link opens what
+    it names."""
     from . import proforma
 
     sid = scenarioId.strip()
@@ -1161,8 +1160,8 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
                  vessel: str | None = None, trainRun: str | None = None) -> dict:  # noqa: N803 (the wire name)
     """A scope's parameters (`ParamScope`): every spec with its bounds and
     their reason, and its value as the service binds it now, with its
-    source. `proforma:<scenario id>` is a seed scenario, or with
-    `?flowsheet=` a scenario made in a browser; `?host=` and `?fits=` (JSON)
+    source. `proforma:<scenario id>` is a scenario the project keeps, or
+    with `?flowsheet=` one not yet saved; `?host=` and `?fits=` (JSON)
     bind as `/api/proforma/bind` does. Binding only: it starts no worker,
     integrates nothing and keeps nothing. `fermos:vessel:<id>` (with
     `?vesselType=`) reads its class's defaults through the Proforma worker,
@@ -1174,7 +1173,7 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     through the Proforma worker as the vessel's do (§5.1); with no type it is
     a 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is
     the train's own, its per-component keys expanded over the train's
-    chemicals and its records bound by the train's program and product, and
+    chemicals and its records bound from the evidence pool by each parameter's field, and
     `pureos:unit:<train>:inlet` is the train's inlet. A `proforma:` scope on
     `custom_train_v1` names its vessel design and train run (`?vessel=`,
     `?trainRun=`; OF-BLD-020 §6.1) and serves the group Finance, read from
@@ -1931,8 +1930,8 @@ def pureos_trains_kept() -> list[dict]:  # noqa: N803 (the wire name)
     """The trains a model built with `pureos_build` or `pureos_write`
     (`KeptTrain`: the train as data, `madeBy` the model, `at` and
     `updatedAt`), the most recently changed first (OF-BLD-020 §5.4). A
-    person's trains stay in their browser. A read: it writes nothing and starts
-    no simulator."""
+    person's trains are the project's rows (`GET /api/state`). A read: it
+    writes nothing and starts no simulator."""
     from .pureos import kept
 
     return [k.model_dump(mode="json") for k in kept.listed()]
@@ -2018,8 +2017,8 @@ def pureos_train_run(req: TrainRunRequest) -> dict:
 def pureos_train(key: str) -> dict:
     """One train: the newest run of the scenario `key` names, the newest run
     of the pureOS train it names (OF-BLD-020 §5.2), or the run whose artifact
-    id it is. 404 says how a run gets there; a deep link opens whatever
-    program it belongs to, and the page names it."""
+    id it is. 404 says how a run gets there; a deep link opens what it
+    names."""
     from . import pureos
 
     try:

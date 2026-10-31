@@ -1,9 +1,10 @@
 """One read tool per module (OF-BLD-015 §7.2), through `tools.run`.
 
-The module rows come from a small projection written here (alpha 2.0 deleted
-the seed modules.json was projected from, ADR-010): fictional runbooks, a
-host and a lesson. The service's stores are stand-ins, so nothing here reads
-a key, the network or this machine's data.
+The module rows come from a small projection written here: fictional
+runbooks, a host and a lesson, handed in as a catalogue no store holds yet
+would be. The service's stores are stand-ins, so nothing here reads a key,
+the network or this machine's data; the last test reads the project's own
+rows (project_state.py).
 """
 from __future__ import annotations
 
@@ -42,7 +43,7 @@ def ctx_for(pool_, **over):  # noqa: F811
     """The service's sources over the fictional projection, with the test's
     stand-ins laid on."""
     def make():
-        src = module_stores.seed_sources(lambda: pool_)
+        src = module_stores.fixture_sources(lambda: pool_)
         src.projection = lambda: json.loads(json.dumps(PROJECTION))
         for k, v in over.items():
             setattr(src, k, v)
@@ -230,7 +231,7 @@ def test_an_artifact_row_is_worth_what_its_inputs_are_worth_now(pool):  # noqa: 
     def no_pool():
         raise AssertionError("the pool was read for an artifact with no record input")
 
-    fermos = module_stores.Stores(module_stores.Sources(**{**vars(module_stores.seed_sources(no_pool)),
+    fermos = module_stores.Stores(module_stores.Sources(**{**vars(module_stores.fixture_sources(no_pool)),
                                                            "artifacts": lambda: [forecast, undecided]}))
     assert {row.id: row.provenance for row in fermos.rows("fermos")} == {"00000000000000dd": "computed"}
 
@@ -353,3 +354,36 @@ def test_pureos_reads_a_train_a_model_built_as_kind_train(pool):  # noqa: F811
     seen = SeenSet()
     seen.add(r)
     assert row.ref in seen.rows and not seen.runs, "a train is data: its runs are the kept runs"
+
+
+def test_the_module_reads_list_the_runbooks_and_scenarios_the_project_keeps(pool):  # noqa: F811
+    """A runbook the project adopted, with its lock, and a scenario made with
+    New scenario are the project's rows (project_state.py), and the module
+    reads list them beside what a fixture hands in."""
+    from openferment_core import project_state
+
+    who = "Ada Moreno"
+    project_state.put("runbooks", "rb-kept-1", {
+        "id": "rb-kept-1", "kind": "research", "title": "Kappase — pilot run", "status": "draft", "stages": [],
+        "note": "", "eta": None, "outputs": [], "productId": None, "progressPct": 0, "estCostUsd": None,
+        "strainId": None, "measurementSchema": [], "lockedAt": None, "lockHash": None,
+        "predictions": [{"id": "p1", "label": "Final titre", "value": 1, "unit": "g/L", "confidence": "low",
+                         "basis": "a placeholder"}]}, who)
+    project_state.put("scenarios", "sc-kept-1", {
+        "id": "sc-kept-1", "modelId": "ethanol_glucose_v0", "flowsheetId": "ethanol_glucose_v0", "kind": "biosteam",
+        "name": "Kept ethanol", "description": "", "product": "", "dims": [], "point": {}, "assumptions": [],
+        "pinned": False}, who)
+
+    def stores():
+        return module_stores.Stores(module_stores.default_sources(lambda: pool))
+
+    (rb,) = [r for r in stores().rows("runbooks") if r.id == "rb-kept-1"]
+    assert (rb.label, rb.state, rb.detail["predictions"]) == ("Kappase — pilot run", "open", ["Final titre"])
+    assert "Kappase" in rb.names
+    project_state.put("runbookLocks", "rb-kept-1", {"lockedAt": "2026-10-31T00:00:00Z", "lockHash": "0123abcd"}, who)
+    (rb,) = [r for r in stores().rows("runbooks") if r.id == "rb-kept-1"]
+    assert rb.state == "locked" and rb.detail["lockedAt"] == "2026-10-31T00:00:00Z"
+    (sc,) = [r for r in stores().rows("proforma") if r.kind == "scenario"]
+    assert (sc.id, sc.label, sc.detail["modelId"]) == ("sc-kept-1", "Kept ethanol", "ethanol_glucose_v0")
+    found = read("runbooks", tools.ToolContext(pool_factory=lambda: pool), words="kappase")
+    assert found.error is None and [row.id for row in found.rows] == ["rb-kept-1"]

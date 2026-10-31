@@ -757,7 +757,7 @@ def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> Fet
     )
 
 
-# ── sources outside Europe PMC (thread Q) ──────────────────────────────
+# ── sources outside Europe PMC: OSTI and SGD ───────────────────────────
 
 # Every page of the Saccharomyces Genome Database carries a rel="license" link
 # to CC BY 4.0 whose image's alt text is 'Creative Commons License'; that link

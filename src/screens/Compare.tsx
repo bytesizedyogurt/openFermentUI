@@ -10,7 +10,7 @@
 // with no run says so; scenarios on different flowsheets are compared under a
 // line saying their bases differ.
 //
-// Pins are Durable (D6): a created scenario carries its own.
+// Pins are the scenario's own (`pinned`, D6), kept with the project's scenarios.
 import { useEffect, useState } from 'react';
 import { Download, GitCompare, Pin } from 'lucide-react';
 import { useStore } from '@/store';

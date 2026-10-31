@@ -170,9 +170,9 @@ class ModuleCoverage(BaseModel):
     # How many rows match; `hits` lists at most COVERAGE_HITS of them.
     count: int = 0
     hits: list[CoverageHit] = Field(default_factory=list)
-    # The question names the module itself ("what is open in Dominion").
+    # The question names the module itself ("what is open in Runbooks").
     named: bool = False
-    # Set when part of the module lives only in a browser, in words.
+    # Set when a read leaves part of the module out (module_stores.PARTIAL), in words.
     partial: str | None = None
     # Set when the module's store could not be read, in words.
     error: str | None = None
@@ -192,8 +192,8 @@ class ModuleRow(BaseModel):
     state: ModuleState
     # The module's own word: a clearance state, a runbook status, an ingest state.
     status: str
-    # The row's provenance mark when the module keeps one; null for a seed
-    # row that carries none (a lesson, a unit operation).
+    # The row's provenance mark when the module keeps one; null for a row
+    # that carries none (a lesson, a unit operation).
     provenance: Provenance | None = None
     # A few named fields the module shows, kept short.
     detail: dict[str, Any] = Field(default_factory=dict)
@@ -300,7 +300,7 @@ class AnswerPlan(BaseModel):
     trace: list[TraceStep] = Field(default_factory=list)
     stopped: StopReason = "done"
     # OF-BLD-015 §7.1: the modules swept before the first turn, and what each
-    # held. The answer's footer reads it; null on the single-call path.
+    # held. The answer's footer reads it; null when no sweep ran.
     coverage: CoverageMap | None = None
     # OF-BLD-015 §7.2: the module rows the claims cite.
     rows: list[ModuleRow] = Field(default_factory=list)
@@ -308,7 +308,7 @@ class AnswerPlan(BaseModel):
     # service (runbook_draft.py), for a person to adopt and lock.
     runbookDraft: "RunbookDraft | None" = None
     # The conversation and the turn the service kept this answer as
-    # (postdoc/conversations.py); None on the single-call path.
+    # (postdoc/conversations.py); None when none was kept.
     conversationId: str | None = None
     turnId: str | None = None
 
@@ -445,7 +445,7 @@ class FetchLicense(BaseModel):
 
 FetchStatus = Literal["complete", "failed:fetch", "failed:parse"]
 # Who served a fetched text: Europe PMC's JATS, an OSTI report's PDF, or a
-# Saccharomyces Genome Database strain entry (thread Q). A file cached before
+# Saccharomyces Genome Database strain entry. A file cached before
 # the field existed was fetched from Europe PMC, and reads as such.
 FetchSource = Literal["europepmc", "osti", "sgd", "upload", "paste"]
 
@@ -579,7 +579,7 @@ class OverlayPaper(BaseModel):
     BioRepo, the review card, the reader and Witness read."""
 
     ingest: str
-    textSource: Literal["full-text", "curation-note"]
+    textSource: Literal["full-text"]
     sections: list[FetchedSection] = Field(default_factory=list)
     license: str | None = None
     fetchedAt: str | None = None
@@ -598,8 +598,8 @@ class OverlayPaper(BaseModel):
 
 
 class Overlay(BaseModel):
-    """GET /api/biorepo/overlay (§2.1). The store applies it in one action on
-    top of the seed; with the service down the app is exactly the seed.
+    """GET /api/biorepo/overlay (§2.1). The browser's store applies it in one
+    action when it arrives; a project's records reach the page through it.
 
     `papers`, the documents the project holds in the kit (ADR-002); `runs`
     and `candidates` recomputed from the project's candidates against the
@@ -788,8 +788,9 @@ class DecisionCheck(BaseModel):
 
 class DroppedCandidate(BaseModel):
     """A candidate anchoring refused (§2.4), kept beside the survivors so the
-    run can be scored honestly (§6.2): a candidate whose value agreed with the
-    seed and whose quote failed is a `span_error` in Witness — the extractor
+    run can be scored honestly (§6.2): a candidate whose value agreed with a
+    value a reviewer typed and whose quote failed is a `span_error` in
+    Witness — the extractor
     produced it, and dropping it from BioRepo does not undo that. Never enters
     BioRepo; never repaired."""
 
@@ -803,7 +804,7 @@ class DroppedCandidate(BaseModel):
 
 
 class ExtractRunResult(BaseModel):
-    """One seed record scored against a run (§6.2)."""
+    """One reference, a value a reviewer typed, scored against a run (§6.2)."""
 
     goldRecordId: str
     outcome: Outcome
@@ -836,8 +837,8 @@ class ReviewDecision(BaseModel):
     The first six fields are exactly the browser's DurableReviewDecision — the
     shape the Durable tier already persists — so a decision made offline and a
     decision posted to the service are the same object. The rest say which
-    record, when, and, for a promotion that re-anchors a curated quote to the
-    paper's own words, the replacement span.
+    record, when, and, for a decision that re-anchors the record to another
+    sentence of the paper, the replacement span.
     """
 
     status: RecordStatus
@@ -1103,8 +1104,9 @@ class PracticeDepositionObservation(BaseModel):
 
 
 class PracticeDeposition(BaseModel):
-    """A Deposition as the browser sends it for drafting: Depositions live in
-    the browser's Durable tier, so the service sees the ones it is shown."""
+    """A Deposition as the page sends it for drafting: the project keeps its
+    depositions as rows (project_state.py), and a draft reads the ones the
+    page sends."""
 
     id: str
     protocolId: str
@@ -1186,7 +1188,8 @@ class CheckReason(BaseModel):
 
 
 class CheckCriterion(BaseModel):
-    """One of a skill's mastery criteria, by its place in src/data/skills.ts."""
+    """One of a skill's mastery criteria, by its place in the skill's list
+    (Guild's skills; none ship with alpha 2.0)."""
 
     skillId: str
     index: int
@@ -1722,7 +1725,9 @@ class ProformaRunRequest(BaseModel):
     # A person's changes in the parameter panel (OF-BLD-020 D3), each an
     # Override of scope `proforma:<scenarioId>`: a named assumption that wins
     # over the records and any fermOS fit for its input, and that the run's
-    # basis names with the person. The service keeps none.
+    # basis names with the person. The page sends the scenario's own, which
+    # the project keeps (project_state.py); `project_state.run_request`
+    # reads them for a run Postdoc makes.
     overrides: list[Override] = Field(default_factory=list)
     host: str | None = None
     seed: int = 0
@@ -1730,9 +1735,9 @@ class ProformaRunRequest(BaseModel):
     # default is proforma.SAMPLES, held equal by test_proforma, and
     # proforma.run refuses more than proforma.MAX_SAMPLES, in words.
     samples: int = 500
-    # The shelf flowsheet a scenario made in the browser runs (OF-BLD-019
-    # §2.3, D6): a seed scenario runs its own and needs none; a scenario id
-    # that is not a seed scenario's runs this one, bound as
+    # The shelf flowsheet the scenario runs (OF-BLD-019 §2.3, D6): a scenario
+    # the project keeps runs its own and needs none (another is refused); a
+    # scenario not yet saved runs this one, bound as
     # GET /api/proforma/bind binds it. A reference biorefinery, the toy or an
     # id the shelf does not hold is refused in words.
     flowsheet: str | None = None
@@ -1743,7 +1748,7 @@ class ProformaRunRequest(BaseModel):
     # is refused in words naming the parameter.
     fits: dict[str, str] = Field(default_factory=dict)
     # OF-BLD-020 §6.1 (D11): what a scenario on `custom_train_v1` is built
-    # from, as the scenario made in the browser keeps them: the kept
+    # from, as the scenario keeps them: the kept
     # `fermos.vessel` design its fermenter is rebuilt from, and the kept
     # `pureos.train_run` whose units follow it. Both are needed for that
     # flowsheet and refused for any other; each refused in words when it is
@@ -1921,7 +1926,7 @@ class CeilingCheck(BaseModel):
     substrate: str
     sugarWords: str
     # The scenario's organism: its host filter, else the strains its yield's
-    # records name, else its program's one species; and how that was read.
+    # records name; and how that was read.
     host: str | None = None
     strains: list[str] = Field(default_factory=list)
     species: list[str] = Field(default_factory=list)
@@ -1986,7 +1991,7 @@ class FlowsheetInfo(BaseModel):
     # The package and version it comes from ('biorefineries 2.35.1,
     # cornstover'), or 'this repository'.
     source: str
-    # A program id from src/data/programs.ts; None for a general flowsheet.
+    # The chemical-set key (`yeast`, train_spec.PROGRAM_CHEMICALS); None for a general flowsheet.
     program: str | None = None
     # A published reference biorefinery, run whole on its package's defaults.
     reference: bool = False
@@ -2241,7 +2246,7 @@ class Train(BaseModel):
     and `pureos_read`."""
 
     # The scenario the run belongs to (the basis's `scenario`, else the one
-    # seed scenario whose modelId is the run's flowsheet); None when no
+    # kept scenario whose modelId is the run's flowsheet); None when no
     # scenario claims it, and the train is then known by its artifact id.
     scenarioId: str | None = None
     scenarioName: str | None = None
@@ -2269,7 +2274,7 @@ class Train(BaseModel):
     note: str | None = None
     # OF-BLD-020 §5.2: the artifact a train is read from, a Proforma run or
     # a `pureos.train_run`, and for a train run the train it ran (its id and
-    # name as the browser keeps it, D9); None for a Proforma run.
+    # name as the project keeps it, D9); None for a Proforma run.
     tool: str = "proforma.run"
     trainId: str | None = None
     trainName: str | None = None
@@ -2547,7 +2552,7 @@ class Runbook(BaseModel):
 # declares its parameters once, in Python, as `ParameterSpec`s; the service
 # resolves each to a `ParameterValue` naming where its value came from, in
 # the order its `sourceRule` gives. A person's change is an `Override`: a
-# named assumption the browser keeps (D3) and a run carries, which the
+# named assumption the project keeps (D3) and a run carries, which the
 # basis names as an `assumption`, so the result's provenance is `assumed`.
 # Bounds are conventions with a written reason (D4): a value outside them
 # is kept and flagged in words, never clamped. `params.py` holds the rules.
@@ -2694,8 +2699,9 @@ class ParamResolveRequest(BaseModel):
     """POST /api/params/{scope}/resolve. Runs nothing."""
 
     overrides: list[Override] = Field(default_factory=list)
-    # A Proforma scenario made in the browser names the shelf flowsheet it
-    # runs, as ProformaRunRequest.flowsheet does; a seed scenario needs none.
+    # The shelf flowsheet a Proforma scenario not yet saved runs, as
+    # ProformaRunRequest.flowsheet names it; a scenario the project keeps
+    # needs none.
     flowsheet: str | None = None
     # A strain filter on the records, as GET /api/proforma/bind takes it.
     host: str | None = None
@@ -2706,11 +2712,10 @@ class ParamResolveRequest(BaseModel):
     # for; None is BioSTEAM's own default design. An anaerobic design takes none.
     vesselType: Literal["stirred-tank", "bubble-column"] | None = None
     # fermOS's family scope (OF-BLD-020 §3.2), bound as a simulation binds:
-    # the strain whose records bind (None: every strain of the program's
-    # organism), the product, the sugar the records must name, the fit a
-    # person chose, where the simulation starts (`records`, `fit` or
-    # `simulation:<artifact id>`), the run-length preset, and the program
-    # switch, which decides what the evidence pool shows.
+    # the strain whose records bind (None: every strain the evidence pool
+    # holds), the product, the sugar the records must name, the fit a person
+    # chose, where the simulation starts (`records`, `fit` or
+    # `simulation:<artifact id>`), and the run-length preset.
     strain: str | None = None
     product: str | None = None
     sugar: str | None = None
@@ -2720,9 +2725,9 @@ class ParamResolveRequest(BaseModel):
     # pureOS's unit scope (OF-BLD-020 §5.1): the catalogue id of the unit's
     # type, when no train is sent; with a train it must agree with the unit's.
     unitType: str | None = None
-    # pureOS's unit scope (§5.2): the whole train, as the browser keeps it
+    # pureOS's unit scope (§5.2): the whole train, as the project keeps it
     # (D9), so the unit's per-component keys expand over the train's
-    # chemicals and its records bind by the train's program and product; the
+    # chemicals and its records bind from the evidence pool by field; the
     # scope `pureos:unit:<train id>:inlet` is the train's inlet. Its units'
     # typed values are not laid on here: a resolve's `overrides` are.
     train: TrainSpec | None = None
@@ -2993,7 +2998,7 @@ class FermosBinding(BaseModel):
     # words the run refuses with (OF-BLD-020 §8.R, findings 12 and 14);
     # None when a run would go ahead.
     refused: str | None = None
-    # What bound from where: the program's papers, whose records, the sugar,
+    # What bound from where: the evidence pool's papers, whose records, the sugar,
     # the fit and the kept simulation, and what they could not give.
     notes: list[str] = Field(default_factory=list)
 
@@ -3374,8 +3379,9 @@ class TrainUnitSpec(BaseModel):
 
 
 class TrainSpec(BaseModel):
-    """A train as data (D9): the browser keeps it whole and sends it with a
-    run; the service keeps the runs."""
+    """A train as data (D9): the project keeps a person's train as a row
+    (pureOS's Builder), and the page sends it whole with a run; the service
+    keeps the runs."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -3591,7 +3597,7 @@ class KeptTrains(BaseModel):
 #
 # pureos/proposer.py reads a product's class and the properties its class's
 # rule splits on (thermosteam's volatility, ProtParam on its sequence, where
-# the seed says it is), and proposes a TrainSpec whose units are catalogue
+# the products catalogue says it is), and proposes a TrainSpec whose units are catalogue
 # types in order, every parameter at its library default or waiting, each
 # unit with one reason naming the rule, the property and its artifact.
 
@@ -3601,8 +3607,8 @@ class ProposeRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # A products seed id, or a product thermosteam's library is asked about by
-    # name (thermo.CHEMICALS: ethanol).
+    # A products catalogue id, or a product thermosteam's library is asked
+    # about by name (thermo.CHEMICALS: ethanol).
     product: str
     # A geneOS host (strain) id: the cells the product is made in.
     host: str
@@ -3613,14 +3619,14 @@ class ProposeRequest(BaseModel):
 
 class ProposalReason(BaseModel):
     """Why one unit of a proposal is there: the rule, the property it read,
-    the artifact that holds that property (None when the products seed
-    states it), and the words, which carry no number."""
+    the artifact that holds that property (None when the products
+    catalogue states it), and the words, which carry no number."""
 
     unitId: str
     rule: str
     # A property name: `boilingPoint`, `azeotrope`, `molecularWeight`,
     # `isoelectricPoint` (each an evidence key of its artifact), or `class`,
-    # `location` (the products seed's).
+    # `location` (the products catalogue's).
     property: str
     artifactId: str | None = None
     words: str

@@ -37,7 +37,7 @@ def store(tmp_path, monkeypatch, pool, held_documents):  # noqa: F811
 
 
 def ctx(pool_, ask="ask-test"):  # noqa: F811
-    c = tools.ToolContext(pool_factory=lambda: pool_, stores_factory=lambda: module_stores.Stores(module_stores.seed_sources(lambda: pool_)))
+    c = tools.ToolContext(pool_factory=lambda: pool_, stores_factory=lambda: module_stores.Stores(module_stores.fixture_sources(lambda: pool_)))
     c.ask_id = ask
     return c
 
@@ -120,7 +120,7 @@ def test_a_gated_action_writes_nothing_and_comes_back_proposed(pool, store, modu
 def test_a_proposal_shows_on_home_read(pool, store):  # noqa: F811
     c = ctx(pool)
     write("home", c, "note", note="keep the fructose ceiling as the only bound")
-    seen = module_stores.Stores(module_stores.Sources(**{**vars(module_stores.seed_sources(lambda: pool)), "proposals": proposals.open_ones}))
+    seen = module_stores.Stores(module_stores.Sources(**{**vars(module_stores.fixture_sources(lambda: pool)), "proposals": proposals.open_ones}))
     rows = module_stores.find(seen, "home", kind="proposal")
     assert len(rows) == 1 and rows[0].state == "proposed" and rows[0].status == "notebook"
 

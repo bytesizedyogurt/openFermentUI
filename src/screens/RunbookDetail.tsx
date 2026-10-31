@@ -624,7 +624,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         <PageHeader
           eyebrow="Runbooks"
           title="Runbook not found"
-          subtitle="Session state resets on refresh, so a deep link from an earlier session can point at nothing."
+          subtitle="This project holds no runbook with this id."
         />
         <Card>
           <EmptyState
@@ -724,7 +724,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
       </div>
 
       <Card className="p-4 mb-6">
-        <Tick p="assumed" title="Curator framing — modeled, not measured">
+        <Tick p="assumed" title="The runbook's note — modeled, not measured">
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
             Why this runbook is here
           </div>

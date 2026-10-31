@@ -498,7 +498,7 @@ def test_the_store_is_written_by_one_function_under_its_locks_and_keeps_every_ch
     units = kept.kept_train(tid).spec.units
     assert len(units) == 20 and len({u.id for u in units}) == 20
     # A person's train is never kept here, and a change keeps its train's id.
-    with pytest.raises(kept.KeptTrainRefused, match="a person's trains live in their browser"):
+    with pytest.raises(kept.KeptTrainRefused, match="a person's trains are the project's rows"):
         kept.keep_train(tid, lambda cur: cur, "Stand-In Person", agent="person")
     with pytest.raises(kept.KeptTrainRefused, match="a change keeps the train's id"):
         kept.keep_train(tid, lambda cur: cur.model_copy(update={"id": "tr-other"}), MODEL)

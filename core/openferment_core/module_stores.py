@@ -9,24 +9,24 @@ that word.
 
 Where each module's rows come from:
 
-- the module projection (the runbooks and protocols, geneOS's hosts and
-  pathways, Proforma's scenarios, Primer's lessons), empty since alpha 2.0
-  deleted the TypeScript seed it was projected from and until a store holds
-  them;
+- the project's own rows (project_state.py): its runbooks, each with its
+  lock, and the BioSTEAM scenarios made with New scenario;
+- the module projection (protocols, geneOS's hosts and pathways, Primer's
+  lessons): no store holds these catalogues yet, so each list is empty, and
+  a test hands its own in;
 - pureOS's unit operations, from `schema/vocabulary.yaml`;
 - the service's own stores (records and candidates through the evidence
   pool, artifacts, Guild's ledger and checks, Intake's fetch state, the
   geneOS shelf).
 
-Some of a module lives only in a browser (depositions, unposted review
-decisions, runbooks adopted and locked there). `PARTIAL` names it, and the
-answer's footer says the module was read in part. Nothing here syncs.
+A read leaves part of some modules out: a project's depositions and
+measurements, and review decisions a browser has not posted yet. `PARTIAL`
+names what, and the answer's footer says the module was read in part.
 
 `coverage(question)` is code and calls no model: it finds the rows the
 question names, and the modules it names, before Postdoc's first turn.
 
-alpha 2.0 removed the program switch and Dominion (ADR-005, ADR-010): every
-row the service holds shows, and projects scope them from stage 2 on.
+A read shows every row the project holds (ADR-005).
 """
 from __future__ import annotations
 
@@ -48,10 +48,11 @@ STATES = ("open", "fenced", "approved", "locked", "proposed", "retired")
 
 # What the service cannot see of a module, said once, in the footer's words.
 PARTIAL = {
-    "runbooks": "depositions, and runbooks adopted or locked in a browser, stay in that browser; "
-                "the service read the seed's runbooks and protocols",
-    "fermos": "depositions stay in the browser; the service read the fits and forecasts it computed",
-    "biorepo": "review decisions not yet posted from a browser stay in that browser",
+    "runbooks": "the project's depositions and measurements are kept with it and shown on the Runbooks page; this "
+                "read lists its runbooks and protocols",
+    "fermos": "the project's depositions are kept with its runbooks; this read lists what the service computed: "
+              "fits, forecasts, simulations and vessel designs",
+    "biorepo": "review decisions a browser has not posted yet wait in that browser",
 }
 
 # Words that name a module itself. Common nouns ("record", "host") are left
@@ -97,10 +98,9 @@ class Row:
     # to tell from a strain's designation, so a source is named by its title.
     id_names: bool = True
     # The species the row is of, as "genus species" in lower case: a host's
-    # or a shelf model's by its label, a record's by its strain, a paper's or
-    # a record's by its program when every strain of the program is one
-    # species. A question naming the species, in full or abbreviated, names
-    # the row (OF-BLD-016 D10).
+    # or a shelf model's by its label, a record's by its strain. A question
+    # naming the species, in full or abbreviated, names the row
+    # (OF-BLD-016 D10).
     species: tuple[str, ...] = ()
     # Other ids a read by id finds the row by: a train's run artifact, and a
     # train's units by their train's scenario and run (OF-BLD-019 §4.1).
@@ -185,8 +185,12 @@ class Sources:
     strain_aliases: Callable[[], dict[str, str]]
     witness: Callable[[], list[Any]] = list
     proposals: Callable[[], list[Any]] = list
-    # The trains a model built (OF-BLD-020 §5.4, pureos.kept), every program's.
+    # The trains a model built (OF-BLD-020 §5.4, pureos.kept).
     kept_trains: Callable[[], list[Any]] = list
+    # The project's own rows (project_state.py): the BioSTEAM scenarios made
+    # with New scenario, and its runbooks, each with its lock.
+    scenarios: Callable[[], list[Any]] = list
+    runbooks: Callable[[], list[Any]] = list
 
 
 def _kept_trains() -> list[Any]:
@@ -195,11 +199,11 @@ def _kept_trains() -> list[Any]:
     return list(kept.read().trains)
 
 
-# What a module holds that is no service record of its own (runbooks and
-# protocols, hosts and pathways, scenarios, lessons). alpha 2.0 deleted the
-# TypeScript seed these were projected from (ADR-010) and no store holds them
-# yet, so every list is empty; a test hands its own in through
-# `Sources.projection`, or in place of `_projection`.
+# The catalogues a module reads that no store holds yet (protocols, hosts and
+# pathways, lessons), each list empty; a test hands its own in through
+# `Sources.projection`, or in place of `_projection`, and may hand runbooks and
+# scenarios this way beside the project's own (`Sources.runbooks`,
+# `Sources.scenarios`).
 EMPTY_PROJECTION: dict[str, Any] = {
     "runbooks": {"runbooks": [], "protocols": []},
     "geneos": {"hosts": [], "pathways": []},
@@ -211,6 +215,18 @@ EMPTY_PROJECTION: dict[str, Any] = {
 def _projection() -> dict[str, Any]:
     """The empty projection, a copy of its own for each caller."""
     return copy.deepcopy(EMPTY_PROJECTION)
+
+
+def _scenarios() -> list[Any]:
+    from . import proforma
+
+    return proforma.held_scenarios()
+
+
+def _project_runbooks() -> list[Any]:
+    from . import project_state
+
+    return project_state.kept("runbooks")
 
 
 def _strain_aliases() -> dict[str, str]:
@@ -233,15 +249,16 @@ def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
         witness=witness.runs,
         proposals=proposals.open_ones,
         kept_trains=_kept_trains,
+        scenarios=_scenarios,
+        runbooks=_project_runbooks,
     )
 
 
-def seed_sources(pool_factory: Callable[[], Any]) -> Sources:
-    """The module projection (empty since alpha 2.0 deleted the seed it was
-    exported from, unless a test hands one) and the given pool, with every
-    store this machine keeps (artifacts, the ledger, checks, fetches, the
-    shelf) empty: what a fixture sweeps, so it reads the same on every
-    machine."""
+def fixture_sources(pool_factory: Callable[[], Any]) -> Sources:
+    """The empty projection (unless a test hands one) and the given pool,
+    with every other store (artifacts, the ledger, checks, fetches, the
+    shelf, the project's runbooks and scenarios) empty: what a fixture
+    sweeps, so it reads the same on every machine."""
     from .models import Checks, Guild
 
     return Sources(projection=_projection, pool=pool_factory, artifacts=list, guild=Guild, checks=Checks,
@@ -392,16 +409,18 @@ class Stores:
 
     def _runbooks(self) -> Iterable[Row]:
         p = self._get("projection")["runbooks"]
-        for r in p["runbooks"]:
-            # Named by its title, the title's head ("Brazzein" of "Brazzein —
-            # pilot process") and the molecule it makes, so a question about a
-            # molecule finds the runbooks that touch it.
+        for r in [*self._get("runbooks"), *p["runbooks"]]:
+            # Named by its title, the title's head ("Ethanol" of "Ethanol —
+            # pilot run") and the product it makes, so a question about a
+            # product finds the runbooks that touch it. A prediction is read
+            # by its label, as the page shows it.
+            predictions = [x if isinstance(x, str) else str(x.get("label") or "") for x in r.get("predictions") or []]
             names = tuple(n for n in (r["title"].split(" — ")[0], r.get("productId")) if n)
             yield Row("runbooks", "runbook", r["id"], r["title"], runbook_state(r["status"], r.get("lockedAt")), r["status"],
                       names=names,
-                      words=" ".join([r["kind"], r.get("productId") or "", r.get("strainId") or ""] + r.get("predictions", [])),
+                      words=" ".join([r["kind"], r.get("productId") or "", r.get("strainId") or ""] + predictions),
                       detail={"kind": r["kind"], "productId": r.get("productId"), "strainId": r.get("strainId"),
-                              "lockedAt": r.get("lockedAt"), "predictions": r.get("predictions", [])})
+                              "lockedAt": r.get("lockedAt"), "predictions": predictions})
         for x in p["protocols"]:
             organisms = list(x.get("organisms", []))
             yield Row("runbooks", "protocol", x["id"], x["title"], "approved", f"version {x['currentVersion']} current",
@@ -452,7 +471,7 @@ class Stores:
             o = a.output if isinstance(a.output, dict) else {}
             family, title = str(o.get("family") or ""), str(o.get("title") or o.get("family") or "")
             strain, product, sugar = o.get("strain"), o.get("product"), o.get("sugar")
-            who = hosts.get(str(strain), str(strain)) if strain else "every strain of the program's organism"
+            who = hosts.get(str(strain), str(strain)) if strain else "every strain the evidence pool holds"
             bound: dict[str, list[str]] = {}
             for v in [*(o.get("parameters") or []), *(o.get("start") or [])]:
                 if isinstance(v, dict) and v.get("key"):
@@ -546,7 +565,7 @@ class Stores:
         the mark is the run's, worked out from its inputs as they stand."""
         from . import pureos
 
-        scenarios = self._get("projection")["proforma"]["scenarios"]
+        scenarios = self._scenario_rows()
         runs = [a for a in self._get("artifacts") if a.tool == pureos.RUN]
         for key, group in pureos._runs(runs, scenarios).items():
             a = group[0]
@@ -574,8 +593,12 @@ class Stores:
                                   "cumulative": u.cumulative, "massIn": u.massIn, "massOut": u.massOut, "note": u.note,
                                   "unitOfMass": tr.tableUnits.get("massFlow")})
 
+    def _scenario_rows(self) -> list[dict[str, Any]]:
+        """The project's scenarios, and any a test handed in the projection."""
+        return [*self._get("scenarios"), *self._get("projection")["proforma"]["scenarios"]]
+
     def _proforma(self) -> Iterable[Row]:
-        for s in self._get("projection")["proforma"]["scenarios"]:
+        for s in self._scenario_rows():
             yield Row("proforma", "scenario", s["id"], s["name"], "open", s["kind"],
                       words=" ".join([s.get("product") or "", s.get("modelId") or ""]),
                       detail={"kind": s["kind"], "product": s.get("product"), "modelId": s.get("modelId")})
@@ -765,8 +788,8 @@ def _states_in(text: str) -> set[str]:
 
 def states_asked(question: str, module: str | None = None) -> set[str]:
     """The states the question asks about. Given a module, only those asked in
-    a clause that names it: in "what is open in Dominion and which runbooks
-    touch it", open is asked of Dominion and not of the runbooks."""
+    a clause that names it: in "what is open in Proforma and which runbooks
+    touch it", open is asked of Proforma and not of the runbooks."""
     if module is None:
         return _states_in(question)
     out: set[str] = set()

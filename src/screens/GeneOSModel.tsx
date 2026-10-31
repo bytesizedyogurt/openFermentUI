@@ -4,7 +4,7 @@
 // on the shelf that names a route to the product, the most of it the network
 // can make from the sugar (flux balance analysis, kept as an artifact), and
 // the view draws each as a dotted rule beside every reported yield of that
-// product in the store: curated, verified, and the extractor's undecided
+// product in the store: gold, verified, and the extractor's undecided
 // candidates as hollow marks. A point above a rule is ringed and listed for a
 // reviewer to check its basis. Below sit the chosen model's production
 // envelope and its sugar-mix line. A model the service cannot compute is

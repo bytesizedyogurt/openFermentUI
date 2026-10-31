@@ -81,7 +81,7 @@ export interface Capabilities {
 /**
  * Steps that ask the operator to work a number out rather than read one off.
  * Matches a `{{stock:…}}` binding (an explicit stock-solution computation) or
- * the arithmetic verbs the seeded protocols use: calculat*, dilut*, inocul*,
+ * the arithmetic verbs protocols use: calculat*, dilut*, inocul*,
  * "adjust to", "make up to".
  */
 const CALC_TEXT_RE = /\{\{stock:|\b(?:calculat|dilut|inocul)|\b(?:adjust|make up) to\b/i;

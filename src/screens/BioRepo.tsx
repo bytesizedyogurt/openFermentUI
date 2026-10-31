@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import {
   AlertTriangle,
-  BookMarked,
   Download,
   Loader2,
 } from 'lucide-react';
@@ -46,7 +45,7 @@ interface LibRow {
   goldCount: number;
   verifiedCount: number;
   prov: ProvKind;
-  ingestKey: 'complete' | 'catalogued' | 'ingesting' | 'failed';
+  ingestKey: 'complete' | 'ingesting' | 'failed';
 }
 
 /** Latest ingest job that references this paper (jobs carry the id in href). */
@@ -132,17 +131,13 @@ export default function BioRepo() {
           ? 'failed'
           : paper.ingest.startsWith('stage:')
             ? 'ingesting'
-            : paper.ingest === 'catalogued'
-              ? 'catalogued'
-              : 'complete';
+            : 'complete';
         const prov: ProvKind =
           ingestKey === 'failed'
             ? 'rejected'
             : ingestKey === 'ingesting'
               ? 'assumed'
-              : ingestKey === 'catalogued' && agg.gold === 0 && agg.verified === 0
-                ? 'curated'
-                : agg.gold > 0
+              : agg.gold > 0
                 ? 'gold'
                 : agg.verified > 0
                   ? 'verified'
@@ -321,20 +316,6 @@ export default function BioRepo() {
               <Loader2 size={11} className={cx(st.pct !== null && 'animate-spin')} />
               {st.label}
               {st.pct !== null && <span className="font-num">{Math.round(st.pct * 100)}%</span>}
-            </span>
-          );
-        }
-        if (r.ingestKey === 'catalogued') {
-          // Bibliographically real, full text not parsed. Saying "in corpus"
-          // here would imply the spans anchor to the paper's own words; they
-          // anchor to the curator's notes.
-          return (
-            <span
-              className="chip text-ink-soft"
-              title="Catalogued: real citation, full text not ingested. Spans anchor to the curation note."
-            >
-              <BookMarked size={11} /> Catalogued
-              {r.goldCount > 0 && <span className="text-gold">· gold</span>}
             </span>
           );
         }

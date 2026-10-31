@@ -170,11 +170,11 @@ def test_an_assumption_needs_a_named_person_and_a_host_narrows_the_binding():
     assert proforma.bound(ETHANOL, pool=pool).hosts == ["s-cerevisiae-cenpk113-7d"]
 
 
-# ── (b) the scenarios the service holds ──────────────────────────────────
+# ── (b) the scenarios the project keeps ──────────────────────────────────
 
 
-def test_the_scenarios_endpoint_serves_the_scenarios_the_service_holds(client, monkeypatch):
-    assert client.get("/api/proforma/scenarios").json() == [], "the seed's scenarios went with the seed"
+def test_the_scenarios_endpoint_serves_the_scenarios_the_project_keeps(client, monkeypatch):
+    assert client.get("/api/proforma/scenarios").json() == [], "the test project keeps no scenario"
     monkeypatch.setattr(proforma, "held_scenarios", lambda: [{"id": HELD, "name": "A held test scenario", "kind": "biosteam",
                                                              "modelId": ETHANOL}])
     [held] = client.get("/api/proforma/scenarios").json()

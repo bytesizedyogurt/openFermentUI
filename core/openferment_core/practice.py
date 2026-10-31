@@ -18,7 +18,7 @@ draft is refused whole, never repaired, when:
   unresolved  a cited ref is one it was not given, or a [vN] marker points
               past the evidence pane
   steps       a named step does not exist, or none of them needs the skill
-  skill       the skill is not in src/data/skills.ts
+  skill       the skill is not one Guild holds
 
 Every scenario and every session is a row of the project's `practice_scenarios`
 and `practice_sessions` (ADR-001). A session holds a person's own words: the
@@ -480,7 +480,7 @@ DRAFT_SCHEMA: dict[str, Any] = {
 def _skill(skill_id: str) -> dict[str, Any]:
     known = guild.skills()
     if skill_id not in known:
-        raise PracticeRefused("skill", f"{skill_id!r} is not a skill in src/data/skills.ts")
+        raise PracticeRefused("skill", f"{skill_id!r} is not a skill Guild holds (none ship with alpha 2.0)")
     return known[skill_id]
 
 

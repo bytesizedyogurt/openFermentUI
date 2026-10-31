@@ -358,7 +358,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
 
   return (
     <div className="flex gap-4 items-start" style={{ height: 'calc(100vh - 132px)' }}>
-      {/* Conversations, newest first, kept in this browser. */}
+      {/* Conversations, newest first, kept with the project. */}
       {sessionsOpen && (
         <aside className="w-[240px] shrink-0 hidden lg:flex flex-col h-full">
           <Button
@@ -425,7 +425,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
               <Callout kind="warn" title="Postdoc needs the service">
                 <p className="text-ink">
                   Start it with <code className="font-num text-caption bg-surface-1 rounded px-1">pnpm prototype:up</code>{' '}
-                  from the repository root, then send the question again. The conversations here stay in this browser,
+                  from the repository root, then send the question again. The conversations are kept with the project,
                   and a question typed meanwhile stays in the box.
                 </p>
                 <button className="btn btn-sm mt-2" onClick={() => void probeHealth()}>

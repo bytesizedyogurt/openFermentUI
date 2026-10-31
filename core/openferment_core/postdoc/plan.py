@@ -138,9 +138,9 @@ def evidence_payload(records: list[dict[str, Any]], papers) -> list[dict[str, An
                 "paperId": r["paperId"],
                 "paperTitle": paper.get("title"),
                 "year": paper.get("year"),
-                # Whether the section text is the paper's own or a curator's
-                # note. A claim built on a curation note is not built on the
-                # source, and the model is told which it has.
+                # Whether the section text is the document's own: every
+                # document the project holds is full text (intake.py), and the
+                # model is told which it has.
                 "textSource": paper.get("textSource"),
                 "measurement": r.get("fieldLabel"),
                 "value": r.get("value"),

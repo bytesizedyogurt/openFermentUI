@@ -31,8 +31,8 @@ class DraftRunbookInput(BaseModel):
 
 def _ids() -> tuple[frozenset[str], frozenset[str]]:
     """The product and strain ids a draft may name. No store holds a product
-    or strain catalogue yet (alpha 2.0 deleted the seed's, ADR-010), so a
-    draft names none; tests supply them here."""
+    or strain catalogue yet, so a draft names none; tests supply them
+    here."""
     return frozenset(), frozenset()
 
 

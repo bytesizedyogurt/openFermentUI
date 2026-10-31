@@ -56,8 +56,8 @@ The rules, by name:
 
 Nothing is repaired on the way through. The skills, the protocol steps that
 need them and the lessons that count toward them come from `projection()`;
-the authored catalogue left with the seed (alpha 2.0, ADR-010) and no store
-holds one yet, so there are none, and the tests hand in a frozen fixture.
+no store holds a skills catalogue yet, so there are none, and the tests hand
+in a frozen fixture.
 """
 from __future__ import annotations
 
@@ -386,7 +386,7 @@ def _precheck(
     if not EVIDENCE_ID.match(entry.id):
         raise GuildRefused("duplicate", f"{entry.id!r} is not an entry id (e- and 4 to 64 letters, digits or hyphens)")
     if entry.skillId not in known:
-        raise GuildRefused("skill", f"{entry.skillId!r} is not a skill in src/data/skills.ts")
+        raise GuildRefused("skill", f"{entry.skillId!r} is not a skill Guild holds (none ship with alpha 2.0)")
 
     kind = entry.kind
     src = entry.source.kind

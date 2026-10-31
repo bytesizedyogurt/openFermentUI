@@ -459,16 +459,16 @@ export const DESCRIPTOR: Record<string, string> = Object.fromEntries(
 /**
  * Old path → new path.
  *
- * Deep-linked demo scripts, bookmarks, corpus prose, `learn.ts` content and
- * the guided tour all point at paths that have moved — some of them twice, as
+ * Bookmarks, old links and the guided tour point at paths that have moved —
+ * some of them twice, as
  * `/library/papers/H4` became `/biorepo/papers/H4` and is now
  * `/biorepo/paper/H4`. A reorganisation that 404s them punishes the people who
  * used the thing most.
  *
  * ENTRIES POINT AT THE FINAL DESTINATION, NEVER AT ANOTHER REDIRECT. Chaining
  * would work in the browser and would be invisible when one link in the chain
- * later changed. Nothing checks this at build time since the seed guard left
- * (ADR-011): keep each entry pointing at a screen.
+ * later changed. Nothing checks this at build time (ADR-011): keep each
+ * entry pointing at a screen.
  */
 export const REDIRECTS: Record<string, string> = {
   // ── OF-BLD-011: the strain catalogue moved from fermOS to geneOS ────

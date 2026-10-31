@@ -1,8 +1,7 @@
 """`search_records`: the records Postdoc may cite, found by words (OF-BLD-014 §3.4).
 
-It searches `ctx.pool`, which leaves archived programs' records and
-candidates out unless the request's switch shows them (OF-BLD-016 §2.3); the
-switch is never an input here."""
+It searches `ctx.pool`: the project's candidates as reviewers' decisions
+leave them (evidence_pool.py)."""
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -54,8 +53,9 @@ TOOL = register(
     Tool(
         name="search_records",
         description=(
-            "Search the records Postdoc may cite: curated and verified records, and the extractor's anchored "
-            "candidates nobody rejected, which are marked unverified. Returns at most ten, best match first, each "
+            "Search the records Postdoc may cite: the candidates extracted from the project's documents that nobody "
+            "rejected, gold or verified where a reviewer promoted one and unverified otherwise. Returns at most ten, "
+            "best match first, each "
             "with its record id, paper, what was measured, its value and unit as the paper wrote them, the quoted "
             "sentence, the strain, the carbon source when the paper states one, and its provenance. Filter by an "
             "ontology field id and by a strain id, or pass null for no filter. Returns none when nothing "

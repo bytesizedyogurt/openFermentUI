@@ -110,14 +110,14 @@ export default function PureOSTrain({ scenarioId }: { scenarioId: string }) {
   );
 }
 
-/** Back to the Builder for a train this browser saved; for any other run, a fresh train read from its units. */
+/** Back to the Builder for a train the project saved; for any other run, a fresh train read from its units. */
 function BuilderLink({ train }: { train: Train }) {
   const saved = useStore((s) => (train.trainId ? (s.trainsMade[train.trainId] ?? null) : null));
   if (train.tool === 'pureos.train_run') {
     if (!train.trainId || !saved)
       return (
         <span className="text-caption text-ink-soft" data-testid="train-builder-elsewhere">
-          Built in pureOS, but not saved in this browser.
+          Built in pureOS, but not saved in this project.
         </span>
       );
     return (

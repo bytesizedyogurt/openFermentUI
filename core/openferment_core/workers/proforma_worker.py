@@ -271,7 +271,7 @@ def montecarlo(name: str, specs: dict[str, dict[str, Any]], n: int, seed: int, b
 # ── the run's tables (OF-BLD-019 §2.1) ─────────────────────────────────
 
 # The units of what the tables hold are BioSTEAM's, written into every run
-# as `tableUnits` (flowsheets/shelf.py's TABLE_UNITS; demo.py's stand-in
+# as `tableUnits` (flowsheets/shelf.py's TABLE_UNITS; the tests' stand-in
 # claims the same). D8's words when the diagram cannot be drawn here:
 NO_GRAPHVIZ = ("Graphviz was not on the host that made this run, so it has no diagram; a host that has it "
                "(brew install graphviz on the Mini) draws its own run of the same inputs. The units are listed in run order.")

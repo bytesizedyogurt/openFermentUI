@@ -32,8 +32,8 @@ TEA (the toy) names no product: its train lists units and masses and no
 recovery, and says why.
 
 WHICH SCENARIO a run belongs to: a basis input named `scenario`, when the
-run carries one; else the one held scenario (the module projection's, none
-since alpha 2.0 deleted the seed's) whose `modelId` is the run's flowsheet.
+run carries one; else the one scenario the project keeps
+(`proforma.held_scenarios`) whose `modelId` is the run's flowsheet.
 A run no scenario claims is a train known by its artifact id.
 
 THE PACKAGE (OF-BLD-020 §5.1). This module was pureos.py; it became the
@@ -96,12 +96,11 @@ def _flowsheet(art: Artifact) -> str | None:
 
 
 def held_scenarios() -> list[dict[str, Any]]:
-    """The scenarios the service holds, from the module projection; none
-    since the seed went (alpha 2.0, ADR-010), and then only a run's own
-    `scenario` input names its scenario."""
-    from .. import module_stores
+    """The BioSTEAM scenarios the project keeps (`proforma.held_scenarios`);
+    a run's own `scenario` input names its scenario before any of them."""
+    from .. import proforma
 
-    return list(module_stores._projection()["proforma"]["scenarios"])
+    return proforma.held_scenarios()
 
 
 def scenario_of(art: Artifact, scenarios: Iterable[dict[str, Any]]) -> tuple[str | None, str | None]:

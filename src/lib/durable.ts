@@ -157,7 +157,7 @@ export interface DurableSnapshot {
   trainsMade?: Record<string, TrainMade>;
 }
 
-/** A train built in pureOS's Builder and saved in this browser (OF-BLD-020 §5.3). */
+/** A train built in pureOS's Builder and saved (OF-BLD-020 §5.3): one of the project's rows. */
 export interface TrainMade {
   /** The train as data, every value typed into its panels laid in as each place's params. */
   train: TrainSpec;

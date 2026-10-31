@@ -26,7 +26,7 @@ const SCALING_LABEL: Record<ScalingClass, string> = {
   per_unit_biomass: 'Scales with biomass',
 };
 
-/** Bump 1.1 → 1.2, or 1.1.1 → 1.1.2 — whatever the seeded scheme uses. */
+/** Bump 1.1 → 1.2, or 1.1.1 → 1.1.2 — whatever scheme the protocol's versions use. */
 function bumpVersion(v: string): string {
   const parts = v.split('.');
   const last = parseInt(parts[parts.length - 1] ?? '0', 10);

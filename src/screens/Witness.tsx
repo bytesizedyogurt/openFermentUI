@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import type { Candidate, ExtractionRecord, ExtractorRun, FieldId, ReviewDecision, RunOutput } from '@/data/types';
 import { fieldName } from '@/data/ontology';
-import { isNewCandidate } from '@/lib/review';
 import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
 import { convert, fmt, sameFamily, toSI } from '@/engine/units';
@@ -219,7 +218,8 @@ export default function Witness() {
   const runOutputs = useStore((s) => s.runOutputs);
   const records = useStore((s) => s.records);
   const papers = useStore((s) => s.papers);
-  // §6.2 — candidates the seed has no record for: the corpus growing, unscored.
+  // §6.2 — the project's candidates nobody has decided: unscored until a
+  // reviewer does.
   const overlayCandidates = useStore((s) => s.overlay?.candidates ?? NO_CANDIDATES);
   const overlayRecords = useStore((s) => s.overlay?.records ?? NO_DECISIONS);
   // A candidate a reviewer has decided is a record or a false positive now,
@@ -227,7 +227,7 @@ export default function Witness() {
   const unscored = useMemo(() => {
     const local = new Map(records.map((r) => [r.id, r]));
     return overlayCandidates.filter((c) => {
-      if (overlayRecords[c.id] || !isNewCandidate(c, records)) return false;
+      if (overlayRecords[c.id]) return false;
       const mine = local.get(c.id);
       return !mine || (mine.status === 'unverified' && !mine.gold);
     });
@@ -1156,7 +1156,7 @@ function ComparisonBody({
 
           {row.note && (
             <p className="text-caption text-ink-soft mt-2">
-              <span className="font-medium">Curator note:</span> {row.note}
+              <span className="font-medium">Note:</span> {row.note}
             </p>
           )}
         </div>

@@ -14,7 +14,7 @@ is a read-check-write in one transaction under the project's checks lock
 
   person     the person is not active on the ledger, or is an auditor; an
              open check on someone no longer active can only be dismissed
-  skill      a skill named is not in src/data/skills.ts, or a check names none
+  skill      a skill named is not one Guild holds, or a check names none
   authority  the one acting may not do this: proposing and dismissing take an
              assessor or the lead; scheduling and running take an assessor on
              every skill in the check, and never the person checked; asking
@@ -311,7 +311,7 @@ def request(asked: CheckRequest) -> Check:
     if person is None or person.role == "auditor":
         raise CheckRefused("person", f"{asked.personId!r} is not an active person who can hold skills")
     if not asked.skillIds or any(s not in known for s in asked.skillIds):
-        raise CheckRefused("skill", "a check names the skills it is for, from src/data/skills.ts")
+        raise CheckRefused("skill", "a check names the skills it is for, from the skills Guild holds")
     if asked.by != asked.personId and not any(_assessor(ledger, asked.by, s) for s in asked.skillIds):
         raise CheckRefused("authority", "a check is asked for by the person, or by an assessor on one of its skills")
     return db.run(_request(projects.current(), ledger, asked))

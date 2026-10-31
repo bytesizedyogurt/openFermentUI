@@ -28,6 +28,12 @@ CANDIDATE = Candidate(id="cl1-T7-0a1b2c3d", paperId="T7", sectionId="s1", quote=
                       field="titer_secreted", value=3, unit="mg L-1", si=Quantity(value=0.003, unit="g L-1"))
 DECISION = ReviewDecision(status="rejected", provenance="unverified", reviewer="Ada Moreno", recordId=CANDIDATE.id,
                           at="2026-10-20T00:00:00Z", rejectReason="a placeholder row")
+# Alpha 1.0's browser sent a decision's provenance as a label; a promotion of a
+# curated record arrived labelled `curated`.
+PROMOTED = Candidate(id="cl1-T7-4e5f6a7b", paperId="T7", sectionId="s1", quote="Placeholder C | 5 | mg L-1",
+                     field="titer_secreted", value=5, unit="mg L-1", si=Quantity(value=0.005, unit="g L-1"))
+LABELLED = ReviewDecision(status="verified", provenance="curated", reviewer="Ada Moreno", recordId=PROMOTED.id,
+                          at="2026-10-21T00:00:00Z")
 LEAD = GuildPerson(id="p-ada", name="Ada Moreno", role="lead", joinedAt="2026-10-01", addedAt="2026-10-01T00:00:00Z")
 ENTRY = GuildEvidence(id="e-0001", personId="p-ada", skillId="SK-OD", kind="independent", at="2026-10-02",
                       source=EvidenceSource(kind="lead", ref="a placeholder training record"), raw="a placeholder entry", observerId=None)
@@ -41,7 +47,8 @@ LINES = [AuditEntry(at="2026-10-03T00:00:00Z", agent="model", who=llm.DEFAULT_PR
 def alpha1(tmp_path):
     data = tmp_path / "data"
     (data / "candidates" / "hand").mkdir(parents=True)
-    (data / "biorepo.json").write_text(BioRepo(decisions={CANDIDATE.id: DECISION}, records=[CANDIDATE]).model_dump_json())
+    (data / "biorepo.json").write_text(BioRepo(decisions={CANDIDATE.id: DECISION, PROMOTED.id: LABELLED},
+                                               records=[CANDIDATE, PROMOTED]).model_dump_json())
     (data / "guild.json").write_text(Guild(people=[LEAD], evidence=[ENTRY]).model_dump_json())
     (data / "proposals.json").write_text(Proposals(proposals=[PROPOSAL]).model_dump_json())
     (data / "audit.jsonl").write_text("".join(line.model_dump_json() + "\n" for line in LINES))
@@ -53,11 +60,14 @@ def alpha1(tmp_path):
 def test_every_store_lands_in_the_new_project_and_reads_back_through_it(alpha1):
     before = sorted(p.name for p in alpha1.rglob("*"))
     pid, counts = import_alpha1.carry(alpha1, "Alpha 1.0 records", "Ada Moreno")
-    assert counts["decisions"] == 1 and counts["people"] == 1 and counts["entries"] == 1
+    assert counts["decisions"] == 2 and counts["people"] == 1 and counts["entries"] == 1
     assert counts["proposals"] == 1 and counts["audit rows"] == 1 and counts["extractions"] == 1
     with projects.using(pid):
         repo = biorepo.read()
-        assert repo.decisions == {CANDIDATE.id: DECISION} and repo.records == [CANDIDATE]
+        # The label goes; the class is the one the decision's kind gives (ADR-006).
+        promoted = LABELLED.model_copy(update={"provenance": "verified"})
+        assert repo.decisions == {CANDIDATE.id: DECISION, PROMOTED.id: promoted}
+        assert sorted(c.id for c in repo.records) == sorted([CANDIDATE.id, PROMOTED.id])
         ledger = guild.read()
         assert ledger.people == [LEAD] and [e.id for e in ledger.evidence] == ["e-0001"]
         assert proposals.read().proposals == [PROPOSAL]
@@ -116,7 +126,7 @@ def test_the_command_reports_what_it_carried_and_refuses_in_words(alpha1, capsys
     monkeypatch.setattr(import_alpha1, "load_dotenv", lambda *a, **k: None)
     assert import_alpha1.main(["--name", "Carried", "--by", "Ada Moreno", "--data", str(alpha1)]) == 0
     out = capsys.readouterr().out
-    assert "carried" in out and "1  decisions" in out and "left as they were" in out
+    assert "carried" in out and "2  decisions" in out and "left as they were" in out
     assert import_alpha1.main(["--name", "Again", "--by", "Ada Moreno", "--data", str(alpha1 / "nowhere")]) == 2
     assert "is not a directory" in capsys.readouterr().err
     assert json.loads((alpha1 / "proposals.json").read_text())["proposals"][0]["id"] == "pr-1"

@@ -229,7 +229,7 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
         <PageHeader
           eyebrow="Assay"
           title="Deposition not found"
-          subtitle="Depositions are durable, so this id was either never created in this browser or the durable store was reset."
+          subtitle="This project holds no deposition with this id."
         />
         <Card>
           <EmptyState

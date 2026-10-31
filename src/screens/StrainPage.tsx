@@ -429,7 +429,7 @@ function FieldRow({
       className="py-3 border-b border-line last:border-b-0"
       title={
         prov === 'gold'
-          ? 'At least one record for this field is in the curated gold set'
+          ? 'At least one record for this field is in the gold set'
           : prov === 'verified'
             ? 'At least one record for this field has been verified by a reviewer'
             : 'No record for this field has been reviewed yet'
@@ -451,7 +451,7 @@ function FieldRow({
               <span className="font-num text-ink">{g.verified}</span>
             </span>
             {g.gold > 0 && (
-              <span className="inline-flex items-center gap-1" title="In the curated gold set">
+              <span className="inline-flex items-center gap-1" title="In the gold set">
                 <ProvDot p="gold" />
                 <span className="font-num text-ink">{g.gold}</span>
               </span>
@@ -970,7 +970,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         <PageHeader
           eyebrow="geneOS · Hosts"
           title="Strain not found"
-          subtitle="Session state resets on refresh, so a deep link from an earlier session can point at nothing."
+          subtitle="No strain catalogue holds a strain with this id."
         />
         <Card>
           <EmptyState
@@ -1084,9 +1084,9 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       </div>
 
       <Card className="p-4 mb-5">
-        <Tick p="gold" title="Curator-authored description — hand-written, not extracted">
+        <Tick p="curated" title="Description — written by hand, not extracted">
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
-            Curator description
+            Description
           </div>
           <p className="font-serif text-reading">{strain.description}</p>
         </Tick>
@@ -1135,7 +1135,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             <EmptyState
               icon={<FlaskConical size={22} />}
               title="No extraction records for this strain"
-              body={`Nothing in this session's corpus is attributed to ${strain.designation}, either by a per-record organism tag or by a paper's organism list. The extraction table is the place to check what the corpus does cover.`}
+              body={`Nothing in this project is attributed to ${strain.designation}, either by a per-record organism tag or by a paper's organism list. The extraction table is the place to check what the corpus does cover.`}
               action={
                 <div className="flex gap-2">
                   <LinkButton to="/intake">Open Intake</LinkButton>
@@ -1549,13 +1549,13 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         )}
       </section>
 
-      {/* ── BAND 4 — curator notes ─────────────────────────────────────── */}
+      {/* ── BAND 4 — notes ─────────────────────────────────────────────── */}
       <section className="mb-4" aria-labelledby="band-notes">
         <SectionTitle>
-          <span id="band-notes">Curator notes</span>
+          <span id="band-notes">Notes</span>
         </SectionTitle>
         <p className="text-caption text-ink-soft mb-2 max-w-3xl">
-          Free text written by the corpus curator. Not extracted, not scored — hand-authored bench
+          Free text written by hand. Not extracted, not scored — hand-authored bench
           judgement, carried with the gold tick because a person put their name on it.
         </p>
         <Card className="p-4">
@@ -1571,7 +1571,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                 .sort((a, b) => b.at.localeCompare(a.at))
                 .map((n) => (
                   <li key={`${n.at}-${n.who}`}>
-                    <Tick p="gold" title="Curator-authored note">
+                    <Tick p="curated" title="A note written by hand">
                       <div className="text-caption text-ink-soft">
                         <span className="font-num">{n.at}</span> · {n.who}
                       </div>
@@ -1589,10 +1589,10 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           Every number above is a summary of{' '}
           <span className="font-num">{points.length}</span> extraction record
           {points.length === 1 ? '' : 's'} drawn from{' '}
-          <span className="font-num">{strainPapers.length}</span> catalogued paper
-          {strainPapers.length === 1 ? '' : 's'} — real, citable sources, but most records are
-          transcribed from the curation document and not yet checked against the source PDF. Medians
-          over a handful of records are descriptions of this corpus, not of the published literature.{' '}
+          <span className="font-num">{strainPapers.length}</span> paper
+          {strainPapers.length === 1 ? '' : 's'} the project holds — real, citable sources, and each
+          record is a candidate the extractor read from one of them until a reviewer decides it. Medians
+          over a handful of records describe this project&rsquo;s records, not the published literature.{' '}
           <a className="text-accent hover:underline" href={href('/intake')}>
             Open the full extraction table
           </a>{' '}

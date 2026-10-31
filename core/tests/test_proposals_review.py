@@ -25,7 +25,7 @@ from test_writes import ctx, store, write  # noqa: F401  (every store under tmp_
 
 
 def _home_rows(pool_):  # noqa: F811
-    seen = module_stores.Stores(module_stores.Sources(**{**vars(module_stores.seed_sources(lambda: pool_)),
+    seen = module_stores.Stores(module_stores.Sources(**{**vars(module_stores.fixture_sources(lambda: pool_)),
                                                          "proposals": proposals.open_ones}))
     return module_stores.find(seen, "home", kind="proposal")
 
@@ -116,7 +116,7 @@ def test_home_read_names_nobody_on_a_guild_proposal(pool, store):  # noqa: F811
     said = " ".join([row.label, row.words, *(str(v) for v in row.detail.values())]).lower()
     assert "alex" not in said and "lapsed" not in said
     # A word from a guild note never finds the row either.
-    assert module_stores.find(module_stores.Stores(module_stores.Sources(**{**vars(module_stores.seed_sources(lambda: pool)),
+    assert module_stores.find(module_stores.Stores(module_stores.Sources(**{**vars(module_stores.fixture_sources(lambda: pool)),
                                                                             "proposals": proposals.open_ones})),
                               "home", words="lapsed") == []
 
@@ -145,7 +145,7 @@ def test_a_restart_does_not_propose_twice(pool, store, monkeypatch):  # noqa: F8
     w1 = ("runbooks_write", {"action": "lock", "target": "rb-1", "fields": {}, "note": "lock it before the run"})
     w2 = ("runbooks_write", {"action": "lock", "target": "rb-1", "fields": {}, "note": "predictions should be frozen"})
     c = tools.ToolContext(pool_factory=lambda: pool,
-                          stores_factory=lambda: module_stores.Stores(module_stores.seed_sources(lambda: pool)))
+                          stores_factory=lambda: module_stores.Stores(module_stores.fixture_sources(lambda: pool)))
     postdoc_agent.ask("Lock rb-1", converse=Script([w1], llm.ModelUnavailable("overloaded"), [w2], plan()), ctx=c)
     assert [(p.action, p.target) for p in proposals.open_ones()] == [("lock", "rb-1")]
 

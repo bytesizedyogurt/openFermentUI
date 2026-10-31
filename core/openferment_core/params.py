@@ -54,8 +54,8 @@ This module registers the `proforma` provider; vessel.py registers
 (`PROVIDER_MODULES`). The vessel scope's values are BioSTEAM's own defaults,
 read in the Proforma worker, so a read of it starts the worker when it is
 cold (and keeps its answer for the process's life). Its scope is
-`proforma:<scenario id>`: a held BioSTEAM scenario, whose flowsheet
-`proforma.held_scenarios` names, or a scenario made in a browser, which names
+`proforma:<scenario id>`: a BioSTEAM scenario the project keeps, whose
+flowsheet `proforma.held_scenarios` names, or one not yet saved, which names
 its shelf flowsheet in the request. Its specs are the flowsheet's
 `FlowsheetInput`s; its values are what `proforma.bound` binds (records
 through the aggregate gate, the fermOS fits a person chose), called, never
@@ -623,10 +623,10 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
     from .flowsheets import shelf
 
     (scenario_id,) = ids
-    seeds = {s["id"]: s for s in proforma.held_scenarios()}
-    if scenario_id not in seeds and not req.flowsheet:
-        raise ScopeUnknown(f"there is no scenario {scenario_id}: the scenarios the service holds are "
-                           f"{', '.join(seeds) or 'none'}, and a scenario made in a browser names the shelf flowsheet "
+    held = {s["id"]: s for s in proforma.held_scenarios()}
+    if scenario_id not in held and not req.flowsheet:
+        raise ScopeUnknown(f"there is no scenario {scenario_id}: the scenarios this project keeps are "
+                           f"{', '.join(held) or 'none'}, and a scenario not yet saved names the shelf flowsheet "
                            "it runs (?flowsheet=)")
     from . import composite
 
@@ -651,7 +651,7 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
             read = proforma.READ_WORDS[(True, False)]
         proforma._check_keys(info, typed)
         pool = evidence_pool.load()
-        bound = proforma.bound(flowsheet, scenario_id=scenario_id, name=seeds.get(scenario_id, {}).get("name") or "",
+        bound = proforma.bound(flowsheet, scenario_id=scenario_id, name=held.get(scenario_id, {}).get("name") or "",
                                host=req.host, assumptions=typed, pool=pool, fits=req.fits, vessel=req.vessel,
                                train_run=req.trainRun)
     except proforma.ScenarioRefused as e:
@@ -666,7 +666,7 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
     if finance:
         fin = resolve(finance, composite.finance_sources(), [o for k, o in given.items() if k in mine])
         added += composite.finance_basis([v for v in fin if v.overriddenBy])
-    name = seeds.get(scenario_id, {}).get("name")
+    name = held.get(scenario_id, {}).get("name")
     title = f"{name} ({info.title})" if name else info.title
     notes = [
         f"Bound as a run of {flowsheet} binds it: each process input to the records of its fields in the evidence "

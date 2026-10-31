@@ -358,8 +358,8 @@ def _assume(inp, a) -> None:
 # ── A person's overrides (OF-BLD-020 §2.2, D3) ─────────────────────────
 #
 # The parameter panel keeps a person's change to a scenario's input as an
-# Override of scope `proforma:<scenario id>`, in the browser that typed it,
-# and a run, a binding or a ceiling check carries it. Each is laid on as the
+# Override of scope `proforma:<scenario id>`, one of the project's rows, and
+# a run, a binding or a ceiling check carries it. Each is laid on as the
 # named assumption it is: it wins over the records and over a fermOS fit
 # for its input, the input says how many records it stands in place of, and
 # the basis names the person (basis.assumption_source), so the run is
@@ -829,8 +829,9 @@ def run(req, pool=None):
     from . import artifacts, evidence_pool
     from .models import ProformaGrid, ProformaRunResult
 
-    # OF-BLD-019 §2.3 (d): a seed scenario by its id, or a scenario a person
-    # made here by the shelf flowsheet it names; anything else is refused.
+    # OF-BLD-019 §2.3 (d): a scenario the project keeps by its id, or one a
+    # page has not yet saved by the shelf flowsheet it names; anything else is
+    # refused.
     flowsheet = flowsheet_of(req.scenarioId, req.flowsheet)
     info = _shelf.info(flowsheet)
     _check_samples(req.samples)
@@ -960,16 +961,16 @@ def evidence_of(art):
 def latest_run(scenario_id: str):
     """The most recent stored run of a scenario, or None: a run whose basis
     names the scenario, or one stored before a basis named its scenario
-    whose flowsheet is the seed scenario's (OF-BLD-019 §2.3)."""
+    whose flowsheet is the kept scenario's (OF-BLD-019 §2.3)."""
     from . import artifacts
 
-    seeded = {s["id"]: s.get("modelId") for s in held_scenarios()}.get(scenario_id)
+    own = {s["id"]: s.get("modelId") for s in held_scenarios()}.get(scenario_id)
 
     def belongs(a) -> bool:
         named = _named(a.inputs, "scenario")
         if named:
             return named == scenario_id
-        return seeded is not None and str(_named(a.inputs, "flowsheet") or "") == seeded
+        return own is not None and str(_named(a.inputs, "flowsheet") or "") == own
 
     runs = [a for a in artifacts.all_artifacts() if a.tool == RUN and belongs(a)]
     return max(runs, key=lambda a: a.createdAt) if runs else None
@@ -979,9 +980,9 @@ def latest_run(scenario_id: str):
 #
 # The flowsheet of our own binds by the shelf alone: each process input to
 # the records of the fields its shelf entry names, in the evidence pool,
-# through the aggregate gate and units.py. A scenario the service holds by
-# its id names the shelf flowsheet it runs; a scenario a person makes in the
-# browser (D6) names one too, and binds and runs the same way. Rule 1: no
+# through the aggregate gate and units.py. A scenario the project keeps
+# names the shelf flowsheet it runs; one not yet saved (D6) names one in the
+# request, and binds and runs the same way. Rule 1: no
 # value here; the stand-ins live in the tests.
 
 ETHANOL = "ethanol_glucose_v0"
@@ -995,15 +996,14 @@ PRODUCTS = {ETHANOL: "ethanol", _shelf.COMPOSITE: "ethanol"}
 
 
 def held_scenarios() -> list[dict]:
-    """The BioSTEAM scenarios the service holds by their ids, each naming the
-    non-reference shelf flowsheet it runs (its `modelId`), read from the
-    module projection. The seed's went with the seed (alpha 2.0, ADR-010),
-    so there are none until stage 2's store holds scenarios."""
-    from . import module_stores
+    """The BioSTEAM scenarios the project keeps (New scenario; the project's
+    rows, project_state.py), each naming the non-reference shelf flowsheet it
+    runs (its `modelId`)."""
+    from . import project_state
 
-    rows = list(module_stores._projection()["proforma"]["scenarios"])
-    return [r for r in rows if r.get("kind") == "biosteam" and r.get("modelId") in _shelf.SHELF
-            and not _shelf.SHELF[r["modelId"]].reference]
+    return [r for r in project_state.kept("scenarios") if r.get("kind") == "biosteam"
+            and r.get("modelId") in _shelf.SHELF and not _shelf.SHELF[r["modelId"]].reference]
+
 
 
 def runnable(flowsheet: str):
@@ -1021,20 +1021,20 @@ def runnable(flowsheet: str):
 
 
 def flowsheet_of(scenario_id: str, flowsheet: str | None = None) -> str:
-    """The flowsheet a run runs: a held scenario's own, by its id; else, for
-    a scenario a person made here, the non-reference shelf flowsheet it
+    """The flowsheet a run runs: a kept scenario's own, by its id; else, for
+    a scenario a page has not yet saved, the non-reference shelf flowsheet it
     names. Any other case is refused, in words."""
     if not (scenario_id or "").strip():
         raise ScenarioRefused("a run names the scenario it belongs to")
-    seeds = {s["id"]: s for s in held_scenarios()}
-    if scenario_id in seeds:
-        own = seeds[scenario_id]["modelId"]
+    held = {s["id"]: s for s in held_scenarios()}
+    if scenario_id in held:
+        own = held[scenario_id]["modelId"]
         if flowsheet and flowsheet != own:
             raise ScenarioRefused(f"{scenario_id} runs {own}, not {flowsheet}")
         return own
     if not flowsheet:
-        raise ScenarioRefused(f"there is no held scenario {scenario_id}; the BioSTEAM scenarios held here are "
-                              f"{', '.join(seeds) or 'none'}, and a scenario made here names the flowsheet it runs")
+        raise ScenarioRefused(f"there is no held scenario {scenario_id}; the BioSTEAM scenarios this project keeps are "
+                              f"{', '.join(held) or 'none'}, and a scenario not yet saved names the flowsheet it runs")
     return runnable(flowsheet).id
 
 
@@ -1149,7 +1149,7 @@ def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | 
           assumptions: list | None = None, pool=None, fits: dict[str, str] | None = None,
           vessel: str | None = None, train_run: str | None = None):
     """A flowsheet's inputs bound, in the shape GET /api/proforma/scenarios
-    serves: a seed scenario's with its id and name, a flowsheet's alone with
+    serves: a kept scenario's with its id and name, a flowsheet's alone with
     both empty (§2.3, c); with the fermOS fits a person chose laid on
     (OF-BLD-019 §5.1), and a person's named values over both (OF-BLD-020
     D3: an input a value overrides takes no fit). A composite (OF-BLD-020
@@ -1177,8 +1177,8 @@ def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | 
 
 
 def scenarios(host: str | None = None, pool=None) -> list:
-    """GET /api/proforma/scenarios (§2.3, b): one bound scenario per seed
-    scenario of kind biosteam."""
+    """GET /api/proforma/scenarios (§2.3, b): one bound scenario per
+    BioSTEAM scenario the project keeps."""
     from . import evidence_pool
 
     out = []
@@ -1649,9 +1649,9 @@ def host_models(product: str, strain: str) -> list[tuple[Any, str, str]]:
 
 def _strain_labels() -> tuple[dict[str, str], dict[str, str]]:
     """Each catalogued strain's label ('Saccharomyces cerevisiae S288C') and
-    each program's one species, when every host it catalogues is of that
-    species, from the projection export:corpus writes (module_stores reads
-    the same). Both empty with no projection here."""
+    each chemical set's one species, from the module projection
+    (module_stores reads the same): empty in alpha 2.0, unless a test hands
+    one in."""
     from . import module_stores
 
     hosts = module_stores._projection()["geneos"]["hosts"]

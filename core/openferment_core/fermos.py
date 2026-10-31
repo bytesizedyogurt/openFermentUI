@@ -2,11 +2,11 @@
 from its sources (OF-BLD-020 §3.1).
 
 THE RULE, AS OF-BLD-020 D1 AMENDS IT. A *fit* takes only a deposition's
-measured series: the browser sends a deposition's own readings, the way
+measured series: the page sends a deposition's own readings, the way
 Practice sends runs, and the service fits them and keeps the fit as an
-artifact. Depositions live in the browser's Durable tier, which the service
-cannot see, so it takes the readings as sent and says so in each fit's basis
-(§7.R). A *simulation* (kinetics.py's model families) may take its
+artifact. The project keeps its depositions as rows (project_state.py); a
+fit takes the readings the page sends, and each fit's basis says so (§7.R;
+its note is hashed into the fit's id, and keeps its alpha 1.0 words). A *simulation* (kinetics.py's model families) may take its
 parameters from records through the aggregate gate, a fit or forecast, a
 kept simulation, a named person's assumption or a stated convention, each
 named in its basis, and its provenance is basis_provenance over them

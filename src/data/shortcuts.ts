@@ -12,7 +12,7 @@ export const SHORTCUTS: { context: string; keys: { key: string; does: string }[]
     keys: [
       { key: '⌘K', does: 'Command palette' },
       { key: '/', does: 'Focus search' },
-      { key: 'g then h/i/b/o/e/f/u/c/r/d/n/g', does: 'Go to one of the twelve' },
+      { key: 'g then h/i/b/o/e/f/u/c/r/n/g', does: 'Go to Home or one of the ten destinations' },
       { key: '⇧D', does: 'Toggle density' },
       { key: '⇧T', does: 'Toggle theme' },
       { key: '?', does: 'This shortcut sheet' },

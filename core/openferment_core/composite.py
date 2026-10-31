@@ -2,8 +2,8 @@
 Proforma prices (OF-BLD-020 §6.1, D11, D3, E.2‴, E.3‴; Appendix 2 §D).
 
 `custom_train_v1` (flowsheets/shelf.py, flowsheets/custom_train_v1.py) is
-built from two kept artifacts a scenario names, as the scenario made in the
-browser keeps them and every request carries them (`vessel`, `trainRun`):
+built from two kept artifacts a scenario names, as the project's scenario
+row keeps them and every request carries them (`vessel`, `trainRun`):
 
     the vessel design   a `fermos.vessel` artifact: its fermenter is rebuilt
                         in the Proforma worker as the same BioSTEAM class,

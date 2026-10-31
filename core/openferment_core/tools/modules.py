@@ -1,8 +1,8 @@
 """One read tool per module (OF-BLD-015 §7.2).
 
 `runbooks_read`, `geneos_read`, `fermos_read`, `pureos_read`, `proforma_read`,
-`biorepo_read`, `guild_read`, `primer_read`, `intake_read` and `home_read`
-(Dominion's pair left with Dominion, alpha 2.0 ADR-010). The build document
+`biorepo_read`, `guild_read`, `primer_read`, `intake_read` and `home_read`,
+one per module of `module_stores.MODULES`. The build document
 wrote them `runbooks.read`; the Messages
 API refuses a tool name outside `^[a-zA-Z0-9_-]{1,128}$` (measured on
 2026-10-19 with the free token-count endpoint), so the registry, the
@@ -15,8 +15,8 @@ where a row stands, the one `state` computed from it in `module_stores.py`,
 and the row's provenance mark. The rows go back on `ToolResult.rows`, which
 is what lets a claim cite them (`SeenSet`).
 
-A module part of which lives only in a browser says so in `partial`, and the
-tool reads what the service has. Nothing here writes.
+A read that leaves part of a module out says so in `partial`. Nothing here
+writes.
 """
 from __future__ import annotations
 

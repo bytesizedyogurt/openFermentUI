@@ -12,7 +12,7 @@
         else: the turn is the answer
     plan = validate_plan(answer, seen, pool)
 
-THE COVERAGE PASS. Before round one, code sweeps all eleven module stores for
+THE COVERAGE PASS. Before round one, code sweeps all ten module stores for
 what the question names and puts the map in round one, after the question;
 the trace shows it as its first step and the plan carries it for the footer.
 A follow-up is swept with the earlier questions it reads (`_swept`), never

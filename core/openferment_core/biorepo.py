@@ -22,7 +22,7 @@ that stand.
              anchoring; or a gold decision has no quote that anchors at all,
              its own or the record's, because gold means "this sentence in
              this paper says this number" and a gold record without a
-             sentence is a curated record wearing a badge
+             sentence is a typed value wearing a badge
   paper      the record's paper is not a document the project holds — a
              decision stands on a text a reader can look up (§7.4)
   unit       a typed value — corrected or gold — is not a number, or its unit
@@ -63,8 +63,8 @@ log = logging.getLogger("openferment.biorepo")
 RULES = ("record", "reviewer", "fulltext", "quote", "paper", "unit", "status", "estimate")
 
 # Names that are not a person (OF-BLD-012.1 F2). The README says a verified
-# record is one a NAMED reviewer promoted; a file signed 'you' is signed by
-# nobody, and this file is the record of who decided what. Closed list,
+# record is one a NAMED reviewer promoted; a decision signed 'you' is signed
+# by nobody, and the decisions table is the record of who decided what. Closed list,
 # matched case-insensitively after trimming; adding to it is a commit with a
 # test.
 PLACEHOLDER_REVIEWERS = frozenset({"you", "me", "reviewer", "user", "test"})
@@ -325,7 +325,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
                     "unit": value_unit.unit,
                     "quote": quote,
                     "method": rec.method,
-                    # What the curators recorded about the value (F1.3). A
+                    # What the record carries about the value (F1.3). A
                     # gold decision on a record whose source states a range
                     # anchors on that range, with no reviewer edit; one on a
                     # recorded absence reads its zero out of the sentence.

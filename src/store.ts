@@ -11,7 +11,6 @@ import type {
   InputAssumption,
   Override,
   RunbookDraft,
-  AuditEvent,
   ReviewDecision,
   ActivityEvent,
   LiveConversation,
@@ -73,7 +72,7 @@ import {
   type TrainMade,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
-import { blocks, carryOverSpan, isNewCandidate, spanChangesNumber, writeRefusal, type ReviewAction } from '@/lib/review';
+import { blocks, writeRefusal, type ReviewAction } from '@/lib/review';
 import { call } from '@/lib/http';
 import { openProjectId, projectSettled, setOpenProjectId } from '@/lib/project';
 import {
@@ -165,13 +164,12 @@ function decisionOf(
 }
 
 /**
- * The span a promotion re-anchored a curated record to (§7.3), when it did:
- * the record's quote and section differ from the seed's. Null for a record on
- * its own quote, and for a candidate, whose quote anchored when it was
- * extracted and is never carried. What the Durable tier persists and what a
- * synced decision posts, so a carry-over made offline survives a reload and
- * reaches the service with the sentence it stands on — a decision posted
- * without it would be anchored on the seed quote, which is not in the paper.
+ * The span a decision re-anchored the record to (§7.3), when one did: the
+ * record's quote and section differ from the `original` stamped as it entered
+ * the store. Null for a record on its own quote, which is every candidate
+ * nobody re-anchored. What the Durable tier persists and what a synced
+ * decision posts, so the decision reaches the service with the sentence it
+ * stands on.
  */
 function reanchoredSpan(r: ExtractionRecord): { quote: string; sectionId: string } | null {
   const was = r.original;
@@ -180,12 +178,10 @@ function reanchoredSpan(r: ExtractionRecord): { quote: string; sectionId: string
 }
 
 /**
- * What a record was published as, stamped once as it ENTERS the store
- * (OF-BLD-012.1 F7) and never touched by a decision. Answering "has this been
- * re-anchored?" by diffing against the seed module was right until a corpus
- * update moved the seed underneath a decided record: the record then looked
- * re-anchored and the sync posted the seed's new sentence as though a
- * reviewer had chosen it.
+ * What a record was extracted as, stamped once as it ENTERS the store
+ * (OF-BLD-012.1 F7) and never touched by a decision, so "has this been
+ * re-anchored?" and "what did the paper say before the correction?" are read
+ * from the record itself.
  */
 function stampOriginal(r: ExtractionRecord): ExtractionRecord {
   return r.original
@@ -271,7 +267,7 @@ function sameDecision(a: ExtractionRecord, b: ExtractionRecord): boolean {
 }
 
 export interface OFState {
-  // ── seeded data (session-mutable) ────────────────────────────────────
+  // ── the project's data, from the service (session-mutable) ───────────
   papers: Paper[];
   records: ExtractionRecord[];
   runOutputs: RunOutput[];
@@ -323,9 +319,9 @@ export interface OFState {
   /** Runbooks adopted from a Postdoc draft, by id (OF-BLD-014 §9.2). Durable. */
   adoptedRunbookIds: string[];
   /**
-   * Proforma scenarios a person made here from a shelf flowsheet, by id
-   * (OF-BLD-019 §3.1, D6). Durable: they live in `scenarios` beside the
-   * seeded ones and are saved whole, keyed by id.
+   * Proforma scenarios a person made from a shelf flowsheet, by id
+   * (OF-BLD-019 §3.1, D6): every scenario the project keeps. They live in
+   * `scenarios` and are saved whole as the project's rows, keyed by id.
    */
   createdScenarioIds: string[];
   /** A research runbook, unlocked, from a draft; returns its id. */
@@ -346,8 +342,8 @@ export interface OFState {
   clearProformaAssumption: (scenarioId: string, key: string) => void;
   /**
    * Every change a person made in the parameter panel, by scope
-   * (OF-BLD-020 D3): a named assumption this browser keeps and a run
-   * carries. Durable; the service keeps none. Read one scope with
+   * (OF-BLD-020 D3): a named assumption the project keeps and a run
+   * carries. Read one scope with
    * `useStore(overridesFor(scope))`.
    */
   parameterOverrides: Record<string, Override[]>;
@@ -550,7 +546,7 @@ export interface OFState {
   ) => void;
 
   // durable tier (OF-BLD-006 §4.6)
-  /** Re-apply a persisted snapshot over the seeded state. Idempotent. */
+  /** Re-apply a persisted snapshot over the state in memory. Idempotent. */
   hydrateDurable: () => Promise<void>;
   applyDurable: (snap: DurableSnapshot) => void;
   /** Whether this browser can persist at all — surfaced honestly in Settings. */
@@ -615,7 +611,7 @@ export interface OFState {
   serviceUp: boolean | null;
   /** The overlay as last received, merged. Later views (runs, candidates) read it here. */
   overlay: Overlay | null;
-  /** Apply an overlay over the seed. Idempotent; merges into any overlay already applied. */
+  /** Apply an overlay. Idempotent; merges into any overlay already applied. */
   applyOverlay: (overlay: Overlay) => void;
   /** Ask the service for its overlay and apply it. Silent when there is no service. */
   hydrateOverlay: () => Promise<void>;
@@ -768,7 +764,7 @@ function freezeLocked(runbooks: Runbook[]): Runbook[] {
 
 // alpha 2.0 ships no seeded science (ADR-010): every list starts empty and is
 // filled from the service, a project's records from stage 2 on.
-const seedState = () => ({
+const initialState = () => ({
   papers: [] as Paper[],
   records: [] as ExtractionRecord[],
   runOutputs: [],
@@ -856,7 +852,7 @@ function paperOf(id: string, o: OverlayPaper): Paper {
 }
 
 export const useStore = create<OFState>()((set, get) => ({
-  ...seedState(),
+  ...initialState(),
   toasts: [],
   durableReady: false,
   durableReview: null as { savedAt: string; decisions: Record<string, DurableReviewDecision> } | null,
@@ -1013,7 +1009,7 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  // Outside seedState: a reset discards the session's work, not what the
+  // Outside initialState: a reset discards the session's work, not what the
   // person chose to see.
 
   guild: EMPTY_GUILD,
@@ -1067,50 +1063,14 @@ export const useStore = create<OFState>()((set, get) => ({
     if (!before) return;
     // OF-BLD-012 §7.3 — what the service would say, said here first.
     const paper = s.papers.find((p) => p.id === before.paperId);
-    const candidates = s.overlay?.candidates ?? [];
-    // A refusal that blocks (no full text, no anchoring sentence) stops here.
-    // The one that does not — the paper has no identifier — lets the review
-    // go on in this browser and keeps the decision from the service.
-    const refusal =
-      action === 'skip' ? null : writeRefusal(action, before, paper, candidates, s.serviceUp, reviewerName());
+    // A refusal that blocks (no name, no text) stops here. The one that does
+    // not — the project does not hold the paper — lets the review go on in
+    // this browser and keeps the decision from the service.
+    const refusal = action === 'skip' ? null : writeRefusal(action, before, paper, s.serviceUp, reviewerName());
     if (blocks(refusal)) {
       get().toast({ text: refusal!.why, kind: 'error' });
       return;
     }
-    // A promotion on a curated record whose quote is not in the fetched text
-    // carries the extractor's agreeing span — and the paper's own number, as
-    // the correction — so the promoted record anchors in the paper's words
-    // and the service finds that number inside them (§2.4 rule 3).
-    const span = action === 'accept' || action === 'gold' ? carryOverSpan(before, paper, candidates) : null;
-    const reanchor = (r: ExtractionRecord, audit: AuditEvent[]): ExtractionRecord => {
-      if (!span) return r;
-      audit.push({
-        at: stamp(),
-        who: decidedBy(),
-        action: `span re-anchored to the extractor's quote (${span.candidateId})`,
-        from: r.quote,
-        to: span.quote,
-      });
-      if (!spanChangesNumber(r, span)) return { ...r, quote: span.quote, sectionId: span.sectionId };
-      audit.push({
-        at: stamp(),
-        who: decidedBy(),
-        action: 'value taken as the paper writes it',
-        from: `${r.value} ${r.unit}`,
-        to: `${span.value} ${span.unit}`,
-      });
-      // spanChangesNumber holds only for two numbers.
-      const corrected = { value: span.value as number, unit: span.unit };
-      return {
-        ...r,
-        quote: span.quote,
-        sectionId: span.sectionId,
-        corrected,
-        value: corrected.value,
-        unit: corrected.unit,
-        si: toSI(corrected.value, corrected.unit),
-      };
-    };
     const frame: UndoFrame = {
       records: structuredClone(s.records),
       recordIds: [id],
@@ -1124,7 +1084,7 @@ export const useStore = create<OFState>()((set, get) => ({
       if (action === 'accept') {
         audit.push({ at: stamp(), who: decidedBy(), action: 'verified' });
         stats.accepted++;
-        return { ...reanchor(r, audit), status: 'verified' as RecordStatus, reviewer: decidedBy(), audit };
+        return { ...r, status: 'verified' as RecordStatus, reviewer: decidedBy(), audit };
       }
       if (action === 'reject') {
         audit.push({ at: stamp(), who: decidedBy(), action: `rejected — ${payload?.reason ?? 'unspecified'}` });
@@ -1142,14 +1102,13 @@ export const useStore = create<OFState>()((set, get) => ({
       if (action === 'gold') {
         audit.push({ at: stamp(), who: decidedBy(), action: 'flagged for gold set' });
         stats.gold++;
-        // The gold value is the number the record carries AFTER re-anchoring:
-        // the paper's own, inside the sentence the service will anchor it in.
-        const re = reanchor(r, audit);
+        // The gold value is the number the record carries: a correction's
+        // when there is one, else the extractor's, inside its quote.
         return {
-          ...re,
+          ...r,
           status: 'verified' as RecordStatus,
           reviewer: decidedBy(),
-          gold: re.gold ?? { value: re.corrected?.value ?? re.value, unit: re.corrected?.unit ?? re.unit },
+          gold: r.gold ?? { value: r.corrected?.value ?? r.value, unit: r.corrected?.unit ?? r.unit },
           audit,
         };
       }
@@ -1170,7 +1129,7 @@ export const useStore = create<OFState>()((set, get) => ({
     // up it is posted too, and `biorepo.write` is what stores it there.
     if (action !== 'skip' && s.serviceUp && !refusal) {
       const after = get().records.find((r) => r.id === id);
-      if (after) void get().postReviewDecision(decisionOf(after, span, now));
+      if (after) void get().postReviewDecision(decisionOf(after, reanchoredSpan(after), now));
     }
   },
 
@@ -1218,7 +1177,7 @@ export const useStore = create<OFState>()((set, get) => ({
     if (s.serviceUp) {
       const after = get().records.find((r) => r.id === id);
       const paper = s.papers.find((p) => p.id === after?.paperId);
-      if (after && !writeRefusal(actionOf(after), after, paper, s.overlay?.candidates ?? [], true, reviewerName())) {
+      if (after && !writeRefusal(actionOf(after), after, paper, true, reviewerName())) {
         void get().postReviewDecision(decisionOf(after, reanchoredSpan(after), now));
       }
     }
@@ -1273,7 +1232,7 @@ export const useStore = create<OFState>()((set, get) => ({
     if (s.serviceUp) {
       for (const r of changed) {
         const paper = s.papers.find((p) => p.id === r.paperId);
-        if (writeRefusal(actionOf(r), r, paper, s.overlay?.candidates ?? [], true, reviewerName())) continue;
+        if (writeRefusal(actionOf(r), r, paper, true, reviewerName())) continue;
         void get().postReviewDecision(decisionOf(r, reanchoredSpan(r), now));
       }
     }
@@ -1313,9 +1272,8 @@ export const useStore = create<OFState>()((set, get) => ({
   // ── ingest ───────────────────────────────────────────────────────────
   //
   // When openferment-core answers /api/health the paper is fetched for real
-  // from Europe PMC and its own text replaces the curation note (OF-BLD-012
-  // §5.4). When it does not, nothing is fetched, and the toast names the
-  // missing service and the command that starts it.
+  // (OF-BLD-012 §5.4). When it does not, nothing is fetched, and the toast
+  // names the missing service and the command that starts it.
   extractPaperLive: async (paperId) => {
     const id = get().startJob({
       title: `Extract ${paperId}`,
@@ -2348,8 +2306,8 @@ export const useStore = create<OFState>()((set, get) => ({
   // The apply half of hydrate, on a snapshot already read (§9.2).
   applyDurable: (snap) => {
     set((s) => {
-      // Review decisions are re-applied over the seeded records rather than
-      // replacing them, so a corpus update ships new records without
+      // Review decisions are re-applied over the records rather than
+      // replacing them, so a new extraction brings new records without
       // discarding what a reviewer already decided.
       const decisionAt = { ...s.decisionAt };
       const records = s.records.map((r) => {
@@ -2433,23 +2391,22 @@ export const useStore = create<OFState>()((set, get) => ({
           ...p,
           ingest: o.ingest,
           textSource: fetched ? 'full-text' : p.textSource,
-          // A failed fetch keeps the curation note: the reader must show
-          // SOMETHING, and the curator's words labelled as such beat nothing.
+          // A fetch that brought no text keeps what the paper held.
           sections: fetched ? o.sections : p.sections,
           license: fetched ? (o.license ?? undefined) : p.license,
           fetchedFrom: fetched ? (o.source ?? 'europepmc') : p.fetchedFrom,
           ingestReason: o.reason ?? undefined,
         } as Paper;
       }), ...held];
-      // §6.4 — Witness reads runs from the store: the overlay's when present,
-      // the seed's RUN_OUTPUTS otherwise. An overlay run replaces a seed run
-      // of the same id; the seed keeps any run the overlay does not carry.
+      // §6.4 — Witness reads runs from the store, and the overlay is where
+      // they come from: an overlay run replaces one of the same id, and a run
+      // the overlay does not carry stays.
       const runOutputs = currentRuns.length
         ? [...s.runOutputs.filter((r) => !currentRuns.some((o) => o.run === r.run)), ...currentRuns]
         : s.runOutputs;
 
-      // §7.3 — the service's decisions, over seed records and candidates
-      // alike. The later of the two wins, judged against the time of the
+      // §7.3 — the service's decisions, over the records. The later of the
+      // service's and this browser's wins, judged against the time of the
       // decision currently on the record — the live one, not the snapshot
       // this session loaded with, so a decision made a minute ago is not
       // overwritten by an older server one a fetch or an extraction brings
@@ -2464,18 +2421,15 @@ export const useStore = create<OFState>()((set, get) => ({
         decisionAt[r.id] = d.at;
         return applyDecision(r, d);
       };
-      // §7.3 — candidates for a field the seed has no record of join the
-      // records, after the seed, as unverified records extracted by claude-1.
-      // A candidate that matches a seed record's field stays in the overlay,
-      // beside that record on its review card. Idempotent: a candidate
-      // already here is not added twice, and a Durable decision on one that
-      // just arrived is applied to it.
+      // §7.3 — the project's candidates join the records as unverified
+      // records extracted by claude-1. Idempotent: a candidate already here is
+      // not added twice, and a Durable decision on one that just arrived is
+      // applied to it.
       const local = s.durableReview;
-      const seed = s.records.filter((r) => r.extractorRun !== 'claude-1');
       const present = new Set(s.records.map((r) => r.id));
       const arrivingIds: string[] = [];
       const arriving: ExtractionRecord[] = currentCandidates
-        .filter((c) => !present.has(c.id) && isNewCandidate(c, seed))
+        .filter((c) => !present.has(c.id))
         .map((c) => {
           arrivingIds.push(c.id);
           const record: ExtractionRecord = stampOriginal({ ...c, audit: [] });
@@ -2496,14 +2450,10 @@ export const useStore = create<OFState>()((set, get) => ({
       const surviving =
         overlay.candidates === null || overlay.candidates === undefined
           ? s.records
-          : s.records.filter((r) => r.extractorRun !== 'claude-1' || stillExtracted.has(r.id) || wasDecided(r.id));
+          : s.records.filter((r) => stillExtracted.has(r.id) || wasDecided(r.id));
       const records = [...surviving, ...arriving]
         .map(decide)
-        .map((r) =>
-          r.extractorRun !== 'claude-1' || overlay.candidates == null
-            ? r
-            : { ...r, absentFromRun: stillExtracted.has(r.id) ? undefined : true },
-        );
+        .map((r) => (overlay.candidates == null ? r : { ...r, absentFromRun: stillExtracted.has(r.id) ? undefined : true }));
       // New records still undecided join an open review queue after
       // everything already in it (§7.3). A queue seeded before the overlay
       // arrived would otherwise never see them.
@@ -2577,7 +2527,7 @@ export const useStore = create<OFState>()((set, get) => ({
       // What the service would refuse is not posted, and not posted again on
       // every load: an accept on an unfetched paper stays this browser's.
       const paper = s.papers.find((p) => p.id === record.paperId);
-      if (writeRefusal(actionOf(record), record, paper, s.overlay.candidates ?? [], true, reviewerName())) {
+      if (writeRefusal(actionOf(record), record, paper, true, reviewerName())) {
         kept++;
         continue;
       }
@@ -2590,7 +2540,7 @@ export const useStore = create<OFState>()((set, get) => ({
         icon: 'upload',
         text:
           `${pending.length} review decision${pending.length === 1 ? '' : 's'} made offline sent to the service` +
-          (kept ? `; ${kept} kept in this browser only (the service would refuse them — unfetched or unidentified papers)` : ''),
+          (kept ? `; ${kept} kept in this browser only (the service would refuse them — documents the project does not hold, or holds no text for)` : ''),
         href: '#/guild',
         provenance: 'user',
       });
@@ -3115,7 +3065,7 @@ export const useStore = create<OFState>()((set, get) => ({
     // the overlay does: they are loaded again, and nothing is taken back on
     // the service. What this browser still owed it goes with the browser's data.
     set({
-      ...seedState(),
+      ...initialState(),
       toasts: [],
       serviceUp,
       durableReview: null,
@@ -3232,8 +3182,8 @@ async function guildPost<T>(
 
 // ── the parameter panel's overrides (OF-BLD-020 §2.1, D3) ────────────────
 //
-// An override is a person's change to one parameter of one scope, kept in
-// this browser and sent with the run; the service keeps none. Proforma's
+// An override is a person's change to one parameter of one scope, kept as
+// one of the project's rows and sent with the run. Proforma's
 // older `proformaAssumptions` is the same thing for one kind of scope: a
 // scenario's assumptions are the overrides of `proforma:<scenario id>`, and
 // the old field is derived from them. Since OF-BLD-020 §2.2 the scenario page
@@ -3525,11 +3475,11 @@ export function useSkillById(): Record<string, Skill> {
 }
 
 /**
- * A record's display provenance. The stored `provenance` field is
- * authoritative — a curated or industry-estimate record does not become
- * 'verified' just because someone accepted it in the queue without opening the
- * source. Review promotes 'curated' → 'verified'; nothing promotes
- * 'industry-estimate'.
+ * A record's display provenance, by the rule `biorepo.provenance_of`
+ * computes a decision's class with (ADR-006): a promoted record is gold with
+ * a gold value and verified without one, a rejected one unverified, and an
+ * undecided one keeps the class it arrived with. A measured or
+ * industry-estimate record keeps its class: review promotes neither.
  */
 export function provenanceOf(r: ExtractionRecord): Provenance {
   if (r.provenance === 'measured') return 'measured';

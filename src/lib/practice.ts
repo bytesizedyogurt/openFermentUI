@@ -77,8 +77,8 @@ export const recordSession = (sessionId: string) => call<PracticeSession>('/api/
 /**
  * A Deposition as the service reads it for drafting: what was recorded, at
  * which step, in the operator's words, with the measure's name from the
- * runbook as its label. Depositions live in this browser, so the service sees
- * the ones it is sent.
+ * runbook as its label. The project keeps its depositions; a draft reads the
+ * ones the page sends.
  */
 export function forDrafting(d: Deposition, runbooks: Runbook[]): PracticeDeposition {
   const schema = runbooks.find((r) => r.id === d.runbookId)?.measurementSchema ?? [];

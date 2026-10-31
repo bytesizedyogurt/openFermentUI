@@ -5,10 +5,8 @@
 // SILENT DROPPING ENDS HERE (OF-BLD-012 §5.4). `locateSpans` finds each
 // record's quote with indexOf and, until this increment, a quote that failed
 // to anchor simply vanished from the text and sank to the bottom of the rail.
-// That was tolerable while every section was a curation note the quotes were
-// transcribed from. It is not tolerable once a section is the paper's own
-// text: a curated quote that is not in the paper is exactly the record a
-// reviewer needs to look at. So on a fetched paper the rail lists those
+// A section is the paper's own text, so a quote that is not in the paper is
+// exactly the record a reviewer needs to look at. So on a fetched paper the rail lists those
 // records under their own heading — pending verification — with a link to
 // the review card, and the count is in the heading where nobody can miss it.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -233,7 +231,7 @@ export default function PaperReader({
         <Card className="p-6">
           <EmptyState
             title="No such paper"
-            body={`${paperId} is not in this session's corpus. It may have been a link from an older session — session state resets on refresh.`}
+            body={`${paperId} is not a document this project holds.`}
             action={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
             icon={<AlertTriangle size={22} />}
           />
@@ -261,7 +259,7 @@ export default function PaperReader({
   const ingesting = paper.ingest.startsWith('stage:');
   const onShelf = paper.ingest === 'shelf';
   const fullText = paper.textSource === 'full-text';
-  /** On a fetched paper: the records whose curated quote the text does not contain. */
+  /** On a fetched paper: the records whose quote the text does not contain. */
   const pending = fullText ? railRecords.filter((x) => !x.located) : [];
 
   const totalChars = paper.sections.reduce((n, s) => n + s.text.length, 0) || 1;
@@ -399,31 +397,13 @@ export default function PaperReader({
         ))}
       </div>
 
-      {paper.textSource === 'curation-note' && (
-        <div className="mt-2 text-caption text-signal-warn flex items-start gap-1.5">
-          <span
-            className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px]"
-            style={{
-              backgroundImage:
-                'repeating-linear-gradient(to bottom, rgb(var(--signal-warn)) 0 3px, transparent 3px 6px)',
-            }}
-            aria-hidden
-          />
-          <span>
-            Catalogued from OF-COR-001: a real, citable paper whose full text has not been ingested.
-            The abstract and the highlighted spans below are the curator&rsquo;s note, not the
-            paper&rsquo;s own words.
-          </span>
-        </div>
-      )}
-
       {paper.textSource === 'full-text' && (
         <div className="mt-2 text-caption text-accent flex items-start gap-1.5">
           <span className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px] bg-accent" aria-hidden />
           <span>
             Full text from {fetchSourceName(paper.fetchedFrom)}{paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
-            The sections below are the paper&rsquo;s own words; a record whose curated quote is not
-            found in them is listed in the rail as pending verification, not hidden.
+            The sections below are the paper&rsquo;s own words; a record whose quote is not found in
+            them is listed in the rail as pending verification.
           </span>
         </div>
       )}
@@ -485,7 +465,7 @@ export default function PaperReader({
           {quote && sectionId && !paper.sections.some((s) => s.id === sectionId) && (
             <p className="mt-4 text-caption text-signal-warn" data-testid="quote-missing">
               The passage from the search is in section {sectionId} of the fetched text, which this
-              reader does not hold{fullText ? '' : ': it shows the curator\u2019s note in its place'}.
+              reader does not hold.
               Fetch the paper in Intake to read it here.
             </p>
           )}
@@ -653,9 +633,9 @@ export default function PaperReader({
                   <span className="font-num ml-auto">{pending.length}</span>
                 </h3>
                 <p className="text-caption text-ink-soft mb-2">
-                  These quotes were transcribed from the curation document and do not appear verbatim in
-                  the fetched text. Each stays unverified until a reviewer anchors it to the paper&rsquo;s
-                  words or rejects it.
+                  These quotes do not appear verbatim in the document&rsquo;s text as the project holds it.
+                  Each stays unverified until a reviewer anchors it to the paper&rsquo;s words or rejects
+                  it.
                 </p>
                 {pending.map(({ record: r }) => {
                   const p = provOf(r);

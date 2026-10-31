@@ -22,8 +22,7 @@ proposal; nothing here runs a train.
 WHAT A RULE READS, AND WHERE IT IS HELD.
 
 - The product's CLASS. A products catalogue entry (`_catalogue().products`,
-  none until a store holds a catalogue: alpha 2.0 deleted the seed's,
-  ADR-010) states it as its `category`, read as a word by
+  none until a store holds a catalogue) states it as its `category`, read as a word by
   `CLASS_OF_CATEGORY` (each protein category a protein; a human milk
   oligosaccharide, a terpene and a glycoside a small molecule; a biopolymer a
   polymer). A product the catalogue holds no entry for but thermosteam's
@@ -199,8 +198,8 @@ RULES: dict[str, Rule] = {r.id: r for r in (
 
 def _catalogue() -> Any:
     """The products and strains on file. No store holds either catalogue yet,
-    so both are empty (alpha 2.0 deleted the seed's, ADR-010) and every
-    proposal is refused for want of a host on file; tests supply them here."""
+    so both are empty and every proposal is refused for want of a host on
+    file; tests supply them here."""
     return SimpleNamespace(products=(), strains=())
 
 

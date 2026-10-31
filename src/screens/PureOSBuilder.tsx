@@ -3,7 +3,7 @@
 //     Which units does the product pass through, with what in hand, and
 //     what comes out of each?
 //
-// /pureos/build/:trainId opens a train this browser saved; /pureos/build/new
+// /pureos/build/:trainId opens a train the project saved; /pureos/build/new
 // (and /pureos/build) starts a fresh one, and `?from=<run artifact id>` starts
 // it from a kept run's units, read by the service (`POST
 // /api/pureos/train/from-run`): every unit the product passes through whose
@@ -39,7 +39,7 @@
 // order, each a catalogue type with each outlet routed onward, to waste or
 // back to an earlier unit (a later unit is never offered). Every value a
 // person types is a parameter-panel override of the place's scope,
-// `pureos:unit:<train id>:<unit id | inlet>` (D3), kept in the Durable tier,
+// `pureos:unit:<train id>:<unit id | inlet>` (D3), kept with the project,
 // and laid into the train's params as it is sent (lib/pureos.trainSpecOf), so
 // the panel and the run read the same values. Save keeps the train whole in
 // `trainsMade`, with when and by whom.
@@ -89,7 +89,6 @@ import type {
 } from '@/data/types';
 import { href, navigate, useRoute } from '@/router';
 import { overridesFor, timeId, useStore } from '@/store';
-import { durableAvailable } from '@/lib/durable';
 import { paramScope, type ParamAsk } from '@/lib/params';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
 import { STATE_WORDS, fermosHarvest, fermosSimulations } from '@/lib/fermos';
@@ -153,7 +152,7 @@ const problemOf = (e: unknown) =>
   e instanceof PureosDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof PureosRefused ? e.message : e instanceof Error ? e.message : String(e);
 
 /**
- * The BioSTEAM scenarios made in this browser, by id and name: their newest
+ * The project's BioSTEAM scenarios, by id and name: their newest
  * runs are among the runs a train can take a stream of. Selected as the
  * store holds them and filtered here, so a render never sees a new list
  * from the store's own snapshot (React's error 185, an endless update).
@@ -200,7 +199,7 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
   const copyFrom = trainId === NEW_TRAIN && !fromRun ? route.query.get('copy') : null;
   // OF-BLD-020 §6.2: `?inlet=simulation:<id>` or `?inlet=scenario:<id>` sets a new train's inlet.
   const inletFrom = trainId === NEW_TRAIN && !fromRun && !copyFrom ? inletOfQuery(route.query.get('inlet')) : null;
-  const durableReady = useStore((s) => s.durableReady);
+  const stateLoaded = useStore((s) => s.stateSeen !== null || s.stateProblem !== null);
   const saved = useStore((s) => (trainId !== NEW_TRAIN ? (s.trainsMade[trainId] ?? null) : null));
   // OF-BLD-020 §5.R (findings 10, 31): a proposal this session kept under this id.
   const proposal = useStore((s) => (trainId !== NEW_TRAIN ? (s.proposedTrains[trainId] ?? null) : null));
@@ -225,7 +224,7 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
   const [copyHere, setCopyInfo] = useState<CopyInfo | null>(null);
   const copyInfo = copyHere ?? (shownHere?.copyOf ? { keptId: shownHere.copyOf.spec.id, kept: shownHere.copyOf, problem: null } : null);
 
-  // A saved train arrives with the Durable tier, read just after the page loads.
+  // A saved train arrives with the project's rows, read just after the page loads.
   useEffect(() => {
     if (!draft && saved) setDraft(structureOf(saved.train));
     else if (!draft && proposedTrain) setDraft(structureOf(proposedTrain));
@@ -282,8 +281,8 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trainId, copyFrom]);
 
-  if (!draft && !saved && trainId !== NEW_TRAIN && !durableReady && durableAvailable())
-    return <p className="text-body text-ink-soft">Reading the trains kept in this browser…</p>;
+  if (!draft && !saved && trainId !== NEW_TRAIN && !stateLoaded)
+    return <p className="text-body text-ink-soft">Reading the project&rsquo;s trains…</p>;
 
   return (
     <div data-testid="pureos-builder" data-train={draft?.id ?? ''}>
@@ -304,10 +303,10 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
         <div data-testid="builder-not-found">
           <EmptyState
             icon={<Plus size={28} />}
-            title={`No train ${trainId} is saved in this browser`}
+            title={`No train ${trainId} is saved in this project`}
             body={
               <>
-                A train built here is kept in this browser when it is saved. Start one with{' '}
+                A train built here is kept with the project when it is saved. Start one with{' '}
                 <a href={href(builderPath(NEW_TRAIN))} className="text-accent hover:underline">
                   New train
                 </a>
@@ -589,12 +588,12 @@ function Builder({
             </>
           ) : saved ? (
             savedSame ? (
-              `Saved in this browser ${stamp(saved.savedAt)} by ${saved.by}.`
+              `Saved in this project ${stamp(saved.savedAt)} by ${saved.by}.`
             ) : (
               `Saved ${stamp(saved.savedAt)} by ${saved.by}; changed since. Save keeps it as it is now.`
             )
           ) : (
-            'Not saved yet: Save keeps it in this browser, with every value typed into its panels.'
+            'Not saved yet: Save keeps it with the project, with every value typed into its panels.'
           )}
         </p>
         {pricing && <PriceInProforma run={run} spec={spec} changed={!!run && !sameTrain(run.spec, spec)} />}
