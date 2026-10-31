@@ -322,7 +322,7 @@ function StripPlot({ field }: { field: FieldId }) {
         </span>
       </div>
       <p className="text-caption text-ink-soft mt-1">
-        {points.length} records, every one clickable through to its source span. Colour is
+        {points.length} record{points.length === 1 ? '' : 's'}, every one clickable through to its source span. Colour is
         provenance, not value.
         {held > 0 && (
           <>

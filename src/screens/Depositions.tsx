@@ -36,7 +36,7 @@ export default function Depositions() {
   return (
     <>
       <PageHeader
-        eyebrow="Module 6 · Runbooks"
+        eyebrow="Runbooks"
         title="Depositions"
         subtitle="What actually happened at the bench, against what a runbook predicted. A deposition is opened from the runbook it tests and closed by reconciling its measurements against that runbook's predictions."
       />

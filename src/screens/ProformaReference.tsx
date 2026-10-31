@@ -311,7 +311,7 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
   return (
     <div data-testid="proforma-reference" data-flowsheet={flowsheetId}>
       <PageHeader
-        eyebrow={missing ? flowsheetId : `${flowsheetId} · reference biorefinery`}
+        eyebrow={<><span className="normal-case font-num">{flowsheetId}</span>{missing ? null : ' · reference biorefinery'}</>}
         title={title}
         subtitle={
           missing ? undefined : (info?.description ?? 'A published biorefinery from the BioSTEAM project’s own biorefineries package, run whole on its package’s defaults.')

@@ -405,8 +405,9 @@ export default function PaperReader({
         <div className="mt-2 text-caption text-accent flex items-start gap-1.5">
           <span className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px] bg-accent" aria-hidden />
           <span>
-            Full text from {fetchSourceName(paper.fetchedFrom)}{paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
-            The sections below are the paper&rsquo;s own words; a record whose quote is not found in
+            {paper.fetchedFrom === 'paste' ? 'The full text as it was pasted' : `Full text from ${fetchSourceName(paper.fetchedFrom)}`}
+            {paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
+            The sections below are the document&rsquo;s own words; a record whose quote is not found in
             them is listed in the rail as pending verification.
           </span>
         </div>
@@ -497,7 +498,11 @@ export default function PaperReader({
                 }}
                 className="mt-6 scroll-mt-4"
               >
-                <h2 className="font-serif text-section-title font-semibold mb-1">{s.heading}</h2>
+                {/* A passage with no heading of its own carries the document's
+                    title as one (literature/kit.py); the page's title says it already. */}
+                {s.heading !== paper.title && (
+                  <h2 className="font-serif text-section-title font-semibold mb-1">{s.heading}</h2>
+                )}
                 {quote && s.id === sectionId && !quoted && (
                   <p className="text-caption text-signal-warn mb-1" data-testid="quote-missing">
                     The sentence from the search is not in this section&rsquo;s text as shown here. The

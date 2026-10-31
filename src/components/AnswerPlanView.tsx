@@ -383,7 +383,7 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
         <ComponentTag
           component="Postdoc"
-          action={plan.declined ? 'declined' : `${plan.claims.length} claims`}
+          action={plan.declined ? 'declined' : `${plan.claims.length} claim${plan.claims.length === 1 ? '' : 's'}`}
         />
         {/* Cost is quiet but present. A visible per-query price is what makes
             the budget-gating story real rather than theoretical. The models,

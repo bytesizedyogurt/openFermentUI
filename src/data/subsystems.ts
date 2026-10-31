@@ -59,8 +59,7 @@ export const SUBSYSTEMS: Subsystem[] = [
     label: 'Control',
     state:
       'Not built. Nothing here computes, stores or retrieves anything yet. Dissolved oxygen as a state of the simulation ' +
-      'with a control loop on it, and an instrument such as a Pioreactor sending its readings to fermOS, would build it ' +
-      '(OF-BLD-020 Appendix 4).',
+      'with a control loop on it, and an instrument such as a Pioreactor sending its readings to fermOS, would build it.',
   },
 
   // ── Guild ────────────────────────────────────────────────────────────

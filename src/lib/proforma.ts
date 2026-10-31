@@ -133,7 +133,7 @@ export async function proformaReference(id: string, signal?: AbortSignal): Promi
 export const LEGACY_BENCHMARK_TOOL = 'proforma_benchmark';
 
 export const LEGACY_BENCHMARK_NOTE =
-  'This is the benchmark run this service kept when Proforma was first built on BioSTEAM (OF-BLD-014 §8.2): its price and settings, with no table and no check against the package’s test. Run makes the full reference run, with its tables and its checks.';
+  'This is the benchmark run kept before reference runs held their tables: its price and settings, with no table and no check against the package’s test. Run makes the full reference run, with its tables and its checks.';
 
 /** Run a reference flowsheet whole, on its package's defaults: `POST /api/proforma/reference/{id}`. */
 export async function runProformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {

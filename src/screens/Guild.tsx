@@ -543,7 +543,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow="Who may verify"
           title="Guild"
           subtitle="The Guild of Applied Life is who may verify. Accept, correct, or reject each extraction against the span it came from."
         />
@@ -595,7 +595,7 @@ export default function Guild() {
         <div className="min-w-[220px] flex-1">
           <div className="text-caption uppercase tracking-wide text-ink-soft">This queue</div>
           <div className="text-body">
-            <span className="font-num">{queue.length}</span> records ·{' '}
+            <span className="font-num">{queue.length}</span> record{queue.length === 1 ? '' : 's'} ·{' '}
             <span className="font-num">{papersInQueue}</span> paper{papersInQueue === 1 ? '' : 's'} ·{' '}
             <span className="font-num">{fieldsInQueue}</span> field{fieldsInQueue === 1 ? '' : 's'}
           </div>
@@ -675,7 +675,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow="Who may verify"
           title="Guild — queue complete"
           subtitle="Every record in this queue has been through the reviewer. The tallies below separate what you did from where the records ended up."
         />
@@ -815,7 +815,7 @@ export default function Guild() {
   if (!record) {
     return (
       <>
-        <PageHeader eyebrow="Module 0 · Evidence" title="Review queue" />
+        <PageHeader eyebrow="Guild" title="Review queue" />
         <GuildTabs />
         {topStrip}
         <Card className="p-4 max-w-2xl">
@@ -857,7 +857,7 @@ export default function Guild() {
   return (
     <>
       <PageHeader
-        eyebrow="Module 0 · Evidence"
+        eyebrow="Guild"
         title="Review queue"
         subtitle="Judge each extraction against the sentence it was pulled from. Accept, correct, or reject — the audit trail keeps both the original and your correction."
         actions={
@@ -1003,7 +1003,7 @@ export default function Guild() {
                 <CitationChip paperId={record.paperId} />
                 <span className="text-caption text-ink-soft">
                   {paper ? paper.title : 'Source unavailable'}
-                  {section ? ` · ${section.heading}` : ''}
+                  {section && section.heading !== paper?.title ? ` · ${section.heading}` : ''}
                 </span>
               </div>
               <a
@@ -1084,13 +1084,11 @@ export default function Guild() {
               Where this record came from
             </div>
             <>
-                <Tick
-                  p={provOf(record)}
-                  title="Extracted by claude-1 from the document's text (OF-BLD-012 §6)"
-                >
-                  <div className="text-body">Extracted by claude-1 from the project&rsquo;s document</div>
+                <Tick p={provOf(record)} title="Extracted by the extractor from the document's text">
+                  <div className="text-body">Extracted from the project&rsquo;s document</div>
                   <div className="font-num text-caption text-ink-soft">
                     field {record.field} · confidence {record.confidence.toFixed(2)}
+                    {record.extractorRun ? ` · run ${record.extractorRun}` : ''}
                   </div>
                 </Tick>
                 {record.absentFromRun && (

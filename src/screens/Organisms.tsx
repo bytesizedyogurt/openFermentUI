@@ -320,7 +320,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
   if (strains.length === 0) {
     return (
       <>
-        {!embedded && <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />}
+        {!embedded && <PageHeader eyebrow="geneOS · Hosts" title="Organisms" subtitle={subtitle} />}
         <Card>
           <EmptyState
             icon={<FlaskConical size={22} />}
@@ -339,7 +339,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           OF-BLD-011 §7.3 moved the mount from fermOS to geneOS; this file is
           unchanged apart from where it is mounted and where its links point. */}
       <PageHeader
-        eyebrow={embedded ? undefined : 'Module 1 · Organisms'}
+        eyebrow={embedded ? undefined : 'geneOS · Hosts'}
         title={embedded ? null : 'Organisms'}
         subtitle={embedded ? undefined : subtitle}
         actions={

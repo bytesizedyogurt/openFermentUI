@@ -11,7 +11,7 @@ import { Loader2, MessageSquareQuote, Search as SearchIcon } from 'lucide-react'
 import type { SearchResponse } from '@/data/types';
 import { useStore } from '@/store';
 import { href } from '@/router';
-import { IntakeDown } from '@/lib/intake';
+import { IntakeDown, licenceWords } from '@/lib/intake';
 import { answerFromLiterature, searchLiterature, type AnswerSource } from '@/lib/literature';
 import { Button, Callout, Card, EmptyState, PageHeader, SectionTitle, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -145,7 +145,7 @@ export default function BioRepoSearch() {
       {found && found.hits.length > 0 && (
         <Card className="p-3">
           <SectionTitle
-            right={<span className="text-caption text-ink-soft font-num">{found.hits.length} passages</span>}
+            right={<span className="text-caption text-ink-soft font-num">{found.hits.length} passage{found.hits.length === 1 ? '' : 's'}</span>}
           >
             Passages
           </SectionTitle>
@@ -162,7 +162,7 @@ export default function BioRepoSearch() {
                 </a>
                 <div className="text-caption text-ink-soft">
                   {h.sectionPath ?? 'Text'}
-                  {h.year ? ` · ${h.year}` : ''} · {h.licenceClass.replace('_', ' ')}
+                  {h.year ? ` · ${h.year}` : ''} · {licenceWords(h.licenceClass)}
                   {h.isTable ? ' · table' : ''}
                 </div>
                 <p className={cx('text-caption mt-1 whitespace-pre-wrap', h.isTable && 'font-num')}>

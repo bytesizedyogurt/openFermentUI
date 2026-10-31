@@ -96,7 +96,7 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
   return (
     <div data-testid="proforma-comparison" data-comparison={comparisonId}>
       <PageHeader
-        eyebrow={`comparison · ${comparisonId}`}
+        eyebrow={<>comparison · <span className="normal-case font-num">{comparisonId}</span></>}
         title={c?.title ?? comparisonId}
         subtitle={
           c && (

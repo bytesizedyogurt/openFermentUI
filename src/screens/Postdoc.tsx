@@ -16,6 +16,7 @@ import { Button, Card, cx, EmptyState, Callout } from '@/components/ui';
 import { AnswerPlanView, PostdocDownNotice } from '@/components/AnswerPlanView';
 import { askPostdocStream, fetchConversation, postdocHealth, PostdocDown, type PostdocHealth } from '@/lib/postdoc';
 import { PlanTrace } from '@/components/PlanTrace';
+import { stamp } from '@/lib/proforma';
 
 /**
  * A conversation of questions, each answered by Postdoc's bounded loop
@@ -62,7 +63,7 @@ function LiveTurnView({
       <div className="flex items-baseline gap-2">
         <span className="text-caption uppercase tracking-wide text-ink-soft shrink-0">Asked</span>
         <p className="text-reading text-ink flex-1">{turn.question}</p>
-        <span className="font-num text-caption text-ink-soft shrink-0">{turn.askedAt}</span>
+        <span className="font-num text-caption text-ink-soft shrink-0">{shownAt(turn.askedAt)}</span>
       </div>
 
       {(running || steps.length > 0) && (
@@ -165,11 +166,15 @@ function LivePanel({
   );
 }
 
-/** A turn's time, as the conversations list writes it. */
+/** A turn's time, written as the service writes one: ISO, in UTC. */
 function askedAt(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return new Date().toISOString();
+}
+
+/** A conversation's or a turn's time on the page: an ISO time to the minute,
+ *  marked UTC; a time an earlier page wrote as a local minute, as it was written. */
+function shownAt(at: string): string {
+  return at.includes('T') ? stamp(at) : at;
 }
 
 /** What `activeId` holds after "New conversation", before its first question. */
@@ -391,7 +396,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
               >
                 <div className="text-body truncate">{c.title}</div>
                 <div className="text-caption text-ink-soft">
-                  <span className="font-num">{c.startedAt}</span> · <span className="font-num">{c.turns.length}</span>{' '}
+                  <span className="font-num">{shownAt(c.startedAt)}</span> · <span className="font-num">{c.turns.length}</span>{' '}
                   {c.turns.length === 1 ? 'question' : 'questions'}
                 </div>
               </button>

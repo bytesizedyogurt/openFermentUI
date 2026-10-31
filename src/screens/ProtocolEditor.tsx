@@ -141,7 +141,7 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
   return (
     <div>
       <PageHeader
-        eyebrow={`${protocol.id} · editing from v${base.version}`}
+        eyebrow={<><span className="normal-case font-num">{protocol.id}</span> · editing from v{base.version}</>}
         title={protocol.title}
         subtitle={
           <>

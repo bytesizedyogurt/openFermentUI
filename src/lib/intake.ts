@@ -28,6 +28,18 @@ const SOURCE_NAMES: Record<FetchSource, string> = {
   paste: 'pasted text',
 };
 
+/** A licence class the kit keeps (`collectors.licence_class`), in the words the reader is shown. */
+const LICENCE_WORDS: Record<string, string> = {
+  public: 'public domain',
+  open_commercial: 'open licence',
+  open_noncommercial: 'open licence, non-commercial',
+  unknown: 'licence unknown',
+};
+
+export function licenceWords(licenceClass: string): string {
+  return LICENCE_WORDS[licenceClass] ?? licenceClass.replace(/_/g, ' ');
+}
+
 /** The name of a fetched text's source; absent is Europe PMC, the one source an older service knew. */
 export function fetchSourceName(source: FetchSource | undefined): string {
   return SOURCE_NAMES[source ?? 'europepmc'];

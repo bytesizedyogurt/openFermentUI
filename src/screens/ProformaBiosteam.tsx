@@ -236,7 +236,7 @@ export function costBreakdownEmpty(view: RunView): { what: string; where: string
       what: `the base case could not run: ${baseCaseRefusal(view.baseInfeasible)}.`,
       where: 'Every input at its value is a case the flowsheet cannot hold, so it has no TEA to break down; change the input the reason names, then run it.',
     };
-  return { what: 'this run kept no TEA breakdown.', where: 'A run of a flowsheet with a TEA keeps one from OF-BLD-019 on; run the scenario again.' };
+  return { what: 'this run kept no TEA breakdown.', where: 'A flowsheet with a TEA keeps its breakdown with every run; run the scenario again to make one.' };
 }
 
 // ── Sensitivity, the distribution, the sliders ──────────────────────────

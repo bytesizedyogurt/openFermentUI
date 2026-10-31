@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ClipboardPaste, FileUp, Link2, Loader2 } from 'lucide-react';
 import type { CollectOutcome, LiteratureDocument } from '@/data/types';
 import { useStore } from '@/store';
-import { IntakeDown } from '@/lib/intake';
+import { IntakeDown, licenceWords } from '@/lib/intake';
 import {
   LICENCE_CLASSES,
   collect,
@@ -261,8 +261,8 @@ export function CollectCard() {
               <div className="text-body leading-snug">{d.title}</div>
               <div className="text-caption text-ink-soft">
                 {COLLECTOR_NAMES[d.collector ?? ''] ?? d.collector ?? 'unknown source'}
-                {d.year ? ` · ${d.year}` : ''} · <span className="font-num">{d.chunks}</span> passages ·{' '}
-                {d.licenceClass.replace('_', ' ')} · added by {d.linkedBy}
+                {d.year ? ` · ${d.year}` : ''} · <span className="font-num">{d.chunks}</span> passage{d.chunks === 1 ? '' : 's'} ·{' '}
+                {licenceWords(d.licenceClass)} · added by {d.linkedBy}
               </div>
             </li>
           ))}

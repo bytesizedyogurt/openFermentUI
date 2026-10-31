@@ -506,7 +506,7 @@ function FieldRow({
                 <button
                   className="text-accent hover:underline"
                   onClick={() => onQueue(unverifiedIds, g.def.name)}
-                  title={`Queue exactly these ${unverifiedIds.length} records into the review workspace`}
+                  title={`Queue exactly ${unverifiedIds.length === 1 ? 'this record' : `these ${unverifiedIds.length} records`} into the review workspace`}
                 >
                   Review them
                 </button>
@@ -1234,7 +1234,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                     {components.map((c) => (
                       <tr key={c.tag} className="border-b border-line/70 last:border-b-0 align-middle">
                         <td className="py-1.5">
-                          <Tick p={c.prov} title={`Strongest provenance among ${c.points.length} records`}>
+                          <Tick p={c.prov} title={`Strongest provenance among ${c.points.length} record${c.points.length === 1 ? '' : 's'}`}>
                             {c.tag}
                           </Tick>
                         </td>

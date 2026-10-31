@@ -12,6 +12,15 @@ const BOX_H = 34;
 const COL = 196;
 const ROW = 52;
 const PAD = 72;
+// Room beside the outer columns for a feed's or a product's name, so the
+// boundary's names stand inside the drawing.
+const EDGE = 128;
+// How many characters of a name fit: at the boundary, and in the gap
+// between two columns, where a longer name would run under the next box.
+const EDGE_CHARS = 20;
+const GAP_CHARS = 10;
+// One line of a name's text.
+const LINE = 11;
 
 function short(text: string, n = 18): string {
   return text.length > n ? `${text.slice(0, n - 1)}…` : text;
@@ -23,11 +32,23 @@ export function SffGraph({ graph, title = 'The flowsheet' }: { graph: SFFGraph; 
     columns.set(n.rank, [...(columns.get(n.rank) ?? []), n.id]);
   }
   const at = new Map<string, { x: number; y: number }>();
-  for (const [rank, ids] of columns) ids.forEach((id, i) => at.set(id, { x: PAD + rank * COL, y: PAD / 2 + i * ROW }));
+  for (const [rank, ids] of columns) ids.forEach((id, i) => at.set(id, { x: EDGE + rank * COL, y: PAD / 2 + i * ROW }));
   const rankOf = new Map(graph.nodes.map((n) => [n.id, n.rank]));
-  const width = PAD * 2 + Math.max(0, ...graph.nodes.map((n) => n.rank)) * COL + BOX_W;
+  const lastRank = Math.max(0, ...graph.nodes.map((n) => n.rank));
+  const width = EDGE * 2 + lastRank * COL + BOX_W;
   const height = PAD + Math.max(1, ...[...columns.values()].map((c) => c.length)) * ROW;
   const typeOf = new Map(graph.nodes.map((n) => [n.id, n.type]));
+  // A unit with more than one feed or product stacks their names, one line each.
+  const nth = (ends: { id: string; unit: string }[]) => {
+    const seen = new Map<string, number>();
+    return new Map(ends.map((e) => {
+      const i = seen.get(e.unit) ?? 0;
+      seen.set(e.unit, i + 1);
+      return [e.id, i];
+    }));
+  };
+  const feedLine = nth(graph.feeds);
+  const productLine = nth(graph.products);
   return (
     <figure className="m-0" data-testid="sff-graph" data-units={graph.nodes.length} data-streams={graph.edges.length}>
       <figcaption className="text-caption text-ink-soft mb-1.5">
@@ -76,8 +97,9 @@ export function SffGraph({ graph, title = 'The flowsheet' }: { graph: SFFGraph; 
               <g key={`feed-${f.id}`}>
                 <line x1={u.x - 44} y1={u.y + BOX_H / 2} x2={u.x} y2={u.y + BOX_H / 2} className="stroke-accent"
                   strokeWidth={1.5} markerEnd="url(#sff-arrow)" />
-                <text x={u.x - 46} y={u.y + BOX_H / 2 - 5} textAnchor="end" className="fill-accent" fontSize={10}>
-                  {short(f.name ?? f.id, 16)}
+                <text x={u.x - 4} y={u.y + BOX_H / 2 - 5 - (feedLine.get(f.id) ?? 0) * LINE} textAnchor="end" className="fill-accent" fontSize={10}>
+                  {short(f.name ?? f.id, rankOf.get(f.unit) === 0 ? EDGE_CHARS : GAP_CHARS)}
+                  <title>{f.name ?? f.id}</title>
                 </text>
               </g>
             );
@@ -89,8 +111,9 @@ export function SffGraph({ graph, title = 'The flowsheet' }: { graph: SFFGraph; 
               <g key={`product-${p.id}`}>
                 <line x1={u.x + BOX_W} y1={u.y + BOX_H / 2 + 6} x2={u.x + BOX_W + 40} y2={u.y + BOX_H / 2 + 6}
                   className="stroke-signal-info" strokeWidth={1.5} markerEnd="url(#sff-arrow)" />
-                <text x={u.x + BOX_W + 42} y={u.y + BOX_H / 2 + 18} className="fill-signal-info" fontSize={10}>
-                  {short(p.name ?? p.id, 16)}
+                <text x={u.x + BOX_W + 4} y={u.y + BOX_H / 2 + 18 + (productLine.get(p.id) ?? 0) * LINE} className="fill-signal-info" fontSize={10}>
+                  {short(p.name ?? p.id, rankOf.get(p.unit) === lastRank ? EDGE_CHARS : GAP_CHARS)}
+                  <title>{p.name ?? p.id}</title>
                 </text>
               </g>
             );

@@ -804,3 +804,14 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
       the documents held and their passages. The reader printed an empty citation line for a
       pasted document with no authors, year or venue; it prints the parts there are. The runbook
       page said a runbook with no product "is not attached to a molecule"; it names no product.
+    - A second pass over the same screens: counts read "1 passages", "1 records" and "1 claims";
+      Postdoc showed raw ISO times to the microsecond (the page now writes ISO as the service does
+      and shows `2026-10-31 02:52 UTC`); the review card said "Extracted by claude-1", the extractor
+      run's name, as if a model of that name had read the document; a runbook made from an engine
+      run drew an empty price distribution ("no sample of this scenario ran"), and it now draws the
+      run's cost breakdown as the run page does; the flowsheet graph cut its feeds' names at its
+      left edge and laid two names on one unit over each other; pages carried alpha 1.0's "Module
+      0 · Evidence" numbering, and empty states and the subsystem map cited OF-BLD documents; an
+      id in a page's eyebrow was set in capitals; the reader said "Full text from pasted text" and
+      repeated a document's title as a passage heading; a licence class read "unknown" alone; and
+      a disclosure laid out as flex lost its marker. Each is fixed in the client.

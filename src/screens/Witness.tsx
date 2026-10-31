@@ -50,7 +50,7 @@ const RUN_LABEL: Record<ExtractorRun, string> = {
 const NO_CANDIDATES: Candidate[] = [];
 const NO_DECISIONS: Record<string, ReviewDecision> = {};
 const RUN_BLURB: Record<ExtractorRun, string> = {
-  'claude-1': 'One structured response per paper over fetched full text; every candidate anchored to a verbatim quote (OF-BLD-012 §2.4).',
+  'claude-1': 'One structured response per document over its passages; every candidate anchored to a verbatim quote.',
 };
 
 /** What a run says about itself: for claude-1, the models that answered,
@@ -427,7 +427,7 @@ export default function Witness() {
   const header = (actions?: ReactNode) => (
     <>
     <PageHeader
-      eyebrow="Module 0 · Evidence"
+      eyebrow="BioRepo"
       title="Witness"
       subtitle="Witness asks one question — does it reproduce. This is what the extractor would be scored on, and what it has been scored on so far."
       actions={actions}

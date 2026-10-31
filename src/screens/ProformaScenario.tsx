@@ -800,7 +800,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   return (
     <div data-testid="proforma-biosteam">
       <PageHeader
-        eyebrow={`${flowsheetId} · BioSTEAM scenario`}
+        eyebrow={<><span className="normal-case font-num">{flowsheetId}</span> · BioSTEAM scenario</>}
         title={scenario.name}
         subtitle={scenario.description || (flowsheet ? `${flowsheet.title}, from ${flowsheet.source}` : `Flowsheet ${flowsheetId}`)}
         actions={

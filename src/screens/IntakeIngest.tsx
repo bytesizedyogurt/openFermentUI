@@ -13,7 +13,7 @@ import type { Candidate } from '@/data/types';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { START_COMMAND } from '@/lib/postdoc';
-import { fetchSourceName } from '@/lib/intake';
+import { fetchSourceName, licenceWords } from '@/lib/intake';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { CollectCard } from '@/components/CollectCard';
 import { INTAKE_TABS } from '@/data/tabs';
@@ -99,8 +99,8 @@ export default function IntakeIngest() {
                       <div className="text-caption text-ink-soft">
                         {fetchSourceName(p.fetchedFrom)}
                         {p.year ? ` · ${p.year}` : ''} · <span className="font-num">{p.sections.length}</span>{' '}
-                        passages
-                        {p.licenceClass ? ` · ${p.licenceClass.replace('_', ' ')}` : ''}
+                        passage{p.sections.length === 1 ? '' : 's'}
+                        {p.licenceClass ? ` · ${licenceWords(p.licenceClass)}` : ''}
                       </div>
                     </div>
                     <div className="shrink-0 flex items-center gap-2 text-caption">

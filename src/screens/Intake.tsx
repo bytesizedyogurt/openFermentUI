@@ -519,7 +519,7 @@ export default function Intake() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow="Documents in, anchored to source"
           title="Intake"
           subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from."
           actions={headerActions}
@@ -563,7 +563,7 @@ export default function Intake() {
   return (
     <>
       <PageHeader
-        eyebrow="Module 0 · Evidence"
+        eyebrow="Documents in, anchored to source"
         title="Intake"
         subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from. Nothing here is trusted until a reviewer says so."
         actions={headerActions}

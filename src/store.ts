@@ -2119,7 +2119,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // reload and these outlive one (the same reason adopted runbooks do).
   startLiveConversation: (title) => {
     const id = timeId('lc');
-    const conversation: LiveConversation = { id, title, startedAt: stamp(), turns: [] };
+    const conversation: LiveConversation = { id, title, startedAt: new Date().toISOString(), turns: [] };
     set((s) => ({ liveConversations: [conversation, ...s.liveConversations].slice(0, MAX_LIVE_CONVERSATIONS) }));
     return id;
   },

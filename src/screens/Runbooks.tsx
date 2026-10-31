@@ -130,7 +130,7 @@ export default function Runbooks() {
 
   return (
     <>
-      <PageHeader eyebrow="Module 6 · Runbooks" title="Runbooks" subtitle={subtitle} />
+      <PageHeader eyebrow="Claims to be tested" title="Runbooks" subtitle={subtitle} />
       <OwnerTabs tabs={RUNBOOK_TABS} />
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">

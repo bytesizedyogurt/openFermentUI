@@ -318,7 +318,7 @@ export default function ProformaRun({ runId }: { runId: string }) {
   return (
     <div data-testid="proforma-run" data-run={runId} data-status={run?.status ?? ''}>
       <PageHeader
-        eyebrow={`engine run · ${runId}`}
+        eyebrow={<>engine run · <span className="normal-case font-num">{runId}</span></>}
         title={where}
         subtitle={
           run && (
