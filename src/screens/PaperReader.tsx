@@ -376,13 +376,17 @@ export default function PaperReader({
 
       <h1 className="font-serif text-page-title font-semibold leading-snug">{paper.title}</h1>
 
-      <div className="mt-2 text-body text-ink-soft">
-        {paper.authors.join(', ')}
-        {' · '}
-        <span className="font-num">{paper.year}</span>
-        {' · '}
-        <span className="italic">{paper.venue}</span>
-      </div>
+      {(paper.authors.length > 0 || paper.year || paper.venue) && (
+        <div className="mt-2 text-body text-ink-soft">
+          {[
+            paper.authors.length > 0 ? <span key="authors">{paper.authors.join(', ')}</span> : null,
+            paper.year ? <span key="year" className="font-num">{paper.year}</span> : null,
+            paper.venue ? <span key="venue" className="italic">{paper.venue}</span> : null,
+          ]
+            .filter((part) => part !== null)
+            .flatMap((part, i) => (i === 0 ? [part] : [<span key={`sep-${i}`}>{' · '}</span>, part]))}
+        </div>
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {paper.organisms.map((o) => (

@@ -798,3 +798,9 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
       export, the reader, Intake, Organisms, the strain page, runbooks, depositions, Proforma,
       pureOS, Postdoc, the shortcut sheet), the export headers that stamped "corpus OF-COR-001
       v1.0", and the comments of the service and the client.
+    - Screenshots of the built app on the proof's kept service found three more: Home's first
+      band was "Corpus vitals" with a "Papers catalogued" tile counting documents "awaiting
+      full-text ingest", a state no document reaches now; it is "Project vitals", the tile counts
+      the documents held and their passages. The reader printed an empty citation line for a
+      pasted document with no authors, year or venue; it prints the parts there are. The runbook
+      page said a runbook with no product "is not attached to a molecule"; it names no product.

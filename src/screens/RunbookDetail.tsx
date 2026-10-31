@@ -862,8 +862,8 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
             processCode={product?.processCode}
             emptyBody={
               product
-                ? 'This molecule declares no unit operations, so there is no train to draw yet.'
-                : 'This runbook is not attached to a molecule — it asks a cross-cutting question, and a cross-cutting question does not have one train. Attaching a product would give it one.'
+                ? 'This product declares no unit operations, so there is no train to draw yet.'
+                : 'This runbook names no product, so it has no process train to draw.'
             }
           />
         </Card>

@@ -340,8 +340,7 @@ export default function Home() {
   );
 
   // ── band 1 numbers ───────────────────────────────────────────────────
-  const ingested = useMemo(() => papers.filter((p) => p.ingest === 'complete'), [papers]);
-  const shelved = papers.length - ingested.length;
+  const passages = useMemo(() => papers.reduce((n, p) => n + p.sections.length, 0), [papers]);
 
   const status = useMemo(() => {
     let verified = 0;
@@ -388,7 +387,7 @@ export default function Home() {
 
   // ── catalogue numbers (OF-BLD-005) ───────────────────────────────────
   //
-  // Kept out of Corpus vitals: those tiles count real literature, and these
+  // Kept out of the project vitals: those tiles count real literature, and these
   // count runbooks, which are modeled. One row for both would imply the same
   // standard of evidence stands behind each.
   const runbooksWaiting = useMemo(
@@ -443,7 +442,7 @@ export default function Home() {
 
         <HomeStart />
 
-        {/* ── Band 1 · Corpus vitals ─────────────────────────────────── */}
+        {/* ── Band 1 · Project vitals ────────────────────────────────── */}
         <section aria-labelledby="home-vitals" className="mb-7">
           <SectionTitle
             right={
@@ -456,32 +455,27 @@ export default function Home() {
               </Explain>
             }
           >
-            <span id="home-vitals">Corpus vitals</span>
+            <span id="home-vitals">Project vitals</span>
           </SectionTitle>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <TileBoundary label="Papers catalogued">
+            <TileBoundary label="Documents held">
               <VitalTile
-                to="/biorepo"
-                label="Papers catalogued"
-                prov="curated"
-                tickTitle="Real literature, entered through Intake"
+                to="/intake/ingest"
+                label="Documents held"
+                prov="user"
+                tickTitle="Documents a person added to the project through Intake"
                 sub={
                   papers.length === 0 ? (
-                    'No papers yet: documents arrive through Intake'
+                    'No documents yet: they arrive through Intake'
                   ) : (
                     <>
-                      <span className="font-num">{shelved}</span> awaiting full-text ingest
+                      <span className="font-num">{passages}</span> passages, each searchable and quotable
                     </>
                   )
                 }
               >
-                <div className="font-num text-display leading-tight">
-                  {ingested.length}
-                  <span className="text-section-title text-ink-soft ml-1.5">
-                    / {papers.length}
-                  </span>
-                </div>
+                <div className="font-num text-display leading-tight">{papers.length}</div>
               </VitalTile>
             </TileBoundary>
 
