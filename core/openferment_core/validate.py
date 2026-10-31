@@ -11,7 +11,7 @@ not being asked to be careful with quantities — it has no slot to put one in.
 A claim is rejected when any of these hold:
 
     1. the text contains a number, in digits or in words
-    2. a cited record id does not resolve against the corpus
+    2. a cited record id does not resolve against the evidence pool
     3. a cited paper id does not resolve
     4. there are no record ids and the claim does not admit to being unsupported
 
@@ -942,15 +942,13 @@ FIELD_DROP_REASONS = ("carbonSource",)
 
 # ── the paper's wording, resolved (OF-BLD-014 §2.1) ────────────────────
 #
-# Two vocabularies cross the boundary inside corpus.json: the strain alias
-# table (`STRAIN_ALIASES` in src/data/strains.ts) and the carbon sources with
-# their spellings (`CARBON_SOURCES` in src/data/vocabulary.ts). The rule that
-# reads them is `matchWholeWord` in strains.ts, and this is its mirror, step
-# for step: the fixture `scripts/export-unit-fixtures.ts` records what the
-# TypeScript answers and tests/test_validate.py asserts the same here. When
-# the two disagree, the TypeScript side is right.
-#
-# Until §3.4 creates `evidence_pool`, `carbon_source_id` lives here.
+# Two vocabularies resolve a paper's wording: a project's strain aliases
+# (none until its records carry them) and the carbon sources with their
+# spellings (`schema/vocabulary.yaml`, mirrored by `CARBON_SOURCES` in
+# src/data/vocabulary.ts). The rule that reads them is `matchWholeWord` in
+# vocabulary.ts, and this is its mirror, step for step: the fixture
+# `scripts/export-unit-fixtures.ts` records what the TypeScript answers and
+# tests/test_validate.py asserts the same here.
 
 
 @lru_cache(maxsize=4)
@@ -1111,8 +1109,8 @@ def anchor_candidate(
 
     `raw` is what the extractor emitted — sectionId, field, value, unit, quote,
     and optionally method, organism, carbonSource, isPrimary, confidence.
-    `sections` are the document's passages in the kit. The ontology and unit tables
-    come from corpus.json through `units`, the same tables the browser ships.
+    `sections` are the document's passages in the kit. The record fields and
+    the unit tables come from `schema/` through `units`.
 
     A candidate that anchors may still lose a field (OF-BLD-014 §2.1): a
     carbon source whose words are not in the cited section, or carry a number,

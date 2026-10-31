@@ -49,7 +49,7 @@ def kept_row(paper_id: str) -> dict:
     return db.run(read())
 
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path, test_corpus, held_documents):
+def _offline(monkeypatch, tmp_path, held_documents):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
     global HELD

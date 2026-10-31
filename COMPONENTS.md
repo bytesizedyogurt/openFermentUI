@@ -184,14 +184,13 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `audit.py` | The audit log (OF-BLD-015 §7.3; execution prompt §7.3): every write a model makes, and every proposal a person carries out or dismisses, one row each in the `audit` table, under the project it was made in. |
 | `basis.py` | The provenance of a computed value (OF-BLD-014 §3.1, E.4). |
 | `binding.py` | What Proforma and fermOS bind a value from records with (OF-BLD-020 §3.2). |
-| `biorepo.py` | BioRepo — one write function for the corpus (OF-BLD-012 §2.3, §7.1). |
+| `biorepo.py` | BioRepo — one write function for a project's review decisions (OF-BLD-012 §2.3, §7.1). |
 | `checks.py` | Checks — proposed by fixed rules, scheduled and run by an assessor (OF-BLD-013 §5.2). |
 | `competence.py` | Competence, mirrored (OF-BLD-013 §2.1). |
 | `composite.py` | The seam on the service's side: a vessel and a train become a flowsheet Proforma prices (OF-BLD-020 §6.1, D11, D3, E.2‴, E.3‴; Appendix 2 §D). |
-| `corpus.py` | Corpus loading and retrieval (OF-BLD-007 §4, §10.3). |
 | `evaluation.py` | `pnpm eval`: Postdoc's evaluation set, asked through the service's answer path (postdoc/evaluate.py; execution prompt §10 stage 6.4). |
 | `events.py` | A project's event stream (execution prompt §7.3 item 2): `GET /api/events?project=`. |
-| `evidence_pool.py` | What Postdoc may cite: one view over every record it can see (OF-BLD-014 §3.4). |
+| `evidence_pool.py` | What Postdoc may cite: one view over every record the project holds (OF-BLD-014 §3.4). |
 | `extract.py` | Extract — one structured response per document (OF-BLD-012 §6.1; ADR-002). |
 | `fermos.py` | fermOS fits what a run measured (OF-BLD-014 §7.2), and simulates a run from its sources (OF-BLD-020 §3.1). |
 | `geneos.py` | geneOS on the service's side (OF-BLD-014 §6.2). |

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from openferment_core import corpus, module_stores
+from openferment_core import module_stores
 from openferment_core.guild import projection as shipped_guild_projection
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -57,6 +57,7 @@ DELETED = [
     "core/openferment_core/expand.py",
     "core/openferment_core/rageval.py",
     "core/openferment_core/anchor_report.py",
+    "core/openferment_core/corpus.py",
     "core/tests/fixtures/demo",
     "core/tests/fixtures/overlay-smoke.json",
     # Dominion (5.6).
@@ -69,7 +70,7 @@ DELETED = [
 # What alpha 1.0 projected the seed into for the service to read. A checkout
 # that ran alpha 1.0 still holds them (gitignored), so the service must read
 # none of them, or a stale copy would feed it the deleted seed without a word.
-PROJECTIONS = ["modules.json", "skills.json"]
+PROJECTIONS = ["corpus.json", "modules.json", "skills.json"]
 
 SEEDED_TYPES = ("ExtractionRecord", "Paper", "Product", "Strain", "Scenario", "Protocol", "Runbook", "Lesson",
                 "LearnModule")
@@ -103,14 +104,6 @@ def test_no_file_under_src_data_exports_seeded_content():
 
 
 def test_the_shipped_stores_are_empty():
-    assert corpus.DATA == PACKAGE / "data" / "corpus.json"
-    corpus.load_corpus.cache_clear()
-    try:
-        shipped = corpus.load_corpus()
-        assert shipped.papers == [] and shipped.records == []
-        assert shipped.products == () and shipped.strains == ()
-    finally:
-        corpus.load_corpus.cache_clear()
     projection = module_stores._projection()
     assert all(not rows for module in projection.values() for rows in module.values())
 

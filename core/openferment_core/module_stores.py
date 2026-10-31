@@ -684,7 +684,7 @@ KINDS = {
 
 
 def _tokens(text: str) -> set[str]:
-    from .corpus import tokenize
+    from .evidence_pool import tokenize
 
     return set(tokenize(text))
 

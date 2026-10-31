@@ -73,10 +73,10 @@ class's own default read in the Proforma worker (so a read may start it, once
 per process and type), or waiting for a record or a named person.
 
 Rule 1 holds here: no value in this file. A bound is a convention with its
-reason written beside it (an ontology plausibility range read from
-corpus.json, or a physical limit: nothing negative, a share between none and
-the whole); a value comes from a record, a fit, a kept artifact, a stated
-convention, a library's own default read from its code, or a named person.
+reason written beside it (a physical limit: nothing negative, a share between
+none and the whole); a value comes from a record, a fit, a kept artifact, a
+stated convention, a library's own default read from its code, or a named
+person.
 """
 from __future__ import annotations
 

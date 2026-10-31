@@ -15,10 +15,10 @@ from openferment_core.workers import SimWorker
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 
 
-# R1 — a record a decision rejected is out of the pool, seed records included.
-def test_a_seed_record_rejected_by_a_decision_is_not_in_the_pool(pool):  # noqa: F811
+# R1 — a record a decision rejected is out of the pool, a fixed record included.
+def test_a_fixed_record_rejected_by_a_decision_is_not_in_the_pool(pool):  # noqa: F811
     rejected = ReviewDecision(status="rejected", provenance="curated", recordId="r-X1-1", at="2026-10-15T00:00:00Z", reviewer="Sean Creighton", rejectReason="misread")
-    p = evidence_pool.build(pool.corpus, [], {"r-X1-1": rejected}, [])
+    p = evidence_pool.build([], {"r-X1-1": rejected}, [], records=pool.records)
     assert p.record("r-X1-1") is None
     r = tools.run("convert_units", {"recordId": "r-X1-1", "toUnit": "mg L-1"}, tools.ToolContext(pool_factory=lambda: p))
     assert r.error and r.evidence == []

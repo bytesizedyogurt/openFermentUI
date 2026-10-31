@@ -251,7 +251,7 @@ def compute(
     """Run `tool` on `inputs`, or return what an identical call stored.
 
     `records_by_id` supplies the provenance of every `record` input; when it
-    is None and a record input is present, the corpus is read. An artifact
+    is None and a record input is present, the evidence pool is read. An artifact
     input's provenance is read from this store. `keep=False` computes and
     returns without writing, for a labelled sample (§7.4).
     """
@@ -312,9 +312,9 @@ def basis_of(artifact: Artifact) -> ComputedBasis:
 def _records_for(inputs: Sequence[BasisInput], given: Mapping[str, Any] | None) -> Mapping[str, Any]:
     if given is not None or not any(i.source.kind == "record" for i in inputs):
         return given or {}
-    from .corpus import load_corpus
+    from . import evidence_pool
 
-    return load_corpus().records_by_id
+    return evidence_pool.load().records_by_id
 
 
 def _artifacts_for(inputs: Sequence[BasisInput]) -> dict[str, Artifact]:

@@ -1,4 +1,4 @@
-"""BioRepo — one write function for the corpus (OF-BLD-012 §2.3, §7.1).
+"""BioRepo — one write function for a project's review decisions (OF-BLD-012 §2.3, §7.1).
 
 Every review decision goes through `write(decision)`. There is no second
 path: not the API, not a script, not a test helper. A project's decisions
@@ -37,9 +37,11 @@ Refusals reach the API as 422 with the rule and the reason. Nothing repairs a
 bad decision: a quote that fails is not trimmed, a missing reviewer is not
 filled in, an unfetched paper is not fetched on the way through.
 
-What a stored decision looks like: exactly what the browser sent, plus — for
-a gold decision that anchored on the record's own quote — that quote and
-section copied onto it, so every gold decision has a quote by construction.
+What a stored decision looks like: what the browser sent, with its
+provenance computed from what the decision is (`provenance_of`; ADR-006: no
+person sets provenance), plus — for a gold decision that anchored on the
+record's own quote — that quote and section copied onto it, so every gold
+decision has a quote by construction.
 """
 from __future__ import annotations
 
@@ -211,6 +213,17 @@ def _is_withdrawal(d: ReviewDecision) -> bool:
     )
 
 
+def provenance_of(d: ReviewDecision) -> str:
+    """The class a decision gives its record, computed from what the decision
+    is: gold for a gold value, verified for a record a named reviewer
+    promoted against the paper's own words, and unverified for anything else,
+    a rejection or a correction left unverified among them. The client's
+    `provenanceOf` reads a decided record the same way."""
+    if d.status == "verified":
+        return "gold" if _is_gold(d) else "verified"
+    return "unverified"
+
+
 # ── the write ──────────────────────────────────────────────────────────
 
 
@@ -268,7 +281,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
         except (TypeError, ValueError, UnitError) as e:
             raise WriteRefused("unit", f"the {what} value {typed.value!r} {typed.unit!r} for {field_id}: {e}") from e
 
-    stored = decision.model_copy()
+    stored = decision.model_copy(update={"provenance": provenance_of(decision)})
     typed = decision.corrected is not None or decision.gold is not None
     if _is_withdrawal(decision):
         # An undo: the record as it was before anyone decided, the candidate

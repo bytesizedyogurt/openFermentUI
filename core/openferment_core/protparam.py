@@ -16,11 +16,10 @@ signature and named in the basis, and the answer is what it returns.
 
 A SEQUENCE IS NAMED, NEVER TYPED BY A MODEL. A product entry carries its own
 chain (`sequence`, with `sequenceSource` saying where it was read, a UniProt
-accession say) in the products catalogue the corpus carries
-(`corpus.Corpus.products`); the endpoints take a product id, and `protparam()`
-takes a sequence only from a caller that names its source. No product entry
-carries a sequence (none is invented), so every product's properties are
-missing: `ProtParamMissing`, a 404 whose words say the entry carries none.
+accession say) in the products catalogue (`products()`); the endpoints take a
+product id, and `protparam()` takes a sequence only from a caller that names
+its source. No store holds a products catalogue yet and none is invented, so
+every product's properties are missing: `ProtParamMissing`, a 404 in words.
 
 REFUSED WHOLE. A sequence holding anything but the twenty standard amino
 acids' one-letter codes (the library's own `protein_letters`), in upper case,

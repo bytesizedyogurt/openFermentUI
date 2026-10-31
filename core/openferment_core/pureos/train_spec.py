@@ -1110,7 +1110,7 @@ def unit_scope(spec: TrainSpec, unit: TrainUnitSpec, chemicals: list[str], pool:
                 f"a record of {field} binds the product's {base} alone ({product_chemical or 'no chemical is named for the product'})"))
             continue
         if pool is None:
-            pool_note = "No evidence pool here (no corpus exported), so no record binds."
+            pool_note = "No evidence pool here, so no record binds."
             continue
         named = unit.records.get(s.key)
         kept, out, bad = _records_for(field, e, spec, pool, named)

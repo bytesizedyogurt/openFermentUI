@@ -855,7 +855,7 @@ class ReviewDecision(BaseModel):
 class BioRepo(BaseModel):
     """A project's standing review decisions (§2.2, §7.1), as `biorepo.read`
     replays them from the decision rows: human decisions and the short quotes
-    that anchor them. This IS the corpus growing.
+    that anchor them. This IS the project's records growing.
 
     `decisions` is keyed by recordId. `records` holds the candidates those
     decisions were made about — accepted ones, which are new records, and

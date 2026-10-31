@@ -55,22 +55,6 @@ def _guild_projection(monkeypatch):
     monkeypatch.setattr(guild, "projection", lambda: GUILD_PROJECTION)
 
 
-# The corpus the service ships is empty (alpha 2.0 deleted the seed, ADR-010).
-# A test of a rule that acts on papers and records asks for this fixture and
-# reads fixtures/test-corpus.json, a fictional corpus of placeholder papers.
-TEST_CORPUS = Path(__file__).parent / "fixtures" / "test-corpus.json"
-
-
-@pytest.fixture
-def test_corpus(monkeypatch):
-    from openferment_core import corpus
-
-    monkeypatch.setattr(corpus, "DATA", TEST_CORPUS)
-    corpus.load_corpus.cache_clear()
-    yield corpus.load_corpus()
-    corpus.load_corpus.cache_clear()
-
-
 # ── PostgreSQL (alpha 2.0, ADR-001; execution prompt §8.1) ─────────────────
 #
 # One disposable database per test session, made on the server that

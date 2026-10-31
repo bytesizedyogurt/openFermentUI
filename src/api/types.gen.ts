@@ -2473,9 +2473,8 @@ export interface paths {
         };
         /**
          * Witness Runs
-         * @description RunOutput[] recomputed from every candidates/*.json against the seed.
-         *     Empty until something has been extracted. 503 when the corpus has not
-         *     been generated, because there is nothing to score against.
+         * @description RunOutput[] recomputed from the project's candidates against the values
+         *     its reviewers typed. Empty until something has been extracted.
          */
         get: operations["witness_runs_api_witness_runs_get"];
         put?: never;

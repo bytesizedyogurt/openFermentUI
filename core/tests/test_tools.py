@@ -1,7 +1,8 @@
 """One tool registry and the first two tools (OF-BLD-014 §3.4, E.6).
 
-The pool is a fixture: a tiny corpus.json written here, and candidates made
-here, labelled as stand-ins. Unit conversion runs on the real unit tables.
+The pool is a fixture: a few records and papers in a record's shape, and
+candidates made here, labelled as stand-ins. Unit conversion runs on the
+real unit tables.
 """
 from __future__ import annotations
 
@@ -11,21 +12,20 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, evidence_pool, intake, tools
-from openferment_core.corpus import load_corpus
 from openferment_core.models import Candidate, Quantity, ReviewDecision
 
 STAND_IN = "STAND-IN for test_tools: invented records, not a paper's values."
 
-CORPUS = {
+FIXTURE = {
     "_fixture": STAND_IN,
     "papers": [
         {"id": "X1", "title": "Polyhydroxybutyrate from xylose hydrolysate", "year": 2020, "textSource": "full-text", "sections": [{"id": "s1", "heading": "Results"}]},
         {"id": "X2", "title": "Casein expression in algae", "year": 2019, "textSource": "curation-note", "sections": [{"id": "s1", "heading": "Results"}]},
     ],
     "records": [
-        {"id": "r-X1-1", "paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "fieldLabel": "Secreted titer", "value": 2.5, "unit": "g L-1", "quote": "polyhydroxybutyrate titre on xylose hydrolysate", "provenance": "curated", "status": "unverified", "primary": True, "strainId": "c-necator-h16", "conditions": None, "source": "seed"},
-        {"id": "r-X2-1", "paperId": "X2", "sectionId": "s1", "field": "expression_pct_tsp", "fieldLabel": "Expression level (% TSP)", "value": 0.2, "unit": "% TSP", "quote": "casein expression level in algae", "provenance": "curated", "status": "unverified", "primary": True, "strainId": "cw15", "conditions": None, "source": "seed"},
-        {"id": "r-X2-2", "paperId": "X2", "sectionId": "s1", "field": "expression_pct_tsp", "fieldLabel": "Expression level (% TSP)", "value": 0.3, "unit": "% TSP", "quote": "casein expression rejected reading", "provenance": "curated", "status": "rejected", "primary": True, "strainId": "cw15", "conditions": None, "source": "seed"},
+        {"id": "r-X1-1", "paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "fieldLabel": "Secreted titer", "value": 2.5, "unit": "g L-1", "quote": "polyhydroxybutyrate titre on xylose hydrolysate", "provenance": "curated", "status": "unverified", "primary": True, "strainId": "c-necator-h16", "conditions": None, "source": "fixture"},
+        {"id": "r-X2-1", "paperId": "X2", "sectionId": "s1", "field": "expression_pct_tsp", "fieldLabel": "Expression level (% TSP)", "value": 0.2, "unit": "% TSP", "quote": "casein expression level in algae", "provenance": "curated", "status": "unverified", "primary": True, "strainId": "cw15", "conditions": None, "source": "fixture"},
+        {"id": "r-X2-2", "paperId": "X2", "sectionId": "s1", "field": "expression_pct_tsp", "fieldLabel": "Expression level (% TSP)", "value": 0.3, "unit": "% TSP", "quote": "casein expression rejected reading", "provenance": "curated", "status": "rejected", "primary": True, "strainId": "cw15", "conditions": None, "source": "fixture"},
     ],
 }
 
@@ -41,15 +41,13 @@ def _candidate(cid: str, *, field="titer_secreted", value=900.0, unit="mg L-1", 
 @pytest.fixture()
 def pool(tmp_path, monkeypatch):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    path = tmp_path / "corpus.json"
-    path.write_text(json.dumps(CORPUS), encoding="utf-8")
-    corpus = load_corpus(str(path))
     rejected = ReviewDecision(status="rejected", provenance="unverified", recordId="cl1-X1-0000000b", at="2026-10-15T00:00:00Z", reviewer="Sean Creighton", rejectReason="wrong field")
     return evidence_pool.build(
-        corpus,
         [_candidate("cl1-X1-0000000a"), _candidate("cl1-X1-0000000b"), _candidate("cl1-X1-0000000c", organism="a soil bacterium", organism_text=None, carbon=None)],
         {"cl1-X1-0000000b": rejected},
         [{"id": "titer_secreted", "name": "Secreted titer"}],
+        records=FIXTURE["records"],
+        papers=FIXTURE["papers"],
     )
 
 
@@ -65,7 +63,7 @@ def _search(pool, **kw):
 # ── the pool ───────────────────────────────────────────────────────────
 
 
-def test_the_pool_holds_seed_records_and_unrejected_candidates_as_unverified(pool):
+def test_the_pool_holds_fixed_records_and_unrejected_candidates_as_unverified(pool):
     ids = set(pool.records_by_id)
     assert ids == {"r-X1-1", "r-X2-1", "cl1-X1-0000000a", "cl1-X1-0000000c"}
     cand = pool.record("cl1-X1-0000000a")

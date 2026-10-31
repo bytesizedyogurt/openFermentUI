@@ -1867,13 +1867,9 @@ def practice_record(request: PracticeRecordRequest) -> PracticeSession:
 
 @app.get("/api/witness/runs", response_model=list[ExtractRun])
 def witness_runs() -> list[ExtractRun]:
-    """RunOutput[] recomputed from every candidates/*.json against the seed.
-    Empty until something has been extracted. 503 when the corpus has not
-    been generated, because there is nothing to score against."""
-    try:
-        return witness.runs()
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
+    """RunOutput[] recomputed from the project's candidates against the values
+    its reviewers typed. Empty until something has been extracted."""
+    return witness.runs()
 
 
 # ── Artifacts (OF-BLD-014 §3.2, E.5) ─────────────────────────────────────

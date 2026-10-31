@@ -21,9 +21,9 @@ proposal; nothing here runs a train.
 
 WHAT A RULE READS, AND WHERE IT IS HELD.
 
-- The product's CLASS. A products catalogue entry (`Corpus.products`, which
-  holds none until a project's documents bring entries: alpha 2.0 deleted the
-  seed, ADR-010) states it as its `category`, read as a word by
+- The product's CLASS. A products catalogue entry (`_catalogue().products`,
+  none until a store holds a catalogue: alpha 2.0 deleted the seed's,
+  ADR-010) states it as its `category`, read as a word by
   `CLASS_OF_CATEGORY` (each protein category a protein; a human milk
   oligosaccharide, a terpene and a glycoside a small molecule; a biopolymer a
   polymer). A product the catalogue holds no entry for but thermosteam's
@@ -31,7 +31,7 @@ WHAT A RULE READS, AND WHERE IT IS HELD.
   small molecule when the library gives it a normal boiling point (`Tb`, the
   `volatility` artifact's `boilingPoint`): a chemical that boils as a pure
   compound. A class nobody states is missing, never guessed from a name. The
-  host is a strain the catalogue holds (`Corpus.strains`).
+  host is a strain the catalogue holds (`_catalogue().strains`).
 - SECRETED OR INTRACELLULAR (`location`), as a catalogue entry states it; an
   entry that states none leaves a protein or a polymer naming it missing.
 - VOLATILITY: thermosteam's answer, one `volatility` artifact

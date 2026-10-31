@@ -16436,7 +16436,7 @@
     },
     "/api/witness/runs": {
       "get": {
-        "description": "RunOutput[] recomputed from every candidates/*.json against the seed.\nEmpty until something has been extracted. 503 when the corpus has not\nbeen generated, because there is nothing to score against.",
+        "description": "RunOutput[] recomputed from the project's candidates against the values\nits reviewers typed. Empty until something has been extracted.",
         "operationId": "witness_runs_api_witness_runs_get",
         "parameters": [
           {
