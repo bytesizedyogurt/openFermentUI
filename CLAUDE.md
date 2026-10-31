@@ -17,7 +17,7 @@
 
 - C: Install: `pnpm install --frozen-lockfile`, then `cd core && uv sync --all-extras`; this container runs Python 3.13.17 and CI runs 3.12.
 - C: Database: PostgreSQL 16 or later with pgvector. `pnpm db:up` starts `compose.yaml`'s `pgvector/pgvector:pg17`, or `OPENFERMENT_DATABASE_URL` in `core/.env` names a local server (`core/.env.example` has the development address); then `pnpm db:migrate` migrates both schemas, `openferment` and the kit's `sci_rag` (ADR-001).
-- C: The tests make databases of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names (default: the compose role on 127.0.0.1:5432) and drop them after; `pnpm db:reset` remakes the development database.
+- C: The tests make databases of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names (default: the compose role on 127.0.0.1:5432) and drop them after; `pnpm db:reset openferment_dev` remakes the development database, and the command refuses the production database `openferment`.
 - C: `pnpm verify` is the gate: sixteen stages in ADR-011's order, `check:secrets` first, about twenty minutes here; CI runs it with a pgvector service, then `pnpm prove`.
 - C: `pnpm test:core`: offline, no key, no network, about five to six minutes; it leaves out the markers `sim`, `lit`, `slow` and `live`.
 - C: `pnpm test:sim` (marker `sim`) starts the real BioSTEAM worker: a cold BioSTEAM import takes about 31 s and a reference plant builds in about 17 s; the suite takes about seven minutes.
@@ -96,7 +96,7 @@
 - C: A library plant carries its package's own numbers; a person's value or a model's estimate enters as an override with its origin (ADR-004, ADR-006).
 - C: The local embedder serves a project's corpus at this scale; `pnpm lit:report` measures retrieval against the kit's seed questions (ADR-002).
 - C: The hand-kept `src/data/types.ts` stands beside the generated types, held to the service by `check:plan`, until the screens move over one by one (ADR-007).
-- C: A review decision's provenance arrives as the label of the reviewer's action, in alpha 1.0's decision shape, and BioRepo refuses `assumed` and any estimate; computing it from the decision's kind is a debt in `docs/PROGRESS.md` (ADR-006).
+- C: A review decision keeps alpha 1.0's shape; BioRepo computes its provenance from what it decides (`biorepo.provenance_of`: gold, verified or unverified) and refuses `assumed` and any estimate (ADR-006).
 
 ## Open questions
 
@@ -131,4 +131,5 @@
 - R: `docs/history/` holds the guidance written before this build, dated 2026-10-21 (`CLAUDE`, `STATE`, `README`, `COMPONENTS`, `THIRD_PARTY`, `BUILD-SPEC`, `OF-COR-001`, `DEMO`, `build/`); grep it for facts about the tree, since it carries no authority (ADR-000).
 - R: Tag `alpha-1.0` marks `d19224f`, the tree before this build, and a deleted piece returns from it (ADR-010); the tag's push waits on the owner (`docs/PROGRESS.md`, Blockers).
 - C: `docs/handoff/2026-10/` holds the owner's handoff documents (white paper, development plan, reference atlas), with extracted text in `txt/`.
+- C: A citation such as OF-BLD-012 §2.3, OF-DES or OF-COR-001 in code or tests names an alpha 1.0 document; those kept are in `docs/history/`, and none carries authority.
 - C: `docs/decisions/` holds ADR-000 to ADR-014; `docs/PROGRESS.md` holds the log of every stage, the departures, the debts and the blockers; `docs/reports/` holds measured reports.

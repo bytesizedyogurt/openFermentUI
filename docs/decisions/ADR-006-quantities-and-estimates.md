@@ -130,3 +130,16 @@ task (development plan §8).
   model that made it and what it rests on (`AnswerPlanView`'s `ClaimValues`).
 - `check:tools` rule 6 holds every tool's input schema to the same line: a number at the count
   fields or a quantity's value and range, and none at all in a fermOS or pureOS tool (E.4‴).
+
+### 8.5 (2026-10-31): a review decision's provenance is computed
+
+- `biorepo.provenance_of` computes the class a decision gives its record from what the decision
+  is: `gold` for a verified decision with a gold value, `verified` for any other verified one, and
+  `unverified` for a rejection, a withdrawal or a correction left unverified. `biorepo.write`
+  stores that class whatever label the request carried, a dry run answers with it, and
+  `import_alpha1` computes it for every decision it carries from alpha 1.0.
+- The evidence pool (`evidence_pool.candidate_record`) gives a decided candidate the computed
+  class, the corrected value and the re-anchored sentence, so an accepted record reaches Postdoc
+  and Home as `verified`. Before 8.5 it reached them as the extractor wrote it, `unverified`.
+- The browser's `provenanceOf` reads a decided record by the same rule; `test_evidence_pool.py`
+  holds the service's.

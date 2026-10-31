@@ -38,6 +38,18 @@ fixed here: Intake refused the `SGD:<id>` form the sources file uses, and the AP
 Postdoc request once the plan schema's typed values joined seven strict tools (ADR-008,
 Implementation 8).
 
+After the pull request, step 8.5 swept out what alpha 1.0 left behind (Log, stage 8): `corpus.py`
+and every reader of a projection of the deleted seed, which a checkout that ran alpha 1.0 still
+holds on disk; `single` mode, the corpus fields of health and ready, and `ask-batch`; program-era
+dead code in the service and the client; and words on screen that described the simulated
+prototype. Two faults it found are fixed with it: an accepted candidate reached Postdoc as
+`unverified` (the pool now applies the decisions, and a decision's provenance is computed), and a
+concurrency test had skipped on every run since stage 1. Its second half found three more, each
+work stage 2 moved to the service that a reader still looked for in the browser or the seed:
+Postdoc's Proforma tools refused every scenario a project made, the module reads listed none of
+its runbooks, and the review queue hid, and never posted, a decision on a document with no PMCID,
+DOI or PMID. Each now reads the project's rows.
+
 ## Last green runs
 
 | When (UTC) | Suite | Result | Time | Commit |
@@ -155,6 +167,8 @@ Implementation 8).
 | §7.4, stage 2 | A Live conversation is kept whole in `conversations.body`; `turns` and `tool_calls` wait for stage 6 | Stage 6 gives Postdoc its memory on the server and fills them |
 | §7.4, stage 2 | `project_state.py` checks a page's row for kind, id and shape, and keeps its content as sent | The content's rules run where they always ran; stage 7 generates the page's types from Pydantic models |
 | §5.5, stage 2 | `core/data/biorepo.json` stays tracked, and nothing reads it | Removing it from git would delete a live instance's working copy on its next pull, decisions and all, before they could be carried into a project (§11.1). `pnpm db:import-alpha1` carries it; it leaves git once the owner says the live instance's import read right |
+| §5.4, stage 8.5 | The evidence pool keeps BM25 as its ranker: it loads the project's candidates and decisions from PostgreSQL and ranks them in memory for one question, with the coverage rule, the filters and the cap of ten | A project's records are few, and the ranking rules are tested on their own (`test_evidence_pool.py`); a ranking in SQL would change what Postdoc cites without a measurement to say it is better |
+| §6.2, stage 8.5 | `src/engine/units.ts` stays the browser's unit engine, mirroring `units.py` on the same tables (`schema/units.json`), held equal by the fixture `pnpm export:unit-fixtures` writes and `test_units.py` asserts | Every screen formats and converts with it; serving each conversion from the service is a change to every caller, after alpha 2.0 |
 | §4, §5.2 | The record fields, the vocabulary (carbon sources and unit operations) and the unit tables live in `core/openferment_core/schema/` (`fields.yaml`, `vocabulary.yaml`, `units.json`), with no range and no example value; `src/data/ontology.ts` and `vocabulary.ts` mirror them, held equal by `test_schema.py` through the fixture `pnpm export:unit-fixtures` writes. BioRepo's typed-value refusal is renamed `range` → `unit`; `pyyaml` is a direct dependency | The service needs the fields without the TypeScript seed; a range is a number about a field (ADR-010) |
 
 ## Blockers
@@ -162,42 +176,47 @@ Implementation 8).
 | Since | Blocker | Next command |
 |---|---|---|
 | 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. Nothing is lost by waiting: the service no longer writes them | On the Mini: `brew install postgresql@17 pgvector && brew services start postgresql@17`; `scripts/host/install.sh` (makes the database `openferment` and names it in `core/.env`; when `core/data/biorepo.json` holds uncommitted decisions, the old deploy asks to commit and push them first, which keeps them); then `pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, and `OPENFERMENT_PROJECT=<the id it prints>` in `core/.env` for the nightly extraction |
+| 2026-10-31 | Owner decision: the live instance's PostgreSQL has no backup. `pnpm ready` used to say a git push "backs up" Guild's decisions, which stopped being true when they moved into the database at stage 2; the row is gone (8.5). Guild's ledger is personnel data and never enters git | Choose where a dump of the database goes, then add it to the nightly (`scripts/host/nightly.sh`): `pg_dump openferment` to that place |
 | 2026-10-30 | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0` ends with "unexpected disconnect while reading sideband packet", lightweight and annotated alike. The tag exists in this container only. Commit `d19224f` stays reachable as an ancestor of `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git push origin alpha-1.0` |
 
 ## Known debts (each names the stage that pays it)
 
 | Debt | Paid at |
 |---|---|
-| `core/tests/standins.py` (27 test files use it) and `test_proforma_slow.py` keep test values that A4's `rg` clause would find: stand-in records on real strain ids, a closed-form ethanol evaluator with the theoretical yield, and the benchmark price this build once measured (a departure above) | after alpha 2.0: fixtures read from the library plants |
-| A review decision's provenance is the label of the reviewer's action, kept as the decision carries it (alpha 1.0's shape); `biorepo.write` refuses `assumed`, any estimate and a gold value on an unverified decision, and otherwise keeps the label as sent. Computing it from the decision's kind (verified → curated, a gold value → gold) is owed to ADR-006 | the next change to `biorepo.write` |
+| `core/tests/standins.py` (27 test files use it) keeps stand-in records on real strain ids, a closed-form ethanol evaluator and `STANDIN_THEORETICAL`, the theoretical yield on glucose; `test_proforma_slow.py`, `test_proforma.py` and `flowsheets/cornstover_benchmark.py` keep the benchmark price this build once measured (1.968 USD per gallon) and the package's regression values to test the parser. A4's `rg` clause finds them (a departure above) | stage 4 (fixtures read from the library plants); still open: after alpha 2.0 |
+| Postdoc's scripted stand-in model and the test pool still speak of PHB, casein and xylose hydrolysate (`test_tools.py`, `test_postdoc_agent.py` and the tests that import their fixtures); §5.3 wants them to speak only of library plants and the kit's demo corpus. The words are test material, and no value of them reaches the service | after alpha 2.0, with the stand-ins above |
+| pureOS's chemical-set key is still called `program` (`TrainSpec.program`, and `FlowsheetInfo`, `Train`, `TrainSummary`, `TrainProposal`); kept trains and train runs validate on that name, and its texts ("the yeast program's chemicals", `PROGRAM_CHEMICALS`, `fermos.NAMED_NOTE`'s "program filter", the kinetics settings' notes) are hashed into artifact ids, so renaming them shifts the id of every new computation. The refusals and descriptions of pureOS, the vessel and the shelf still say "the yeast program" beside the key, and fermOS's note on every fit's deposition input ("the readings as the browser sent them; the service cannot see the deposition itself"), hashed the same way, is untrue since stage 2. The screens no longer say "program" | one stage that renames the key with a before-validator for stored rows and accepts the id shift |
+| `kinetics.py` keeps the storage machinery of the deleted `storage_v1` family (the N and Q states, `Mode.storing`, the N event, the Storage group); no family sets `has_N` or `has_Q`, so none of it runs. §11.5 keeps the kinetics families untouched, and dropping the state slots changes LSODA's finite-difference Jacobian, which a replay compares exactly | the next change to the kinetics families, with every family's trajectories held bit for bit |
+| `proforma._strain_labels`' per-program species map serves the vessel's organism check; with no catalogue it is empty in production, and its two notes are hashed into vessel designs | with the `program` key above |
 | A retrieval report over a project's own corpus with the lanes that call a model (the graph, HyDE, a judge grading the answers): alpha 1.0's paid lanes (Live owed, §4.5) | after alpha 2.0, with the key: `pnpm lit:report` extended to a project and a judge route |
-| The `openferment` MCP server did not connect at this session's start within the client's 30 s (no `core/.env` then, so no database named); `pnpm test:core`'s `test_mcp.py` holds its tools in process | paid after the pull request: both servers connected at the next session's start, and both answered over stdio (stage 8 log) |
 | The kit's `search_entities` and `get_entity_relationships` read the concept graph whole (every project's entities, relationships and evidence quotes), so the kit's MCP server leaves them off; nothing in openFerment builds the graph yet | before a graph is built: scope both to the project's chunks, or serve them from openFerment's registry |
-| `core/tests/standins.py` carries invented stand-in records (on real strain ids) and a closed-form evaluator for rule tests | stage 4: fixtures from `biorefineries` library plants; still open at stage 8: after alpha 2.0 |
-| `program` survives as pureOS's chemical-set key (`TrainSpec.program`), and as a field of `FlowsheetInfo`, `VesselSummary`, `TrainSummary` and `TrainProposal`; the UI no longer shows or filters by it; projects (stage 2) took the scoping, so what remains is the chemical-set key | stage 4 (the adapter); still open at stage 8: after alpha 2.0 |
-| Proforma tool rules that need a successful run of a seed scenario (`run_flowsheet` keeps one run and audits it; `stream_table` on a scenario's run) lost their tests with the seed scenarios | stage 5, when scenarios live in projects; still open at stage 8: after alpha 2.0 |
-| The vessel's organism check reads the yeast program's species from a strain catalogue that is empty; its test supplies one | stage 3 (strains with a project's records) or stage 4; still open at stage 8: after alpha 2.0 |
-| `test_proforma_slow.py` and `flowsheets/cornstover_benchmark.py` still state the benchmark price this build once measured (1.968 USD per gallon); the browser no longer shows it | stage 4: the adapter holds a library plant to its package's own test values; still open at stage 8: after alpha 2.0 |
-| `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program | the vocabulary review at stage 3; still open at stage 8: after alpha 2.0 |
-| `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's funnel | after alpha 2.0 (stage 7 left the module screens as they were, now views inside a project) |
+| Catalogues that left with the seed are empty in production and supplied by fixtures in tests: the strain catalogue and its aliases, the proposer's products and hosts, Guild's skills, protocol steps and lessons, Primer's lessons. Until a store holds them, every pureOS proposal is refused for want of a host on file and Guild refuses an entry that names a skill | after alpha 2.0, each catalogue's store with its project |
+| `stream_table` on a scenario's kept run lost its test with the seed scenarios; `run_flowsheet` and `selling_price` on a scenario the project keeps have theirs again (8.5) | a test that reads the stream table of the run `test_tools` now makes |
+| The module reads leave a project's depositions and measured evidence out (`module_stores.PARTIAL` says so in every read's footer); the Runbooks page shows them | a `deposition` kind in the runbooks read |
+| Proforma's screens keep alpha 1.0's split between a held scenario and one made here (`createdScenarioIds`, the index's `needsBinding`, the `/api/proforma/scenarios` path); every scenario is the project's now, so the held path is never taken | the screens read every scenario as the project's |
+| `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's research funnel, whose words still speak of a clearance reading and a molecule | after alpha 2.0 (stage 7 left the module screens as they were, now views inside a project) |
 | `src/data/types.ts` is still hand-kept beside the generated `src/api/types.gen.ts`, held to the service by `check:plan`'s pairs; the screens read the hand-kept types | the screens move to the generated types one by one, after alpha 2.0 |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, §9.3) are not built; the walk and the smoke run against the real service | after alpha 2.0 |
-| Dead service paths the deletions left: the storage machinery (`kinetics.py`'s N and Q states, `fermos._no_broth_product`'s store-in-cells branch, `proforma.fit_info`'s store branch), `proforma._strain_labels`' program map, `proforma.basis_inputs`' `cap` and the yield cap in `_specs`; `fermos.NAMED_NOTE` still says "program" (its text is hashed into every simulation's basis) | stage 4, with the adapter; still open at stage 8: after alpha 2.0 |
-| Catalogues that left with the seed are empty in production and supplied by fixtures in tests: held scenarios, the strain catalogue and its aliases, the proposer's products and hosts. Until a project's records carry them, every pureOS proposal is refused for want of a host on file. Stage 2 gave each project its tables; what fills them is the literature | stage 3 (records), stage 5 (scenarios); still open at stage 8: after alpha 2.0 |
-| No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | stage 4; still open at stage 8: after alpha 2.0 |
-| `test_proforma.py` holds the package's own regression values and this build's benchmark price to test the parser | stage 4 (A4 review); still open at stage 8: after alpha 2.0 |
-| `core/tests/standins.py` keeps a closed-form ethanol evaluator, stand-in yeast records and `STANDIN_THEORETICAL` | stage 4 (with the row above on stand-ins); still open at stage 8: after alpha 2.0 |
-| `pnpm smoke` opens the rail entries and checks nothing more; alpha 1.0's smoke also walked review, deposition, the runs and the redirects against the service double | paid at stage 7: the walk (`scripts/walk.ts`, proof step 9) goes through Home, a project, a document pasted and searched, a run's report and its graph, a conversation and a runbook on the real service |
-| `test_biorepo.py::test_the_committed_file_is_the_model_and_starts_empty` holds the shape of a tracked file nothing reads | when `core/data/biorepo.json` leaves git (owner action above) |
+| No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | still open: after alpha 2.0 |
+| `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.0 |
+| `openferment.records` (migration 0001, §7.4) is written by no code: a project's records are its candidates and the decisions on them (`biorepo.py`) | the owner's call: write it from `biorepo.write`, or drop it in a migration |
+| `test_biorepo.py::test_the_committed_file_is_the_model_and_starts_empty` holds the shape of a tracked file nothing reads | when `core/data/biorepo.json` leaves git (owner action, Blockers) |
 | The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run only as `bash -n` here: this container is not a Mac | the owner's first install on the Mini |
-| `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run: this container has no Docker daemon, so stages 2 and 3 run on the distribution's PostgreSQL 16 with pgvector 0.6.0. CI's verify runs the same image as a service from 3.1 on (the workflow had no database through stage 2, so verify failed in CI on the stage 2 pushes) | the first CI run of 3.1, or the owner's machine |
-| The kit's MCP server (`literature_mcp.py`) has run only as an import here: the session's MCP clients start from `.mcp.json` at session start | the next session, or the owner's Claude Code |
-| `src/data/nav.ts` still calls the rail "THE TWELVE" and exports `ELEVEN` (ten destinations since Dominion left) | stage 7; still open at stage 8: after alpha 2.0 |
-| fermOS, pureOS and Proforma take a run's values as `Override`s (a person's assumption or a model's estimate) and name each input's source in the basis, which `basis.origin_of` reads as an `Origin`; their requests are not yet lists of `Quantity` objects, and their runs are artifacts with no row in `runs` (engine runs alone are) | stage 6 (tool inputs as `Quantity` objects), stage 7 (`gen:api`); still open at stage 8: after alpha 2.0 |
-| The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | stage 7, when the UI reads the library shelf; still open at stage 8: after alpha 2.0 |
+| `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | the owner's machine |
+| fermOS, pureOS and Proforma take a run's values as `Override`s (a person's assumption or a model's estimate) and name each input's source in the basis, which `basis.origin_of` reads as an `Origin`; their requests are not yet lists of `Quantity` objects, and their runs are artifacts with no row in `runs` (engine runs alone are) | still open: after alpha 2.0 |
+| The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | when the UI reads the library shelf alone, after alpha 2.0 |
 | A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and not offered | after alpha 2.0 (4.3 composes the cellulosic plant's pretreatment and fermentation instead) |
 | A second organism's reaction set for the composed flowsheet: the package holds one | when a package or a record gives another |
-| Small handler mismatches the worker op reference found (4.4): `train_spec.py` sends `train_run` a `product` its handler reads nowhere; `grid` and `montecarlo` leave out the `structure` that `evaluate` and `run` pass on (both ops are called by tests alone); an unknown flowsheet's refusal arrives quoted (`Refused: 'there is no flowsheet …'`); an unknown catalogue type raises `CatalogueUnknown`, which callers avoid by checking the type first | the next change to those ops (stage 5 reshapes the Proforma scenarios); still open at stage 8: after alpha 2.0 |
+| Small handler mismatches the worker op reference found (4.4): `train_spec.py` sends `train_run` a `product` its handler reads nowhere; `grid` and `montecarlo` leave out the `structure` that `evaluate` and `run` pass on (both ops are called by tests alone); an unknown flowsheet's refusal arrives quoted (`Refused: 'there is no flowsheet …'`); an unknown catalogue type raises `CatalogueUnknown`, which callers avoid by checking the type first | the next change to those ops |
+| Paid: a review decision's provenance was the label the browser sent; `biorepo.provenance_of` computes it from the decision (ADR-006) | 8.5 |
+| Paid: the evidence pool put an accepted candidate in front of Postdoc as `unverified`, and Home listed it as awaiting review; the pool applies the standing decisions | 8.5 |
+| Paid: dead service paths the deletions left (Proforma's yield cap, the store branches in fermOS and Proforma, `_example`, the check:seed entry points, `ProjectionMissing`); kinetics' and the hashed texts stay (rows above) | 8.5 |
+| Paid: `src/data/nav.ts` called the rail "THE TWELVE" and exported `ELEVEN`; it exports `DESTINATIONS` | 8.5 |
+| Paid: the held scenarios were the seed's, so Postdoc's `selling_price` and `run_flowsheet`, the params scope and pureOS's naming saw none of a project's scenarios; they read the project's rows | 8.5 |
+| Paid: the client's review path kept alpha 1.0's curated-record machinery (the extractor's best candidate beside a curated record, the span carried on promotion) and its committed file's rule that a decision needs a PMCID, DOI or PMID | 8.5 |
+| Paid: `pnpm smoke` opened the rail entries and checked nothing more; the walk (`scripts/walk.ts`, proof step 9) goes through a project on the real service | stage 7 |
+| Paid: both MCP servers connect at a session's start and answer over stdio (stage 8 log) | after the pull request |
+
 ## Live owed (folded from `docs/history/STATE-2026-10-21.md` at stage 8)
 
 The two LIVE steps alpha 1.0 still owed, each judged against this build:
@@ -710,3 +729,68 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
   asks for the project before any call and says any failure in words, as `tools.run` does for
   openFerment's own server; checked over stdio with the database down (both refusals in words) and
   up again.
+- 8.5, the remnant sweep (2026-10-31). ruff's pyflakes rules and vulture over the service, knip and
+  `tsc --noUnusedLocals --noUnusedParameters` over the client, and three read-only surveys of what
+  alpha 1.0 left behind. Each commit kept `test:core` green:
+  - The lint: unused imports, f-strings with nothing to format, two request models both named
+    `ProposeRequest` (the checks' one is `CheckProposeRequest`), and a thermo test that a duplicate
+    name had hidden since it was written; it failed once it ran (its stand-in refused PHB) and
+    passes on an invented chemical.
+  - The seed's readers: `corpus.py` read alpha 1.0's generated `corpus.json`, module_stores
+    `modules.json` and Guild `skills.json`, each whenever the file was there. alpha 2.0 ships none,
+    and the live Mini's checkout still holds all three, so its first alpha 2.0 deploy would have
+    served the deleted seed. All of them are gone; test_no_seed holds that no service module names
+    a projection, in place of checking this checkout's disk. `anchor_report.py` went with them.
+  - BioRepo and Witness stand on the project's candidates and decisions alone, their tests on
+    candidates planted with the structure anchoring reads; `test_atomic`'s concurrency test, which
+    looked for corpus records and skipped on every run since stage 1, runs and passes.
+  - One loop: `/api/ask`'s `single` mode paid for a call over the empty corpus and could only
+    decline, and nothing sent it. It is gone; the plan's prompt and schema live in
+    `postdoc/plan.py`, byte for byte as the loop used them. `/api/health` and `pnpm ready` lost the
+    corpus's fields and row; `pnpm ready`'s backup row, which said a git push backs decisions up,
+    is gone (Blockers); `pnpm ask:batch` and `pnpm bundle:single` are deleted.
+  - The evidence pool is the project's candidates as the standing decisions leave them, its papers
+    the documents the project holds; `biorepo.provenance_of` computes a decision's provenance from
+    what it is, where the label the browser sent was kept (ADR-006, Implementation 8.5).
+  - Program-era dead code: Proforma's yield cap, the store branches no family reaches, `_example`,
+    the check:seed entry points, `held_scenarios` where it said `seed_scenarios`; in the client the
+    authored cost model, the simulated chat's types, Dominion's routes and patent components, the
+    seed's extractor runs, the PHA read-back, the built entries of the subsystem map. `tsconfig`
+    now fails typecheck on an unused local or parameter.
+  - On screen: Settings said decisions are stored in a committed `biorepo.json`; its colophon,
+    fidelity table and version rows, the Architecture page (which lacked pureOS and called fermOS
+    unbuilt), Home, the guided tour and Witness (whose provisional mode stood curated seed records in
+    as gold) now say what alpha 2.0 does. Witness counts the values reviewers typed, as witness.py
+    does.
+  - Kept, with reasons in the debts: the `program` key and the texts hashed into artifact ids,
+    kinetics' storage branches (§11.5), the test stand-ins, the hand-kept client types.
+  - CI: the client's dead-code commit deleted `src/data/runOutputs.ts` without regenerating the
+    package map, and verify's `gen:components --check` failed on the three pushes that followed;
+    `c8ba32b` regenerated it, verified in a clean worktree first, and CI went green.
+  - The second half, from a read-only survey of every place that still described alpha 1.0
+    (about sixty a person or Postdoc reads, about seventy comments):
+    - Stage 2 made a project's Proforma scenarios, overrides, fits, runbooks and locks rows of
+      the project (project_state.py), and the service's own readers went on reading the seed's
+      projection, empty since stage 1. `proforma.held_scenarios` now reads the project's
+      BioSTEAM scenarios; `selling_price` names and cites them, and `run_flowsheet` runs one as
+      its page does (`project_state.run_request`: its flowsheet and parts, the overrides a person
+      set there and the fits chosen for it); the params scope, pureOS's naming of a run and the
+      module reads see them, and the runbooks read lists the project's runbooks with their locks.
+      Their refusals, which sent Postdoc to "the browser that made it", say what the project
+      keeps. `test_tools` runs a kept scenario once its person's overrides bind every input.
+    - The review queue's filter and the client's refusal rule kept alpha 1.0's committed-file
+      rule: a decision on a document with no PMCID, DOI or PMID was kept in the browser only, and
+      such records were hidden from the default queue, though `biorepo.write` keeps a decision on
+      any document the project holds (an upload, an OSTI report, an SGD entry). The rule is the
+      service's now (`paperHeld`). The review card's comparison with a curated record, the span
+      carried on promotion and their helpers in review.ts are gone: every record is a candidate.
+    - `import_alpha1` computes each decision's provenance as `biorepo.write` does.
+    - The paper type loses the `curation-note` text source and the `catalogued` ingest state on
+      both sides of the API, and the corpus fields nothing read (thread, tranche, corpusRole,
+      verifyNeeded); their branches in the reader, the citation chip and BioRepo go with them.
+    - Words: the tool descriptions and refusals Postdoc reads (`search_records`, Primer, kept
+      trains, Guild's skills), route and model docstrings (the API document regenerated), the
+      screens (the provenance legend's gold and curated labels, Home, the review card and its
+      export, the reader, Intake, Organisms, the strain page, runbooks, depositions, Proforma,
+      pureOS, Postdoc, the shortcut sheet), the export headers that stamped "corpus OF-COR-001
+      v1.0", and the comments of the service and the client.
