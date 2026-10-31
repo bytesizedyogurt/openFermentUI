@@ -1,5 +1,6 @@
-// Settings (OF-DES-001 §8.15) — appearance, units, corpus ownership, the
-// export center, and the colophon that tells the truth about this build.
+// Settings (OF-DES-001 §8.15) — appearance, units, the reviewer and the
+// record fields, the export center, and the colophon that tells the truth
+// about this build.
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   Award,
@@ -72,12 +73,12 @@ const SECTIONS: SectionDef[] = [
     id: 'architecture',
     label: 'Architecture',
     blurb:
-      'The eighteen named components and the seven layers they sit in — the map the system is built from.',
+      'The named components and the layers they sit in — the map the system is built from.',
   },
   {
     id: 'corpus',
-    label: 'Corpus & ontology',
-    blurb: 'Owner controls: the ontology reference, the gold set, and clearing this browser’s data.',
+    label: 'Reviewer & ontology',
+    blurb: 'Owner controls: who signs the decisions made here, the record fields, the gold set, and clearing this browser’s data.',
     owner: true,
   },
   {
@@ -456,7 +457,7 @@ function UnitsSection() {
           right={
             <Explain label="What does the SI setting change?">
               Records store the number in the unit the source reported it in, plus a canonical SI
-              twin recomputed from that pair when the corpus loads. Switching to SI changes which of
+              twin recomputed from that pair when the records load. Switching to SI changes which of
               the two is displayed in tables, chips and protocol references — it never rewrites the
               stored value, and the reported figure is always one hover away.
             </Explain>
@@ -634,8 +635,8 @@ function CorpusSection() {
   return (
     <div className="space-y-6">
       <Callout kind="info" title="Owner view">
-        This panel is the owner&rsquo;s. Everything on it edits the corpus for the whole session; there is
-        no second reviewer to undo it for you.
+        This panel is the owner&rsquo;s: who signs the decisions made in this browser, the fields every
+        value is typed to, and this browser&rsquo;s data. There is no second reviewer to undo it for you.
       </Callout>
 
       <section>
@@ -654,12 +655,11 @@ function CorpusSection() {
             />
           </Row>
           <p className="text-body text-ink-soft mt-3 max-w-3xl">
-            Every decision you make in the review queue is stored against this name, in{' '}
-            <code className="font-mono text-caption">core/data/biorepo.json</code>, which is
-            committed. A record is only verified when a named person promoted it against a sentence
-            in the paper&rsquo;s own text — so the service refuses a decision signed by nobody, or
-            by a word like &ldquo;you&rdquo; that names nobody. The name is kept in this browser and is not
-            sent anywhere except with a decision.
+            Every decision you make in the review queue is stored against this name by the service,
+            among the open project&rsquo;s decisions. A record is only verified when a named person
+            promoted it against a sentence in the paper&rsquo;s own text — so the service refuses a
+            decision signed by nobody, or by a word like &ldquo;you&rdquo; that names nobody. The name is
+            kept in this browser and is sent only with a decision.
           </p>
         </Card>
       </section>
@@ -682,7 +682,7 @@ function CorpusSection() {
             </div>
             <div>
               <div className="text-caption uppercase tracking-wide text-ink-soft">
-                Papers in corpus
+                Documents held
               </div>
               <div className="font-num text-display leading-tight">{papers.length}</div>
             </div>
@@ -730,11 +730,9 @@ function CorpusSection() {
         <Card className="p-3">
           {gold.length === 0 ? (
             <div className="text-body text-ink-soft">
-              No records are flagged for the gold set, and none ship flagged: a gold annotation
-              has to be made against the paper's own words, and no full text has been retrieved.
-              Flag one with <span className="kbd">g</span> in the review queue and it joins the
-              baseline immediately — but nothing scores against that baseline until an extractor
-              has actually been run.
+              No record is flagged for the gold set. A gold annotation is made against a sentence of
+              a document the project holds: flag one with <span className="kbd">g</span> in the
+              review queue and it joins the values Witness scores the extractor against.
             </div>
           ) : (
             <>
@@ -977,7 +975,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Navigation, routing, deep links, command palette',
     fidelity: 'Full',
     notes:
-      'Every screen is hash-addressable and shareable within the session; the palette searches papers, parameters, protocols and actions.',
+      'Every screen has an address inside its project (/p/:project/…); the palette searches papers, parameters, protocols and actions.',
   },
   {
     feature: 'Theme, density, reduced motion',
@@ -991,15 +989,16 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
       'Sorting, facets, column visibility, keyboard row traversal and virtualization past 200 rows are real; exports write real files.',
   },
   {
-    feature: 'Global and entity search',
-    fidelity: 'Full',
-    notes: 'Lexical scoring over the in-memory corpus. No search service is contacted.',
+    feature: 'Search over the project’s documents',
+    fidelity: 'Full, through the service when it is running',
+    notes:
+      'Sci RAG Kit searches the passages of the documents the project holds, embedded on the service’s machine, and answers a question with the passages it cites. With the service down, nothing is searched.',
   },
   {
     feature: 'Citation chips and reader span anchoring',
     fidelity: 'Full',
     notes:
-      'Every chip resolves to a section, and the quote is found in that section by string match and highlighted in place. The section holds the curator’s catalogue note, so a span anchors to curator prose rather than to the paper’s own words.',
+      'Every chip resolves to a passage of a document the project holds, and the quote is found in that passage and highlighted in place.',
   },
   {
     feature: 'Unit-aware fields and the SI toggle',
@@ -1008,26 +1007,25 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Review queue',
-    fidelity: 'Full',
+    fidelity: 'Full, through the service when it is running',
     notes:
-      'Accept, reject, edit, gold-flag and undo mutate the session record set and propagate to strain pages, protocols and metrics.',
+      'Accept, reject, edit, gold-flag and undo post a decision the service holds to its anchoring rules and keeps under the project; one made while the service is away waits in this browser until it answers.',
   },
   {
     feature: 'Validation metrics',
     fidelity: 'Real, from the service when it is running',
     notes:
-      'Witness scores the extractor\'s run (claude-1) against the curated records on the papers it fetched, and labels the figures provisional with the number of records they stand on. With the service down, or before any run, it shows what unblocks a figure, and no figure.',
+      'Witness scores the extractor\'s run (claude-1) against the values reviewers typed on the documents the project holds. Before any run or any typed value, it shows what unblocks a figure, and no figure.',
   },
   {
     feature: 'Leave-one-out methodology',
     fidelity: 'Visual + explainer',
-    notes:
-      'The Sim does not train models. The panel explains what a leave-one-out evaluation would mean; no fold is ever run.',
+    notes: 'The panel explains what a leave-one-out evaluation would mean; no fold is ever run.',
   },
   {
     feature: 'Organism strip plots',
     fidelity: 'Full',
-    notes: 'Drawn from the live record set — points move as you verify, edit or reject.',
+    notes: 'Drawn from the project’s records — points move as you verify, edit or reject.',
   },
   {
     feature: 'Protocol scaling and materials math',
@@ -1055,7 +1053,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Simulation results',
     fidelity: 'Full, through the service when it is running',
     notes:
-      'A Proforma scenario runs on BioSTEAM in the service and is kept as an artifact with its inputs. The authored cost-model grids of alpha 1.0 left with the seed (alpha 2.0).',
+      'A library plant or an openFerment flowsheet runs on BioSTEAM in the service and is kept as a run with its inputs and their origins, its tables, its SFF file and the versions it ran on.',
   },
   {
     feature: 'Scenario compare',
@@ -1066,19 +1064,19 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Agent chat',
     fidelity: 'Real model call, through openferment-core',
     notes:
-      'Postdoc, when the service is running, on the model its health check names (Claude Opus 5.5 with Sonnet 5.5 as fallback unless core/.env says otherwise): a bounded loop of tools, then a validated plan, and the browser renders every value from the cited record — the prose carries no numbers of its own. A follow-up sends the conversation\'s earlier questions and claims in words. With the service down Postdoc says so and how to start it, and keeps the conversations and the typed question; nothing answers in its place.',
+      'Postdoc, when the service is running, on the models its routing table names: a bounded loop of tools, then a validated plan in which every number carries its origin and an estimate is marked as one. The service keeps each conversation, and a follow-up reads it there. With the service down Postdoc says so and how to start it; nothing answers in its place.',
   },
   {
     feature: 'Ingest pipeline',
-    fidelity: 'Full for Fetch and Parse, through the service when it is running',
+    fidelity: 'Full, through the service when it is running',
     notes:
-      'With the service running, Fetch asks Europe PMC for a paper\u2019s open-access text and Parse cuts it into sections, on the machine that runs the service; the text stays there and never enters the build. Extraction is its own step. With the service down, a fetch stops at its first stage and says the service is not running; nothing is retrieved.',
+      'Intake collects a paper by its PMCID, DOI, PMID, OSTI or SGD id, an uploaded file or pasted text into the project’s documents, cut into passages and embedded on the service’s machine. Extraction is its own step. With the service down nothing is collected.',
   },
   {
     feature: 'Learn lessons and checkpoints',
     fidelity: 'Full',
     notes:
-      'No lesson ships with this build: the authored lessons left with the seed (alpha 2.0). Navigation, live embeds, checkpoint grading and progress tracking work for any lesson the store holds.',
+      'No lesson ships with this build. Navigation, live embeds, checkpoint grading and progress tracking work for any lesson the store holds.',
   },
   {
     feature: 'Guided tour',
@@ -1100,7 +1098,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Real PDF rendering',
     fidelity: 'Visual',
     notes:
-      'Each entry carries the curator’s catalogue note as its text. No PDF is fetched, parsed or displayed, and no paper’s full text is present in this build.',
+      'The reader shows a document as the passages the service holds for it. No PDF is rendered.',
   },
 ];
 
@@ -1126,32 +1124,15 @@ function AboutSection() {
     return c;
   }, []);
 
-  // Identifier coverage is partial and the colophon must not round it up, so
-  // every figure below is counted from the corpus rather than written down.
-  const corpus = useMemo(() => {
-    let doi = 0;
-    let noId = 0;
-    let noAuthors = 0;
-    let verify = 0;
-    const threads = new Set<string>();
-    for (const p of papers) {
-      if (p.doi) doi++;
-      if (!p.doi && !p.pmcid && !p.pmid) noId++;
-      if (p.authors.length === 0) noAuthors++;
-      if (p.verifyNeeded) verify++;
-      if (p.thread) threads.add(p.thread);
-    }
-    return { doi, noId, noAuthors, verify, threads: threads.size };
-  }, [papers]);
-
-  const prov = useMemo(() => {
-    let curated = 0;
-    let estimate = 0;
+  // Counted from the open project rather than written down.
+  const decided = useMemo(() => {
+    let verified = 0;
+    let gold = 0;
     for (const r of records) {
-      if (r.provenance === 'curated') curated++;
-      else if (r.provenance === 'industry-estimate') estimate++;
+      if (r.gold) gold++;
+      else if (r.status === 'verified') verified++;
     }
-    return { curated, estimate };
+    return { verified, gold };
   }, [records]);
 
   return (
@@ -1161,44 +1142,28 @@ function AboutSection() {
         <Callout kind="warn" title="Read this before you believe a number on this site">
           <ul className="space-y-1.5 mt-1">
             <li>
-              <span className="font-medium">The literature is real.</span> All{' '}
-              <span className="font-num">{papers.length}</span> entries are real papers, theses,
-              patents and reports, spread over{' '}
-              <span className="font-num">{corpus.threads}</span> corpus threads, with real titles,
-              real venues and real DOIs where one exists. They are citable. Identifier coverage is
-              partial and the corpus does not pretend otherwise:{' '}
-              <span className="font-num">{corpus.doi}</span> of{' '}
-              <span className="font-num">{papers.length}</span> entries carry a DOI,{' '}
-              <span className="font-num">{corpus.noId}</span> carry no DOI, PMCID or PMID at all,{' '}
-              <span className="font-num">{corpus.noAuthors}</span> have no author list yet, and{' '}
-              <span className="font-num">{corpus.verify}</span> are flagged for verification.
-            </li>
-            <li>
-              <span className="font-medium">The build carries no paper&rsquo;s full text.</span>{' '}
-              A hand-curated entry is metadata plus a curator&rsquo;s note, so a span highlighted on
-              it anchors to the curator&rsquo;s prose. With the service running, Intake fetches
-              open-access full text onto that machine, where extraction and search read it; it never
-              enters the build. Of the <span className="font-num">{records.length}</span> extraction
-              records showing, <span className="font-num">{prov.curated}</span> are curated:
-              transcribed from the curation document and not yet checked against the source PDF;{' '}
-              <span className="font-num">{prov.estimate}</span> are industry estimates, which are
-              not evidence; and <span className="font-num">{records.length - prov.curated - prov.estimate}</span>{' '}
-              carry another provenance, shown on each by its badge. Read a value against its source
+              <span className="font-medium">Nothing scientific ships with the app.</span> The open
+              project holds <span className="font-num">{papers.length}</span> documents and{' '}
+              <span className="font-num">{records.length}</span> extraction records, all of them
+              brought in here: documents through Intake, records through extraction and review. Of
+              the records, <span className="font-num">{decided.verified}</span> are verified by a
+              named reviewer against a sentence of their document,{' '}
+              <span className="font-num">{decided.gold}</span> are gold, and the rest are
+              unverified candidates, each marked by its badge. Read a value against its source
               before you cite it.
             </li>
             <li>
-              <span className="font-medium">The extractor runs in the service, not here.</span>{' '}
-              What it extracts arrives as unverified candidates, each anchored to a sentence of a
-              fetched paper, and waits for a reviewer in Guild. Witness scores a run against the
-              curated records on the papers it fetched and labels the figures provisional; with the
-              service down, or before any run, it shows no figure.
+              <span className="font-medium">The extractor runs in the service.</span> What it
+              extracts arrives as unverified candidates, each anchored to a sentence of a document
+              the project holds, and waits for a reviewer. Witness scores a run against the values
+              reviewers typed; before any run or any typed value, it shows no figure.
             </li>
             <li>
-              <span className="font-medium">What you do here is kept in this browser.</span>{' '}
-              Depositions, review decisions, runbook locks, the lessons finished here, Postdoc&rsquo;s
-              conversations and this browser&rsquo;s copy of Guild&rsquo;s ledger survive a refresh.
-              With the service running, a review decision is also written to the service&rsquo;s
-              files on its machine. There is no account and no sign-in.
+              <span className="font-medium">The service keeps the project.</span> Documents,
+              records, decisions, runs, studies and Postdoc&rsquo;s conversations are kept by the
+              service, in its database, under the project. This browser keeps its preferences and
+              the writes the service has not yet acknowledged, and sends them when it answers.
+              There is no account and no sign-in.
             </li>
             <li>
               <span className="font-medium">Simulation economics come from BioSTEAM.</span> A price
@@ -1208,9 +1173,10 @@ function AboutSection() {
             </li>
             <li>
               <span className="font-medium">Postdoc answers only through the service.</span>{' '}
-              Every answer is a real model call through openferment-core, and every value in it is
-              rendered from the record it cites. With the service down Postdoc says so and how to
-              start it; nothing answers in its place.
+              Every answer is a real model call through openferment-core, and every number in it
+              carries where it came from: a record, a computed value, or a model&rsquo;s estimate
+              marked as one. With the service down Postdoc says so and how to start it; nothing
+              answers in its place.
             </li>
           </ul>
         </Callout>
@@ -1238,7 +1204,7 @@ function AboutSection() {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-ink-soft mb-2">
           <span className="inline-flex items-center gap-1.5">
             <span className="chip text-accent border-accent/45">Full</span>
-            computed here, from the corpus in memory —{' '}
+            computed from the project&rsquo;s data —{' '}
             <span className="font-num">{counts.Full}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
@@ -1255,7 +1221,7 @@ function AboutSection() {
         <Card className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ fontSize: 'var(--table-fs)' }}>
             <caption className="sr-only">
-              Fidelity of each feature in the openFerment simulation
+              Fidelity of each feature in openFerment
             </caption>
             <thead>
               <tr className="bg-surface-1 border-b border-line">
@@ -1300,40 +1266,35 @@ function AboutSection() {
         </SectionTitle>
         <Card className="p-3">
           <Row label="App version">
-            <span className="font-num">openFerment Sim {APP_VERSION}</span> — implements design
-            OF-DES-001 v0.1 over corpus OF-COR-001 v1.0
+            <span className="font-num">openFerment {APP_VERSION}</span> — alpha 2.0, the foundation
+            build
           </Row>
-          <Row label="Corpus">
-            <span className="font-num">{papers.length}</span> catalogued papers across{' '}
-            <span className="font-num">{corpus.threads}</span> threads,{' '}
-            <span className="font-num">{records.length}</span> extraction records, ontology v1 with{' '}
-            <span className="font-num">{ONTOLOGY.length}</span> fields
+          <Row label="Project">
+            <span className="font-num">{papers.length}</span> documents held,{' '}
+            <span className="font-num">{records.length}</span> extraction records,{' '}
+            <span className="font-num">{ONTOLOGY.length}</span> record fields
           </Row>
           <Row label="Extractor">
             With the service running, the extractor&rsquo;s candidates (run claude-1) arrive
-            through the overlay, each anchored to a sentence of a fetched paper and unverified until a
-            named reviewer decides; Witness scores that run.
+            through the overlay, each anchored to a sentence of a document the project holds and
+            unverified until a named reviewer decides; Witness scores that run.
           </Row>
           <Row label="Agent">
-            One path: Postdoc through openferment-core, on the model the service reports (Opus 5.5 with
-            Sonnet 5.5 as fallback by default), values rendered from the cited records. With the
-            service down it says so, and nothing answers in its place.
+            One path: Postdoc through openferment-core, on the models its routing table names, every
+            number with its origin. With the service down it says so, and nothing answers in its
+            place.
           </Row>
           <Row label="Retrieval">
-            In the service, through the literature layer that alpha 2.0&rsquo;s stage 3 brings; until it
-            lands, Postdoc&rsquo;s passage search says no index exists yet. The browser holds no index; the
-            &ldquo;Embed&rdquo; stage in the offline ingest board is a timed animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
-            one structured response per paper for the candidates.
+            In the service: Sci RAG Kit holds each project&rsquo;s documents, cut into passages and
+            embedded on the service&rsquo;s machine, and answers searches and cited questions over
+            them. The browser holds no index.
           </Row>
           <Row label="Storage">
-            Split by lifetime. Reference data — papers, protocols, molecules, vocabulary — is never
-            mutated and is read from the build every load. The Durable tier — depositions, review
-            decisions, runbook locks and Postdoc&rsquo;s Live conversations — is written to
-            IndexedDB in this browser, because a fermentation at hour 14 with timers running cannot
-            be lost to a page reload, and neither can a question somebody is halfway through. Everything
-            else is memory only and resets: open panels, density, theme. No
-            localStorage, no sessionStorage, no cookies, no telemetry, and nothing leaves the
-            browser. &ldquo;Clear this browser&rsquo;s data&rdquo; clears the durable store as well as memory.
+            The service keeps each project in its database. This browser keeps its preferences and
+            the writes the service has not yet acknowledged, in IndexedDB, because a deposition at
+            hour 14 with timers running cannot be lost to a page reload; they are sent when the
+            service answers. No cookies, no telemetry. &ldquo;Clear this browser&rsquo;s data&rdquo;
+            clears this browser&rsquo;s copy and leaves the service&rsquo;s untouched.
           </Row>
           <Row label="Type">
             <span className="inline-flex items-center gap-1.5">
@@ -1345,8 +1306,7 @@ function AboutSection() {
                 }}
                 aria-hidden
               />
-              A working simulation of a product, built to be judged as a design — not a beta, not a
-              preview of a shipping service.
+              alpha 2.0: a working platform, run on one machine, on loopback, by its owner.
             </span>
           </Row>
         </Card>

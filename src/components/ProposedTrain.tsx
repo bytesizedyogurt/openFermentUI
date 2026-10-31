@@ -85,7 +85,7 @@ export function ProposedTrainView({ proposal, trainId }: { proposal: TrainPropos
       <p className="text-body text-ink">
         For <span className="font-num">{proposal.product}</span> made in <span className="font-num">{proposal.host}</span>
         {proposal.productClass ? `, a ${proposal.productClass}` : ', whose class nothing states'}
-        {proposal.program ? ` (program ${proposal.program})` : ''}.
+        {proposal.program ? `, on the ${proposal.program} chemicals` : ''}.
       </p>
       <ProposalMissingList missing={proposal.missing} />
       {units.length === 0 ? (

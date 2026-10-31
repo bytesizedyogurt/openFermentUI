@@ -400,7 +400,7 @@ export default function Proforma() {
     return () => ctrl.abort();
   }, []);
 
-  // The service binds the seed scenarios (GET /api/proforma/scenarios,
+  // The service binds the held scenarios (GET /api/proforma/scenarios,
   // OF-BLD-019 §3.2's contract (b)); asked only when one of them is on the
   // index.
   const needsBinding = scenarios.some((sc) => !createdIds.includes(sc.id));

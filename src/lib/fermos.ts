@@ -4,7 +4,7 @@
 // as an artifact; a forecast is asked of a kept fit, or of the sample run's
 // fit inline. The fitted curve drawn through the points is the closed form
 // the service fitted, evaluated here on its parameters; it computes nothing
-// the fit did not already hold. Shares lib/rag.ts's call and its failures.
+// the fit did not already hold. Shares lib/http.ts's call and its failures.
 //
 // A SIMULATION (OF-BLD-020 §3.3, D1) is asked of the service whole: the
 // families (`GET /api/fermos/families`), what binds and what waits with the
@@ -65,7 +65,7 @@ export const FIT_LENGTH = 'fit-length';
 /** What a simulation is asked with besides the overrides: ids and words alone. */
 export interface SimulateAsk {
   family: string;
-  /** Null: every strain of the program's organism. */
+  /** Null: any strain the bound records name. */
   strain: string | null;
   product: string | null;
   sugar: string | null;

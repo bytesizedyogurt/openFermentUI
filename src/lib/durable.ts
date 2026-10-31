@@ -280,7 +280,7 @@ export function flushDurable(): void {
   void flush();
 }
 
-/** Drop everything persisted. Used by the demo reset, which must truly reset. */
+/** Drop everything persisted. Used by "Clear this browser’s data", which must truly clear. */
 export async function clearDurable(): Promise<void> {
   pending = null;
   if (timer) {

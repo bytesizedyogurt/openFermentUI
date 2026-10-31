@@ -2,7 +2,7 @@
 //
 // The simulator's status and the benchmark it reproduced. The service runs
 // BioSTEAM and keeps the benchmark as an artifact; with it down this says so,
-// and nothing stands in for a result (E.2). Shares lib/rag.ts's call.
+// and nothing stands in for a result (E.2). Shares lib/http.ts's call.
 import type {
   Artifact,
   BasisInput,

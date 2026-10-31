@@ -1,16 +1,13 @@
 // The component architecture, made visible (OF-BLD-006 §2, §2.2 reversed).
 //
-// The eighteen names and seven layers used to live only in COMPONENTS.md and
-// in attribution tags a few pixels high. This screen renders the architecture
-// as the thing it actually is: a pipeline with a direction, seven components
-// not yet built, one piece of code with no name at all, and one layer where
-// the arrow reverses.
+// This screen renders the architecture as the thing it actually is: a
+// pipeline with a direction, the components named but not built, the code
+// with no name of its own, and one layer where the arrow reverses.
 //
-// It is also the glossary, and since OF-BLD-008 it is the map of the ELEVEN:
-// the rail carries Home plus eleven destinations and nothing else, and every
-// component below is owned by one of them. A reader who has met a few names in
-// the rail sees the whole architecture here, including which parts they have
-// not met because there is nothing there yet.
+// It is also the glossary, and the map of the destinations (OF-BLD-008): every
+// component below is owned by one destination on the rail. A reader who has
+// met a few names in the rail sees the whole architecture here, including
+// which parts have nothing there yet.
 import { ArrowDown, CircleDashed, FileCode2, Tag } from 'lucide-react';
 import {
   COMPONENTS,
@@ -44,7 +41,7 @@ function ComponentRow({ c }: { c: ComponentDef }) {
         {DESCRIPTOR[c.name] && (
           <span className="text-caption text-ink-soft">{DESCRIPTOR[c.name]}</span>
         )}
-        {/* OF-BLD-008 — which of the eleven owns this. Shown on machinery
+        {/* OF-BLD-008 — which destination owns this. Shown on machinery
             rather than on destinations, where it would just repeat the name. */}
         {c.owner !== c.name && (
           <span className="text-caption text-ink-soft">
@@ -88,7 +85,7 @@ export default function Architecture() {
       <PageHeader
         eyebrow="Settings · Architecture"
         title="Components"
-        subtitle="Home plus eleven destinations, and the components each one owns. This is both the architecture the system is built from and the vocabulary it is used through — the words in the rail are these words, and the list is closed."
+        subtitle="The destinations on the rail, and the components each one owns. This is both the architecture the system is built from and the vocabulary it is used through: the words in the rail are these words."
       />
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">
@@ -116,16 +113,12 @@ export default function Architecture() {
         </span>
       </div>
 
-      <Callout
-        kind="info"
-        title={`${COMPONENTS.length - built} of these are names with nothing under them`}
-      >
-        That is on purpose, and it is why the empty rows are here rather than omitted. A name with
-        no code behind it is a smaller problem than a system with no name for the thing it is
-        missing — <span className="font-num">fermOS</span> is now the largest hole in the platform
-        by some distance, holding five named subsystems and no line of code, and leaving it off
-        this page would make the map look complete.
-      </Callout>
+      {COMPONENTS.length > built && (
+        <Callout kind="info" title="Named, with nothing under them yet">
+          A component with no code behind it stays on this page, marked, so the map shows what
+          the platform is missing as well as what it has.
+        </Callout>
+      )}
 
       <div className="mt-5 space-y-5">
         {LAYERS.map((layer, i) => {

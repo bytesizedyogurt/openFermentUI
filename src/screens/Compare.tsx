@@ -1,6 +1,6 @@
 // Scenario comparison (OF-DES-001 §8.13; OF-BLD-019 §3.3, D1, D6).
 //
-// Pinned BioSTEAM scenarios (kind 'biosteam', seeded or made here) side by
+// Pinned BioSTEAM scenarios (kind 'biosteam', held or made here) side by
 // side from each one's NEWEST RUN ARTIFACT (its `lastRunId`, read at GET
 // /api/biorepo/artifacts/{id}): the price with its basis and provenance, the
 // TEA's cost lines closing on the run's own base-case price, and the inputs as
@@ -8,11 +8,9 @@
 // person's assumption with its range, an artifact, a model or a convention).
 // Nothing is recomputed: no delta, no total, no price is made here. A scenario
 // with no run says so; scenarios on different flowsheets are compared under a
-// line saying their bases differ. The authored cost surfaces this page also
-// compared left with the seed (alpha 2.0, ADR-010).
+// line saying their bases differ.
 //
-// Pins are Durable (D6): a created scenario carries its own, and the seeded
-// ones pinned here ride in the snapshot's `pinnedScenarios`.
+// Pins are Durable (D6): a created scenario carries its own.
 import { useEffect, useState } from 'react';
 import { Download, GitCompare, Pin } from 'lucide-react';
 import { useStore } from '@/store';

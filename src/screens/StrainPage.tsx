@@ -1562,8 +1562,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           {strain.notes.length === 0 ? (
             <EmptyState
               icon={<NotebookPen size={22} />}
-              title="No curator notes for this strain"
-              body="Notes are authored alongside the seeded corpus; this strain has none. The parameter summary above is the whole of what the platform knows about it."
+              title="No notes for this strain"
+              body="No note is kept for this strain. The parameter summary above is the whole of what the platform knows about it."
             />
           ) : (
             <ul className="space-y-4">

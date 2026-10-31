@@ -1,7 +1,7 @@
 // One parameter in the panel (OF-BLD-020 §2.2, D2–D4). ParameterPanel.tsx
 // renders one of these per `ParameterSpec`; no screen writes a form for a
-// parameter of its own (E.1‴: `check:seed` fails on a numeric control in a
-// module's screens outside these two files).
+// parameter of its own (E.1‴): a numeric control in a module's screens
+// stands in these two files alone.
 //
 // The row COMPUTES NOTHING. The value, its interval, its source, the bounds
 // and their reason, the warning outside them and the words that explain a
@@ -16,8 +16,8 @@
 // labelled, every touch target is at least 44 px (the citation chips a
 // record-bound row opens included, through TOUCH_CHIP), nothing appears only
 // on hover (Why and the records are disclosures a key or a tap opens), and
-// the keyboard reaches every control. check:store walks these files, and the
-// records Proforma renders into a row, for it.
+// the keyboard reaches every control, here and in the records Proforma
+// renders into a row.
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { Override, ParameterSpec, ParameterValue } from '@/data/types';
 import { href } from '@/router';

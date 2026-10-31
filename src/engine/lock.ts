@@ -14,7 +14,7 @@
 // detect a determined rewrite of both the content and the hash.
 //
 // Real attestation — a timestamp somebody else can vouch for — belongs to
-// Common Seal, which is not built (COMPONENTS.md). Naming that gap is more
+// Common Seal, which is not built (Settings → Architecture). Naming that gap is more
 // useful than dressing FNV-1a up as tamper-proofing.
 import type { Measure, Prediction } from '@/data/types';
 

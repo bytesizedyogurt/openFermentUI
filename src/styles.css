@@ -130,7 +130,7 @@ body {
     transparent 3px 6px
   );
 }
-/* Demo/synthetic — now only simulation grids and scripted agent text (§20) */
+/* Assumed: a result resting on a person's assumption or a model's estimate (ADR-006) */
 .tick-assumed::before {
   background: repeating-linear-gradient(
     to bottom,

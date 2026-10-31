@@ -33,7 +33,7 @@ import { ProposalsCard } from '@/components/ProposalsCard';
 import { pinnedCard } from '@/lib/proforma';
 import { href } from '@/router';
 import { RUNBOOK_STATUS_LABEL } from '@/data/labels';
-import { ELEVEN } from '@/data/nav';
+import { DESTINATIONS } from '@/data/nav';
 import { UNIT_OPERATIONS } from '@/data/vocabulary';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle, cx } from '@/components/ui';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
@@ -748,22 +748,21 @@ export default function Home() {
             current state per entry. "Empty" is a legitimate state and is shown
             as one: a reader who wants sequence work learns here that geneOS
             has none, before clicking through. */}
-        <section aria-labelledby="home-eleven">
+        <section aria-labelledby="home-destinations">
           <SectionTitle
             right={
               <span className="font-num text-caption text-ink-soft">
-                {ELEVEN.filter((d) => STATE[d.label]?.built).length}/{ELEVEN.length} with something behind them
+                {DESTINATIONS.filter((d) => STATE[d.label]?.built).length}/{DESTINATIONS.length} with something behind them
               </span>
             }
           >
-            <span id="home-eleven">The destinations</span>
+            <span id="home-destinations">The destinations</span>
           </SectionTitle>
           <p className="text-body text-ink-soft mb-3 max-w-3xl">
-            Everything this platform does lives inside one of these {ELEVEN.length}. The list is closed:
-            when something new is built, the question is which of them owns it.
+            Everything this platform does lives inside one of these {DESTINATIONS.length}.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {ELEVEN.map((d) => {
+            {DESTINATIONS.map((d) => {
               const state = STATE[d.label];
               return (
                 <a

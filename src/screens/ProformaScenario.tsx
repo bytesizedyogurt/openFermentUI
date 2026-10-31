@@ -3,11 +3,10 @@
 // simulation treated as work rather than magic.
 //
 // OF-BLD-019 §3.2 (D1, D5, D6): the BioSTEAM page is THE scenario page. A
-// seed BioSTEAM scenario and one a person made here with New scenario open
+// held BioSTEAM scenario and one a person made here with New scenario open
 // the same page (BiosteamScenario, below): header, inputs with their sources,
 // Run with the worker's status line, and every section of the newest run read
-// from its one artifact (ProformaBiosteam.tsx). The authored cost surfaces
-// this page also opened left with the seed (alpha 2.0, ADR-010).
+// from its one artifact (ProformaBiosteam.tsx).
 import { useEffect, useMemo, useState } from 'react';
 import { Download, GitCompare, Pin, PinOff, Play, Route } from 'lucide-react';
 import { overrideEnds, overridesFor, proformaScope, useStore } from '@/store';
@@ -57,12 +56,12 @@ import { RunReport, inputLabels } from './ProformaBiosteam';
 
 // ── The BioSTEAM scenario page (OF-BLD-014 §8.4; OF-BLD-019 §3.2) ───────
 //
-// ONE page for a seed BioSTEAM scenario and for one a person made here with
+// ONE page for a held BioSTEAM scenario and for one a person made here with
 // New scenario (D6). It reads, and never types:
 //
 //   the shelf       the flowsheet's title, source and each input's
 //                   dimension (GET /api/proforma/shelf);
-//   the binding     a seed scenario from GET /api/proforma/scenarios, one
+//   the binding     a held scenario from GET /api/proforma/scenarios, one
 //                   made here from GET /api/proforma/bind?flowsheet= (the
 //                   scenario run contract, src/lib/proforma.ts), each input
 //                   bound to records, an artifact, a named person's
@@ -102,7 +101,7 @@ const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e
  * the input's unit. The parameter panel opens it from the input's
  * `record ×N` chip (OF-BLD-020 §2.2: the records chooser this page had
  * became the panel's record link). Rendered inside the panel, its chips are
- * the panel's 44 px touch targets (§2.R, finding 11; check:store walks it).
+ * the panel's 44 px touch targets (§2.R, finding 11).
  */
 function RecordsChooser({ input }: { input: ScenarioInput | undefined }) {
   if (!input || input.records.length === 0) return null;
@@ -597,9 +596,9 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     return () => ctrl.abort();
   }, []);
 
-  // The binding: a seed scenario by (b), one made here by its flowsheet (c);
+  // The binding: a held scenario by (b), one made here by its flowsheet (c);
   // with a fermOS fit chosen, either by (c) with the fits (OF-BLD-019 §5.1),
-  // which binds a seed scenario's flowsheet exactly as (b) does.
+  // which binds a held scenario's flowsheet exactly as (b) does.
   const fitsKey = JSON.stringify(Object.entries(chosenFits).sort());
   useEffect(() => {
     const ctrl = new AbortController();

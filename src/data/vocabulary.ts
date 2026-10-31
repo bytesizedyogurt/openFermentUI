@@ -239,7 +239,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
   },
   // OF-BLD-020 §5.1 — the steps pureOS's unit catalogue builds a train from
   // (core/openferment_core/pureos/catalogue.py), each a catalogue id. The
-  // vocabulary carries no number; a class is one step (check:seed), so the
+  // vocabulary carries no number; a class is one step, so the
   // shortcut column and the counter-current extractor left `distillation` and
   // `lle` for entries of their own.
   {
@@ -368,8 +368,8 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
  * concentration or a feed rate is a measurement, and belongs on a record.
  *
  * `spellings` are lower-case and include the name itself. `carbonSourceId`
- * reads them by the whole-word rule `normalizeStrain` uses, and
- * `scripts/export-corpus.ts` carries the list to the service, where
+ * reads them by the whole-word rule `normalizeStrain` uses. The service reads
+ * the same list from core/openferment_core/schema/vocabulary.yaml, where
  * `validate.carbon_source_id` applies the same rule.
  */
 export const CARBON_SOURCES: CarbonSource[] = [
@@ -393,7 +393,7 @@ const CARBON_SPELLINGS: Record<string, string> = Object.fromEntries(
 /**
  * The carbon source a paper's wording names, or null: an exact spelling, or
  * spellings standing in the wording as whole words that all name one source
- * (`matchWholeWord` in strains.ts). "Crude glycerol" is glycerol; "glucose
+ * (`matchWholeWord` above). "Crude glycerol" is glycerol; "glucose
  * and xylose" names two and is null, and the record keeps the words.
  */
 export function carbonSourceId(text: string): string | null {
@@ -407,7 +407,7 @@ export const UNIT_OPERATIONS_BY_ID = byId(UNIT_OPERATIONS);
 
 /**
  * The vocabulary's step for a BioSTEAM unit class, or null (OF-BLD-019 §4.1).
- * A class names at most one step (`check:seed` holds it), so a unit in a
+ * A class names at most one step, so a unit in a
  * train links to one entry or to none.
  */
 export function operationForClass(unitClass: string): UnitOperation | null {

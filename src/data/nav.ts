@@ -44,7 +44,7 @@ export interface NavSurface {
   label: string;
   to: string;
   /**
-   * One line of gloss. Eleven invented words with no explanation is friction
+   * One line of gloss. Ten invented words with no explanation is friction
    * the names do not earn on first contact, and this is the cheapest possible
    * fix: the descriptor sits under the label in the rail and in the title
    * attribute when the rail is collapsed.
@@ -62,13 +62,12 @@ export interface NavSurface {
 }
 
 /**
- * THE TWELVE. Home, then the eleven destinations, in order.
+ * THE RAIL. Home, then the ten destinations, in order.
  *
- * Five things that used to be here are now views inside their owner, and none
- * of their screens were deleted: the strain catalogue is geneOS's default view
- * (as Hosts), Molecules is Dominion's, Protocols and Depositions are Runbooks
- * tabs, and Witness is a BioRepo tab. A catalogue of strains is not a
- * destination — it is what one of the eleven happens to hold.
+ * Four things that used to be here are views inside their owner: the strain
+ * catalogue is geneOS's default view (as Hosts), Protocols and Depositions are
+ * Runbooks tabs, and Witness is a BioRepo tab. A catalogue of strains is not a
+ * destination — it is what one of them happens to hold.
  *
  * OF-BLD-011 §1 corrected which one. The catalogue sat under fermOS until the
  * three OS components were re-cut along the three stages of making something —
@@ -235,13 +234,13 @@ export const RAIL: (NavSurface & { key: string })[] = [
   },
 ];
 
-/** Home is the twelfth entry, not one of the eleven. */
-export const ELEVEN = RAIL.filter((r) => r.to !== '/');
+/** The ten destinations: the rail, less Home. */
+export const DESTINATIONS = RAIL.filter((r) => r.to !== '/');
 
 /**
  * Sub-views worth naming in search but which are not destinations.
  *
- * Each belongs to one of the eleven and is reached from inside it. They are
+ * Each belongs to one destination and is reached from inside it. They are
  * here so the palette can take somebody who types "organisms" straight to the
  * catalogue rather than to fermOS's front door.
  */
@@ -279,8 +278,8 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'fermOS',
   },
   {
-    // OF-BLD-020 §3.3 — 'simulate' and 'vessel' are reserved under /fermos
-    // (check-seed's RESERVED): a model family integrated from its sources,
+    // OF-BLD-020 §3.3 — 'simulate' and 'vessel' are reserved under /fermos:
+    // a model family integrated from its sources,
     // and (§4.2) the fermenter a simulation needs.
     label: 'Simulate',
     to: '/fermos/simulate',
@@ -468,8 +467,8 @@ export const DESCRIPTOR: Record<string, string> = Object.fromEntries(
  *
  * ENTRIES POINT AT THE FINAL DESTINATION, NEVER AT ANOTHER REDIRECT. Chaining
  * would work in the browser and would be invisible when one link in the chain
- * later changed; `check:seed` fails the build on a redirect whose target is
- * itself redirected.
+ * later changed. Nothing checks this at build time since the seed guard left
+ * (ADR-011): keep each entry pointing at a screen.
  */
 export const REDIRECTS: Record<string, string> = {
   // ── OF-BLD-011: the strain catalogue moved from fermOS to geneOS ────

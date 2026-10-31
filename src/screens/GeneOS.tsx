@@ -158,9 +158,10 @@ export default function GeneOS() {
         <PathwayView />
       ) : (
         <>
-          <Callout kind="info" title="Hosts is the built part of geneOS">
-            The catalogue and its strain pages are real: hosts, lineages, and the extraction
-            records anchored to each. Choosing a chassis is a genetic design decision — it sets
+          <Callout kind="info" title="Hosts">
+            The strain catalogue and its pages: hosts, lineages, and the extraction records
+            anchored to each, as a project's records name them. Choosing a chassis is a genetic
+            design decision — it sets
             whether the product is secreted, whether endotoxin clearance is mandatory, and what
             the entire downstream train will have to be — which is why it lives here rather than
             with the reactor.

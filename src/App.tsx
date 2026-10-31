@@ -240,7 +240,7 @@ function Screen() {
         return c ? <ProtocolDetail protocolId={c} /> : <Protocols />;
       }
       if (b === 'depositions') return c ? <DepositionDetail depositionId={c} /> : <Depositions />;
-      // OF-BLD-014 §9.3 — 'ledger' is reserved too; check:seed refuses a runbook with that id.
+      // OF-BLD-014 §9.3 — 'ledger' is reserved too: a runbook with that id would be unreachable.
       if (b === 'ledger') return <RunbookLedger />;
       return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
     case 'primer':
@@ -248,7 +248,7 @@ function Screen() {
       // its own. /primer/m0/l0-1 still resolves — an old deep link should not
       // need a redirect when the id it carries is enough. 'path' and
       // 'practice' are reserved before the lesson lookup (OF-BLD-013 §3.3,
-      // §4.3), and check:seed refuses a lesson that takes either as an id.
+      // §4.3), so a lesson that took either as an id would be unreachable.
       if (b === 'path') return <PrimerPath />;
       if (b === 'practice') return <PrimerPractice id={c} />;
       if (b && c) return <PrimerLesson moduleId={b} lessonId={c} />;

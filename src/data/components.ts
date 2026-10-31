@@ -1,9 +1,6 @@
-// The component architecture (OF-BLD-006 §2, with §2.2 reversed).
-//
-// Eighteen named components in seven layers. This module is the source of
-// truth. COMPONENTS.md, which carried the same content at the repo root, is at
-// docs/history/COMPONENTS-2026-10-21.md since alpha 2.0, and stage 8 writes
-// its replacement.
+// The component architecture (OF-BLD-006 §2, with §2.2 reversed): the named
+// components in their layers, as Settings → Architecture shows them. The
+// package map of the code is COMPONENTS.md, written from the boundary rules.
 //
 // §2.2 SAID THE OPPOSITE AND WAS WRONG. It held that these names were for
 // building the system and that a user should see "Ask" rather than "Postdoc".
@@ -19,8 +16,8 @@
 // different jobs, and `ComponentTag` still does the second one.
 import type { ComponentName } from '@/components/ComponentTag';
 
-/** The eleven destinations. Home is not one of them; it is the twelfth rail entry. */
-export type Eleven =
+/** The destinations on the rail. Home is not one of them. */
+export type Destination =
   | 'Intake'
   | 'BioRepo'
   | 'Postdoc'
@@ -44,13 +41,12 @@ export interface ComponentDef {
   name: ComponentName;
   layer: ComponentLayer;
   /**
-   * Which of the eleven owns this (OF-BLD-008 §8). A destination owns itself.
-   * Internal machinery — Audit, Witness, Clearance, Deposition and the unbuilt
-   * patent pieces — is not a destination and names the one it lives inside, so
-   * that "where does this live" has an answer for every component rather than
-   * only for the ones with a rail entry.
+   * Which destination owns this (OF-BLD-008 §8). A destination owns itself.
+   * Internal machinery — Audit, Witness, Common Seal, Deposition — is not a
+   * destination and names the one it lives inside, so that "where does this
+   * live" has an answer for every component.
    */
-  owner: Eleven;
+  owner: Destination;
   /** Where the code is, or `[]` when the component is not built. */
   livesIn: string[];
   /** Where a user reads this name, or null when there is nothing to read. */
@@ -62,8 +58,8 @@ export interface ComponentDef {
 /**
  * Layer order is the direction evidence travels: something is asked, evidence
  * comes in, models compute over it, the honest layer decides whether the
- * result may be used, patents decide whether you may build it, people decide
- * who may say so — and Assay is where it leaves software entirely.
+ * result may be used, people decide who may say so — and Assay is where it
+ * leaves software entirely.
  */
 export const LAYERS: { id: ComponentLayer; blurb: string }[] = [
   {
@@ -76,7 +72,7 @@ export const LAYERS: { id: ComponentLayer; blurb: string }[] = [
   },
   {
     id: 'Computing',
-    blurb: 'The models that turn a question into numbers. Two of the three are not built, and the map says so rather than quietly omitting them.',
+    blurb: 'The models that turn a question into numbers: the organism, the reactor, downstream and the economics, each run in the service on its own engine.',
   },
   {
     id: 'Keeping it honest',
@@ -103,6 +99,8 @@ export const COMPONENTS: ComponentDef[] = [
       'src/lib/postdoc.ts',
       'src/screens/Postdoc.tsx',
       'core/openferment_core/postdoc_agent.py',
+      'core/openferment_core/postdoc/',
+      'core/openferment_core/llm.py',
       'core/openferment_core/validate.py',
       // OF-BLD-015 §7.1–§7.4 — the module stores it sweeps and reads, the
       // audit log its writes land in, and the proposals its gates make.
@@ -119,25 +117,25 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Intake',
     owner: 'Intake',
     layer: 'Evidence in',
-    // OF-BLD-012 — fetch and extract are the service's; the board drives them.
+    // OF-BLD-012, ADR-002 — collection into Sci RAG Kit and extraction are the
+    // service's; the board drives them.
     livesIn: [
       'src/screens/IntakeIngest.tsx',
       'src/screens/Intake.tsx',
       'core/openferment_core/intake.py',
+      'core/openferment_core/literature/',
       'core/openferment_core/extract.py',
     ],
     surfacedAs: 'the rail, /intake',
-    role: 'Ingest and extraction of parameters from sources',
+    role: 'Documents collected into the project, and parameters extracted from them, each anchored to a sentence',
   },
   {
     name: 'BioRepo',
     owner: 'BioRepo',
     layer: 'Evidence in',
-    // OF-BLD-012 §2.3 — one write function for the corpus's decisions.
+    // OF-BLD-012 §2.3 — one write function for a project's review decisions.
     // OF-BLD-014 §3.2 — and what the service computed, kept and replayable.
     livesIn: [
-      'src/data/',
-      'src/engine/retrieval.ts',
       'src/screens/BioRepo.tsx',
       'core/openferment_core/biorepo.py',
       'src/screens/BioRepoArtifacts.tsx',
@@ -148,7 +146,7 @@ export const COMPONENTS: ComponentDef[] = [
       'src/components/figures/',
     ],
     surfacedAs: 'the rail, /biorepo',
-    role: 'The corpus, and everything retrieved from it',
+    role: 'The project\u2019s records and the decisions on them, what was computed from them, and search over its documents',
   },
   {
     // OF-BLD-011 §2 — the first of the three stages. The strain catalogue and
@@ -205,11 +203,32 @@ export const COMPONENTS: ComponentDef[] = [
       'src/screens/ProformaBiosteam.tsx',
       'src/screens/ProformaReference.tsx',
       'src/engine/interp.ts',
+      'src/screens/ProformaStudies.tsx',
+      'src/screens/ProformaRun.tsx',
+      'src/screens/ProformaComparison.tsx',
       'core/openferment_core/proforma.py',
+      'core/openferment_core/engine/',
+      'core/openferment_core/studies/',
       'core/openferment_core/flowsheets/',
     ],
     surfacedAs: 'the rail, /proforma',
-    role: 'Scenario economics on BioSTEAM: a shelf of flowsheets, two published reference plants held to their package\u2019s own tests, and scenarios priced as a distribution; the authored cost surfaces stay for the archived examples',
+    role: 'Scenario economics on BioSTEAM: the library\u2019s plants and openFerment\u2019s flowsheets through one adapter, each run kept with its SFF file, and studies of scenarios, comparisons and runbooks',
+  },
+  {
+    // OF-BLD-020 §5 — trains of BioSTEAM's units (and the in-house ones it
+    // lacks), each parameter bound with its source, run in the Proforma worker.
+    name: 'pureOS',
+    owner: 'pureOS',
+    layer: 'Computing',
+    livesIn: [
+      'src/screens/PureOS.tsx',
+      'src/screens/PureOSBuilder.tsx',
+      'src/screens/PureOSTrain.tsx',
+      'src/screens/PureOSPropose.tsx',
+      'core/openferment_core/pureos/',
+    ],
+    surfacedAs: 'the rail, /pureos',
+    role: 'Downstream — harvest, capture, polish, recovery: a train of units, each parameter with its source',
   },
   {
     // §3 — Primer moved. It named the unit engine; it now names the Learn
@@ -249,7 +268,7 @@ export const COMPONENTS: ComponentDef[] = [
       'core/openferment_core/witness.py',
     ],
     surfacedAs: 'a BioRepo tab, /biorepo/witness',
-    role: 'Extractor validation against the gold set',
+    role: 'Extractor validation against the values reviewers typed',
   },
   {
     name: 'Common Seal',
@@ -314,8 +333,15 @@ export const UNNAMED: {
   {
     what: 'the unit engine',
     layer: 'Keeping it honest',
-    livesIn: ['src/engine/units.ts', 'src/engine/scale.ts'],
+    livesIn: ['core/openferment_core/units.py', 'src/engine/units.ts', 'src/engine/scale.ts'],
     role: 'Units, conversion, scaling, and refusals that carry their reason',
+  },
+  {
+    // ADR-001 — PostgreSQL is the one store.
+    what: 'the store',
+    layer: 'Evidence in',
+    livesIn: ['core/openferment_core/db/', 'core/openferment_core/projects/', 'core/openferment_core/migrations.py'],
+    role: 'PostgreSQL: every project\u2019s documents, records, decisions, runs, studies and conversations',
   },
   {
     // OF-BLD-014 §3.4 — heavy simulators run in their own processes.

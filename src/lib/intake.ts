@@ -175,8 +175,8 @@ export async function extractPaper(
  *
  * Deliberately never throws: this runs at every page load, and a page that
  * fails to load because an optional service is absent has the priorities
- * backwards. The built artifact has no server at all — the fetch answers 404
- * from whatever static host it sits on, and the app is exactly the seed.
+ * backwards. Served from a static host with no service, the fetch answers 404,
+ * and the screens show their empty states.
  */
 export async function loadOverlay(signal?: AbortSignal): Promise<Overlay | null> {
   try {

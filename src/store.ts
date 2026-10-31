@@ -2345,8 +2345,7 @@ export const useStore = create<OFState>()((set, get) => ({
     get().applyDurable(snap);
   },
 
-  // The apply half of hydrate, on a snapshot already read; check:store
-  // round-trips a snapshot through it with no IndexedDB (§9.2).
+  // The apply half of hydrate, on a snapshot already read (§9.2).
   applyDurable: (snap) => {
     set((s) => {
       // Review decisions are re-applied over the seeded records rather than

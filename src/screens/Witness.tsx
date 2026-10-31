@@ -48,10 +48,6 @@ const RUN_LABEL: Record<ExtractorRun, string> = {
   'claude-1': 'claude-1',
 };
 
-/** The spec's own sentence (OF-BLD-012 §6.4); the smoke test looks for it. */
-const PROVISIONAL_LABEL =
-  'Provisional — curated values from OF-COR-001 standing in as gold until a reviewer flags them in Guild.';
-
 const NO_CANDIDATES: Candidate[] = [];
 const NO_DECISIONS: Record<string, ReviewDecision> = {};
 const RUN_BLURB: Record<ExtractorRun, string> = {
@@ -84,10 +80,10 @@ const OUTCOME_EXPLAIN: Record<string, string> = {
   unit_error:
     'The magnitude was read correctly and the unit was not, so the normalised value is wrong. Counts once as a false positive and once as a false negative.',
   span_error:
-    'The run attributed the value to a different sentence. The run output records the outcome but not the rejected span, so only the curated span can be shown below.',
-  miss: 'The run produced no record for this gold annotation. Counts as a false negative only.',
+    'The run attributed the value to a different sentence. The run output records the outcome but not the rejected span, so only the record\u2019s own span can be shown below.',
+  miss: 'The run produced no record for this typed value. Counts as a false negative only.',
   spurious:
-    'The run produced a record the curated set does not contain. Counts as a false positive only; there is no gold annotation to compare against.',
+    'The run produced a record a reviewer rejected. Counts as a false positive only; there is no typed value to compare against.',
 };
 
 /** Severity colouring for the extracted side of a diff — never a provenance hue. */
@@ -246,8 +242,6 @@ export default function Witness() {
   const [open, setOpen] = useState<MismatchRow | null>(null);
   const [noteText, setNoteText] = useState('');
   const [filed, setFiled] = useState<Set<string>>(new Set());
-  // null until the reader touches the toggle; the default depends on the data.
-  const [provisionalPick, setProvisionalPick] = useState<boolean | null>(null);
 
   const upColor = palette[0];
   const downColor = palette[1];
@@ -260,44 +254,16 @@ export default function Witness() {
     [runOutputs],
   );
 
-  // ── provisional mode (OF-BLD-012 §6.4) ───────────────────────────────
-  // computeRunMetrics counts only records with `gold` set, and none has it
-  // yet. Until a reviewer flags some, the curated values on FETCHED papers
-  // can stand in — clearly labelled — so the run that ran gets a number.
-  // Once real gold exists the toggle defaults off and both numbers show.
-  const fetchedPapers = useMemo(
-    () => new Set(papers.filter((p) => p.textSource === 'full-text').map((p) => p.id)),
-    [papers],
-  );
-  const hasRealGold = useMemo(() => records.some((r) => r.gold), [records]);
-  const provisional = provisionalPick ?? !hasRealGold;
-  const provisionalRecords = useMemo<ExtractionRecord[]>(
-    () =>
-      records.map((r) =>
-        r.gold || r.status === 'rejected' || r.extractorRun === 'claude-1' || !fetchedPapers.has(r.paperId)
-          ? r
-          : { ...r, gold: { value: r.value, unit: r.unit } },
-      ),
-    [records, fetchedPapers],
-  );
-  const scoringRecords = provisional ? provisionalRecords : records;
-
-  // Every run is scored, every render, from the live records array — editing
-  // the gold set during a review session moves these numbers immediately.
-  // Both bases are computed so the other can sit beside the headline.
-  const measuredMetrics = useMemo<RunMetrics[]>(
+  // Every run is scored, every render, from the live records array — a value a
+  // reviewer types during a review session moves these numbers immediately.
+  const allMetrics = useMemo<RunMetrics[]>(
     () => orderedRuns.map((r) => computeRunMetrics(r, records)),
     [orderedRuns, records],
   );
-  const provisionalMetrics = useMemo<RunMetrics[]>(
-    () => orderedRuns.map((r) => computeRunMetrics(r, provisionalRecords)),
-    [orderedRuns, provisionalRecords],
-  );
-  const allMetrics = provisional ? provisionalMetrics : measuredMetrics;
 
   const recordById = useMemo(
-    () => new Map<string, ExtractionRecord>(scoringRecords.map((r) => [r.id, r])),
-    [scoringRecords],
+    () => new Map<string, ExtractionRecord>(records.map((r) => [r.id, r])),
+    [records],
   );
 
   const activeIdx = useMemo(() => {
@@ -396,7 +362,7 @@ export default function Witness() {
 
   const exportMetrics = () => {
     const rows: unknown[][] = [];
-    const basis = provisional ? 'provisional — curated values as gold' : 'gold';
+    const basis = 'values reviewers typed';
     for (const m of allMetrics) {
       rows.push([
         m.run,
@@ -518,26 +484,9 @@ export default function Witness() {
   const partial = run.results.length < metrics.goldSize;
   const isBaseline = activeIdx === 0;
 
-  // The other basis, beside the headline, once both exist (§6.4).
-  const beside = hasRealGold ? (provisional ? measuredMetrics : provisionalMetrics)[activeIdx] : null;
-  const besideLabel = provisional ? 'Measured' : 'Provisional';
-  const besideLine = (value: number, defined: boolean) =>
-    beside ? (
-      <div className="text-caption text-ink-soft">
-        {besideLabel}{' '}
-        <span className="font-num">{defined ? `${pct(value)} %` : '—'}</span>
-      </div>
-    ) : null;
-  // A run other than claude-1 is marked assumed; claude-1's numbers rest on whichever gold
-  // basis is in force, and the tick says which.
-  const headlineTick: 'assumed' | 'curated' | 'gold' =
-    run.run === 'claude-1' ? (provisional ? 'curated' : 'gold') : 'assumed';
-  const headlineTitle =
-    run.run === 'claude-1'
-      ? provisional
-        ? 'Micro-averaged over this run against curated values standing in as gold'
-        : 'Micro-averaged over this run against reviewer-flagged gold records'
-      : "Micro-averaged over this run's matched records against the gold-set annotations";
+  // claude-1's numbers rest on the values reviewers typed; another run is marked assumed.
+  const headlineTick: 'assumed' | 'gold' = run.run === 'claude-1' ? 'gold' : 'assumed';
+  const headlineTitle = "Micro-averaged over this run against the values reviewers typed";
 
   const headerActions = (
     <>
@@ -589,36 +538,13 @@ export default function Witness() {
               on your own tuning data.
             </p>
             <p className="text-signal-warn">
-              This Sim trains and runs no models. The scheme is described here, not executed.
+              openFerment trains no models: the scheme is described here, and no fold is run.
             </p>
           </Explain>
         </div>
 
-        <label className="flex items-center gap-2 text-body cursor-pointer">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-[var(--accent)]"
-            checked={provisional}
-            onChange={(e) => setProvisionalPick(e.target.checked)}
-          />
-          Score against curated records as provisional gold
-        </label>
-
         <div className="text-caption text-ink-soft">{runBlurb(run)}</div>
       </div>
-
-      {provisional && (
-        <div className="mb-4">
-          <Callout kind="warn" title={PROVISIONAL_LABEL}>
-            Every curated record on a fetched paper (
-            <span className="font-num">{fetchedPapers.size}</span>
-            {fetchedPapers.size === 1 ? ' paper' : ' papers'}) is scored as if its value were
-            gold. That measures whether the extractor reproduces the curator, not whether either
-            is right. Flag records for gold in the review queue and the measured number appears
-            beside this one.
-          </Callout>
-        </div>
-      )}
 
       {partial && (
         <div className="mb-4">
@@ -627,7 +553,7 @@ export default function Witness() {
               <FileWarning size={13} className="mt-[3px] shrink-0" aria-hidden />
               <span>
                 {RUN_LABEL[run.run]} reports <span className="font-num">{run.results.length}</span> of
-                the <span className="font-num">{metrics.goldSize}</span> records now in the gold set.
+                the <span className="font-num">{metrics.goldSize}</span> values reviewers have typed.
                 The missing{' '}
                 <span className="font-num">{metrics.goldSize - run.results.length}</span> are not
                 counted as misses — they were never scored, so precision and recall below describe
@@ -655,7 +581,6 @@ export default function Witness() {
         <Tick p={headlineTick} className="card py-3 pr-3" title={headlineTitle}>
           <div className="text-caption uppercase tracking-wide text-ink-soft">Precision</div>
           <MetricValue value={metrics.micro.precision} defined={precisionDefined} />
-          {besideLine(beside?.micro.precision ?? 0, !!beside && beside.micro.tp + beside.micro.fp > 0)}
           <div className="mt-0.5">
             <Delta
               now={precisionDefined ? metrics.micro.precision : null}
@@ -671,7 +596,6 @@ export default function Witness() {
         <Tick p={headlineTick} className="card py-3 pr-3" title={headlineTitle}>
           <div className="text-caption uppercase tracking-wide text-ink-soft">Recall</div>
           <MetricValue value={metrics.micro.recall} defined={recallDefined} />
-          {besideLine(beside?.micro.recall ?? 0, !!beside && beside.micro.tp + beside.micro.fn > 0)}
           <div className="mt-0.5">
             <Delta
               now={recallDefined ? metrics.micro.recall : null}
@@ -687,10 +611,6 @@ export default function Witness() {
         <Tick p={headlineTick} className="card py-3 pr-3" title={headlineTitle}>
           <div className="text-caption uppercase tracking-wide text-ink-soft">F1 (micro)</div>
           <MetricValue value={metrics.micro.f1} defined={f1Defined} />
-          {besideLine(
-            beside?.micro.f1 ?? 0,
-            !!beside && beside.micro.tp + beside.micro.fp > 0 && beside.micro.tp + beside.micro.fn > 0,
-          )}
           <div className="mt-0.5">
             <Delta
               now={f1Defined ? metrics.micro.f1 : null}
@@ -705,14 +625,8 @@ export default function Witness() {
           </div>
         </Tick>
 
-        <Tick
-          p={provisional ? 'curated' : 'gold'}
-          className="card py-3 pr-3"
-          title={provisional ? 'Curated records on fetched papers, standing in as gold' : 'Curated gold-set annotations'}
-        >
-          <div className="text-caption uppercase tracking-wide text-ink-soft">
-            {provisional ? 'Gold-set size (provisional)' : 'Gold-set size'}
-          </div>
+        <Tick p="gold" className="card py-3 pr-3" title="Values reviewers typed: a gold value or a correction">
+          <div className="text-caption uppercase tracking-wide text-ink-soft">Typed values</div>
           <div className="font-num text-display leading-tight">{metrics.goldSize}</div>
           <div className="mt-0.5">
             <Delta
@@ -756,10 +670,10 @@ export default function Witness() {
         <div className="mb-6 max-w-4xl">
           <Callout
             kind="info"
-            title={`${unscored.length} candidate${unscored.length === 1 ? '' : 's'} new to the corpus — unscored`}
+            title={`${unscored.length} candidate${unscored.length === 1 ? '' : 's'} new to the project — unscored`}
           >
-            The extractor read values for fields the curated set has no record of on these papers.
-            They are the corpus growing, not false positives: nothing here can say whether they are
+            The extractor read values for fields no reviewer has typed a value for on these papers.
+            They are the project&rsquo;s records growing, and nothing here can say whether they are
             right until a reviewer decides in Guild. A rejection adds one to this run&rsquo;s false
             positives; an acceptance makes it a record.
           </Callout>
@@ -1019,11 +933,9 @@ export default function Witness() {
       </Card>
 
       <p className="text-caption text-ink-soft mt-3 max-w-4xl">
-        Every row above is a disagreement between the curated gold annotation and what the run
-        produced. Open one to read both sides against the text held for that paper — for a
-        catalogued entry that text is the curator&rsquo;s note, not the paper&rsquo;s own words. The
-        literature is real and citable, but a curated annotation has not yet been checked against
-        the source PDF, so a row here is a lead to check, not a verdict.
+        Every row above is a disagreement between a value a reviewer typed and what the run
+        produced. Open one to read both sides against the passages the project holds for that
+        paper; a row here is a lead to check against the paper.
       </p>
 
       {/* ── comparison sheet ─────────────────────────────────────────── */}
@@ -1174,12 +1086,12 @@ function ComparisonBody({
             </>
           ) : (
             <div className="text-body text-ink-soft">
-              No gold annotation — the curated set contains no record for this claim.
+              No typed value — no reviewer has typed one for this claim.
             </div>
           )}
 
           <div className="text-caption uppercase tracking-wide text-ink-soft mt-3 mb-1">
-            Curated span{paperSectionText ? ` · ${paperSectionText.heading}` : ''}
+            Record&rsquo;s span{paperSectionText ? ` · ${paperSectionText.heading}` : ''}
           </div>
           <SpanBlock
             text={paperSectionText?.text ?? null}
@@ -1187,8 +1099,8 @@ function ComparisonBody({
             markClass="span-gold"
             emptyNote={
               record
-                ? 'The curated quote is not present in the parsed section text for this paper, so it cannot be shown in context.'
-                : 'No curated record exists for this row, so there is no span to show.'
+                ? 'The record\u2019s quote is not in the passages the project holds for this paper, so it cannot be shown in context.'
+                : 'No record backs this row, so there is no span to show.'
             }
           />
         </div>

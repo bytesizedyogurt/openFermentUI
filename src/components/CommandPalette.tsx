@@ -1,5 +1,4 @@
-// ⌘K palette (OF-DES-001 §7.2) — the demo driver's steering wheel. Three
-// groups: Navigate, Actions, Ask. Every golden-path step is reachable here.
+// ⌘K palette (OF-DES-001 §7.2). Three groups: Navigate, Actions, Ask.
 //
 // It is also the escape hatch for the renamed vocabulary (§6). Every surface
 // carries the words it used to be called, so someone who reaches for "library"

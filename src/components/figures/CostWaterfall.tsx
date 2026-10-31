@@ -29,7 +29,7 @@ export interface CostWaterfallProps {
   lines: WaterfallLine[];
   /** The price the run solved, on the lines' basis: the last row. Null when the run has none. */
   total: { label: string; value: number } | null;
-  /** The per-unit basis, e.g. "USD per kg of PHA contained in dried cell mass". */
+  /** The per-unit basis, e.g. "USD per gallon of ethanol". */
   unit: string;
   /** The annual amounts' unit, as the run's tables state it. */
   annualUnit: string;

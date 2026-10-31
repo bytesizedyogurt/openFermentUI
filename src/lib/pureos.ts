@@ -4,7 +4,7 @@
 // unit tables (`core/openferment_core/pureos/__init__.py`); the browser shows it and
 // computes nothing of its own: every mass, recovery and cumulative share on
 // the page is a field the service sent. With the service down this says so,
-// and nothing stands in for a train (E.2). Shares lib/rag.ts's call.
+// and nothing stands in for a train (E.2). Shares lib/http.ts's call.
 import type {
   Artifact,
   KeptTrain,
@@ -267,8 +267,8 @@ export function flowsheetOfRun(a: Artifact): string | null {
 
 /**
  * The kept runs a train can take a stream of, or be read from: pureOS's own
- * train runs, the newest run of every BioSTEAM scenario (the seed's and the
- * ones made here), and every reference run on the shelf, each with its
+ * train runs, the newest run of every BioSTEAM scenario (the held ones and
+ * the ones made here), and every reference run on the shelf, each with its
  * streams as its artifact or its train holds them.
  * Read, never made; a source the service cannot answer is said in words and
  * the rest still come back.
@@ -293,8 +293,8 @@ export async function runChoices(
   // The shelf names each scenario flowsheet's broth (OF-BLD-020 §6.2).
   const shelf = (await proformaShelf(signal).catch(said('Proforma’s shelf'))) ?? [];
   const brothOf = new Map(shelf.map((f) => [f.id, f.brothStream ?? null]));
-  const seeds = (await proformaScenarios({ host: null }, signal).catch(said('Proforma’s scenarios'))) ?? [];
-  const scenarios = [...seeds.map((s) => ({ id: s.id, name: s.name })), ...made];
+  const held = (await proformaScenarios({ host: null }, signal).catch(said('Proforma’s scenarios'))) ?? [];
+  const scenarios = [...held.map((s) => ({ id: s.id, name: s.name })), ...made];
   for (const sc of scenarios) {
     const a = await proformaNewestRun(sc.id, signal).catch(said(`the runs of ${sc.id}`));
     if (!a) continue;

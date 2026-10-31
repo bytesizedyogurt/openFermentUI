@@ -1,15 +1,12 @@
 // Purpose-built unit engine for the openFerment ontology (OF-DES-001 §7.5).
 // Linear families use factor-to-base; temperature is affine.
 //
-// THE TABLES ARE DATA THAT CROSSES THE BOUNDARY (OF-BLD-012 §5.3). `U`,
-// `ALIASES`, `SI_UNIT` and `REFUSALS` are exported so `scripts/export-corpus.ts`
-// can ship them to the Python service verbatim, and `core/openferment_core/
-// units.py` normalises and converts from the same table rather than from a
-// second one somebody typed in by hand. The FUNCTIONS stay here and are the
-// reference implementation: `scripts/export-unit-fixtures.ts` records what
-// they answer for a fixed set of inputs, and the Python test asserts the same
-// answers on every pair. If the two sides ever disagree, this side is right and
-// the test says so.
+// THE SERVICE HOLDS THE SAME TABLES (OF-BLD-012 §5.3). `core/openferment_core/
+// units.py` normalises and converts from core/openferment_core/schema/
+// units.json, and this file is the browser's mirror of it, held to it by test:
+// `scripts/export-unit-fixtures.ts` records what these functions answer for a
+// fixed set of inputs, and test_units.py asserts the service answers the same
+// on every pair. A disagreement fails the test and names the pair.
 
 export interface UnitDef {
   family: string;

@@ -60,9 +60,9 @@ function ingestJobFor(jobs: Job[], paperId: string): Job | undefined {
 }
 
 /**
- * Stage read live from the running job. A paper seeded mid-pipeline has no job
- * behind it, so its progress is genuinely unknown — `pct` is null rather than a
- * plausible-looking number.
+ * Stage read live from the running job. A paper with no job behind it here (one
+ * collected from another session) has a genuinely unknown progress — `pct` is
+ * null rather than a plausible-looking number.
  */
 function stageOf(
   paper: Paper,

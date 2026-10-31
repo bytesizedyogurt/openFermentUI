@@ -172,10 +172,9 @@ export function quoteAnchors(record: Quoted, paper: Paper | undefined): boolean 
 }
 
 /**
- * A candidate for a field the seed has no record of on that paper — the
- * corpus growing (§6.2). These join the review queue after the seed records;
- * a candidate that matches a seed record's field is evidence about that
- * record and stays beside it instead.
+ * A candidate for a field no record covers on that paper — the project's
+ * records growing (§6.2). A candidate that matches a record's field is
+ * evidence about that record and stays beside it.
  */
 export function isNewCandidate(c: Pick<Candidate, 'paperId' | 'field'>, records: ExtractionRecord[]): boolean {
   return !records.some(

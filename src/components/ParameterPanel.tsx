@@ -5,8 +5,8 @@
 // and this panel renders any scope the same way: Proforma's scenarios
 // (`proforma:<scenario id>`) now, fermOS's Simulate and Vessel and pureOS's
 // Builder in later steps, unchanged. A screen never hand-writes a form for a
-// parameter, and `check:seed` (E.1‴) fails on a numeric control in a
-// module's screens outside this file and ParameterRow.tsx.
+// parameter (E.1‴): a numeric control in a module's screens stands in this
+// file and ParameterRow.tsx alone.
 //
 //   the caller   fetches the scope (`GET /api/params/{scope}`, lib/params.ts)
 //                and passes it in as `data`, with what it binds by (a

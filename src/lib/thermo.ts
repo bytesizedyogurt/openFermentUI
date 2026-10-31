@@ -7,7 +7,7 @@
 // what is on file, the Proforma worker asks thermosteam, and the answer is one
 // `thermo_props` artifact (`core/openferment_core/thermo.py`). This file asks
 // and reads; it computes no property. With the service down it says so, and
-// nothing stands in for an answer (E.2). Shares lib/rag.ts's call.
+// nothing stands in for an answer (E.2). Shares lib/http.ts's call.
 import type { Artifact, ThermoProps, ThermoPropsRequest, Train } from '@/data/types';
 import { ServiceDown, ServiceRefused, call } from './http';
 
