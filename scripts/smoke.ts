@@ -69,7 +69,7 @@ function onServer(address: string, name: string): string {
   return url.toString();
 }
 
-/** Run one database command (core/openferment_core/db/__main__.py) against SERVER. */
+/** Run one database command (`python -m openferment_core.migrations`) against SERVER. */
 function dbCommand(args: string[]): void {
   const [command, argv] = python(['-m', 'openferment_core.migrations', ...args]);
   const done = spawnSync(command, argv, { cwd: CORE, env: { ...process.env, OPENFERMENT_DATABASE_URL: SERVER }, encoding: 'utf8' });

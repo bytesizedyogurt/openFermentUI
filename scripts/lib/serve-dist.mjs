@@ -1,6 +1,6 @@
 /**
- * One static handler for every script that serves dist/ (OF-BLD-012.1 §6.9):
- * `pnpm prototype:up`, and the smoke test that stage 1 brings back.
+ * The static handler for a script that serves dist/ apart from the service
+ * (OF-BLD-012.1 §6.9): `pnpm prototype:up`.
  *
  * The copies of these eight lines that earlier scripts carried shared a hole:
  * `join(DIST, url)` collapses `..`, so `/../core/.env` read the key off the

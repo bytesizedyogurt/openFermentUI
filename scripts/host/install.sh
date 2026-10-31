@@ -8,7 +8,7 @@
 # What it does, in order: checks the tools and where the checkout lives;
 # builds the app and the service's environment; sets the power settings an
 # always-on machine needs; installs two LaunchDaemons (the server, which starts
-# at power-on before anyone logs in, and the 03:00 fetch-and-extract); waits for
+# at power-on before anyone logs in, and the 03:00 extraction); waits for
 # /api/health; then publishes the port to your own devices with Tailscale.
 #
 # It asks for your password (sudo) for the power settings and for the two files

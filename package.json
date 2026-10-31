@@ -11,7 +11,6 @@
     "typecheck": "tsc --noEmit",
     "test:reconcile": "tsx scripts/check-reconcile-kinds.ts",
     "verify": "pnpm check:secrets && pnpm typecheck && pnpm gen:api --check && pnpm gen:components --check && pnpm check:plan && pnpm test:core && pnpm test:sim && pnpm test:lit && pnpm check:licences && pnpm check:tools && pnpm check:guild && pnpm check:state && pnpm check:figures && pnpm build && pnpm smoke && pnpm test:reconcile",
-    "bundle:single": "pnpm build && node scripts/bundle-single.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:licences": "cd core && uv run --all-extras python ../scripts/check-licences.py",
     "check:tools": "cd core && uv run --all-extras python ../scripts/check-tools.py",

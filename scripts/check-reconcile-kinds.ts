@@ -1,8 +1,8 @@
 /**
  * The three prediction kinds, held and missed (OF-BLD-014 §9.1). One
  * scenario per kind through `computeDeltas` and `suggestOutcome`, the code
- * the deposition page draws from. Run by `pnpm test:reconcile` before the
- * browser loop in check-reconcile.mjs.
+ * the deposition page draws from. Run by `pnpm test:reconcile`, verify's last
+ * stage.
  */
 import { computeDeltas, suggestOutcome } from '../src/engine/reconcile';
 import { HIT_RATE_MIN_TESTED, ledgerCounts } from '../src/engine/ledger';

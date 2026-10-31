@@ -7,7 +7,7 @@
  *    point no other provenance draws; a filled point stands for an observed
  *    value alone (rule 3).
  * 2. The two classes that are never evidence are dashed, point and line.
- * 3. Each figure's `toTable` returns one row per mark of the gallery's sample.
+ * 3. Each figure's `toTable` returns one row per mark of the test sample below.
  * 4. `recharts` is imported nowhere under src/, by any import form: every
  *    chart is drawn from src/components/figures/ (the dependency is gone).
  * 5. What the review of Phase 6 found (§6.R): a modeled mark is held out of

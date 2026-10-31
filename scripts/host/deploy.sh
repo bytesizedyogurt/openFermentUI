@@ -42,9 +42,9 @@ fi
 
 say "Installing packages"
 pnpm install --frozen-lockfile
-# Every extra: the service's own workers need them (sim for geneOS, fermOS
-# and Proforma, rag for the hybrid lane, agent for the MCP server), and a
-# sync is exact, so naming one extra would remove the others.
+# Every extra: the service needs them (sim for the workers of geneOS, fermOS
+# and Proforma, lit for the literature layer, agent for the MCP servers), and
+# a sync is exact, so naming one extra would remove the others.
 (cd core && uv sync --frozen --all-extras)
 
 say "Bringing the database to the newest schema"

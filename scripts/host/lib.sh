@@ -61,8 +61,8 @@ wait_for_health() {
   die "the service did not answer /api/health within 30 s. Its log: tail -50 \"$LOGS/server.log\""
 }
 
-# Stop when a rebase or merge was left half-done: the decisions file may hold
-# conflict markers, and building on it would commit them.
+# Stop when a rebase or merge was left half-done: a file may hold conflict
+# markers, and building on it would serve them.
 refuse_unfinished_git() {
   local p
   for p in rebase-merge rebase-apply MERGE_HEAD; do
