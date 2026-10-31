@@ -11,8 +11,8 @@ from openferment_core.validate import SeenSet
 from test_postdoc_agent import Script, ask, plan
 from test_tools import pool  # noqa: F401
 
-# A strain no archived program holds: with the switch off the tool refuses
-# an archived one before it drafts anything (OF-BLD-016 §2.R, test_programs).
+# A product and a strain a draft may name, handed to the tool as the
+# catalogue's ids.
 PRODUCT, STRAIN = "taq-dna-polymerase", "s-cerevisiae-s288c"
 
 

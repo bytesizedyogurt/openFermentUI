@@ -41,9 +41,9 @@ def test_a_call_through_the_server_returns_what_the_registry_returns(store):
 
 def test_a_number_is_refused_at_this_boundary_as_at_the_others(store):
     server = mcp_server.build()
-    out = _text(asyncio.run(server.call_tool("selling_price", {"scenarioId": "sc-pha-1", "price": 4})))
+    out = _text(asyncio.run(server.call_tool("selling_price", {"scenarioId": "sc-nonesuch", "price": 4})))
     assert "a number was typed into price" in out["error"]
-    assert out["error"] == tools.run("selling_price", {"scenarioId": "sc-pha-1", "price": 4}).error
+    assert out["error"] == tools.run("selling_price", {"scenarioId": "sc-nonesuch", "price": 4}).error
 
 
 def test_get_artifact_reads_and_says_when_there_is_none(store):
@@ -130,8 +130,8 @@ def test_the_server_offers_run_flowsheet_and_stream_table_as_the_registry_does(s
         assert listed[name].description == tools.REGISTRY[name].description
         assert listed[name].input_schema == tools.REGISTRY[name].info().inputSchema
     server = mcp_server.build()
-    for name, args in (("stream_table", {"artifactId": "0123456789abcdef"}), ("run_flowsheet", {"scenarioId": "sc-pha-1"}),
-                       ("run_flowsheet", {"scenarioId": "sc-pha-1", "samples": 9})):
+    for name, args in (("stream_table", {"artifactId": "0123456789abcdef"}), ("run_flowsheet", {"scenarioId": "sc-nonesuch"}),
+                       ("run_flowsheet", {"scenarioId": "sc-nonesuch", "samples": 9})):
         through = _text(asyncio.run(server.call_tool(name, args)))
         assert through == json.loads(tools.run(name, args).model_dump_json(exclude_none=True)) and through["error"]
 

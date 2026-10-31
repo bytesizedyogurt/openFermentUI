@@ -52,7 +52,7 @@ def standin(monkeypatch, store):
 def held(monkeypatch):
     """One scenario the service holds by its id, on the ethanol flowsheet."""
     row = {"id": HELD, "name": "A held test scenario", "kind": "biosteam", "modelId": ETHANOL}
-    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [row])
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: [row])
     return row
 
 
@@ -175,7 +175,7 @@ def test_an_assumption_needs_a_named_person_and_a_host_narrows_the_binding():
 
 def test_the_scenarios_endpoint_serves_the_scenarios_the_service_holds(client, monkeypatch):
     assert client.get("/api/proforma/scenarios").json() == [], "the seed's scenarios went with the seed"
-    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [{"id": HELD, "name": "A held test scenario", "kind": "biosteam",
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: [{"id": HELD, "name": "A held test scenario", "kind": "biosteam",
                                                              "modelId": ETHANOL}])
     [held] = client.get("/api/proforma/scenarios").json()
     assert held["id"] == HELD and held["flowsheet"] == ETHANOL and held["name"] and held["product"] == "ethanol"
@@ -218,7 +218,7 @@ def test_a_scenario_made_here_runs_its_flowsheet_bound_as_bind_binds_it(standin,
 
 def test_every_other_run_is_refused_in_words(standin, client, held):
     cases = [
-        ({"scenarioId": MADE_HERE}, f"there is no seed scenario {MADE_HERE}"),
+        ({"scenarioId": MADE_HERE}, f"there is no held scenario {MADE_HERE}"),
         ({"scenarioId": MADE_HERE, "flowsheet": "cornstover_benchmark"}, "reference biorefinery"),
         ({"scenarioId": MADE_HERE, "flowsheet": "toy"}, "STAND-IN for tests"),
         ({"scenarioId": MADE_HERE, "flowsheet": "nowhere"}, "there is no flowsheet nowhere"),
@@ -251,18 +251,18 @@ def test_every_run_names_its_scenario_in_the_basis_as_a_convention(standin, held
 
 def test_the_scenario_input_leaves_the_provenance_as_it_was():
     record = BasisInput(name="titre record", value=1.0, unit="g L-1", source=BasisSource(kind="record", id="r1"))
-    scenario = proforma.basis_inputs([], None, ETHANOL, 8, scenario_id=MADE_HERE)
+    scenario = proforma.basis_inputs([], ETHANOL, 8, scenario_id=MADE_HERE)
     [named] = [i for i in scenario if i.name == "scenario"]
     for prov in ("verified", "unverified", "gold"):
         def of(inputs):
             b = ComputedBasis(tool=proforma.RUN, toolVersion="test", inputs=inputs, artifactId="0" * 16, at="2026-10-20")
             return basis.basis_provenance(b, {"r1": {"provenance": prov}}, {})
         assert of([record, named]) == of([record])
-    assert "scenario" not in [i.name for i in proforma.basis_inputs([], None, ETHANOL, 8)]
+    assert "scenario" not in [i.name for i in proforma.basis_inputs([], ETHANOL, 8)]
 
 
 def test_the_basis_names_the_packages_and_the_conventions():
-    named = {i.name: i for i in proforma.basis_inputs([], None, ETHANOL, 8)}
+    named = {i.name: i for i in proforma.basis_inputs([], ETHANOL, 8)}
     assert named["chemicals and finance"].source.kind == "model" and named["chemicals and finance"].source.id.startswith("biorefineries.corn@")
     assert named["purification train"].source.id.startswith("biorefineries.ethanol@")
     assert named["fermenter"].source.id.startswith("biosteam@")
@@ -290,7 +290,7 @@ def test_every_run_names_the_utility_prices_and_cost_index_it_priced_on():
     # BioSTEAM's utility prices and plant cost index; the basis names them,
     # BioSTEAM's own defaults set for every case, and the run reads them back.
     for flowsheet in (ETHANOL, shelf.COMPOSITE):
-        named = {i.name: i for i in proforma.basis_inputs([], None, flowsheet, 8)}
+        named = {i.name: i for i in proforma.basis_inputs([], flowsheet, 8)}
         u = named["utility prices and cost index"]
         assert u.source.kind == "model" and u.source.id.startswith("biosteam@"), flowsheet
         assert "default_utilities" in str(u.value) and "default_CEPCI" in str(u.value)
@@ -352,5 +352,5 @@ def test_a_host_with_graphviz_draws_its_own_run_of_a_basis_run_without_it(monkey
     drawn = proforma.run_reference("corn_drygrind")
     assert drawn.id != without.id and {i.name: i for i in drawn.inputs}["diagram"].value == "drawn by Graphviz"
     assert without.provenance == drawn.provenance == "computed"
-    run_without = {i.name: i for i in proforma.basis_inputs([], None, ETHANOL, 8)}["diagram"]
+    run_without = {i.name: i for i in proforma.basis_inputs([], ETHANOL, 8)}["diagram"]
     assert run_without.value == "drawn by Graphviz"  # drawn_here is patched to True above

@@ -1,7 +1,7 @@
 """A simulation's parameters from a fit, the records, a kept simulation or a
 named person, in that order, each named (OF-BLD-020 §3.2, D6).
 
-Every record here is a STAND-IN written in the test, on thread Q paper ids;
+Every record here is a STAND-IN written in the test, on stand-in paper ids;
 every series is SYNTHETIC, made from parameters chosen here. None is a
 measurement and no number here is a result.
 """

@@ -4,7 +4,7 @@
 `selling_price`: the price a person's run produced.
 
 Ids in: a scenario id, any of the BioSTEAM scenarios the service holds
-(`proforma.seed_scenarios`; none since the seed went, alpha 2.0, until
+(`proforma.held_scenarios`; none since the seed went, alpha 2.0, until
 stage 2's store holds them). The most recent run artifact of that
 scenario (`proforma.latest_run`) comes back as one `Evidence` with the hint
 `distribution`: the median price and its 5th to 95th percentile, with the
@@ -61,7 +61,7 @@ TABLE_NAME = "stream_table"
 def _priced() -> list[str]:
     """The BioSTEAM scenarios the service holds, for the description; none
     when it holds none."""
-    return [s["id"] for s in proforma.seed_scenarios()]
+    return [s["id"] for s in proforma.held_scenarios()]
 
 
 _PRICED = _priced()
@@ -112,7 +112,7 @@ def _not_held(sid: str, ctx: ToolContext) -> str:
         return (f"{NAME} refused: {sid} is a reference biorefinery, not a scenario: proforma_read lists its kept runs, "
                 "and stream_table returns a run's evidence id, the price its package gives on its own defaults; the "
                 f"corn stover benchmark's stored run is read here as {proforma.BENCHMARK}")
-    shown = [s["id"] for s in proforma.seed_scenarios()]
+    shown = [s["id"] for s in proforma.held_scenarios()]
     return (f"{NAME} refused: {sid} is not a scenario this service holds. A scenario made with New scenario lives in "
             "the browser that made it, and its runs are read on its page in Proforma; the ids it takes are "
             f"{', '.join([*shown, proforma.BENCHMARK])}")
@@ -146,7 +146,7 @@ def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
     if not sid:
         return ToolResult(error=f"{NAME} refused: name the scenario by its id (proforma_read lists them), or "
                                 f"{proforma.BENCHMARK}")
-    seed = {s["id"]: s for s in proforma.seed_scenarios()}.get(sid)
+    seed = {s["id"]: s for s in proforma.held_scenarios()}.get(sid)
     if seed is None:
         return ToolResult(error=_not_held(sid, ctx))
     art = proforma.latest_run(sid)
@@ -211,7 +211,7 @@ def _biosteam_scenarios() -> list[str]:
     when it holds none."""
     from .. import pureos
 
-    return [s["id"] for s in pureos.seed_scenarios() if s.get("kind") == "biosteam"]
+    return [s["id"] for s in pureos.held_scenarios() if s.get("kind") == "biosteam"]
 
 
 _OFFERED = _biosteam_scenarios()
@@ -330,7 +330,7 @@ def _stream_table(inp: StreamTableInput, ctx: ToolContext) -> ToolResult:
     if art.tool not in (proforma.RUN, proforma.REFERENCE):
         return ToolResult(error=f"{TABLE_NAME} refused: {aid} is a {art.tool} artifact, not a Proforma run; it reads the "
                                 f"stream table of a {proforma.RUN} or {proforma.REFERENCE} artifact")
-    scenario_id = pureos.scenario_of(art, pureos.seed_scenarios())[0] if art.tool == proforma.RUN else None
+    scenario_id = pureos.scenario_of(art, pureos.held_scenarios())[0] if art.tool == proforma.RUN else None
     t = proforma.tables_of(art)
     if not t.streams:
         return ToolResult(error=f"{TABLE_NAME} refused: run {aid} holds no stream table; a run kept before runs carried "

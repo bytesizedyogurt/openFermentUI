@@ -95,7 +95,7 @@ def _flowsheet(art: Artifact) -> str | None:
     return str(named) if named else next((str(i.value) for i in art.inputs if i.name == "flowsheet"), None)
 
 
-def seed_scenarios() -> list[dict[str, Any]]:
+def held_scenarios() -> list[dict[str, Any]]:
     """The scenarios the service holds, from the module projection; none
     since the seed went (alpha 2.0, ADR-010), and then only a run's own
     `scenario` input names its scenario."""
@@ -239,7 +239,7 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
         train_id, train_name = spec.get("id"), spec.get("name")
         program = _train.program_of_run(art)
     else:
-        scenarios = list(seed_scenarios() if scenarios is None else scenarios)
+        scenarios = list(held_scenarios() if scenarios is None else scenarios)
         sid, sname = scenario_of(art, scenarios)
         infeasible = _base_infeasible(art)
         no_tea = (f"the base case could not run ({infeasible}), so the run kept no tables, names no product and reads "
@@ -376,7 +376,7 @@ def trains(*, arts: Iterable[Artifact] | None = None,
     worth now, as pureos_read gives it."""
     from .. import artifacts
 
-    scenarios = list(seed_scenarios() if scenarios is None else scenarios)
+    scenarios = list(held_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)
     mark = _Marks(kept, records_by_id)
     out = []
@@ -400,7 +400,7 @@ def train(key: str, *, arts: Iterable[Artifact] | None = None, scenarios: Iterab
     pureos_read gives it."""
     from .. import artifacts
 
-    scenarios = list(seed_scenarios() if scenarios is None else scenarios)
+    scenarios = list(held_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)
     mark = _Marks(kept, records_by_id)
     runs = _runs(kept, scenarios)

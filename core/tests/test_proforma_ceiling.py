@@ -53,7 +53,7 @@ def catalogue(monkeypatch):
 def held(monkeypatch):
     """One scenario the service holds by its id, on the ethanol flowsheet."""
     row = {"id": HELD, "name": "A held test scenario", "kind": "biosteam", "modelId": ETHANOL}
-    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [row])
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: [row])
     return row
 
 
@@ -251,7 +251,7 @@ def test_a_fermos_fit_feeds_the_yield_the_check_reads(pool):
 def test_it_is_refused_in_words_as_the_binding_is(pool, held):
     with pytest.raises(proforma.ScenarioRefused, match="reference biorefinery"):
         check(pool, scenario=MADE_HERE, flowsheet="corn_drygrind")
-    with pytest.raises(proforma.ScenarioRefused, match="no seed scenario"):
+    with pytest.raises(proforma.ScenarioRefused, match="no held scenario"):
         check(pool, scenario=MADE_HERE, flowsheet=None)
     with pytest.raises(proforma.ScenarioRefused, match="runs ethanol_glucose_v0, not custom_train_v1"):
         check(pool, scenario=HELD, flowsheet="custom_train_v1")

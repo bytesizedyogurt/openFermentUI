@@ -47,16 +47,15 @@ served; no screen writes a form for a parameter of its own.
                               through the Proforma worker, once per process,
                               and so starts the worker when it is cold (below)
     check()                   every statically named spec has a written
-                              boundsReason (D4); `pnpm check:seed` runs
-                              `python -m openferment_core.params --check`
+                              boundsReason (D4); test_params holds it
 
 This module registers the `proforma` provider; vessel.py registers
 `fermos-vessel` (OF-BLD-020 §4.1), imported on first need
 (`PROVIDER_MODULES`). The vessel scope's values are BioSTEAM's own defaults,
 read in the Proforma worker, so a read of it starts the worker when it is
 cold (and keeps its answer for the process's life). Its scope is
-`proforma:<scenario id>`: a seed BioSTEAM scenario, whose flowsheet
-`proforma.seed_scenarios` names, or a scenario made in a browser, which names
+`proforma:<scenario id>`: a held BioSTEAM scenario, whose flowsheet
+`proforma.held_scenarios` names, or a scenario made in a browser, which names
 its shelf flowsheet in the request. Its specs are the flowsheet's
 `FlowsheetInput`s; its values are what `proforma.bound` binds (records
 through the aggregate gate, the fermOS fits a person chose), called, never
@@ -82,7 +81,6 @@ from __future__ import annotations
 
 import math
 import re
-import sys
 from typing import Any, Callable, Iterable, Mapping, NamedTuple
 
 from .models import (
@@ -625,7 +623,7 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
     from .flowsheets import shelf
 
     (scenario_id,) = ids
-    seeds = {s["id"]: s for s in proforma.seed_scenarios()}
+    seeds = {s["id"]: s for s in proforma.held_scenarios()}
     if scenario_id not in seeds and not req.flowsheet:
         raise ScopeUnknown(f"there is no scenario {scenario_id}: the scenarios the service holds are "
                            f"{', '.join(seeds) or 'none'}, and a scenario made in a browser names the shelf flowsheet "
@@ -773,25 +771,3 @@ def check() -> tuple[int, list[str]]:
                 except ValueError as e:
                     problems.append(f"{label}: {spec.key}: {e}")
     return n, problems
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = sys.argv[1:] if argv is None else argv
-    if args != ["--check"]:
-        print("usage: python -m openferment_core.params --check", file=sys.stderr)
-        return 2
-    # Run as `python -m`, this file is `__main__`, a module apart from the
-    # `params` the provider modules register with: check through that one.
-    from importlib import import_module
-
-    module = import_module(f"{__package__}.params")
-    n, problems = module.check()
-    for p in problems:
-        print(f"✗ {p}")
-    print(f"  parameters        {n} declared across {', '.join(sorted(module._STATIC))}; "
-          f"{'every one has' if not problems else f'{len(problems)} problem(s), and not every one has'} a written bounds reason")
-    return 1 if problems else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

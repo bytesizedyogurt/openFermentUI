@@ -157,7 +157,7 @@ def test_a_whole_yeast_run_through_the_worker(store, monkeypatch):
     from openferment_core.models import InputAssumption, ProformaRunRequest
 
     # A scenario the service holds by its id, on the ethanol flowsheet: the seed's left with it (ADR-010).
-    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: [
         {"id": "sc-held-ethanol", "name": "A held test scenario", "kind": "biosteam", "modelId": "ethanol_glucose_v0"}])
     rs = standins._standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})

@@ -191,7 +191,7 @@ def _record(rid: str, pool: Any) -> dict[str, Any]:
     r = pool.record(rid) if pool is not None else None
     if r is None:
         raise ThermoNotFound(f"no record {rid!r} is in the evidence pool this reads: an ethanol titre extracted from a "
-                             "thread Q paper and anchored to its sentence fills this")
+                             "paper the project holds and anchored to its sentence fills this")
     if r.get("field") != TITRE_FIELD:
         raise ThermoRefused(f"record {rid} is a {r.get('field')}, not an ethanol titre ({TITRE_FIELD}); "
                             f"{BEER} reads a titre")

@@ -39,7 +39,7 @@ SCOPE = f"proforma:{HELD}"
 def held(monkeypatch):
     """One scenario the service holds by its id, on the ethanol flowsheet."""
     row = {"id": HELD, "name": "A held test scenario", "kind": "biosteam", "modelId": ETHANOL}
-    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [row])
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: [row])
     return row
 
 
@@ -146,7 +146,7 @@ def test_a_run_with_no_override_keeps_the_basis_and_the_artifact_id_it_had(stand
                 ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=old, samples=8)):
         r = proforma.run(req, pool=standin)
         inputs = proforma.bind_inputs(ETHANOL, standin.records, None, old)
-        before = proforma.basis_inputs(inputs, None, ETHANOL, 8, scenario_id=req.scenarioId, fitted=[])
+        before = proforma.basis_inputs(inputs, ETHANOL, 8, scenario_id=req.scenarioId, fitted=[])
         art = artifacts.get(r.artifactId)
         assert [i.model_dump() for i in art.inputs] == [i.model_dump() for i in before]
         assert artifacts.compute(proforma.RUN, before, records_by_id=standin.records_by_id, seed=0).id == r.artifactId

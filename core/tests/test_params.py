@@ -60,7 +60,7 @@ def held(monkeypatch):
     """One scenario the service holds by its id, on the ethanol flowsheet (the
     seed's went with the seed, alpha 2.0, ADR-010)."""
     row = {"id": HELD, "name": "A held test scenario", "kind": "biosteam", "modelId": ETHANOL}
-    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [row])
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: [row])
     return row
 
 
@@ -258,13 +258,12 @@ def test_the_check_reads_every_declared_spec_and_names_one_with_no_reason(monkey
                  + sum(len(s) for _, s in fermos._forecast_static())
                  + sum(len(s) for _, s in catalogue._static()))
     assert "pureos-unit" in params.providers()
-    assert params.main(["--check"]) == 0 and "every one has a written bounds reason" in capsys.readouterr().out
+    assert params.check()[1] == []
     unreasoned = ParameterSpec.model_construct(**{**spec().model_dump(), "boundsReason": " "})
     monkeypatch.setitem(params._STATIC, "fermos-family", lambda: [("a STAND-IN family", [spec(), unreasoned])])
     n, problems = params.check()
     assert any("a STAND-IN family: mu_max has no boundsReason" in p for p in problems)
     assert any("two parameters named mu_max" in p for p in problems)
-    assert params.main(["--check"]) == 1 and "✗" in capsys.readouterr().out
 
     def broken():
         yield "a STAND-IN family", [spec(boundsReason="")]

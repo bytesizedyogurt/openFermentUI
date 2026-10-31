@@ -256,12 +256,12 @@ TEST_SEED = [{"id": "sc-test-ethanol", "kind": "biosteam", "modelId": "ethanol_g
 def test_seed(monkeypatch):
     from openferment_core import proforma
 
-    monkeypatch.setattr(proforma, "seed_scenarios", lambda: TEST_SEED)
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: TEST_SEED)
     return TEST_SEED[0]["id"]
 
 
 def _yeast_pool(drop=()):
-    """demo.py's STAND-IN yeast records (thread Q paper ids), less the fields
+    """demo.py's STAND-IN yeast records (stand-in paper ids), less the fields
     a test drops."""
     from types import SimpleNamespace
 
@@ -409,17 +409,17 @@ def test_run_flowsheet_refuses_a_scenario_it_does_not_hold_in_words(proforma_sto
     from openferment_core import audit, pureos
 
     seed = TEST_SEED
-    monkeypatch.setattr(pureos, "seed_scenarios", lambda: seed)
+    monkeypatch.setattr(pureos, "held_scenarios", lambda: seed)
     c = _pcx(proforma_store)
     made_here = tools.run("run_flowsheet", {"scenarioId": "sc-mg2k1-1"}, c).error
     assert "is not a scenario this service holds" in made_here and "the browser that made it" in made_here
     assert "sc-test-ethanol" in made_here
     assert "name the scenario" in tools.run("run_flowsheet", {"scenarioId": " "}, c).error
     # With no projection to read, proforma.run's own words refuse it.
-    monkeypatch.setattr(pureos, "seed_scenarios", lambda: [])
+    monkeypatch.setattr(pureos, "held_scenarios", lambda: [])
     # (§2.3's flowsheet_of writes them: a seed id runs its own flowsheet, and
     # an id the seed lacks names no flowsheet to run.)
-    assert "there is no seed scenario sc-nonesuch" in tools.run("run_flowsheet", {"scenarioId": "sc-nonesuch"}, c).error
+    assert "there is no held scenario sc-nonesuch" in tools.run("run_flowsheet", {"scenarioId": "sc-nonesuch"}, c).error
     # An empty target is refused too: proforma_write runs no scenario unnamed.
     assert "name the scenario" in tools.run("proforma_write", {"action": "run", "target": "", "fields": {}, "note": ""}, c).error
     assert audit.read() == []
@@ -509,7 +509,7 @@ def test_stream_table_refuses_what_is_not_a_proforma_run_in_words(pool, proforma
 def fermos_store(tmp_path, monkeypatch):
     """A throwaway store with the audit log and the proposals in it, and
     test_fermos_bind's STAND-IN batch_v1 pool (records written in the test
-    on thread Q paper ids, none a paper's value)."""
+    on stand-in paper ids, none a paper's value)."""
     from test_fermos_bind import STANDIN, pool_of, rec
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)

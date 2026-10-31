@@ -340,14 +340,6 @@ def test_the_catalogue_and_its_units_hold_no_number_but_structural_ones():
         assert odd == [], f"numbers in pureos/{name}: {odd}"
 
 
-def test_the_guards_reading_names_every_entry_and_what_was_left_out(capsys):
-    assert catalogue.main(["--ids"]) == 0
-    rows = json.loads(capsys.readouterr().out)
-    assert [r["id"] for r in rows if not r.get("leftOut")] == list(catalogue.BY_ID)
-    assert [r for r in rows if r.get("leftOut")] == [{"id": "adsorption", "leftOut": "SingleComponentAdsorptionColumn"}]
-    assert catalogue.main(["--nonesuch"]) == 1
-
-
 # ── the real worker (sim) ──────────────────────────────────────────────
 
 

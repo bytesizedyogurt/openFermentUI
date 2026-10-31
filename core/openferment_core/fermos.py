@@ -2349,11 +2349,6 @@ def _no_broth_product(art: Any, family: str, fam: Any, kept: list[str]) -> str:
     it lacks and what it keeps."""
     if fam is None:
         what = f"its family {family or 'unnamed'} is none fermOS has"
-    elif fam.product_state() not in (None, BROTH_PRODUCT):
-        what = (f"its family {fam.id} keeps its product as a store inside the cells ({fam.product_state()}), not in "
-                "the broth")
-    elif fam.product_state() is None:
-        what = f"its family {fam.id} has no product state"
     else:
         what = f"its family {fam.id} has one, and the artifact keeps no series of it"
     return (f"simulation {art.id} keeps no product series ({BROTH_PRODUCT}, the product in the broth): {what}; it "

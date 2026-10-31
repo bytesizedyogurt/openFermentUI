@@ -264,13 +264,6 @@ ARTIFACT_MODULE = {
 # `simulation`, never as a bare artifact row.
 SIMULATION = "fermos.simulation"
 
-# A Proforma run: a scenario's (`proforma.run`) or a reference biorefinery's
-# (`proforma.reference`). Its program is decided by one rule (OF-BLD-019 §6.R).
-RUN_TOOLS = ("proforma.run", "proforma.reference")
-# A simulation and a vessel (OF-BLD-020 §3.R): a family belongs to a program
-# (storage_v1 is PHA's) and a simulation may start from another, or a vessel
-# rest on one, so their program is read from those as well as their inputs.
-FERMOS_RUNS = (SIMULATION, "fermos.vessel")
 
 
 HEADLINE_VALUES = 8
@@ -287,13 +280,6 @@ def _headline(output: Any) -> dict[str, Any]:
         if len(out) >= HEADLINE_VALUES:
             break
     return out
-
-
-def _example(row: dict[str, Any]) -> dict[str, Any]:
-    """`{"example": True}` for a seed row that describes a run nobody made
-    (OF-BLD-016 §3.3, D3), else nothing. The browser hides an example with the
-    archive; the service still lists it, marked, so a read can say it is one."""
-    return {"example": True} if row.get("example") else {}
 
 
 def _artifact_row(module: str, a: Any, provenance: str) -> Row:
@@ -415,15 +401,13 @@ class Stores:
                       names=names,
                       words=" ".join([r["kind"], r.get("productId") or "", r.get("strainId") or ""] + r.get("predictions", [])),
                       detail={"kind": r["kind"], "productId": r.get("productId"), "strainId": r.get("strainId"),
-                              "lockedAt": r.get("lockedAt"), "predictions": r.get("predictions", []),
-                              **_example(r)})
+                              "lockedAt": r.get("lockedAt"), "predictions": r.get("predictions", [])})
         for x in p["protocols"]:
             organisms = list(x.get("organisms", []))
             yield Row("runbooks", "protocol", x["id"], x["title"], "approved", f"version {x['currentVersion']} current",
                       words=" ".join([x["category"], x.get("purpose") or ""] + organisms),
                       detail={"category": x["category"], "organisms": organisms,
-                              "currentVersion": x["currentVersion"], "versions": x.get("versions", []),
-                              **_example(x)})
+                              "currentVersion": x["currentVersion"], "versions": x.get("versions", [])})
 
     def _geneos(self) -> Iterable[Row]:
         p = self._get("projection")["geneos"]
@@ -594,7 +578,7 @@ class Stores:
         for s in self._get("projection")["proforma"]["scenarios"]:
             yield Row("proforma", "scenario", s["id"], s["name"], "open", s["kind"],
                       words=" ".join([s.get("product") or "", s.get("modelId") or ""]),
-                      detail={"kind": s["kind"], "product": s.get("product"), "modelId": s.get("modelId"), **_example(s)})
+                      detail={"kind": s["kind"], "product": s.get("product"), "modelId": s.get("modelId")})
         yield from self._artifacts("proforma")
 
     def _biorepo(self) -> Iterable[Row]:
@@ -635,7 +619,7 @@ class Stores:
         for lesson in self._get("projection")["primer"]["lessons"]:
             yield Row("primer", "lesson", lesson["id"], lesson["title"], "approved", "published",
                       words=" ".join([lesson["moduleTitle"], lesson.get("blurb") or ""] + lesson.get("skills", [])),
-                      detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", []), **_example(lesson)})
+                      detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", [])})
 
     def _intake(self) -> Iterable[Row]:
         for document_id, held in self._get("intake").items():

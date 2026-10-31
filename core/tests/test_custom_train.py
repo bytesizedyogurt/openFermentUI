@@ -139,7 +139,7 @@ def test_the_shelf_holds_the_composite_the_yeast_programs_built_from_a_vessel_an
     assert set(info.gridInputs) <= {i.key for i in info.inputs} and info.priceOutput in info.outputs
     assert "the fermenter's beer is its inlet" in info.description
     # No seed scenario names it: a scenario on it is made in the browser alone.
-    assert all(s.get("modelId") != FLOWSHEET for s in proforma.seed_scenarios())
+    assert all(s.get("modelId") != FLOWSHEET for s in proforma.held_scenarios())
     # The worker loads it by its id; its module is that id's (the tree's rule for every shelf flowsheet).
     assert (PKG / "flowsheets" / f"{FLOWSHEET}.py").is_file()
 

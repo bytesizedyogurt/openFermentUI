@@ -479,12 +479,11 @@ def assumptions_read(words: str | None) -> list:
                                 "for one release; a basis without this input read the older field alone"))]
 
 
-def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str,
-                 samples: int = SAMPLES, scenario_id: str | None = None, fitted: list | None = None,
-                 parts: Any = None, finance: list | None = None) -> list:
+def basis_inputs(inputs: list, flowsheet: str, samples: int = SAMPLES, scenario_id: str | None = None,
+                 fitted: list | None = None, parts: Any = None, finance: list | None = None) -> list:
     """The run's basis: the flowsheet, the scenario it belongs to, what it
-    borrows from a package, the samples, and every record, assumption, the
-    cap and the conventions; an input a fermOS fit feeds names the fit's
+    borrows from a package, the samples, and every record, assumption and
+    convention; an input a fermOS fit feeds names the fit's
     artifact (OF-BLD-019 §5.1), and `fitted` adds what else the fit gave
     (the batch time a productivity is the titre over). A composite run
     (OF-BLD-020 §6.1) adds its vessel design, its train run and its finance
@@ -511,8 +510,6 @@ def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str,
         out.append(utility_input())
     out.append(diagram_input())
     out.append(BasisInput(name="samples", value=f"{samples} Latin hypercube", unit="", source=BasisSource(kind="convention")))
-    if cap is not None:
-        out.append(BasisInput(name="yield cap", value=cap[0], unit="g g-1", source=BasisSource(kind="artifact", id=cap[1])))
     for inp in inputs:
         if inp.binding == "records":
             out += [BasisInput(name=f"{inp.key} record", value=r.value, unit=inp.unit,
@@ -567,7 +564,6 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
     assumed: dict[str, dict[str, float]] = {}
     estimated: set[str] = set()
     fitted: dict[str, dict[str, float]] = {}
-    cap = next((float(i.value) for i in inputs if i.name == "yield cap"), None)
     from . import composite
 
     for i in inputs:
@@ -583,7 +579,7 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
         elif i.name.endswith(" record"):
             v = float(i.value)
             key = i.name.removesuffix(" record")
-            vals.setdefault(key, []).append(min(v, cap) if key == "yield" and cap is not None else v)
+            vals.setdefault(key, []).append(v)
         elif i.source.kind in ASSUMED_KINDS:
             key, _, part = i.name.partition(" ")
             assumed.setdefault(key, {})[part or "value"] = float(i.value)
@@ -852,7 +848,6 @@ def run(req, pool=None):
         read = READ_WORDS[(True, bool(req.assumptions))]
     _check_keys(info, typed)
     pool = pool or evidence_pool.load()
-    cap = None
     inputs = bind_inputs(flowsheet, pool.records, req.host, typed)
     if parts is not None:
         from . import composite
@@ -865,7 +860,7 @@ def run(req, pool=None):
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
         raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
-    art = artifacts.compute(RUN, basis_inputs(inputs, cap, flowsheet, req.samples, scenario_id=req.scenarioId,
+    art = artifacts.compute(RUN, basis_inputs(inputs, flowsheet, req.samples, scenario_id=req.scenarioId,
                                               fitted=fitted, parts=parts, finance=finance) + assumptions_read(read),
                             records_by_id=pool.records_by_id, seed=req.seed)
     o = art.output
@@ -919,7 +914,7 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
         raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
-    return artifacts.compute(RUN, basis_inputs(inputs, None, flowsheet, samples, scenario_id=scenario_id),
+    return artifacts.compute(RUN, basis_inputs(inputs, flowsheet, samples, scenario_id=scenario_id),
                              records_by_id={}, seed=seed)
 
 
@@ -968,7 +963,7 @@ def latest_run(scenario_id: str):
     whose flowsheet is the seed scenario's (OF-BLD-019 §2.3)."""
     from . import artifacts
 
-    seeded = {s["id"]: s.get("modelId") for s in seed_scenarios()}.get(scenario_id)
+    seeded = {s["id"]: s.get("modelId") for s in held_scenarios()}.get(scenario_id)
 
     def belongs(a) -> bool:
         named = _named(a.inputs, "scenario")
@@ -990,7 +985,6 @@ def latest_run(scenario_id: str):
 # value here; the stand-ins live in the tests.
 
 ETHANOL = "ethanol_glucose_v0"
-YEAST_SCENARIO_ID = "sc-yeast-1"
 # The carbon source a record must name to bind a process input of a
 # flowsheet `bind_inputs` binds: the flowsheet's own feed. A record naming
 # none is left out and counted, as one naming another feed is.
@@ -1000,7 +994,7 @@ FEED_CARBON: dict[str, frozenset[str]] = {ETHANOL: frozenset({"glucose"}), _shel
 PRODUCTS = {ETHANOL: "ethanol", _shelf.COMPOSITE: "ethanol"}
 
 
-def seed_scenarios() -> list[dict]:
+def held_scenarios() -> list[dict]:
     """The BioSTEAM scenarios the service holds by their ids, each naming the
     non-reference shelf flowsheet it runs (its `modelId`), read from the
     module projection. The seed's went with the seed (alpha 2.0, ADR-010),
@@ -1032,14 +1026,14 @@ def flowsheet_of(scenario_id: str, flowsheet: str | None = None) -> str:
     names. Any other case is refused, in words."""
     if not (scenario_id or "").strip():
         raise ScenarioRefused("a run names the scenario it belongs to")
-    seeds = {s["id"]: s for s in seed_scenarios()}
+    seeds = {s["id"]: s for s in held_scenarios()}
     if scenario_id in seeds:
         own = seeds[scenario_id]["modelId"]
         if flowsheet and flowsheet != own:
             raise ScenarioRefused(f"{scenario_id} runs {own}, not {flowsheet}")
         return own
     if not flowsheet:
-        raise ScenarioRefused(f"there is no seed scenario {scenario_id}; the seed's BioSTEAM scenarios are "
+        raise ScenarioRefused(f"there is no held scenario {scenario_id}; the BioSTEAM scenarios held here are "
                               f"{', '.join(seeds) or 'none'}, and a scenario made here names the flowsheet it runs")
     return runnable(flowsheet).id
 
@@ -1188,7 +1182,7 @@ def scenarios(host: str | None = None, pool=None) -> list:
     from . import evidence_pool
 
     out = []
-    for s in seed_scenarios():
+    for s in held_scenarios():
         pool = pool or evidence_pool.load()
         out.append(bound(s["modelId"], scenario_id=s["id"], name=s.get("name") or s["id"], host=host, pool=pool))
     return out
@@ -1433,13 +1427,11 @@ def _simulation_info(art, out, declared: dict, product: str, flowsheet: str, ref
         return refuse_all(f"it simulates a chemostat ({sim.family}), which runs continuously and has no batch: "
                           f"{flowsheet} takes a batch's titre, yield and batch time")
     # OF-BLD-020 §3.R (finding 14): the titre a flowsheet takes is a product
-    # in the broth (the family's P); a store inside the cells (storage_v1's
-    # Q) is not one, whatever product the simulation names.
-    state = fam.product_state() if fam is not None else None
-    if state != "P":
-        kept = (f"a store inside the cells ({state}), not a product in the broth" if state else "no product state")
-        return refuse_all(f"it simulates {sim.family}, whose product is {kept}: {flowsheet} takes the titre of "
-                          f"{product} in the broth")
+    # in the broth (the family's P), which a family fermOS does not have
+    # carries none, whatever product the simulation names.
+    if fam is None or fam.product_state() != "P":
+        return refuse_all(f"it simulates {sim.family}, a family that keeps no product in the broth: {flowsheet} "
+                          f"takes the titre of {product} in the broth")
     if sim.product and sim.product != product:
         return refuse_all(f"it simulates {sim.product}, not {product}, the product of {flowsheet}")
     if not sim.product:

@@ -875,7 +875,7 @@ def chemicals_of(spec: TrainSpec, overrides: Iterable[Override] = ()) -> list[st
 
 def static_specs() -> Iterable[tuple[str, list[ParameterSpec]]]:
     """Every spec a train adds to the catalogue's, read with no worker, for
-    `params --check` (check:seed holds each to a written bounds reason, D4):
+    `params.check()` (each held to a written bounds reason, D4):
     the inlet's, by kind, a typed concentration and a side inlet's flow each
     one template (expanded per chemical when a train is resolved)."""
     conc = _spec("conc", "Concentration", "a component's mass in each litre of the inlet", "massConc", "g L⁻¹",

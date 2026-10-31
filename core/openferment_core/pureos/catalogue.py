@@ -12,7 +12,7 @@ and which outlet goes on with the product by default.
 
 THIS MODULE IS DATA, AND IMPORTS NO BIOSTEAM AT ITS TOP (E.3‴). The service
 lists the catalogue from it (`listing`, GET /api/pureos/catalogue) and reads
-every declaration statically (`static_specs`, which `params --check` holds to
+every declaration statically (`static_specs`, which `params.check()` holds to
 a written bounds reason). What only BioSTEAM knows — each class's defaults,
 the choices its cost tables list, what its setters refuse — is read by the
 functions under "the worker side", which import BioSTEAM inside themselves
@@ -59,9 +59,7 @@ class's own.
 """
 from __future__ import annotations
 
-import json
 import re
-import sys
 import threading
 from dataclasses import dataclass
 from itertools import combinations
@@ -1474,20 +1472,3 @@ def unit_report(unit: Any, keys: Iterable[str]) -> dict[str, Any]:
         "utilityCost": float(unit.utility_cost or 0.0), "power": float(unit.power_utility.rate),
         "heatDuties": [float(h.duty) for h in unit.heat_utilities], "held": held,
     }
-
-
-# ── the guard's reading (check:seed) ───────────────────────────────────
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = sys.argv[1:] if argv is None else argv
-    if args != ["--ids"]:
-        print("usage: python -m openferment_core.pureos.catalogue --ids", file=sys.stderr)
-        return 1
-    print(json.dumps([{"id": e.id, "biosteamClass": e.biosteam, "inhouseClass": e.inhouse, "maps": list(e.maps)}
-                      for e in UNIT_TYPES] + [{"id": vid, "leftOut": cls} for cls, (vid, _) in LEFT_OUT.items()]))
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

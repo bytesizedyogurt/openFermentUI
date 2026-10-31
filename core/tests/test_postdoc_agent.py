@@ -430,12 +430,6 @@ def test_one_run_sweeps_first_offers_every_tool_and_opens_with_the_earlier_turns
     assert cmap["text"].startswith("COVERAGE MAP")
 
 
-# ── the program switch (OF-BLD-016 §2.3) ──────────────────────────────────
-
-
-ARCHIVED_QUESTION = "What PHB yield did Cupriavidus necator H16 reach on glucose?"
-
-
 # ── a flowsheet run is cited like any computed value (OF-BLD-019 §6.1) ──
 
 

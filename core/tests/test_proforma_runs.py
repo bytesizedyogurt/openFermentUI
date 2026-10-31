@@ -30,7 +30,7 @@ HELD = "sc-held-1"  # a scenario the service holds by its id, as the `held` fixt
 def held(monkeypatch):
     """One scenario the service holds by its id, on the ethanol flowsheet."""
     row = {"id": HELD, "name": "A held test scenario", "kind": "biosteam", "modelId": ETHANOL}
-    monkeypatch.setattr(proforma, "seed_scenarios", lambda: [row])
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: [row])
     return row
 
 

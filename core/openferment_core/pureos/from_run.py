@@ -93,7 +93,7 @@ def _read(art: Artifact) -> tuple[Any, str | None, str | None, str | None, str |
     """(the tables, the product stream, the chemical traced, the product id,
     the program, what the run is called) for a kept run."""
     from .. import proforma
-    from . import _train_product, product_of, program_of, program_of_run, scenario_of, seed_scenarios
+    from . import _train_product, product_of, program_of, program_of_run, scenario_of, held_scenarios
 
     t = proforma.tables_of(art)
     o = art.output if isinstance(art.output, dict) else {}
@@ -108,7 +108,7 @@ def _read(art: Artifact) -> tuple[Any, str | None, str | None, str | None, str |
         if not chem:
             raise TrainRefused(f"run {art.id} names no product to trace ({how}), so no train is read from it")
         pid = _product_id(chem)
-        scenarios = seed_scenarios() if art.tool == RUN else []
+        scenarios = held_scenarios() if art.tool == RUN else []
         sid, sname = scenario_of(art, scenarios) if art.tool == RUN else (None, None)
         program = program_of(art, sid, scenarios)
         label = sname or t.flowsheet or art.id

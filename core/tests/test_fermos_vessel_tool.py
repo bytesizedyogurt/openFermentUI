@@ -47,7 +47,7 @@ def a_person_typed_a_scale(monkeypatch):
     monkeypatch.setattr(vessel, "design", with_a_person)
 
 
-def ctx(archived=True):
+def ctx():
     c = tools.ToolContext()
     c.ask_id, c.model = "ask-42", "claude-haiku-5-5"
     return c

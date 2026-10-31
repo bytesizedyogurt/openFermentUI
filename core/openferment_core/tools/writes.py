@@ -489,7 +489,7 @@ def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> To
     sid = (scenario_id or "").strip()
     if not sid:
         return ToolResult(error=f"{tool} refused: name the scenario to run by its id (proforma_read lists them)")
-    seed = {s["id"]: s for s in pureos.seed_scenarios()}
+    seed = {s["id"]: s for s in pureos.held_scenarios()}
     if seed and sid not in seed:
         held = ", ".join(sorted(k for k, s in seed.items() if s.get("kind") == "biosteam"))
         return ToolResult(error=f"{tool} refused: {sid} is not a scenario this service holds. A scenario made with New "
@@ -588,7 +588,7 @@ def _simulation_evidence(r: Any) -> Any:
     from ..models import Evidence
 
     state = kinetics.FAMILIES[r.family].product_state() if r.family in kinetics.FAMILIES else None
-    who = r.strain or "every strain of the program's organism"
+    who = r.strain or "any strain"
     on = f" on {r.sugar}" if r.sugar else ""
     made = r.product or "product"
     value: float | str = r.finalTitre if r.finalTitre is not None else "no product state"

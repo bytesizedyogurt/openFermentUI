@@ -83,7 +83,7 @@ def test_the_basis_comes_back_as_the_same_sampling(store):
     rs += [rec("p1", "ethanol_productivity", 1.0, "g L-1 h-1"), rec("p2", "ethanol_productivity", 3.0, "g L-1 h-1")]
     rs += [rec("y", "ethanol_yield_substrate", 0.4, "g g-1")]
     inputs = proforma.bind_inputs(ETHANOL, rs, assumptions=[assume("glucose_price", 0.4, 0.3, 0.5)])
-    specs, base, kinds = proforma._specs(proforma.basis_inputs(inputs, None, ETHANOL))
+    specs, base, kinds = proforma._specs(proforma.basis_inputs(inputs, ETHANOL))
     assert specs["titre"] == {"kind": "triangular", "low": 10.0, "mode": 25.0, "high": 40.0}
     assert specs["productivity"] == {"kind": "uniform", "low": 1.0, "high": 3.0}
     assert specs["yield"] == {"kind": "fixed", "value": pytest.approx(0.4)}
@@ -101,7 +101,7 @@ def test_r1_a_constant_input_has_no_rank_correlation():
     assert proforma._spearman(flat, rising) is None
     two_same = [rec("a", "ethanol_titre", 10.0, "g/L"), rec("b", "ethanol_titre", 10.0, "g/L")]
     assert by_key(proforma.bind_inputs(ETHANOL, two_same))["titre"].sampling == "fixed"
-    specs, _, _ = proforma._specs(proforma.basis_inputs(proforma.bind_inputs(ETHANOL, two_same), None, ETHANOL))
+    specs, _, _ = proforma._specs(proforma.basis_inputs(proforma.bind_inputs(ETHANOL, two_same), ETHANOL))
     assert specs["titre"]["kind"] == "fixed"
 
 

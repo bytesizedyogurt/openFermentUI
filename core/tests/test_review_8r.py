@@ -110,7 +110,7 @@ def test_the_vessel_tool_is_registered_when_the_service_starts():
     assert out.stdout.strip().endswith("registered")
 
 
-# ── finding 3: a vessel for an archived program's simulation hides ──────
+# ── the stand-in simulations a vessel reads ─────────────────────────────
 
 
 def _keep(aid: str, tool: str, output: dict, inputs: list[BasisInput]) -> Artifact:
