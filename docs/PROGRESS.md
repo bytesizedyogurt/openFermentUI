@@ -18,7 +18,11 @@ session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage D** of alpha 2.1, the debts, in the prompt's §6 order, on work that needs no
+4. **Next step: once the account answers, finish stage C** (the commands at the end of
+   `docs/reports/model-routing-2026-11.md`), set the routing defaults on it, ask the twelve again,
+   and run `pnpm prove --live`; meanwhile the open debts need no model call: debt 3, debt 5, the
+   rest of debts 1 and 6. The stage D entry below says what each step paid. The earlier plan:
+   stage D of alpha 2.1, the debts, in the prompt's §6 order, on work that needs no
    model call: the catalogues as project stores (debt 1), fermOS, pureOS and Proforma on Quantity
    inputs and the runs table (3), the key override and the local-model route (4, its negative
    test offline), the screens on the generated types (5), the small debts (6). Debt 2 (records
@@ -38,6 +42,12 @@ session continues from this file and `git log` alone.
 5. Files in flight: none.
 
 ## Current stage
+
+Alpha 2.1, stage F (2026-11-02): the work is on `claude/alpha-2-1-functional` with its pull request
+to `main` and the §9 completion report. Stage C is held by the Anthropic account's own usage limit
+(Blockers), which refuses every model call until the owner raises it or 2026-12-01; stage D paid
+debts 2 and 4, debt 1 in part and one of debt 6's tests; stage E wrote the live host's runbook.
+`pnpm verify` is green on all sixteen stages and `pnpm prove` holds 66 of 66 offline.
 
 Alpha 2.1, stage B (2026-11-02): the project "Ethanol" made on Home, the 22 ethanol sources held
 through Intake (814 passages), extraction over every document (272 candidates waiting for the
@@ -144,6 +154,8 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-02 12:05 | `pnpm prove --live`, steps 1 to 8, every route on the alpha 2.1 table (`plan`, `explain`, `extract` and `judge` on `claude-opus-5-5`, `index` on `claude-haiku-5-5`): 22 of 22 ethanol sources, 814 chunks; PMC4842200 extracted by `claude-opus-5-5` for 0.1898 USD (26 candidates kept, 12 refused); the evaluation set asked of `claude-opus-5-5` | 46 of 46 checks hold; 10 calls, 0.6601 USD from the proof's spend table; scored by code `eq-price` tools 1, citations 1, estimates 1, bare numbers 0 (one claim dropped for a number), `eq-dearer` tools 1, citations 1, estimates 0, bare numbers 1 | 7 min 54 s | `d30fb63` |
 | 2026-11-02 19:41 | Alpha 2.1 stage B on `2d2ca61`, the Opus `core/.env` in place: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2279 passed, 1 skipped, 168 deselected; `test:sim` 132 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 9 min 34 s | `2d2ca61` |
 | 2026-11-02 19:43 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 66 of 66 checks hold, the walk's scenario begun from a run, Studies' plants and Flowsheets among them; no call in the proof's spend table | 2 min 11 s | `2d2ca61` |
+| 2026-11-02 20:55 | Alpha 2.1 stage F on `32b95f1`, the Opus `core/.env` in place: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2302 passed, 1 skipped, 168 deselected; `test:sim` 132 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 9 min 32 s | `32b95f1` |
+| 2026-11-02 20:58 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 66 of 66 checks hold; no call in the proof's spend table. `pnpm prove --live` was not run: the account's usage limit refuses every call (Blockers) | 2 min 6 s | `32b95f1` |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
