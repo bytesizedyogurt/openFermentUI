@@ -74,8 +74,29 @@ score as JSON:
 |---|---|
 | `tools` | The share of the question's tool groups the trace reached (any one tool of a group) |
 | `citations` | The share of the claims kept that cite what the question expects (evidence, records, passages, module rows) |
-| `estimates` | 1 when a labelled estimate stands exactly where the question asks for one, every claim stating one `assumed` |
+| `estimates` | 1 when a labelled estimate stands where the question asks for one and none where it forbids one (a question may also leave it open), every claim stating one `assumed` |
 | `bareNumbers` | 1 when no claim was dropped for a number in its text; `droppedForNumbers` keeps the count |
+
+Two suites (alpha 2.1): `default`, the proof's two questions, and `ethanol`, the owner's twelve
+real questions of `docs/reports/live-questions-2026-11.md`, each with what a good answer does in
+words (`expects`). `pnpm eval seed --suite ethanol` keeps them; `pnpm eval run --live --suite
+ethanol --tag <name> [--judge]` asks them on the routing table the environment sets and keeps each
+run under the tag, with the seconds it took. `--judge` has the first model on the `judge` route
+read each answer as it is kept: the question, what a good answer does, every claim with what it
+cites (the evidence's values, each record's quote, each passage's words), the gaps and the tools
+called, and score it from 0 to 1:
+
+| Judge's score | What it is |
+|---|---|
+| `answers` | How far the answer does what the question asks |
+| `grounded` | The share of claims that what they cite bears out |
+| `labelled` | Every value's origin said, every estimate labelled as the model's |
+| `coverage` | How much of what a good answer covers this one covers |
+
+A judgement keeps the judge model's id, its faults in words and its cost, beside the code's scores
+and never in their place. `pnpm eval judge --suite ethanol --tag <name>` has the judge route as it
+now stands read the newest kept answers again and adds its judgement, so a second judge reads the
+same answers; `pnpm eval summary --suite ethanol` sets each tag's newest runs side by side.
 
 ## Routes
 

@@ -25,7 +25,7 @@
 - C: `pnpm test:slow` (marker `slow`) and `pnpm test:live` (marker `live`: a real network call, most needing the key and spending) run by hand, outside verify.
 - C: `pnpm prove` runs the proof (`scripts/prove.py`, steps 1 to 9) on a database of its own, with no key and the network refused; run `pnpm build` first, since step 9 walks the built app in Chromium; `--steps 3,8` proves the steps named with what they stand on.
 - C: `pnpm ready` (or `pnpm ready --offline`) says in rows whether the service can run: the database, both schemas, pgvector, the embedder, the model routes and the key.
-- C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names.
+- C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names; `--suite ethanol` is the owner's twelve, `--tag` names a route table, `--judge` and `pnpm eval judge` add the `judge` route's scores, and `pnpm eval summary` sets the tags side by side (`docs/api/postdoc.md`).
 - C: `pnpm gen:api`, `pnpm gen:tools` and `pnpm gen:components` write `docs/api/openapi.json` with `src/api/types.gen.ts`, `docs/TOOLS.md` and `COMPONENTS.md`; verify fails on drift, so regenerate a generated file and leave it unedited by hand.
 - C: `pnpm smoke` opens every rail entry against the real service and needs a build; `pnpm dev` serves the client on Vite.
 - R: `pnpm test:core` green before every commit; push after every step; never force-push; never commit `core/.env` or a database dump (§11.2).
