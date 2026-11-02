@@ -290,6 +290,11 @@ eval_questions = _scoped("eval_questions")
 eval_runs = _scoped("eval_runs", Column("question_id", Text, nullable=False),
                     Index(None, "project_id", "question_id"))
 
+# A project's catalogues (alpha 2.1; catalogues.py): strains, products, Guild's
+# skills and Primer's lessons, one row an entry, kept whole by `<kind>/<id>`.
+catalogue = _scoped("catalogue", Column("kind", Text, nullable=False), Index(None, "project_id", "kind"),
+                    updated=True)
+
 jobs = _scoped("jobs", Column("kind", Text, nullable=False), Column("state", Text, nullable=False), updated=True)
 
 # ── Guild and Primer ──────────────────────────────────────────────────────

@@ -197,10 +197,11 @@ RULES: dict[str, Rule] = {r.id: r for r in (
 
 
 def _catalogue() -> Any:
-    """The products and strains on file. No store holds either catalogue yet,
-    so both are empty and every proposal is refused for want of a host on
-    file; tests supply them here."""
-    return SimpleNamespace(products=(), strains=())
+    """The products and strains on file, from the open project's catalogues
+    (catalogues.py): a proposal's host is a strain kept there."""
+    from .. import catalogues
+
+    return SimpleNamespace(products=tuple(catalogues.as_products()), strains=tuple(catalogues.as_hosts()))
 
 
 def _molecules() -> dict[str, dict[str, Any]]:

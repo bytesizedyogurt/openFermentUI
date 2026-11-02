@@ -247,9 +247,10 @@ def protparam(sequence: str, *, source: BasisSource, product: str | None = None,
 
 def products() -> list[dict[str, Any]]:
     """The products catalogue: each entry's id and name, and its sequence and
-    source when it has one. No store holds a product catalogue yet, so it is
-    empty; tests supply one here."""
-    return []
+    source when it has one, from the open project's catalogue (catalogues.py)."""
+    from . import catalogues
+
+    return catalogues.as_products()
 
 
 def sequence_of(product: str) -> tuple[str, BasisSource]:

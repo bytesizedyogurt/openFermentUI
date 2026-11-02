@@ -196,7 +196,8 @@ NAMES = (["search_records", "convert_units", "search_passages", "yield_ceiling",
                                        "engine_plants", "engine_parameters", "engine_run", "engine_report",
                                        "study_scenario", "study_compare", "study_read",
                                        "literature_sources", "literature_document",
-                                       "flowsheet_library", "flowsheet_import", "flowsheet_read"])
+                                       "flowsheet_library", "flowsheet_import", "flowsheet_read",
+                                       "catalogue_read", "catalogue_write"])
 
 
 def test_only_the_whitelisted_names_may_register():
@@ -210,7 +211,7 @@ def test_the_tools_that_keep_something_say_so_and_every_tool_acts_in_one_project
 
     assert {n for n, t in tools.REGISTRY.items() if t.writes} == {f"{m}_write" for m in module_stores.MODULES} | {
         "run_flowsheet", "fermos_simulate", "fermos_vessel", "pureos_build", "engine_run", "study_scenario",
-        "study_compare", "flowsheet_import"}
+        "study_compare", "flowsheet_import", "catalogue_write"}
     assert {t.scope for t in tools.REGISTRY.values()} == {"project"}
 
 

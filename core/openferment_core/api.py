@@ -881,6 +881,80 @@ def flowsheets_file(record_id: str):
 # ── Library plants (alpha 2.0, ADR-004; engine/library.py) ──────────────
 
 
+# ── a project's catalogues (alpha 2.1, debt 1; catalogues.py) ──────────
+
+
+class CatalogueKeep(BaseModel):
+    """POST /api/catalogues/{kind}: one entry and who keeps it."""
+
+    entry: dict[str, Any]
+    by: str = ""
+
+
+def _catalogue_kind(kind: str) -> str:
+    from . import catalogues
+
+    if kind not in catalogues.KINDS:
+        raise HTTPException(status_code=404, detail=f"there is no catalogue of {kind!r}: the catalogues are "
+                                                    f"{', '.join(catalogues.KINDS)}")
+    return kind
+
+
+@app.get("/api/catalogues/{kind}")
+def catalogue_listed(kind: str) -> list[dict]:
+    """The open project's entries of one catalogue (strain, product, skill, lesson), by id."""
+    from . import catalogues
+
+    return [e.model_dump(mode="json") for e in catalogues.listed(_catalogue_kind(kind))]
+
+
+@app.get("/api/catalogues/{kind}/{entry_id}")
+def catalogue_entry(kind: str, entry_id: str) -> dict:
+    from . import catalogues
+
+    try:
+        return catalogues.get(_catalogue_kind(kind), entry_id).model_dump(mode="json")
+    except catalogues.CatalogueEntryNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+
+
+@app.post("/api/catalogues/{kind}")
+def catalogue_keep(kind: str, asked: CatalogueKeep) -> dict:
+    """One entry kept in the open project's catalogue of `kind`, in the name of
+    `by`; an entry already held under its id is replaced. 422 in words for an
+    entry the kind does not take."""
+    from pydantic import ValidationError
+
+    from . import catalogues
+
+    try:
+        entry = catalogues.CatalogueEntry.model_validate({**asked.entry, "kind": _catalogue_kind(kind)})
+        return catalogues.keep(entry, by=asked.by).model_dump(mode="json")
+    except ValidationError as e:
+        first = e.errors()[0]
+        raise HTTPException(status_code=422, detail=f"{'.'.join(str(x) for x in first.get('loc', ())) or 'the entry'}: "
+                                                    f"{first.get('msg')}") from e
+    except catalogues.CatalogueRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/intake/catalogue")
+def catalogue_intake(kind: str = Form(...), by: str = Form(..., min_length=1, max_length=200),
+                     file: UploadFile = File(...)) -> dict:
+    """A file of catalogue entries of one kind, JSON or CSV, taken in: every
+    row that is an entry kept with the file as its source, every other row
+    refused with its reason."""
+    from . import catalogues
+
+    data = file.file.read(4 * 1024 * 1024 + 1)
+    if len(data) > 4 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"{file.filename} is larger than 4 MB")
+    try:
+        return catalogues.intake(_catalogue_kind(kind), data, file.filename or "", by=by).model_dump(mode="json")
+    except catalogues.CatalogueRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
 @app.get("/api/library", response_model=LibraryShelf)
 def library_shelf() -> LibraryShelf:
     """Every subpackage of the installed biorefineries as discovery read it:

@@ -213,8 +213,15 @@ EMPTY_PROJECTION: dict[str, Any] = {
 
 
 def _projection() -> dict[str, Any]:
-    """The empty projection, a copy of its own for each caller."""
-    return copy.deepcopy(EMPTY_PROJECTION)
+    """The projection, a copy of its own for each caller: geneOS's hosts and
+    Primer's lessons from the open project's catalogues (catalogues.py), the
+    rest empty."""
+    from . import catalogues
+
+    out = copy.deepcopy(EMPTY_PROJECTION)
+    out["geneos"]["hosts"] = catalogues.as_hosts()
+    out["primer"]["lessons"] = catalogues.as_lessons()
+    return out
 
 
 def _scenarios() -> list[Any]:
@@ -230,8 +237,11 @@ def _project_runbooks() -> list[Any]:
 
 
 def _strain_aliases() -> dict[str, str]:
-    """Strain aliases arrive with a project's records (stage 2); none here."""
-    return {}
+    """Each strain's other names, and its name, to its id, from the open
+    project's strain catalogue (catalogues.py)."""
+    from . import catalogues
+
+    return catalogues.as_strain_aliases()
 
 
 def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:

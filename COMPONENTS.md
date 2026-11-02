@@ -144,6 +144,7 @@ One tool registry, three callers (OF-BLD-014 §3.4, E.6).
 
 | Module | What it says it is |
 |---|---|
+| `catalogues.py` | A project's catalogues, for Postdoc (alpha 2.1 stage D, debt 1; catalogues.py). |
 | `engine.py` | The library shelf and the project's engine runs, for Postdoc (alpha 2.0 stage 6; execution prompt §4.6, §9.1 step 6; ADR-004, ADR-006). |
 | `fermos.py` | fermOS's tools: `growth_forecast` (OF-BLD-014 §7.3), `fermos_simulate` (OF-BLD-020 §3.4) and `fermos_vessel` (OF-BLD-020 §4.2). |
 | `flowsheets.py` | SFF flowsheets, for Postdoc (alpha 2.1 stage B; ADR-003): the toolkit's reference files, a reference file imported into the project, and a kept record read back. |
@@ -186,6 +187,7 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `basis.py` | The provenance of a computed value (OF-BLD-014 §3.1, E.4). |
 | `binding.py` | What Proforma and fermOS bind a value from records with (OF-BLD-020 §3.2). |
 | `biorepo.py` | BioRepo — one write function for a project's review decisions (OF-BLD-012 §2.3, §7.1). |
+| `catalogues.py` | A project's catalogues (alpha 2.1 stage D, debt 1): the strains and their aliases, the products, Guild's skills and Primer's lessons. |
 | `checks.py` | Checks — proposed by fixed rules, scheduled and run by an assessor (OF-BLD-013 §5.2). |
 | `competence.py` | Competence, mirrored (OF-BLD-013 §2.1). |
 | `composite.py` | The seam on the service's side: a vessel and a train become a flowsheet Proforma prices (OF-BLD-020 §6.1, D11, D3, E.2‴, E.3‴; Appendix 2 §D). |

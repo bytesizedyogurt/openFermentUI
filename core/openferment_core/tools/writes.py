@@ -455,6 +455,30 @@ def import_flowsheet(tool: str, file_id: str, note: str, ctx: ToolContext) -> To
     return record_result(record)
 
 
+CATALOGUE_MODULES = {"strain": "geneos", "product": "pureos", "skill": "guild", "lesson": "primer"}
+
+
+def keep_catalogue(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
+    """One entry kept in the project's catalogue of its kind (alpha 2.1,
+    debt 1), marked as the caller's and audited under the module that reads
+    that kind; refused in words when the kind does not take it."""
+    from .. import catalogues
+
+    kind = str(inp.kind).strip().lower()
+    if kind not in catalogues.KINDS:
+        return ToolResult(error=f"{tool} refused: there is no catalogue of {kind!r}; the catalogues are "
+                                f"{', '.join(catalogues.KINDS)}")
+    agent, who = _actor(ctx)
+    fields = {k: v for k, v in inp.model_dump().items() if k != "kind" and v not in ("", [], None)}
+    try:
+        kept = catalogues.keep_fields(kind, fields, by=who, source=f"Postdoc ({who})" if agent == "model" else who)
+    except catalogues.CatalogueRefused as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    _audit_as(ctx, CATALOGUE_MODULES[kind], tool, "open", f"{kind}/{kept.id}", {"tool": tool, "kind": kind})
+    return ToolResult(summary={"state": "open", "kind": kind, "id": kept.id, "name": kept.name, "by": kept.by,
+                               "note": "kept in the project's catalogue, marked as yours; a person may replace it."})
+
+
 def make_scenario(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
     """Keep a study scenario whose values the caller typed, each marked by
     the registry as the caller's (ADR-006), and audit it as theirs."""
