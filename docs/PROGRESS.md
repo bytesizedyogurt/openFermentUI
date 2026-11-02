@@ -7,41 +7,40 @@ session continues from this file and `git log` alone.
 
 ## Resume
 
-1. Branch: `claude/alpha-2-1-functional`, cut from `main` at `7f990f8` (the merge of #15).
-   `git fetch origin claude/alpha-2-1-functional && git checkout claude/alpha-2-1-functional`.
+1. Branch: `claude/alpha-2-2-base`, cut from `main` at `112eb8b` (the merge of #16, alpha 2.1).
+   `git fetch origin claude/alpha-2-2-base && git checkout claude/alpha-2-2-base`. The work is the
+   alpha 2.2 execution prompt of 2 November 2026 (the base, sealed), stages A to H.
 2. Environment:
    - `pnpm install --frozen-lockfile`
    - `cd core && uv sync --all-extras`
-   - From stage 2 on, PostgreSQL: `pnpm db:up` (compose.yaml), or a local PostgreSQL 16 or later
-     with pgvector and a role that may create databases. `OPENFERMENT_DATABASE_URL` in `core/.env`
-     (`core/.env.example` has the development address), then `pnpm db:migrate`. The tests make a
-     database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
-     compose role on 127.0.0.1:5432.
+   - PostgreSQL: `pnpm db:up` (compose.yaml), or a local PostgreSQL 16 or later with pgvector and a
+     role that may create databases (in a cloud container, `service postgresql start`).
+     `OPENFERMENT_DATABASE_URL` in `core/.env` (`core/.env.example` has the development address),
+     then `pnpm db:migrate`. The tests make databases of their own on the server
+     `OPENFERMENT_TEST_DATABASE_URL` names; the default is the compose role on 127.0.0.1:5432.
+   - `core/.env` as the prompt's §4 names: Opus with Sonnet behind it in every answering family,
+     `plan` and `judge` at effort max, `explain` and `extract` at high, `index` on Haiku at low,
+     `OPENFERMENT_DAILY_BUDGET_USD=150`, `OPENFERMENT_ASK_BUDGET_USD=8`. A cloud session's own
+     environment pins `OPENFERMENT_MODEL` and its three kin to Haiku, and the service reads
+     `core/.env` with `override=False`, so run every command with the four unset (`env -u
+     OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
+     OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: once the account answers, finish stage C** (the commands at the end of
-   `docs/reports/model-routing-2026-11.md`), set the routing defaults on it, ask the twelve again,
-   and run `pnpm prove --live`; meanwhile the open debts need no model call: debt 3, debt 5, the
-   rest of debts 1 and 6. The stage D entry below says what each step paid. The earlier plan:
-   stage D of alpha 2.1, the debts, in the prompt's §6 order, on work that needs no
-   model call: the catalogues as project stores (debt 1), fermOS, pureOS and Proforma on Quantity
-   inputs and the runs table (3), the key override and the local-model route (4, its negative
-   test offline), the screens on the generated types (5), the small debts (6). Debt 2 (records
-   written from `biorepo.write`) is paid. **Stage C is held by the Anthropic account's usage
-   limit** (Blockers): it measured eight answers before every call was refused; finish it with the
-   commands at the end of `docs/reports/model-routing-2026-11.md` once the account answers. The
-   paid retrieval lanes (debt 7), the questions asked again after debts 1 and 3, and `pnpm prove
-   --live` wait on the same limit. For real work set
-   `core/.env` as the prompt's §4 names (the Opus routes,
-   `OPENFERMENT_DAILY_BUDGET_USD=150`, `OPENFERMENT_ASK_BUDGET_USD=6`). The service reads
-   `core/.env` with `override=False`, so a cloud session whose environment sets `OPENFERMENT_MODEL`
-   and kin to Haiku runs every command with those four unset (`env -u OPENFERMENT_MODEL -u
-   OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u OPENFERMENT_EFFORT <command>`), or the
-   environment wins. Stage B's project "Ethanol" lived in that session's container
-   (`openferment_dev`); a fresh container makes it again on Home and collects
+4. **Next step: stage B, the engine contract**: `docs/api/engines.md` first, then ADR-015,
+   `engine/registry.py` on the entry-point group `openferment.engines`, migration 0008 (the
+   `engine` column) and the `biosteam` engine registered through `core/pyproject.toml`. Then
+   stages C, D and E in the prompt's order. `pnpm ready --probe` found the account answering at
+   23:50 UTC on 2 November, so stage F, the live work, follows E. Alpha 2.1's Ethanol project is
+   in this container's `openferment_dev`; a fresh container makes it again on Home from
    `docs/corpus/ethanol-sources.txt` through Intake (about twenty minutes), then extracts.
 5. Files in flight: none.
 
 ## Current stage
+
+Alpha 2.2, stage A (2026-11-02): #16 merged into `main` as `112eb8b` and `claude/alpha-2-2-base`
+cut from it; the tag pushes refused again (Blockers); `pnpm verify` green on all sixteen stages and
+`pnpm prove` 66 of 66 offline on the merged `main`; `pnpm ready --probe` added and run once, and the
+index route answered, so the account's usage limit no longer refuses a call.
 
 Alpha 2.1, stage F (2026-11-02): the work is on `claude/alpha-2-1-functional` with its pull request
 to `main` and the §9 completion report. Stage C is held by the Anthropic account's own usage limit
@@ -159,6 +158,8 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-02 21:29 | Alpha 2.1 F.2, A→B→A held within one part in 10¹²: `pnpm test:sim` | 132 passed, 2339 deselected | 4 min 9 s | F.2 |
 | 2026-11-02 21:35 | `pnpm test:core` | 2302 passed, 1 skipped, 168 deselected | 3 min 59 s | F.2 |
 | 2026-11-02 22:07 | Alpha 2.1 F.3, every conversation held: `typecheck`, `check:state`, `gen:components --check`, `check:plan`, `build`, `pnpm test:core`, `pnpm smoke` | all passed; 2302 passed, 1 skipped, 168 deselected; 12 of 12 screens open | 4 min 13 s (`test:core`) | F.3 |
+| 2026-11-02 23:46 | Alpha 2.2 stage A on `112eb8b` (the merge of #16), `core/.env` as the prompt's §4 names: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2302 passed, 1 skipped, 168 deselected; `test:sim` 132 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 9 min | `112eb8b` |
+| 2026-11-02 23:49 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 66 of 66 checks hold; no call in the proof's spend table | 2 min 18 s (the proof 119 s) | `112eb8b` |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -171,6 +172,15 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 | A | 10 | 0.6601 | `pnpm prove --live` on the Opus routes |
 | B | 203 | 17.6463 | extraction over 22 documents (4.53) and nine again after the anchoring fixes (1.80); the twelve questions asked three times (4.54, 5.01, and 1.60 for the three asked a third time). Those sums are what each answer reported of itself; the table of `openferment_dev` holds 0.17 more |
 | C | 72 | 2.1006 | the three route tables until the account's usage limit refused every call (eight answers kept, five judged); the judge's calls among them |
+
+## Spend (alpha 2.2)
+
+From the spend tables. The day's cap for this work is 150 USD and an ask's 8 USD (`core/.env`, the
+prompt's §4).
+
+| Stage | Calls | USD | What |
+|---|---|---|---|
+| A | 1 | 0.000004 | `pnpm ready --probe`: one call on the index route (`claude-haiku-5-5`, 18 tokens in, 4 out) |
 
 ## Decisions
 
@@ -243,8 +253,7 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 |---|---|---|
 | 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. Nothing is lost by waiting: the service no longer writes them | On the Mini: `brew install postgresql@17 pgvector && brew services start postgresql@17`; `scripts/host/install.sh` (makes the database `openferment` and names it in `core/.env`; when `core/data/biorepo.json` holds uncommitted decisions, the old deploy asks to commit and push them first, which keeps them); then `pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, and `OPENFERMENT_PROJECT=<the id it prints>` in `core/.env` for the nightly extraction |
 | 2026-10-31 | Owner decision: the live instance's PostgreSQL has no backup. `pnpm ready` used to say a git push "backs up" Guild's decisions, which stopped being true when they moved into the database at stage 2; the row is gone (8.5). Guild's ledger is personnel data and never enters git | Choose where a dump of the database goes, then add it to the nightly (`scripts/host/nightly.sh`): `pg_dump openferment` to that place |
-| 2026-11-02 20:01 UTC | **Owner action: the Anthropic account behind `core/.env`'s key reached its own usage limit.** Every model call answers HTTP 400, "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC." It is the account's limit, set in the Anthropic console, and separate from openFerment's daily cap (19.75 of 150 USD spent that day). It stopped stage C's comparison part way (`docs/reports/model-routing-2026-11.md`) and holds every live step after it: the questions asked again after debts 1 and 3, `pnpm prove --live`, extraction, Postdoc. The service now says so in those words, never "malformed" | Raise the limit in the Anthropic console (Settings, Limits), or wait for 2026-12-01; then `pnpm ready`, and finish stage C with the commands at the end of the report |
-| 2026-10-30, again 2026-11-02 (HTTP 403) | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0` ends with "unexpected disconnect while reading sideband packet", lightweight and annotated alike. The tag exists in this container only. Commit `d19224f` stays reachable as an ancestor of `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git push origin alpha-1.0` |
+| 2026-10-30, again 2026-11-02 (HTTP 403, twice) | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0 alpha-2.1` ends with "RPC failed; HTTP 403" and "unexpected disconnect while reading sideband packet". The tags `alpha-1.0` (`d19224f`) and `alpha-2.1` (`fa1b744`, #16's head) exist in this container only; both commits stay reachable from `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git tag alpha-2.1 fa1b7448a5b5e5a2b943b3fc9546f8a420a8ef10 && git push origin alpha-1.0 alpha-2.1` |
 
 ## Known debts (each names the stage that pays it)
 
@@ -1009,3 +1018,20 @@ holds the numbers, the tables and the judgements).
   a link to one opened an empty pane. The page now holds every conversation the service keeps
   (`projectState.conversationsHeld`; `check:state` holds a project of 51); the browser's snapshot
   keeps no conversation, so nothing grows there.
+
+### Alpha 2.2 — Stage A — 2026-11-02
+
+- A1. #16 merged into `main` with a merge commit (`112eb8b`, CI green on its head `fa1b744`) and
+  `claude/alpha-2-2-base` cut from it. The tag `alpha-2.1` was made beside `alpha-1.0`, and the push
+  of both was refused once more (HTTP 403 from the session's relay); the commands are in Blockers.
+- A2. `core/.env` set to the prompt's §4: effort max on `plan` and `judge`, `explain` and `extract`
+  at high, Sonnet behind Opus in every answering family, `index` on Haiku at low, an ask's budget
+  of 8 USD. `llm.routes()` reads the table as written and `llm.PRICES` prices every model it names.
+  This session's environment sets `ANTHROPIC_BASE_URL` to `https://api.anthropic.com`, so the
+  service's calls reach the account behind the key. `pnpm ready` green.
+- A3. `pnpm verify` green on all sixteen stages, and `pnpm prove` 66 of 66 offline (Last green runs).
+- A4. `pnpm ready --probe` (`ready.check_probe`): one call of a few tokens on the index route, the
+  one row that sees the account's own usage limit, since an account past it still answers the free
+  Models API the model row asks. A refused probe names the API's date and sets the lane to `none`
+  (`test_ready.py`). Run once at 23:50 UTC: `claude-haiku-5-5` answered, 18 tokens in and 4 out,
+  0.000004 USD. The plan keeps every stage, F after E.
