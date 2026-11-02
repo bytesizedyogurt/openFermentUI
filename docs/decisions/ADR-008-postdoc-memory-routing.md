@@ -160,6 +160,27 @@ another round, as 6.3 held back the whole ceiling. On the owner's default ask bu
 D8's figure) a turn on Opus still gets what the budget left pays for; on the 6 USD core/.env names
 for real work, every turn gets the whole ceiling.
 
+## Implementation 10 (alpha 2.1 stage D: the key a request names)
+
+The owner authorized the per-request key override on 2 November 2026 (question 10), within these
+rules: a key sent on a request is used for that request's model calls and never stored, logged or
+echoed; it reaches openFerment's client and the kit's; a request with none uses core/.env's; the
+audit row records that an override was used, never the key. Built as 6.3 designed it:
+
+- A request names its key in `X-OpenFerment-Key` (`llm.KEY_HEADER`). The API's middleware reads
+  it after the guard and the project's middleware: `guard.key_refusal` refuses a request through
+  Tailscale Funnel, from the public internet, and one under a name the service does not answer
+  to, in words that never repeat the key; an empty header is refused with a 422.
+- `llm.request_key` holds the key in a context variable for the request. `_default_client` builds
+  every client on it in place of core/.env's; the kit's calls reach it through `llm.call` on
+  asyncio's worker thread, and the ask stream's thread through `contextvars.copy_context`, both
+  of which carry the context. A key the API rejects is said to be the one the request named.
+- The project's audit table keeps one row for the request (`home`, `key_override`, its method and
+  path, `{"override": true}`), and nothing of the key.
+- `test_key_override.py` is the negative test: an ask on a named key reaches a stand-in client
+  built on that key and no other, an ask with none on core/.env's, and the key appears in no log
+  line, no response body or header, and no row of any table of either schema.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

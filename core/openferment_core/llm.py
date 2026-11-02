@@ -71,13 +71,15 @@ a non-streaming request is cut off at ten; the final message is the same.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import copy
 import hashlib
 import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 import anthropic
 
@@ -557,8 +559,39 @@ def make_client(**kwargs: Any) -> Any:
     return anthropic.Anthropic(default_headers=headers or None, **kwargs)
 
 
+# ── the key a request names (owner question 10, 2 November 2026; ADR-008) ──
+
+#: The header a request names its own Anthropic key in. The API's middleware
+#: reads it, on a request the guard lets name one (`guard.key_refusal`).
+KEY_HEADER = "X-OpenFerment-Key"
+_REQUEST_KEY: contextvars.ContextVar[str | None] = contextvars.ContextVar("openferment_request_key", default=None)
+
+
+@contextlib.contextmanager
+def request_key(key: str | None) -> Iterator[None]:
+    """Within it, every model call of this request runs on `key` in place of
+    core/.env's: the service's own, and the kit's, which call through `call`
+    here on a thread that copies this context, as the threads a request starts
+    do. The key is held in this context alone: never stored, logged or
+    echoed. An empty key is none, and core/.env's serves."""
+    token = _REQUEST_KEY.set((key or "").strip() or None)
+    try:
+        yield
+    finally:
+        _REQUEST_KEY.reset(token)
+
+
+def key_named() -> bool:
+    """Whether this request's model calls run on a key the request named."""
+    return _REQUEST_KEY.get() is not None
+
+
+def _whose_key() -> str:
+    return "the key this request named" if key_named() else "the key in core/.env"
+
+
 def _default_client() -> Any:
-    key = os.environ.get("ANTHROPIC_API_KEY")
+    key = _REQUEST_KEY.get() or os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         raise ModelUnavailable(
             "ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service."
@@ -617,7 +650,7 @@ def call(
                 with client.messages.stream(model=model, **request) as stream:
                     response = stream.get_final_message()
             except anthropic.AuthenticationError as e:
-                raise ModelUnavailable("The Anthropic API rejected the key in core/.env.", spent) from e
+                raise ModelUnavailable(f"The Anthropic API rejected {_whose_key()}.", spent) from e
             except anthropic.APIConnectionError as e:
                 raise ModelUnavailable(f"Could not reach the Anthropic API: {e}", spent) from e
             except anthropic.BadRequestError as e:
@@ -808,7 +841,7 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
             with client.messages.stream(**request) as stream:
                 response = stream.get_final_message()
     except anthropic.AuthenticationError as e:
-        raise ModelUnavailable("The Anthropic API rejected the key in core/.env.") from e
+        raise ModelUnavailable(f"The Anthropic API rejected {_whose_key()}.") from e
     except anthropic.APIConnectionError as e:
         raise ModelUnavailable(f"Could not reach the Anthropic API: {e}") from e
     except anthropic.BadRequestError as e:

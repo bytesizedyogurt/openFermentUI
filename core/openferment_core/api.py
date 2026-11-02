@@ -33,7 +33,7 @@ from fastapi.staticfiles import StaticFiles
 
 from sqlalchemy.exc import InterfaceError, OperationalError
 
-from . import artifacts, biorepo, checks, db, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, projects, tools, witness
+from . import artifacts, audit, biorepo, checks, db, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, projects, tools, witness
 from .literature import kit
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
@@ -166,6 +166,37 @@ def _scoped_openapi() -> dict[str, Any]:
 
 
 app.openapi = _scoped_openapi  # type: ignore[method-assign]
+
+
+# Added before the project's middleware below, so it runs after it and the
+# guard: it knows the project, and a refused request never names a key.
+@app.middleware("http")
+async def use_the_key_a_request_names(request: Request, call_next):
+    """A request may name its own Anthropic key in `X-OpenFerment-Key` (owner
+    question 10, ADR-008): its model calls, openFerment's and the kit's, run
+    on it in place of core/.env's, and a request that names none runs on
+    core/.env's. The key is never stored, logged or echoed: the audit row the
+    request's project keeps says an override was used, and nothing of the
+    key. A request the guard would not let name one is refused in words."""
+    named = request.headers.get(llm.KEY_HEADER)
+    if named is None:
+        return await call_next(request)
+    why = guard.key_refusal(request.headers)
+    if why is not None:
+        log.warning("refused a key named on %s %s: %s", request.method, request.url.path, why)
+        return JSONResponse(status_code=403, content={"detail": why})
+    if not named.strip():
+        return JSONResponse(status_code=422, content={"detail": f"{llm.KEY_HEADER} names no key"})
+    try:
+        project = projects.current()
+    except projects.ProjectRequired:
+        project = None
+    if project is not None:
+        await db.arun(audit.add(project, agent="person", who="the request's sender", module="home",
+                                action="key_override", state="done", target=f"{request.method} {request.url.path}",
+                                detail={"override": True}))
+    with llm.request_key(named):
+        return await call_next(request)
 
 
 # Starlette runs the middleware added last first, so this one, added before

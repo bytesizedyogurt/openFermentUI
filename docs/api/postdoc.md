@@ -98,6 +98,15 @@ and never in their place. `pnpm eval judge --suite ethanol --tag <name>` has the
 now stands read the newest kept answers again and adds its judgement, so a second judge reads the
 same answers; `pnpm eval summary --suite ethanol` sets each tag's newest runs side by side.
 
+## A key the request names
+
+A request may name its own Anthropic key in the `X-OpenFerment-Key` header (owner question 10;
+ADR-008, Implementation 10): every model call it makes, Postdoc's, extraction's and the kit's, runs
+on that key in place of `core/.env`'s, and a request that names none runs on `core/.env`'s. The key
+is never stored, logged or echoed; the project's audit table keeps a `key_override` row that says
+an override was used. A request through Tailscale Funnel, or under a name the service does not
+answer to, is refused with a 403 in words; an empty header with a 422.
+
 ## Routes
 
 | Route | Answers |

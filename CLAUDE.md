@@ -80,6 +80,7 @@
 - C: REST: FastAPI routes in `core/openferment_core/api.py`; `docs/api/openapi.json` is generated and marks each operation's project scope (`x-openferment-scope`); a refusal is a 422 in words.
 - C: SSE: `GET /api/events?project=` streams `job.*`, `tool.call` and `tool.result`, `artifact.kept` and `turn.*`, with ids a page resumes from (`docs/api/postdoc.md`).
 - C: Postdoc: conversations, turns, a claim's typed values, the routing table and the evaluation set (`docs/api/postdoc.md`).
+- C: A request may name its own Anthropic key in `X-OpenFerment-Key`: its calls, openFerment's and the kit's, run on it, never stored, logged or echoed, and the audit row says an override was used (owner question 10; ADR-008, Implementation 10; `core/tests/test_key_override.py`).
 - C: The worker protocol: JSON lines, every op with its request and result schema (`docs/api/workers.md`).
 - C: Engine runs: a run's inputs with their origins, its outputs, tables, SFF file and versions (`docs/api/runs.md`).
 - C: SFF: the schema version, the record kept for a file, and what openFerment adds in `metadata` (`docs/api/sff.md`).
