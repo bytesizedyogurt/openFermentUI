@@ -235,6 +235,7 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 
 | Debt | Paid at |
 |---|---|
+| Paid: the per-request key override and the local-model route (owner question 10 and §3 of the alpha 2.1 prompt): `X-OpenFerment-Key` serves a request's calls and is kept nowhere; `OPENFERMENT_LOCAL_BASE_URL` serves a local model in single calls | alpha 2.1, D.4 |
 | `core/tests/standins.py` (27 test files use it) keeps stand-in records on real strain ids, a closed-form ethanol evaluator and `STANDIN_THEORETICAL`, the theoretical yield on glucose; `test_proforma_slow.py`, `test_proforma.py` and `flowsheets/cornstover_benchmark.py` keep the benchmark price this build once measured (1.968 USD per gallon) and the package's regression values to test the parser. A4's `rg` clause finds them (a departure above) | stage 4 (fixtures read from the library plants); still open: after alpha 2.0 |
 | Postdoc's scripted stand-in model and the test pool still speak of PHB, casein and xylose hydrolysate (`test_tools.py`, `test_postdoc_agent.py` and the tests that import their fixtures); §5.3 wants them to speak only of library plants and the kit's demo corpus. The words are test material, and no value of them reaches the service | after alpha 2.0, with the stand-ins above |
 | pureOS's chemical-set key is still called `program` (`TrainSpec.program`, and `FlowsheetInfo`, `Train`, `TrainSummary`, `TrainProposal`); kept trains and train runs validate on that name, and its texts ("the yeast program's chemicals", `PROGRAM_CHEMICALS`, `fermos.NAMED_NOTE`'s "program filter", the kinetics settings' notes) are hashed into artifact ids, so renaming them shifts the id of every new computation. The refusals and descriptions of pureOS, the vessel and the shelf still say "the yeast program" beside the key, and fermOS's note on every fit's deposition input ("the readings as the browser sent them; the service cannot see the deposition itself"), hashed the same way, is untrue since stage 2. The screens no longer say "program" | one stage that renames the key with a before-validator for stored rows and accepts the id shift |
@@ -946,3 +947,27 @@ holds the numbers, the tables and the judgements).
   account past its usage limit in words, with the date the API gives and who can raise it
   (`UsageLimitReached`; `test_llm.py`). `pnpm ready` checks the key by listing models, which an
   account past its limit still answers, so it cannot see the limit before a call.
+
+### Alpha 2.1 — Stage D — 2026-11-02 (in progress)
+
+- D.2 `openferment.records` written from `biorepo.write`: each decision leaves the record as the
+  next version of its row, an undo the candidate as extracted (`ae603d3`; `test_biorepo.py`).
+- D.4 The key a request names (`fa9782e`, `f957fd0`; ADR-008, Implementation 10): the
+  `X-OpenFerment-Key` header, read after the guard; `llm.request_key` serves openFerment's calls
+  and the kit's, and the threads a request starts; the audit row says an override was used; the
+  negative test finds the key in no log line, response or row of either schema.
+- D.4 A local model behind an OpenAI-compatible endpoint (`53c123c`; ADR-008, Implementation 11):
+  `OPENFERMENT_LOCAL_BASE_URL` serves `openai-compatible:<model>` in single calls through the kit's
+  adapter (its `openai` extra, Apache-2.0, now locked); Postdoc's loop passes it over in words.
+- Departure: debts 2 and 4 were paid before debt 1, the catalogues, because every live step after
+  them waits on the account's usage limit and these two needed no model call; the catalogues,
+  Quantity runs (3), the screens on the generated types (5) and the small debts (6) follow in
+  order, and the retrieval lanes (7) wait on the limit.
+
+### Alpha 2.1 — Stage E — 2026-11-02
+
+- E1. This session runs in a Linux container, so the live host is written up and not installed:
+  `docs/runbooks/live-host-install.md`, from the host scripts as they stand: what the Mini needs,
+  the key and the account's own limit, `core/.env`, `scripts/host/install.sh` (the database, the
+  two LaunchDaemons, the power settings, `tailscale serve`), `pnpm ready`, alpha 1.0's records,
+  the first project, and what `deploy.sh` does after. None of it has run on macOS.
