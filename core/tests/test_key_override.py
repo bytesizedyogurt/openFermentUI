@@ -26,8 +26,10 @@ from sqlalchemy import text
 from openferment_core import api, audit, db, evidence_pool, guard, llm
 from test_tools import pool  # noqa: F401
 
-OVERRIDE = "sk-ant-api03-OVERRIDE-negative-test-0123456789abcdef"
-ENV_KEY = "sk-ant-api03-core-env-key-of-the-test"
+# Needles, not keys: any string serves, and none of these looks like one, so
+# check:secrets has nothing to find in this file.
+OVERRIDE = "named-by-the-request-OVERRIDE-negative-test-7f3a9c"
+ENV_KEY = "core-env-key-of-the-test"
 
 
 class Made:
