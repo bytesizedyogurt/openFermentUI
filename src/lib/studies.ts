@@ -13,9 +13,21 @@
 //   GET  /api/studies/export                    the export package, one zip
 //   GET  /api/flowsheets/{id}/file              an SFF file, byte for byte as held
 //
+// And the person's own starts (alpha 2.1 stage B):
+//
+//   GET  /api/library                           the installed plants and the configurations each built in
+//   POST /api/library/{plant}/run               one engine run of a plant in a configuration, in a person's name
+//   POST /api/studies/scenarios                 a scenario whose values are a person's assumptions
+//   GET  /api/flowsheets                        the project's SFF records
+//   GET  /api/flowsheets/library                the toolkit's reference files at the pinned commit
+//   POST /api/flowsheets/library/{id}           one reference file kept in the project
+//   POST /api/flowsheets/import                 an SFF file a person uploads
+//
 // Nothing here computes: each screen shows what the service answered. With the
 // service down a call says so (ServiceDown); a refusal comes back in the
 // service's words (ServiceRefused).
+import type { components } from '@/api/types.gen';
+import type { LibraryShelf } from './library';
 import type {
   ComparisonCreate,
   ComparisonReport,
@@ -24,9 +36,13 @@ import type {
   Runbook,
   RunbookCreate,
   SFFFlowsheet,
+  ScenarioCreate,
   StudyComparison,
   StudyScenario,
 } from '@/data/types';
+
+/** One of the toolkit's reference SFF files at the pinned commit. */
+export type SFFLibraryEntry = components['schemas']['SFFLibraryEntry'];
 import { downloadBlob } from './csv';
 import { ServiceDown, ServiceRefused, call } from './http';
 import { apiFetch } from './project';
@@ -57,6 +73,25 @@ export const listStudyRunbooks = (signal?: AbortSignal) => call<Runbook[]>('/api
 export const getFlowsheet = (recordId: string, signal?: AbortSignal) =>
   call<SFFFlowsheet>(`/api/flowsheets/${id(recordId)}`, { signal });
 export const makeRunbook = (asked: RunbookCreate) => call<Runbook>('/api/studies/runbooks', post(asked));
+
+export const libraryShelf = (signal?: AbortSignal) => call<LibraryShelf>('/api/library', { signal });
+/** One engine run of a plant on its package's own values, in a configuration it built in (null: the plant's own). */
+export const runPlant = (plant: string, configuration: string | null, by: string) =>
+  call<RunReport>(`/api/library/${id(plant)}/run`, post({ configuration, overrides: [], by }));
+export const makeScenario = (asked: ScenarioCreate) => call<StudyScenario>('/api/studies/scenarios', post(asked));
+
+export const listFlowsheets = (signal?: AbortSignal) => call<SFFFlowsheet[]>('/api/flowsheets', { signal });
+export const flowsheetLibrary = (signal?: AbortSignal) => call<SFFLibraryEntry[]>('/api/flowsheets/library', { signal });
+export const importLibraryFlowsheet = (fileId: string, by: string) =>
+  call<SFFFlowsheet>(`/api/flowsheets/library/${id(fileId)}`, post({ by }));
+/** An SFF file the person chose, kept in the project as the toolkit checked it (a file that fails validation is kept with its findings). */
+export function importFlowsheet(file: File, by: string): Promise<SFFFlowsheet> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('by', by);
+  return call<SFFFlowsheet>('/api/flowsheets/import', { method: 'POST', body: form });
+}
+
 
 /** A file the service answers, fetched with the open project named and handed to the person; its name as the service gave it. */
 async function fetchFile(path: string, fallback: string): Promise<string> {

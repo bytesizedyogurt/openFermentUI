@@ -145,9 +145,15 @@ EMPTY_PROJECTION: dict[str, Any] = {"skills": [], "steps": [], "lessons": [], "p
 
 
 def projection() -> dict[str, Any]:
-    """The skills, the protocol steps that need them and the lessons that
-    count toward them: none, a copy of its own for each caller."""
-    return copy.deepcopy(EMPTY_PROJECTION)
+    """The skills and the lessons that count toward them, from the open
+    project's catalogues (catalogues.py), a copy of its own for each caller;
+    no store holds protocol steps' skills yet, so a step needs none."""
+    from . import catalogues
+
+    out = copy.deepcopy(EMPTY_PROJECTION)
+    out["skills"] = catalogues.as_skills()
+    out["lessons"] = [{"lessonId": lesson["lessonId"], "skills": lesson["skills"]} for lesson in catalogues.as_lessons()]
+    return out
 
 
 def skills() -> dict[str, dict[str, Any]]:

@@ -38,14 +38,18 @@ export async function call<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ServiceDown('The service is not running.');
   }
   if (response.ok) return (await response.json()) as T;
-  if ([404, 409, 422, 503].includes(response.status)) {
+  // 413 is an upload past the size an import takes, 502 a source the service
+  // could not fetch (an SFF reference file); like 404, a 502 is the service's
+  // only when it says why, since a proxy in front of it answers 502 too.
+  if ([404, 409, 413, 422, 502, 503].includes(response.status)) {
     let detail = '';
     try {
       detail = String(((await response.json()) as { detail?: unknown }).detail ?? '');
     } catch {
       /* the status is the message */
     }
-    if (response.status !== 404 || detail) throw new ServiceRefused(response.status, detail || `The service answered ${response.status}.`);
+    if ((response.status !== 404 && response.status !== 502) || detail)
+      throw new ServiceRefused(response.status, detail || `The service answered ${response.status}.`);
   }
   try {
     await postdocHealth(init?.signal ?? undefined);

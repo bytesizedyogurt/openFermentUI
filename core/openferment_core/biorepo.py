@@ -47,8 +47,9 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
-from sqlalchemy import insert, select
+from sqlalchemy import func, insert, select
 
 from . import db, extract, projects
 from .basis import EstimateRefused, refuse_estimates
@@ -129,9 +130,42 @@ def read() -> BioRepo:
     return db.run(_standing(projects.current()))
 
 
-async def _keep(project_id: str, decision: ReviewDecision, record: Candidate | None, *, undo: bool) -> None:
-    """Add one row under the project's lock. An undo of a record with no
-    standing decision adds nothing: there is nothing to take back."""
+def _record_row(project_id: str, decision: ReviewDecision, candidate: Candidate, version: int) -> dict[str, Any]:
+    """The record as a decision leaves it, for `openferment.records`: the
+    candidate's field and document, the corrected value where the reviewer
+    typed one and the candidate's otherwise, the quote and section the
+    decision stands on, and the status and provenance the decision carries
+    (computed, `provenance_of`). An undo leaves the candidate as extracted."""
+    typed = decision.corrected
+    value = typed.value if typed is not None else candidate.value
+    unit = typed.unit if typed is not None else candidate.unit
+    number = isinstance(value, (int, float)) and not isinstance(value, bool)
+    return {
+        "project_id": project_id,
+        "id": decision.recordId,
+        "version": version,
+        "document_id": candidate.paperId,
+        "field": candidate.field,
+        "value": float(value) if number else None,
+        "value_text": None if number else str(value),
+        "unit": unit,
+        "quote": decision.quote or candidate.quote,
+        "section": decision.sectionId or candidate.sectionId,
+        "status": decision.status,
+        "provenance": decision.provenance,
+        "body": {"decision": decision.model_dump(mode="json", exclude_none=True),
+                 "candidate": candidate.model_dump(mode="json", exclude_none=True)},
+        "created_by": (decision.reviewer or "").strip(),
+    }
+
+
+async def _keep(project_id: str, decision: ReviewDecision, record: Candidate | None, *, undo: bool,
+                candidate: Candidate | None = None) -> None:
+    """Add one row under the project's lock, and the record as the decision
+    leaves it as the next version of its row in `records` (alpha 2.1): the
+    newest version is the record as it stands, the earlier ones what it was.
+    An undo of a record with no standing decision adds nothing: there is
+    nothing to take back."""
     async with db.session() as s:
         await db.lock(s, "biorepo", project_id)
         if undo and decision.recordId not in (await _standing(project_id)).decisions:
@@ -145,6 +179,28 @@ async def _keep(project_id: str, decision: ReviewDecision, record: Candidate | N
                 created_by=(decision.reviewer or "").strip(),
             )
         )
+        about = candidate or record
+        if about is not None:
+            held = (await s.execute(
+                select(func.coalesce(func.max(t.records.c.version), 0))
+                .where(t.records.c.project_id == project_id, t.records.c.id == decision.recordId)
+            )).scalar_one()
+            await s.execute(insert(t.records).values(**_record_row(project_id, decision, about, int(held) + 1)))
+
+
+async def _versions(project_id: str, record_id: str) -> list[dict[str, Any]]:
+    async with db.session() as s:
+        found = await s.execute(
+            select(t.records).where(t.records.c.project_id == project_id, t.records.c.id == record_id)
+            .order_by(t.records.c.version)
+        )
+        return [dict(r._mapping) for r in found]
+
+
+def versions(record_id: str) -> list[dict[str, Any]]:
+    """A record's rows in `openferment.records`, oldest first: what each
+    decision on it left it as."""
+    return db.run(_versions(projects.current(), record_id))
 
 
 def decisions() -> dict[str, ReviewDecision]:
@@ -286,7 +342,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
         # An undo: the record as it was before anyone decided, the candidate
         # it was about with it. Idempotent when there was none.
         if not dry_run:
-            db.run(_keep(projects.current(), stored, None, undo=True))
+            db.run(_keep(projects.current(), stored, None, undo=True, candidate=rec))
             log.info("biorepo: %s withdrawn by %s", decision.recordId, reviewer)
         return stored
     if _is_promotion(decision) or typed:

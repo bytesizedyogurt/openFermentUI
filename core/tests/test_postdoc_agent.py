@@ -142,29 +142,31 @@ def test_a_number_in_a_claim_is_dropped(pool):  # noqa: F811
     assert out.claims == [] and out.rejected == 1
 
 
-def test_twelve_tool_calls_end_the_loop(pool):  # noqa: F811
-    # Three calls a turn: the twelfth lands in the fourth round, before the rounds run out.
-    turns = [[records(f"query {chr(97 + 3 * t + i)}") for i in range(3)] for t in range(4)]
+def test_the_tool_call_budget_ends_the_loop(pool):  # noqa: F811
+    # Three calls a turn: the last call the budget allows lands before the rounds run out.
+    rounds = -(-postdoc_agent.MAX_TOOL_CALLS // 3)
+    assert rounds < postdoc_agent.MAX_ROUNDS
+    turns = [[records(f"query {t}-{i}") for i in range(3)] for t in range(rounds)]
     script = Script(*turns, plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
     assert out.stopped == "calls"
-    assert len(script.calls) == 5
-    assert [c["tool_choice"] for c in script.calls] == ["auto"] * 4 + ["none"]
+    assert len(script.calls) == rounds + 1
+    assert [c["tool_choice"] for c in script.calls] == ["auto"] * rounds + ["none"]
     assert sum(1 for s in out.trace if s.kind == "tool") == postdoc_agent.MAX_TOOL_CALLS
     note = script.calls[-1]["messages"][-1]["content"][-1]
     assert note["type"] == "text" and "budget is spent" in note["text"]
 
 
 def test_calls_past_the_budget_in_one_turn_are_not_run(pool):  # noqa: F811
-    script = Script([records(f"q {chr(97 + i)}") for i in range(14)], plan(claim(records=["r-X1-1"])))
+    script = Script([records(f"q {i}") for i in range(postdoc_agent.MAX_TOOL_CALLS + 2)], plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
-    assert out.stopped == "calls" and sum(1 for s in out.trace if s.kind == "tool") == 12
+    assert out.stopped == "calls" and sum(1 for s in out.trace if s.kind == "tool") == postdoc_agent.MAX_TOOL_CALLS
     results = script.calls[-1]["messages"][-1]["content"]
     assert sum(1 for b in results if b.get("is_error")) == 2, "every tool_use still gets its tool_result"
 
 
 def test_rounds_end_the_loop(pool):  # noqa: F811
-    script = Script(*[[records(f"r {chr(97 + i)}")] for i in range(6)], plan())
+    script = Script(*[[records(f"r {i}")] for i in range(postdoc_agent.MAX_ROUNDS)], plan())
     out = ask(script, pool)
     assert out.stopped == "rounds" and script.calls[-1]["tool_choice"] == "none"
 
@@ -180,13 +182,41 @@ def test_the_cost_budget_ends_the_loop_keeping_back_what_the_final_turn_could_co
     assert ask(script, pool).stopped == "cost" and len(script.calls) == 4, "nothing kept back, a round more"
 
 
-def test_the_final_turns_worst_case_is_its_conversation_and_every_output_token():
+def test_the_final_turns_worst_case_is_its_conversation_and_the_answer_every_turn_has():
     said = [{"role": "user", "content": "q?"}]
     held = postdoc_agent._final_turn_usd(llm.DEFAULT_PRIMARY, said, [])
     assert held == llm.worst_case_usd(llm.DEFAULT_PRIMARY, {"system": postdoc_agent.AGENT_SYSTEM, "messages": said,
-                                                            "tools": []}, postdoc_agent.MAX_TOKENS) > 0
+                                                            "tools": []}, postdoc_agent.MIN_TOKENS) > 0
     assert postdoc_agent._final_turn_usd(f"anthropic:{llm.DEFAULT_PRIMARY}", said, []) == held
     assert postdoc_agent._final_turn_usd("an-unpriced-model", said, []) == 0.0
+
+
+def test_a_turn_may_write_what_the_questions_budget_has_left_to_pay_for():
+    # Alpha 2.1: asked on Opus at effort high, an answer over a project's 22
+    # documents ran out of room at the old ceiling of 8,000 tokens.
+    said = [{"role": "user", "content": "q?"}]
+    request = {"system": postdoc_agent.AGENT_SYSTEM, "messages": said, "tools": []}
+    run = postdoc_agent._Run(question="q?", ctx=tools.ToolContext(), converse=None, clock=lambda: 0.0, started=0.0)
+    whole = llm.worst_case_usd(llm.DEFAULT_PRIMARY, request, postdoc_agent.MAX_TOKENS)
+    assert postdoc_agent._turn_tokens(run, llm.DEFAULT_PRIMARY, said, [], whole + 1) == postdoc_agent.MAX_TOKENS
+    assert postdoc_agent._turn_tokens(run, llm.DEFAULT_PRIMARY, said, [], 0.0) == postdoc_agent.MIN_TOKENS, "the floor"
+    halfway = llm.worst_case_usd(llm.DEFAULT_PRIMARY, request, 20_000)
+    got = postdoc_agent._turn_tokens(run, llm.DEFAULT_PRIMARY, said, [], halfway)
+    assert postdoc_agent.MIN_TOKENS < got <= 20_000 and got >= 19_990, got
+    run.spent = Usage(costUsd=halfway)
+    assert postdoc_agent._turn_tokens(run, llm.DEFAULT_PRIMARY, said, [], halfway) == postdoc_agent.MIN_TOKENS, "spent"
+    assert postdoc_agent._turn_tokens(run, "an-unpriced-model", said, [], 100.0) == postdoc_agent.MIN_TOKENS
+
+
+def test_each_turn_is_asked_with_the_ceiling_its_budget_allows(pool, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "6")
+    script = Script([records()], plan())
+    ask(script, pool)
+    assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MAX_TOKENS] * 2
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.003")
+    script = Script(plan())
+    ask(script, pool)
+    assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MIN_TOKENS]
 
 
 def test_wall_time_ends_the_loop(pool):  # noqa: F811

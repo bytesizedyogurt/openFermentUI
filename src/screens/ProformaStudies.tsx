@@ -16,24 +16,35 @@
 //   the package   the export: study.json, study.md, each run's SFF file and the
 //                 versions, one zip that opens without the service.
 //
-// Nothing here is typed as a number: a scenario's values are made where a
-// person or Postdoc sets them, through the service.
+// RUN A PLANT (alpha 2.1 stage B). A person runs any plant the installed
+// package holds, or openFerment's composed flowsheet, in a configuration it
+// built in when discovery built it (GET /api/library), on the package's own
+// values (POST /api/library/{plant}/run, in the person's name); the run lands
+// in the list and its page is a link away. Configurations that did not build
+// here are named with the package's words.
+//
+// Nothing here is typed as a number: a scenario's values are set on a run's
+// page, each a person's assumption, or by Postdoc, each a labelled estimate.
 import { useEffect, useState } from 'react';
-import { BookOpen, Download, GitCompare, Play } from 'lucide-react';
-import type { EngineRun, Runbook, StudyComparison, StudyScenario } from '@/data/types';
+import { BookOpen, Download, GitCompare, Network, Play } from 'lucide-react';
+import type { EngineRun, RunReport, Runbook, StudyComparison, StudyScenario } from '@/data/types';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { stamp } from '@/lib/proforma';
 import {
   StudiesDown,
+  StudiesRefused,
   compareRuns,
   downloadExport,
+  libraryShelf,
   listComparisons,
   listRuns,
   listScenarios,
   listStudyRunbooks,
+  runPlant,
   runScenario,
 } from '@/lib/studies';
+import { runnable, type LibraryPlant } from '@/lib/library';
 import { Button, Callout, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ORIGIN_WORDS } from '@/screens/ProformaRun';
@@ -48,6 +59,141 @@ interface Held {
 }
 
 const where = (plant: string, configuration: string | null) => plant + (configuration ? ` (${configuration})` : '');
+
+/** A configuration as a person reads it: the plant's own when it names none. */
+const configurationWords = (c: string | null) => c ?? 'its own';
+
+function RunAPlant({ onRan }: { onRan: () => void }) {
+  const reviewer = useStore((s) => s.reviewer).trim();
+  const [plants, setPlants] = useState<LibraryPlant[] | null>(null);
+  const [plantId, setPlantId] = useState('');
+  const [configuration, setConfiguration] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [ran, setRan] = useState<RunReport | null>(null);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    libraryShelf(ctrl.signal)
+      .then((shelf) => {
+        // A plant with an entry point, or one of openFerment's flowsheets, that built here in some configuration.
+        const shown = (shelf.plants ?? []).filter((p) => (p.kind === 'plant' || p.kind === 'flowsheet') && runnable(p).configurations.length > 0);
+        setPlants(shown);
+        const first = shown.find((p) => p.kind === 'flowsheet') ?? shown[0];
+        if (first) {
+          setPlantId(first.id);
+          setConfiguration(runnable(first).configurations[0] ?? null);
+        }
+      })
+      .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
+    return () => ctrl.abort();
+  }, []);
+
+  const plant = plants?.find((p) => p.id === plantId) ?? null;
+  const { configurations, failed } = plant ? runnable(plant) : { configurations: [], failed: [] };
+  const choose = (id: string) => {
+    setPlantId(id);
+    const p = plants?.find((x) => x.id === id);
+    setConfiguration(p ? (runnable(p).configurations[0] ?? null) : null);
+    setRan(null);
+    setProblem(null);
+  };
+  const run = () => {
+    if (!plant) return;
+    setBusy(true);
+    setProblem(null);
+    setRan(null);
+    runPlant(plant.id, configuration, reviewer)
+      .then((report) => {
+        setRan(report);
+        onRan();
+      })
+      .catch((e: unknown) => setProblem(e instanceof StudiesRefused ? `${plant.id} refused: ${e.message}` : problemOf(e)))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <Card className="p-4" data-testid="studies-run-plant">
+      <h2 className="font-serif text-section-title font-semibold mb-1">Run a plant</h2>
+      <p className="text-caption text-ink-soft mb-2">
+        Any plant the installed package holds, or openFerment&rsquo;s composed flowsheet, run whole by BioSTEAM on the package&rsquo;s own values in a
+        configuration it built in here, and kept with its basis, its artifact and its SFF file.
+      </p>
+      {plants === null && !problem && <p className="text-body text-ink-soft">Reading the installed package…</p>}
+      {plants && plants.length === 0 && <p className="text-body text-ink-soft">No plant of the installed package built here.</p>}
+      {plants && plants.length > 0 && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-caption text-ink-soft">
+            Plant
+            <select className="input text-body block mt-0.5" aria-label="Plant" value={plantId} onChange={(e) => choose(e.target.value)} data-testid="run-plant-plant">
+              {plants.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.id}
+                  {p.kind === 'flowsheet' ? ` (openFerment, composed from ${p.composedFrom ?? 'the package'})` : p.title ? ` (${p.title})` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-caption text-ink-soft">
+            Configuration
+            <select
+              className="input text-body block mt-0.5"
+              aria-label="Configuration"
+              value={configuration ?? ''}
+              onChange={(e) => setConfiguration(e.target.value === '' ? null : e.target.value)}
+              disabled={configurations.length <= 1}
+              data-testid="run-plant-configuration"
+            >
+              {configurations.map((c) => (
+                <option key={c ?? ''} value={c ?? ''}>
+                  {configurationWords(c)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button variant="primary" disabled={busy || !reviewer || !plant} onClick={run} data-testid="run-plant-go">
+            <Play size={14} /> {busy ? 'Running…' : 'Run it'}
+          </Button>
+        </div>
+      )}
+      {plant && failed.length > 0 && (
+        <p className="text-caption text-ink-soft mt-2" data-testid="run-plant-failed">
+          Did not build here, so not offered:{' '}
+          {failed.map((f, i) => (
+            <span key={f.configuration ?? ''} title={f.error}>
+              {i > 0 && '; '}
+              {configurationWords(f.configuration)}
+            </span>
+          ))}
+          .
+        </p>
+      )}
+      {!reviewer && plants && plants.length > 0 && (
+        <p className="text-caption text-ink-soft mt-2">A run is asked for in a person&rsquo;s name: set yours in Settings first.</p>
+      )}
+      {busy && <p className="text-caption text-ink-soft mt-2">A first run starts the simulator and takes a minute or two; it stays warm after.</p>}
+      {ran && (
+        <p className="text-body mt-2" data-testid="run-plant-ran" data-run={ran.run.id} data-status={ran.run.status}>
+          {ran.run.status === 'done' ? 'Ran' : 'Refused'} {where(ran.run.plant, ran.run.configuration)}
+          {ran.run.refused && <>: {ran.run.refused}</>}.{' '}
+          <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/proforma/runs/${ran.run.id}`)}>
+            Run {ran.run.id}
+          </a>
+          {ran.run.sff && (
+            <>
+              {' '}
+              · its SFF file{' '}
+              <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/flowsheets/${ran.run.sff.recordId}`)}>
+                {ran.run.sff.recordId}
+              </a>
+            </>
+          )}
+        </p>
+      )}
+      {problem && <p className="text-caption text-signal-warn mt-2" data-testid="run-plant-problem">{problem}</p>}
+    </Card>
+  );
+}
 
 function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario[] }) {
   const reviewer = useStore((s) => s.reviewer).trim();
@@ -73,9 +219,8 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
           title="No engine run yet"
           body={
             <>
-              A run is one library plant or openFerment flowsheet run whole by BioSTEAM, kept with its basis, its artifact and its SFF file. Running a scenario
-              below makes one; so does the service&rsquo;s <span className="font-num">POST /api/library/&#123;plant&#125;/run</span>, and Postdoc runs the scenarios
-              it proposes.
+              A run is one library plant or openFerment flowsheet run whole by BioSTEAM, kept with its basis, its artifact and its SFF file. Run a plant
+              above, or a scenario below; Postdoc runs the scenarios it proposes.
             </>
           }
         />
@@ -160,8 +305,8 @@ function Scenarios({ scenarios }: { scenarios: StudyScenario[] }) {
           body={
             <>
               A scenario names a plant, its configuration and the values it sets, each a named person&rsquo;s assumption or a model&rsquo;s estimate, checked
-              against the plant&rsquo;s parameters. The service makes one (<span className="font-num">POST /api/studies/scenarios</span>), and Postdoc proposes
-              them with each estimate labelled.
+              against the plant&rsquo;s parameters. A run&rsquo;s page makes one from the values that run read back, each set as your assumption, and
+              Postdoc proposes them with each estimate labelled.
             </>
           }
         />
@@ -225,14 +370,19 @@ export default function ProformaStudies() {
   const [problem, setProblem] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportProblem, setExportProblem] = useState<string | null>(null);
+  // Bumped when a run is made here, so the lists read the service again.
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
     Promise.all([listRuns(ctrl.signal), listScenarios(ctrl.signal), listComparisons(ctrl.signal), listStudyRunbooks(ctrl.signal)])
-      .then(([runs, scenarios, comparisons, runbooks]) => setHeld({ runs, scenarios, comparisons, runbooks }))
+      .then(([runs, scenarios, comparisons, runbooks]) => {
+        setHeld({ runs, scenarios, comparisons, runbooks });
+        setProblem(null);
+      })
       .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, []);
+  }, [version]);
 
   const exportPackage = () => {
     setExporting(true);
@@ -253,12 +403,18 @@ export default function ProformaStudies() {
             <Button onClick={exportPackage} disabled={exporting} data-testid="studies-export">
               <Download size={14} /> {exporting ? 'Packing…' : 'The export package'}
             </Button>
+            <LinkButton to="/flowsheets">
+              <Network size={14} /> SFF flowsheets
+            </LinkButton>
             <LinkButton to="/proforma">
               <BookOpen size={14} /> Proforma
             </LinkButton>
           </>
         }
       />
+      <div className="mb-4">
+        <RunAPlant onRan={() => setVersion((v) => v + 1)} />
+      </div>
       {exportProblem && (
         <div className="mb-4">
           <Callout kind="warn">{exportProblem}</Callout>

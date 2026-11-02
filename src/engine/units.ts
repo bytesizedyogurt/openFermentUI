@@ -19,7 +19,7 @@ export interface UnitDef {
 // percent=%, yield=g g⁻¹, volProd=g L⁻¹ h⁻¹, specProd=mg g⁻¹ h⁻¹,
 // odDcw=g L⁻¹ OD⁻¹, temp=°C, light=µmol m⁻² s⁻¹, ph=(none), molar=mol L⁻¹,
 // percentCdw=% CDW, molarMass=g mol⁻¹, costUSDVolume=USD gal⁻¹,
-// specMolarRate=mmol g⁻¹ h⁻¹
+// specMolarRate=mmol g⁻¹ h⁻¹, massFlow=kg h⁻¹
 export const U: Record<string, UnitDef> = {
   'h⁻¹': { family: 'rate', factor: 1, label: 'h⁻¹' },
   'd⁻¹': { family: 'rate', factor: 1 / 24, label: 'd⁻¹' },
@@ -38,6 +38,8 @@ export const U: Record<string, UnitDef> = {
   'µg mL⁻¹': { family: 'massConc', factor: 0.001, label: 'µg mL⁻¹' },
   'mg dL⁻¹': { family: 'massConc', factor: 0.01, label: 'mg dL⁻¹' },
   'g 100mL⁻¹': { family: 'massConc', factor: 10, label: 'g 100 mL⁻¹' },
+  // A percent weight per volume is grams per 100 mL (alpha 2.1, stage B: 14 titres the live extraction refused).
+  '% w/v': { family: 'massConc', factor: 10, label: '% w/v' },
   g: { family: 'mass', factor: 1, label: 'g' },
   mg: { family: 'mass', factor: 0.001, label: 'mg' },
   µg: { family: 'mass', factor: 0.000001, label: 'µg' },
@@ -49,9 +51,9 @@ export const U: Record<string, UnitDef> = {
   '%': { family: 'percent', factor: 1, label: '%' },
   '% DW': { family: 'percent', factor: 1, label: '% DW' },
   '% v/v': { family: 'percent', factor: 1, label: '% v/v' },
-  '% w/v': { family: 'percent', factor: 1, label: '% w/v' },
   'g g⁻¹': { family: 'yield', factor: 1, label: 'g g⁻¹' },
   'mg g⁻¹': { family: 'yield', factor: 0.001, label: 'mg g⁻¹' },
+  'kg kg⁻¹': { family: 'yield', factor: 1, label: 'kg kg⁻¹' },
   'g L⁻¹ h⁻¹': { family: 'volProd', factor: 1, label: 'g L⁻¹ h⁻¹' },
   'mg L⁻¹ h⁻¹': { family: 'volProd', factor: 0.001, label: 'mg L⁻¹ h⁻¹' },
   'g L⁻¹ d⁻¹': { family: 'volProd', factor: 1 / 24, label: 'g L⁻¹ d⁻¹' },
@@ -93,6 +95,13 @@ export const U: Record<string, UnitDef> = {
   residue: { family: 'position', factor: 1, label: 'residue' },
   'kWh kg⁻¹': { family: 'energyPerMass', factor: 1, label: 'kWh kg⁻¹' },
   'MJ kg⁻¹': { family: 'energyPerMass', factor: 1 / 3.6, label: 'MJ kg⁻¹' },
+  // A plant's rate of mass (alpha 2.1): what a library plant's streams, and
+  // a runbook of a plant's run, are measured in.
+  'kg h⁻¹': { family: 'massFlow', factor: 1, label: 'kg h⁻¹' },
+  'g h⁻¹': { family: 'massFlow', factor: 0.001, label: 'g h⁻¹' },
+  'kg d⁻¹': { family: 'massFlow', factor: 1 / 24, label: 'kg d⁻¹' },
+  't d⁻¹': { family: 'massFlow', factor: 1000 / 24, label: 't d⁻¹' },
+  'kg s⁻¹': { family: 'massFlow', factor: 3600, label: 'kg s⁻¹' },
 
   // Currency is per-family on purpose. Converting EUR/kg to USD/kg needs an
   // exchange rate with a date, which a unit engine has no business inventing —
@@ -227,6 +236,7 @@ export const SI_UNIT: Record<string, string> = {
   molarMass: 'kDa',
   costUSDVolume: 'USD gal⁻¹',
   specMolarRate: 'mmol g⁻¹ h⁻¹',
+  massFlow: 'kg h⁻¹',
 };
 
 // Alias normalization: accept human/ASCII notations.
@@ -258,6 +268,14 @@ export const ALIASES: Record<string, string> = {
   'g/100 mL': 'g 100mL⁻¹',
   'g/g': 'g g⁻¹',
   'mg/g': 'mg g⁻¹',
+  'kg/kg': 'kg kg⁻¹',
+  'kg/h': 'kg h⁻¹',
+  'kg/hr': 'kg h⁻¹',
+  'kg/d': 'kg d⁻¹',
+  'kg/day': 'kg d⁻¹',
+  'g/h': 'g h⁻¹',
+  'kg/s': 'kg s⁻¹',
+  't/d': 't d⁻¹',
   'g/l/h': 'g L⁻¹ h⁻¹',
   'g/L/h': 'g L⁻¹ h⁻¹',
   'mg/l/h': 'mg L⁻¹ h⁻¹',
@@ -290,6 +308,7 @@ export const ALIASES: Record<string, string> = {
   '%v/v': '% v/v',
   '% vv': '% v/v',
   '%w/v': '% w/v',
+  '% (w/v)': '% w/v',
   // No-space forms of the expression-share units. Papers write "15%TSP" at
   // least as often as "15 % TSP", and the superscript-insensitive fallback
   // below cannot bridge a missing space.

@@ -57,7 +57,11 @@ def _from_evidence(item: DraftItem, ev: Any, n: int) -> Prediction:
     if ev.interval is not None:
         return Prediction(**base, value=float(ev.value), confidence="medium", basis=basis, kind="interval",
                           interval=Range(low=ev.interval.low, high=ev.interval.high))
-    raise DraftRefused(f"evidence {ev.id} has neither a ceiling nor an interval, so it cannot become a prediction")
+    # A computed point, an engine run's number: the run's value at low
+    # confidence, as a runbook made from a run writes it (studies/runbooks.py).
+    if isinstance(ev.value, bool) or not isinstance(ev.value, (int, float)):
+        raise DraftRefused(f"evidence {ev.id} is not a number, so it cannot become a prediction")
+    return Prediction(**base, value=float(ev.value), confidence="low", basis=basis, kind="point")
 
 
 def _artifact_of(ev: Any) -> str:
@@ -94,9 +98,11 @@ def build(title: str, product_id: str, strain_id: str, items: list[DraftItem], m
     if seen is None:
         raise DraftRefused("draft_runbook runs inside Postdoc's loop, where the ids it names were returned")
     _no_number("the title", title)
-    if product_id not in products:
+    # A runbook of a plant's run tests the plant and names neither; one that
+    # names a product or a strain names one its catalogue holds.
+    if product_id and product_id not in products:
         raise DraftRefused(f"there is no product {product_id!r}")
-    if strain_id not in strains:
+    if strain_id and strain_id not in strains:
         raise DraftRefused(f"there is no strain {strain_id!r}")
     labels = [i.label for i in items]
     if len(set(labels)) != len(labels):

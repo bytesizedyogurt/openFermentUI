@@ -12,6 +12,8 @@ scenario it keeps.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from openferment_core import api, evidence_pool
@@ -74,3 +76,127 @@ def test_the_scores_are_computed_from_the_plan():
     assert evaluate.score(plain, _plan(good)).estimates == 0.0, "an estimate where none was asked for"
     assert evaluate.score(plain, _plan()).model_dump() == {"tools": 1.0, "citations": 0.0, "estimates": 1.0,
                                                           "bareNumbers": 1.0}
+
+
+# ── alpha 2.1 stage C: the owner's twelve, tags and the judge ──────────
+
+
+def test_the_owners_twelve_are_a_suite_of_their_own():
+    made = evaluate.seed(suite=evaluate.ETHANOL)
+    assert made == [f"eq-eth-{n:02d}" for n in range(1, 13)] and evaluate.seed(suite=evaluate.ETHANOL) == []
+    held = {q.id: q for q in evaluate.questions(evaluate.ETHANOL)}
+    assert (held["eq-eth-07"].follows, held["eq-eth-08"].follows) == ("eq-eth-06", "eq-eth-05")
+    assert all(q.expects and q.suite == evaluate.ETHANOL for q in held.values())
+    assert evaluate.questions(evaluate.DEFAULT) == [], "a suite is seeded on its own"
+    assert held["eq-eth-05"].estimate is True and held["eq-eth-07"].estimate is False and held["eq-eth-01"].estimate is None
+    with pytest.raises(ValueError, match="no suite"):
+        evaluate.seed(suite="nonesuch")
+
+
+def test_an_estimate_a_question_allows_is_held_to_its_label():
+    may = evaluate.EvalQuestion(id="m", question="m", estimate=None)
+    estimate = ClaimValue(label="a share", quantity=Quantity(value=0.5, unit="", origin=Origin(
+        kind="model-estimate", by=evaluate.STANDIN, at="2026-11-02")))
+    labelled = Claim(id="c1", text="t", evidenceIds=["e1"], provenance="assumed", values=[estimate])
+    unlabelled = Claim(id="c2", text="t", evidenceIds=["e1"], provenance="computed", values=[estimate])
+    assert evaluate.score(may, _plan(labelled)).estimates == 1.0
+    assert evaluate.score(may, _plan()).estimates == 1.0, "none stated, none needed"
+    assert evaluate.score(may, _plan(unlabelled)).estimates == 0.0, "stated and not labelled"
+
+
+class _Judge:
+    """A stand-in for `llm.call` on the judge route: what it was handed, and a judgement."""
+
+    def __init__(self, data, model="judge-standin", stop="end_turn"):
+        self.data, self.model, self.stop, self.asked = data, model, stop, []
+
+    def __call__(self, **kw):
+        from openferment_core import llm
+        from openferment_core.models import Usage
+
+        self.asked.append(kw)
+        return llm.Result(data=self.data, model=self.model, usage=Usage(costUsd=0.0123, models=[self.model]),
+                          stop_reason=self.stop)
+
+
+def _cited_plan():
+    from openferment_core.models import Evidence, Passage, PassageRef
+    from openferment_core.models import ComputedBasis
+
+    basis = ComputedBasis(tool="t", toolVersion="1", artifactId="a1", at="2026-11-02", inputs=[])
+    ev = Evidence(id="a1:price.solvedPrice", label="the solved price", value=0.66, unit="USD/kg",
+                  provenance="computed", basis=basis)
+    passage = Passage(id="P1:s1:0", paperId="P1", sectionId="s1", heading="Results", kind="prose",
+                      text="The titre reached its peak after two days. More words follow.", start=0, end=60)
+    claim = Claim(id="c1", text="The plant solves a selling price.", evidenceIds=[ev.id], recordIds=["r1"],
+                  passages=[PassageRef(passageId=passage.id, quote="The titre reached its peak after two days.")],
+                  provenance="computed", values=[ClaimValue(label="the price", quantity=Quantity(
+                      value=0.66, unit="USD/kg", origin=Origin(kind="artifact", ref="a1")), source=ev.id)])
+    return AnswerPlan(question="q", claims=[claim], evidence=[ev], passages=[passage], gaps=["a gap in words"],
+                      trace=[TraceStep(n=1, kind="tool", tool="engine_run", summary="", ms=0, ok=True),
+                             TraceStep(n=2, kind="tool", tool="draft_runbook", summary="", ms=0, ok=False)])
+
+
+def test_the_judge_reads_each_claim_with_what_it_cites_and_its_judgement_is_labelled():
+    q = evaluate.EvalQuestion(id="q", question="What does the plant solve?", expects="A price, cited.")
+    call = _Judge({"answers": 1.4, "grounded": 0.8, "labelled": "1", "coverage": -0.2,
+                   "errors": ["c1: the unit is per gallon"], "note": "Mostly sound."})
+    record = {"r1": {"paperId": "P1", "fieldLabel": "Ethanol titre", "value": 21.0, "unit": "g/L",
+                     "quote": "a titre of 21 g/L"}}.get
+    got = evaluate.judge(q, _cited_plan(), call=call, record=record, paper=lambda pid: {"title": "A paper on titres"})
+    (asked,) = call.asked
+    assert (asked["family"], asked["schema"], asked["system"]) == ("judge", evaluate.JUDGE_SCHEMA, evaluate.JUDGE_SYSTEM)
+    seen = json.loads(asked["user"])
+    (c,) = seen["claims"]
+    assert (seen["question"], seen["aGoodAnswer"], seen["documents"]) == ("What does the plant solve?", "A price, cited.",
+                                                                          {"P1": "A paper on titres"})
+    assert c["evidence"] == [{"id": "a1:price.solvedPrice", "label": "the solved price", "value": 0.66, "unit": "USD/kg"}]
+    assert c["records"][0]["quote"] == "a titre of 21 g/L" and c["passages"][0]["context"].startswith("The titre")
+    assert c["values"][0]["origin"] == "artifact" and seen["toolsCalled"] == ["engine_run", "draft_runbook (refused)"]
+    assert (got.model, got.answers, got.grounded, got.labelled, got.coverage) == ("judge-standin", 1.0, 0.8, 1.0, 0.0)
+    assert got.errors == ["c1: the unit is per gallon"] and got.costUsd == 0.0123
+    cut = evaluate.judge(q, _cited_plan(), call=_Judge(None, stop="max_tokens"), record=record, paper=lambda _: None)
+    assert "ran out of room" in cut.declined and cut.answers is None
+
+
+def test_a_judge_that_declines_leaves_no_score_and_says_why(worker):
+    from openferment_core import llm
+    from openferment_core.models import Usage
+
+    def refuses(**kw):
+        raise llm.ModelRefused("bio", ["claude-opus-5-5"], Usage(costUsd=0.002))
+
+    q = evaluate.EvalQuestion(id="q", question="q")
+    got = evaluate.judge(q, _cited_plan(), call=refuses, record=lambda _: None, paper=lambda _: None)
+    assert (got.model, got.answers, got.costUsd) == ("claude-opus-5-5", None, 0.002) and "bio" in got.declined
+    evaluate.seed()
+
+    def half(q, plan):
+        return evaluate.Judgement(model="claude-opus-5-5", answers=0.5, grounded=0.5, labelled=0.5, coverage=0.5)
+
+    found, _ = evaluate.run(api._answer, tag="t", judged=True,
+                            judge_with=lambda q, plan: got if q.id == "eq-dearer" else half(q, plan))
+    judged = evaluate.summary(evaluate.DEFAULT)["t"]["judges"]["claude-opus-5-5"]
+    assert (judged["answers"], judged["answers judged"], judged["declined"]) == (0.5, 1, ["eq-dearer"])
+
+
+def test_a_run_is_tagged_timed_judged_and_judged_again(worker):
+    evaluate.seed()
+    with pytest.raises(ValueError, match="offline run is not judged"):
+        evaluate.run(api._answer, judged=True)
+
+    def first(q, plan):
+        return evaluate.Judgement(model="judge-one", answers=1.0, grounded=1.0, labelled=1.0, coverage=0.5)
+
+    def second(q, plan):
+        assert plan.claims is not None, "the answer as it was kept"
+        return evaluate.Judgement(model="judge-two", answers=0.5, grounded=1.0, labelled=1.0, coverage=0.5)
+
+    found, _ = evaluate.run(api._answer, tag="stand-in table", judged=True, judge_with=first)
+    assert all(r.tag == "stand-in table" and r.seconds is not None and [j.model for j in r.judged] == ["judge-one"]
+               for r in found)
+    again = evaluate.judge_kept(evaluate.DEFAULT, "stand-in table", judge_with=second)
+    assert [[j.model for j in r.judged] for r in again] == [["judge-one", "judge-two"]] * 2
+    s = evaluate.summary(evaluate.DEFAULT)["stand-in table"]
+    assert s["questions"] == 2 and s["code"]["tools"] == 1.0 and s["droppedForNumbers"] == 1
+    assert s["judges"]["judge-one"]["coverage"] == 0.5 and s["judges"]["judge-two"]["answers"] == 0.5

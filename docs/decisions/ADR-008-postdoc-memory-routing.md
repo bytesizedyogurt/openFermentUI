@@ -140,6 +140,59 @@ with its tools loose and its answer schema strict, and remembers its shape, so t
 loose at once (`GrammarTooLarge`; `test_llm.py`). `tools.run` validates every tool's input alike,
 strict or not. The offline suites could not see it: the API compiles the grammar.
 
+## Implementation 9 (alpha 2.1 stage B: the owner's questions on Opus)
+
+The owner's twelve questions, asked live on `claude-opus-5-5` through the Postdoc screen
+(`docs/reports/live-questions-2026-11.md`), found the loop's bounds too tight for real work: four
+answers spent their 12 tool calls before they covered the project's 22 documents, and two spent
+their 6 rounds before a scenario ran or a draft was written. The bounds are now 10 rounds, 24 tool
+calls and 360 s (`postdoc_agent.MAX_ROUNDS`, `MAX_TOOL_CALLS`, `MAX_SECONDS`); the tests derive
+their budgets from the constants. The ask's cost cap (`OPENFERMENT_ASK_BUDGET_USD`) bounds what one
+question spends, and its reservation for the final turn stands as 6.3 built it. The same asking
+added `flowsheet_library`, `flowsheet_import` and `flowsheet_read` to the registry (46 names), and
+the plan prompt now names ordinals, fractions and table labels as the numbers they are.
+
+Asked again, the answer over the project's 22 documents ran out of room: a turn's ceiling of 8,000
+tokens holds the model's thinking as well as its plan. A turn now writes as much as the question's
+budget has left to pay for, between `MIN_TOKENS` (8,000) and `MAX_TOKENS` (32,000)
+(`postdoc_agent._turn_tokens`), and the loop holds back a `MIN_TOKENS` answer before it asks
+another round, as 6.3 held back the whole ceiling. On the owner's default ask budget (0.75 USD,
+D8's figure) a turn on Opus still gets what the budget left pays for; on the 6 USD core/.env names
+for real work, every turn gets the whole ceiling.
+
+## Implementation 10 (alpha 2.1 stage D: the key a request names)
+
+The owner authorized the per-request key override on 2 November 2026 (question 10), within these
+rules: a key sent on a request is used for that request's model calls and never stored, logged or
+echoed; it reaches openFerment's client and the kit's; a request with none uses core/.env's; the
+audit row records that an override was used, never the key. Built as 6.3 designed it:
+
+- A request names its key in `X-OpenFerment-Key` (`llm.KEY_HEADER`). The API's middleware reads
+  it after the guard and the project's middleware: `guard.key_refusal` refuses a request through
+  Tailscale Funnel, from the public internet, and one under a name the service does not answer
+  to, in words that never repeat the key; an empty header is refused with a 422.
+- `llm.request_key` holds the key in a context variable for the request. `_default_client` builds
+  every client on it in place of core/.env's; the kit's calls reach it through `llm.call` on
+  asyncio's worker thread, and the ask stream's thread through `contextvars.copy_context`, both
+  of which carry the context. A key the API rejects is said to be the one the request named.
+- The project's audit table keeps one row for the request (`home`, `key_override`, its method and
+  path, `{"override": true}`), and nothing of the key.
+- `test_key_override.py` is the negative test: an ask on a named key reaches a stand-in client
+  built on that key and no other, an ask with none on core/.env's, and the key appears in no log
+  line, no response body or header, and no row of any table of either schema.
+
+## Implementation 11 (alpha 2.1 stage D: a local model in a route)
+
+The owner allowed a local model behind an OpenAI-compatible endpoint named in core/.env to stand
+in a route through the kit's adapter (2 November 2026). `OPENFERMENT_LOCAL_BASE_URL` names the
+endpoint and `OPENFERMENT_LOCAL_API_KEY` its key (many local servers take any); a route's
+`openai-compatible:<model>` is then served (`llm.served_providers`). `llm.call` asks it through
+Sci RAG Kit's `OpenAICompatLLM` (the `openai` extra of the kit, Apache-2.0, now in `uv.lock`), at
+no charge on the day's cap, and passes to the next model in words when the endpoint does not
+answer. Postdoc's loop needs a model that calls tools, so `converse` passes a local model over in
+words. With no endpoint named, a local model in a route is passed over and `pnpm ready` names the
+setting; another provider's model still waits for the owner.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

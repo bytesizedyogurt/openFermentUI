@@ -146,3 +146,20 @@ def test_the_overlay_carries_a_collected_document_as_a_paper(kit_client):
     assert paper.licenceClass == "open_commercial" and paper.license == "https://creativecommons.org/licenses/by/4.0/"
     assert [s.id for s in paper.sections] == [f"p{i}" for i in range(len(paper.sections))]
     assert any("| Placeholder A | 7 | mg L-1 |" in s.text for s in paper.sections), "the table keeps its rows"
+
+
+def test_the_overlay_says_what_a_documents_kept_extraction_found(kit_client):
+    from openferment_core import extract
+    from openferment_core.models import ExtractResponse, Usage
+
+    client, pmcid = kit_client
+    doc = client.post("/api/intake/collect", json={"identifier": pmcid, "by": "A. Reader"}).json()["documentId"]
+    before = Overlay.model_validate(client.get("/api/biorepo/overlay").json()).papers[doc]
+    assert before.extraction is None, "a document no extraction of this run is kept for says so"
+    extract._persist(ExtractResponse(paperId=doc, extractedAt="2026-11-02T18:00:00Z", rejected=3,
+                                     usage=Usage(models=["claude-opus-5-5", "claude-sonnet-5-5"])))
+    after = Overlay.model_validate(client.get("/api/biorepo/overlay").json()).papers[doc]
+    assert after.extraction is not None
+    assert (after.extraction.at, after.extraction.kept, after.extraction.refused, after.extraction.models) == (
+        "2026-11-02T18:00:00Z", 0, 3, ["claude-opus-5-5", "claude-sonnet-5-5"])
+

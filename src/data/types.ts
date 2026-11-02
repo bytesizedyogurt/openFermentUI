@@ -215,6 +215,8 @@ export interface Paper {
   held?: boolean;
   /** Its licence class in the kit's taxonomy. */
   licenceClass?: string;
+  /** What its kept extraction found; unset when none of this run is kept. */
+  extraction?: ExtractionSummary;
   /** The licence the fetched full text carried, when `textSource` is 'full-text'. */
   license?: string;
   /** Who served the fetched full text, when `textSource` is 'full-text'. */
@@ -1621,6 +1623,16 @@ export interface OverlayPaper {
   pmcid?: string | null;
   url?: string | null;
   licenceClass?: string | null;
+  /** What its kept extraction found; null when none of this run is kept. */
+  extraction?: ExtractionSummary | null;
+}
+
+/** What a document's kept extraction found (models.ExtractionSummary): when, what anchoring kept and refused, and on which models. */
+export interface ExtractionSummary {
+  at: string;
+  kept: number;
+  refused: number;
+  models: string[];
 }
 
 /**
@@ -2307,6 +2319,7 @@ export interface DraftMeasure {
 /** Assembled by the service; a person adopts it as a research runbook and locks it. */
 export interface RunbookDraft {
   title: string;
+  /** Empty for a runbook of a plant's run, which names no product or strain. */
   productId: string;
   strainId: string;
   predictions: Prediction[];

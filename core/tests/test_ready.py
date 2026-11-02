@@ -152,10 +152,19 @@ def test_a_routing_table_that_cannot_route_fails_before_any_call(monkeypatch):
 
 
 def test_a_route_to_a_provider_that_waits_is_named(monkeypatch):
-    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"index": {"models": ["openai-compatible:qwen3-32b"]}}')
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"index": {"models": ["google:gemini-2.5-pro"]}}')
     check = ready.check_model(True, client_factory=FakeClient)
-    assert check.mark == "warn" and "openai-compatible:qwen3-32b" in check.detail, check.detail
+    assert check.mark == "warn" and "google:gemini-2.5-pro" in check.detail, check.detail
     assert "waits for the owner" in check.detail
+
+
+def test_a_local_model_with_no_endpoint_is_named_and_one_with_an_endpoint_is_served(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"index": {"models": ["openai-compatible:qwen3-32b"]}}')
+    monkeypatch.delenv("OPENFERMENT_LOCAL_BASE_URL", raising=False)
+    check = ready.check_model(True, client_factory=FakeClient)
+    assert check.mark == "warn" and "OPENFERMENT_LOCAL_BASE_URL" in check.detail, check.detail
+    monkeypatch.setenv("OPENFERMENT_LOCAL_BASE_URL", "http://127.0.0.1:11434/v1")
+    assert "openai-compatible" not in ready.check_model(True, client_factory=FakeClient).detail
 
 
 def test_network_checks_skip_in_fixture_mode(monkeypatch):

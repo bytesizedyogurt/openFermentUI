@@ -376,6 +376,28 @@ def test_every_decision_and_every_undo_stays_a_row_and_the_newest_holds():
     assert db.run(count()) == 3
 
 
+def test_each_decision_leaves_the_record_as_the_next_version_of_its_row():
+    # Alpha 2.1: `openferment.records` was written by no code. Each decision
+    # now writes the record as it leaves it, and an undo the candidate as
+    # extracted; the newest version is the record as it stands.
+    fetch_t5()
+    planted("cl1-T5-00000001")
+    biorepo.write(decision("cl1-T5-00000001", "verified"))
+    biorepo.write(decision("cl1-T5-00000001", "rejected", rejectReason="on reflection"))
+    biorepo.write(decision("cl1-T5-00000001", "unverified", provenance="unverified"))
+    rows = biorepo.versions("cl1-T5-00000001")
+    assert [(r["version"], r["status"], r["provenance"]) for r in rows] == [
+        (1, "verified", "verified"), (2, "rejected", "unverified"),
+        (3, "unverified", "unverified")]
+    first = rows[0]
+    held = first["body"]["candidate"]
+    assert first["document_id"] == "T5" and first["quote"]
+    assert (first["field"], first["value"], first["unit"], first["quote"]) == (
+        held["field"], held["value"], held["unit"], held["quote"])
+    assert first["created_by"] == "sean" and first["body"]["decision"]["status"] == "verified"
+    assert biorepo.versions("cl1-T5-99999999") == [], "a record nobody decided has no row"
+
+
 # ── the endpoint ───────────────────────────────────────────────────────
 
 

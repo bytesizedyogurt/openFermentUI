@@ -22,10 +22,18 @@ import pytest
 import openferment_core  # noqa: F401, E402
 
 
+# The routing table and the budgets a person's core/.env may set for real work
+# (the service loads that file at import). An offline test reads the code's
+# defaults, as CI does with no core/.env, unless it sets a value itself.
+ROUTING_SETTINGS = ("OPENFERMENT_ROUTES", "OPENFERMENT_MODEL", "OPENFERMENT_FALLBACK_MODEL", "OPENFERMENT_INDEX_MODEL",
+                    "OPENFERMENT_EFFORT", "OPENFERMENT_DAILY_BUDGET_USD", "OPENFERMENT_ASK_BUDGET_USD")
+
+
 @pytest.fixture(autouse=True)
 def _spend_kept_apart(request, monkeypatch):
     if request.node.get_closest_marker("live") is None:
-        monkeypatch.delenv("OPENFERMENT_DAILY_BUDGET_USD", raising=False)
+        for name in ROUTING_SETTINGS:
+            monkeypatch.delenv(name, raising=False)
         yield
         return
     from dotenv import dotenv_values

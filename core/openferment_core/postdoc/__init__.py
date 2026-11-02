@@ -12,4 +12,4 @@ package until their imports keep its row of §7.2 (test_boundaries.py). Postdoc 
 tool registry, the model client, the spend ledger and the store, and the project, provenance
 and event modules a turn is kept and said with (test_boundaries.py names each).
 """
-from .plan import MAX_TOKENS, SYSTEM, TOOL  # noqa: F401  (the plan the loop answers in)
+from .plan import MAX_TOKENS, MIN_TOKENS, SYSTEM, TOOL  # noqa: F401  (the plan the loop answers in)

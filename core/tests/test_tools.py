@@ -195,7 +195,9 @@ NAMES = (["search_records", "convert_units", "search_passages", "yield_ceiling",
                                        "fermos_vessel", "pureos_build", "pureos_propose",
                                        "engine_plants", "engine_parameters", "engine_run", "engine_report",
                                        "study_scenario", "study_compare", "study_read",
-                                       "literature_sources", "literature_document"])
+                                       "literature_sources", "literature_document",
+                                       "flowsheet_library", "flowsheet_import", "flowsheet_read",
+                                       "catalogue_read", "catalogue_write"])
 
 
 def test_only_the_whitelisted_names_may_register():
@@ -209,7 +211,7 @@ def test_the_tools_that_keep_something_say_so_and_every_tool_acts_in_one_project
 
     assert {n for n, t in tools.REGISTRY.items() if t.writes} == {f"{m}_write" for m in module_stores.MODULES} | {
         "run_flowsheet", "fermos_simulate", "fermos_vessel", "pureos_build", "engine_run", "study_scenario",
-        "study_compare"}
+        "study_compare", "flowsheet_import", "catalogue_write"}
     assert {t.scope for t in tools.REGISTRY.values()} == {"project"}
 
 
@@ -456,6 +458,14 @@ def test_proforma_tools_run_a_scenario_the_project_keeps_as_its_page_runs_it(pro
     cited = tools.run("selling_price", {"scenarioId": sid}, c)
     assert cited.error is None, cited.error
     assert cited.evidence[0].id == ev.id == r.summary["artifactId"] == cited.summary["evidenceId"]
+    # The run's stream table, read from its kept artifact and never simulated
+    # again (a debt since the seed's scenarios left; paid in alpha 2.1).
+    table = tools.run("stream_table", {"artifactId": r.summary["artifactId"]}, c)
+    assert table.error is None, table.error
+    t = table.summary
+    assert (t["artifactId"], t["scenarioId"], t["provenance"]) == (ev.id, sid, "assumed")
+    assert t["streamCount"] == len(t["streams"]) > 0 and t["evidenceId"] == ev.id
+    assert all(row.get("id") or row.get("name") for row in t["streams"])
 
 
 @pytest.mark.parametrize("name, raw", [

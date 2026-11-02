@@ -131,6 +131,17 @@ export function applyEntries(state: ProjectState, entries: OutboxEntry[]): Proje
   };
 }
 
+/**
+ * The Live conversations a page holds once a project's rows load: those the
+ * page started first, then every one the service keeps, newest first. The
+ * service keeps every conversation, so the page holds every one too, and a
+ * link to the oldest opens it.
+ */
+export function conversationsHeld(saved: LiveConversation[], current: LiveConversation[]): LiveConversation[] {
+  const ids = new Set(current.map((c) => c.id));
+  return [...current, ...saved.filter((c) => !ids.has(c.id)).reverse()];
+}
+
 /** Add `entries` to `outbox`, a later write of a row replacing an earlier one still unsent. */
 export function enqueue(outbox: OutboxEntry[], entries: OutboxEntry[]): OutboxEntry[] {
   const key = (e: OutboxEntry) => `${e.project}\u0000${e.kind}\u0000${e.id}`;

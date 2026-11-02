@@ -8,8 +8,8 @@ a receipt naming its unit); SCF runs its saccharification and co-fermentation
 in two batch reactors; the gates refuse a dry composition whose shares do not
 sum to one and a reactant converted more than wholly; a person's composition
 changes the price and makes the run assumed; a warm plant set B and back to A
-returns A's answer (A→B→A); the run's SFF file validates with the recipe
-embedded and its digests valid.
+returns A's answer within one part in 10¹² (A→B→A); the run's SFF file
+validates with the recipe embedded and its digests valid.
 """
 from __future__ import annotations
 
@@ -25,6 +25,14 @@ pytestmark = pytest.mark.sim
 
 FLOWSHEET = "cellulosic_ethanol_v0"
 PROJECT = "test-project"
+# How near A again comes to A (A→B→A), relative. The last places of the capital
+# numbers are the arithmetic's: BioSTEAM sums its units' installed costs over a
+# set, in the set's order, and two orders in three of this plant's 47 units move
+# the sum by one to three units in the last place (measured); CI has seen A again
+# come back 1.5e-15 from A. A plant that leans on the last case moves far more:
+# with its recycles kept, A again's price moves 3.6e-5 and its installed cost
+# 2e-9 (measured).
+WARM_REL = 1e-12
 
 
 @pytest.fixture(scope="module")
@@ -92,12 +100,28 @@ def test_a_persons_composition_changes_the_price_and_makes_the_run_assumed(warm)
     assert {i.name for i in art.inputs if i.source.kind == "assumption"} == {"feed.dry.Glucan", "feed.dry.Xylan"}
 
 
+def moved(a: dict, b: dict, path: str = "") -> dict[str, tuple]:
+    """Each value of `b` that is not `a`'s: a number further than WARM_REL
+    from it, relative, and anything else unequal."""
+    out: dict[str, tuple] = {}
+    for k in a.keys() | b.keys():
+        x, y = a.get(k), b.get(k)
+        if isinstance(x, dict) and isinstance(y, dict):
+            out.update(moved(x, y, f"{path}{k}."))
+        elif isinstance(x, float) and isinstance(y, float):
+            if abs(y - x) > WARM_REL * abs(x):
+                out[path + k] = (x, y)
+        elif x != y:
+            out[path + k] = (x, y)
+    return out
+
+
 def test_a_warm_plant_set_b_and_back_to_a_returns_as_answer(warm):
     a, b, a_again = proforma.call("library_cases", {
         "plant": FLOWSHEET, "configuration": None, "digits": 17,
         "cases": [{}, {"stream.cornstover.price": 0.08, "unit.R303.tau_cofermentation": 48.0}, {}]})
-    assert b["outputs"]["mespUsdPerKg"] != a["outputs"]["mespUsdPerKg"]
-    assert a_again["outputs"] == a["outputs"] and a_again["price"] == a["price"], "A→B→A"
+    assert "outputs.mespUsdPerKg" in moved(a, b)
+    assert moved(a, a_again) == {}, "A→B→A"
 
 
 def test_the_runs_sff_file_validates_with_its_recipe_embedded(warm):

@@ -1,7 +1,7 @@
 // An engine run's page (execution prompt §7.4, §9.1 step 5): /proforma/runs/:id.
 //
 // One run of a library plant or an openFerment flowsheet, as the service kept
-// it (GET /api/runs/{id}, engine/runs.py). It reads, and never types:
+// it (GET /api/runs/{id}, engine/runs.py). What it reads:
 //
 //   the run         its plant and configuration, its status and provenance,
 //                   who asked and when, the study scenario that asked for it;
@@ -21,18 +21,22 @@
 //   its SFF file    the record the run wrote, as the toolkit checked and scored
 //                   it, and the file itself to download.
 //
-// A runbook is made here from the run's numbers: each output chosen becomes a
-// prediction in the run's unit, measured at harvest (POST /api/studies/runbooks),
-// and opens on the runbook's page, where it is locked.
+// A scenario is made here from the run (alpha 2.1 stage B): parameters found
+// by words, each value set as the person's assumption, the scenario made and
+// run in their name (POST /api/studies/scenarios, then its run), and the new
+// run's page opens. A runbook is made here from the run's numbers: each output
+// chosen becomes a prediction in the run's unit, measured at harvest
+// (POST /api/studies/runbooks), and opens on the runbook's page, where it is
+// locked.
 import { SffGraph } from '@/components/SffGraph';
 import { useEffect, useState } from 'react';
-import { BookOpen, Download, ListChecks } from 'lucide-react';
+import { BookOpen, Download, ListChecks, Play } from 'lucide-react';
 import type { ParamScope, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';
 import { runViewOfRun, stamp } from '@/lib/proforma';
-import { StudiesDown, downloadFlowsheet, makeRunbook, predictable, runReport } from '@/lib/studies';
+import { StudiesDown, downloadFlowsheet, makeRunbook, makeScenario, predictable, runReport, runScenario } from '@/lib/studies';
 import { Button, Callout, Card, LinkButton, PageHeader, cx } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
@@ -223,6 +227,178 @@ function FlowsheetCard({ report }: { report: EngineRunReport }) {
   );
 }
 
+/** How many matching parameters the finder lists at once. */
+const FOUND_ROWS = 12;
+
+interface Setting {
+  key: string;
+  label: string;
+  unit: string;
+  /** As the person typed it; read as a number when the scenario is made. */
+  value: string;
+  /** What the value rests on, in the person's words. */
+  note: string;
+}
+
+/**
+ * A scenario from this run (alpha 2.1 stage B): the person finds parameters
+ * of the run by words, sets each one's value as their own assumption, and the
+ * scenario is made (POST /api/studies/scenarios) and run (…/{id}/run) in their
+ * name. The plant and its configuration are the run's; every value the person
+ * leaves alone stays the package's own.
+ */
+function MakeScenario({ report }: { report: EngineRunReport }) {
+  const reviewer = useStore((s) => s.reviewer).trim();
+  const run = report.run;
+  const scope = report.parameters;
+  const [words, setWords] = useState('');
+  const [settings, setSettings] = useState<Setting[]>([]);
+  const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [made, setMade] = useState<string | null>(null);
+  if (run.status !== 'done' || !scope) return null;
+  const valueOf = new Map(scope.values.map((v) => [v.key, v.value]));
+  const numeric = scope.specs.filter((s) => !s.choices && typeof valueOf.get(s.key) === 'number');
+  const wanted = words.toLowerCase().split(/\s+/).filter(Boolean);
+  const taken = new Set(settings.map((s) => s.key));
+  const found = wanted.length
+    ? numeric.filter((s) => !taken.has(s.key) && wanted.every((w) => `${s.key} ${s.label}`.toLowerCase().includes(w)))
+    : [];
+  const add = (key: string) => {
+    const spec = numeric.find((s) => s.key === key);
+    if (!spec) return;
+    setSettings((list) => [...list, { key, label: spec.label, unit: spec.unit, value: String(valueOf.get(key) ?? ''), note: '' }]);
+  };
+  const change = (key: string, patch: Partial<Setting>) => setSettings((list) => list.map((s) => (s.key === key ? { ...s, ...patch } : s)));
+  const make = () => {
+    const at = new Date().toISOString();
+    const bad = settings.find((s) => s.value.trim() === '' || !Number.isFinite(Number(s.value)));
+    if (bad) {
+      setProblem(`${bad.label}: a value is one number, in ${bad.unit || 'the parameter’s own terms'}.`);
+      return;
+    }
+    setBusy(true);
+    setProblem(null);
+    makeScenario({
+      title: title.trim(),
+      plant: run.plant,
+      configuration: run.configuration ?? null,
+      values: settings.map((s) => ({
+        key: s.key,
+        quantity: {
+          value: Number(s.value),
+          unit: s.unit,
+          origin: { kind: 'person-assumption', by: reviewer, at, note: s.note.trim() || note.trim() || null },
+        },
+      })),
+      note: note.trim() || null,
+      by: reviewer,
+    })
+      .then((scenario) => {
+        setMade(scenario.id);
+        return runScenario(scenario.id, reviewer);
+      })
+      .then((rep) => navigate(`/proforma/runs/${rep.run.id}`))
+      .catch((e: unknown) => setProblem(problemOf(e)))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <Card className="p-4" data-testid="run-make-scenario">
+      <h2 className="font-serif text-section-title font-semibold mb-1">A scenario from this run</h2>
+      <p className="text-caption text-ink-soft mb-2">
+        Find a parameter by its words, set its value as your assumption, and the scenario is made on {run.plant}
+        {run.configuration ? ` (${run.configuration})` : ''} and run in your name. Each value starts at this run&rsquo;s; every parameter you leave alone
+        stays the package&rsquo;s own.
+      </p>
+      <input
+        className="input text-body w-full mb-2"
+        aria-label="Find a parameter"
+        placeholder="Words of a parameter: xylose ethanol, moisture, price…"
+        value={words}
+        onChange={(e) => setWords(e.target.value)}
+        data-testid="scenario-find"
+      />
+      {found.length > 0 && (
+        <ul className="space-y-0.5 mb-2 text-caption" data-testid="scenario-found">
+          {found.slice(0, FOUND_ROWS).map((s) => (
+            <li key={s.key} className="flex flex-wrap items-center gap-2" data-testid="scenario-found-row" data-key={s.key}>
+              <button className="chip" onClick={() => add(s.key)} aria-label={`Set ${s.label}`}>
+                Set
+              </button>
+              <span>{s.label}</span>
+              <span className="font-num text-ink-soft">
+                {String(valueOf.get(s.key))} {s.unit}
+              </span>
+            </li>
+          ))}
+          {found.length > FOUND_ROWS && <li className="text-ink-soft">and {found.length - FOUND_ROWS} more: add words to narrow them.</li>}
+        </ul>
+      )}
+      {wanted.length > 0 && found.length === 0 && <p className="text-caption text-ink-soft mb-2">No parameter of this run left to set matches those words.</p>}
+      {settings.length > 0 && (
+        <table className="w-full text-caption mb-2" data-testid="scenario-settings">
+          <tbody>
+            {settings.map((s) => (
+              <tr key={s.key} className="border-b border-line/50 align-top" data-testid="scenario-setting" data-key={s.key}>
+                <td className="py-1 pr-2">{s.label}</td>
+                <td className="py-1 pr-2">
+                  <input
+                    className="input text-caption font-num w-28"
+                    inputMode="decimal"
+                    aria-label={`Your value for ${s.label}`}
+                    value={s.value}
+                    onChange={(e) => change(s.key, { value: e.target.value })}
+                  />{' '}
+                  <span className="font-num text-ink-soft">{s.unit}</span>
+                </td>
+                <td className="py-1 pr-2">
+                  <input
+                    className="input text-caption w-full"
+                    aria-label={`What ${s.label} rests on`}
+                    placeholder="What it rests on (optional)"
+                    value={s.note}
+                    onChange={(e) => change(s.key, { note: e.target.value })}
+                  />
+                </td>
+                <td className="py-1">
+                  <button className="chip" onClick={() => setSettings((list) => list.filter((x) => x.key !== s.key))} aria-label={`Leave ${s.label} as the run's`}>
+                    Leave
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <input className="input text-body" aria-label="The scenario's title" placeholder="What the scenario asks" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input className="input text-body flex-1 min-w-48" aria-label="What the scenario rests on" placeholder="What it rests on, in words" value={note} onChange={(e) => setNote(e.target.value)} />
+        <Button variant="primary" disabled={busy || !reviewer || settings.length === 0 || !title.trim()} onClick={make} data-testid="run-make-scenario-go">
+          <Play size={14} /> {busy ? 'Running…' : 'Make the scenario and run it'}
+        </Button>
+      </div>
+      {!reviewer && <p className="text-caption text-ink-soft mt-1">A scenario is made in a person&rsquo;s name: set yours in Settings first.</p>}
+      {problem && (
+        <p className="text-caption text-signal-warn mt-1" data-testid="run-make-scenario-problem">
+          {problem}
+          {made && (
+            <>
+              {' '}
+              The scenario <span className="font-num">{made}</span> is kept;{' '}
+              <a className="underline underline-offset-2" href={href('/proforma/studies')}>
+                Studies
+              </a>{' '}
+              lists it.
+            </>
+          )}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 function MakeRunbook({ report }: { report: EngineRunReport }) {
   const reviewer = useStore((s) => s.reviewer).trim();
   const hydrate = useStore((s) => s.hydrateProjectState);
@@ -380,6 +556,7 @@ export default function ProformaRun({ runId }: { runId: string }) {
             />
           )}
           <FlowsheetCard report={report} />
+          <MakeScenario key={run.id} report={report} />
           <MakeRunbook report={report} />
           <p className="text-caption text-ink-soft">
             The run as the service keeps it: <a className="font-num underline underline-offset-2" href={href('/proforma/studies')}>Studies</a> lists every run

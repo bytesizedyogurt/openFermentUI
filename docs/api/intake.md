@@ -49,3 +49,23 @@ first time), `linked` (the kit held the same text, and the project now holds it 
 project held it before) or `failed` with the `reason` in words, and `transient` marks a failure
 that was the network's condition. A failure is an answer the Intake board renders: the route
 raises no 5xx for a document it could not collect.
+
+## A project's catalogues (alpha 2.1)
+
+The strains and their other names, the products, Guild's skills and Primer's lessons are kinds of
+row in the project's `catalogue` table (migration 0007; `core/openferment_core/catalogues.py`), each
+kept whole with who added it and where it came from. Names and words only: a number a paper
+reports is a record. Nothing here deletes an entry.
+
+| Route | Answers |
+|---|---|
+| `GET /api/catalogues/{kind}` | The entries of `strain`, `product`, `skill` or `lesson`, by id; 404 in words for another kind |
+| `GET /api/catalogues/{kind}/{id}` | One entry; 404 in words when the catalogue holds none |
+| `POST /api/catalogues/{kind}` | `{"entry": {...}, "by": "<name>"}` kept, an entry under the same id replaced; 422 in words for a field the kind does not take (a sequence on a strain, a species on a product, a sequence with no `sequenceSource`) |
+| `POST /api/intake/catalogue` | A file of entries of one kind (form fields `kind`, `by`, `file`): a JSON list of objects (or one under `entries`), or a CSV with `id` and `name` columns and a list's items split by `;`. Every row that is an entry is kept with the file as its source; every other row is refused with its reason (`{"kind", "kept", "refused"}`) |
+
+The readers that had read an empty list read these: geneOS's hosts and the strain aliases
+(`module_stores`), ProtParam's products, pureOS's proposer (a proposal's host is a strain kept
+here), Guild's skills and the lessons that count toward them. Postdoc reads a catalogue with
+`catalogue_read` and keeps an entry, marked as its own and audited, with `catalogue_write`
+(`docs/TOOLS.md`).

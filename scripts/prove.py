@@ -49,7 +49,8 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
        and the flowsheet's artifact replays within its tolerance
     9  the UI walk (scripts/walk.ts, Chromium): Home, the project at its own address with its
        live trace, a document pasted in and searched, the flowsheet run's report and its SFF
-       graph, the conversation of step 6 with its estimate marked, the runbook of step 5
+       graph, a scenario begun from that run, the plants Studies offers to run, the project's
+       SFF flowsheets, the conversation of step 6 with its estimate marked, the runbook of step 5
 """
 from __future__ import annotations
 
@@ -117,7 +118,7 @@ TITLES = {
        "its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
-    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a conversation, a runbook",
+    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a conversation, a runbook",
 }
 RUN_TIMEOUT_S = 1800.0
 

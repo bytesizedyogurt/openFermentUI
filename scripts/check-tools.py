@@ -164,12 +164,18 @@ ALLOWED_WRITES = (
     "studies.scenarios.run",
     "studies.scenarios.make",
     "studies.comparisons.make",
+    # flowsheet_import (alpha 2.1 stage B), through writes.import_flowsheet: a
+    # reference SFF file kept as a project's record, audited as its caller's.
+    "engine.sff.import_library",
+    # catalogue_write (alpha 2.1, debt 1), through writes.keep_catalogue: an
+    # entry of the project's catalogues, kept and audited as its caller's.
+    "catalogues.keep_fields",
 )
 # The modules that keep a store: anything of theirs a write tool names is a
 # write function in ALLOWED_WRITES, an exception, or a constant.
 STORES = ("geneos", "fermos", "vessel", "proforma", "extract", "intake", "proposals", "audit", "checks", "guild",
           "biorepo", "artifacts", "atomic", "db.rows", "pureos.kept", "pureos.train_spec", "engine.runs",
-          "studies.scenarios", "studies.comparisons")
+          "studies.scenarios", "studies.comparisons", "engine.sff", "catalogues")
 # What a write tool may never do itself.
 FORBIDDEN = ("write_text", "open(", "json.dump", ".write(", "atomic.", "_persist", "Path(", "write_bytes", "unlink(", "rename(",
              "rows.put", "rows.drop", "db.session", "db.run")

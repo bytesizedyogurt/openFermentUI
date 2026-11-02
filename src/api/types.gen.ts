@@ -211,6 +211,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalogues/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catalogue Listed
+         * @description The open project's entries of one catalogue (strain, product, skill, lesson), by id.
+         */
+        get: operations["catalogue_listed_api_catalogues__kind__get"];
+        put?: never;
+        /**
+         * Catalogue Keep
+         * @description One entry kept in the open project's catalogue of `kind`, in the name of
+         *     `by`; an entry already held under its id is replaced. 422 in words for an
+         *     entry the kind does not take.
+         */
+        post: operations["catalogue_keep_api_catalogues__kind__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalogues/{kind}/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalogue Entry */
+        get: operations["catalogue_entry_api_catalogues__kind___entry_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations": {
         parameters: {
             query?: never;
@@ -1043,6 +1086,28 @@ export interface paths {
         get: operations["health_api_health_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/intake/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Catalogue Intake
+         * @description A file of catalogue entries of one kind, JSON or CSV, taken in: every
+         *     row that is an entry kept with the file as its source, every other row
+         *     refused with its reason.
+         */
+        post: operations["catalogue_intake_api_intake_catalogue_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2674,6 +2739,15 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** Body_catalogue_intake_api_intake_catalogue_post */
+        Body_catalogue_intake_api_intake_catalogue_post: {
+            /** By */
+            by: string;
+            /** File */
+            file: string;
+            /** Kind */
+            kind: string;
+        };
         /** Body_flowsheets_import_api_flowsheets_import_post */
         Body_flowsheets_import_api_flowsheets_import_post: {
             /** By */
@@ -2794,6 +2868,21 @@ export interface components {
             value: number | string;
             /** Valuebasis */
             valueBasis?: ("exact" | "converted" | "range-midpoint" | "range-low" | "range-high" | "negation") | null;
+        };
+        /**
+         * CatalogueKeep
+         * @description POST /api/catalogues/{kind}: one entry and who keeps it.
+         */
+        CatalogueKeep: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            /** Entry */
+            entry: {
+                [key: string]: unknown;
+            };
         };
         /** CeilingRequest */
         CeilingRequest: {
@@ -3403,6 +3492,22 @@ export interface components {
              * @enum {string}
              */
             outcome: "match" | "value_mismatch" | "unit_error" | "span_error" | "miss";
+        };
+        /**
+         * ExtractionSummary
+         * @description What a document's kept extraction found, for the page that lists the
+         *     document: when it ran, the candidates anchoring kept and refused, and the
+         *     models that answered (the primary, then any it fell back to).
+         */
+        ExtractionSummary: {
+            /** At */
+            at: string;
+            /** Kept */
+            kept: number;
+            /** Models */
+            models?: string[];
+            /** Refused */
+            refused: number;
         };
         /** FermosFitRequest */
         FermosFitRequest: {
@@ -4269,14 +4374,16 @@ export interface components {
          * OverlayPaper
          * @description One document the project holds, as the overlay carries it (§2.1;
          *     ADR-002): its passages in the kit as its sections, its citation, its
-         *     licence and who served it. The browser makes a paper of it, which
-         *     BioRepo, the review card, the reader and Witness read.
+         *     licence and who served it, and what its kept extraction found. The
+         *     browser makes a paper of it, which BioRepo, the review card, the reader
+         *     and Witness read.
          */
         OverlayPaper: {
             /** Authors */
             authors?: string[];
             /** Doi */
             doi?: string | null;
+            extraction?: components["schemas"]["ExtractionSummary"] | null;
             /** Fetchedat */
             fetchedAt?: string | null;
             /** Ingest */
@@ -5280,9 +5387,15 @@ export interface components {
             measures: components["schemas"]["Measure"][];
             /** Predictions */
             predictions: components["schemas"]["Prediction"][];
-            /** Productid */
+            /**
+             * Productid
+             * @default
+             */
             productId: string;
-            /** Strainid */
+            /**
+             * Strainid
+             * @default
+             */
             strainId: string;
             /** Title */
             title: string;
@@ -6586,6 +6699,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Overlay"];
+                };
+            };
+        };
+    };
+    catalogue_listed_api_catalogues__kind__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalogue_keep_api_catalogues__kind__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogueKeep"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalogue_entry_api_catalogues__kind___entry_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                kind: string;
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7950,6 +8176,44 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    catalogue_intake_api_intake_catalogue_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_catalogue_intake_api_intake_catalogue_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

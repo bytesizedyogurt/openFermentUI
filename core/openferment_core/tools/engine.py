@@ -11,11 +11,14 @@ at the library's defaults, or a study's scenario, as an engine run
 caller's; `engine_report` reads a kept run back.
 
 A RUN'S EVIDENCE. Each number its price block and its flowsheet's own outputs
-hold, in its unit, is one Evidence whose id is `<artifact id>:<block>.<key>`
+hold, in its unit, and each line of its TEA breakdown, per unit of the price's
+basis and per year, is one Evidence whose id is `<artifact id>:<block>.<key>`
 and whose basis is the run's artifact, its provenance the artifact's
 (`assumed` when a value the run set is a person's assumption or a model's
-estimate). A claim cites those ids, and a value a claim states is read from
-one by its id.
+estimate). `engine_report` also gives, by words, the parameters the run read
+back from the plant (`<artifact id>:parameters.<key>`), each with its origin:
+computed where the package set it, assumed where a person or a model did. A
+claim cites those ids, and a value a claim states is read from one by its id.
 """
 from __future__ import annotations
 
@@ -69,7 +72,56 @@ def run_evidence(report: RunReport) -> list[Evidence]:
         if _number(value) or isinstance(value, str):
             out.append(Evidence(id=f"{art.id}:outputs.{key}", label=f"{name}: {key}", value=value,
                                 unit=units.get(key) or "", provenance=art.provenance, basis=basis))
+    # The TEA's breakdown, line by line as the worker read it from BioSTEAM's TEA object.
+    tea = art.output.get("tea") or {}
+    per_unit = f"USD per {tea['basis']}" if tea.get("basis") else "USD per unit of the price's basis"
+    annual = (art.output.get("tableUnits") or {}).get("annual") or "USD/yr"
+    for line in tea.get("lines") or []:
+        what = f"{name}: {line.get('label') or line.get('key')}, a line of the TEA's breakdown ({line.get('reads') or 'read from the TEA'})"
+        if _number(line.get("perUnit")):
+            out.append(Evidence(id=f"{art.id}:tea.{line['key']}", label=f"{what}, per unit of the price's basis",
+                                value=line["perUnit"], unit=per_unit, provenance=art.provenance, basis=basis))
+        if _number(line.get("usdPerYear")):
+            out.append(Evidence(id=f"{art.id}:tea.{line['key']}.year", label=f"{what}, a year",
+                                value=line["usdPerYear"], unit=annual, provenance=art.provenance, basis=basis))
     return out[:MAX_ROWS]
+
+
+# What a parameter's origin is, in words, as a claim's label says it.
+ORIGIN_WORDS = {"library-default": "the package's own value", "person-assumption": "a person's assumption",
+                "model-estimate": "a model's estimate", "record": "read from a record", "artifact": "read from an artifact"}
+
+
+def parameter_evidence(report: RunReport, words: str, limit: int) -> list[Evidence]:
+    """The parameters a kept run read back from the plant whose key, label or
+    group hold every one of `words`, as evidence on the run's artifact: computed
+    where the package set the value, assumed where a person or a model did."""
+    art, run = report.artifact, report.run
+    held = report.parameters
+    if hasattr(held, "model_dump"):
+        held = held.model_dump(mode="json")
+    if art is None or not isinstance(held, dict):
+        return []
+    basis = ComputedBasis(tool=art.tool, toolVersion=art.toolVersion, inputs=art.inputs, artifactId=art.id,
+                          at=art.createdAt, seed=art.seed)
+    name = run.plant + (f" ({run.configuration})" if run.configuration else "")
+    specs = {sp.get("key"): sp for sp in held.get("specs") or [] if isinstance(sp, dict)}
+    wanted = [w for w in words.lower().split() if w]
+    out: list[Evidence] = []
+    for v in held.get("values") or []:
+        spec = specs.get(v.get("key")) or {}
+        said = f"{v.get('key')} {spec.get('label', '')} {spec.get('group', '')}".lower()
+        if (wanted and not all(w in said for w in wanted)) or not (_number(v.get("value")) or isinstance(v.get("value"), str)):
+            continue
+        origin = v.get("origin") or "library-default"
+        source = (v.get("source") or {}).get("id")
+        label = f"{name}: {spec.get('label') or v.get('key')}, {ORIGIN_WORDS.get(origin, origin)}" + (f" ({source})" if source else "")
+        out.append(Evidence(id=f"{art.id}:parameters.{v.get('key')}", label=label, value=v["value"],
+                            unit=spec.get("unit") or "", provenance="assumed" if origin in ("person-assumption", "model-estimate") else "computed",
+                            basis=basis))
+        if len(out) >= limit:
+            break
+    return out
 
 
 def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
@@ -186,6 +238,10 @@ def _run(inp: EngineRunInput, ctx: ToolContext) -> ToolResult:
 
 class EngineReportInput(BaseModel):
     run: str = Field(max_length=80, description="A kept run's id, as engine_run or study_read gives it.")
+    parameters: str = Field(default="", max_length=200, description=(
+        "Words to read the parameters the run read back from the plant by (its feed, a unit, a price, a finance term): "
+        "each one matched comes back as an evidence id with its value, its unit and its origin. Empty for none."))
+    limit: int = Field(default=20, ge=1, le=MAX_ROWS, description="How many parameters at most.")
 
 
 def _report(inp: EngineReportInput, ctx: ToolContext) -> ToolResult:
@@ -195,7 +251,18 @@ def _report(inp: EngineReportInput, ctx: ToolContext) -> ToolResult:
         report = runs.report(inp.run.strip())
     except runs.RunNotFound as e:
         return ToolResult(error=f"engine_report refused: {str(e).strip(chr(39))}")
-    return run_result(report, state="open")
+    result = run_result(report, state="open")
+    if inp.parameters.strip() and result.error is None:
+        # The parameters asked for, in the summary's room: the run's own numbers
+        # stay citable, and engine_report with no words lists them.
+        found = parameter_evidence(report, inp.parameters, inp.limit)
+        keep = ("state", "runId", "artifactId", "plant", "configuration", "scenarioId", "provenance", "valuesSet")
+        result.summary = {**{k: result.summary.get(k) for k in keep}, "matched": len(found),
+                          "parameters": [{"id": e.id, "label": e.label.split(": ", 1)[-1], "value": e.value,
+                                          "unit": e.unit} for e in found],
+                          "note": "The run's price, its outputs and its TEA breakdown: engine_report with no parameters."}
+        result.evidence = [*result.evidence, *found]
+    return result
 
 
 PLANTS_TOOL = register(Tool(
@@ -235,8 +302,10 @@ REPORT_TOOL = register(Tool(
     name="engine_report",
     description=(
         "Read a kept engine run by its id: what ran, the values it set with their origins, its provenance, and "
-        "each number its price and its flowsheet's outputs hold as an evidence id to cite; for a refused run, "
-        "the plant's own words."
+        "each number its price block, its flowsheet's outputs and its TEA breakdown hold as an evidence id to cite; "
+        "with words in `parameters`, the parameters the run read back from the plant (its feed's composition, "
+        "moisture and price, the chemicals' prices, the finance terms), each as an evidence id with its origin. "
+        "For a refused run, the plant's own words."
     ),
     input_model=EngineReportInput, run=_report, strict=False,
 ))

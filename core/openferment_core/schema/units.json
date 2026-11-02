@@ -136,8 +136,8 @@
    "label": "% v/v"
   },
   "% w/v": {
-   "family": "percent",
-   "factor": 1,
+   "family": "massConc",
+   "factor": 10,
    "label": "% w/v"
   },
   "g g⁻¹": {
@@ -149,6 +149,11 @@
    "family": "yield",
    "factor": 0.001,
    "label": "mg g⁻¹"
+  },
+  "kg kg⁻¹": {
+   "family": "yield",
+   "factor": 1,
+   "label": "kg kg⁻¹"
   },
   "g L⁻¹ h⁻¹": {
    "family": "volProd",
@@ -328,6 +333,31 @@
    "factor": 0.2777777777777778,
    "label": "MJ kg⁻¹"
   },
+  "kg h⁻¹": {
+   "family": "massFlow",
+   "factor": 1,
+   "label": "kg h⁻¹"
+  },
+  "g h⁻¹": {
+   "family": "massFlow",
+   "factor": 0.001,
+   "label": "g h⁻¹"
+  },
+  "kg d⁻¹": {
+   "family": "massFlow",
+   "factor": 0.041666666666666664,
+   "label": "kg d⁻¹"
+  },
+  "t d⁻¹": {
+   "family": "massFlow",
+   "factor": 41.666666666666664,
+   "label": "t d⁻¹"
+  },
+  "kg s⁻¹": {
+   "family": "massFlow",
+   "factor": 3600,
+   "label": "kg s⁻¹"
+  },
   "USD kg⁻¹": {
    "family": "costUSD",
    "factor": 1,
@@ -407,6 +437,14 @@
   "g/100 mL": "g 100mL⁻¹",
   "g/g": "g g⁻¹",
   "mg/g": "mg g⁻¹",
+  "kg/kg": "kg kg⁻¹",
+  "kg/h": "kg h⁻¹",
+  "kg/hr": "kg h⁻¹",
+  "kg/d": "kg d⁻¹",
+  "kg/day": "kg d⁻¹",
+  "g/h": "g h⁻¹",
+  "kg/s": "kg s⁻¹",
+  "t/d": "t d⁻¹",
   "g/l/h": "g L⁻¹ h⁻¹",
   "g/L/h": "g L⁻¹ h⁻¹",
   "mg/l/h": "mg L⁻¹ h⁻¹",
@@ -438,6 +476,7 @@
   "%v/v": "% v/v",
   "% vv": "% v/v",
   "%w/v": "% w/v",
+  "% (w/v)": "% w/v",
   "%tsp": "% TSP",
   "%tcp": "% TCP",
   "%cdw": "% CDW",
@@ -504,7 +543,8 @@
   "percentCdw": "% CDW",
   "molarMass": "kDa",
   "costUSDVolume": "USD gal⁻¹",
-  "specMolarRate": "mmol g⁻¹ h⁻¹"
+  "specMolarRate": "mmol g⁻¹ h⁻¹",
+  "massFlow": "kg h⁻¹"
  },
  "refusals": [
   {

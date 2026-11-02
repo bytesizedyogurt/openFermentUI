@@ -160,8 +160,10 @@ def test_a_value_written_as_a_string_is_read_like_a_quote(written):
 
 
 def test_a_string_value_must_hold_exactly_one_number():
+    # A range written as the value is read as that range, and a quote that
+    # does not state it refuses it (the tests on values copied whole, below).
     _, rule, detail = anchor(good(sectionId="t1", value="7-10", unit="mg/L", quote="Fed-batch | 4200 | mg L-1"))
-    assert rule == "value" and "single number" in detail
+    assert rule == "value" and "the recorded range 7-10" in detail, detail
     _, rule, _ = anchor(good(value="four point two"))
     assert rule == "value"
 
@@ -465,6 +467,38 @@ def test_a_range_written_as_a_to_b_with_a_unit_on_each_end():
     )
     assert rule is None, detail
     assert c.valueBasis == "range-midpoint"
+
+
+# A value a model copies whole from a paper (alpha 2.1, stage B: the live
+# extraction refused every "0.15 ± 0.01 (A)" and "2–3" a fallback model sent).
+SPREAD = [{"id": "r1", "heading": "Results", "text": "The secreted titre was 0.15 ± 0.01 g L-1 in strain A. "
+           "Colonies appeared in 7–10 days."}]
+
+
+def _copied(**overrides):
+    return anchor_candidate(good(sectionId="r1", **overrides), SPREAD, paper_id="X2", candidate_id="cl1-X2-1")
+
+
+def test_a_mean_written_with_its_spread_anchors_on_the_mean():
+    c, rule, detail = _copied(value="0.15 ± 0.01 (A)", unit="g/L", quote="The secreted titre was 0.15 ± 0.01 g L-1 in strain A")
+    assert rule is None, detail
+    assert (c.value, c.valueBasis, c.range) == (0.15, "exact", None)
+
+
+def test_a_mean_with_its_spread_still_stands_in_the_quote():
+    _, rule, detail = _copied(value="0.16 ± 0.01", unit="g/L", quote="The secreted titre was 0.15 ± 0.01 g L-1 in strain A")
+    assert rule == "value", detail
+
+
+def test_a_range_copied_whole_is_the_records_range_and_its_low_end():
+    c, rule, detail = _copied(field="time_to_colony", value="7–10", unit="d", quote="Colonies appeared in 7–10 days")
+    assert rule is None, detail
+    assert (c.value, c.valueBasis, (c.range.low, c.range.high)) == (7, "range-low", (7, 10))
+
+
+def test_a_value_holding_several_numbers_otherwise_is_refused():
+    _, rule, detail = _copied(field="time_to_colony", value="7, 8 and 10", unit="d", quote="Colonies appeared in 7–10 days")
+    assert rule == "value" and "not a single number" in detail, detail
 
 
 def test_a_range_the_quote_does_not_state_refuses():

@@ -3,8 +3,9 @@
  * the built app, in Chromium, against a real service that serves dist/ on
  * loopback and holds a project the proof has filled (scripts/prove.py step 9
  * starts it): Home → the project → a document pasted in and searched → a run's
- * report and its SFF graph → a conversation with its labelled estimate → a
- * runbook.
+ * report and its SFF graph → a scenario begun from the run → the plants Studies
+ * offers to run → the project's SFF flowsheets → a conversation with its
+ * labelled estimate → a runbook.
  *
  *   WALK_ORIGIN=http://127.0.0.1:PORT WALK_PROJECT=<id> WALK_RUN=<run id> \
  *   WALK_CONVERSATION=<id> WALK_RUNBOOK=<id> npx tsx scripts/walk.ts
@@ -119,6 +120,38 @@ async function main(): Promise<void> {
     const drawn = await page.getByTestId('sff-unit').count();
     if (!(units > 0 && drawn === units)) throw new Error(`the graph names ${units} units and draws ${drawn}`);
     return `run ${RUN}'s report, its SFF file and its graph: ${units} units drawn`;
+  });
+
+  await step('A scenario from the run', async () => {
+    // The run's page offers its parameters to set as the person's assumptions;
+    // the walk finds one by words and leaves it unmade.
+    const maker = page.getByTestId('run-make-scenario');
+    await maker.waitFor();
+    await maker.getByTestId('scenario-find').fill('price');
+    const found = maker.getByTestId('scenario-found-row');
+    await found.first().waitFor();
+    await found.first().getByRole('button').click();
+    await maker.getByTestId('scenario-setting').first().waitFor();
+    const n = await found.count();
+    return `the run's parameters found by words (${n} for "price"), one set to make a scenario of, nothing made`;
+  });
+
+  await step('Run a plant', async () => {
+    await at(page, '/proforma/studies');
+    const plants = page.getByTestId('run-plant-plant').locator('option');
+    await plants.first().waitFor({ state: 'attached' });
+    const n = await plants.count();
+    return `Studies offers ${n} plant${n === 1 ? '' : 's'} the installed package built here, each in the configurations it built in`;
+  });
+
+  await step('Flowsheets', async () => {
+    await at(page, '/flowsheets');
+    await page.getByTestId('flowsheets-held').waitFor();
+    const runs = await page.locator('[data-testid="flowsheets-record"][data-origin="run"]').count();
+    if (runs === 0) throw new Error('no SFF record written by a run is listed');
+    await page.getByTestId('flowsheets-import').waitFor();
+    await page.getByTestId('flowsheets-library-file').first().waitFor();
+    return `${runs} record${runs === 1 ? '' : 's'} written by runs listed, with an import and the toolkit's reference files`;
   });
 
   await step('Conversation', async () => {

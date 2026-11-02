@@ -22,7 +22,12 @@ alpha 2.0 stage 6 (execution prompt §4.6, §10 stage 6): `engine_plants`,
 `engine_parameters`, `engine_run` and `engine_report` over the library shelf
 and the project's runs, `study_scenario`, `study_compare` and `study_read`
 over its studies, and `literature_sources` and `literature_document` over the
-documents it holds. Forty-three names. A tool outside it is a new decision.
+documents it holds; then alpha 2.1's `flowsheet_library`, `flowsheet_import`
+(a free write through `writes.import_flowsheet`) and `flowsheet_read` over
+the SFF toolkit's reference files and the project's records; and
+`catalogue_read` and `catalogue_write` over the project's catalogues of
+strains, products, skills and lessons. Forty-eight names. A tool outside it is
+a new decision.
 `test_tools.NAMES` is the one literal list the tests hold the registry to;
 every other count is derived from `WHITELIST`. `docs/TOOLS.md` is written
 from this registry (`pnpm gen:tools`).
@@ -124,6 +129,17 @@ WHITELIST = (
     "study_read",
     "literature_sources",
     "literature_document",
+    # Alpha 2.1 stage B — the SFF toolkit's reference files, one imported into
+    # the project (a free write through writes.import_flowsheet), and a kept
+    # record read back: asked to import a file, Postdoc had no tool for it.
+    "flowsheet_library",
+    "flowsheet_import",
+    "flowsheet_read",
+    # alpha 2.1 stage D (debt 1): the project's catalogues of strains,
+    # products, skills and lessons, read, and an entry kept as the model's (a
+    # free write through writes.keep_catalogue).
+    "catalogue_read",
+    "catalogue_write",
 )
 # The fields a number may stand in outside a quantity: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})
@@ -415,6 +431,8 @@ def infos() -> list[ToolInfo]:
 
 # The tools this phase builds register on import.
 from . import engine as _engine  # noqa: E402,F401
+from . import flowsheets as _flowsheets  # noqa: E402,F401
+from . import catalogues as _catalogues  # noqa: E402,F401
 from . import fermos as _fermos  # noqa: E402,F401
 from . import geneos as _geneos  # noqa: E402,F401
 from . import literature as _literature  # noqa: E402,F401

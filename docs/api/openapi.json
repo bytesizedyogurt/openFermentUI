@@ -540,6 +540,32 @@
         "title": "BasisSource",
         "type": "object"
       },
+      "Body_catalogue_intake_api_intake_catalogue_post": {
+        "properties": {
+          "by": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "By",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "by",
+          "file"
+        ],
+        "title": "Body_catalogue_intake_api_intake_catalogue_post",
+        "type": "object"
+      },
       "Body_flowsheets_import_api_flowsheets_import_post": {
         "properties": {
           "by": {
@@ -875,6 +901,26 @@
           "si"
         ],
         "title": "Candidate",
+        "type": "object"
+      },
+      "CatalogueKeep": {
+        "description": "POST /api/catalogues/{kind}: one entry and who keeps it.",
+        "properties": {
+          "by": {
+            "default": "",
+            "title": "By",
+            "type": "string"
+          },
+          "entry": {
+            "additionalProperties": true,
+            "title": "Entry",
+            "type": "object"
+          }
+        },
+        "required": [
+          "entry"
+        ],
+        "title": "CatalogueKeep",
         "type": "object"
       },
       "CeilingRequest": {
@@ -2291,6 +2337,37 @@
           "outcome"
         ],
         "title": "ExtractRunResult",
+        "type": "object"
+      },
+      "ExtractionSummary": {
+        "description": "What a document's kept extraction found, for the page that lists the\ndocument: when it ran, the candidates anchoring kept and refused, and the\nmodels that answered (the primary, then any it fell back to).",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "kept": {
+            "title": "Kept",
+            "type": "integer"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "refused": {
+            "title": "Refused",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "kept",
+          "refused"
+        ],
+        "title": "ExtractionSummary",
         "type": "object"
       },
       "FermosFitRequest": {
@@ -4526,7 +4603,7 @@
         "type": "object"
       },
       "OverlayPaper": {
-        "description": "One document the project holds, as the overlay carries it (§2.1;\nADR-002): its passages in the kit as its sections, its citation, its\nlicence and who served it. The browser makes a paper of it, which\nBioRepo, the review card, the reader and Witness read.",
+        "description": "One document the project holds, as the overlay carries it (§2.1;\nADR-002): its passages in the kit as its sections, its citation, its\nlicence and who served it, and what its kept extraction found. The\nbrowser makes a paper of it, which BioRepo, the review card, the reader\nand Witness read.",
         "properties": {
           "authors": {
             "items": {
@@ -4545,6 +4622,16 @@
               }
             ],
             "title": "Doi"
+          },
+          "extraction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExtractionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "fetchedAt": {
             "anyOf": [
@@ -7356,10 +7443,12 @@
             "type": "array"
           },
           "productId": {
+            "default": "",
             "title": "Productid",
             "type": "string"
           },
           "strainId": {
+            "default": "",
             "title": "Strainid",
             "type": "string"
           },
@@ -7370,8 +7459,6 @@
         },
         "required": [
           "title",
-          "productId",
-          "strainId",
           "predictions",
           "measures"
         ],
@@ -10393,6 +10480,181 @@
         "x-openferment-scope": "project"
       }
     },
+    "/api/catalogues/{kind}": {
+      "get": {
+        "description": "The open project's entries of one catalogue (strain, product, skill, lesson), by id.",
+        "operationId": "catalogue_listed_api_catalogues__kind__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Catalogue Listed Api Catalogues  Kind  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Catalogue Listed",
+        "x-openferment-scope": "project"
+      },
+      "post": {
+        "description": "One entry kept in the open project's catalogue of `kind`, in the name of\n`by`; an entry already held under its id is replaced. 422 in words for an\nentry the kind does not take.",
+        "operationId": "catalogue_keep_api_catalogues__kind__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogueKeep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Catalogue Keep Api Catalogues  Kind  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Catalogue Keep",
+        "x-openferment-scope": "project"
+      }
+    },
+    "/api/catalogues/{kind}/{entry_id}": {
+      "get": {
+        "operationId": "catalogue_entry_api_catalogues__kind___entry_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Catalogue Entry Api Catalogues  Kind   Entry Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Catalogue Entry",
+        "x-openferment-scope": "project"
+      }
+    },
     "/api/conversations": {
       "get": {
         "description": "The project's Postdoc conversations, oldest first, each with its turns.",
@@ -12514,6 +12776,59 @@
         },
         "summary": "Health",
         "x-openferment-scope": "none"
+      }
+    },
+    "/api/intake/catalogue": {
+      "post": {
+        "description": "A file of catalogue entries of one kind, JSON or CSV, taken in: every\nrow that is an entry kept with the file as its source, every other row\nrefused with its reason.",
+        "operationId": "catalogue_intake_api_intake_catalogue_post",
+        "parameters": [
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_catalogue_intake_api_intake_catalogue_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Catalogue Intake Api Intake Catalogue Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Catalogue Intake",
+        "x-openferment-scope": "project"
       }
     },
     "/api/intake/collect": {

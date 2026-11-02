@@ -25,7 +25,7 @@
 - C: `pnpm test:slow` (marker `slow`) and `pnpm test:live` (marker `live`: a real network call, most needing the key and spending) run by hand, outside verify.
 - C: `pnpm prove` runs the proof (`scripts/prove.py`, steps 1 to 9) on a database of its own, with no key and the network refused; run `pnpm build` first, since step 9 walks the built app in Chromium; `--steps 3,8` proves the steps named with what they stand on.
 - C: `pnpm ready` (or `pnpm ready --offline`) says in rows whether the service can run: the database, both schemas, pgvector, the embedder, the model routes and the key.
-- C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names.
+- C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names; `--suite ethanol` is the owner's twelve, `--tag` names a route table, `--judge` and `pnpm eval judge` add the `judge` route's scores, and `pnpm eval summary` sets the tags side by side (`docs/api/postdoc.md`).
 - C: `pnpm gen:api`, `pnpm gen:tools` and `pnpm gen:components` write `docs/api/openapi.json` with `src/api/types.gen.ts`, `docs/TOOLS.md` and `COMPONENTS.md`; verify fails on drift, so regenerate a generated file and leave it unedited by hand.
 - C: `pnpm smoke` opens every rail entry against the real service and needs a build; `pnpm dev` serves the client on Vite.
 - R: `pnpm test:core` green before every commit; push after every step; never force-push; never commit `core/.env` or a database dump (§11.2).
@@ -80,6 +80,7 @@
 - C: REST: FastAPI routes in `core/openferment_core/api.py`; `docs/api/openapi.json` is generated and marks each operation's project scope (`x-openferment-scope`); a refusal is a 422 in words.
 - C: SSE: `GET /api/events?project=` streams `job.*`, `tool.call` and `tool.result`, `artifact.kept` and `turn.*`, with ids a page resumes from (`docs/api/postdoc.md`).
 - C: Postdoc: conversations, turns, a claim's typed values, the routing table and the evaluation set (`docs/api/postdoc.md`).
+- C: A request may name its own Anthropic key in `X-OpenFerment-Key`: its calls, openFerment's and the kit's, run on it, never stored, logged or echoed, and the audit row says an override was used (owner question 10; ADR-008, Implementation 10; `core/tests/test_key_override.py`).
 - C: The worker protocol: JSON lines, every op with its request and result schema (`docs/api/workers.md`).
 - C: Engine runs: a run's inputs with their origins, its outputs, tables, SFF file and versions (`docs/api/runs.md`).
 - C: SFF: the schema version, the record kept for a file, and what openFerment adds in `metadata` (`docs/api/sff.md`).
@@ -92,7 +93,7 @@
 ## Working assumptions
 
 - C: The live instance is one Mac mini serving its owner on loopback (`scripts/host/`); accounts wait as a membership stub (ADR-005).
-- C: Anthropic is the one served provider; a route naming another provider's model is passed over in words (ADR-008, Implementation 6.3).
+- C: Anthropic is the served provider, beside a local model behind an OpenAI-compatible endpoint `core/.env` names (`OPENFERMENT_LOCAL_BASE_URL`), which answers single calls through the kit's adapter; a route naming another provider's model is passed over in words (ADR-008, Implementations 6.3 and 11).
 - C: A library plant carries its package's own numbers; a person's value or a model's estimate enters as an override with its origin (ADR-004, ADR-006).
 - C: The local embedder serves a project's corpus at this scale; `pnpm lit:report` measures retrieval against the kit's seed questions (ADR-002).
 - C: The hand-kept `src/data/types.ts` stands beside the generated types, held to the service by `check:plan`, until the screens move over one by one (ADR-007).
@@ -100,11 +101,12 @@
 
 ## Open questions
 
-- C: The owner's questions 1 to 10 stand in `docs/PROGRESS.md` (execution prompt §13), each with the default this build took; none is answered yet.
-- C: Q1 PostgreSQL as the one database — default yes. Q2 the kit in process with a local embedder — yes. Q3 delete thread Q's TypeScript list and keep `docs/corpus/ethanol-sources.txt` — yes.
-- C: Q4 delete Dominion with its return condition recorded — yes. Q5 rename `demo` to `assumed` — yes. Q6 a Python pin — none needed: the kit's suite passed on 3.13.17.
-- C: Q7 the kit's REST under `/rag` on the same port — yes, behind `OPENFERMENT_RAG_KEY`. Q8 a licence — none added (ADR-012). Q9 accounts — tables and a membership stub only.
-- C: Q10 the per-request key override (§4.8) and keys for a route's other-provider model — neither built, since each changes how a key is read (§11.1; ADR-008, Implementation 6.3).
+- R: The owner answered questions 1 to 9 on 2 November 2026, confirming each default below, and authorized question 10 (alpha 2.1 execution prompt §3; `docs/PROGRESS.md`).
+- R: Q1 PostgreSQL as the one database — yes. Q2 the kit in process with a local embedder — yes. Q3 delete thread Q's TypeScript list and keep `docs/corpus/ethanol-sources.txt` — yes.
+- R: Q4 delete Dominion with its return condition recorded — yes. Q5 rename `demo` to `assumed` — yes. Q6 a Python pin — none needed: the kit's suite passed on 3.13.17.
+- R: Q7 the kit's REST under `/rag` on the same port — yes, behind `OPENFERMENT_RAG_KEY`. Q8 a licence — none added (ADR-012). Q9 accounts — tables and a membership stub only.
+- R: Q10 the per-request key override — authorized: a key sent on a request serves that request's model calls, openFerment's and the kit's, and is never stored, logged or echoed; the audit row says an override was used (prompt §3).
+- R: A local model behind an OpenAI-compatible endpoint named in `core/.env` may stand in a route through the kit's adapter; nothing else about keys changes (prompt §3).
 
 ## Revisit conditions
 

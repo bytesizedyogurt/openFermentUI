@@ -71,13 +71,15 @@ a non-streaming request is cut off at ten; the final message is the same.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import copy
 import hashlib
 import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 import anthropic
 
@@ -136,6 +138,26 @@ PROVIDERS = ("anthropic", "openai-compatible", "google")
 # through the kit's client, which reads that provider's key from the kit's
 # settings: a change to how keys are read, which waits for the owner (§11.1).
 SERVED = ("anthropic",)
+# A local model behind an OpenAI-compatible endpoint (vLLM, Ollama, LM Studio)
+# may stand in a route (the owner, 2 November 2026): core/.env names the
+# endpoint, and a route's `openai-compatible:<model>` is called through Sci RAG
+# Kit's adapter, its key read from core/.env too, at no charge on the day's
+# cap. It answers a single call (`call`); Postdoc's loop of tools (`converse`)
+# passes it over in words. A route naming another provider still waits.
+LOCAL = "openai-compatible"
+LOCAL_URL_SETTING = "OPENFERMENT_LOCAL_BASE_URL"
+LOCAL_KEY_SETTING = "OPENFERMENT_LOCAL_API_KEY"
+
+
+def local_endpoint() -> str | None:
+    """The OpenAI-compatible endpoint core/.env names for a local model, or None."""
+    return os.environ.get(LOCAL_URL_SETTING, "").strip() or None
+
+
+def served_providers() -> tuple[str, ...]:
+    """The providers a call may reach now: Anthropic's, and a local model's
+    once core/.env names its endpoint."""
+    return SERVED + ((LOCAL,) if local_endpoint() else ())
 
 
 class RoutesInvalid(ValueError):
@@ -219,8 +241,26 @@ def family_of(name: str) -> str:
 
 def waits(named: str) -> str:
     """Why a route's model the service does not serve is passed over, in words."""
+    if spec(named)[0] == LOCAL:
+        return (f"{named} is a local model behind an OpenAI-compatible endpoint, and core/.env names none "
+                f"({LOCAL_URL_SETTING})")
     return (f"{named} is a {spec(named)[0]} model: calling it reads that provider's key through Sci RAG Kit's "
             "settings, a change to how keys are read that waits for the owner (execution prompt §11.1)")
+
+
+def _local_generate(model: str, *, system: str, user: str, max_tokens: int, json_mode: bool) -> str:
+    """One answer of a local model through Sci RAG Kit's OpenAI-compatible
+    adapter, at the endpoint core/.env names, on the key it names (many local
+    servers take any; the adapter wants one)."""
+    import asyncio
+
+    from sci_rag.config import Settings
+    from sci_rag.llm.openai_compat import OpenAICompatLLM
+
+    settings = Settings(openai_base_url=local_endpoint(), llm_model=model,
+                        openai_api_key=os.environ.get(LOCAL_KEY_SETTING, "").strip() or "local")
+    client = OpenAICompatLLM(settings, model=model)
+    return asyncio.run(client.generate(user, system=system or None, max_tokens=max_tokens, json_mode=json_mode))
 
 # USD per million tokens, input and output, from the pricing page
 # (platform.claude.com/docs/en/about-claude/pricing, read 2026-10-08; the
@@ -281,6 +321,31 @@ GRAMMAR_TOO_LARGE = "compiled grammar is too large"
 
 class GrammarTooLarge(ModelUnavailable):
     """The API refused a request because its compiled grammar is too large."""
+
+
+#: What the API answers (HTTP 400) once the Anthropic account's own usage
+#: limit is reached, measured 2026-11-02: "You have reached your specified API
+#: usage limits. You will regain access on <date>." Every model of every route
+#: answers it alike until that date or until the account's owner raises the
+#: limit in the Anthropic console; openFerment's daily cap is another limit.
+USAGE_LIMIT = "usage limit"
+
+
+class UsageLimitReached(ModelUnavailable):
+    """The Anthropic account's own usage limit is reached: no model answers."""
+
+
+def _bad_request(e: Any, usage: Usage | None = None) -> ModelUnavailable:
+    """A 400 in words: the account's usage limit, a grammar too large, or a
+    request the API could not take."""
+    message = str(getattr(e, "message", e))
+    low = message.lower()
+    if USAGE_LIMIT in low:
+        return UsageLimitReached(
+            f"The Anthropic account's usage limit is reached, so no model can answer: {message} The account's "
+            "owner raises the limit in the Anthropic console; openFerment's daily cap is a separate limit.", usage)
+    kind = GrammarTooLarge if GRAMMAR_TOO_LARGE in low else ModelUnavailable
+    return kind(f"The Anthropic API refused the request as malformed: {message}", usage)
 
 
 #: Requests found too large, by their answer schema and strict tools: their
@@ -532,8 +597,39 @@ def make_client(**kwargs: Any) -> Any:
     return anthropic.Anthropic(default_headers=headers or None, **kwargs)
 
 
+# ── the key a request names (owner question 10, 2 November 2026; ADR-008) ──
+
+#: The header a request names its own Anthropic key in. The API's middleware
+#: reads it, on a request the guard lets name one (`guard.key_refusal`).
+KEY_HEADER = "X-OpenFerment-Key"
+_REQUEST_KEY: contextvars.ContextVar[str | None] = contextvars.ContextVar("openferment_request_key", default=None)
+
+
+@contextlib.contextmanager
+def request_key(key: str | None) -> Iterator[None]:
+    """Within it, every model call of this request runs on `key` in place of
+    core/.env's: the service's own, and the kit's, which call through `call`
+    here on a thread that copies this context, as the threads a request starts
+    do. The key is held in this context alone: never stored, logged or
+    echoed. An empty key is none, and core/.env's serves."""
+    token = _REQUEST_KEY.set((key or "").strip() or None)
+    try:
+        yield
+    finally:
+        _REQUEST_KEY.reset(token)
+
+
+def key_named() -> bool:
+    """Whether this request's model calls run on a key the request named."""
+    return _REQUEST_KEY.get() is not None
+
+
+def _whose_key() -> str:
+    return "the key this request named" if key_named() else "the key in core/.env"
+
+
 def _default_client() -> Any:
-    key = os.environ.get("ANTHROPIC_API_KEY")
+    key = _REQUEST_KEY.get() or os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         raise ModelUnavailable(
             "ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service."
@@ -579,11 +675,32 @@ def call(
     for i, named in enumerate(models):
         last = i == len(models) - 1
         provider, model = spec(named)
-        if provider not in SERVED:
+        if provider not in served_providers():
             if last:
                 raise ModelUnavailable(waits(named), spent)
             log.warning("%s%s; trying %s", label, waits(named), models[i + 1])
             continue
+        if provider == LOCAL:
+            tried.append(named)
+            try:
+                text = _local_generate(model, system=system, user=user, max_tokens=max_tokens,
+                                       json_mode=schema is not None)
+            except Exception as e:  # the endpoint down, the model missing, an answer refused: said, then the next
+                why = f"{named} at {local_endpoint()} did not answer ({type(e).__name__}: {str(e)[:200]})"
+                if last:
+                    raise ModelUnavailable(why, spent) from e
+                log.warning("%s%s; trying %s", label, why, models[i + 1])
+                continue
+            data = None
+            if schema is not None:
+                try:
+                    value = json.loads(text)
+                    data = value if isinstance(value, dict) else None
+                except ValueError:
+                    data = None
+            spent = add(spent, Usage(models=[named]))
+            return Result(data=data, model=named, usage=spent, stop_reason="end_turn", fell_back=i > 0, tried=tried,
+                          text=text)
         tried.append(model)
         held = _reserve(model, request, max_tokens, spent, role)
         cost = 0.0
@@ -592,11 +709,11 @@ def call(
                 with client.messages.stream(model=model, **request) as stream:
                     response = stream.get_final_message()
             except anthropic.AuthenticationError as e:
-                raise ModelUnavailable("The Anthropic API rejected the key in core/.env.", spent) from e
+                raise ModelUnavailable(f"The Anthropic API rejected {_whose_key()}.", spent) from e
             except anthropic.APIConnectionError as e:
                 raise ModelUnavailable(f"Could not reach the Anthropic API: {e}", spent) from e
             except anthropic.BadRequestError as e:
-                raise ModelUnavailable(f"The Anthropic API refused the request as malformed: {e.message}", spent) from e
+                raise _bad_request(e, spent) from e
             except (anthropic.NotFoundError, anthropic.PermissionDeniedError) as e:
                 why = f"{model} is not available to this key ({e.status_code})"
                 if last:
@@ -722,6 +839,9 @@ def converse(
     family = family_of(family or role)
     role = SPEND_ROLES[family]
     provider, model = spec(model)
+    if provider == LOCAL and LOCAL in served_providers():
+        raise ModelUnavailable(f"{provider}:{model} is a local model, which answers a single call; Postdoc's loop "
+                               "of tools needs a model that calls tools", Usage())
     if provider not in SERVED:
         raise ModelUnavailable(waits(f"{provider}:{model}"), Usage())
     output_config: dict[str, Any] = {"effort": routes()[family].effort}
@@ -783,12 +903,11 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
             with client.messages.stream(**request) as stream:
                 response = stream.get_final_message()
     except anthropic.AuthenticationError as e:
-        raise ModelUnavailable("The Anthropic API rejected the key in core/.env.") from e
+        raise ModelUnavailable(f"The Anthropic API rejected {_whose_key()}.") from e
     except anthropic.APIConnectionError as e:
         raise ModelUnavailable(f"Could not reach the Anthropic API: {e}") from e
     except anthropic.BadRequestError as e:
-        refused = GrammarTooLarge if GRAMMAR_TOO_LARGE in str(e.message).lower() else ModelUnavailable
-        raise refused(f"The Anthropic API refused the request as malformed: {e.message}") from e
+        raise _bad_request(e) from e
     except (anthropic.NotFoundError, anthropic.PermissionDeniedError) as e:
         raise ModelUnavailable(f"{model} is not available to this key ({e.status_code})") from e
     except (anthropic.APIError, _http.TransportError) as e:

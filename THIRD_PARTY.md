@@ -100,6 +100,7 @@ accepted licence strings, and every package a person accepted, are in
 | numpoly | 1.3.9 | BSD-2-Clause | the simulation workers, through biorefineries, biosteam | allowed |
 | numpy | 2.5.2 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | service, through biopython, rank-bm25 | allowed |
 | onnxruntime | 1.31.0 | MIT License | extra lit, through fastembed | allowed |
+| openai | 3.42.1 | Apache-2.0 | extra lit, through sci-rag-kit | allowed |
 | openpyxl | 3.1.5 | MIT | the simulation workers, through biorefineries, biosteam | allowed |
 | opentelemetry-api | 1.45.1 | Apache-2.0 | extra agent, through mcp; extra lit, through sci-rag-kit | allowed |
 | optlang | 1.9.1 | Apache-2.0 | the simulation workers, through cobra | allowed |

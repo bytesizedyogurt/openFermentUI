@@ -429,6 +429,56 @@ def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note
     return run_result(report)
 
 
+def import_flowsheet(tool: str, file_id: str, note: str, ctx: ToolContext) -> ToolResult:
+    """Import one of the toolkit's reference SFF files into the project and
+    mark it as the caller's (alpha 2.1 stage B): fetched at the pinned commit,
+    its hash checked, checked by the toolkit, drawn and kept with origin
+    `library`."""
+    from .. import projects
+    from ..engine import sff
+    from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
+    from .flowsheets import record_result
+
+    _, who = _actor(ctx)
+    fid = file_id.strip()
+    try:
+        record = sff.import_library(fid, project_id=ctx.project or projects.current(), by=who)
+    except (sff.FlowsheetNotFound, KeyError) as e:
+        return ToolResult(error=f"{tool} refused: {str(e).strip(chr(39))} (flowsheet_library lists the reference files)")
+    except sff.SFFRefused as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    except sff.LibraryUnavailable as e:
+        return ToolResult(error=f"{tool} could not fetch {fid}: {e}")
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        return ToolResult(error=f"{tool} could not check {fid}: {e}")
+    _audit_as(ctx, "proforma", "flowsheet_import", "open", record.id, {"tool": tool, "libraryId": fid, "note": note})
+    return record_result(record)
+
+
+CATALOGUE_MODULES = {"strain": "geneos", "product": "pureos", "skill": "guild", "lesson": "primer"}
+
+
+def keep_catalogue(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
+    """One entry kept in the project's catalogue of its kind (alpha 2.1,
+    debt 1), marked as the caller's and audited under the module that reads
+    that kind; refused in words when the kind does not take it."""
+    from .. import catalogues
+
+    kind = str(inp.kind).strip().lower()
+    if kind not in catalogues.KINDS:
+        return ToolResult(error=f"{tool} refused: there is no catalogue of {kind!r}; the catalogues are "
+                                f"{', '.join(catalogues.KINDS)}")
+    agent, who = _actor(ctx)
+    fields = {k: v for k, v in inp.model_dump().items() if k != "kind" and v not in ("", [], None)}
+    try:
+        kept = catalogues.keep_fields(kind, fields, by=who, source=f"Postdoc ({who})" if agent == "model" else who)
+    except catalogues.CatalogueRefused as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    _audit_as(ctx, CATALOGUE_MODULES[kind], tool, "open", f"{kind}/{kept.id}", {"tool": tool, "kind": kind})
+    return ToolResult(summary={"state": "open", "kind": kind, "id": kept.id, "name": kept.name, "by": kept.by,
+                               "note": "kept in the project's catalogue, marked as yours; a person may replace it."})
+
+
 def make_scenario(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
     """Keep a study scenario whose values the caller typed, each marked by
     the registry as the caller's (ADR-006), and audit it as theirs."""

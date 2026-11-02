@@ -91,6 +91,21 @@ def same_site(origin: str | None, host: str | None) -> bool:
     return origin_port == h[1] if h[1] is not None else origin_port in DEFAULT_PORTS.values()
 
 
+def key_refusal(headers: Mapping[str, str]) -> str | None:
+    """Why a request may not name its own Anthropic key (owner question 10;
+    llm.KEY_HEADER), or None when it may: one that reaches the service on its
+    own machine or the owner's tailnet, under a name the service answers to,
+    and never one through Tailscale Funnel from the public internet. Read or
+    change alike, since a key spends. The refusal never repeats the key."""
+    if FUNNEL in headers:
+        return "a request through Tailscale Funnel comes from the public internet and may not name a key"
+    host = hostname(headers.get("host"))
+    if not answers_to(host):
+        return (f"this service does not answer to {host or 'a request with no Host'!r}, so a key a request "
+                "under that name sends is not taken")
+    return None
+
+
 def refusal(method: str, headers: Mapping[str, str]) -> str | None:
     """Why this request may not proceed, or None when it may."""
     if method.upper() not in CHANGING:
