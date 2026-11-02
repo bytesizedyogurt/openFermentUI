@@ -18,12 +18,16 @@ session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage C** of alpha 2.1: the model comparison. The twelve questions of
-   `docs/reports/live-questions-2026-11.md` join the evaluation set, are asked on three route
-   tables (Haiku, Sonnet and Opus, `index` on Haiku), scored by code and by an Opus judge (a Sonnet
-   cross-judge for Opus's answers), and written up in `docs/reports/model-routing-2026-11.md`;
-   then `llm.ROUTES`' defaults are set on that evidence. Stages A and B are done (Log, alpha 2.1).
-   For real work set `core/.env` as the prompt's §4 names (the Opus routes,
+4. **Next step: stage D** of alpha 2.1, the debts, in the prompt's §6 order, on work that needs no
+   model call: the catalogues as project stores (debt 1), fermOS, pureOS and Proforma on Quantity
+   inputs and the runs table (3), the key override and the local-model route (4, its negative
+   test offline), the screens on the generated types (5), the small debts (6). Debt 2 (records
+   written from `biorepo.write`) is paid. **Stage C is held by the Anthropic account's usage
+   limit** (Blockers): it measured eight answers before every call was refused; finish it with the
+   commands at the end of `docs/reports/model-routing-2026-11.md` once the account answers. The
+   paid retrieval lanes (debt 7), the questions asked again after debts 1 and 3, and `pnpm prove
+   --live` wait on the same limit. For real work set
+   `core/.env` as the prompt's §4 names (the Opus routes,
    `OPENFERMENT_DAILY_BUDGET_USD=150`, `OPENFERMENT_ASK_BUDGET_USD=6`). The service reads
    `core/.env` with `override=False`, so a cloud session whose environment sets `OPENFERMENT_MODEL`
    and kin to Haiku runs every command with those four unset (`env -u OPENFERMENT_MODEL -u
@@ -151,6 +155,7 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 |---|---|---|---|
 | A | 10 | 0.6601 | `pnpm prove --live` on the Opus routes |
 | B | 203 | 17.6463 | extraction over 22 documents (4.53) and nine again after the anchoring fixes (1.80); the twelve questions asked three times (4.54, 5.01, and 1.60 for the three asked a third time). Those sums are what each answer reported of itself; the table of `openferment_dev` holds 0.17 more |
+| C | 72 | 2.1006 | the three route tables until the account's usage limit refused every call (eight answers kept, five judged); the judge's calls among them |
 
 ## Decisions
 
@@ -223,6 +228,7 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 |---|---|---|
 | 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. Nothing is lost by waiting: the service no longer writes them | On the Mini: `brew install postgresql@17 pgvector && brew services start postgresql@17`; `scripts/host/install.sh` (makes the database `openferment` and names it in `core/.env`; when `core/data/biorepo.json` holds uncommitted decisions, the old deploy asks to commit and push them first, which keeps them); then `pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, and `OPENFERMENT_PROJECT=<the id it prints>` in `core/.env` for the nightly extraction |
 | 2026-10-31 | Owner decision: the live instance's PostgreSQL has no backup. `pnpm ready` used to say a git push "backs up" Guild's decisions, which stopped being true when they moved into the database at stage 2; the row is gone (8.5). Guild's ledger is personnel data and never enters git | Choose where a dump of the database goes, then add it to the nightly (`scripts/host/nightly.sh`): `pg_dump openferment` to that place |
+| 2026-11-02 20:01 UTC | **Owner action: the Anthropic account behind `core/.env`'s key reached its own usage limit.** Every model call answers HTTP 400, "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC." It is the account's limit, set in the Anthropic console, and separate from openFerment's daily cap (19.75 of 150 USD spent that day). It stopped stage C's comparison part way (`docs/reports/model-routing-2026-11.md`) and holds every live step after it: the questions asked again after debts 1 and 3, `pnpm prove --live`, extraction, Postdoc. The service now says so in those words, never "malformed" | Raise the limit in the Anthropic console (Settings, Limits), or wait for 2026-12-01; then `pnpm ready`, and finish stage C with the commands at the end of the report |
 | 2026-10-30, again 2026-11-02 (HTTP 403) | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0` ends with "unexpected disconnect while reading sideband packet", lightweight and annotated alike. The tag exists in this container only. Commit `d19224f` stays reachable as an ancestor of `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git push origin alpha-1.0` |
 
 ## Known debts (each names the stage that pays it)
@@ -245,7 +251,7 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, §9.3) are not built; the walk and the smoke run against the real service | after alpha 2.0 |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | still open: after alpha 2.0 |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.0 |
-| `openferment.records` (migration 0001, §7.4) is written by no code: a project's records are its candidates and the decisions on them (`biorepo.py`) | the owner's call: write it from `biorepo.write`, or drop it in a migration |
+| Paid: `openferment.records` (migration 0001, §7.4) was written by no code; each decision `biorepo.write` keeps now writes the record as it leaves it as the next version of its row, and an undo the candidate as extracted (`biorepo.versions`) | alpha 2.1, D.2 (the owner's §6 chose to write it) |
 | `test_biorepo.py::test_the_committed_file_is_the_model_and_starts_empty` holds the shape of a tracked file nothing reads | when `core/data/biorepo.json` leaves git (owner action, Blockers) |
 | The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run only as `bash -n` here: this container is not a Mac | the owner's first install on the Mini |
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | the owner's machine |
@@ -923,3 +929,20 @@ holds the numbers, the tables and the judgements).
   pretreatment with dilute acid's `PretreatmentReactorSystem` and its reaction conversions, at
   another temperature, so the pretreatment comparison rests on dilute acid's conversions (Postdoc's
   answer to Q7 found it; the package's code confirms it).
+
+### Alpha 2.1 — Stage C — 2026-11-02 (held)
+
+- C1. The evaluation set gained the owner's twelve as the suite `ethanol`, runs tagged by route
+  table and timed, and a judge on the `judge` route that reads each answer with what each claim
+  cites and scores answers, grounded, labelled and coverage, each judgement labelled with its
+  model; a judge that declines leaves no score and says why (`2161189`; `docs/api/postdoc.md`).
+- C2. The three tables (Haiku alone, Sonnet alone, and `core/.env`'s Opus then Sonnet, each at
+  effort high, judged by Opus) ran in parallel in the Ethanol project. At 20:01 UTC the Anthropic
+  account's own usage limit refused every call: eight answers were kept (Haiku Q1 to Q4, Sonnet Q1
+  to Q3, Opus Q1), five judged; the Opus judge declined two of Haiku's in the `bio` category
+  (`docs/reports/model-routing-2026-11.md`; Blockers). The routing defaults stay as they are until
+  the comparison finishes. 2.10 USD over 72 calls.
+- C3. The service called the limit's 400 "refused the request as malformed"; `llm` now names an
+  account past its usage limit in words, with the date the API gives and who can raise it
+  (`UsageLimitReached`; `test_llm.py`). `pnpm ready` checks the key by listing models, which an
+  account past its limit still answers, so it cannot see the limit before a call.
