@@ -2166,6 +2166,23 @@ wheels = [
 ]
 
 [[package]]
+name = "openai"
+version = "3.42.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "httpx2" },
+    { name = "jiter" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9f/7b/e01d5288d13e3bae3714ed39df402f99f88f422dcd978c5ce94848037200/openai-3.42.1.tar.gz", hash = "sha256:4222d919374648ff572753626e942f26eb1ece8a5e0e9a2708c9be4d560f070f", size = 2356422, upload-time = "2026-11-01T20:57:02.607Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/11/37b847d8a057000193974eeea1bcc681355ae50d35865f2eb2b323de6153/openai-3.42.1-py3-none-any.whl", hash = "sha256:c1959518a8e26f81a3564357082cb684540be639a21fece35ac5619415a3eadc", size = 2397433, upload-time = "2026-11-01T20:57:00.622Z" },
+]
+
+[[package]]
 name = "openferment-core"
 version = "0.1.0"
 source = { editable = "." }
@@ -2195,7 +2212,7 @@ dev = [
 ]
 lit = [
     { name = "fastembed" },
-    { name = "sci-rag-kit" },
+    { name = "sci-rag-kit", extra = ["openai"] },
 ]
 sim = [
     { name = "biorefineries" },
@@ -2228,7 +2245,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6" },
     { name = "pyyaml", marker = "extra == 'sim'", specifier = ">=6" },
     { name = "rank-bm25", specifier = ">=0.2.2" },
-    { name = "sci-rag-kit", marker = "extra == 'lit'", specifier = "==0.5.0" },
+    { name = "sci-rag-kit", extras = ["openai"], marker = "extra == 'lit'", specifier = "==0.5.0" },
     { name = "scipy", marker = "extra == 'sim'" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.30" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
@@ -3153,6 +3170,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c4/3a/64c38cc1183e05399dd91a9b2f386873854780369c85942adcffa79c72a9/sci_rag_kit-0.5.0.tar.gz", hash = "sha256:d24f0d5db75bb28f0dbadbd3050c4d836af6cffef4dfbd5e5121727f9a86cf86", size = 6066872, upload-time = "2026-09-03T18:40:15.733Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/1c/7e683309037200985f9b2dfd232a0f326ff14cbd949e52d52a8431c2cdc1/sci_rag_kit-0.5.0-py3-none-any.whl", hash = "sha256:1b339c5b1e41b78a1596da468dcdf5d0e6733ea0fbba858221b0138d4541ff3f", size = 315622, upload-time = "2026-09-03T18:40:13.918Z" },
+]
+
+[package.optional-dependencies]
+openai = [
+    { name = "openai" },
 ]
 
 [[package]]

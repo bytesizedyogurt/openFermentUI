@@ -138,6 +138,26 @@ PROVIDERS = ("anthropic", "openai-compatible", "google")
 # through the kit's client, which reads that provider's key from the kit's
 # settings: a change to how keys are read, which waits for the owner (§11.1).
 SERVED = ("anthropic",)
+# A local model behind an OpenAI-compatible endpoint (vLLM, Ollama, LM Studio)
+# may stand in a route (the owner, 2 November 2026): core/.env names the
+# endpoint, and a route's `openai-compatible:<model>` is called through Sci RAG
+# Kit's adapter, its key read from core/.env too, at no charge on the day's
+# cap. It answers a single call (`call`); Postdoc's loop of tools (`converse`)
+# passes it over in words. A route naming another provider still waits.
+LOCAL = "openai-compatible"
+LOCAL_URL_SETTING = "OPENFERMENT_LOCAL_BASE_URL"
+LOCAL_KEY_SETTING = "OPENFERMENT_LOCAL_API_KEY"
+
+
+def local_endpoint() -> str | None:
+    """The OpenAI-compatible endpoint core/.env names for a local model, or None."""
+    return os.environ.get(LOCAL_URL_SETTING, "").strip() or None
+
+
+def served_providers() -> tuple[str, ...]:
+    """The providers a call may reach now: Anthropic's, and a local model's
+    once core/.env names its endpoint."""
+    return SERVED + ((LOCAL,) if local_endpoint() else ())
 
 
 class RoutesInvalid(ValueError):
@@ -221,8 +241,26 @@ def family_of(name: str) -> str:
 
 def waits(named: str) -> str:
     """Why a route's model the service does not serve is passed over, in words."""
+    if spec(named)[0] == LOCAL:
+        return (f"{named} is a local model behind an OpenAI-compatible endpoint, and core/.env names none "
+                f"({LOCAL_URL_SETTING})")
     return (f"{named} is a {spec(named)[0]} model: calling it reads that provider's key through Sci RAG Kit's "
             "settings, a change to how keys are read that waits for the owner (execution prompt §11.1)")
+
+
+def _local_generate(model: str, *, system: str, user: str, max_tokens: int, json_mode: bool) -> str:
+    """One answer of a local model through Sci RAG Kit's OpenAI-compatible
+    adapter, at the endpoint core/.env names, on the key it names (many local
+    servers take any; the adapter wants one)."""
+    import asyncio
+
+    from sci_rag.config import Settings
+    from sci_rag.llm.openai_compat import OpenAICompatLLM
+
+    settings = Settings(openai_base_url=local_endpoint(), llm_model=model,
+                        openai_api_key=os.environ.get(LOCAL_KEY_SETTING, "").strip() or "local")
+    client = OpenAICompatLLM(settings, model=model)
+    return asyncio.run(client.generate(user, system=system or None, max_tokens=max_tokens, json_mode=json_mode))
 
 # USD per million tokens, input and output, from the pricing page
 # (platform.claude.com/docs/en/about-claude/pricing, read 2026-10-08; the
@@ -637,11 +675,32 @@ def call(
     for i, named in enumerate(models):
         last = i == len(models) - 1
         provider, model = spec(named)
-        if provider not in SERVED:
+        if provider not in served_providers():
             if last:
                 raise ModelUnavailable(waits(named), spent)
             log.warning("%s%s; trying %s", label, waits(named), models[i + 1])
             continue
+        if provider == LOCAL:
+            tried.append(named)
+            try:
+                text = _local_generate(model, system=system, user=user, max_tokens=max_tokens,
+                                       json_mode=schema is not None)
+            except Exception as e:  # the endpoint down, the model missing, an answer refused: said, then the next
+                why = f"{named} at {local_endpoint()} did not answer ({type(e).__name__}: {str(e)[:200]})"
+                if last:
+                    raise ModelUnavailable(why, spent) from e
+                log.warning("%s%s; trying %s", label, why, models[i + 1])
+                continue
+            data = None
+            if schema is not None:
+                try:
+                    value = json.loads(text)
+                    data = value if isinstance(value, dict) else None
+                except ValueError:
+                    data = None
+            spent = add(spent, Usage(models=[named]))
+            return Result(data=data, model=named, usage=spent, stop_reason="end_turn", fell_back=i > 0, tried=tried,
+                          text=text)
         tried.append(model)
         held = _reserve(model, request, max_tokens, spent, role)
         cost = 0.0
@@ -780,6 +839,9 @@ def converse(
     family = family_of(family or role)
     role = SPEND_ROLES[family]
     provider, model = spec(model)
+    if provider == LOCAL and LOCAL in served_providers():
+        raise ModelUnavailable(f"{provider}:{model} is a local model, which answers a single call; Postdoc's loop "
+                               "of tools needs a model that calls tools", Usage())
     if provider not in SERVED:
         raise ModelUnavailable(waits(f"{provider}:{model}"), Usage())
     output_config: dict[str, Any] = {"effort": routes()[family].effort}

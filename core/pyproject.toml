@@ -36,7 +36,7 @@ dependencies = [
 dev = ["pytest>=8.3"]
 # alpha 2.0 (ADR-002) — the literature layer: Sci RAG Kit as a library, with
 # passage vectors computed on this machine by FastEmbed.
-lit = ["sci-rag-kit==0.5.0", "fastembed==0.9.0"]
+lit = ["sci-rag-kit[openai]==0.5.0", "fastembed==0.9.0"]
 # OF-BLD-014 §10.1 — the MCP servers that open the tool registry and the kit to
 # outside assistants (.mcp.json).
 agent = ["mcp>=2.3,<3"]

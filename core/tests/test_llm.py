@@ -713,13 +713,13 @@ def test_a_spec_is_the_kits_provider_and_model_and_a_bare_id_is_anthropics():
 
 def test_a_call_runs_at_its_familys_effort_on_its_anthropic_spec_and_passes_over_a_provider_that_waits(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps(
-        {"extract": {"models": ["openai-compatible:qwen3-32b", f"anthropic:{SONNET}"], "effort": "high"}}))
+        {"extract": {"models": ["google:gemini-2.5-pro", f"anthropic:{SONNET}"], "effort": "high"}}))
     client = FakeClient({SONNET: answer(SONNET)})
     result = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: client,
                       family="extract")
     assert result.model == SONNET and result.tried == [SONNET] and client.asked == [SONNET]
     assert client.requests[0]["output_config"]["effort"] == "high"
-    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"extract": {"models": ["openai-compatible:qwen3-32b"]}}))
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"extract": {"models": ["google:gemini-2.5-pro"]}}))
     with pytest.raises(llm.ModelUnavailable, match="waits for the owner"):
         llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: FakeClient({}),
                  family="extract")
@@ -728,7 +728,7 @@ def test_a_call_runs_at_its_familys_effort_on_its_anthropic_spec_and_passes_over
 def test_a_turn_on_a_provider_that_waits_is_unavailable_in_words():
     with pytest.raises(llm.ModelUnavailable, match="waits for the owner"):
         llm.converse(system="s", messages=[{"role": "user", "content": "q"}], tools=[], schema=None, max_tokens=10,
-                     model="openai-compatible:qwen3-32b", ask=lambda request: None)
+                     model="google:gemini-2.5-pro", ask=lambda request: None)
 
 
 def test_a_grammar_too_large_sends_the_tools_loose_and_is_remembered(monkeypatch):
@@ -794,3 +794,66 @@ def test_any_other_malformed_request_is_unavailable_as_before():
     with pytest.raises(llm.ModelUnavailable) as e:
         _converse(ask)
     assert not isinstance(e.value, llm.GrammarTooLarge) and len(sent) == 1
+
+
+# ── a local model behind an OpenAI-compatible endpoint (the owner, 2 November 2026) ──
+
+LOCAL_MODEL = "openai-compatible:qwen3-32b"
+
+
+def test_a_local_model_with_no_endpoint_named_is_passed_over_in_words(monkeypatch):
+    monkeypatch.delenv(llm.LOCAL_URL_SETTING, raising=False)
+    monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({"explain": {"models": [LOCAL_MODEL, OPUS]}}))
+    client = FakeClient({OPUS: answer(OPUS)})
+    got = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: client, family="explain")
+    assert got.model == OPUS and client.asked == [OPUS]
+    assert "names none" in llm.waits(LOCAL_MODEL) and llm.LOCAL_URL_SETTING in llm.waits(LOCAL_MODEL)
+
+
+def test_a_local_model_answers_a_single_call_through_the_kits_adapter_at_no_charge(monkeypatch):
+    monkeypatch.setenv(llm.LOCAL_URL_SETTING, "http://127.0.0.1:11434/v1")
+    monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({"explain": {"models": [LOCAL_MODEL, OPUS]}}))
+    asked = []
+
+    def generate(model, **kw):
+        asked.append((model, kw))
+        return '{"candidates": []}'
+
+    monkeypatch.setattr(llm, "_local_generate", generate)
+    got = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, family="explain")
+    assert (got.model, got.data, got.usage.costUsd, got.tried) == (LOCAL_MODEL, {"candidates": []}, 0.0, [LOCAL_MODEL])
+    assert asked == [("qwen3-32b", {"system": "s", "user": "u", "max_tokens": 100, "json_mode": True})]
+
+    def down(model, **kw):
+        raise ConnectionError("connection refused")
+
+    monkeypatch.setattr(llm, "_local_generate", down)
+    client = FakeClient({OPUS: answer(OPUS)})
+    fell = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: client, family="explain")
+    assert fell.model == OPUS and fell.fell_back, "an endpoint that does not answer passes to the next model"
+
+
+def test_the_local_adapter_is_the_kits_at_the_endpoint_and_key_core_env_names(monkeypatch):
+    import sci_rag.llm.openai_compat as compat
+
+    monkeypatch.setenv(llm.LOCAL_URL_SETTING, "http://127.0.0.1:11434/v1")
+    monkeypatch.setenv(llm.LOCAL_KEY_SETTING, "local-key")
+    built = []
+
+    class StandIn:
+        def __init__(self, settings, *, model=None, api_key_override=None):
+            built.append((settings.openai_base_url, settings.openai_api_key, model))
+
+        async def generate(self, prompt, *, system=None, temperature=0.2, max_tokens=2048, json_mode=False):
+            return f"{system}|{prompt}|{max_tokens}|{json_mode}"
+
+    monkeypatch.setattr(compat, "OpenAICompatLLM", StandIn)
+    said = llm._local_generate("qwen3-32b", system="s", user="u", max_tokens=50, json_mode=False)
+    assert said == "s|u|50|False" and built == [("http://127.0.0.1:11434/v1", "local-key", "qwen3-32b")]
+
+
+def test_postdocs_loop_passes_a_local_model_over_in_words(monkeypatch):
+    monkeypatch.setenv(llm.LOCAL_URL_SETTING, "http://127.0.0.1:11434/v1")
+    with pytest.raises(llm.ModelUnavailable, match="answers a single call"):
+        llm.converse(system="s", messages=[{"role": "user", "content": "q"}], tools=[], schema=None, max_tokens=10,
+                     model=LOCAL_MODEL, tool_choice="auto")

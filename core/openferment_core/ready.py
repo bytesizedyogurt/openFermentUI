@@ -322,7 +322,7 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
         table = llm.routes()
     except llm.RoutesInvalid as e:
         return Check("model", "fail", f"{e}, so no call can be routed")
-    waiting = sorted({m for r in table.values() for m in r.models if llm.spec(m)[0] not in llm.SERVED})
+    waiting = sorted({m for r in table.values() for m in r.models if llm.spec(m)[0] not in llm.served_providers()})
     if not have_key:
         return Check("model", "skip", "needs the key")
     if intake.fixtures_only():
@@ -360,8 +360,14 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
                      "Add it to PRICES in core/openferment_core/llm.py")
     if waiting:
         return Check("model", "warn", f"the key is accepted; {' then '.join(offered)}; the routes name "
-                     f"{', '.join(waiting)}, which wait: {llm.waits(waiting[0]).split(': ', 1)[1]}")
+                     f"{', '.join(waiting)}, which wait: {_why_it_waits(waiting[0])}")
     return Check("model", "ok", f"the key is accepted; {' then '.join(offered)}, effort {llm.effort()}")
+
+
+def _why_it_waits(named: str) -> str:
+    """Why a route's model is passed over, without its name, which the row already gives."""
+    words = llm.waits(named)
+    return words.split(": ", 1)[1] if ": " in words else words.removeprefix(f"{named} is ")
 
 
 def _said(e: Exception) -> str:

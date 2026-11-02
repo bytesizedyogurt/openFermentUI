@@ -181,6 +181,18 @@ audit row records that an override was used, never the key. Built as 6.3 designe
   built on that key and no other, an ask with none on core/.env's, and the key appears in no log
   line, no response body or header, and no row of any table of either schema.
 
+## Implementation 11 (alpha 2.1 stage D: a local model in a route)
+
+The owner allowed a local model behind an OpenAI-compatible endpoint named in core/.env to stand
+in a route through the kit's adapter (2 November 2026). `OPENFERMENT_LOCAL_BASE_URL` names the
+endpoint and `OPENFERMENT_LOCAL_API_KEY` its key (many local servers take any); a route's
+`openai-compatible:<model>` is then served (`llm.served_providers`). `llm.call` asks it through
+Sci RAG Kit's `OpenAICompatLLM` (the `openai` extra of the kit, Apache-2.0, now in `uv.lock`), at
+no charge on the day's cap, and passes to the next model in words when the endpoint does not
+answer. Postdoc's loop needs a model that calls tools, so `converse` passes a local model over in
+words. With no endpoint named, a local model in a route is passed over and `pnpm ready` names the
+setting; another provider's model still waits for the owner.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.
