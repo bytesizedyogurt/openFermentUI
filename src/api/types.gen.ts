@@ -3404,6 +3404,22 @@ export interface components {
              */
             outcome: "match" | "value_mismatch" | "unit_error" | "span_error" | "miss";
         };
+        /**
+         * ExtractionSummary
+         * @description What a document's kept extraction found, for the page that lists the
+         *     document: when it ran, the candidates anchoring kept and refused, and the
+         *     models that answered (the primary, then any it fell back to).
+         */
+        ExtractionSummary: {
+            /** At */
+            at: string;
+            /** Kept */
+            kept: number;
+            /** Models */
+            models?: string[];
+            /** Refused */
+            refused: number;
+        };
         /** FermosFitRequest */
         FermosFitRequest: {
             /** Depositionid */
@@ -4269,14 +4285,16 @@ export interface components {
          * OverlayPaper
          * @description One document the project holds, as the overlay carries it (§2.1;
          *     ADR-002): its passages in the kit as its sections, its citation, its
-         *     licence and who served it. The browser makes a paper of it, which
-         *     BioRepo, the review card, the reader and Witness read.
+         *     licence and who served it, and what its kept extraction found. The
+         *     browser makes a paper of it, which BioRepo, the review card, the reader
+         *     and Witness read.
          */
         OverlayPaper: {
             /** Authors */
             authors?: string[];
             /** Doi */
             doi?: string | null;
+            extraction?: components["schemas"]["ExtractionSummary"] | null;
             /** Fetchedat */
             fetchedAt?: string | null;
             /** Ingest */

@@ -609,6 +609,8 @@ export interface OFState {
   // service overlay (OF-BLD-012 §2.1)
   /** Whether openferment-core answered /api/health this session. null = not asked yet. */
   serviceUp: boolean | null;
+  /** Why the running service refused the overlay, in its words; null when it loaded or was not asked. */
+  overlayProblem: string | null;
   /** The overlay as last received, merged. Later views (runs, candidates) read it here. */
   overlay: Overlay | null;
   /** Apply an overlay. Idempotent; merges into any overlay already applied. */
@@ -616,7 +618,8 @@ export interface OFState {
   /** Ask the service for its overlay and apply it. Silent when there is no service. */
   hydrateOverlay: () => Promise<void>;
   /** One structured model response over a fetched paper, through the service (§6.3); then the overlay again. */
-  extractPaperLive: (paperId: string) => Promise<void>;
+  /** Extract a paper through the service; `again` asks it to extract one it already holds an extraction of. */
+  extractPaperLive: (paperId: string, again?: boolean) => Promise<void>;
   completeJob: (id: string) => void;
   /** Put one record's card in front of the reviewer — the reader's rail links here. */
   focusReview: (recordId: string) => void;
@@ -785,6 +788,7 @@ const initialState = () => ({
   activeRunId: null,
   jobs: [] as Job[],
   serviceUp: null as boolean | null,
+  overlayProblem: null,
   overlay: null as Overlay | null,
   reviewQueue: [] as string[],
   reviewIndex: 0,
@@ -846,6 +850,7 @@ function paperOf(id: string, o: OverlayPaper): Paper {
     sourceType: o.source ? SOURCE_TYPES[o.source] : undefined,
     license: o.license ?? undefined,
     licenceClass: o.licenceClass ?? undefined,
+    extraction: o.extraction ?? undefined,
     fetchedFrom: o.source,
     held: true,
   };
@@ -1274,7 +1279,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // When openferment-core answers /api/health the paper is fetched for real
   // (OF-BLD-012 §5.4). When it does not, nothing is fetched, and the toast
   // names the missing service and the command that starts it.
-  extractPaperLive: async (paperId) => {
+  extractPaperLive: async (paperId, again = false) => {
     const id = get().startJob({
       title: `Extract ${paperId}`,
       kind: 'ingest',
@@ -1289,7 +1294,7 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     try {
-      const result = await extractPaper(paperId);
+      const result = await extractPaper(paperId, { force: again });
       get().completeJob(id);
       const dropped = Object.entries(result.rejectionReasons)
         .filter(([, n]) => n > 0)
@@ -2480,13 +2485,19 @@ export const useStore = create<OFState>()((set, get) => ({
     }),
 
   hydrateOverlay: async () => {
-    const overlay = await loadOverlay();
-    if (!overlay) {
+    // The overlay acts in one project: with none open there is nothing to load.
+    if (!get().projectId) return;
+    const got = await loadOverlay();
+    if ('down' in got) {
       set({ serviceUp: false });
       return;
     }
-    set({ serviceUp: true });
-    get().applyOverlay(overlay);
+    if ('refused' in got) {
+      set({ serviceUp: true, overlayProblem: got.refused });
+      return;
+    }
+    set({ serviceUp: true, overlayProblem: null });
+    get().applyOverlay(got.overlay);
     if (get().durableReview) void get().syncDecisions();
     if (get().guildHydrated) void get().syncGuild();
   },

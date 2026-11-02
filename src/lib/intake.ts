@@ -182,22 +182,39 @@ export async function extractPaper(
   return (await response.json()) as ExtractResponse;
 }
 
+/** What loading the overlay found: the overlay, no service to ask, or a running service's refusal in its words. */
+export type OverlayLoad = { overlay: Overlay } | { down: true } | { refused: string };
+
 /**
- * The overlay, or null when there is no service to ask.
+ * The overlay, or why there is none.
  *
  * Deliberately never throws: this runs at every page load, and a page that
  * fails to load because an optional service is absent has the priorities
- * backwards. Served from a static host with no service, the fetch answers 404,
- * and the screens show their empty states.
+ * backwards. Served from a static host with no service, health answers 404,
+ * and the screens show their empty states. A service that answers health and
+ * then refuses the overlay is running: its refusal comes back in its words,
+ * and the page never says it is down.
  */
-export async function loadOverlay(signal?: AbortSignal): Promise<Overlay | null> {
+export async function loadOverlay(signal?: AbortSignal): Promise<OverlayLoad> {
   try {
     const health = await postdocHealth(signal);
-    if (!health.ok) return null;
-    const response = await apiFetch('/api/biorepo/overlay', { signal });
-    if (!response.ok) return null;
-    return (await response.json()) as Overlay;
+    if (!health.ok) return { down: true };
   } catch {
-    return null;
+    return { down: true };
+  }
+  try {
+    const response = await apiFetch('/api/biorepo/overlay', { signal });
+    if (!response.ok) {
+      let detail = '';
+      try {
+        detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+      } catch {
+        /* not JSON — the status is the message */
+      }
+      return { refused: `The service is running and answered ${response.status} for the project's documents and records${detail ? `: ${detail}` : ''}.` };
+    }
+    return { overlay: (await response.json()) as Overlay };
+  } catch {
+    return { down: true };
   }
 }

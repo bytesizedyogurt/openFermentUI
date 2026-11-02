@@ -2293,6 +2293,37 @@
         "title": "ExtractRunResult",
         "type": "object"
       },
+      "ExtractionSummary": {
+        "description": "What a document's kept extraction found, for the page that lists the\ndocument: when it ran, the candidates anchoring kept and refused, and the\nmodels that answered (the primary, then any it fell back to).",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "kept": {
+            "title": "Kept",
+            "type": "integer"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "refused": {
+            "title": "Refused",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "kept",
+          "refused"
+        ],
+        "title": "ExtractionSummary",
+        "type": "object"
+      },
       "FermosFitRequest": {
         "properties": {
           "depositionId": {
@@ -4526,7 +4557,7 @@
         "type": "object"
       },
       "OverlayPaper": {
-        "description": "One document the project holds, as the overlay carries it (§2.1;\nADR-002): its passages in the kit as its sections, its citation, its\nlicence and who served it. The browser makes a paper of it, which\nBioRepo, the review card, the reader and Witness read.",
+        "description": "One document the project holds, as the overlay carries it (§2.1;\nADR-002): its passages in the kit as its sections, its citation, its\nlicence and who served it, and what its kept extraction found. The\nbrowser makes a paper of it, which BioRepo, the review card, the reader\nand Witness read.",
         "properties": {
           "authors": {
             "items": {
@@ -4545,6 +4576,16 @@
               }
             ],
             "title": "Doi"
+          },
+          "extraction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExtractionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "fetchedAt": {
             "anyOf": [

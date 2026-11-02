@@ -134,8 +134,12 @@ def paste(title: str, text: str, *, project_id: str, by: str, url: str = "", lic
 def overlay_papers(project_id: str) -> dict[str, OverlayPaper]:
     """Every document the project holds, as the overlay's `papers` (§2.1):
     its passages as its sections, its citation, its licence as the source
-    stated it and its class, and who served it."""
+    stated it and its class, who served it, and what its kept extraction
+    found."""
+    from . import extract
+
     sources = set(get_args(FetchSource))
+    found = extract.summaries(project_id)
     out: dict[str, OverlayPaper] = {}
     for document, link, passages in kit.held(project_id):
         selection = link["selection"] or {}
@@ -156,6 +160,7 @@ def overlay_papers(project_id: str) -> dict[str, OverlayPaper]:
             pmcid=selection.get("pmcid"),
             url=selection.get("url") or document.source_ref,
             licenceClass=document.license_class,
+            extraction=found.get(document.id),
         )
     return out
 

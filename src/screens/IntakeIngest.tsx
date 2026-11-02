@@ -27,6 +27,7 @@ export default function IntakeIngest() {
   const jobs = useStore((s) => s.jobs);
   const extractPaperLive = useStore((s) => s.extractPaperLive);
   const serviceUp = useStore((s) => s.serviceUp);
+  const overlayProblem = useStore((s) => s.overlayProblem);
 
   const held = useMemo(() => papers.filter((p) => p.held), [papers]);
   const extracted = useMemo(() => {
@@ -60,6 +61,14 @@ export default function IntakeIngest() {
             The Intake service is not running. Start it with{' '}
             <span className="font-num">{START_COMMAND}</span> from <span className="font-num">core/</span>{' '}
             and reload.
+          </Callout>
+        </div>
+      )}
+
+      {serviceUp !== false && overlayProblem && (
+        <div className="mb-4">
+          <Callout kind="warn" title="The project's documents and records did not load">
+            {overlayProblem} Its log names what went wrong.
           </Callout>
         </div>
       )}
@@ -104,7 +113,15 @@ export default function IntakeIngest() {
                       </div>
                     </div>
                     <div className="shrink-0 flex items-center gap-2 text-caption">
-                      {n > 0 ? (
+                      {p.extraction ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-ink-soft"
+                          title={`Extracted ${p.extraction.at} by ${p.extraction.models.join(' → ') || 'the extract route'}`}
+                        >
+                          <CheckCircle2 size={13} aria-hidden /> <span className="font-num">{p.extraction.kept}</span> kept,{' '}
+                          <span className="font-num">{p.extraction.refused}</span> refused
+                        </span>
+                      ) : n > 0 ? (
                         <span className="inline-flex items-center gap-1 text-ink-soft">
                           <CheckCircle2 size={13} aria-hidden /> <span className="font-num">{n}</span> candidate
                           {n === 1 ? '' : 's'}
@@ -115,14 +132,15 @@ export default function IntakeIngest() {
                       <Button
                         size="sm"
                         disabled={busy || serviceUp === false}
-                        onClick={() => void extractPaperLive(p.id)}
+                        onClick={() => void extractPaperLive(p.id, Boolean(p.extraction))}
+                        title={p.extraction ? 'Ask the model again: the new extraction replaces this one, and the decisions made stay' : undefined}
                       >
                         {busy ? (
                           <Loader2 size={12} className="animate-spin" aria-hidden />
                         ) : (
                           <Sparkles size={12} aria-hidden />
                         )}
-                        {busy ? 'Extracting…' : 'Extract'}
+                        {busy ? 'Extracting…' : p.extraction ? 'Extract again' : 'Extract'}
                       </Button>
                     </div>
                   </li>

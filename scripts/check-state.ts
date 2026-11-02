@@ -2,8 +2,10 @@
  * What a project keeps of its pages, on the browser's side (alpha 2.0, stage
  * 2; src/lib/projectState.ts): the writes a change makes, the outbox they
  * wait in, the rows laid over a load, and a flush that drops a refusal and
- * keeps everything from the first write the service did not answer. Run by
- * `pnpm check:state`, offline: the service is a stand-in for `fetch`.
+ * keeps everything from the first write the service did not answer; and the
+ * overlay a project's pages load (src/lib/intake.ts), where a service that
+ * answers and refuses is running and says why. Run by `pnpm check:state`,
+ * offline: the service is a stand-in for `fetch`.
  */
 import {
   EMPTY_STATE,
@@ -15,6 +17,7 @@ import {
   type ProjectState,
 } from '../src/lib/projectState';
 import type { Deposition, LiveConversation, Scenario } from '../src/data/types';
+import { loadOverlay } from '../src/lib/intake';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -89,5 +92,34 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
     result.left.length === 2 && result.left[0] === three[1], `${result.left.length} left`);
 }
 
-console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers.');
+// ── the overlay a project's pages load ───────────────────────────────
+
+async function overlayAgainst(health: Answer, overlay: Answer) {
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const next = String(input).startsWith('/api/health') ? health : overlay;
+    if (next === 'down') throw new TypeError('fetch failed');
+    return new Response(JSON.stringify(next.body ?? {}), { status: next.status });
+  }) as typeof fetch;
+  try {
+    return await loadOverlay();
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+{
+  const got = await overlayAgainst('down', { status: 200 });
+  check('a service that does not answer its health is down', 'down' in got, JSON.stringify(got));
+}
+{
+  const got = await overlayAgainst({ status: 200, body: { ok: true } }, { status: 500, body: { detail: 'column decisions.record does not exist' } });
+  check('a service that answers its health and refuses the overlay is running, and says why in its words',
+    'refused' in got && got.refused.includes('500') && got.refused.includes('column decisions.record does not exist'), JSON.stringify(got));
+}
+{
+  const got = await overlayAgainst({ status: 200, body: { ok: true } }, { status: 200, body: { papers: {}, records: {} } });
+  check('an overlay that loads is the overlay', 'overlay' in got, JSON.stringify(got));
+}
+
+console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');
 process.exit(fails ? 1 : 0);

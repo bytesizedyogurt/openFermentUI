@@ -572,11 +572,23 @@ class LiteratureQuestion(BaseModel):
     topK: int = Field(default=8, ge=1, le=20)
 
 
+class ExtractionSummary(BaseModel):
+    """What a document's kept extraction found, for the page that lists the
+    document: when it ran, the candidates anchoring kept and refused, and the
+    models that answered (the primary, then any it fell back to)."""
+
+    at: str
+    kept: int
+    refused: int
+    models: list[str] = Field(default_factory=list)
+
+
 class OverlayPaper(BaseModel):
     """One document the project holds, as the overlay carries it (§2.1;
     ADR-002): its passages in the kit as its sections, its citation, its
-    licence and who served it. The browser makes a paper of it, which
-    BioRepo, the review card, the reader and Witness read."""
+    licence and who served it, and what its kept extraction found. The
+    browser makes a paper of it, which BioRepo, the review card, the reader
+    and Witness read."""
 
     ingest: str
     textSource: Literal["full-text"]
@@ -595,6 +607,9 @@ class OverlayPaper(BaseModel):
     pmcid: str | None = None
     url: str | None = None
     licenceClass: str | None = None
+    # None when no extraction of this run is kept: never extracted, or an
+    # extraction that found nothing, which is not kept (extract.extract_paper).
+    extraction: ExtractionSummary | None = None
 
 
 class Overlay(BaseModel):
