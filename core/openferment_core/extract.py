@@ -48,7 +48,7 @@ from . import db, llm, projects
 from .basis import refuse_estimates
 from .db import models as t
 from .literature import collectors, kit
-from .models import AuditEvent, Candidate, ExtractResponse, Usage
+from .models import AuditEvent, Candidate, ExtractionSummary, ExtractResponse, Usage
 from .units import tables
 from .validate import ANCHOR_RULES, anchor_all, anchor_candidate
 
@@ -179,8 +179,10 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
                             "value": {
                                 "type": ["number", "string"],
                                 "description": (
-                                    "The number as the paper wrote it, or the category for a "
-                                    "categorical field."
+                                    "One number as the paper wrote it, or the category for a "
+                                    "categorical field. For a mean the paper gives with its spread "
+                                    "('0.15 ± 0.01'), the mean; for a range, its low end, with the "
+                                    "range in `range`."
                                 ),
                             },
                             "unit": {
@@ -416,6 +418,17 @@ def _this_run(paper_id: str, body: dict[str, Any] | None) -> ExtractResponse | N
 def cached(paper_id: str) -> ExtractResponse | None:
     """This run's extraction of a paper, or None."""
     return _this_run(paper_id, db.run(_one(projects.current(), paper_id, MODEL)))
+
+
+def summaries(project_id: str) -> dict[str, ExtractionSummary]:
+    """What each document's kept extraction of this run found, by document id."""
+    out: dict[str, ExtractionSummary] = {}
+    for body in db.run(_rows(project_id, MODEL)):
+        r = _this_run(str(body.get("paperId")), body)
+        if r is not None:
+            out[r.paperId] = ExtractionSummary(at=r.extractedAt, kept=len(r.candidates), refused=r.rejected,
+                                               models=list(r.usage.models))
+    return out
 
 
 def all_extracted() -> list[ExtractResponse]:

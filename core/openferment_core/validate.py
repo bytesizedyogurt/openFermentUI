@@ -1095,6 +1095,27 @@ def _why_not_in_quote(
     return f"{head}; the quote states no quantity at all"
 
 
+# A mean a paper gives with its spread, as a model may copy it whole:
+# "0.15 ± 0.01", "0.15 +/- 0.01", with a trailing label such as "(A)".
+_MEAN_AND_SPREAD = re.compile(
+    r"^\s*([-+]?\d[\d,]*(?:\.\d+)?)\s*(?:±|\+/-|\+-)\s*\d[\d,]*(?:\.\d+)?(?:\s*\([^)]*\))?\s*$"
+)
+
+
+def _one_value(text: str) -> tuple[float, tuple[float, float] | None] | None:
+    """The one value in a (normalised) value string a model copied whole from
+    the paper: a mean with its spread is the mean; a range is its low end with
+    the range beside it, as the extraction's schema asks for one. None for
+    anything else, which rule 3 refuses."""
+    if m := _MEAN_AND_SPREAD.match(text):
+        return float(m.group(1).replace(",", "")), None
+    ranges = parse_ranges(text)
+    if len(ranges) == 1 and len(parse_numbers(text)) == 2:
+        low, high = ranges[0].low.value, ranges[0].high.value
+        return low, (low, high)
+    return None
+
+
 def anchor_candidate(
     raw: dict[str, Any],
     sections: list[dict[str, Any]],
@@ -1165,10 +1186,20 @@ def anchor_candidate(
         if isinstance(value, bool):
             return None, "value", f"value {value!r} is not a number"
         if isinstance(value, str):
-            numbers = parse_numbers(normalize_text(value))
-            if len(numbers) != 1:
-                return None, "value", f"value {value!r} is not a single number"
-            number = numbers[0]
+            said = normalize_text(value)
+            numbers = parse_numbers(said)
+            if len(numbers) == 1:
+                number = numbers[0]
+            else:
+                # A paper writes a mean with its spread or a range, and a
+                # model can copy either whole: the one value is read from it,
+                # and a range joins the candidate, still held to the quote.
+                read = _one_value(said)
+                if read is None:
+                    return None, "value", f"value {value!r} is not a single number"
+                number, stated = read
+                if stated is not None and recorded_range(raw) is None:
+                    raw = {**raw, "range": {"low": stated[0], "high": stated[1]}}
         else:
             try:
                 number = float(value)  # type: ignore[arg-type]

@@ -38,6 +38,8 @@ export const U: Record<string, UnitDef> = {
   'µg mL⁻¹': { family: 'massConc', factor: 0.001, label: 'µg mL⁻¹' },
   'mg dL⁻¹': { family: 'massConc', factor: 0.01, label: 'mg dL⁻¹' },
   'g 100mL⁻¹': { family: 'massConc', factor: 10, label: 'g 100 mL⁻¹' },
+  // A percent weight per volume is grams per 100 mL (alpha 2.1, stage B: 14 titres the live extraction refused).
+  '% w/v': { family: 'massConc', factor: 10, label: '% w/v' },
   g: { family: 'mass', factor: 1, label: 'g' },
   mg: { family: 'mass', factor: 0.001, label: 'mg' },
   µg: { family: 'mass', factor: 0.000001, label: 'µg' },
@@ -49,7 +51,6 @@ export const U: Record<string, UnitDef> = {
   '%': { family: 'percent', factor: 1, label: '%' },
   '% DW': { family: 'percent', factor: 1, label: '% DW' },
   '% v/v': { family: 'percent', factor: 1, label: '% v/v' },
-  '% w/v': { family: 'percent', factor: 1, label: '% w/v' },
   'g g⁻¹': { family: 'yield', factor: 1, label: 'g g⁻¹' },
   'mg g⁻¹': { family: 'yield', factor: 0.001, label: 'mg g⁻¹' },
   'g L⁻¹ h⁻¹': { family: 'volProd', factor: 1, label: 'g L⁻¹ h⁻¹' },
@@ -290,6 +291,7 @@ export const ALIASES: Record<string, string> = {
   '%v/v': '% v/v',
   '% vv': '% v/v',
   '%w/v': '% w/v',
+  '% (w/v)': '% w/v',
   // No-space forms of the expression-share units. Papers write "15%TSP" at
   // least as often as "15 % TSP", and the superscript-insensitive fallback
   // below cannot bridge a missing space.

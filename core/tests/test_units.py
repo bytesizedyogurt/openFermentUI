@@ -335,3 +335,11 @@ def test_a_labelled_gram_per_gram_is_grams_per_gram(raw):
 def test_what_a_labelled_ratio_must_not_swallow(raw, expected):
     assert normalize(raw) == expected
 
+
+def test_a_percent_weight_per_volume_is_grams_per_hundred_millilitres():
+    # A titre written "4% w/v" is 40 g/L: the live extraction of alpha 2.1
+    # refused 14 such titres while % w/v stood in the percent family.
+    assert normalize("% (w/v)") == normalize("%w/v") == normalize("% w/v")
+    assert convert(4, "% w/v", "g/L") == pytest.approx(40)
+    assert convert(4, "% w/v", "g/100 mL") == pytest.approx(4)
+

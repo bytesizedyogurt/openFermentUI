@@ -136,8 +136,8 @@
    "label": "% v/v"
   },
   "% w/v": {
-   "family": "percent",
-   "factor": 1,
+   "family": "massConc",
+   "factor": 10,
    "label": "% w/v"
   },
   "g g⁻¹": {
@@ -438,6 +438,7 @@
   "%v/v": "% v/v",
   "% vv": "% v/v",
   "%w/v": "% w/v",
+  "% (w/v)": "% w/v",
   "%tsp": "% TSP",
   "%tcp": "% TCP",
   "%cdw": "% CDW",
