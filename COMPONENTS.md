@@ -189,7 +189,7 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `checks.py` | Checks — proposed by fixed rules, scheduled and run by an assessor (OF-BLD-013 §5.2). |
 | `competence.py` | Competence, mirrored (OF-BLD-013 §2.1). |
 | `composite.py` | The seam on the service's side: a vessel and a train become a flowsheet Proforma prices (OF-BLD-020 §6.1, D11, D3, E.2‴, E.3‴; Appendix 2 §D). |
-| `evaluation.py` | `pnpm eval`: Postdoc's evaluation set, asked through the service's answer path (postdoc/evaluate.py; execution prompt §10 stage 6.4). |
+| `evaluation.py` | `pnpm eval`: Postdoc's evaluation set, asked through the service's answer path (postdoc/evaluate.py; execution prompt §10 stage 6.4; alpha 2.1 stage C). |
 | `events.py` | A project's event stream (execution prompt §7.3 item 2): `GET /api/events?project=`. |
 | `evidence_pool.py` | What Postdoc may cite: one view over every record the project holds (OF-BLD-014 §3.4). |
 | `extract.py` | Extract — one structured response per document (OF-BLD-012 §6.1; ADR-002). |
