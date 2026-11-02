@@ -18,26 +18,38 @@ session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage B** of alpha 2.1: the project "Ethanol" made on the screens, the ethanol
-   sources collected through Intake, extraction over every held document on the `extract` route,
-   the twelve questions through the Postdoc screen (`docs/reports/live-questions-2026-11.md`), then
-   the Runs, Studies and Flowsheets paths. Stage A is done (Log, alpha 2.1). For real work set
-   `core/.env` as the prompt's §4 names (the Opus routes, `OPENFERMENT_DAILY_BUDGET_USD=150`,
-   `OPENFERMENT_ASK_BUDGET_USD=6`). The service reads `core/.env` with `override=False`, so a cloud
-   session whose environment sets `OPENFERMENT_MODEL` and kin to Haiku runs every command with those
-   four unset (`env -u OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
-   OPENFERMENT_EFFORT <command>`), or the environment wins.
+4. **Next step: stage C** of alpha 2.1: the model comparison. The twelve questions of
+   `docs/reports/live-questions-2026-11.md` join the evaluation set, are asked on three route
+   tables (Haiku, Sonnet and Opus, `index` on Haiku), scored by code and by an Opus judge (a Sonnet
+   cross-judge for Opus's answers), and written up in `docs/reports/model-routing-2026-11.md`;
+   then `llm.ROUTES`' defaults are set on that evidence. Stages A and B are done (Log, alpha 2.1).
+   For real work set `core/.env` as the prompt's §4 names (the Opus routes,
+   `OPENFERMENT_DAILY_BUDGET_USD=150`, `OPENFERMENT_ASK_BUDGET_USD=6`). The service reads
+   `core/.env` with `override=False`, so a cloud session whose environment sets `OPENFERMENT_MODEL`
+   and kin to Haiku runs every command with those four unset (`env -u OPENFERMENT_MODEL -u
+   OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u OPENFERMENT_EFFORT <command>`), or the
+   environment wins. Stage B's project "Ethanol" lived in that session's container
+   (`openferment_dev`); a fresh container makes it again on Home and collects
+   `docs/corpus/ethanol-sources.txt` through Intake (about twenty minutes), then extracts.
 5. Files in flight: none.
 
 ## Current stage
 
-Alpha 2.1, stage A (2026-11-02): #15 is merged into `main` with a merge commit (`7f990f8`), and
-the work continues on `claude/alpha-2-1-functional`. The tag push was refused again (Blockers).
-`core/.env` names the Opus routes and the alpha 2.1 budgets; `pnpm ready` is green on them.
-`pnpm verify` first failed 19 offline tests, which read the routing table and budgets of the
-`core/.env` set for real work; conftest now clears those settings for every test not marked live,
-as CI runs with none, and verify is green on all sixteen stages. `pnpm prove` holds 63 of 63
-offline and `pnpm prove --live` 46 of 46 on the Opus routes, for 10 calls and 0.6601 USD.
+Alpha 2.1, stage B (2026-11-02): the project "Ethanol" made on Home, the 22 ethanol sources held
+through Intake (814 passages), extraction over every document (272 candidates waiting for the
+owner's review), the twelve questions asked through the Postdoc screen on Opus, and the owner's
+plant work done from the screens (`docs/reports/live-questions-2026-11.md`). The first asking
+answered five of twelve as expected; nine faults were fixed with tests across two more askings,
+and eleven of twelve now come back as expected, the twelfth (Q1) as expected in kind and short in
+coverage. The screens could not run a plant, make a scenario of a person's own or import an SFF
+file; Studies, a run's page and the new Flowsheets screen now do, and every run, comparison, locked
+runbook and SFF record read back after a restart. Stage B spent 17.65 USD over 203 calls (Spend).
+
+Stage A (2026-11-02): #15 is merged into `main` with a merge commit (`7f990f8`), and the work
+continues on `claude/alpha-2-1-functional`. The tag push was refused again (Blockers). `pnpm
+verify` is green on all sixteen stages after conftest stopped `core/.env`'s routing table reaching
+the offline tests; `pnpm prove` holds 63 of 63 offline and `pnpm prove --live` 46 of 46 on the Opus
+routes, for 10 calls and 0.6601 USD.
 
 The alpha 2.0 foundation build is complete: stages 0 to 8. Stage 8 reconciled the guidance
 (`CLAUDE.md`, 134 lines, every line labelled, held by `test_guidance.py`; `README.md`;
@@ -126,6 +138,8 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-02 11:52 | Alpha 2.1 stage A on `7f990f8` with conftest's isolation fix, the Opus `core/.env` in place: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2257 passed, 1 skipped, 168 deselected; `test:sim` 132 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 11 min 12 s | `d30fb63` |
 | 2026-11-02 11:56 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 63 of 63 checks hold, no call in the proof's spend table | 2 min 41 s | `d30fb63` |
 | 2026-11-02 12:05 | `pnpm prove --live`, steps 1 to 8, every route on the alpha 2.1 table (`plan`, `explain`, `extract` and `judge` on `claude-opus-5-5`, `index` on `claude-haiku-5-5`): 22 of 22 ethanol sources, 814 chunks; PMC4842200 extracted by `claude-opus-5-5` for 0.1898 USD (26 candidates kept, 12 refused); the evaluation set asked of `claude-opus-5-5` | 46 of 46 checks hold; 10 calls, 0.6601 USD from the proof's spend table; scored by code `eq-price` tools 1, citations 1, estimates 1, bare numbers 0 (one claim dropped for a number), `eq-dearer` tools 1, citations 1, estimates 0, bare numbers 1 | 7 min 54 s | `d30fb63` |
+| 2026-11-02 19:41 | Alpha 2.1 stage B on `2d2ca61`, the Opus `core/.env` in place: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2279 passed, 1 skipped, 168 deselected; `test:sim` 132 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 9 min 34 s | `2d2ca61` |
+| 2026-11-02 19:43 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 66 of 66 checks hold, the walk's scenario begun from a run, Studies' plants and Flowsheets among them; no call in the proof's spend table | 2 min 11 s | `2d2ca61` |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -136,6 +150,7 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 | Stage | Calls | USD | What |
 |---|---|---|---|
 | A | 10 | 0.6601 | `pnpm prove --live` on the Opus routes |
+| B | 203 | 17.6463 | extraction over 22 documents (4.53) and nine again after the anchoring fixes (1.80); the twelve questions asked three times (4.54, 5.01, and 1.60 for the three asked a third time). Those sums are what each answer reported of itself; the table of `openferment_dev` holds 0.17 more |
 
 ## Decisions
 
@@ -868,3 +883,43 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
   - `pnpm prove` 63 of 63 offline; `pnpm prove --live` 46 of 46 on the Opus routes, 0.6601 USD
     (Last green runs).
 
+
+### Alpha 2.1 — Stage B — 2026-11-02
+
+The live Ethanol project end to end, on the screens, on Opus (`docs/reports/live-questions-2026-11.md`
+holds the numbers, the tables and the judgements).
+
+- B1. The project "Ethanol" made on Home in this container's `openferment_dev`; every identifier
+  of `docs/corpus/ethanol-sources.txt` collected through Intake's Identifier form, one at a time:
+  22 of 22 held, 814 passages. OSTI reset the connection once and the second try held it. Intake
+  had said "Offline" for a service that answered and refused the overlay: `openferment_dev` had
+  drifted from migration 0001 (`pnpm db:reset openferment_dev` cured it), and the page now says a
+  running service's refusal in its words and asks for the overlay only once a project is open
+  (`lib/intake.ts`, `check:state`; `50f014d`).
+- B2. Extraction over every held document from Intake's list on the `extract` route (Opus, then
+  Sonnet, at medium): 224 kept and 89 refused, 4.53 USD; Opus declined ten of the 22 papers in the
+  `bio` refusal category and Sonnet answered each. The anchoring rule refused a mean with its
+  spread and a range written whole, and the unit table held no `% w/v`; both fixed (`21306e1`),
+  and the nine documents extracted again kept 103 where they had kept 55 (1.80 USD). Intake's list
+  now says what a document's kept extraction found and offers Extract again. 272 candidates wait
+  for the owner; no decision was made here.
+- B3. The twelve questions asked through the Postdoc screen: five of twelve as expected at first
+  (4.54 USD). Fixed with tests (`fb03eb2`): ordinals and labels named in the plan prompt; the loop's
+  bounds raised to 10 rounds, 24 tool calls and 360 s (ADR-008, Implementation 9); a run's TEA
+  lines and the values it read back, each with its origin, as evidence ids; drafts of a plant's
+  run with no product or strain; and `flowsheet_library`, `flowsheet_import` and `flowsheet_read`
+  (46 tools). Asked again, eleven of twelve (5.01 USD); then fixed (`c007456`): a turn's ceiling
+  sized to the question's budget between 8,000 and 32,000 tokens, the rate-of-mass units and
+  `kg kg⁻¹`, and fractions in the prompt; asked a third time for those three (1.60 USD). Eleven of
+  twelve as expected, Q1 as expected in kind and short in coverage.
+- B4. The owner's plant work from the screens (`422e617`). The screens could not run a plant, make
+  a scenario of a person's own, import an SFF file or list the project's SFF records; Studies' Run
+  a plant, a run's page's A scenario from this run, and Flowsheets now do, on the generated types.
+  Every plant the package built here ran, and the composed flowsheet in dilute acid and hot water
+  with IB and SCF; a glucose-only scenario of the person's assumptions ran; two comparisons, a
+  runbook locked, the export downloaded, a run's SFF file from it imported and a reference file
+  kept; after a restart every one read back as it was, with no console error.
+- B5. Found for the owner, the package's and not openFerment's: biorefineries 2.35.1 builds hot-water
+  pretreatment with dilute acid's `PretreatmentReactorSystem` and its reaction conversions, at
+  another temperature, so the pretreatment comparison rests on dilute acid's conversions (Postdoc's
+  answer to Q7 found it; the package's code confirms it).
