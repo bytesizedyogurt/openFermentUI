@@ -10,8 +10,9 @@ allows) and otherwise records that the person took it to the place the gate
 names (the runbook to lock, the Guild page to sign on). Either way the
 person's name goes on the proposal and a line goes to the audit log.
 
-`core/data/proposals.json`, written through `atomic.write_text` under the
-store's two locks, gitignored, on this machine alone.
+Each proposal is a row of the project's `proposals` table (ADR-001), written
+under the project's proposals lock (`db.lock`) with its audit row in the same
+transaction.
 
 THE RULES (OF-BLD-016 §1.R). A proposal's words reach Home and the model's
 next ask, so its title, why, note, target and field values hold no number
@@ -20,28 +21,30 @@ breaks either is refused whole, never repaired. One ask makes one open
 proposal of a kind (module, action, target); the second is refused. A Guild
 proposal is listed (`listed`, `shown`) without its words, because who a
 check names is never shown before it is run; the store keeps them. A server
-gate is marked done only when its server action ran. The store's locks are
+gate is marked done only when its server action ran. The store's lock is
 never held while an action runs: the proposal is marked running in this
-process, the locks are let go, and they are taken again to record the end.
+process, the lock is let go, and it is taken again to record the end.
 """
 from __future__ import annotations
 
-import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from . import atomic, audit, intake
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from . import audit, db, projects
+from .db import models as t
+from .db import rows
 from .models import Proposal, Proposals
 from .tools import gates
 from .validate import find_number
 
-PATH = intake.DATA_DIR / "proposals.json"
-_LOCK = threading.Lock()
-# Proposals whose action is running in this process, held under _LOCK: the
-# mark that lets carry_out let go of the store while the action runs (§1.R
-# finding 13). In memory, so a process that dies mid-run leaves the proposal
-# open to be pressed again, never stuck.
+# Proposals whose action is running in this process: the mark that lets
+# carry_out let go of the store while the action runs (§1.R finding 13). It
+# is set and read under the store's lock and cleared when the action ends. In
+# memory, so a process that dies mid-run leaves the proposal open to be
+# pressed again, never stuck.
 _RUNNING: set[str] = set()
 
 
@@ -53,22 +56,44 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# ── the store ──────────────────────────────────────────────────────────
+
+
+async def _all(s: AsyncSession, pid: str, state: str | None = None) -> list[Proposal]:
+    where = [t.proposals.c.state == state] if state is not None else []
+    return [Proposal.model_validate(b) for b in await rows.bodies(s, t.proposals, pid, *where)]
+
+
+async def _one(s: AsyncSession, pid: str, proposal_id: str, *, for_update: bool = False) -> Proposal | None:
+    found = await rows.body(s, t.proposals, pid, proposal_id, for_update=for_update)
+    return Proposal.model_validate(found) if found is not None else None
+
+
+async def _put(s: AsyncSession, pid: str, p: Proposal) -> None:
+    await rows.put(s, t.proposals, pid, p.id, p.model_dump(mode="json"), by=p.by, state=p.state)
+
+
+async def _read(pid: str, state: str | None = None) -> list[Proposal]:
+    async with db.session() as s:
+        return await _all(s, pid, state)
+
+
+async def _get(pid: str, proposal_id: str) -> Proposal | None:
+    async with db.session() as s:
+        return await _one(s, pid, proposal_id)
+
+
 def read() -> Proposals:
-    if not PATH.exists():
-        return Proposals()
-    return Proposals.model_validate_json(PATH.read_text(encoding="utf-8"))
-
-
-def _persist(store: Proposals) -> None:
-    atomic.write_text(PATH, store.model_dump_json(indent=2) + "\n")
+    """The project's proposals, in the order they were made."""
+    return Proposals(proposals=db.run(_read(projects.current())))
 
 
 def open_ones() -> list[Proposal]:
-    return [p for p in read().proposals if p.state == "proposed"]
+    return db.run(_read(projects.current(), "proposed"))
 
 
 def get(proposal_id: str) -> Proposal | None:
-    return next((p for p in read().proposals if p.id == proposal_id), None)
+    return db.run(_get(projects.current(), proposal_id))
 
 
 def propose(
@@ -91,20 +116,26 @@ def propose(
         title=title, why=why, how=gate.how, route=gate.route, server=gate.server,
         target=target or None, fields=fields or {}, note=note, by=by, askId=ask_id or None,
     )
-    with _LOCK, atomic.held(PATH):
-        store = read()
+    return db.run(_keep(projects.current(), made, effort))
+
+
+async def _keep(pid: str, made: Proposal, effort: str | None) -> Proposal:
+    """The proposal and its audit row, written together, unless one of its
+    kind already waits in this ask."""
+    async with db.session() as s:
+        await db.lock(s, "proposals", pid)
         # One open proposal of a kind per ask (§1.R finding 2): a restart, or
         # a second call worded otherwise, asks for what is already waiting.
-        twin = next((p for p in store.proposals if p.state == "proposed" and p.askId == made.askId
+        twin = next((p for p in await _all(s, pid, "proposed") if p.askId == made.askId
                      and (p.module, p.action, p.target) == (made.module, made.action, made.target)), None)
         if twin is not None:
             on = f" on {made.target}" if made.target else ""
-            raise ProposalRefused(f"{module} {action}{on} is already proposed in this ask ({twin.id}) and waits for a "
-                                  "person")
-        store.proposals.append(made)
-        _persist(store)
-    audit.append(agent="model", who=by, module=module, action=action, state="proposed", target=target,
-                 ask_id=ask_id, effort=effort, detail={"proposalId": made.id, "gate": gate.id})
+            raise ProposalRefused(f"{made.module} {made.action}{on} is already proposed in this ask ({twin.id}) and "
+                                  "waits for a person")
+        await _put(s, pid, made)
+        await audit.add(pid, agent="model", who=made.by, module=made.module, action=made.action, state="proposed",
+                        target=made.target, ask_id=made.askId, effort=effort,
+                        detail={"proposalId": made.id, "gate": made.gate})
     return made
 
 
@@ -162,8 +193,7 @@ def _run(p: Proposal, person: str, acting: str | None = None) -> str:
     return f"handed to {person}: {p.how}"
 
 
-def _open(store: Proposals, proposal_id: str) -> Proposal:
-    p = next((x for x in store.proposals if x.id == proposal_id), None)
+def _open(p: Proposal | None, proposal_id: str) -> Proposal:
     if p is None:
         raise ProposalRefused(f"no proposal {proposal_id!r}")
     if p.state != "proposed":
@@ -180,43 +210,61 @@ def carry_out(proposal_id: str, person: str, acting: str | None = None) -> Propo
     runs (§1.R finding 13): it is marked running here, and the end is
     recorded under the locks taken again. Returns the proposal as `shown`."""
     name = _person(person)
-    with _LOCK, atomic.held(PATH):
-        p = _open(read(), proposal_id)
-        _RUNNING.add(p.id)
+    pid = projects.current()
+    p = db.run(_start(pid, proposal_id))
     try:
         result = _run(p, name, acting)
-        with _LOCK, atomic.held(PATH):
-            store = read()
-            p = next((x for x in store.proposals if x.id == proposal_id), None)
-            if p is None:
-                raise ProposalRefused(f"proposal {proposal_id} left the store while it ran: {result}")
-            p.state = "done"
-            p.carriedOutBy = name
-            p.carriedOutAt = _now()
-            p.result = result
-            _persist(store)
+        p = db.run(_end(pid, proposal_id, name, result))
     finally:
-        with _LOCK:
-            _RUNNING.discard(proposal_id)
-    audit.append(agent="person", who=name, module=p.module, action=p.action, state="done", target=p.target,
-                 detail={"proposalId": p.id, "gate": p.gate, "result": result})
+        _RUNNING.discard(proposal_id)
     return shown(p)
+
+
+async def _start(pid: str, proposal_id: str) -> Proposal:
+    """Mark the proposal running in this process, under the store's lock."""
+    async with db.session() as s:
+        await db.lock(s, "proposals", pid)
+        p = _open(await _one(s, pid, proposal_id), proposal_id)
+        _RUNNING.add(p.id)
+    return p
+
+
+async def _end(pid: str, proposal_id: str, name: str, result: str) -> Proposal:
+    """The action ran: the proposal is done, in the person's name, and the
+    audit row says so in the same transaction."""
+    async with db.session() as s:
+        await db.lock(s, "proposals", pid)
+        p = await _one(s, pid, proposal_id, for_update=True)
+        if p is None:
+            raise ProposalRefused(f"proposal {proposal_id} left the store while it ran: {result}")
+        p.state = "done"
+        p.carriedOutBy = name
+        p.carriedOutAt = _now()
+        p.result = result
+        await _put(s, pid, p)
+        await audit.add(pid, agent="person", who=name, module=p.module, action=p.action, state="done", target=p.target,
+                        detail={"proposalId": p.id, "gate": p.gate, "result": result})
+    return p
 
 
 def dismiss(proposal_id: str, person: str, reason: str) -> Proposal:
     name = _person(person)
     why = (reason or "").strip() or "dismissed on Home"
-    with _LOCK, atomic.held(PATH):
-        store = read()
-        p = _open(store, proposal_id)
+    return shown(db.run(_dismiss(projects.current(), proposal_id, name, why)))
+
+
+async def _dismiss(pid: str, proposal_id: str, name: str, why: str) -> Proposal:
+    async with db.session() as s:
+        await db.lock(s, "proposals", pid)
+        p = _open(await _one(s, pid, proposal_id, for_update=True), proposal_id)
         p.state = "dismissed"
         p.carriedOutBy = name
         p.carriedOutAt = _now()
         p.result = why
-        _persist(store)
-    audit.append(agent="person", who=name, module=p.module, action=p.action, state="dismissed", target=p.target,
-                 detail={"proposalId": p.id, "gate": p.gate, "reason": why})
-    return shown(p)
+        await _put(s, pid, p)
+        await audit.add(pid, agent="person", who=name, module=p.module, action=p.action, state="dismissed",
+                        target=p.target, detail={"proposalId": p.id, "gate": p.gate, "reason": why})
+    return p
 
 
 def shown(p: Proposal) -> Proposal:
@@ -234,7 +282,7 @@ def shown(p: Proposal) -> Proposal:
 def listed(state: str | None = None) -> list[Proposal]:
     """Every proposal, or those in one state, as `shown`: what
     GET /api/proposals serves."""
-    return [shown(p) for p in read().proposals if state is None or p.state == state]
+    return [shown(p) for p in db.run(_read(projects.current(), state))]
 
 
 def as_rows(limit: int = 20) -> list[dict[str, Any]]:

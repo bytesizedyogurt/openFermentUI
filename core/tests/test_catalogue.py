@@ -30,9 +30,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import intake, module_stores, params, proforma
+from openferment_core import intake, params, proforma
 from openferment_core.models import Override, ParameterSpec, ParamResolveRequest, UnitSpecs, UnitType
 from openferment_core.pureos import catalogue
+from openferment_core.validate import unit_operations
 from test_pureos import _biosteam_unit_classes
 
 CORE = Path(__file__).resolve().parent.parent
@@ -146,7 +147,7 @@ def test_every_entry_names_a_class_its_source_defines():
 
 
 def test_ids_are_vocabulary_steps_and_every_spec_has_a_bounds_reason():
-    steps = {o["id"]: o for o in module_stores._projection()["pureos"]["unitOperations"]}
+    steps = {o["id"]: o for o in unit_operations()}
     ids = [e.id for e in catalogue.UNIT_TYPES]
     assert len(ids) == len(set(ids)) == len(catalogue.BY_ID)
     for e in catalogue.UNIT_TYPES:
@@ -337,14 +338,6 @@ def test_the_catalogue_and_its_units_hold_no_number_but_structural_ones():
                and isinstance(n.value, (int, float)) and not isinstance(n.value, bool)
                and n.value not in (0, 1) and id(n) not in allowed]
         assert odd == [], f"numbers in pureos/{name}: {odd}"
-
-
-def test_the_guards_reading_names_every_entry_and_what_was_left_out(capsys):
-    assert catalogue.main(["--ids"]) == 0
-    rows = json.loads(capsys.readouterr().out)
-    assert [r["id"] for r in rows if not r.get("leftOut")] == list(catalogue.BY_ID)
-    assert [r for r in rows if r.get("leftOut")] == [{"id": "adsorption", "leftOut": "SingleComponentAdsorptionColumn"}]
-    assert catalogue.main(["--nonesuch"]) == 1
 
 
 # ── the real worker (sim) ──────────────────────────────────────────────

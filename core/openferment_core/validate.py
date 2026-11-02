@@ -11,7 +11,7 @@ not being asked to be careful with quantities — it has no slot to put one in.
 A claim is rejected when any of these hold:
 
     1. the text contains a number, in digits or in words
-    2. a cited record id does not resolve against the corpus
+    2. a cited record id does not resolve against the evidence pool
     3. a cited paper id does not resolve
     4. there are no record ids and the claim does not admit to being unsupported
 
@@ -34,13 +34,22 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from .models import Candidate, Claim, DroppedCandidate, PassageRef, Quantity, Range, weakest_provenance
+from .models import (
+    Candidate,
+    Claim,
+    ClaimValue,
+    DroppedCandidate,
+    Origin,
+    PassageRef,
+    Quantity,
+    Range,
+    weakest_provenance,
+)
 from .units import (
-    DATA as CORPUS_PATH,
+    SCHEMA,
     UnitError,
     convert,
     field as ontology_field,
-    in_range,
     normalize as normalize_unit,
     to_canonical,
     to_si,
@@ -81,7 +90,7 @@ _MAGNITUDE = re.compile(
 
 # Identifiers carry digits and are not quantities. Strain designations
 # (cenpk113-7d, S288C, cw15, UVM4, CC-4350), model names (iMM904, Yeast9),
-# assay names (OD600), proteins (CK2) and corpus ids (Q4, r-A1-1) all contain
+# assay names (OD600), proteins (CK2) and corpus ids (T5, r-T5-1) all contain
 # digits, and a claim that cannot name the strain it is about is useless —
 # "Ethanol yield on glucose in cenpk113-7d under anaerobic conditions" is a
 # GOOD claim (the specification's own worked example named cw15 the same way).
@@ -172,7 +181,7 @@ def _blank_prose_counts(text: str) -> str:
 
 
 # The names of kinetic models and their constants that carry a number word
-# (thread Q, 2026-10-20): "the half-saturation constant" is Ks's name, and
+# (ethanol kinetics papers, 2026-10-20): "the half-saturation constant" is Ks's name, and
 # "first-order kinetics" names a model, neither a quantity. The list is closed
 # and each entry is a whole hyphenated term, so "half the titre", "first of
 # the strains" and "a half-saturating dose" still trip the rule.
@@ -351,13 +360,89 @@ class SeenSet:
 
 
 def _whole_sentences(quote: str, passage: Any) -> bool:
-    from .rerank import is_whole_sentence  # rerank imports this module
+    from .quotes import is_whole_sentence  # quotes imports this module
 
     return is_whole_sentence(quote, passage)
 
 
-def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) -> ValidationResult:
-    """The agent's claims, each held to five rules; a claim that breaks one is
+def _number(x: Any) -> bool:
+    import math
+
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(float(x))
+
+
+def claim_values(raw: Any, seen: SeenSet, pool: Any, model: str, at: str) -> tuple[list[ClaimValue], str | None]:
+    """A claim's `values` as typed quantities with their origins (ADR-006),
+    or the reason they cannot stand. Each names one source: a computed value
+    a tool returned (its evidence id), a record a tool returned (its id), or
+    the answering model's estimate, with its unit, its range when it has one
+    and in words what it rests on. The number of an evidence or a record is
+    read from it, never from the plan."""
+    if raw is None:
+        return [], None
+    if not isinstance(raw, list):
+        return [], "its values are not a list"
+    out: list[ClaimValue] = []
+    for n, v in enumerate(raw, start=1):
+        if not isinstance(v, dict):
+            return [], f"value {n} is not an object"
+        label = str(v.get("label") or "").strip()
+        if not label:
+            return [], f"value {n} has no label"
+        if found := find_number(label):
+            return [], f"value {n}'s label holds a number ({found!r}); the number goes in the value"
+        evidence_id = str(v.get("evidenceId") or "").strip()
+        record_id = str(v.get("recordId") or "").strip()
+        estimate = v.get("estimate")
+        named = [k for k, x in (("evidenceId", evidence_id), ("recordId", record_id), ("estimate", estimate)) if x]
+        if len(named) != 1:
+            return [], f"value {n} ({label}) names {' and '.join(named) or 'no source'}; it names one: evidenceId, recordId or estimate"
+        if evidence_id:
+            e = seen.evidence.get(evidence_id)
+            if e is None:
+                return [], f"value {n} ({label}) reads {evidence_id}, which no tool returned in this run"
+            q = Quantity(value=e.value, unit=e.unit, low=e.interval.low if e.interval else None,
+                         high=e.interval.high if e.interval else None,
+                         origin=Origin(kind="artifact", ref=e.basis.artifactId))
+            out.append(ClaimValue(label=label, quantity=q, source=e.id))
+        elif record_id:
+            rec = pool.record(record_id)
+            if rec is None:
+                return [], f"value {n} ({label}) reads a record that does not exist: {record_id}"
+            if record_id not in seen.records:
+                return [], f"value {n} ({label}) reads {record_id}, which no tool returned in this run"
+            value, unit = rec.get("value"), rec.get("unit")
+            if value is None or not isinstance(unit, str):
+                return [], f"value {n} ({label}) reads {record_id}, which holds no value with a unit"
+            q = Quantity(value=value, unit=unit, origin=Origin(kind="record", ref=record_id))
+            out.append(ClaimValue(label=label, quantity=q, source=record_id))
+        else:
+            if not isinstance(estimate, dict):
+                return [], f"value {n} ({label}): an estimate is an object of value, unit, low, high and basis"
+            value, unit = estimate.get("value"), str(estimate.get("unit") or "").strip()
+            low, high = estimate.get("low"), estimate.get("high")
+            basis = str(estimate.get("basis") or "").strip()
+            if not _number(value):
+                return [], f"value {n} ({label}): an estimate's value is a finite number"
+            if not unit:
+                return [], f"value {n} ({label}): an estimate names its unit"
+            if any(x is not None and not _number(x) for x in (low, high)):
+                return [], f"value {n} ({label}): an estimate's low and high are finite numbers, or null"
+            if (low is not None and low > value) or (high is not None and high < value):
+                return [], f"value {n} ({label}): an estimate stands inside its own range"
+            if not basis:
+                return [], f"value {n} ({label}): an estimate says in words what it rests on (basis)"
+            if found := find_number(basis):
+                return [], f"value {n} ({label}): an estimate's basis holds a number ({found!r})"
+            q = Quantity(value=value, unit=unit, low=low, high=high,
+                         origin=Origin(kind="model-estimate", by=model or "the answering model", at=at, note=basis))
+            out.append(ClaimValue(label=label, quantity=q))
+    return out, None
+
+
+def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *, model: str = "",
+                  at: str = "") -> ValidationResult:
+    """The agent's claims, each held to six rules; a claim that breaks one is
     dropped whole and counted with its reason, never repaired.
 
     1. Its text holds a number.
@@ -371,12 +456,21 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
        or table row of its passage, or a run of them, after `normalize_text`
        (§5.R: a fragment can lift a number out of its negation).
     5. It cites nothing, and its support is not `unsupported`.
+    6. A value it states (ADR-006) names no single source, reads an id no
+       tool returned in this run, or is an estimate without a finite value,
+       a unit, a range it stands in, or words that say what it rests on
+       (`claim_values`). A value read from a computed value or a record is
+       cited by the claim with it.
 
     Its provenance is the weakest of its records, computed values and module
-    rows that carry a mark; a claim resting on quotes or unmarked rows alone
-    is `unverified`. Its papers are derived from
-    its records and passages, never taken from the model.
+    rows that carry a mark, and `assumed` when it states the model's
+    estimate (`model`, at `at`); a claim resting on quotes or unmarked rows
+    alone is `unverified`. Its papers are derived from its records and
+    passages, never taken from the model.
     """
+    from datetime import datetime, timezone
+
+    at = at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     out = ValidationResult()
     for index, raw in enumerate(raw_claims):
         if not isinstance(raw, dict):
@@ -437,6 +531,16 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
         if bad_quote:
             reject(bad_quote)
             continue
+        values, why = claim_values(raw.get("values"), seen, pool, model, at)
+        if why:
+            reject(why)
+            continue
+        for v in values:
+            if v.quantity.origin.kind == "artifact" and v.source not in evidence_ids:
+                evidence_ids.append(v.source)
+            elif v.quantity.origin.kind == "record" and v.source not in record_ids:
+                record_ids.append(v.source)
+        estimated = any(v.quantity.origin.kind == "model-estimate" for v in values)
         if not (record_ids or refs or evidence_ids or module_refs) and support != "unsupported":
             reject(f"cites nothing and support is '{support}', not 'unsupported'")
             continue
@@ -446,6 +550,8 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
         classes += [seen.rows[m].provenance for m in module_refs if seen.rows[m].provenance]
         if not classes and (refs or module_refs):
             classes = ["unverified"]
+        if estimated:
+            classes.append("assumed")
         papers = {pool.record(r)["paperId"] for r in record_ids}
         papers |= {seen.passages[str(r.get("passageId"))].paperId for r in refs}
         out.claims.append(
@@ -459,6 +565,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
                 passages=[PassageRef(passageId=str(r.get("passageId")), quote=str(r.get("quote"))) for r in refs],
                 evidenceIds=evidence_ids,
                 moduleRefs=module_refs,
+                values=values,
             )
         )
     return out
@@ -578,9 +685,9 @@ def parse_numbers(text: str) -> list[float]:
 # ── the quantities a sentence states (OF-BLD-012.1 F1.2) ───────────────
 #
 # Rule 3 asks whether the sentence says this number. Read as bare numbers it
-# cannot see three things the curators recorded and the papers write plainly:
+# cannot see three things a record carries and the papers write plainly:
 # a number in another unit ("15 mg/L" for 0.015 g/L), a range ("7-10 days",
-# whose midpoint the curator recorded), and a number written in words ("all
+# whose midpoint the record holds), and a number written in words ("all
 # eight sites"). So the quote is parsed into QUANTITIES — a number, and the
 # unit token the sentence attached to it — and into the RANGES those
 # quantities form. Both lists below are closed: adding to either is a commit
@@ -608,12 +715,12 @@ _WORD_QUANTITY = re.compile(
 # A cardinal that is not counting anything: 'one of the highest titres' states
 # no titre of 1, and 'a two-step purification' states no 2. A partitive ('of'
 # straight after) and a hyphenated compound ('two-step', 'three-dimensional')
-# are left alone; '-fold' is the one compound that IS a number (r-J10-3).
+# are left alone; '-fold' is the one compound that IS a number.
 _NOT_COUNTING = re.compile(r"\s+of(?![A-Za-z])|-(?!fold(?![A-Za-z]))[A-Za-z]", re.IGNORECASE)
 
-# An absence is a measurement the paper made. A curator who recorded
-# negativeResult recorded that this sentence states one; these are the
-# spellings the corpus uses for it. Closed, and matched case-insensitively.
+# An absence is a measurement the paper made. A record marked
+# negativeResult says this sentence states one; these are the spellings
+# papers use for it. Closed, and matched case-insensitively.
 NEGATION_MARKERS = (
     "no detectable", "not detected", "not phosphorylated", "non-phosphorylated",
     "unphosphorylated", "dephosphorylated", "did not", "no ", "none", "absent",
@@ -770,7 +877,7 @@ def _close(a: float, b: float) -> bool:
 
 
 def recorded_range(raw: Any) -> tuple[float, float] | None:
-    """The range the curators recorded, from a dict or a Range."""
+    """The range a record carries, from a dict or a Range."""
     r = raw.get("range") if isinstance(raw, dict) else getattr(raw, "range", None)
     if r is None:
         return None
@@ -795,7 +902,7 @@ def value_basis(
     output and no reviewer sets it."""
     norm = normalize_text(quote)
 
-    # A range the curators recorded, stated by the sentence in whatever units
+    # A range the record carries, stated by the sentence in whatever units
     # the paper used. The value is then the midpoint or an endpoint of it.
     if recorded_range is not None:
         low, high = recorded_range
@@ -811,8 +918,8 @@ def value_basis(
             if _close(number, b):
                 return "range-high"
 
-    # An absence the curators recorded. Zero is the reading; the sentence has
-    # to say the absence in one of the words the corpus uses for it.
+    # An absence the record carries. Zero is the reading; the sentence has
+    # to say the absence in one of the words papers use for it.
     if negative_result and number == 0 and _NEGATION.search(norm):
         return "negation"
 
@@ -825,7 +932,7 @@ def value_basis(
 
 
 # Rule codes, in rule order. The counts are keyed by these.
-ANCHOR_RULES = ("field", "section", "quote", "value", "unit", "range", "method")
+ANCHOR_RULES = ("field", "section", "quote", "value", "unit", "method")
 
 # Fields anchoring may drop from a candidate it KEEPS (OF-BLD-014 §2.1), each
 # its own reason. A drop is not a rejection: the candidate stays, without the
@@ -835,39 +942,43 @@ FIELD_DROP_REASONS = ("carbonSource",)
 
 # ── the paper's wording, resolved (OF-BLD-014 §2.1) ────────────────────
 #
-# Two vocabularies cross the boundary inside corpus.json: the strain alias
-# table (`STRAIN_ALIASES` in src/data/strains.ts) and the carbon sources with
-# their spellings (`CARBON_SOURCES` in src/data/vocabulary.ts). The rule that
-# reads them is `matchWholeWord` in strains.ts, and this is its mirror, step
-# for step: the fixture `scripts/export-unit-fixtures.ts` records what the
-# TypeScript answers and tests/test_validate.py asserts the same here. When
-# the two disagree, the TypeScript side is right.
-#
-# Until §3.4 creates `evidence_pool`, `carbon_source_id` lives here.
+# Two vocabularies resolve a paper's wording: a project's strain aliases
+# (none until its records carry them) and the carbon sources with their
+# spellings (`schema/vocabulary.yaml`, mirrored by `CARBON_SOURCES` in
+# src/data/vocabulary.ts). The rule that reads them is `matchWholeWord` in
+# vocabulary.ts, and this is its mirror, step for step: the fixture
+# `scripts/export-unit-fixtures.ts` records what the TypeScript answers and
+# tests/test_validate.py asserts the same here.
 
 
 @lru_cache(maxsize=4)
 def vocabulary(path: str | None = None) -> dict[str, dict[str, str]]:
-    """The strain aliases and the carbon-source spellings, as the browser
-    exported them: two maps from a lower-case spelling to an id.
+    """The strain aliases and the carbon-source spellings: two maps from a
+    lower-case spelling to an id. With no path, the carbon sources this
+    package ships (`schema/vocabulary.yaml`) and no strain alias: strains
+    arrive with a project's records (alpha 2.0 stage 2). A path names a JSON
+    file holding `strainAliases` and `carbonSources`, how a test hands the
+    resolver a vocabulary of its own."""
+    if path:
+        raw = json.loads(Path(path).read_text())
+        if "strainAliases" not in raw or "carbonSources" not in raw:
+            raise ValueError(f"{path} carries no `strainAliases` or `carbonSources` key")
+        strains, carbon = dict(raw["strainAliases"]), raw["carbonSources"]
+    else:
+        import yaml
 
-    Raises when the file is missing or predates §2.1, for the reason
-    `units.tables` does: a resolver with no table would have to guess."""
-    target = Path(path) if path else CORPUS_PATH
-    if not target.exists():
-        raise FileNotFoundError(
-            f"{target} not found. Generate it with `pnpm export:corpus` from the repository root."
-        )
-    raw = json.loads(target.read_text())
-    if "strainAliases" not in raw or "carbonSources" not in raw:
-        raise ValueError(
-            f"{target} carries no `strainAliases` or `carbonSources` key. It predates "
-            "OF-BLD-014 §2.1 — regenerate it with `pnpm export:corpus`."
-        )
-    return {
-        "strains": dict(raw["strainAliases"]),
-        "carbon": {sp: c["id"] for c in raw["carbonSources"] for sp in c["spellings"]},
-    }
+        strains = {}
+        carbon = yaml.safe_load((SCHEMA / "vocabulary.yaml").read_text(encoding="utf-8"))["carbonSources"]
+    return {"strains": strains, "carbon": {sp: c["id"] for c in carbon for sp in c["spellings"]}}
+
+
+def unit_operations() -> list[dict[str, Any]]:
+    """The downstream unit operations (`schema/vocabulary.yaml`): each step's
+    id, label, stage, note and the BioSTEAM unit classes it stands for."""
+    import yaml
+
+    raw = yaml.safe_load((SCHEMA / "vocabulary.yaml").read_text(encoding="utf-8"))
+    return [dict(u) for u in raw.get("unitOperations") or []]
 
 
 _WORD_CHAR = re.compile(r"[a-z0-9]")
@@ -998,8 +1109,8 @@ def anchor_candidate(
 
     `raw` is what the extractor emitted — sectionId, field, value, unit, quote,
     and optionally method, organism, carbonSource, isPrimary, confidence.
-    `sections` are the paper's fetched sections. The ontology and unit tables
-    come from corpus.json through `units`, the same tables the browser ships.
+    `sections` are the document's passages in the kit. The record fields and
+    the unit tables come from `schema/` through `units`.
 
     A candidate that anchors may still lose a field (OF-BLD-014 §2.1): a
     carbon source whose words are not in the cited section, or carry a number,
@@ -1011,11 +1122,11 @@ def anchor_candidate(
     if spec is None:
         return None, "field", f"{field_id!r} is not an ontology field"
 
-    # 1. The section exists in the fetched text.
+    # 1. The passage exists in the document's text.
     section_id = str(raw.get("sectionId") or "").strip()
     section = next((s for s in sections if s.get("id") == section_id), None)
     if section is None:
-        return None, "section", f"sectionId {section_id!r} is not a fetched section of {paper_id}"
+        return None, "section", f"sectionId {section_id!r} is not a passage of {paper_id}"
 
     # 2. The quote is verbatim, and short enough to be a quote.
     quote = str(raw.get("quote") or "").strip()
@@ -1028,7 +1139,7 @@ def anchor_candidate(
         return None, "quote", f"quote is not in section {section_id} after normalisation"
 
     # 3. The value is inside the quote — as the sentence states it (F1.2):
-    #    in the units the paper used, as the range the curators recorded, as
+    #    in the units the paper used, as the range the record carries, as
     #    the absence it reports, or written in words.
     value = raw.get("value")
     categorical = bool(spec.get("categorical"))
@@ -1046,7 +1157,6 @@ def anchor_candidate(
         if normalize_text(value).lower() not in norm_quote.lower():
             return None, "value", f"value {value!r} does not appear in the quote"
         unit = ""
-        canonical: float | None = None
         si = Quantity(value=value.strip(), unit="")
     else:
         # The tool asks for the number as the paper wrote it, and a paper
@@ -1081,18 +1191,11 @@ def anchor_candidate(
         if not unit and spec["canonicalUnit"]:
             return None, "unit", f"field {field_id} is denominated in {spec['canonicalUnit']!r}; no unit given"
         try:
-            canonical = to_canonical(number, unit, field_id)
+            to_canonical(number, unit, field_id)
         except UnitError as e:
             why = e.reason or str(e)
             return None, "unit", f"unit {unit!r} is not in the family of {spec['canonicalUnit']!r}: {why}"
 
-        # 5. Inside the field's range, in canonical units.
-        if not in_range(canonical, field_id):
-            low, high = spec["range"]
-            return None, "range", (
-                f"{canonical:g} {spec['canonicalUnit']} is outside the range "
-                f"{low:g}–{high:g} for {field_id}"
-            )
         si_value, si_unit = to_si(number, unit)
         si = Quantity(value=si_value, unit=si_unit)
 

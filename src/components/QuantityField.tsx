@@ -1,12 +1,11 @@
 // Unit-aware quantity field (OF-DES-001 §7.5). Parses free text, validates
-// dimension against the bound ParameterDef, shows the SI twin, and warns —
-// but never blocks — on out-of-range values, because a reviewer may be
-// recording a genuinely anomalous published number.
+// dimension against the bound ParameterDef and shows the SI twin. A field
+// carries no range (alpha 2.0, ADR-010), so a value is held to its unit and
+// to the quote it stands in, which review checks.
 import { useEffect, useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
 import type { FieldId } from '@/data/types';
 import { ONTOLOGY_BY_ID } from '@/data/ontology';
-import { parseQuantity, toSI, sameFamily, convert, fmt, explainRefusal } from '@/engine/units';
+import { parseQuantity, toSI, sameFamily, fmt, explainRefusal } from '@/engine/units';
 import { ComponentTag } from './ComponentTag';
 import { cx } from './ui';
 
@@ -42,17 +41,6 @@ export function QuantityField({
   const dimensionOK =
     parsed !== null && (def.canonicalUnit === '' ? parsed.unit === '' : sameFamily(parsed.unit, def.canonicalUnit));
 
-  let canonicalValue: number | null = null;
-  if (parsed && dimensionOK) {
-    try {
-      canonicalValue = def.canonicalUnit === '' ? parsed.value : convert(parsed.value, parsed.unit, def.canonicalUnit);
-    } catch {
-      canonicalValue = null;
-    }
-  }
-  const outOfRange =
-    canonicalValue !== null && (canonicalValue < def.range[0] || canonicalValue > def.range[1]);
-
   const si = parsed && dimensionOK ? toSI(parsed.value, parsed.unit) : null;
   const showTwin = si && parsed && si.unit !== parsed.unit;
 
@@ -71,11 +59,7 @@ export function QuantityField({
         autoFocus={autoFocus}
         className={cx(
           'input font-num',
-          !parsed || !dimensionOK
-            ? 'border-signal-error'
-            : outOfRange
-              ? 'border-signal-warn'
-              : undefined,
+          !parsed || !dimensionOK ? 'border-signal-error' : undefined,
         )}
         value={text}
         onChange={(e) => commit(e.target.value)}
@@ -117,21 +101,6 @@ export function QuantityField({
         {showTwin && (
           <div className="text-ink-soft font-num">
             = {fmt(si!.value)} {si!.unit}
-          </div>
-        )}
-        {outOfRange && (
-          <div className="text-signal-warn flex items-start gap-1">
-            <AlertTriangle size={12} className="mt-[2px] shrink-0" />
-            <span>
-              <span className="font-num">
-                {fmt(canonicalValue!)} {def.canonicalUnit}
-              </span>{' '}
-              is outside the typical range for {def.name} (
-              <span className="font-num">
-                {def.range[0]}–{def.range[1]} {def.canonicalUnit}
-              </span>
-              ). Saving anyway records it as anomalous.
-            </span>
           </div>
         )}
       </div>

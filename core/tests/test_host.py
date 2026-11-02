@@ -101,13 +101,13 @@ def test_refusals(kwargs):
         launchd.daemons(**args)
 
 
-@pytest.mark.parametrize("name", ["install.sh", "deploy.sh", "nightly.sh", "sync_decisions.sh", "merge-biorepo"])
+@pytest.mark.parametrize("name", ["install.sh", "deploy.sh", "nightly.sh"])
 def test_scripts_are_executable(name):
     assert os.access(HOST_DIR / name, os.X_OK), f"chmod +x scripts/host/{name}"
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
-@pytest.mark.parametrize("name", ["install.sh", "deploy.sh", "nightly.sh", "lib.sh", "sync_decisions.sh", "merge-biorepo"])
+@pytest.mark.parametrize("name", ["install.sh", "deploy.sh", "nightly.sh", "lib.sh"])
 def test_scripts_parse(name):
     subprocess.run(["bash", "-n", str(HOST_DIR / name)], check=True)
 

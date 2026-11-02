@@ -17,6 +17,7 @@ import type {
   Runbook,
 } from '@/data/types';
 import { IntakeDown } from './intake';
+import { apiFetch } from './project';
 
 /** The service refused what the model wrote, or the request, and said which rule held. */
 export class PracticeRefused extends Error {
@@ -32,7 +33,7 @@ export class PracticeRefused extends Error {
 async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await apiFetch(
       path,
       body === undefined
         ? { signal }
@@ -68,10 +69,7 @@ export async function loadPractice(signal?: AbortSignal): Promise<Practice | nul
   }
 }
 
-/** With the switch off (the default) the service drafts from no archived
- *  program's protocol; `includeArchived` sends the switch (OF-BLD-016 §2.R). */
-export const draftScenario = (r: PracticeDraftRequest, includeArchived = false) =>
-  call<PracticeScenario>(`/api/practice/draft${includeArchived ? '?includeArchived=true' : ''}`, r);
+export const draftScenario = (r: PracticeDraftRequest) => call<PracticeScenario>('/api/practice/draft', r);
 export const takeTurn = (r: PracticeTurnRequest) => call<PracticeSession>('/api/practice/turn', r);
 /** Ask the ledger again for a closed session it holds no entry for. */
 export const recordSession = (sessionId: string) => call<PracticeSession>('/api/practice/record', { sessionId });
@@ -79,8 +77,8 @@ export const recordSession = (sessionId: string) => call<PracticeSession>('/api/
 /**
  * A Deposition as the service reads it for drafting: what was recorded, at
  * which step, in the operator's words, with the measure's name from the
- * runbook as its label. Depositions live in this browser, so the service sees
- * the ones it is sent.
+ * runbook as its label. The project keeps its depositions; a draft reads the
+ * ones the page sends.
  */
 export function forDrafting(d: Deposition, runbooks: Runbook[]): PracticeDeposition {
   const schema = runbooks.find((r) => r.id === d.runbookId)?.measurementSchema ?? [];

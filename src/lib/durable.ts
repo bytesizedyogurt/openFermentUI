@@ -11,11 +11,15 @@
 //
 //   Reference  papers, protocols, products, vocabulary — never mutated, so
 //              there is nothing to persist. Reloading gets them from source.
-//   Durable    depositions, review decisions, runbook locks, this browser's
-//              copy of Guild's ledger, the lessons finished here,
-//              Postdoc's Live conversations, whether archived programs
-//              show, the parameter overrides typed here and pureOS's
-//              trains built here — must survive.
+//   Service    since alpha 2.0 (stage 2) every scientific record lives on the
+//              service, in the open project: review decisions, Guild's
+//              ledger, depositions, measured evidence, runbooks and their
+//              locks, overrides, fits, scenarios, trains and Live
+//              conversations (lib/projectState.ts).
+//   Durable    who is deciding and who is acting, the lessons finished here,
+//              and the writes the service has not yet acknowledged: review
+//              decisions, Guild changes and project rows made while it was
+//              away — must survive until they are sent.
 //   Ephemeral  open panels, density, theme, sim speed — must NOT survive. A
 //              theme that follows you across sessions is a preference; a
 //              collapsed panel that does is a bug.
@@ -30,6 +34,7 @@
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
 import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Override, Runbook, Provenance, RecordStatus, ReviewDecision, Scenario, TrainSpec } from '@/data/types';
+import type { OutboxEntry } from './projectState';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -84,13 +89,27 @@ export interface DurableSnapshot {
   /** Bumped when the shape changes; an older snapshot is dropped, not guessed at. */
   version: 1;
   savedAt: string;
-  depositions: Deposition[];
-  /** First-party measurements released by reconciliation. */
-  measuredEvidence: MeasuredEvidence[];
-  /** Keyed by record id. Re-applied over the seeded records at hydrate. */
+  /**
+   * Review decisions the service has not yet acknowledged, keyed by record
+   * id: re-applied over the service's records at hydrate and posted when it
+   * answers (`syncDecisions`).
+   */
   reviewDecisions: Record<string, DurableReviewDecision>;
-  /** Keyed by runbook id. Locks only — the runbook itself comes from seed. */
-  runbookLocks: Record<string, { lockedAt: string; lockHash: string }>;
+  /**
+   * The project rows the service has not yet acknowledged, oldest first
+   * (lib/projectState.ts). Each names its project.
+   */
+  outbox?: OutboxEntry[];
+  /**
+   * LEGACY, read once. Before alpha 2.0 the browser kept these itself; a
+   * snapshot that still holds them has them carried to the open project's
+   * outbox at hydrate, and the next save leaves them out.
+   */
+  depositions?: Deposition[];
+  /** LEGACY, read once: first-party measurements released by reconciliation. */
+  measuredEvidence?: MeasuredEvidence[];
+  /** LEGACY, read once: locks by runbook id. */
+  runbookLocks?: Record<string, { lockedAt: string; lockHash: string }>;
   /**
    * The person deciding, as they typed it in Settings (OF-BLD-012.1 F2).
    * Durable because a reviewer should not have to re-introduce themselves
@@ -99,15 +118,11 @@ export interface DurableSnapshot {
    */
   reviewerName: string;
   /**
-   * Whether archived programs show (OF-BLD-016 §2.1). Optional, so a
-   * snapshot written before programs existed still loads, and reads as off.
-   */
-  showArchived?: boolean;
-  /**
-   * Guild's ledger as this browser last held it, what it still owes the
-   * service, and who was signing (OF-BLD-013 §1.3). Optional, so snapshots
-   * written before Guild held people still load: their depositions are not
-   * dropped for want of a field they could not have had.
+   * What Guild's ledger still owes the service, and who was signing
+   * (OF-BLD-013 §1.3): `ledger` holds the people and entries made while the
+   * service was away (since alpha 2.0, those alone; the ledger itself loads
+   * from the service), `pending` their ids. Optional, so older snapshots
+   * still load.
    */
   guild?: {
     ledger: Guild;
@@ -123,69 +138,26 @@ export interface DurableSnapshot {
    */
   learnProgress?: Record<string, true>;
   /**
-   * Proforma's typed assumptions, by scenario id (OF-BLD-014 §8.4): what a
-   * named person entered for an input no record binds. Optional for the
-   * same reason as `guild`. Since OF-BLD-020 §2.1 it is written from
-   * `parameterOverrides` (each `proforma:<id>` scope's numeric overrides),
-   * and a snapshot that holds it with no `parameterOverrides` entry for a
-   * scenario is read once into that scope (D3).
+   * LEGACY, read once. Proforma's typed assumptions, by scenario id
+   * (OF-BLD-014 §8.4); a snapshot that holds them with no
+   * `parameterOverrides` entry for a scenario is read into that scope (D3).
    */
   proformaAssumptions?: Record<string, InputAssumption[]>;
-  /**
-   * Every change a person made in the parameter panel, by scope
-   * (`proforma:<scenario id>`, `fermos:family:<id>`, `fermos:vessel:<id>`,
-   * `pureos:unit:<train>:<unit>`): a named assumption kept in this browser
-   * and sent with the run (OF-BLD-020 D3). Optional for the same reason as
-   * `guild`.
-   */
+  /** LEGACY, read once: the parameter panel's overrides, by scope (OF-BLD-020 D3). */
   parameterOverrides?: Record<string, Override[]>;
-  /**
-   * The fermOS fits a person chose for a scenario's inputs, by scenario id
-   * and input key: a kept kinetic fit's or forecast's artifact id
-   * (OF-BLD-019 §5.1). Optional for the same reason as `guild`.
-   */
+  /** LEGACY, read once: the fermOS fits chosen for a scenario's inputs (OF-BLD-019 §5.1). */
   proformaFits?: Record<string, Record<string, string>>;
-  /**
-   * Runbooks adopted from a Postdoc draft (OF-BLD-014 §9.2), as adopted. A
-   * lock on one is kept in `runbookLocks`, like a seeded runbook's.
-   */
+  /** LEGACY, read once: runbooks adopted from a Postdoc draft (OF-BLD-014 §9.2). */
   adoptedRunbooks?: Runbook[];
-  /**
-   * Postdoc's Live conversations, newest first: each question, the steps the
-   * loop took, and the plan or the failure that came back. Optional for the
-   * same reason as `guild`.
-   */
+  /** LEGACY, read once: Postdoc's Live conversations, newest first. */
   liveConversations?: LiveConversation[];
-  /**
-   * Proforma scenarios a person made here from a shelf flowsheet
-   * (OF-BLD-019 D6), keyed by id: each with its flowsheet id, name, program,
-   * pin and the id of its newest run artifact. Their typed assumptions ride
-   * in `proformaAssumptions` under the same id. Optional for the same reason
-   * as `guild`.
-   */
+  /** LEGACY, read once: Proforma scenarios made here (OF-BLD-019 D6), keyed by id. */
   createdScenarios?: Record<string, Scenario>;
-  /**
-   * The newest run artifact of each SEEDED scenario that ran here, by
-   * scenario id (a created scenario carries its own `lastRunId`).
-   */
-  scenarioRuns?: Record<string, string>;
-  /**
-   * The SEEDED scenarios pinned to compare here (OF-BLD-019 §3.3, D6), by id;
-   * a created scenario carries its own `pinned`. Every seeded scenario ships
-   * unpinned, so an id absent here is unpinned.
-   */
-  pinnedScenarios?: string[];
-  /**
-   * pureOS's trains built here (OF-BLD-020 §5.3, D9), by train id: each
-   * saved whole as data, with when and by whom. The values typed into a
-   * train's panels ride in `parameterOverrides` under its scopes
-   * (`pureos:unit:<train id>:<unit id | inlet>`), and the saved train carries
-   * them as they stood at the save. Optional for the same reason as `guild`.
-   */
+  /** LEGACY, read once: pureOS's trains built here (OF-BLD-020 §5.3), by train id. */
   trainsMade?: Record<string, TrainMade>;
 }
 
-/** A train built in pureOS's Builder and saved in this browser (OF-BLD-020 §5.3). */
+/** A train built in pureOS's Builder and saved (OF-BLD-020 §5.3): one of the project's rows. */
 export interface TrainMade {
   /** The train as data, every value typed into its panels laid in as each place's params. */
   train: TrainSpec;
@@ -198,10 +170,7 @@ export interface TrainMade {
 export const EMPTY_SNAPSHOT: DurableSnapshot = {
   version: 1,
   savedAt: '',
-  depositions: [],
-  measuredEvidence: [],
   reviewDecisions: {},
-  runbookLocks: {},
   reviewerName: '',
 };
 
@@ -311,7 +280,7 @@ export function flushDurable(): void {
   void flush();
 }
 
-/** Drop everything persisted. Used by the demo reset, which must truly reset. */
+/** Drop everything persisted. Used by "Clear this browser’s data", which must truly clear. */
 export async function clearDurable(): Promise<void> {
   pending = null;
   if (timer) {
@@ -325,5 +294,31 @@ export async function clearDurable(): Promise<void> {
     tx.objectStore(STORE).delete(KEY);
   } catch {
     /* nothing to do — the caller cannot act on this either */
+  }
+}
+
+// ── The last-open project (alpha 2.0, ADR-005) ─────────────────────────
+//
+// One id, the project this browser last opened. It is read synchronously at
+// load, so the first call to the service already names it, which is why it
+// lives in localStorage beside the IndexedDB snapshot. Like everything here,
+// a failure reads as none.
+const PROJECT_KEY = 'openferment.project';
+
+export function lastProject(): string | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage.getItem(PROJECT_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberProject(id: string | null): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (id) localStorage.setItem(PROJECT_KEY, id);
+    else localStorage.removeItem(PROJECT_KEY);
+  } catch {
+    /* the open project is then this page's alone */
   }
 }

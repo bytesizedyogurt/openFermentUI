@@ -1,21 +1,26 @@
 // The chain behind a runbook's predictions (OF-BLD-014 §9.4). For a runbook
 // whose predictions point at artifacts, the band lays them out in the order
 // the product runs: the geneOS ceiling (stoichiometry), the fermOS forecast
-// (dynamics), the Proforma price. Each is drawn from its artifact as the
-// service keeps it, shows its basis, and names the prediction it stands
-// behind. The two seam sentences the product already uses sit between the
-// figures. With the service down the band says the artifacts need it.
+// (dynamics), the Proforma price: a scenario's sampled distribution, or an
+// engine run's one case drawn as what its price is made of. Each is drawn
+// from its artifact as the service keeps it, shows its basis, and names the
+// prediction it stands behind. The two seam sentences the product already
+// uses sit between the figures. With the service down the band says the
+// artifacts need it.
 import { useEffect, useState } from 'react';
 import type { Artifact, Band, ComputedBasis, HistogramBin, Runbook } from '@/data/types';
 import { useStore } from '@/store';
 import { ArtifactsDown, getArtifact } from '@/lib/artifacts';
 import { productOfBasis, productWords, yieldsOnSugar } from '@/lib/geneos';
-import { INFEASIBLE_WORDS } from '@/lib/proforma';
-import { CeilingGap, Distribution, TrajectoryBand } from '@/components/figures';
+import { INFEASIBLE_WORDS, LIBRARY_RUN_TOOL, RUN_TOOL, runViewOfRun } from '@/lib/proforma';
+import { CeilingGap, CostWaterfall, Distribution, TrajectoryBand } from '@/components/figures';
 import { Card } from './ui';
 
 /** The order of the chain, by the tool that kept each artifact. */
-export const DOSSIER_ORDER = ['geneos.ceiling', 'growth_forecast', 'proforma.run'] as const;
+export const DOSSIER_ORDER = ['geneos.ceiling', 'growth_forecast', RUN_TOOL, LIBRARY_RUN_TOOL] as const;
+
+/** The tools whose artifact prices the plant's product: a scenario's sampled run, an engine run. */
+const PRICE_TOOLS: readonly string[] = [RUN_TOOL, LIBRARY_RUN_TOOL];
 
 /** The seams, in the words fermOS's page already uses. */
 export const SEAMS = {
@@ -104,6 +109,26 @@ function Figure({ link }: { link: Link }) {
       />
     );
   }
+  if (a.tool === LIBRARY_RUN_TOOL) {
+    // One case, no samples: the price the run solved, drawn as the run page
+    // draws it, from the TEA breakdown the run kept.
+    const view = runViewOfRun(a);
+    const tea = view?.tables.tea;
+    return (
+      <CostWaterfall
+        title="What is the price made of?"
+        lines={tea?.lines ?? []}
+        total={view?.basePrice != null ? { label: 'Base-case price', value: view.basePrice } : null}
+        unit={tea?.basis ? `USD per ${tea.basis}` : 'USD kg-1'}
+        annualUnit={view?.tables.tableUnits.annual ?? 'USD/yr'}
+        provenance={a.provenance}
+        basis={[basisOf(a)]}
+        empty={{ what: 'this run kept no TEA breakdown.', where: 'Its report, with every table the run kept, is on the run’s page.' }}
+        csvName={`dossier-price-${a.id}`}
+      />
+    );
+  }
+  if (a.tool !== RUN_TOOL) return null;
   const infeasible = (o.infeasible as Record<string, number>) ?? {};
   return (
     <Distribution
@@ -161,7 +186,7 @@ export function Dossier({ runbook }: { runbook: Runbook }) {
             const seam =
               next && l.artifact.tool === 'geneos.ceiling' && next.artifact.tool === 'growth_forecast'
                 ? SEAMS.afterCeiling
-                : next && l.artifact.tool === 'growth_forecast' && next.artifact.tool === 'proforma.run'
+                : next && l.artifact.tool === 'growth_forecast' && PRICE_TOOLS.includes(next.artifact.tool)
                   ? SEAMS.afterForecast
                   : null;
             return (

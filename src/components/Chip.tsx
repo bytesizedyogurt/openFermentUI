@@ -1,13 +1,13 @@
 // The citation chip (OF-DES-001 §7.3) — the load-bearing primitive. One
 // component in agent answers, extraction tables, protocol references,
 // simulation assumptions, and lesson text.
-import { ExternalLink, Copy, AlertTriangle, BookMarked } from 'lucide-react';
+import { ExternalLink, Copy, AlertTriangle } from 'lucide-react';
 import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
 import { fieldName } from '@/data/ontology';
 import { Popover, cx } from './ui';
-import { ProvenanceBadge, provMeta, type ProvKind } from './Provenance';
+import { ProvenanceBadge, type ProvKind } from './Provenance';
 
 function shortTitle(t: string, max = 64) {
   return t.length > max ? t.slice(0, max - 1) + '…' : t;
@@ -44,19 +44,15 @@ export function CitationChip({
     );
   }
 
-  const prov: ProvKind = record ? provenanceOf(record) : 'demo';
+  const prov: ProvKind = record ? provenanceOf(record) : 'assumed';
   const target = record
     ? `/biorepo/paper/${paper.id}?span=${record.id}`
     : `/biorepo/paper/${paper.id}`;
 
   const copyCitation = () => {
     const doi = paper.doi ? ` https://doi.org/${paper.doi}` : paper.pmcid ? ` PMC${paper.pmcid.replace(/^PMC/, '')}` : '';
-    const caveat =
-      paper.textSource === 'curation-note'
-        ? ' [catalogued in openFerment; full text not ingested — verify before citing]'
-        : '';
     const authors = paper.authors.length ? paper.authors.join(', ') : '(authors pending verification)';
-    const text = `${authors} (${paper.year}). ${paper.title}. ${paper.venue}.${doi}${caveat}`;
+    const text = `${authors} (${paper.year}). ${paper.title}. ${paper.venue}.${doi}`;
     navigator.clipboard?.writeText(text);
     useStore.getState().toast({ text: 'Citation copied', kind: 'info' });
   };
@@ -130,30 +126,7 @@ export function CitationChip({
             <Copy size={12} /> Copy citation
           </button>
         </div>
-        {paper.textSource === 'curation-note' && (
-          <div className="text-[10px] text-ink-soft flex items-start gap-1.5">
-            <BookMarked size={11} className="shrink-0 mt-[1px]" />
-            <span>
-              Catalogued, full text not yet ingested. The quoted span is the curator&rsquo;s note,
-              not the paper&rsquo;s own words.
-              {paper.verifyNeeded && ' Author string pending verification.'}
-            </span>
-          </div>
-        )}
       </div>
     </Popover>
   );
-}
-
-/** Compact record chip that reads "ex-0112" — used in audit and assumption rows. */
-export function RecordChip({ recordId }: { recordId: string }) {
-  const record = useStore((s) => s.records.find((r) => r.id === recordId));
-  if (!record) return <CitationChip recordId={recordId} label={recordId} />;
-  return <CitationChip recordId={recordId} label={record.id} />;
-}
-
-/** A tiny inline provenance mark used where a chip would be too heavy. */
-export function ProvMark({ p }: { p: ProvKind }) {
-  const { Icon, color, label } = provMeta(p);
-  return <Icon size={12} className={cx('inline align-[-2px]', color)} aria-label={label} />;
 }

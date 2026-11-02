@@ -22,7 +22,7 @@ export interface TrajectoryBandProps {
   series: TrajectorySeries[];
   /** The forecast, when there is one: times and a band per role. */
   forecast?: { times: number[]; bands: Band[]; provenance?: Provenance } | null;
-  /** The readings' provenance: measured for a deposition, demo for the sample run. */
+  /** The readings' provenance: measured for a deposition, assumed for the sample run. */
   readingProvenance?: Provenance;
   basis?: ComputedBasis[];
   notes?: string[];

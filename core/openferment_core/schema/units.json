@@ -1,0 +1,541 @@
+{
+ "table": {
+  "h⁻¹": {
+   "family": "rate",
+   "factor": 1,
+   "label": "h⁻¹"
+  },
+  "d⁻¹": {
+   "family": "rate",
+   "factor": 0.041666666666666664,
+   "label": "d⁻¹"
+  },
+  "min⁻¹": {
+   "family": "rate",
+   "factor": 60,
+   "label": "min⁻¹"
+  },
+  "s⁻¹": {
+   "family": "rate",
+   "factor": 3600,
+   "label": "s⁻¹"
+  },
+  "h": {
+   "family": "time",
+   "factor": 1,
+   "label": "h"
+  },
+  "min": {
+   "family": "time",
+   "factor": 0.016666666666666666,
+   "label": "min"
+  },
+  "d": {
+   "family": "time",
+   "factor": 24,
+   "label": "d"
+  },
+  "s": {
+   "family": "time",
+   "factor": 0.0002777777777777778,
+   "label": "s"
+  },
+  "g L⁻¹": {
+   "family": "massConc",
+   "factor": 1,
+   "label": "g L⁻¹"
+  },
+  "mg L⁻¹": {
+   "family": "massConc",
+   "factor": 0.001,
+   "label": "mg L⁻¹"
+  },
+  "µg L⁻¹": {
+   "family": "massConc",
+   "factor": 1e-06,
+   "label": "µg L⁻¹"
+  },
+  "kg m⁻³": {
+   "family": "massConc",
+   "factor": 1,
+   "label": "kg m⁻³"
+  },
+  "mg mL⁻¹": {
+   "family": "massConc",
+   "factor": 1,
+   "label": "mg mL⁻¹"
+  },
+  "µg mL⁻¹": {
+   "family": "massConc",
+   "factor": 0.001,
+   "label": "µg mL⁻¹"
+  },
+  "mg dL⁻¹": {
+   "family": "massConc",
+   "factor": 0.01,
+   "label": "mg dL⁻¹"
+  },
+  "g 100mL⁻¹": {
+   "family": "massConc",
+   "factor": 10,
+   "label": "g 100 mL⁻¹"
+  },
+  "g": {
+   "family": "mass",
+   "factor": 1,
+   "label": "g"
+  },
+  "mg": {
+   "family": "mass",
+   "factor": 0.001,
+   "label": "mg"
+  },
+  "µg": {
+   "family": "mass",
+   "factor": 1e-06,
+   "label": "µg"
+  },
+  "kg": {
+   "family": "mass",
+   "factor": 1000,
+   "label": "kg"
+  },
+  "L": {
+   "family": "volume",
+   "factor": 1,
+   "label": "L"
+  },
+  "mL": {
+   "family": "volume",
+   "factor": 0.001,
+   "label": "mL"
+  },
+  "µL": {
+   "family": "volume",
+   "factor": 1e-06,
+   "label": "µL"
+  },
+  "m³": {
+   "family": "volume",
+   "factor": 1000,
+   "label": "m³"
+  },
+  "%": {
+   "family": "percent",
+   "factor": 1,
+   "label": "%"
+  },
+  "% DW": {
+   "family": "percent",
+   "factor": 1,
+   "label": "% DW"
+  },
+  "% v/v": {
+   "family": "percent",
+   "factor": 1,
+   "label": "% v/v"
+  },
+  "% w/v": {
+   "family": "percent",
+   "factor": 1,
+   "label": "% w/v"
+  },
+  "g g⁻¹": {
+   "family": "yield",
+   "factor": 1,
+   "label": "g g⁻¹"
+  },
+  "mg g⁻¹": {
+   "family": "yield",
+   "factor": 0.001,
+   "label": "mg g⁻¹"
+  },
+  "g L⁻¹ h⁻¹": {
+   "family": "volProd",
+   "factor": 1,
+   "label": "g L⁻¹ h⁻¹"
+  },
+  "mg L⁻¹ h⁻¹": {
+   "family": "volProd",
+   "factor": 0.001,
+   "label": "mg L⁻¹ h⁻¹"
+  },
+  "g L⁻¹ d⁻¹": {
+   "family": "volProd",
+   "factor": 0.041666666666666664,
+   "label": "g L⁻¹ d⁻¹"
+  },
+  "mg g⁻¹ h⁻¹": {
+   "family": "specProd",
+   "factor": 1,
+   "label": "mg g⁻¹ h⁻¹"
+  },
+  "g g⁻¹ h⁻¹": {
+   "family": "specProd",
+   "factor": 1000,
+   "label": "g g⁻¹ h⁻¹"
+  },
+  "mg g⁻¹ d⁻¹": {
+   "family": "specProd",
+   "factor": 0.041666666666666664,
+   "label": "mg g⁻¹ d⁻¹"
+  },
+  "g L⁻¹ OD⁻¹": {
+   "family": "odDcw",
+   "factor": 1,
+   "label": "g L⁻¹ OD⁻¹"
+  },
+  "°C": {
+   "family": "temp",
+   "factor": 1,
+   "offset": 0,
+   "label": "°C"
+  },
+  "K": {
+   "family": "temp",
+   "factor": 1,
+   "offset": -273.15,
+   "label": "K"
+  },
+  "°F": {
+   "family": "temp",
+   "factor": 0.5555555555555556,
+   "offset": -17.77777777777778,
+   "label": "°F"
+  },
+  "µmol m⁻² s⁻¹": {
+   "family": "light",
+   "factor": 1,
+   "label": "µmol m⁻² s⁻¹"
+  },
+  "µE m⁻² s⁻¹": {
+   "family": "light",
+   "factor": 1,
+   "label": "µE m⁻² s⁻¹"
+  },
+  "": {
+   "family": "ph",
+   "factor": 1,
+   "label": ""
+  },
+  "mol L⁻¹": {
+   "family": "molar",
+   "factor": 1,
+   "label": "mol L⁻¹"
+  },
+  "mmol L⁻¹": {
+   "family": "molar",
+   "factor": 0.001,
+   "label": "mmol L⁻¹"
+  },
+  "µmol L⁻¹": {
+   "family": "molar",
+   "factor": 1e-06,
+   "label": "µmol L⁻¹"
+  },
+  "vvm": {
+   "family": "vvm",
+   "factor": 1,
+   "label": "vvm"
+  },
+  "rpm": {
+   "family": "rpm",
+   "factor": 1,
+   "label": "rpm"
+  },
+  "µm": {
+   "family": "length",
+   "factor": 1e-06,
+   "label": "µm"
+  },
+  "cm": {
+   "family": "length",
+   "factor": 0.01,
+   "label": "cm"
+  },
+  "m": {
+   "family": "length",
+   "factor": 1,
+   "label": "m"
+  },
+  "nm": {
+   "family": "length",
+   "factor": 1e-09,
+   "label": "nm"
+  },
+  "mm": {
+   "family": "length",
+   "factor": 0.001,
+   "label": "mm"
+  },
+  "% TSP": {
+   "family": "proteinShare",
+   "factor": 1,
+   "label": "% TSP"
+  },
+  "% TCP": {
+   "family": "proteinShare",
+   "factor": 1,
+   "label": "% TCP"
+  },
+  "% of native sites": {
+   "family": "percent",
+   "factor": 1,
+   "label": "% of native sites"
+  },
+  "% sedimentable": {
+   "family": "percent",
+   "factor": 1,
+   "label": "% sedimentable"
+  },
+  "% of total expressed": {
+   "family": "percent",
+   "factor": 1,
+   "label": "% of total expressed"
+  },
+  "% of total protein": {
+   "family": "percent",
+   "factor": 1,
+   "label": "% of total protein"
+  },
+  "mol mol⁻¹": {
+   "family": "stoichiometry",
+   "factor": 1,
+   "label": "mol mol⁻¹"
+  },
+  "×": {
+   "family": "fold",
+   "factor": 1,
+   "label": "×"
+  },
+  "colonies µg⁻¹": {
+   "family": "transformationEff",
+   "factor": 1,
+   "label": "colonies µg⁻¹ DNA"
+  },
+  "residue": {
+   "family": "position",
+   "factor": 1,
+   "label": "residue"
+  },
+  "kWh kg⁻¹": {
+   "family": "energyPerMass",
+   "factor": 1,
+   "label": "kWh kg⁻¹"
+  },
+  "MJ kg⁻¹": {
+   "family": "energyPerMass",
+   "factor": 0.2777777777777778,
+   "label": "MJ kg⁻¹"
+  },
+  "USD kg⁻¹": {
+   "family": "costUSD",
+   "factor": 1,
+   "label": "USD kg⁻¹"
+  },
+  "EUR kg⁻¹": {
+   "family": "costEUR",
+   "factor": 1,
+   "label": "EUR kg⁻¹"
+  },
+  "% CDW": {
+   "family": "percentCdw",
+   "factor": 1,
+   "label": "% CDW"
+  },
+  "g mol⁻¹": {
+   "family": "molarMass",
+   "factor": 1,
+   "label": "g mol⁻¹"
+  },
+  "Da": {
+   "family": "molarMass",
+   "factor": 1,
+   "label": "Da"
+  },
+  "kDa": {
+   "family": "molarMass",
+   "factor": 1000,
+   "label": "kDa"
+  },
+  "USD gal⁻¹": {
+   "family": "costUSDVolume",
+   "factor": 1,
+   "label": "USD gal⁻¹"
+  },
+  "mmol g⁻¹ h⁻¹": {
+   "family": "specMolarRate",
+   "factor": 1,
+   "label": "mmol g⁻¹ h⁻¹"
+  },
+  "µmol g⁻¹ h⁻¹": {
+   "family": "specMolarRate",
+   "factor": 0.001,
+   "label": "µmol g⁻¹ h⁻¹"
+  },
+  "mol g⁻¹ h⁻¹": {
+   "family": "specMolarRate",
+   "factor": 1000,
+   "label": "mol g⁻¹ h⁻¹"
+  }
+ },
+ "aliases": {
+  "1/h": "h⁻¹",
+  "h-1": "h⁻¹",
+  "/h": "h⁻¹",
+  "per hour": "h⁻¹",
+  "1/d": "d⁻¹",
+  "d-1": "d⁻¹",
+  "/d": "d⁻¹",
+  "/day": "d⁻¹",
+  "per day": "d⁻¹",
+  "g/l": "g L⁻¹",
+  "g/L": "g L⁻¹",
+  "mg/l": "mg L⁻¹",
+  "mg/L": "mg L⁻¹",
+  "ug/l": "µg L⁻¹",
+  "µg/L": "µg L⁻¹",
+  "kg/m3": "kg m⁻³",
+  "kg/m³": "kg m⁻³",
+  "mg/ml": "mg mL⁻¹",
+  "mg/mL": "mg mL⁻¹",
+  "ug/ml": "µg mL⁻¹",
+  "µg/mL": "µg mL⁻¹",
+  "mg/dl": "mg dL⁻¹",
+  "mg/dL": "mg dL⁻¹",
+  "g/100ml": "g 100mL⁻¹",
+  "g/100 mL": "g 100mL⁻¹",
+  "g/g": "g g⁻¹",
+  "mg/g": "mg g⁻¹",
+  "g/l/h": "g L⁻¹ h⁻¹",
+  "g/L/h": "g L⁻¹ h⁻¹",
+  "mg/l/h": "mg L⁻¹ h⁻¹",
+  "mg/L/h": "mg L⁻¹ h⁻¹",
+  "g/l/d": "g L⁻¹ d⁻¹",
+  "g/L/d": "g L⁻¹ d⁻¹",
+  "mg/g/h": "mg g⁻¹ h⁻¹",
+  "g/g/h": "g g⁻¹ h⁻¹",
+  "mg/g/d": "mg g⁻¹ d⁻¹",
+  "mmol/g/h": "mmol g⁻¹ h⁻¹",
+  "mmol/gdw/h": "mmol g⁻¹ h⁻¹",
+  "mmol gdw-1 h-1": "mmol g⁻¹ h⁻¹",
+  "1/s": "s⁻¹",
+  "/s": "s⁻¹",
+  "g/l/od": "g L⁻¹ OD⁻¹",
+  "g/L/OD": "g L⁻¹ OD⁻¹",
+  "c": "°C",
+  "°c": "°C",
+  "degc": "°C",
+  "deg c": "°C",
+  "f": "°F",
+  "°f": "°F",
+  "k": "K",
+  "umol/m2/s": "µmol m⁻² s⁻¹",
+  "µmol/m²/s": "µmol m⁻² s⁻¹",
+  "ue/m2/s": "µE m⁻² s⁻¹",
+  "%dw": "% DW",
+  "% dw": "% DW",
+  "%v/v": "% v/v",
+  "% vv": "% v/v",
+  "%w/v": "% w/v",
+  "%tsp": "% TSP",
+  "%tcp": "% TCP",
+  "%cdw": "% CDW",
+  "% cdw": "% CDW",
+  "wt%": "% CDW",
+  "% (w/w)": "% CDW",
+  "kda": "kDa",
+  "kg/mol": "kDa",
+  "$/gal": "USD gal⁻¹",
+  "USD/gal": "USD gal⁻¹",
+  "$ gal-1": "USD gal⁻¹",
+  "$ gal⁻¹": "USD gal⁻¹",
+  "$ gal−1": "USD gal⁻¹",
+  "US$/gal": "USD gal⁻¹",
+  "$/gallon": "USD gal⁻¹",
+  "$ per gallon": "USD gal⁻¹",
+  "usd per gallon": "USD gal⁻¹",
+  "$/kg": "USD kg⁻¹",
+  "USD/kg": "USD kg⁻¹",
+  "g.l-1": "g L⁻¹",
+  "g.l−1": "g L⁻¹",
+  "g l-1h-1": "g L⁻¹ h⁻¹",
+  "g l−1h−1": "g L⁻¹ h⁻¹",
+  "g/l hr": "g L⁻¹ h⁻¹",
+  "g/l/hr": "g L⁻¹ h⁻¹",
+  "m": "mol L⁻¹",
+  "mm": "mmol L⁻¹",
+  "um": "µmol L⁻¹",
+  "µm": "µmol L⁻¹",
+  "mol/l": "mol L⁻¹",
+  "mmol/l": "mmol L⁻¹",
+  "ml": "mL",
+  "ul": "µL",
+  "µl": "µL",
+  "l": "L",
+  "m3": "m³"
+ },
+ "si": {
+  "proteinShare": "% TSP",
+  "stoichiometry": "mol mol⁻¹",
+  "fold": "×",
+  "transformationEff": "colonies µg⁻¹",
+  "position": "residue",
+  "energyPerMass": "kWh kg⁻¹",
+  "costUSD": "USD kg⁻¹",
+  "costEUR": "EUR kg⁻¹",
+  "rate": "h⁻¹",
+  "time": "h",
+  "massConc": "kg m⁻³",
+  "mass": "g",
+  "volume": "L",
+  "percent": "%",
+  "yield": "g g⁻¹",
+  "volProd": "g L⁻¹ h⁻¹",
+  "specProd": "mg g⁻¹ h⁻¹",
+  "odDcw": "g L⁻¹ OD⁻¹",
+  "temp": "°C",
+  "light": "µmol m⁻² s⁻¹",
+  "ph": "",
+  "molar": "mol L⁻¹",
+  "vvm": "vvm",
+  "rpm": "rpm",
+  "length": "m",
+  "percentCdw": "% CDW",
+  "molarMass": "kDa",
+  "costUSDVolume": "USD gal⁻¹",
+  "specMolarRate": "mmol g⁻¹ h⁻¹"
+ },
+ "refusals": [
+  {
+   "a": "proteinShare",
+   "b": "massConc",
+   "because": "A share of total soluble protein and a concentration are not interconvertible without the cell density and the total-protein fraction of the biomass. Record those two values and the conversion becomes possible; guessing them would fabricate a titer."
+  },
+  {
+   "a": "proteinShare",
+   "b": "percent",
+   "because": "Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error."
+  },
+  {
+   "a": "costUSD",
+   "b": "costEUR",
+   "because": "Currency conversion needs an exchange rate with a date attached. The engine will not invent one — record the rate and the date as an explicit assumption."
+  },
+  {
+   "a": "percentCdw",
+   "b": "massConc",
+   "because": "A share of dry cell mass and a concentration are not interconvertible without the biomass density of that culture. Record the dry cell weight per litre the paper reports for it and the conversion becomes possible; guessing it would fabricate a titre."
+  },
+  {
+   "a": "specMolarRate",
+   "b": "specProd",
+   "because": "A rate in moles per gram per hour and one in grams per gram per hour differ by the molar mass of what is taken up or made. Record which substance it is and convert by its molar mass as a stated step; the engine will not assume it."
+  },
+  {
+   "a": "costUSDVolume",
+   "b": "costUSD",
+   "because": "A price per gallon and a price per kilogram are not interconvertible without the density of the product. Record the density the analysis assumes for it and the conversion becomes possible; guessing it would fabricate a price."
+  }
+ ]
+}

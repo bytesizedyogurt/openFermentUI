@@ -1,7 +1,8 @@
 """A check brief from the real model (OF-BLD-013 §5.3).
 
 Marked `live`: needs a key and spends one call. Run with `pnpm test:live`.
-Prints the brief and what it cost.
+Prints the brief and what it cost. The ledger and the queue are the test's
+own rolled-back database (conftest.py).
 """
 from __future__ import annotations
 
@@ -16,12 +17,6 @@ from openferment_core.models import EvidenceSource, GuildEvidence, GuildPerson
 pytestmark = pytest.mark.live
 
 needs_key = pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="live tests need ANTHROPIC_API_KEY in core/.env")
-
-
-@pytest.fixture(autouse=True)
-def _files(monkeypatch, tmp_path):
-    monkeypatch.setattr(guild, "PATH", tmp_path / "guild.json")
-    monkeypatch.setattr(checks, "PATH", tmp_path / "checks.json")
 
 
 @needs_key

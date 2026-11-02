@@ -123,11 +123,48 @@ def test_a_model_file_names_its_source_revision_hash_and_who_accepted_it(tmp_pat
         lic.load_policy(path)
 
 
+def test_vendored_code_names_its_source_revision_directory_and_what_was_left_out(tmp_path):
+    path = tmp_path / "licences.toml"
+    path.write_text('allowed = ["MIT"]\n[vendored.v]\nlicence = "MIT"\nsource = "s"\nrevision = "r"\npath = "core/vendor/v"\nwhy = "w"\n')
+    with pytest.raises(ValueError, match="left_out"):
+        lic.load_policy(path)
+
+
+def test_vendored_code_stands_where_the_ledger_says_under_an_allowed_licence(tmp_path):
+    (tmp_path / "core" / "vendor" / "kept").mkdir(parents=True)
+    (tmp_path / "core" / "vendor" / "kept" / "LICENSE").write_text("MIT License", encoding="utf-8")
+    (tmp_path / "core" / "vendor" / "bare").mkdir(parents=True)
+    path = tmp_path / "licences.toml"
+    entry = 'source = "s"\nrevision = "r"\nleft_out = "nothing"\nwhy = "w"\n'
+    path.write_text('allowed = ["MIT"]\n'
+                    f'[vendored.kept]\nlicence = "MIT"\npath = "core/vendor/kept"\n{entry}'
+                    f'[vendored.bare]\nlicence = "MIT"\npath = "core/vendor/bare"\n{entry}'
+                    f'[vendored.gone]\nlicence = "MIT"\npath = "core/vendor/gone"\n{entry}'
+                    f'[vendored.copyleft]\nlicence = "GPL-3.0-only"\npath = "core/vendor/kept"\n{entry}', encoding="utf-8")
+    faults = lic.vendored_faults(lic.load_policy(path), repo=tmp_path)
+    assert len(faults) == 3
+    assert any("[vendored.bare]" in f and "no LICENSE" in f for f in faults)
+    assert any("[vendored.gone]" in f and "not a directory" in f for f in faults)
+    assert any("[vendored.copyleft]" in f and "GPL-3.0-only" in f for f in faults)
+
+
+def test_the_committed_ledger_holds_the_vendored_sff_toolkit_where_it_stands():
+    committed = lic.load_policy()
+    [v] = [v for v in committed.vendored if v.id == "pisces_sff"]
+    assert v.path == "core/vendor/pisces_sff" and v.licence == "MIT" and len(v.revision) == 40
+    assert lic.vendored_faults(committed) == []
+
+
 def test_the_model_files_are_listed_with_their_hash():
+    from openferment_core import geneos_models
+
     committed = lic.load_policy()
     by_id = {d.id: d for d in committed.data}
-    assert by_id["RehMBEL1391"].sha256 == "85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89"
-    assert "| RehMBEL1391 | GPL-3.0 |" in lic.render([], [], committed)
+    fetched = [m for m in geneos_models.SHELF.values() if m.fetched]
+    assert fetched, "the shelf fetches at least one model file"
+    for m in fetched:
+        assert by_id[m.id].sha256 == m.fetched.sha256, m.id
+        assert f"| {m.id} | {by_id[m.id].licence} |" in lic.render([], [], committed)
 
 
 def test_the_committed_ledger_reads_and_every_acceptance_is_signed():

@@ -1,12 +1,15 @@
 """The day's spend, by role, and its settings (OF-BLD-014 §3.3, E.7)."""
 from __future__ import annotations
 
-import json
 import threading
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import update
 
-from openferment_core import spend
+from openferment_core import db, projects, spend
+from openferment_core.db import models as t
+from openferment_core.db.engine import make_engine
 
 
 def test_charges_add_up_by_role():
@@ -24,33 +27,71 @@ def test_a_new_utc_day_starts_from_zero(monkeypatch):
     monkeypatch.setattr(spend, "today", lambda: "2026-10-15")
     assert spend.total_today() == 0.0
     spend.charge("answer", 1.0)
-    assert json.loads(spend.path().read_text())["day"] == "2026-10-15"
+    assert spend.state()["day"] == "2026-10-15" and spend.total_today() == 1.0
 
 
-def test_the_file_is_the_one_the_setting_names(tmp_path, monkeypatch):
-    target = tmp_path / "elsewhere" / "spend.json"
-    monkeypatch.setenv("OPENFERMENT_SPEND_FILE", str(target))
-    spend.charge("answer", 0.1)
-    assert target.is_file()
+def test_the_cap_is_the_machines_across_every_project():
+    spend.charge("answer", 0.3)
+    with projects.using("another-project"):
+        spend.charge("answer", 0.2)
+        assert spend.total_today() == 0.5
+    assert spend.total_today() == 0.5
 
 
-def test_a_damaged_file_closes_the_gate_and_is_left_for_a_person():
-    # §3.R: reading a damaged file as "nothing spent" reset the cap.
-    spend.path().write_text("{not json", encoding="utf-8")
-    with pytest.raises(spend.SpendFileDamaged, match="delete it"):
-        spend.total_today()
-    assert spend.would_pass(0.01)[0] is True
-    spend.path().unlink()
+def test_a_database_that_does_not_answer_closes_the_gate():
+    # §3.R: reading unknown spend as "nothing spent" would reset the cap.
+    down = make_engine("postgresql://nobody:nothing@127.0.0.1:9/none")
+    previous_binding, previous_engine = db.bind(None), db.use_engine(down)
+    try:
+        with pytest.raises(spend.SpendUnknown, match="no model call is made"):
+            spend.total_today()
+        assert spend.would_pass(0.01)[0] is True
+        with pytest.raises(spend.SpendUnknown):
+            spend.reserve("answer", 0.01)
+    finally:
+        db.use_engine(previous_engine)
+        db.bind(previous_binding)
+        db.run(down.dispose())
     spend.charge("answer", 0.2)
     assert spend.total_today() == 0.2
 
 
+def test_a_reservation_holds_against_the_cap_until_it_settles(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "1")
+    held = spend.reserve("answer", 0.8)
+    with pytest.raises(spend.CapReached):
+        spend.reserve("answer", 0.3)
+    assert spend.state()["reservedUsd"] == 0.8
+    assert spend.settle(held, "answer", 0.25) == 0.25
+    assert spend.state()["reservedUsd"] == 0.0
+    spend.reserve("answer", 0.7)
+
+
+def test_an_abandoned_reservation_holds_nothing(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "1")
+    spend.reserve("answer", 0.9)
+
+    async def expire() -> None:
+        async with db.session() as s:
+            await s.execute(update(t.spend).values(expires_at=datetime.now(timezone.utc) - timedelta(seconds=1)))
+
+    db.run(expire())
+    assert spend.state()["reservedUsd"] == 0.0
+    spend.reserve("answer", 0.9)
+
+
+def test_a_reservation_settled_at_nothing_counts_no_call():
+    held = spend.reserve("answer", 0.5)
+    spend.settle(held, "answer", 0.0)
+    assert spend.state()["calls"] == 0 and spend.total_today() == 0.0
+
+
 def test_concurrent_charges_lose_nothing():
     threads = [threading.Thread(target=spend.charge, args=("answer", 0.01)) for _ in range(20)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
     assert spend.total_today() == 0.2 and spend.state()["calls"] == 20
 
 

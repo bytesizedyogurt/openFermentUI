@@ -1,11 +1,16 @@
 # The whole of `pnpm verify`, on every push and pull request (OF-BLD-012 §4.3).
 #
-# No secrets. Verify is designed to run with no key, no service and no network
-# beyond package registries, and this workflow holds it to that: a stage that
-# starts needing a key would fail here first.
+# No secrets. Verify is designed to run with no key and no network beyond
+# package registries and one model file, and this workflow holds it to that: a
+# stage that starts needing a key would fail here first.
 #
-# Two things the local machine has that a runner does not, both installed
+# Four things the local machine has that a runner does not, each provided
 # explicitly rather than assumed:
+#   - PostgreSQL with pgvector (ADR-001, ADR-002): a service container of the
+#     image compose.yaml runs. The tests, the tools check and the smoke each
+#     make a database of their own on it and drop it after.
+#   - FastEmbed's model file (ADR-002), fetched from Hugging Face by the first
+#     run and restored from the cache after, for test:lit.
 #   - a Chromium for Playwright. The browser scripts try the pre-installed
 #     one first (smoke.mjs also honours CHROMIUM_PATH) and fall back to Playwright's
 #     own cache, which is empty on a fresh runner.
@@ -21,11 +26,29 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: openferment
+          POSTGRES_PASSWORD: openferment
+          POSTGRES_DB: openferment_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openferment"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
       # Playwright's own postinstall would fetch every browser; the explicit
       # step below fetches the one the scripts use.
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      # The server every database of verify's own is made on (the default,
+      # named here so it is seen).
+      OPENFERMENT_TEST_DATABASE_URL: postgresql://openferment:openferment@127.0.0.1:5432/openferment_test
+      FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.cache/fastembed
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +67,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: FastEmbed's model file
+        uses: actions/cache@v4
+        with:
+          path: .cache/fastembed
+          key: fastembed-BAAI-bge-small-en-v1.5
+
       - name: Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
       - run: pnpm verify
+
+      # The proof (execution prompt §9.1, acceptance A2): every step offline
+      # against a real service on a database of its own, the UI walk in
+      # Chromium through the app verify built among them (step 9).
+      - name: The proof
+        run: pnpm prove

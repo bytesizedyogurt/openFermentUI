@@ -54,10 +54,9 @@ export function batchLabel(version: ProtocolVersion, scale: number): string {
 export function materialsChecklist(version: ProtocolVersion, scale: number, title: string): string {
   const lines = [
     `# ${title} — materials at ${batchLabel(version, scale)}`,
-    `# openFerment export — corpus OF-COR-001 v1.0`,
-    `# Protocol content is real: drawn from the catalogued literature and standard bench practice.`,
+    `# openFerment export`,
+    `# The protocol is the lab's own, as this version of it stands.`,
     `# Amounts here are computed by scaling the base batch, not measured at this scale.`,
-    `# Cited figures are curator transcriptions, not yet checked against the source PDFs.`,
     '',
   ];
   for (const m of scaleMaterials(version, scale)) {
@@ -68,17 +67,4 @@ export function materialsChecklist(version: ProtocolVersion, scale: number, titl
     lines.push(`[ ] ${m.name}: ${fmt(m.scaledAmount)} ${m.unit}${fixedNote}${stockNote}`);
   }
   return lines.join('\n');
-}
-
-/** Inoculation-density helper: volume of seed at measured OD to hit target OD. */
-export function inoculumVolume(
-  targetOD: number,
-  cultureVolumeML: number,
-  seedOD: number,
-): number | null {
-  if (seedOD <= targetOD || seedOD <= 0) return null;
-  // V_seed = V_final * targetOD / (seedOD - targetOD) approximated for small V:
-  // exact: V_seed * seedOD = targetOD * (V_final); assume V_final includes seed.
-  const v = (targetOD * cultureVolumeML) / seedOD;
-  return roundToPrecision(v, 0.1);
 }

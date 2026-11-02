@@ -20,10 +20,10 @@ THE INLET a model names (`inletRef`):
                                                `proforma.reference`,
                                                `pureos.train_run`)
 
-THE PROGRAM a model's train belongs to is its inlet's (the program the inlet
-artifact belongs to, `module_stores.artifact_program`), else the one active
-program when exactly one is, said so; the product is the one the request
-names, else the simulation's.
+THE CHEMICAL SET a model's train builds on is the one pureOS holds, said so
+(its `program`, the set's key, until stage 4 reads the set from the run's
+flowsheet); the product is the one the request names, else the
+simulation's.
 
 A UNIT a model adds takes the catalogue's default routing (its onward port
 on, every other outlet to waste) and an id of the type's first letter and the
@@ -85,22 +85,7 @@ def _artifact(aid: str, what: str) -> Artifact:
         raise BuildRefused(f"artifact {aid}, which {what} names, cannot be read: {e}") from None
 
 
-def _hidden(art: Artifact, include_archived: bool) -> None:
-    """An archived program's artifact as an inlet, refused with the switch
-    off, as the run refuses it (train_spec._shown)."""
-    from .. import module_stores, programs
-
-    try:
-        program = module_stores.artifact_program(art)
-        if not programs.hides(program, include_archived):
-            return
-        p = programs.program_by_id(program)
-    except FileNotFoundError:
-        return
-    raise BuildRefused(f"artifact {art.id} belongs to {p.name if p else program}, archived (hidden). {programs.SWITCH}")
-
-
-def inlet_of(inlet_ref: str, include_archived: bool = False) -> tuple[TrainInlet, Artifact, Artifact | None]:
+def inlet_of(inlet_ref: str) -> tuple[TrainInlet, Artifact, Artifact | None]:
     """The inlet `inletRef` names, the artifact it names, and the kept
     simulation the broth comes from (None for a run's stream)."""
     ref = (inlet_ref or "").strip()
@@ -113,7 +98,6 @@ def inlet_of(inlet_ref: str, include_archived: bool = False) -> tuple[TrainInlet
         raise BuildRefused(f"{aid!r} is not an artifact id (sixteen hex digits); fermos_read lists the simulations and "
                            "vessel designs, proforma_read and pureos_read the runs")
     art = _artifact(aid, "inletRef")
-    _hidden(art, include_archived)
     if art.tool == train_spec.SIMULATION:
         if sep:
             raise BuildRefused(f"{aid} is a kept simulation, whose harvest is the inlet: it names no stream")
@@ -129,7 +113,6 @@ def inlet_of(inlet_ref: str, include_archived: bool = False) -> tuple[TrainInlet
                                + ", not a kept simulation: a train's inlet is a simulation's harvest, a vessel design's "
                                "simulation, or a stream of a kept run")
         sim = _artifact(source, f"vessel design {aid}")
-        _hidden(sim, include_archived)
         return TrainInlet(kind="simulation", ref=source, vessel=aid), art, sim
     if art.tool in train_spec.STREAM_TOOLS:
         from .. import proforma
@@ -148,32 +131,24 @@ def inlet_of(inlet_ref: str, include_archived: bool = False) -> tuple[TrainInlet
 
 
 def _program(art: Artifact) -> tuple[str, str]:
-    """The train's program and how it was read, in words."""
-    from .. import module_stores, programs
+    """The chemical set the train builds on, and how it was read, in words:
+    the one set pureOS holds while there is one (stage 4 reads it from the
+    run's flowsheet)."""
+    from .train_spec import PROGRAM_CHEMICALS
 
-    try:
-        program = module_stores.artifact_program(art)
-    except FileNotFoundError:
-        program = None
-    if program:
-        return program, f"the program {art.tool} {art.id} belongs to"
-    try:
-        active = programs.active_programs()
-    except FileNotFoundError:
-        active = []
-    if len(active) == 1:
-        return active[0].id, (f"the one active program, {active[0].name}: {art.tool} {art.id} names no program of "
-                              "its own")
-    raise BuildRefused(f"{art.tool} {art.id} names no program, and there is no one active program to take: a train "
-                       "belongs to a program, whose chemicals it is built on")
+    if len(PROGRAM_CHEMICALS) == 1:
+        (only,) = PROGRAM_CHEMICALS
+        return only, f"the one chemical set pureOS holds: {art.tool} {art.id} names none of its own"
+    raise BuildRefused(f"{art.tool} {art.id} names no chemical set, and pureOS holds more than one: a train is "
+                       "built on one set of chemicals")
 
 
-def new_spec(product: str, inlet_ref: str, include_archived: bool = False) -> tuple[TrainSpec, list[str]]:
+def new_spec(product: str, inlet_ref: str) -> tuple[TrainSpec, list[str]]:
     """A new train with no unit yet: its id, a name of words, its program,
     its product and its inlet; and what was read, in words."""
     from .. import params, thermo
 
-    inlet, art, sim = inlet_of(inlet_ref, include_archived)
+    inlet, art, sim = inlet_of(inlet_ref)
     said: list[str] = []
     made = str((sim.output or {}).get("product") or "") if sim is not None else ""
     pid = (product or "").strip() or made
@@ -191,9 +166,6 @@ def new_spec(product: str, inlet_ref: str, include_archived: bool = False) -> tu
                            f"{named}; {pid} is none of them")
     program, how = _program(art)
     said.append(f"the program is {program}: {how}")
-    if program not in train_spec.PROGRAM_CHEMICALS:
-        raise BuildRefused(f"pureOS builds a train on {', '.join(train_spec.PROGRAM_CHEMICALS.values())}; program "
-                           f"{program} has no chemical set here, so its train does not run yet")
     spec = TrainSpec(id=new_id(), name=f"{pid} train, built by a model", program=program, product=pid, inlet=inlet,
                      units=[])
     return spec, said
@@ -248,12 +220,11 @@ def without_unit(spec: TrainSpec, unit_id: str) -> TrainSpec:
     return spec.model_copy(update={"units": [*spec.units[:n], *spec.units[n + 1:]]})
 
 
-def with_records(spec: TrainSpec, unit_id: str, records_by_param: dict[str, list[str]], pool: Any,
-                 include_archived: bool = False) -> tuple[TrainSpec, dict[str, dict[str, Any]]]:
+def with_records(spec: TrainSpec, unit_id: str, records_by_param: dict[str, list[str]], pool: Any) -> tuple[TrainSpec, dict[str, dict[str, Any]]]:
     """The train with a unit's parameters bound to exactly the records named
-    for each (D13): each must be in the evidence pool the switch shows, a
-    record of the field the parameter's source rule names, on the train's
-    program's papers, kept by the aggregate gate, naming the unit's step where
+    for each (D13): each must be in the evidence pool, a record of the field
+    the parameter's source rule names, kept by the aggregate gate, naming the
+    unit's step where
     its field says nothing of one, and in a unit the parameter reads; else the
     call is refused naming the record and why. The check is the run's own:
     the unit's scope (`train_spec.unit_scope`), which reads the class's
@@ -285,7 +256,7 @@ def with_records(spec: TrainSpec, unit_id: str, records_by_param: dict[str, list
     if new:
         raise BuildRefused("; ".join(new))
     try:
-        chemicals = train_spec.chemicals_of(candidate, (), include_archived)
+        chemicals = train_spec.chemicals_of(candidate, ())
         got = train_spec.unit_scope(candidate, changed, chemicals, pool, (), thermo.CHEMICALS.get(spec.product))
     except train_spec.TrainRefused as e:
         raise BuildRefused(f"the train's inlet cannot be read, so no record can be checked against unit {unit.id}: "
@@ -344,7 +315,7 @@ def _cut(line: str) -> str:
     return head.rstrip(" ,;:.") + " (cut here; the artifact holds the whole line)"
 
 
-def to_run(spec: TrainSpec, include_archived: bool = False) -> tuple[list[str], str | None]:
+def to_run(spec: TrainSpec) -> tuple[list[str], str | None]:
     """What a run of the train would refuse now, in the run's own words
     (`train_spec.check_train`, OF-BLD-020 §5.R, finding 20): the validation's
     refusals, then every value that waits and every need a unit has, as a
@@ -356,13 +327,13 @@ def to_run(spec: TrainSpec, include_archived: bool = False) -> tuple[list[str], 
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 
     try:
-        return list(train_spec.check_train(spec, None, None, include_archived).refusals), None
+        return list(train_spec.check_train(spec, None, None).refusals), None
     except (WorkerError, WorkerCrashed, WorkerTimeout, artifacts.ArtifactNotFound, artifacts.ArtifactDamaged) as e:
         return train_spec.validate(spec), (f"its values were not checked, so a value that waits is not named here: "
                                            f"{str(e).rstrip('.')}. The run names every one")
 
 
-def described(k: KeptTrain, include_archived: bool = False) -> dict[str, Any]:
+def described(k: KeptTrain) -> dict[str, Any]:
     """A kept train as a model reads it: ids and words, what is named for
     each unit, and what a run of it would refuse now, in the run's own words
     (`to_run`)."""
@@ -373,7 +344,7 @@ def described(k: KeptTrain, include_archived: bool = False) -> dict[str, Any]:
         units.append({"id": u.id, "type": e.id, "name": e.name, "stage": e.stage, "class": e.cls,
                       "outlets": train_spec.routes(u, e),
                       "recordsNamed": {key: len(ids) for key, ids in u.records.items()}})
-    refusals, unchecked = to_run(s, include_archived)
+    refusals, unchecked = to_run(s)
     return {
         "trainId": s.id, "name": s.name, "program": s.program, "product": s.product,
         "inlet": {"kind": s.inlet.kind, "ref": s.inlet.ref, "streamId": s.inlet.streamId, "vessel": s.inlet.vessel},

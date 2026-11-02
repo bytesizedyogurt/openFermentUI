@@ -1,25 +1,38 @@
 """match_run on a fixture (OF-BLD-012 §6.2, §6.3).
 
-A hand-written seed and hand-written candidates, so every outcome in the
-browser's vocabulary is produced by a case built to produce it and nothing
-else: match, span_error, value_mismatch, unit_error, miss. Then the rules
-around the score — a paper the extractor never ran over is not scored, a
-candidate the seed has no record for is new and unscored — and the endpoint
-that recomputes the run from the cache. Offline and free.
+Hand-written references (the values reviewers typed) and hand-written
+candidates, so every outcome in the browser's vocabulary is produced by a case
+built to produce it and nothing else: match, span_error, value_mismatch,
+unit_error, miss. Then the rules around the score — a paper the extractor
+never ran over is not scored, a candidate no reference covers is new and
+unscored, only a value a reviewer typed is a reference — and the endpoint that
+recomputes the run from the project's candidates. Offline and free.
 """
 from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import biorepo, extract, intake, witness
+from openferment_core import biorepo, db, extract, projects, witness
 from openferment_core.api import app
-from openferment_core.models import Candidate, DroppedCandidate, ExtractRun, Overlay, Quantity, Range, ReviewDecision
+from openferment_core.literature import kit
+from openferment_core.models import (
+    BioRepo,
+    Candidate,
+    DroppedCandidate,
+    ExtractRun,
+    Overlay,
+    Quantity,
+    Range,
+    ReviewDecision,
+)
 from openferment_core.units import to_si
 
-# ── a seed nobody curated ──────────────────────────────────────────────
+from conftest import structural_passages
 
-SEED = [
+# ── references nobody typed ─────────────────────────────────────────────
+
+REFERENCES = [
     {"id": "r-P1-1", "paperId": "P1", "field": "titer_secreted", "value": 4.2, "unit": "g L⁻¹"},
     {"id": "r-P1-2", "paperId": "P1", "field": "growth_rate_mu", "value": 0.12, "unit": "h⁻¹"},
     {"id": "r-P1-3", "paperId": "P1", "field": "time_to_colony", "value": 8.5, "unit": "d"},
@@ -58,7 +71,7 @@ CANDIDATES = [
     cand("P1", "growth_rate_mu", 0.20, "h⁻¹", 2),  # value_mismatch: same family, 67 % off
     cand("P1", "expression_pct_tsp", 2.0, "mg/L", 3),  # unit_error: a titre where a fraction belongs
     cand("P1", "kinase_identity", "CK2", "", 4),  # categorical value_mismatch
-    cand("P1", "titer_intracellular", 1.1, "g/L", 5),  # new: no seed record for this field
+    cand("P1", "titer_intracellular", 1.1, "g/L", 5),  # new: no reference covers this field
     cand("P3", "titer_secreted", 9.0, "g/L", 1),  # on a paper that was not extracted
 ]
 DROPPED = [
@@ -73,7 +86,7 @@ def outcomes(run: ExtractRun) -> dict[str, str]:
 
 @pytest.fixture
 def run() -> ExtractRun:
-    return witness.match_run(CANDIDATES, SEED, papers={"P1", "P2"}, dropped=DROPPED)
+    return witness.match_run(CANDIDATES, REFERENCES, papers={"P1", "P2"}, dropped=DROPPED)
 
 
 # ── one case per outcome ───────────────────────────────────────────────
@@ -104,7 +117,7 @@ def test_a_refused_quote_whose_value_agreed_is_a_span_error(run):
 
 def test_a_refusal_for_any_other_rule_is_not_a_span_error():
     only_range = [d for d in DROPPED if d.rule == "range"]
-    run = witness.match_run([], SEED, papers={"P1"}, dropped=only_range)
+    run = witness.match_run([], REFERENCES, papers={"P1"}, dropped=only_range)
     assert outcomes(run)["r-P1-2"] == "miss"
 
 
@@ -114,7 +127,7 @@ def test_nothing_for_the_field_is_a_miss(run):
 
 
 def test_categorical_values_compare_case_insensitively():
-    run = witness.match_run([cand("P1", "kinase_identity", "fam20c", "")], SEED, papers={"P1"})
+    run = witness.match_run([cand("P1", "kinase_identity", "fam20c", "")], REFERENCES, papers={"P1"})
     assert outcomes(run)["r-P1-5"] == "match"
 
 
@@ -124,13 +137,13 @@ def test_a_categorical_disagreement_is_a_value_mismatch(run):
 
 def test_match_beats_every_other_outcome():
     both = [cand("P1", "titer_secreted", 40, "g/L", 1), cand("P1", "titer_secreted", 4.2, "g/L", 2)]
-    run = witness.match_run(both, SEED, papers={"P1"})
+    run = witness.match_run(both, REFERENCES, papers={"P1"})
     assert outcomes(run)["r-P1-1"] == "match"
 
 
 def test_the_tolerance_is_two_percent():
-    assert outcomes(witness.match_run([cand("P1", "titer_secreted", 4.28, "g/L")], SEED, papers={"P1"}))["r-P1-1"] == "match"
-    assert outcomes(witness.match_run([cand("P1", "titer_secreted", 4.30, "g/L")], SEED, papers={"P1"}))["r-P1-1"] == "value_mismatch"
+    assert outcomes(witness.match_run([cand("P1", "titer_secreted", 4.28, "g/L")], REFERENCES, papers={"P1"}))["r-P1-1"] == "match"
+    assert outcomes(witness.match_run([cand("P1", "titer_secreted", 4.30, "g/L")], REFERENCES, papers={"P1"}))["r-P1-1"] == "value_mismatch"
 
 
 # ── what is and is not scored ──────────────────────────────────────────
@@ -144,13 +157,13 @@ def test_only_extracted_papers_are_scored(run):
 
 
 def test_a_scored_paper_with_no_candidates_misses_everything():
-    run = witness.match_run([], SEED, papers={"P2"})
+    run = witness.match_run([], REFERENCES, papers={"P2"})
     assert outcomes(run) == {"r-P2-1": "miss"}
 
 
 def test_new_records_are_unscored_and_not_false_positives(run):
     assert run.falsePositives == []
-    new = witness.new_records(CANDIDATES, SEED, papers={"P1", "P2"})
+    new = witness.new_records(CANDIDATES, REFERENCES, papers={"P1", "P2"})
     assert [c.id for c in new] == ["cl1-P1-5"]
     assert all(c.status == "unverified" for c in new)
 
@@ -169,19 +182,26 @@ def test_false_positives_are_only_what_a_reviewer_rejected():
     assert witness.false_positives(CANDIDATES, {}) == []
 
 
-def test_an_accepted_candidate_appended_to_the_corpus_is_not_scored_against_itself(monkeypatch):
-    # export-corpus appends accepted candidates with source='biorepo'. They
-    # must be neither gold to match against nor cover a field so it stops
-    # being new: the seed is what is scored.
-    appended = {**SEED[0], "id": "cl1-P1-9", "field": "titer_intracellular", "value": 1.1,
-                "unit": "g L⁻¹", "source": "biorepo"}
-    corpus = type("C", (), {"records": SEED + [appended]})()
-    monkeypatch.setattr(witness, "load_corpus", lambda: corpus)
-    seed = witness.seed_records()
-    assert [r["id"] for r in seed] == [r["id"] for r in SEED]
-    run = witness.match_run(CANDIDATES, seed, papers={"P1"})
-    assert "cl1-P1-9" not in outcomes(run)
-    assert [c.id for c in witness.new_records(CANDIDATES, seed, papers={"P1"})] == ["cl1-P1-5"]
+def test_only_a_value_a_reviewer_typed_is_a_reference():
+    # A gold value or a correction is what a person typed, independent of the
+    # extractor. A candidate accepted as the extractor wrote it would score
+    # the extractor against itself, so it is no reference, and it does not
+    # cover its field so that the field stops being new.
+    def d(rid, **typed):
+        return ReviewDecision(**{"status": "verified", "provenance": "curated", "reviewer": "sean", "recordId": rid,
+                                 "at": "2026-09-14T00:00:00Z", **typed})
+
+    kept = [cand("P1", "titer_secreted", 4200, "mg/L", 1), cand("P1", "growth_rate_mu", 0.20, "h⁻¹", 2),
+            cand("P1", "titer_intracellular", 1.1, "g/L", 5)]
+    repo = BioRepo(records=kept, decisions={
+        "cl1-P1-1": d("cl1-P1-1", provenance="gold", gold=Quantity(value=4.2, unit="g L⁻¹")),
+        "cl1-P1-2": d("cl1-P1-2", corrected=Quantity(value=0.12, unit="h⁻¹")),
+        "cl1-P1-5": d("cl1-P1-5"),
+    })
+    references = witness.reviewed_records(repo)
+    assert [(r["id"], r["field"], r["value"]) for r in references] == [
+        ("cl1-P1-1", "titer_secreted", 4.2), ("cl1-P1-2", "growth_rate_mu", 0.12)]
+    assert "cl1-P1-5" in [c.id for c in witness.new_records(CANDIDATES, references, papers={"P1"})]
 
 
 SIBLINGS = [
@@ -230,7 +250,7 @@ GOOD = {
             "sectionId": "t1", "field": "titer_secreted", "value": 7, "unit": "mg L-1",
             "quote": "Placeholder A | 7 | mg L-1", "isPrimary": True, "confidence": 0.8,
         },
-        {  # quote not verbatim → dropped, and no seed value agrees → nothing
+        {  # quote not verbatim → dropped, and no reference agrees → nothing
             "sectionId": "t1", "field": "time_to_colony", "value": 9, "unit": "d",
             "quote": "nine days, paraphrased", "isPrimary": True, "confidence": 0.8,
         },
@@ -238,13 +258,15 @@ GOOD = {
 }
 
 
+HELD: dict[str, list[dict]] = {}
+
+
 @pytest.fixture(autouse=True)
-def _offline(monkeypatch, tmp_path):
+def _offline(monkeypatch, tmp_path, held_documents):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
+    global HELD
+    HELD = held_documents
 
 
 @pytest.fixture
@@ -258,25 +280,33 @@ def test_runs_are_empty_until_something_is_extracted(client):
     assert overlay.runs == [] and overlay.candidates == []
 
 
-def test_runs_recompute_from_the_cache_against_the_seed(client, monkeypatch):
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    assert client.post("/api/intake/B5/fetch").json()["status"] == "complete"
+# Colony times reviewers typed for T5, a fictional paper.
+T5_TYPED = [
+    {"id": "cl1-T5-00000001", "paperId": "T5", "field": "time_to_colony", "value": 8.5, "unit": "d"},
+    {"id": "cl1-T5-00000002", "paperId": "T5", "field": "time_to_colony", "value": 8.5, "unit": "d"},
+    {"id": "cl1-T5-00000003", "paperId": "T5", "field": "time_to_colony", "value": 17.5, "unit": "d"},
+]
+
+
+def test_runs_recompute_from_the_projects_candidates_against_the_typed_values(client, monkeypatch):
+    monkeypatch.setattr(witness, "reviewed_records", lambda repo=None: T5_TYPED)
+    HELD["T5"] = structural_passages()
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
-    assert client.post("/api/intake/B5/extract").status_code == 200
+    assert client.post("/api/intake/T5/extract").status_code == 200
 
     runs = [ExtractRun.model_validate(r) for r in client.get("/api/witness/runs").json()]
     assert [r.run for r in runs] == ["claude-1"]
-    # B5's three seed records are time_to_colony; the extractor produced a
-    # titre for it and a paraphrased colony time that anchoring refused with
-    # a value the seed does not hold — so three misses, honestly.
-    assert outcomes(runs[0]) == {"r-B5-1": "miss", "r-B5-2": "miss", "r-B5-3": "miss"}
+    # The typed values are time_to_colony; the extractor produced a titre
+    # for T5 and a paraphrased colony time that anchoring refused with a
+    # value no reviewer typed — so three misses, honestly.
+    assert outcomes(runs[0]) == {"cl1-T5-00000001": "miss", "cl1-T5-00000002": "miss", "cl1-T5-00000003": "miss"}
 
     overlay = Overlay.model_validate(client.get("/api/biorepo/overlay").json())
     assert [r.run for r in overlay.runs] == ["claude-1"]
-    # The titre is new to B5 — the corpus growing — and it is in the overlay
-    # for Guild, not in the score.
+    # The titre is new to T5 — the project's records growing — and it is in
+    # the overlay for review, not in the score.
     assert [c.field for c in overlay.candidates] == ["titer_secreted"]
-    assert overlay.candidates[0].id == "cl1-B5-a07dd73c"
+    assert overlay.candidates[0].id == "cl1-T5-276fbb61"
     assert runs[0].falsePositives == []
 
 
@@ -286,30 +316,30 @@ def test_a_decision_stays_with_its_content_across_a_re_extraction(client, monkey
     # The rejection stays with the sentence it was about (kept as the file's
     # copy, no longer a false positive the extractor produces), and the new
     # candidate arrives undecided under its own id.
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    client.post("/api/intake/B5/fetch")
+    HELD["T5"] = structural_passages()
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
-    client.post("/api/intake/B5/extract")
+    client.post("/api/intake/T5/extract")
+    db.run(kit._link(projects.current(), "T5", {}, "test"))  # a decision stands on a document the project holds
     biorepo.write(ReviewDecision(status="rejected", provenance="unverified", reviewer="sean",
-                                 recordId="cl1-B5-a07dd73c", at="2026-09-15T00:00:00Z",
+                                 recordId="cl1-T5-276fbb61", at="2026-09-15T00:00:00Z",
                                  rejectReason="a placeholder row"))
-    assert [fp.id for fp in witness.runs()[0].falsePositives] == ["cl1-B5-a07dd73c"]
+    assert [fp.id for fp in witness.runs()[0].falsePositives] == ["cl1-T5-276fbb61"]
 
     other = {"candidates": [{
         "sectionId": "t1", "field": "titer_secreted", "value": 9, "unit": "mg L-1",
         "quote": "Placeholder B | 9 | mg L-1", "isPrimary": True, "confidence": 0.7,
     }]}
     monkeypatch.setattr(extract, "call_model", lambda *_: (other, extract.Usage()))
-    assert client.post("/api/intake/B5/extract?force=true").status_code == 200
+    assert client.post("/api/intake/T5/extract?force=true").status_code == 200
 
     runs_, candidates, decisions = witness.overlay_bundle()
-    assert [(c.id, c.value) for c in candidates] == [("cl1-B5-93a4e8a2", 9), ("cl1-B5-a07dd73c", 7)]
-    assert "cl1-B5-a07dd73c" in decisions and "cl1-B5-93a4e8a2" not in decisions
+    assert [(c.id, c.value) for c in candidates] == [("cl1-T5-da48b780", 9), ("cl1-T5-276fbb61", 7)]
+    assert "cl1-T5-276fbb61" in decisions and "cl1-T5-da48b780" not in decisions
     # The rejected 7 is still a false positive of the run: the file keeps it
     # and Witness measures what the extractor produced, then and now.
-    assert [fp.id for fp in runs_[0].falsePositives] == ["cl1-B5-a07dd73c"]
+    assert [fp.id for fp in runs_[0].falsePositives] == ["cl1-T5-276fbb61"]
     stored = biorepo.write(ReviewDecision(status="verified", provenance="unverified", reviewer="sean",
-                                          recordId="cl1-B5-93a4e8a2", at="2026-09-15T01:00:00Z"))
+                                          recordId="cl1-T5-da48b780", at="2026-09-15T01:00:00Z"))
     assert stored.status == "verified"
     assert sorted(c.value for c in biorepo.records()) == [7, 9]
 
@@ -320,12 +350,11 @@ def test_a_candidate_written_by_hand_is_shown_and_never_scored(client, monkeypat
     not extracted until the extractor runs over it, the candidate is never
     the extractor's match, and a rejection of it is not the extractor's
     false positive."""
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    assert client.post("/api/intake/B5/fetch").json()["status"] == "complete"
-    monkeypatch.setattr(witness, "seed_records", lambda: [
-        {"id": "r-B5-9", "paperId": "B5", "field": "titer_secreted", "value": 9, "unit": "mg L-1"},
+    HELD["T5"] = structural_passages()
+    monkeypatch.setattr(witness, "reviewed_records", lambda repo=None: [
+        {"id": "cl1-T5-00000009", "paperId": "T5", "field": "titer_secreted", "value": 9, "unit": "mg L-1"},
     ])
-    made, _, detail = extract.add_candidate("B5", {"sectionId": "t1", "field": "titer_secreted", "value": "9", "unit": "mg L-1",
+    made, _, detail = extract.add_candidate("T5", {"sectionId": "t1", "field": "titer_secreted", "value": "9", "unit": "mg L-1",
                                                    "quote": "Placeholder B | 9 | mg L-1"}, who="claude-haiku-5-5")
     assert made is not None, detail
     assert client.get("/api/witness/runs").json() == []
@@ -335,23 +364,21 @@ def test_a_candidate_written_by_hand_is_shown_and_never_scored(client, monkeypat
     asked = []
 
     def model(*_):
-        asked.append("B5")
+        asked.append("T5")
         return GOOD, extract.Usage()
 
     monkeypatch.setattr(extract, "call_model", model)
-    assert client.post("/api/intake/B5/extract").status_code == 200 and asked == ["B5"]
-    # A rejection of the hand-written one, as biorepo.json would keep it.
-    repo = biorepo.read()
-    repo.decisions[made.id] = ReviewDecision(status="rejected", provenance="unverified", reviewer="Sean Creighton",
-                                             recordId=made.id, at="2026-10-20T00:00:00Z", rejectReason="a placeholder row")
-    repo.records.append(made)
-    biorepo.PATH.write_text(repo.model_dump_json())
+    assert client.post("/api/intake/T5/extract").status_code == 200 and asked == ["T5"]
+    # A rejection of the hand-written one, kept as biorepo.write keeps it.
+    rejection = ReviewDecision(status="rejected", provenance="unverified", reviewer="Sean Creighton",
+                               recordId=made.id, at="2026-10-20T00:00:00Z", rejectReason="a placeholder row")
+    db.run(biorepo._keep(projects.current(), rejection, made, undo=False))
 
     [run] = witness.runs()
     # The extractor's 7 is the reading scored; the hand-written 9 would have matched.
-    assert outcomes(run) == {"r-B5-9": "value_mismatch"} and run.falsePositives == []
+    assert outcomes(run) == {"cl1-T5-00000009": "value_mismatch"} and run.falsePositives == []
     _, candidates, decisions = witness.overlay_bundle()
-    assert sorted(c.id for c in candidates) == sorted(["cl1-B5-a07dd73c", made.id]) and made.id in decisions
+    assert sorted(c.id for c in candidates) == sorted(["cl1-T5-276fbb61", made.id]) and made.id in decisions
 
 
 def test_a_range_candidate_matches_a_range_record_on_its_endpoints():
@@ -360,8 +387,8 @@ def test_a_range_candidate_matches_a_range_record_on_its_endpoints():
     # reporting the same measurement, and the run must score it as a match.
     low_end = cand("P1", "time_to_colony", 7, "d", 9)
     low_end = low_end.model_copy(update={"range": Range(low=7, high=10)})
-    seed = [{**r, "range": {"low": 7, "high": 10}} if r["id"] == "r-P1-3" else r for r in SEED]
-    run = witness.match_run([low_end], seed, papers={"P1"})
+    references = [{**r, "range": {"low": 7, "high": 10}} if r["id"] == "r-P1-3" else r for r in REFERENCES]
+    run = witness.match_run([low_end], references, papers={"P1"})
     assert outcomes(run)["r-P1-3"] == "match"
 
 
@@ -370,13 +397,13 @@ def test_the_closest_pair_is_the_match_not_the_first_one_tried():
     # order, the first record consumes the candidate the SECOND one is closer
     # to, and the second is left with one 2.9 % away — a value mismatch the
     # extractor did not earn. Both pairings agree; only one is right.
-    seed = [
+    references = [
         {"id": "r-Q1-1", "paperId": "Q1", "field": "titer_secreted", "value": 100, "unit": "g L\u207b\u00b9"},
         {"id": "r-Q1-2", "paperId": "Q1", "field": "titer_secreted", "value": 103, "unit": "g L\u207b\u00b9"},
     ]
     near = cand("Q1", "titer_secreted", 101.5, "g L\u207b\u00b9", 1)
     exact = cand("Q1", "titer_secreted", 100, "g L\u207b\u00b9", 2)
-    run = witness.match_run([near, exact], seed, papers={"Q1"})
+    run = witness.match_run([near, exact], references, papers={"Q1"})
     assert outcomes(run) == {"r-Q1-1": "match", "r-Q1-2": "match"}
     # And the closest candidate went to the record it is closest to.
     by_record = {r.goldRecordId: r.extracted.value for r in run.results if r.extracted}
@@ -384,14 +411,14 @@ def test_the_closest_pair_is_the_match_not_the_first_one_tried():
 
 
 def test_the_pairing_does_not_depend_on_the_order_the_candidates_arrive():
-    seed = [
+    references = [
         {"id": "r-Q1-1", "paperId": "Q1", "field": "titer_secreted", "value": 100, "unit": "g L\u207b\u00b9"},
         {"id": "r-Q1-2", "paperId": "Q1", "field": "titer_secreted", "value": 103, "unit": "g L\u207b\u00b9"},
     ]
     near = cand("Q1", "titer_secreted", 101.5, "g L\u207b\u00b9", 1)
     exact = cand("Q1", "titer_secreted", 100, "g L\u207b\u00b9", 2)
-    one = witness.match_run([near, exact], seed, papers={"Q1"})
-    other = witness.match_run([exact, near], seed, papers={"Q1"})
+    one = witness.match_run([near, exact], references, papers={"Q1"})
+    other = witness.match_run([exact, near], references, papers={"Q1"})
     assert outcomes(one) == outcomes(other)
     assert [r.extracted.value for r in one.results if r.extracted] == [
         r.extracted.value for r in other.results if r.extracted
@@ -403,7 +430,7 @@ def test_a_dropped_candidate_whose_value_is_a_numeric_string_is_still_a_span_err
     # that writes "4,200" has agreed with 4.2 g/L. Compared as a category,
     # the string could never score a span_error, so exactly the emissions
     # the prompt invites were scored as misses (OF-BLD-012.1 §6.9).
-    run = witness.match_run([], SEED, papers={"P1"}, dropped=[dropped("P1", "titer_secreted", "4,200", "mg/L")])
+    run = witness.match_run([], REFERENCES, papers={"P1"}, dropped=[dropped("P1", "titer_secreted", "4,200", "mg/L")])
     assert outcomes(run)["r-P1-1"] == "span_error"
     extracted = next(r.extracted for r in run.results if r.goldRecordId == "r-P1-1")
     assert extracted == Quantity(value="4,200", unit="mg/L"), "what the model wrote is what Witness shows"
@@ -412,17 +439,15 @@ def test_a_dropped_candidate_whose_value_is_a_numeric_string_is_still_a_span_err
 def test_a_run_names_the_models_that_answered(client, monkeypatch):
     # Witness shows which model a run used, read from each paper's
     # usage.models, never typed into the screen (live test, 2026-10-16).
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    client.post("/api/intake/B5/fetch")
+    HELD["T5"] = structural_passages()
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage(models=["claude-haiku-5-5"])))
-    client.post("/api/intake/B5/extract")
+    client.post("/api/intake/T5/extract")
     runs = [ExtractRun.model_validate(r) for r in client.get("/api/witness/runs").json()]
     assert runs[0].models == ["claude-haiku-5-5"]
 
 
 def test_a_run_with_no_recorded_model_says_none(client, monkeypatch):
-    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
-    client.post("/api/intake/B5/fetch")
+    HELD["T5"] = structural_passages()
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
-    client.post("/api/intake/B5/extract")
+    client.post("/api/intake/T5/extract")
     assert witness.runs()[0].models == []

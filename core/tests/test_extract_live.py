@@ -1,6 +1,7 @@
-"""Extraction against the real model (OF-BLD-012 §6.1).
+"""Extraction against the real model (OF-BLD-012 §6.1; ADR-002).
 
-Marked `live`: needs the network for the fetch, a key for the call, and it
+Marked `live` and `lit`: needs the network for the fetch, FastEmbed's model to
+store the paper in the project's literature, a key for the call, and it
 spends money — one model call (Opus, or Sonnet on fallback) over one paper. Excluded from `pnpm verify`;
 run with `pnpm test:live`. Prints the per-paper usage so the cost of a real
 extraction is a number somebody has seen rather than an estimate.
@@ -11,9 +12,9 @@ import os
 
 import pytest
 
-from openferment_core import extract, intake
+from openferment_core import extract, intake, projects
 
-pytestmark = pytest.mark.live
+pytestmark = [pytest.mark.live, pytest.mark.lit]
 
 needs_key = pytest.mark.skipif(
     not os.environ.get("ANTHROPIC_API_KEY"),
@@ -22,11 +23,11 @@ needs_key = pytest.mark.skipif(
 
 
 @needs_key
-def test_h1_extracts_at_least_one_anchored_candidate():
-    fetched = intake.fetch_paper({"id": "H1", "pmcid": "PMC12292773"})
-    assert fetched.status == "complete", fetched.reason
+def test_h1_extracts_at_least_one_anchored_candidate(kit_database):
+    collected = intake.collect("PMC12292773", project_id=projects.current(), by="the live test")
+    assert collected.documentId, collected.reason
 
-    result = extract.extract_paper("H1", force=True)
+    result = extract.extract_paper(collected.documentId, force=True)
     print(
         f"\nH1: {len(result.candidates)} anchored, {result.rejected} rejected "
         f"({', '.join(f'{k}={v}' for k, v in result.rejectionReasons.items() if v) or 'none'}), "

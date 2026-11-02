@@ -11,7 +11,6 @@ to the centrifuge. Nothing here starts BioSTEAM, reads a key or the network.
 from __future__ import annotations
 
 import importlib.util
-import json
 from pathlib import Path
 
 import pytest
@@ -19,10 +18,10 @@ from fastapi.testclient import TestClient
 
 from openferment_core import intake, module_stores, pureos, tools
 from openferment_core.models import Artifact, BasisInput, BasisSource
+from openferment_core.validate import unit_operations
 from test_module_tools import ctx_for, read
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 
-PROTOTYPE = Path(__file__).parent / "fixtures" / "prototype"
 LINE = "aaaaaaaaaaaaaaa1"
 
 
@@ -251,7 +250,7 @@ def test_product_that_enters_a_unit_on_the_path_and_does_not_leave_it_is_lost_th
 SCENARIOS = [
     {"id": "sc-a", "name": "A", "kind": "biosteam", "modelId": "test_line", "program": None},
     {"id": "sc-x", "name": "X", "kind": "authored", "modelId": "test_line", "program": None},
-    {"id": "sc-p", "name": "P", "kind": "biosteam", "modelId": "pha_sugar_v0", "program": "pha"},
+    {"id": "sc-o", "name": "O", "kind": "biosteam", "modelId": "test_other", "program": None},
 ]
 
 
@@ -263,15 +262,12 @@ def test_a_run_belongs_to_the_one_seed_scenario_of_its_flowsheet_or_to_its_own_s
     assert pureos.scenario_of(_art(), two) == (None, None)
 
 
-def test_trains_keep_the_newest_run_of_each_scenario_and_hide_an_archived_program():
+def test_trains_keep_the_newest_run_of_each_scenario():
     old, new = _art("aaaaaaaaaaaaaaa1", created="2026-10-01T00:00:00Z"), _art("aaaaaaaaaaaaaaa2", created="2026-10-02T00:00:00Z")
-    pha = _art("aaaaaaaaaaaaaaa3", flowsheet="pha_sugar_v0", created="2026-09-01T00:00:00Z")
+    elsewhere = _art("aaaaaaaaaaaaaaa3", flowsheet="test_other", created="2026-09-01T00:00:00Z")
     other = _art("aaaaaaaaaaaaaaa4", tool="kinetic_fit")
-    every = pureos.trains(True, arts=[old, pha, new, other], scenarios=SCENARIOS)
-    assert [(t.scenarioId, t.artifactId, t.runs) for t in every] == [("sc-a", new.id, 2), ("sc-p", pha.id, 1)]
-    assert every[1].program == "pha"
-    shown = pureos.trains(False, arts=[old, pha, new, other], scenarios=SCENARIOS)
-    assert [t.scenarioId for t in shown] == ["sc-a"]
+    every = pureos.trains(arts=[old, elsewhere, new, other], scenarios=SCENARIOS)
+    assert [(t.scenarioId, t.artifactId, t.runs) for t in every] == [("sc-a", new.id, 2), ("sc-o", elsewhere.id, 1)]
 
 
 def test_a_train_opens_by_scenario_or_by_run_and_refuses_anything_else_in_words():
@@ -291,14 +287,17 @@ def test_a_train_opens_by_scenario_or_by_run_and_refuses_anything_else_in_words(
 
 @pytest.fixture()
 def stored(tmp_path, monkeypatch):
+    """Two runs on file: the line, which no scenario claims here, and a run
+    of another flowsheet whose basis names its scenario."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    folder = tmp_path / "artifacts"
-    folder.mkdir()
-    kept = json.loads((PROTOTYPE / "artifacts.json").read_text(encoding="utf-8"))["response"]
-    run = next(a for a in kept if a["tool"] == "proforma.run")
-    for a in (_art(), Artifact.model_validate(run)):
-        (folder / f"{a.id}.json").write_text(a.model_dump_json(), encoding="utf-8")
-    return run
+    from standins import plant_artifact
+
+    named = _art("aaaaaaaaaaaaaaa5", flowsheet="test_other", created="2026-10-21T10:00:00Z", inputs=[
+        BasisInput(name="flowsheet", value="test_other", unit="", source=BasisSource(kind="convention")),
+        BasisInput(name="scenario", value="sc-o", unit="", source=BasisSource(kind="convention"))])
+    for a in (_art(), named):
+        plant_artifact(a)
+    return named
 
 
 def _client():
@@ -307,21 +306,18 @@ def _client():
     return TestClient(api.app, base_url="http://127.0.0.1")
 
 
-def test_get_trains_lists_one_a_scenario_and_takes_the_switch_from_the_request(stored):
-    c = _client()
-    off = c.get("/api/pureos/trains").json()
-    on = c.get("/api/pureos/trains?includeArchived=true").json()
-    assert [t["artifactId"] for t in off] == [LINE], "the PHA run is hidden with the switch off"
-    assert {t["artifactId"] for t in on} == {LINE, stored["id"]}
-    pha = next(t for t in on if t["artifactId"] == stored["id"])
-    assert (pha["scenarioId"], pha["program"], pha["product"], pha["unitCount"]) == ("sc-pha-1", "pha", "PHB", 3)
-    assert pha["overallRecovery"] == pytest.approx(0.95)
+def test_get_trains_lists_every_run_and_one_a_scenario(stored):
+    listed = _client().get("/api/pureos/trains").json()
+    assert {t["artifactId"] for t in listed} == {LINE, stored.id}
+    named = next(t for t in listed if t["artifactId"] == stored.id)
+    assert (named["scenarioId"], named["flowsheet"], named["unitCount"]) == ("sc-o", "test_other", 4)
+    assert named["overallRecovery"] == pytest.approx(0.9)
 
 
 def test_get_train_reads_by_scenario_or_run_and_404s_in_words(stored):
     c = _client()
-    by_scenario = c.get("/api/pureos/train/sc-pha-1").json()
-    assert by_scenario["artifactId"] == stored["id"] and [u["id"] for u in by_scenario["units"]] == ["R1", "C1", "D1"]
+    by_scenario = c.get("/api/pureos/train/sc-o").json()
+    assert by_scenario["artifactId"] == stored.id and [u["id"] for u in by_scenario["units"]] == ["R", "C", "D", "W"]
     assert c.get(f"/api/pureos/train/{LINE}").json()["overallRecovery"] == pytest.approx(0.9)
     missing = c.get("/api/pureos/train/sc-nothing")
     assert missing.status_code == 404 and "run the scenario in Proforma" in missing.json()["detail"]
@@ -332,12 +328,13 @@ def test_the_page_and_pureos_read_give_one_train_one_provenance(tmp_path, monkey
     the pool is worth less now. pureos_read worked that out from its inputs;
     the page served the file's word. Both read it as it stands now."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    (tmp_path / "artifacts").mkdir()
+    from standins import plant_artifact
+
     inputs = [BasisInput(name="flowsheet", value="test_line", unit="", source=BasisSource(kind="convention")),
               BasisInput(name="titre", value="a record", unit="", source=BasisSource(kind="record", id="gone-record-1"))]
     a = _art(inputs=inputs)
     assert a.provenance == "computed"
-    (tmp_path / "artifacts" / f"{a.id}.json").write_text(a.model_dump_json(), encoding="utf-8")
+    plant_artifact(a)
     row = read("pureos", ctx_for(pool, artifacts=lambda: [a]), ids=[LINE], kind="train").rows[0]
     c = _client()
     page = c.get(f"/api/pureos/train/{LINE}").json()
@@ -346,57 +343,24 @@ def test_the_page_and_pureos_read_give_one_train_one_provenance(tmp_path, monkey
     assert page["provenance"] == listed["provenance"] == row.provenance
 
 
-def test_the_double_serves_what_the_code_reads_from_the_same_run():
-    """The double's train is the one the real code reads from the run
-    artifacts.json carries (test_demo holds the files to demo.py)."""
-    kept = json.loads((PROTOTYPE / "artifacts.json").read_text(encoding="utf-8"))["response"]
-    run = Artifact.model_validate(next(a for a in kept if a["tool"] == "proforma.run"))
-    served = json.loads((PROTOTYPE / "pureos-train.json").read_text(encoding="utf-8"))["response"]
-    assert pureos.train_of(run).model_dump(mode="json") == served
-
-
-def test_every_run_the_double_keeps_has_its_train_listed_and_served():
-    """OF-BLD-019 §7.R (finding 0): the double keeps sc-pha-1's run and
-    sc-yeast-1's, and lists and serves a train for each, so pureOS → Train
-    after a run of the yeast scenario is drawn by the browser tests."""
-    kept = json.loads((PROTOTYPE / "artifacts.json").read_text(encoding="utf-8"))["response"]
-    runs = [Artifact.model_validate(a) for a in kept if a["tool"] == "proforma.run"]
-    assert len(runs) >= 2
-    listed = json.loads((PROTOTYPE / "pureos-trains-archived.json").read_text(encoding="utf-8"))["response"]
-    active = json.loads((PROTOTYPE / "pureos-trains.json").read_text(encoding="utf-8"))["response"]
-    served = [json.loads((PROTOTYPE / f).read_text(encoding="utf-8"))["response"]
-              for f in ("pureos-train.json", "pureos-train-yeast.json")]
-    assert {r.id for r in runs} == {t["artifactId"] for t in listed} == {t["artifactId"] for t in served}
-    assert [t["scenarioId"] for t in active] == ["sc-yeast-1"]
-    for run in runs:
-        assert pureos.train_of(run).model_dump(mode="json") in served
-
-
 # ── pureos_read: trains and their units, by id ───────────────────────────
 
 
 def test_pureos_read_finds_a_train_and_its_units_by_scenario_or_by_run(pool):  # noqa: F811
-    kept = json.loads((PROTOTYPE / "artifacts.json").read_text(encoding="utf-8"))["response"]
-    run = Artifact.model_validate(next(a for a in kept if a["tool"] == "proforma.run"))
+    run = _art(inputs=[BasisInput(name="flowsheet", value="test_line", unit="", source=BasisSource(kind="convention")),
+                       BasisInput(name="scenario", value="sc-mine", unit="", source=BasisSource(kind="convention"))])
     ctx = ctx_for(pool, artifacts=lambda: [run])
-    got = read("pureos", ctx, ids=["sc-pha-1"])
-    assert [(r.kind, r.id) for r in got.rows] == [("train", "sc-pha-1"), ("train-unit", "sc-pha-1:R1"),
-                                                  ("train-unit", "sc-pha-1:C1"), ("train-unit", "sc-pha-1:D1")]
-    train, c1 = got.rows[0], got.rows[2]
-    assert train.ref == "pureos/train/sc-pha-1" and train.provenance == "demo"
-    assert train.detail["artifactId"] == run.id and train.detail["overallRecovery"] == pytest.approx(0.95)
-    assert c1.detail["recovery"] == pytest.approx(0.95) and c1.detail["lostTo"] == ["spent_medium"]
+    got = read("pureos", ctx, ids=["sc-mine"])
+    assert [(r.kind, r.id) for r in got.rows] == [("train", "sc-mine"), ("train-unit", "sc-mine:R"),
+                                                  ("train-unit", "sc-mine:C"), ("train-unit", "sc-mine:D"),
+                                                  ("train-unit", "sc-mine:W")]
+    train, c = got.rows[0], got.rows[2]
+    assert train.ref == "pureos/train/sc-mine" and train.provenance == "computed"
+    assert train.detail["artifactId"] == run.id and train.detail["overallRecovery"] == pytest.approx(0.9)
+    assert c.detail["recovery"] == pytest.approx(47.0 / 52.0) and c.detail["lostTo"] == ["centrate"]
     by_run = read("pureos", ctx, ids=[run.id], kind="train-unit")
-    assert [r.id for r in by_run.rows] == ["sc-pha-1:R1", "sc-pha-1:C1", "sc-pha-1:D1"]
+    assert [r.id for r in by_run.rows] == ["sc-mine:R", "sc-mine:C", "sc-mine:D", "sc-mine:W"]
     assert read("pureos", ctx, kind="train").summary["count"] == 1
-
-
-def test_an_archived_train_is_hidden_and_a_read_by_its_id_says_whose(pool):  # noqa: F811
-    kept = json.loads((PROTOTYPE / "artifacts.json").read_text(encoding="utf-8"))["response"]
-    run = Artifact.model_validate(next(a for a in kept if a["tool"] == "proforma.run"))
-    ctx = ctx_for(pool, include_archived=False, artifacts=lambda: [run])
-    got = read("pureos", ctx, ids=["sc-pha-1"])
-    assert got.rows == [] and "PHA" in got.summary["hidden"]
 
 
 def test_the_kinds_name_trains_and_the_registry_stays_closed():
@@ -434,7 +398,7 @@ def _biosteam_unit_classes() -> set[str]:
 
 
 def test_every_class_the_vocabulary_names_is_one_biosteam_defines_and_names_one_step():
-    ops = module_stores._projection()["pureos"]["unitOperations"]
+    ops = unit_operations()
     named = [(c, o["id"]) for o in ops for c in o.get("biosteamClasses") or []]
     assert named, "the vocabulary names no BioSTEAM class"
     assert len({c for c, _ in named}) == len(named), "a BioSTEAM class names two steps"
@@ -462,7 +426,7 @@ def test_the_ethanol_train_loses_at_the_beer_column_and_the_exchanger_passes_on_
     proforma.start(background=False)
     a = [InputAssumption(key=k, value=v, low=v, high=v, by="openFerment test fixture", at="2026-10-20")
          for k, v in ETHANOL_STANDIN.items()]
-    tr = pureos.train_of(proforma.run_flowsheet("ethanol_glucose_v0", a, samples=1, seed=1, scenario_id="sc-yeast-1"),
+    tr = pureos.train_of(proforma.run_flowsheet("ethanol_glucose_v0", a, samples=1, seed=1, scenario_id="sc-k3x9q-1"),
                          scenarios=[])
     u = _by(tr)
     assert tr.product == "Ethanol" and tr.productStream == "ethanol"

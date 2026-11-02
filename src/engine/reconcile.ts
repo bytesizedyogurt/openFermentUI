@@ -25,7 +25,7 @@ export interface Delta {
   pctDelta: number;
   /** Whether the operator ever read the observed value back (§4.4). */
   confirmed: boolean;
-  /** The prediction's kind; a seeded prediction is a point. */
+  /** The prediction's kind; a prediction with none is a point. */
   kind: PredictionKind;
   /** Held or missed, decided by `holds` for every kind. */
   held: boolean;

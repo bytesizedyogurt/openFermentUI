@@ -1,0 +1,38 @@
+# The tag registry: the single source of truth for SFF tag names, their
+# check subsets, and their tolerated-skip policies (sff_checks.md section 8).
+# Key order defines the canonical tag order. The schema's metadata.tags enum
+# mirrors these names (sync pinned by tests/tier1/test_tag_registry.py).
+# Condition names under tolerated_skips must exist in the validator's
+# condition map (_TOLERATED_SKIP_CONDITIONS); unknown names are rejected at
+# load time. A `harness`-class tag carries no subset/tolerated_skips/
+# required_metadata -- its earning rule is code (verify_reproducible).
+# required_metadata lists metadata fields a static tag needs present (any
+# value; the schema types each field) to be earned; the schema's metadata
+# if/then rules mirror it
+# for declared tags (sync pinned by tests/tier1/test_tag_registry.py).
+tags:
+  exported-from-simulator:
+    class: static
+    subset: all            # sentinel: every check id that ran
+    tolerated_skips:
+      STR-03: always
+      STR-13: always
+      CHEM-04: always
+      STR-10: all_streams_empty
+      UNIT-04: no_reactions
+      UNIT-05: no_reactions
+      UNIT-06: no_reactions
+  extracted-from-prose:
+    class: static
+    subset: [UNIT-10, STR-14]     # tolerated_skips omitted => none
+    required_metadata: [prose_type, extraction_method]
+  extracted-from-image:
+    class: static
+    subset: [UNIT-10, STR-14]
+    required_metadata: [image_type, extraction_method]
+  extracted-from-table:
+    class: static
+    subset: [UNIT-10, STR-14]
+    required_metadata: [prose_type, extraction_method]
+  reproducible:
+    class: harness

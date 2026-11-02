@@ -1,15 +1,12 @@
 // Purpose-built unit engine for the openFerment ontology (OF-DES-001 §7.5).
 // Linear families use factor-to-base; temperature is affine.
 //
-// THE TABLES ARE DATA THAT CROSSES THE BOUNDARY (OF-BLD-012 §5.3). `U`,
-// `ALIASES`, `SI_UNIT` and `REFUSALS` are exported so `scripts/export-corpus.ts`
-// can ship them to the Python service verbatim, and `core/openferment_core/
-// units.py` normalises and converts from the same table rather than from a
-// second one somebody typed in by hand. The FUNCTIONS stay here and are the
-// reference implementation: `scripts/export-unit-fixtures.ts` records what
-// they answer for a fixed set of inputs, and the Python test asserts the same
-// answers on every pair. If the two sides ever disagree, this side is right and
-// the test says so.
+// THE SERVICE HOLDS THE SAME TABLES (OF-BLD-012 §5.3). `core/openferment_core/
+// units.py` normalises and converts from core/openferment_core/schema/
+// units.json, and this file is the browser's mirror of it, held to it by test:
+// `scripts/export-unit-fixtures.ts` records what these functions answer for a
+// fixed set of inputs, and test_units.py asserts the service answers the same
+// on every pair. A disagreement fails the test and names the pair.
 
 export interface UnitDef {
   family: string;
@@ -113,7 +110,7 @@ export const U: Record<string, UnitDef> = {
   Da: { family: 'molarMass', factor: 1, label: 'Da' },
   kDa: { family: 'molarMass', factor: 1000, label: 'kDa' },
 
-  // ── the yeast-ethanol program (thread Q) ────────────────────────────
+  // ── yeast ethanol and its techno-economics ──────────────────────────
   // A price per US gallon, as ethanol techno-economic analyses quote one.
   // Its OWN family, not `costUSD`: a gallon is a volume and a kilogram a
   // mass, and between them stands the product's density, which a unit
@@ -169,7 +166,7 @@ export const REFUSALS: { a: string; b: string; because: string }[] = [
       'A rate in moles per gram per hour and one in grams per gram per hour differ by the molar mass of what is taken up or made. Record which substance it is and convert by its molar mass as a stated step; the engine will not assume it.',
   },
   {
-    // Thread Q: a minimum ethanol selling price and minimum_selling_price.
+    // A minimum ethanol selling price and minimum_selling_price.
     a: 'costUSDVolume',
     b: 'costUSD',
     because:
@@ -307,7 +304,7 @@ export const ALIASES: Record<string, string> = {
   '% (w/w)': '% CDW',
   kda: 'kDa',
   'kg/mol': 'kDa',
-  // Thread Q. How techno-economic analyses write a price per gallon or per
+  // How techno-economic analyses write a price per gallon or per
   // kilogram; every spelling names its currency and its denominator.
   '$/gal': 'USD gal⁻¹',
   'USD/gal': 'USD gal⁻¹',
@@ -322,7 +319,7 @@ export const ALIASES: Record<string, string> = {
   'usd per gallon': 'USD gal⁻¹',
   '$/kg': 'USD kg⁻¹',
   'USD/kg': 'USD kg⁻¹',
-  // Thread Q's papers. A dot or nothing between the factors, and an hour
+  // Ethanol papers' spellings. A dot or nothing between the factors, and an hour
   // written out; each spelling is one unit and no other.
   'g.l-1': 'g L⁻¹',
   'g.l−1': 'g L⁻¹',

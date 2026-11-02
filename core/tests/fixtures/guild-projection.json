@@ -1,0 +1,1033 @@
+{
+  "_fixture": "TEST FIXTURE: Guild's projection in the shape alpha 1.0 exported (skills.json): skill ids, families, criticality and the ladder's policy, the steps that tag them and the lessons that count toward them. Every text is a placeholder: the authored skills and protocols left with the seed (alpha 2.0, ADR-010). Tests read it; the service ships with no skill.",
+  "skills": [
+    {
+      "id": "SK-ASEP",
+      "name": "Aseptic transfer",
+      "family": "contamination",
+      "summary": "Test skill SK-ASEP (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-ASEP (placeholder).",
+        "Criterion B of SK-ASEP (placeholder).",
+        "Criterion C of SK-ASEP (placeholder).",
+        "Criterion D of SK-ASEP (placeholder)."
+      ],
+      "criticality": "critical",
+      "recencyDays": 90,
+      "supervisedRuns": 3,
+      "prerequisites": []
+    },
+    {
+      "id": "SK-STER",
+      "name": "Vessel sterilisation",
+      "family": "contamination",
+      "summary": "Test skill SK-STER (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-STER (placeholder).",
+        "Criterion B of SK-STER (placeholder).",
+        "Criterion C of SK-STER (placeholder).",
+        "Criterion D of SK-STER (placeholder)."
+      ],
+      "criticality": "critical",
+      "recencyDays": 120,
+      "supervisedRuns": 2,
+      "prerequisites": [
+        "SK-PRESS"
+      ]
+    },
+    {
+      "id": "SK-HOLD",
+      "name": "Sterility release",
+      "family": "contamination",
+      "summary": "Test skill SK-HOLD (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-HOLD (placeholder).",
+        "Criterion B of SK-HOLD (placeholder).",
+        "Criterion C of SK-HOLD (placeholder)."
+      ],
+      "criticality": "critical",
+      "recencyDays": 120,
+      "supervisedRuns": 2,
+      "prerequisites": [
+        "SK-STER"
+      ]
+    },
+    {
+      "id": "SK-ISOL",
+      "name": "Isolation and drain",
+      "family": "vessel",
+      "summary": "Test skill SK-ISOL (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-ISOL (placeholder).",
+        "Criterion B of SK-ISOL (placeholder).",
+        "Criterion C of SK-ISOL (placeholder).",
+        "Criterion D of SK-ISOL (placeholder)."
+      ],
+      "criticality": "critical",
+      "recencyDays": 90,
+      "supervisedRuns": 2,
+      "prerequisites": [
+        "SK-PRESS"
+      ]
+    },
+    {
+      "id": "SK-CIP",
+      "name": "Clean-in-place cycle",
+      "family": "vessel",
+      "summary": "Test skill SK-CIP (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-CIP (placeholder).",
+        "Criterion B of SK-CIP (placeholder).",
+        "Criterion C of SK-CIP (placeholder).",
+        "Criterion D of SK-CIP (placeholder)."
+      ],
+      "criticality": "critical",
+      "recencyDays": 90,
+      "supervisedRuns": 3,
+      "prerequisites": [
+        "SK-CAUSTIC"
+      ]
+    },
+    {
+      "id": "SK-ASSY",
+      "name": "Strip, inspect, reassemble",
+      "family": "vessel",
+      "summary": "Test skill SK-ASSY (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-ASSY (placeholder).",
+        "Criterion B of SK-ASSY (placeholder).",
+        "Criterion C of SK-ASSY (placeholder).",
+        "Criterion D of SK-ASSY (placeholder)."
+      ],
+      "criticality": "routine",
+      "recencyDays": 180,
+      "supervisedRuns": 2,
+      "prerequisites": []
+    },
+    {
+      "id": "SK-PROBE",
+      "name": "Probe service",
+      "family": "monitoring",
+      "summary": "Test skill SK-PROBE (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-PROBE (placeholder).",
+        "Criterion B of SK-PROBE (placeholder).",
+        "Criterion C of SK-PROBE (placeholder)."
+      ],
+      "criticality": "routine",
+      "recencyDays": 90,
+      "supervisedRuns": 2,
+      "prerequisites": []
+    },
+    {
+      "id": "SK-ENV",
+      "name": "Culture environment set-up",
+      "family": "monitoring",
+      "summary": "Test skill SK-ENV (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-ENV (placeholder).",
+        "Criterion B of SK-ENV (placeholder).",
+        "Criterion C of SK-ENV (placeholder)."
+      ],
+      "criticality": "routine",
+      "recencyDays": 180,
+      "supervisedRuns": 1,
+      "prerequisites": []
+    },
+    {
+      "id": "SK-OD",
+      "name": "OD750 reading",
+      "family": "qc",
+      "summary": "Test skill SK-OD (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-OD (placeholder).",
+        "Criterion B of SK-OD (placeholder).",
+        "Criterion C of SK-OD (placeholder)."
+      ],
+      "criticality": "routine",
+      "recencyDays": 60,
+      "supervisedRuns": 3,
+      "prerequisites": []
+    },
+    {
+      "id": "SK-DCW",
+      "name": "Dry cell weight",
+      "family": "qc",
+      "summary": "Test skill SK-DCW (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-DCW (placeholder).",
+        "Criterion B of SK-DCW (placeholder).",
+        "Criterion C of SK-DCW (placeholder).",
+        "Criterion D of SK-DCW (placeholder)."
+      ],
+      "criticality": "routine",
+      "recencyDays": 120,
+      "supervisedRuns": 2,
+      "prerequisites": []
+    },
+    {
+      "id": "SK-FACTOR",
+      "name": "OD-to-DCW factor",
+      "family": "qc",
+      "summary": "Test skill SK-FACTOR (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-FACTOR (placeholder).",
+        "Criterion B of SK-FACTOR (placeholder).",
+        "Criterion C of SK-FACTOR (placeholder)."
+      ],
+      "criticality": "routine",
+      "recencyDays": 365,
+      "supervisedRuns": 1,
+      "prerequisites": [
+        "SK-OD",
+        "SK-DCW"
+      ]
+    },
+    {
+      "id": "SK-LOG",
+      "name": "Vessel log and batch sheet",
+      "family": "records",
+      "summary": "Test skill SK-LOG (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-LOG (placeholder).",
+        "Criterion B of SK-LOG (placeholder).",
+        "Criterion C of SK-LOG (placeholder)."
+      ],
+      "criticality": "critical",
+      "recencyDays": 90,
+      "supervisedRuns": 2,
+      "prerequisites": []
+    },
+    {
+      "id": "SK-CAUSTIC",
+      "name": "Caustic and acid handling",
+      "family": "safety",
+      "summary": "Test skill SK-CAUSTIC (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-CAUSTIC (placeholder).",
+        "Criterion B of SK-CAUSTIC (placeholder).",
+        "Criterion C of SK-CAUSTIC (placeholder)."
+      ],
+      "criticality": "critical",
+      "recencyDays": 180,
+      "supervisedRuns": 1,
+      "prerequisites": []
+    },
+    {
+      "id": "SK-PRESS",
+      "name": "Pressure and heat safety",
+      "family": "safety",
+      "summary": "Test skill SK-PRESS (placeholder summary).",
+      "mastery": [
+        "Criterion A of SK-PRESS (placeholder).",
+        "Criterion B of SK-PRESS (placeholder).",
+        "Criterion C of SK-PRESS (placeholder)."
+      ],
+      "criticality": "critical",
+      "recencyDays": 180,
+      "supervisedRuns": 1,
+      "prerequisites": []
+    }
+  ],
+  "steps": [
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s1",
+      "skills": [
+        "SK-ENV"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s2",
+      "skills": [
+        "SK-ENV"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s3",
+      "skills": [
+        "SK-ASEP"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s4",
+      "skills": [
+        "SK-ASEP"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s5",
+      "skills": [
+        "SK-ASEP"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s6",
+      "skills": []
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s7",
+      "skills": [
+        "SK-OD"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s8",
+      "skills": [
+        "SK-OD"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s9",
+      "skills": [
+        "SK-ASEP"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s10",
+      "skills": [
+        "SK-ASEP"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s11",
+      "skills": []
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s12",
+      "skills": [
+        "SK-OD"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s13",
+      "skills": [
+        "SK-FACTOR"
+      ]
+    },
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "stepId": "s14",
+      "skills": [
+        "SK-LOG"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o1",
+      "skills": [
+        "SK-DCW"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o2",
+      "skills": [
+        "SK-DCW"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o3",
+      "skills": [
+        "SK-OD"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o4",
+      "skills": [
+        "SK-OD"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o5",
+      "skills": [
+        "SK-DCW"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o6",
+      "skills": [
+        "SK-DCW"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o7",
+      "skills": [
+        "SK-DCW"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o8",
+      "skills": [
+        "SK-DCW"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o9",
+      "skills": [
+        "SK-DCW"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o10",
+      "skills": [
+        "SK-FACTOR"
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "stepId": "o11",
+      "skills": [
+        "SK-FACTOR",
+        "SK-LOG"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c1",
+      "skills": [
+        "SK-ISOL",
+        "SK-PRESS"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c2",
+      "skills": [
+        "SK-ASSY"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c3",
+      "skills": [
+        "SK-CIP"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c4",
+      "skills": [
+        "SK-CIP",
+        "SK-CAUSTIC"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c5",
+      "skills": [
+        "SK-CIP",
+        "SK-CAUSTIC"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c6",
+      "skills": [
+        "SK-CIP",
+        "SK-CAUSTIC"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c7",
+      "skills": [
+        "SK-ASSY"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c8",
+      "skills": [
+        "SK-ASSY"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c9",
+      "skills": [
+        "SK-ASSY",
+        "SK-LOG"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c10",
+      "skills": [
+        "SK-PROBE"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c11",
+      "skills": [
+        "SK-STER",
+        "SK-PRESS"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c12",
+      "skills": [
+        "SK-HOLD"
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "stepId": "c13",
+      "skills": [
+        "SK-LOG"
+      ]
+    }
+  ],
+  "lessons": [
+    {
+      "lessonId": "l6-1",
+      "skills": [
+        "SK-OD",
+        "SK-DCW"
+      ]
+    },
+    {
+      "lessonId": "l6-2",
+      "skills": [
+        "SK-CIP",
+        "SK-CAUSTIC"
+      ]
+    },
+    {
+      "lessonId": "l6-3",
+      "skills": [
+        "SK-STER",
+        "SK-HOLD"
+      ]
+    }
+  ],
+  "protocols": [
+    {
+      "protocolId": "PR-SEED-01",
+      "version": "1.0",
+      "title": "Test protocol PR-SEED-01",
+      "baseBatch": "a test batch",
+      "steps": [
+        {
+          "stepId": "s1",
+          "text": "Test step s1 of PR-SEED-01 (placeholder text).",
+          "note": "Test note on step s1 (placeholder).",
+          "skills": [
+            "SK-ENV"
+          ]
+        },
+        {
+          "stepId": "s2",
+          "text": "Test step s2 of PR-SEED-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-ENV"
+          ]
+        },
+        {
+          "stepId": "s3",
+          "text": "Test step s3 of PR-SEED-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-ASEP"
+          ]
+        },
+        {
+          "stepId": "s4",
+          "text": "Test step s4 of PR-SEED-01 (placeholder text).",
+          "note": "Test note on step s4 (placeholder).",
+          "skills": [
+            "SK-ASEP"
+          ]
+        },
+        {
+          "stepId": "s5",
+          "text": "Test step s5 of PR-SEED-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-ASEP"
+          ]
+        },
+        {
+          "stepId": "s6",
+          "text": "Test step s6 of PR-SEED-01 (placeholder text).",
+          "note": "Test note on step s6 (placeholder).",
+          "skills": []
+        },
+        {
+          "stepId": "s7",
+          "text": "Test step s7 of PR-SEED-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-OD"
+          ]
+        },
+        {
+          "stepId": "s8",
+          "text": "Test step s8 of PR-SEED-01 (placeholder text).",
+          "note": "Test note on step s8 (placeholder).",
+          "skills": [
+            "SK-OD"
+          ]
+        },
+        {
+          "stepId": "s9",
+          "text": "Test step s9 of PR-SEED-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-ASEP"
+          ]
+        },
+        {
+          "stepId": "s10",
+          "text": "Test step s10 of PR-SEED-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-ASEP"
+          ]
+        },
+        {
+          "stepId": "s11",
+          "text": "Test step s11 of PR-SEED-01 (placeholder text).",
+          "note": null,
+          "skills": []
+        },
+        {
+          "stepId": "s12",
+          "text": "Test step s12 of PR-SEED-01 (placeholder text).",
+          "note": "Test note on step s12 (placeholder).",
+          "skills": [
+            "SK-OD"
+          ]
+        },
+        {
+          "stepId": "s13",
+          "text": "Test step s13 of PR-SEED-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-FACTOR"
+          ]
+        },
+        {
+          "stepId": "s14",
+          "text": "Test step s14 of PR-SEED-01 (placeholder text).",
+          "note": "Test note on step s14 (placeholder).",
+          "skills": [
+            "SK-LOG"
+          ]
+        }
+      ],
+      "materials": [
+        {
+          "name": "Test material A",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material B",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material C",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material D",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material E",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material F",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material G",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material H",
+          "amount": null,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "protocolId": "PR-OD-01",
+      "version": "1.0",
+      "title": "Test protocol PR-OD-01",
+      "baseBatch": "a test batch",
+      "steps": [
+        {
+          "stepId": "o1",
+          "text": "Test step o1 of PR-OD-01 (placeholder text).",
+          "note": "Test note on step o1 (placeholder).",
+          "skills": [
+            "SK-DCW"
+          ]
+        },
+        {
+          "stepId": "o2",
+          "text": "Test step o2 of PR-OD-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-DCW"
+          ]
+        },
+        {
+          "stepId": "o3",
+          "text": "Test step o3 of PR-OD-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-OD"
+          ]
+        },
+        {
+          "stepId": "o4",
+          "text": "Test step o4 of PR-OD-01 (placeholder text).",
+          "note": "Test note on step o4 (placeholder).",
+          "skills": [
+            "SK-OD"
+          ]
+        },
+        {
+          "stepId": "o5",
+          "text": "Test step o5 of PR-OD-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-DCW"
+          ]
+        },
+        {
+          "stepId": "o6",
+          "text": "Test step o6 of PR-OD-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-DCW"
+          ]
+        },
+        {
+          "stepId": "o7",
+          "text": "Test step o7 of PR-OD-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-DCW"
+          ]
+        },
+        {
+          "stepId": "o8",
+          "text": "Test step o8 of PR-OD-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-DCW"
+          ]
+        },
+        {
+          "stepId": "o9",
+          "text": "Test step o9 of PR-OD-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-DCW"
+          ]
+        },
+        {
+          "stepId": "o10",
+          "text": "Test step o10 of PR-OD-01 (placeholder text).",
+          "note": "Test note on step o10 (placeholder).",
+          "skills": [
+            "SK-FACTOR"
+          ]
+        },
+        {
+          "stepId": "o11",
+          "text": "Test step o11 of PR-OD-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-FACTOR",
+            "SK-LOG"
+          ]
+        }
+      ],
+      "materials": [
+        {
+          "name": "Test material A",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material B",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material C",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material D",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material E",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material F",
+          "amount": null,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "protocolId": "PR-CIP-01",
+      "version": "1.0",
+      "title": "Test protocol PR-CIP-01",
+      "baseBatch": "a test batch",
+      "steps": [
+        {
+          "stepId": "c1",
+          "text": "Test step c1 of PR-CIP-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-ISOL",
+            "SK-PRESS"
+          ]
+        },
+        {
+          "stepId": "c2",
+          "text": "Test step c2 of PR-CIP-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-ASSY"
+          ]
+        },
+        {
+          "stepId": "c3",
+          "text": "Test step c3 of PR-CIP-01 (placeholder text).",
+          "note": "Test note on step c3 (placeholder).",
+          "skills": [
+            "SK-CIP"
+          ]
+        },
+        {
+          "stepId": "c4",
+          "text": "Test step c4 of PR-CIP-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-CIP",
+            "SK-CAUSTIC"
+          ]
+        },
+        {
+          "stepId": "c5",
+          "text": "Test step c5 of PR-CIP-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-CIP",
+            "SK-CAUSTIC"
+          ]
+        },
+        {
+          "stepId": "c6",
+          "text": "Test step c6 of PR-CIP-01 (placeholder text).",
+          "note": "Test note on step c6 (placeholder).",
+          "skills": [
+            "SK-CIP",
+            "SK-CAUSTIC"
+          ]
+        },
+        {
+          "stepId": "c7",
+          "text": "Test step c7 of PR-CIP-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-ASSY"
+          ]
+        },
+        {
+          "stepId": "c8",
+          "text": "Test step c8 of PR-CIP-01 (placeholder text).",
+          "note": "Test note on step c8 (placeholder).",
+          "skills": [
+            "SK-ASSY"
+          ]
+        },
+        {
+          "stepId": "c9",
+          "text": "Test step c9 of PR-CIP-01 (placeholder text).",
+          "note": "Test note on step c9 (placeholder).",
+          "skills": [
+            "SK-ASSY",
+            "SK-LOG"
+          ]
+        },
+        {
+          "stepId": "c10",
+          "text": "Test step c10 of PR-CIP-01 (placeholder text).",
+          "note": "Test note on step c10 (placeholder).",
+          "skills": [
+            "SK-PROBE"
+          ]
+        },
+        {
+          "stepId": "c11",
+          "text": "Test step c11 of PR-CIP-01 (placeholder text).",
+          "note": null,
+          "skills": [
+            "SK-STER",
+            "SK-PRESS"
+          ]
+        },
+        {
+          "stepId": "c12",
+          "text": "Test step c12 of PR-CIP-01 (placeholder text).",
+          "note": "Test note on step c12 (placeholder).",
+          "skills": [
+            "SK-HOLD"
+          ]
+        },
+        {
+          "stepId": "c13",
+          "text": "Test step c13 of PR-CIP-01 (placeholder text).",
+          "note": "Test note on step c13 (placeholder).",
+          "skills": [
+            "SK-LOG"
+          ]
+        }
+      ],
+      "materials": [
+        {
+          "name": "Test material A",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material B",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material C",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material D",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material E",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material F",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material G",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material H",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material I",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material J",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material K",
+          "amount": null,
+          "unit": ""
+        },
+        {
+          "name": "Test material L",
+          "amount": null,
+          "unit": ""
+        }
+      ]
+    }
+  ]
+}

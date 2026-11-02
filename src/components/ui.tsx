@@ -94,20 +94,6 @@ export function EmptyState({
   );
 }
 
-export function Skeleton({ rows = 5 }: { rows?: number }) {
-  return (
-    <div className="p-3 space-y-2" aria-hidden>
-      {Array.from({ length: rows }).map((_, i) => (
-        <div
-          key={i}
-          className="h-[var(--row-h)] rounded bg-ink-soft/10"
-          style={{ opacity: 1 - i * 0.09 }}
-        />
-      ))}
-    </div>
-  );
-}
-
 // ── Buttons ────────────────────────────────────────────────────────────
 
 export function Button({

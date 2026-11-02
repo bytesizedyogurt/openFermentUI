@@ -2,6 +2,8 @@
 
     pnpm ready                 every check
     pnpm ready --no-network    only what needs no network
+    pnpm ready --offline       what an offline run needs: no network, and no key,
+                               because it makes no model call (scripts/prove.py)
 
 One line per check: ✓ ready, ! works with a gap worth knowing, ✗ the live
 loop fails here, · skipped. Each ✗ and ! says what to do. Exits 1 when any
@@ -14,15 +16,15 @@ check is one search. The key itself is never printed, in whole or in part.
 
 The last line is the lane (OF-BLD-014 A.4), what this machine can run:
 `full` with a key the Models API accepted and Europe PMC answering,
-`model-only` with that key alone, `none` otherwise. The `huggingface` row is optional: a
-blocked host is a warning, and it never changes the exit code. Nor does the
+`model-only` with that key alone, `none` otherwise. The `huggingface` row is a
+warning at most, and it never changes the exit code: FastEmbed's model file
+comes from there once (the `embedder` row). Nor does the
 `graphviz` row (OF-BLD-019 D8): without `dot`, Proforma lists a flowsheet's
 units where its diagram would be.
 """
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,18 +33,20 @@ from typing import Callable
 import httpx
 from dotenv import load_dotenv
 
-from . import biorepo, extract, intake
-from .corpus import load_corpus
+from sqlalchemy import func, select
+
+from . import db, extract, intake
+from .db import migrate
+from .db import models as t
 from . import llm, spend
 
 CORE = Path(__file__).parent.parent
 REPO = CORE.parent
 MARKS = {"ok": "✓", "warn": "!", "fail": "✗", "skip": "·"}
 PLACEHOLDER_KEY = "sk-ant-..."
-# A paper with a PMCID in the seed: B5's, the one the offline demo replays.
+# A PMCID the Europe PMC check asks about: one search says whether it answers.
 PROBE_PMCID = "PMC8471596"
-# Where the meaning-match search lanes download their one model file from
-# (OF-BLD-014 §4.2).
+# Where FastEmbed fetches its model file from, once (ADR-002).
 HUGGINGFACE = "https://huggingface.co"
 LANES = ("full", "model-only", "none")
 # Where api.py mounts the build from, worked out the same way and kept equal to
@@ -63,21 +67,11 @@ class Check:
 def check_key() -> Check:
     key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
     if not key or key == PLACEHOLDER_KEY:
-        return Check("key", "fail", "core/.env holds no key. Postdoc's Live mode and Extract need one: set a "
+        return Check("key", "fail", "core/.env holds no key. Postdoc and extraction need one: set a "
                      "spend cap in the Anthropic console, copy core/.env.example to core/.env, add the key")
     if not key.startswith("sk-ant-"):
         return Check("key", "warn", "core/.env holds a key that does not start the way Anthropic keys do")
     return Check("key", "ok", "core/.env holds a key")
-
-
-def check_corpus() -> Check:
-    try:
-        corpus = load_corpus()
-    except FileNotFoundError:
-        return Check("corpus", "fail", "the service has no corpus to answer from. Run: pnpm export:corpus")
-    except (ValueError, KeyError):
-        return Check("corpus", "fail", "the corpus projection is damaged. Run: pnpm export:corpus")
-    return Check("corpus", "ok", f"{len(corpus.records)} records on {len(corpus.papers)} papers")
 
 
 def check_build() -> Check:
@@ -86,64 +80,161 @@ def check_build() -> Check:
     return Check("app", "warn", "not built, so the service answers /api alone. Run: pnpm build")
 
 
+def _count(table, *where) -> int:
+    """How many rows `table` holds across every project: `pnpm ready` speaks
+    for the machine."""
+
+    async def count() -> int:
+        async with db.session() as s:
+            return (await s.execute(select(func.count()).select_from(table).where(*where))).scalar_one()
+
+    return db.run(count())
+
+
+def _held() -> tuple[int, int]:
+    """How many projects the database holds, and how many review decisions."""
+    return _count(t.projects), _count(t.decisions)
+
+
 def check_data() -> Check:
-    folder = biorepo.PATH.parent
-    if folder.exists() and not os.access(folder, os.W_OK):
-        return Check("data", "fail", f"{folder} is not writable, so Guild decisions cannot be kept")
+    """The database every record is kept in (ADR-001): set, answering, at the
+    newest schema, and what it holds."""
     try:
-        repo = biorepo.read()
-    except ValueError as e:
-        return Check("data", "fail", f"core/data/biorepo.json does not parse: {str(e).splitlines()[0]}")
-    n = len(repo.decisions)
-    return Check("data", "ok", f"{n} review decision{'s' if n != 1 else ''} in core/data/biorepo.json")
+        url = db.database_url()
+    except db.DatabaseUnavailable as e:
+        return Check("data", "fail", str(e))
+    where = url.render_as_string(hide_password=True)
+    try:
+        at, head = migrate.revision(url), migrate.head()
+    except Exception as e:  # the server's own words are the row's answer
+        return Check("data", "fail", f"{where} did not answer ({type(e).__name__}: {e}). Start PostgreSQL: pnpm db:up")
+    if at != head:
+        return Check("data", "fail", f"{where} is at revision {at or 'none'} of {head}. Run: pnpm db:migrate")
+    n_projects, n_decisions = _held()
+    return Check("data", "ok", f"{n_projects} project{'s' if n_projects != 1 else ''}, {n_decisions} review "
+                               f"decision{'s' if n_decisions != 1 else ''}, at revision {head}")
 
 
 def check_intake() -> Check:
-    complete = missed = 0
-    damaged: list[str] = []
-    for path in sorted(intake.FULLTEXT_DIR.glob("*.json")):
-        try:
-            hit = intake.cached(path.stem)
-        except ValueError:
-            damaged.append(path.name)
-            continue
-        if hit is not None and hit.status == "complete":
-            complete += 1
-        else:
-            missed += 1
-    extracted = len(list(extract.CANDIDATES_DIR.glob("*.json")))
-    summary = f"{complete} papers fetched with full text, {missed} misses cached, {extracted} extracted"
-    if damaged:
-        return Check("intake", "warn", f"{summary}; {len(damaged)} damaged ({', '.join(damaged[:5])}). "
-                     "Delete them from core/data/fulltext/ and they are fetched again tonight")
-    if complete == 0:
-        return Check("intake", "warn", f"{summary}. Fetch now: scripts/host/nightly.sh (or pnpm intake:fetch --all)")
+    """What the projects hold in their literature (ADR-002), and how much of
+    it has been extracted, across every project on this machine."""
+    try:
+        links = _count(t.documents_link)
+        documents = db.run(_distinct_documents())
+        extracted: int | str = _count(t.candidates, t.candidates.c.source == extract.MODEL)
+    except Exception as e:  # the data row says why the database cannot be read
+        return Check("intake", "warn", f"could not be read ({type(e).__name__})")
+    summary = (f"{documents} document{'s' if documents != 1 else ''} held "
+               f"({links} link{'s' if links != 1 else ''} to projects), {extracted} extracted")
+    if documents == 0:
+        return Check("intake", "warn", f"{summary}. Collect a paper on Intake (Add to this project)")
     return Check("intake", "ok", summary)
 
 
-# ── what this document added (OF-BLD-014 §10.2) ───────────────────────
+async def _distinct_documents() -> int:
+    from sqlalchemy import distinct
+
+    async with db.session() as s:
+        return (await s.execute(select(func.count(distinct(t.documents_link.c.document_id))))).scalar_one()
 
 
-def _fetched_complete() -> int:
-    n = 0
-    for path in intake.FULLTEXT_DIR.glob("*.json"):
+# ── the literature layer (ADR-002) ─────────────────────────────────────
+
+
+def check_literature() -> Check:
+    """Sci RAG Kit's side of the database, as its own `sci-rag doctor` sees it:
+    the vector extension, the kit's schema at its newest revision, a vector
+    column of FastEmbed's dimension, its domain profile, and every chunk
+    embedded by the model the service embeds with now."""
+    import asyncio
+
+    from sqlalchemy import pool, text
+
+    from . import migrations
+    from .literature import DOMAIN_DIR, EMBEDDING_DIM, kit
+
+    try:
+        url = db.database_url()
+    except db.DatabaseUnavailable as e:
+        return Check("literature", "fail", str(e))
+
+    async def ask() -> tuple[str | None, int | None, int, int, dict[str, int]]:
+        engine = db.make_engine(url, search_path=kit.SEARCH_PATH, poolclass=pool.NullPool)
         try:
-            hit = intake.cached(path.stem)
-        except ValueError:
-            continue
-        n += hit is not None and hit.status == "complete"
-    return n
+            async with engine.connect() as c:
+                vector = (await c.execute(text("SELECT extversion FROM pg_extension WHERE extname = 'vector'"))).scalar()
+                if vector is None:
+                    return None, None, 0, 0, {}
+                width = (await c.execute(text(
+                    "SELECT atttypmod FROM pg_attribute WHERE attrelid = to_regclass('sci_rag.chunks') "
+                    "AND attname = 'embedding'"
+                ))).scalar()
+                if width is None:
+                    return vector, None, 0, 0, {}
+                documents = (await c.execute(text("SELECT count(*) FROM sci_rag.documents"))).scalar_one()
+                versions = dict((await c.execute(text(
+                    "SELECT coalesce(embedding_version, 'none'), count(*) FROM sci_rag.chunks GROUP BY 1"
+                ))).all())
+                return vector, width, documents, sum(versions.values()), versions
+        finally:
+            await engine.dispose()
+
+    try:
+        vector, width, documents, chunks, versions = asyncio.run(ask())
+        at, head = migrations.at_head(url)[kit.SCHEMA]
+    except Exception as e:  # the server's own words are the row's answer
+        return Check("literature", "fail", f"the kit's schema could not be read ({type(e).__name__}: {e})")
+    if vector is None:
+        return Check("literature", "fail", "the database has no vector extension. As its owner or a superuser, run "
+                     "CREATE EXTENSION vector; (pgvector: brew install pgvector, or the pgvector/pgvector image), "
+                     "then pnpm db:migrate")
+    if at != head or width is None:
+        return Check("literature", "fail", f"Sci RAG Kit's schema is at revision {at or 'none'} of {head}. Run: pnpm db:migrate")
+    if width != EMBEDDING_DIM:
+        return Check("literature", "fail", f"the kit's vector column holds {width} dimensions and FastEmbed gives "
+                     f"{EMBEDDING_DIM}: the schema was made for another embedder")
+    try:
+        from sci_rag.domain import load_domain
+
+        load_domain(DOMAIN_DIR)
+    except Exception as e:  # a broken profile is the row's answer, in words
+        return Check("literature", "fail", f"the domain profile in {DOMAIN_DIR} does not load: {e}")
+    summary = f"pgvector {vector}, revision {head}, {documents} documents, {chunks} chunks"
+    current = kit.FastEmbedProvider(kit.EMBEDDING_MODEL, dim=EMBEDDING_DIM).version
+    stale = {v: n for v, n in versions.items() if v != current}
+    if stale:
+        return Check("literature", "warn", f"{summary}; {sum(stale.values())} chunks embedded by "
+                     f"{', '.join(sorted(stale))}, not {current}: they rank against other vectors until re-embedded")
+    return Check("literature", "ok", summary)
 
 
-def check_index() -> Check:
-    from . import passages
+def check_embedder() -> Check:
+    """FastEmbed's model file: every document collected is embedded with it,
+    on this machine. Loaded from the cache alone, so this row needs no
+    network; a model not cached yet is fetched by the first collection."""
+    from .literature import EMBEDDING_CACHE, EMBEDDING_MODEL
 
-    st = passages.status()
-    fetched = _fetched_complete()
-    detail = f"{st.papersIndexed} papers indexed of {fetched} fetched, {st.passages} passages; lane {st.chosenLane}"
-    if st.papersIndexed < fetched:
-        return Check("index", "warn", f"{detail}. Rebuild: pnpm index:build")
-    return Check("index", "ok", detail)
+    try:
+        from fastembed import TextEmbedding
+
+        TextEmbedding(model_name=EMBEDDING_MODEL, cache_dir=str(EMBEDDING_CACHE), local_files_only=True)
+    except Exception:
+        return Check("embedder", "warn", f"{EMBEDDING_MODEL} is not in {EMBEDDING_CACHE} yet: the first document "
+                     "collected fetches it from huggingface.co (the huggingface row says whether that host answers)")
+    return Check("embedder", "ok", f"{EMBEDDING_MODEL}, from {EMBEDDING_CACHE}")
+
+
+def check_rag() -> Check:
+    """The kit's REST app at /rag asks every client for a key (ADR-002)."""
+    from .literature import kit
+
+    if os.environ.get(kit.RAG_KEY, "").strip():
+        return Check("rag", "ok", f"/rag answers a client that sends the key in {kit.RAG_KEY}")
+    return Check("rag", "warn", f"/rag refuses every request: no {kit.RAG_KEY} in core/.env. Set one to search "
+                 "the literature from another program; the app itself does not need it")
+
+
+# ── what this document added (OF-BLD-014 §10.2) ───────────────────────
 
 
 def check_workers(ping: bool = True) -> Check:
@@ -200,12 +291,10 @@ def check_graphviz() -> Check:
 
 
 def check_artifacts() -> Check:
-    from . import artifacts
-
     try:
-        n = len(list(artifacts.folder().glob("*.json")))
-    except OSError as e:
-        return Check("artifacts", "warn", f"the artifact store cannot be read: {e}")
+        n = _count(t.artifacts)
+    except Exception as e:  # the database's own words are the row's answer
+        return Check("artifacts", "warn", f"the artifact store cannot be read: {type(e).__name__}: {e}")
     return Check("artifacts", "ok", f"{n} kept")
 
 
@@ -213,8 +302,8 @@ def check_spend() -> Check:
     try:
         cap = spend.daily_budget()
         day = spend.today()
-        spent = sum(float(v) for v in spend._read(day)["byRole"].values())
-    except (spend.BudgetSettingInvalid, spend.SpendFileDamaged) as e:
+        spent = spend.total_today()
+    except (spend.BudgetSettingInvalid, spend.SpendUnknown) as e:
         return Check("spend", "fail", str(e))
     mark = "warn" if spent >= cap else "ok"
     return Check("spend", mark, f"${spent:.2f} of the ${cap:.2f} daily cap spent today ({day}, UTC)")
@@ -229,6 +318,11 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
     if llm.effort() not in llm.EFFORTS:
         return Check("model", "fail", f"OPENFERMENT_EFFORT={llm.effort()} is not one of "
                      f"{', '.join(llm.EFFORTS)}, so every call would be refused")
+    try:
+        table = llm.routes()
+    except llm.RoutesInvalid as e:
+        return Check("model", "fail", f"{e}, so no call can be routed")
+    waiting = sorted({m for r in table.values() for m in r.models if llm.spec(m)[0] not in llm.SERVED})
     if not have_key:
         return Check("model", "skip", "needs the key")
     if intake.fixtures_only():
@@ -238,7 +332,10 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
     client = (client_factory or llm.make_client)()
     offered: list[str] = []
     missing: list[str] = []
-    for model in llm.chain():
+    for named in llm.chain():
+        provider, model = llm.spec(named)
+        if provider not in llm.SERVED:
+            continue
         try:
             client.models.retrieve(model, timeout=15)
         except anthropic.AuthenticationError:
@@ -261,6 +358,9 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
     if unpriced:
         return Check("model", "warn", f"no price on file for {', '.join(unpriced)}, so its cost shows as $0. "
                      "Add it to PRICES in core/openferment_core/llm.py")
+    if waiting:
+        return Check("model", "warn", f"the key is accepted; {' then '.join(offered)}; the routes name "
+                     f"{', '.join(waiting)}, which wait: {llm.waits(waiting[0]).split(': ', 1)[1]}")
     return Check("model", "ok", f"the key is accepted; {' then '.join(offered)}, effort {llm.effort()}")
 
 
@@ -289,7 +389,7 @@ def check_roles(have_key: bool, client_factory: Callable[[], object] | None = No
         return Check("roles", "fail", str(e))
     try:
         today = f"today ${spend.total_today():.2f} of the ${cap:.2f} daily cap"
-    except spend.SpendFileDamaged as e:
+    except spend.SpendUnknown as e:
         return Check("roles", "fail", str(e))
     chains = {role: llm.chain(role) for role in llm.ROLES}
     named = "; ".join(f"{role}: {' → '.join(models)}" for role, models in chains.items())
@@ -335,11 +435,11 @@ def check_europe_pmc() -> Check:
 
 
 def check_huggingface() -> Check:
-    """Optional, so a warning at most: the two hybrid search lanes need one
-    model download from here, and the other lanes work without it."""
+    """A warning at most: FastEmbed's model file comes from here the first
+    time (the embedder row says whether it is cached), and nothing else does."""
     if intake.fixtures_only():
         return Check("huggingface", "skip", "OPENFERMENT_FIXTURES is set")
-    gap = "so the two hybrid search lanes will report themselves unavailable"
+    gap = "so a document cannot be collected until FastEmbed's model file is cached"
     try:
         r = httpx.head(HUGGINGFACE, timeout=10, follow_redirects=True)
     except httpx.HTTPError as e:
@@ -388,54 +488,34 @@ def check_service(port: int, have_key: bool, host: str = "127.0.0.1") -> Check:
         return Check("service", "warn", "running, but started before the key was added. "
                      "Restart it: sudo launchctl kickstart -k system/com.umutuzo.openferment")
     if not body.get("ok"):
-        return Check("service", "warn", f"running, but reports: {body.get('corpusError') or 'not ok'}")
-    return Check("service", "ok", f"answers on {host}:{port} with {body.get('records')} records")
-
-
-def check_backup() -> Check:
-    if intake.fixtures_only():
-        return Check("backup", "skip", "OPENFERMENT_FIXTURES is set")
-    try:
-        r = subprocess.run(
-            ["git", "push", "--dry-run", "origin", "HEAD"],
-            cwd=REPO, capture_output=True, text=True, timeout=30,
-            env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "", "SSH_ASKPASS": ""},
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return Check("backup", "warn", f"could not ask GitHub: {type(e).__name__}")
-    said = (r.stdout + r.stderr).lower()
-    # A dry run that GitHub answered at all, accepted or rejected as behind,
-    # means the credentials work.
-    if r.returncode == 0 or "rejected" in said:
-        return Check("backup", "ok", "this checkout can push, so Guild decisions made here can be backed up")
-    if "not a git repository" in said:
-        return Check("backup", "skip", "not a git checkout")
-    return Check("backup", "warn", "this checkout cannot push to GitHub, so decisions made here stay on this "
-                 "machine. Sign in once: gh auth login (or set up an SSH key)")
+        return Check("service", "warn", "running, but reports itself not ok: its log says why")
+    return Check("service", "ok", f"answers on {host}:{port}")
 
 
 # ── the report ─────────────────────────────────────────────────────────
 
 
-def run(no_network: bool = False, port: int | None = None, workers: bool = True) -> list[Check]:
+def run(no_network: bool = False, port: int | None = None, workers: bool = True, offline: bool = False) -> list[Check]:
     load_dotenv(CORE / ".env", override=False)
     host, found_port = service_address()
     port = port or found_port
-    key = check_key()
+    no_network = no_network or offline
+    key = Check("key", "skip", "--offline: this run makes no model call, so it asks for no key") if offline else check_key()
     have_key = key.mark in ("ok", "warn")
-    checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
+    checks = [key, check_build(), check_data(), check_intake()]
     # §10.R: one damaged file must not stop the report; a row that cannot be
     # checked says why and the rest still run.
-    for name, row in (("index", check_index), ("models", check_models), ("artifacts", check_artifacts),
+    for name, row in (("literature", check_literature), ("embedder", check_embedder), ("rag", check_rag),
+                      ("models", check_models), ("artifacts", check_artifacts),
                       ("spend", check_spend), ("workers", lambda: check_workers(workers)), ("graphviz", check_graphviz)):
         try:
             checks.append(row())
         except Exception as e:  # any failure is the row's answer, in words
             checks.append(Check(name, "warn", f"could not be checked: {type(e).__name__}: {e}"))
     if no_network:
-        checks += [Check(n, "skip", "--no-network") for n in ("model", "roles", "europepmc", "huggingface", "backup")]
+        checks += [Check(n, "skip", "--no-network") for n in ("model", "roles", "europepmc", "huggingface")]
     else:
-        checks += [check_model(have_key), check_roles(have_key), check_europe_pmc(), check_huggingface(), check_backup()]
+        checks += [check_model(have_key), check_roles(have_key), check_europe_pmc(), check_huggingface()]
     checks.append(check_service(port, have_key, host))
     return checks
 
@@ -467,10 +547,10 @@ def report(checks: list[Check]) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if any(a not in ("--no-network", "--no-workers") for a in argv):
-        print("usage: python -m openferment_core.ready [--no-network] [--no-workers]")
+    if any(a not in ("--no-network", "--no-workers", "--offline") for a in argv):
+        print("usage: python -m openferment_core.ready [--no-network] [--no-workers] [--offline]")
         return 2
-    checks = run(no_network="--no-network" in argv, workers="--no-workers" not in argv)
+    checks = run(no_network="--no-network" in argv, workers="--no-workers" not in argv, offline="--offline" in argv)
     print(report(checks))
     return 1 if any(c.mark == "fail" for c in checks) else 0
 

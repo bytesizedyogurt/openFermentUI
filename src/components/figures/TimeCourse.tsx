@@ -3,7 +3,7 @@
 // A simulation is computed, never measured (D1), so each state it integrates
 // (cells, substrate, product, the volume where it varies) draws as a computed
 // curve, its line taking the simulation's own provenance: dotted when it is
-// `computed`, short amber dashes when a person's value made it `demo`. When a
+// `computed`, short amber dashes when a person's value made it `assumed`. When a
 // deposition is drawn against it, its readings are filled points (a
 // measurement is the only filled mark, E.8 rule 3); a forecast is a band. The
 // oxygen uptake rate rides on the cells' panel against a second axis, on the
@@ -31,7 +31,7 @@ export interface TimeCourseProps {
   /** Hours, shared by every state. */
   t: number[];
   states: TimeCourseState[];
-  /** The curves' provenance: the simulation's (or the fit's), computed or demo. */
+  /** The curves' provenance: the simulation's (or the fit's), computed or assumed. */
   provenance: Provenance;
   /** The oxygen uptake rate on the cells' panel's second axis; omitted when the culture takes up none. */
   our?: { unit: string; values: number[] } | null;

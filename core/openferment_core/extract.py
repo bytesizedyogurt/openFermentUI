@@ -1,58 +1,65 @@
-"""Extract — one structured response per paper (OF-BLD-012 §6.1).
+"""Extract — one structured response per document (OF-BLD-012 §6.1; ADR-002).
 
-The whole paper goes in, as sections; candidate records come out as JSON that
+The whole document goes in, as the passages Sci RAG Kit holds for it
+(`kit.passages`: one a chunk, `p0`, `p1`, …, each under the section it sits
+in); candidate records come out as JSON that
 matches the `emit_candidates` schema, through structured outputs (llm.py), so
 the model has exactly one way to respond and the API checks the shape before
-we see it. The same pattern `postdoc.py` uses with `emit_answer_plan`, for the
-same reason: structured output by construction, not by asking nicely for JSON.
-The model is Claude Opus 5.5, with Claude Sonnet 5.5 for a paper Opus declines
-or cannot take; each response records which answered.
+we see it. The same pattern Postdoc's plan uses with `emit_answer_plan`
+(postdoc/plan.py), for the same reason: structured output by construction, not
+by asking nicely for JSON. The routing table names the models; each response
+records which answered.
 
 NOTHING THE MODEL EMITS ENTERS BIOREPO ON ITS SAY-SO. Every candidate goes
 through `validate.anchor_candidate` — §2.4's six rules — and only a candidate
-whose quote is verbatim in the section it names, whose value is inside that
+whose quote is verbatim in the passage it names, whose value is inside that
 quote, whose unit is one the field is denominated in, and whose converted
 value is in range survives. The rest are dropped and counted per rule. The
 model's `status` and `provenance`, if it offered any, are ignored: both are
 'unverified' by construction.
 
-What this module does NOT do. It does not score the run against the seed —
-`match_run` (§6.2) does that. It does not decide which candidates are new
+What this module does NOT do. It does not score the run against the values
+reviewers typed — `witness.match_run` (§6.2) does that. It does not decide which candidates are new
 records — that is the same function's job. It does not loop: one call per
-paper, no retries on content, no follow-ups. And it does not fetch: a paper
-with no cached full text is refused, because there is nothing to anchor to.
+document, no retries on content, no follow-ups. And it does not fetch: a
+document the project does not hold is refused, because there is nothing to
+anchor to; Intake collects it first.
 
 Fixture mode (`OPENFERMENT_FIXTURES=1`) reads a saved response from
-`tests/fixtures/extract/{paperId}.json` and refuses the API — §8.1's offline
-demo replays the loop that way, and the tests here stub the call directly.
+`tests/fixtures/extract/{paperId}.json` and refuses the API — the offline
+proof (`pnpm prove`) replays the loop that way, and the tests here stub the
+call directly.
 """
 from __future__ import annotations
 
-import copy
 import json
-import threading
 import logging
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import atomic, intake, llm
+from . import db, llm, projects
+from .basis import refuse_estimates
+from .db import models as t
+from .literature import collectors, kit
 from .models import AuditEvent, Candidate, ExtractResponse, Usage
 from .units import tables
-from .validate import anchor_all, anchor_candidate
+from .validate import ANCHOR_RULES, anchor_all, anchor_candidate
 
 log = logging.getLogger("openferment.extract")
 
-CANDIDATES_DIR = intake.DATA_DIR / "candidates"
 # A candidate a model wrote by hand (§7.3) is named apart from the extractor's,
-# and kept apart from it, in candidates/hand/ (OF-BLD-016 §1.R finding 3).
+# and kept apart from it, in its own row of the candidates table (source
+# `hand`; the extractor's is `model`; OF-BLD-016 §1.R finding 3).
 MODEL_PREFIX = "mw1"
-HAND_DIR = "hand"
-_WRITE_LOCK = threading.Lock()
-FIXTURE_DIR = intake.FIXTURE_ROOT / "extract"
+MODEL, HAND = "model", "hand"
+FIXTURE_DIR = collectors.FIXTURE_ROOT / "extract"
 # The first extraction run that runs for real. Named for the pipeline and not
 # for one model: Opus answers most papers and Sonnet the ones Opus declines,
 # and each response's `usage.models` says which (OF-BLD-012 §6).
@@ -85,10 +92,11 @@ SECTION_CHAR_LIMIT = 12_000
 SYSTEM = """You are Intake, the extraction stage of openFerment. You read one \
 paper and emit candidate records for a fixed ontology.
 
-Copy the quote verbatim from the section you cite. Never paraphrase, never \
+Copy the quote verbatim from the passage you cite. Never paraphrase, never \
 tidy, never translate a unit. The value must appear inside the quote, as the \
-paper wrote it. A candidate whose quote is not in the section, or whose value \
-is not in the quote, is discarded whole — it is not corrected.
+paper wrote it. A candidate whose quote is not in the passage, or whose value \
+is not in the quote, is discarded whole — it is not corrected. Neighbouring passages share a sentence or two; cite \
+either.
 
 Emit one candidate per measurement. When a sentence reports someone else's \
 result — a citation, a comparison to prior work — set isPrimary to false.
@@ -104,11 +112,8 @@ A field marked requiresMethod needs the analytical method the paper used. \
 Name it as the paper does; if the paper reports the value without saying how \
 it was measured, write "undetermined".
 
-Give the unit as the paper wrote it, with one exception: a field that is a \
-share of dry cell mass takes the unit "% CDW", chosen from its list, \
-whether the paper writes "%", "wt%", "% of CDW" or "% (w/w)". Give \
-confidence as your own estimate that the quote really reports this field, \
-from 0 to 1.
+Give the unit as the paper wrote it. Give confidence as your own estimate \
+that the quote really reports this field, from 0 to 1.
 
 When the sentence states a RANGE rather than a point — "7-10 days", "0.6 to \
 1 g/L", "$4-6/kg" — emit `range` with the low and high as the paper wrote \
@@ -130,15 +135,20 @@ class ExtractTruncated(RuntimeError):
 
 
 class ExtractUnavailable(RuntimeError):
-    """No key, no cached text, or the API could not be reached."""
+    """No key, nothing to anchor to, or the API could not be reached."""
+
+
+class NothingToAnchor(ExtractUnavailable):
+    """The project holds no such document, or the document holds no text:
+    nothing for a quote to anchor to."""
 
 
 # ── the tool ───────────────────────────────────────────────────────────
 
 
 def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
-    """`emit_candidates`, with this paper's section ids and the ontology's
-    field ids as enums, so the model cannot cite a section that does not
+    """`emit_candidates`, with this document's passage ids and the ontology's
+    field ids as enums, so the model cannot cite a passage that does not
     exist or a field the ontology does not have. §2.4 checks both anyway;
     the enum just stops the wasted output."""
     tool = {
@@ -159,7 +169,7 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
                             "sectionId": {
                                 "type": "string",
                                 "enum": section_ids,
-                                "description": "The section the quote is copied from.",
+                                "description": "The passage the quote is copied from.",
                             },
                             "field": {
                                 "type": "string",
@@ -180,7 +190,7 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
                             "quote": {
                                 "type": "string",
                                 "description": (
-                                    "Verbatim from the section, at most 300 characters, containing "
+                                    "Verbatim from the passage, at most 300 characters, containing "
                                     "the value."
                                 ),
                             },
@@ -213,12 +223,10 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
                                 "minimum": 0,
                                 "maximum": 1,
                             },
-                            # What the curators can record, the model can say
-                            # too (OF-BLD-012.1 F1.4). Without these it has to
-                            # invent a point for "7-10 days" and something
-                            # arbitrary for "not phosphorylated", and then
-                            # disagrees with the seed on exactly the records
-                            # the curators handled most carefully.
+                            # A range or a negative a paper states, the model
+                            # can say too (OF-BLD-012.1 F1.4). Without these it
+                            # has to invent a point for "7-10 days" and
+                            # something arbitrary for "not phosphorylated".
                             "range": {
                                 "type": "object",
                                 "description": (
@@ -246,38 +254,6 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
             "required": ["candidates"],
         },
     }
-    return _cdw_variants(tool, field_ids)
-
-
-# The unit a cell-mass fraction is recorded in (live test, 2026-10-16): the
-# model wrote "%" for such a field, another family, and 70 values were
-# rejected. These fields take their unit from an enumeration.
-CDW_UNITS = ["% CDW"]
-
-
-def _cdw_variants(tool: dict[str, Any], field_ids: list[str]) -> dict[str, Any]:
-    """Split the candidate schema in two when the ontology has cell-mass
-    fraction fields: those fields with `unit` enumerated, every other field
-    with `unit` free as before."""
-    ontology = tables()["ontology"]
-    cdw = [f for f in field_ids if ontology.get(f, {}).get("canonicalUnit") in CDW_UNITS]
-    if not cdw:
-        return tool
-    items = tool["input_schema"]["properties"]["candidates"]["items"]
-    other = [f for f in field_ids if f not in cdw]
-    fraction = copy.deepcopy(items)
-    fraction["properties"]["field"] = {**fraction["properties"]["field"], "enum": cdw}
-    fraction["properties"]["unit"] = {
-        "type": "string",
-        "enum": list(CDW_UNITS),
-        "description": "A share of dry cell mass is recorded in % CDW, whatever the paper writes.",
-    }
-    variants = [fraction]
-    if other:
-        rest = copy.deepcopy(items)
-        rest["properties"]["field"] = {**rest["properties"]["field"], "enum": other}
-        variants.append(rest)
-    tool["input_schema"]["properties"]["candidates"]["items"] = {"anyOf": variants}
     return tool
 
 
@@ -299,7 +275,7 @@ def ontology_for_prompt() -> list[dict[str, Any]]:
     """The ontology as the model sees it (§6.1): id, name, definition,
     canonicalUnit, categorical, requiresMethod. Not the range — a range in
     front of an extractor is an invitation to find a number that fits it —
-    and not the curator's notes, which carry example values."""
+    and not the fields' notes, which carry example values."""
     return [
         {
             "id": f["id"],
@@ -314,14 +290,14 @@ def ontology_for_prompt() -> list[dict[str, Any]]:
 
 
 def build_prompt(sections: list[dict[str, Any]]) -> tuple[str, list[str]]:
-    """The user turn: the ontology, then every section as `[id · heading]`
-    followed by its text. Returns the notes for any section that was cut."""
+    """The user turn: the ontology, then every passage as `[id · heading]`
+    followed by its text. Returns the notes for any passage that was cut."""
     notes: list[str] = []
     parts = [
         "Ontology (the only fields you may emit):",
         json.dumps(ontology_for_prompt(), ensure_ascii=False),
         "",
-        "Paper, by section:",
+        "Document, by passage:",
     ]
     for s in sections:
         text, cut = _truncate(str(s.get("text") or ""), SECTION_CHAR_LIMIT)
@@ -343,7 +319,7 @@ def call_model(paper_id: str, user_text: str, tool: dict[str, Any]) -> tuple[dic
     In fixture mode the saved response for the paper is returned instead and
     the API is never touched.
     """
-    if intake.fixtures_only():
+    if collectors.fixtures_only():
         path = FIXTURE_DIR / f"{paper_id}.json"
         if not path.exists():
             raise ExtractUnavailable(f"OPENFERMENT_FIXTURES is set and there is no saved response at {path}")
@@ -357,6 +333,7 @@ def call_model(paper_id: str, user_text: str, tool: dict[str, Any]) -> tuple[dic
             schema=tool["input_schema"],
             max_tokens=MAX_TOKENS,
             label=f"{paper_id}: ",
+            family="extract",
         )
     except llm.ModelRefused as e:
         # Not cached: a later model, or a later version of this one, may take
@@ -378,39 +355,74 @@ def call_model(paper_id: str, user_text: str, tool: dict[str, Any]) -> tuple[dic
 
 
 # ── persistence ────────────────────────────────────────────────────────
+#
+# One row of the `candidates` table per paper and source: the extractor's
+# run (`model`) and the candidates a model wrote by hand (`hand`), each the
+# ExtractResponse as JSON, in the current project (ADR-001, ADR-005).
 
 
-def _path(paper_id: str) -> Path:
-    return CANDIDATES_DIR / f"{paper_id}.json"
+async def _row(s: AsyncSession, project_id: str, paper_id: str, source: str) -> dict[str, Any] | None:
+    return (
+        await s.execute(
+            select(t.candidates.c.body).where(
+                t.candidates.c.project_id == project_id,
+                t.candidates.c.document_id == paper_id,
+                t.candidates.c.source == source,
+            )
+        )
+    ).scalar_one_or_none()
 
 
-def cached(paper_id: str) -> ExtractResponse | None:
-    """This run's extraction of a paper, or None. A file left by an earlier
-    run (`haiku-1`, from before the move to Opus) is not this run's and is
-    not read: the paper counts as unextracted and the next batch extracts it
+async def _rows(project_id: str, source: str) -> list[dict[str, Any]]:
+    async with db.session() as s:
+        q = select(t.candidates.c.body).where(t.candidates.c.project_id == project_id, t.candidates.c.source == source)
+        return list((await s.execute(q.order_by(t.candidates.c.document_id))).scalars())
+
+
+async def _put(s: AsyncSession, project_id: str, source: str, result: ExtractResponse, by: str) -> None:
+    # A candidate is a record waiting for review: no model's estimate (ADR-006).
+    refuse_estimates(result, "the candidates store")
+    stmt = insert(t.candidates).values(
+        project_id=project_id, document_id=result.paperId, source=source, body=result.model_dump(mode="json"), created_by=by
+    )
+    await s.execute(
+        stmt.on_conflict_do_update(
+            index_elements=[t.candidates.c.project_id, t.candidates.c.document_id, t.candidates.c.source],
+            set_={"body": stmt.excluded.body, "updated_at": func.clock_timestamp()},
+        )
+    )
+
+
+async def _one(project_id: str, paper_id: str, source: str) -> dict[str, Any] | None:
+    async with db.session() as s:
+        return await _row(s, project_id, paper_id, source)
+
+
+def _this_run(paper_id: str, body: dict[str, Any] | None) -> ExtractResponse | None:
+    """`body` when it is this run's extraction. One left by an earlier run
+    (`haiku-1`, from before the move to Opus) is not this run's and is not
+    read: the paper counts as unextracted and the next batch extracts it
     again, under the current run, rather than serving one model's output
     under another's name."""
-    path = _path(paper_id)
-    if not path.exists():
+    if body is None:
         return None
-    text = path.read_text(encoding="utf-8")
-    try:
-        run = json.loads(text).get("run")
-    except (ValueError, AttributeError):
-        run = None
+    run = body.get("run") if isinstance(body, dict) else None
     if run is not None and run != RUN:
         log.info("%s: cached extraction is from run %r, not %r; it will be extracted again", paper_id, run, RUN)
         return None
-    return ExtractResponse.model_validate_json(text)
+    return ExtractResponse.model_validate(body)
+
+
+def cached(paper_id: str) -> ExtractResponse | None:
+    """This run's extraction of a paper, or None."""
+    return _this_run(paper_id, db.run(_one(projects.current(), paper_id, MODEL)))
 
 
 def all_extracted() -> list[ExtractResponse]:
-    """This run's extractions, one per paper: what Witness scores."""
-    if not CANDIDATES_DIR.exists():
-        return []
+    """This run's extractions, one per paper, by paper id: what Witness scores."""
     out = []
-    for path in sorted(CANDIDATES_DIR.glob("*.json")):
-        r = cached(path.stem)
+    for body in db.run(_rows(projects.current(), MODEL)):
+        r = _this_run(str(body.get("paperId")), body)
         if r is not None:
             out.append(r)
     return out
@@ -418,16 +430,12 @@ def all_extracted() -> list[ExtractResponse]:
 
 # ── candidates a model wrote by hand (OF-BLD-015 §7.3) ─────────────────
 #
-# Kept in candidates/hand/<paper>.json and never in the extractor's file
-# (OF-BLD-016 §1.R finding 3). A hand-written candidate is not an
-# extraction: in the extractor's file it made `cached` answer for a paper the
-# extractor never ran over, so the batch skipped the paper for good and
-# Witness scored a run that never happened. The file has the extractor's
-# shape and is read by `hand` alone, never by `cached`.
-
-
-def _hand_path(paper_id: str) -> Path:
-    return CANDIDATES_DIR / HAND_DIR / f"{paper_id}.json"
+# Kept in a row of their own and never in the extractor's (OF-BLD-016 §1.R
+# finding 3). A hand-written candidate is not an extraction: in the
+# extractor's row it made `cached` answer for a paper the extractor never ran
+# over, so the batch skipped the paper for good and Witness scored a run that
+# never happened. The row has the extractor's shape and is read by `hand`
+# alone, never by `cached`.
 
 
 def by_hand(candidate_id: str) -> bool:
@@ -437,28 +445,28 @@ def by_hand(candidate_id: str) -> bool:
 
 def hand(paper_id: str) -> ExtractResponse | None:
     """The candidates a model wrote by hand on a paper, or None."""
-    path = _hand_path(paper_id)
-    if not path.exists():
-        return None
-    return ExtractResponse.model_validate_json(path.read_text(encoding="utf-8"))
+    body = db.run(_one(projects.current(), paper_id, HAND))
+    return None if body is None else ExtractResponse.model_validate(body)
 
 
 def all_hand() -> list[ExtractResponse]:
-    folder = CANDIDATES_DIR / HAND_DIR
-    if not folder.exists():
-        return []
-    return [r for path in sorted(folder.glob("*.json")) if (r := hand(path.stem)) is not None]
+    return [ExtractResponse.model_validate(b) for b in db.run(_rows(projects.current(), HAND))]
 
 
 def all_cached() -> list[ExtractResponse]:
-    """Every cached candidate's file: this run's extractions, then the
-    candidates written by hand. The evidence pool reads all of them; Witness
-    scores `all_extracted` alone."""
+    """Every paper's candidates: this run's extractions, then the candidates
+    written by hand. The evidence pool reads all of them; Witness scores
+    `all_extracted` alone."""
     return all_extracted() + all_hand()
 
 
+async def _keep(project_id: str, result: ExtractResponse) -> None:
+    async with db.session() as s:
+        await _put(s, project_id, MODEL, result, by=RUN)
+
+
 def _persist(result: ExtractResponse) -> ExtractResponse:
-    atomic.write_text(_path(result.paperId), result.model_dump_json(indent=2) + "\n")
+    db.run(_keep(projects.current(), result))
     return result
 
 
@@ -543,6 +551,22 @@ def _extract_sections(paper_id: str, sections: list[dict[str, Any]], *, depth: i
     return out
 
 
+def passages(document_id: str) -> list[dict[str, Any]]:
+    """The document's passages in the kit, which every quote anchors to.
+    Refused when the project holds no such document, or it holds no text."""
+    from sci_rag.server.errors import ApiError
+
+    try:
+        held = kit.passages(document_id, project_id=projects.current())
+    except ApiError as e:
+        raise NothingToAnchor(
+            f"this project holds no document {document_id}. Collect it first — there is nothing to anchor to."
+        ) from e
+    if not held.sections:
+        raise NothingToAnchor(f"{document_id} holds no text — there is nothing to anchor to.")
+    return held.sections
+
+
 def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
     """Fetch → prompt → one call → anchor → persist. Cached unless `force`."""
     if not force:
@@ -550,12 +574,7 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
         if hit is not None:
             return hit
 
-    fetched = intake.cached(paper_id)
-    if fetched is None or fetched.status != "complete" or not fetched.sections:
-        raise ExtractUnavailable(
-            f"{paper_id} has no cached full text. Fetch it first — there is nothing to anchor to."
-        )
-    sections = [s.model_dump() for s in fetched.sections]
+    sections = passages(paper_id)
 
     got = _extract_sections(paper_id, sections)
     # What the prompt had to cut to fit a section in — from the call that
@@ -573,9 +592,9 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
     if got.truncatedSections:
         notes.append(
             "sections " + ", ".join(got.truncatedSections) + " still hit the token limit after "
-            f"splitting and were not extracted; the rest of the paper was"
+            "splitting and were not extracted; the rest of the paper was"
         )
-    if SAVE_RESPONSES and not intake.fixtures_only():
+    if SAVE_RESPONSES and not collectors.fixtures_only():
         # The candidates from every call, as one response: a fixture replays
         # the RESULT, and a split is how it was obtained rather than what it
         # was. A run that produced nothing is not saved at all.
@@ -649,24 +668,28 @@ def add_candidate(paper_id: str, raw: dict[str, Any], *, who: str) -> tuple[Cand
     hand-written candidates under the lock, with an audit line naming `who`.
     The extractor's file is never created, read or replaced here (§1.R
     finding 3): the paper stays as extracted, or as unextracted, as it was."""
-    fetched = intake.cached(paper_id)
-    if fetched is None or fetched.status != "complete" or not fetched.sections:
-        raise ExtractUnavailable(f"{paper_id} has no cached full text. Fetch it first — there is nothing to anchor to.")
-    sections = [s.model_dump() for s in fetched.sections]
-    path = _hand_path(paper_id)
-    with _WRITE_LOCK, atomic.held(path):
-        current = hand(paper_id)
+    sections = passages(paper_id)
+    return db.run(_add_candidate(projects.current(), paper_id, raw, sections, who))
+
+
+async def _add_candidate(
+    project_id: str, paper_id: str, raw: dict[str, Any], sections: list[dict[str, Any]], who: str
+) -> tuple[Candidate | None, str | None, str | None]:
+    async with db.session() as s:
+        await db.lock(s, "candidates", project_id, paper_id)
+        body = await _row(s, project_id, paper_id, HAND)
+        current = None if body is None else ExtractResponse.model_validate(body)
         n = len(current.candidates) if current else 0
         made, rule, detail = anchor_candidate(raw, sections, paper_id=paper_id, candidate_id=f"{MODEL_PREFIX}-{paper_id}-{n:04d}")
         if made is None:
             return None, rule, detail
         now = datetime.now(timezone.utc).isoformat()
         if current is None:
-            # No model call made this file: no usage, and no calls.
+            # No model call made this row: no usage, and no calls.
             current = ExtractResponse(paperId=paper_id, extractedAt=now, candidates=[], audit=[], usage=Usage(), calls=0)
         current.candidates.append(made)
         current.audit.append(AuditEvent(at=now, who=who, action=f"candidate {made.id} written by hand"))
-        atomic.write_text(path, current.model_dump_json(indent=2) + "\n")
+        await _put(s, project_id, HAND, current, by=who)
     return made, None, None
 
 
@@ -674,29 +697,27 @@ def add_candidate(paper_id: str, raw: dict[str, Any], *, who: str) -> tuple[Cand
 
 
 def extract_all(*, force: bool = False, failed: list[str] | None = None) -> list[ExtractResponse]:
-    """Every paper with cached full text, in id order. A paper whose call
+    """Every document the project holds, newest first. A document whose call
     fails is reported and skipped; the batch does not stop for it, and its id
     goes into `failed` when one is given, so the caller can say the batch did
     not finish clean."""
     out: list[ExtractResponse] = []
-    for paper_id, status in intake.all_statuses().items():
-        if status.ingest != "complete":
-            continue
+    for document, _ in kit.documents(projects.current()):
         try:
-            out.append(extract_paper(paper_id, force=force))
+            out.append(extract_paper(document.id, force=force))
         except ExtractTruncated as e:
-            print(f"{paper_id:<6} NOT extracted — {e}")
+            print(f"{document.id} NOT extracted — {e}")
             if failed is not None:
-                failed.append(paper_id)
+                failed.append(document.id)
         except ExtractUnavailable as e:
-            print(f"{paper_id:<6} skipped — {e}")
+            print(f"{document.id} skipped — {e}")
             if failed is not None:
-                failed.append(paper_id)
+                failed.append(document.id)
     return out
 
 
 def _print_table(results: list[ExtractResponse]) -> None:
-    rules = ["field", "section", "quote", "value", "unit", "range", "method"]
+    rules = list(ANCHOR_RULES)
     print(f"{'id':<6} {'kept':>5} {'rejected':>8}  " + "  ".join(f"{r:>7}" for r in rules) + f"  {'in':>7} {'out':>6} {'cost':>9}")
     total_cost = 0.0
     for r in results:

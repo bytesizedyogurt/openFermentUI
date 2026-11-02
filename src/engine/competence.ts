@@ -114,7 +114,7 @@ const signedOff = (ev: GuildEvidence[]) =>
 
 /**
  * Every person's status on every skill. `people` decides who is computed (an
- * auditor holds no skills and is left out); `skills` is the seed.
+ * auditor holds no skills and is left out); `skills` is Guild's skill list.
  */
 export function competenceOf(
   evidence: GuildEvidence[],

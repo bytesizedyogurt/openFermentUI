@@ -1,6 +1,6 @@
 """A run's train, read into the Builder (OF-BLD-020 §5.3, D9).
 
-    from_run(artifact_id, train_id=None, include_archived=False) -> TrainFromRun
+    from_run(artifact_id, train_id=None) -> TrainFromRun
 
 A kept run (a `proforma.run`, a `proforma.reference` or a `pureos.train_run`)
 holds its stream and unit tables (`proforma.tables_of`). This reads them into
@@ -40,8 +40,8 @@ a `TrainSpec` the Builder opens, as data, and never computes a quantity:
     the product   the chemical the run traced (pureOS's reading of the run) and
                   the product id `thermo.CHEMICALS` names for it; a run whose
                   product no id names here, or that names no product, is refused
-                  in words, as is one naming no program, of an archived program
-                  with the switch off, or with no unit to take
+                  in words, as is one naming no chemical set, or with no unit
+                  to take
 
 The train's structure is held to `validate` and its refusals are returned
 beside it, for a person to settle in the Builder. Nothing is kept: the
@@ -89,11 +89,11 @@ def _product_id(chemical: str) -> str | None:
     return next((pid for pid, chem in thermo.CHEMICALS.items() if chem == chemical), None)
 
 
-def _read(art: Artifact, include_archived: bool) -> tuple[Any, str | None, str | None, str | None, str | None, str]:
+def _read(art: Artifact) -> tuple[Any, str | None, str | None, str | None, str | None, str]:
     """(the tables, the product stream, the chemical traced, the product id,
     the program, what the run is called) for a kept run."""
-    from .. import programs, proforma
-    from . import _train_product, product_of, program_of, program_of_run, scenario_of, seed_scenarios
+    from .. import proforma
+    from . import _train_product, product_of, program_of, program_of_run, scenario_of, held_scenarios
 
     t = proforma.tables_of(art)
     o = art.output if isinstance(art.output, dict) else {}
@@ -108,16 +108,10 @@ def _read(art: Artifact, include_archived: bool) -> tuple[Any, str | None, str |
         if not chem:
             raise TrainRefused(f"run {art.id} names no product to trace ({how}), so no train is read from it")
         pid = _product_id(chem)
-        scenarios = seed_scenarios() if art.tool == RUN else []
+        scenarios = held_scenarios() if art.tool == RUN else []
         sid, sname = scenario_of(art, scenarios) if art.tool == RUN else (None, None)
         program = program_of(art, sid, scenarios)
         label = sname or t.flowsheet or art.id
-    try:
-        if program and programs.hides(program, include_archived):
-            p = programs.program_by_id(program)
-            raise TrainRefused(f"run {art.id} belongs to {p.name if p else program}, archived (hidden). {programs.SWITCH}")
-    except FileNotFoundError:
-        pass
     if not chem or not stream_id:
         raise TrainRefused(f"run {art.id} names no product stream, so no train is read from it")
     if not pid:
@@ -172,7 +166,7 @@ def _parts_train(art: Artifact, flowsheet: str | None) -> tuple[str | None, Trai
         return rid, None, f"train run {rid}, which run {art.id} names, cannot be read"
 
 
-def from_run(artifact_id: str, train_id: str | None = None, include_archived: bool = False) -> TrainFromRun:
+def from_run(artifact_id: str, train_id: str | None = None) -> TrainFromRun:
     """POST /api/pureos/train/from-run: the run's units, each by its class,
     into a train (module docstring); nothing is kept."""
     from .. import artifacts
@@ -186,7 +180,7 @@ def from_run(artifact_id: str, train_id: str | None = None, include_archived: bo
     if art.tool not in RUN_TOOLS:
         raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact; a train is read from a run ("
                            f"{', '.join(RUN_TOOLS)})")
-    t, stream_id, chem, pid, program, label = _read(art, include_archived)
+    t, stream_id, chem, pid, program, label = _read(art)
     streams = {s.id: s for s in t.streams}
     leads = _leads_on(stream_id, t.streams, t.units)
     by_class = _by_class()

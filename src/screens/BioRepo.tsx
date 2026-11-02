@@ -1,17 +1,13 @@
 // Library — the faceted corpus table (OF-DES-001 §8.3). Every row is a paper
-// in the OF-COR-001 catalogue; the ingest queue lives on the Ingest screen.
-import { useMemo, useState } from 'react';
+// that arrived through Intake; the ingest queue lives on the Ingest screen.
+import { useMemo } from 'react';
 import {
   AlertTriangle,
-  BookMarked,
   Download,
-  Layers,
   Loader2,
-  X,
 } from 'lucide-react';
 import type { Job, Paper } from '@/data/types';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, useProgramFilter, useStore } from '@/store';
+import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
@@ -48,9 +44,8 @@ interface LibRow {
   extractions: number;
   goldCount: number;
   verifiedCount: number;
-  collections: string[];
   prov: ProvKind;
-  ingestKey: 'complete' | 'catalogued' | 'ingesting' | 'failed';
+  ingestKey: 'complete' | 'ingesting' | 'failed';
 }
 
 /** Latest ingest job that references this paper (jobs carry the id in href). */
@@ -64,9 +59,9 @@ function ingestJobFor(jobs: Job[], paperId: string): Job | undefined {
 }
 
 /**
- * Stage read live from the running job. A paper seeded mid-pipeline has no job
- * behind it, so its progress is genuinely unknown — `pct` is null rather than a
- * plausible-looking number.
+ * Stage read live from the running job. A paper with no job behind it here (one
+ * collected from another session) has a genuinely unknown progress — `pct` is
+ * null rather than a plausible-looking number.
  */
 function stageOf(
   paper: Paper,
@@ -112,41 +107,12 @@ function TagList({ items, max = 2 }: { items: string[]; max?: number }) {
   );
 }
 
-/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
-function archivedNames(paperIds: string[]): string {
-  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
-  return PROGRAMS.filter((p) => hit.has(p.id))
-    .map((p) => p.name)
-    .join(' and ');
-}
-
 export default function BioRepo() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
-  const allCollections = useStore((s) => s.collections);
-  // OF-BLD-016 §2.2: every paper, record, collection and count on this
-  // screen passes through the one program filter. With archived programs
-  // hidden (the default) a casein or PHA paper is not listed, not counted
-  // and not offered in a collection; with the switch on, this is the whole
-  // library exactly as before.
-  const shows = useProgramFilter();
-  // A collection shows while it is empty or holds a paper that shows, and
-  // counts the papers that show.
-  const collections = useMemo(
-    () => allCollections.filter((c) => c.paperIds.length === 0 || c.paperIds.some((id) => shows('paper', id))),
-    [allCollections, shows],
-  );
-  const shownIn = (paperIds: string[]) => paperIds.filter((id) => shows('paper', id)).length;
-  const hiddenPapers = useMemo(
-    () => papers.filter((p) => p.ingest !== 'shelf' && !shows('paper', p.id)).map((p) => p.id),
-    [papers, shows],
-  );
-  const shownRecords = useMemo(() => records.filter((r) => shows('record', r.id)).length, [records, shows]);
   const jobs = useStore((s) => s.jobs);
   const density = useStore((s) => s.ui.density);
-  const toast = useStore((s) => s.toast);
 
-  const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
 
   const allRows = useMemo<LibRow[]>(() => {
     const byPaper = new Map<string, { total: number; gold: number; verified: number }>();
@@ -158,24 +124,20 @@ export default function BioRepo() {
       byPaper.set(r.paperId, agg);
     }
     return papers
-      .filter((p) => p.ingest !== 'shelf' && shows('paper', p.id))
+      .filter((p) => p.ingest !== 'shelf')
       .map((paper) => {
         const agg = byPaper.get(paper.id) ?? { total: 0, gold: 0, verified: 0 };
         const ingestKey: LibRow['ingestKey'] = paper.ingest.startsWith('failed:')
           ? 'failed'
           : paper.ingest.startsWith('stage:')
             ? 'ingesting'
-            : paper.ingest === 'catalogued'
-              ? 'catalogued'
-              : 'complete';
+            : 'complete';
         const prov: ProvKind =
           ingestKey === 'failed'
             ? 'rejected'
             : ingestKey === 'ingesting'
-              ? 'demo'
-              : ingestKey === 'catalogued' && agg.gold === 0 && agg.verified === 0
-                ? 'curated'
-                : agg.gold > 0
+              ? 'assumed'
+              : agg.gold > 0
                 ? 'gold'
                 : agg.verified > 0
                   ? 'verified'
@@ -185,18 +147,13 @@ export default function BioRepo() {
           extractions: agg.total,
           goldCount: agg.gold,
           verifiedCount: agg.verified,
-          collections: collections.filter((c) => c.paperIds.includes(paper.id)).map((c) => c.name),
           prov,
           ingestKey,
         };
       });
-  }, [papers, records, collections, shows]);
+  }, [papers, records]);
 
-  const activeCollection = collections.find((c) => c.id === collectionFilter) ?? null;
-  const rows = useMemo(
-    () => (activeCollection ? allRows.filter((r) => activeCollection.paperIds.includes(r.paper.id)) : allRows),
-    [allRows, activeCollection],
-  );
+  const rows = allRows;
 
   const pinned = allRows.filter((r) => r.ingestKey === 'ingesting');
   const brokenRows = allRows.filter((r) => r.ingestKey === 'failed');
@@ -218,7 +175,6 @@ export default function BioRepo() {
         'Extractions',
         'Gold records',
         'Ingest status',
-        'Collections',
       ],
       selected.map((r) => [
         r.paper.id,
@@ -231,7 +187,6 @@ export default function BioRepo() {
         r.extractions,
         r.goldCount,
         r.paper.ingest,
-        r.collections.join('; '),
       ]),
     );
   };
@@ -296,7 +251,7 @@ export default function BioRepo() {
       numeric: true,
       priority: 2,
       render: (r) => <span className="font-num">{r.paper.year}</span>,
-      value: (r) => r.paper.year,
+      value: (r) => r.paper.year ?? '',
     },
     {
       key: 'organisms',
@@ -364,20 +319,6 @@ export default function BioRepo() {
             </span>
           );
         }
-        if (r.ingestKey === 'catalogued') {
-          // Bibliographically real, full text not parsed. Saying "in corpus"
-          // here would imply the spans anchor to the paper's own words; they
-          // anchor to the curator's notes.
-          return (
-            <span
-              className="chip text-ink-soft"
-              title="Catalogued: real citation, full text not ingested. Spans anchor to the curation note."
-            >
-              <BookMarked size={11} /> Catalogued
-              {r.goldCount > 0 && <span className="text-gold">· gold</span>}
-            </span>
-          );
-        }
         return (
           <span className="chip text-ink-soft">
             Full text
@@ -405,7 +346,6 @@ export default function BioRepo() {
       valuesOf: (r) => [r.goldCount > 0 ? 'yes' : 'no'],
       labelOf: (v) => GOLD_FACET_LABEL[v] ?? v,
     },
-    { key: 'collection', label: 'Collection', valuesOf: (r) => r.collections },
   ];
 
   // ── header actions ───────────────────────────────────────────────────
@@ -424,19 +364,9 @@ export default function BioRepo() {
       title="BioRepo"
       subtitle={
         <>
-          Real literature, catalogued by hand — <span className="font-num">{allRows.length}</span> papers carrying{' '}
-          <span className="font-num">{shownRecords}</span> extraction records. Filters combine with AND
+          Papers that arrived through Intake — <span className="font-num">{allRows.length}</span> papers carrying{' '}
+          <span className="font-num">{records.length}</span> extraction records. Filters combine with AND
           across groups and OR inside a group.
-          {hiddenPapers.length > 0 && (
-            <span className="block text-caption text-ink-soft mt-0.5" data-testid="archived-hidden">
-              <span className="font-num">{hiddenPapers.length}</span> papers in {archivedNames(hiddenPapers)} are
-              hidden, because archived programs are.{' '}
-              <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
-                Settings → Programs
-              </a>{' '}
-              shows them.
-            </span>
-          )}
         </>
       }
       actions={headerActions}
@@ -445,21 +375,6 @@ export default function BioRepo() {
     </>
   );
 
-  if (allRows.length === 0 && hiddenPapers.length > 0) {
-    return (
-      <>
-        {header}
-        <Card>
-          <EmptyState
-            title="Every paper here is in an archived program"
-            body={`The ${hiddenPapers.length} papers in ${archivedNames(hiddenPapers)} are hidden, because archived programs are hidden unless you turn them on. Nothing was deleted.`}
-            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Show archived programs in Settings</LinkButton>}
-          />
-        </Card>
-      </>
-    );
-  }
-
   if (allRows.length === 0) {
     return (
       <>
@@ -467,7 +382,7 @@ export default function BioRepo() {
         <Card>
           <EmptyState
             title="No papers in the corpus yet"
-            body="Every paper is still in the ingest queue. Fetch one to see it flow through fetch, parse, chunk, embed and extract."
+            body="Documents arrive through Intake: a paper fetched there flows through fetch, parse, chunk, embed and extract, and lands here with its records."
             action={<LinkButton to="/intake/ingest">Open the ingest board</LinkButton>}
           />
         </Card>
@@ -563,30 +478,9 @@ export default function BioRepo() {
         }
         exportName="openferment-library"
         exportNote="CSV exports carry the provenance disclosure header — the citations are real, and a per-class note says what each provenance value is worth."
-        emptyTitle={activeCollection ? 'This collection is empty' : 'No papers match'}
-        emptyBody={
-          activeCollection
-            ? `${activeCollection.name} has no papers in it.`
-            : hiddenPapers.length > 0
-              ? `Nothing in the corpus matches the current filters. ${hiddenPapers.length} papers in ${archivedNames(hiddenPapers)} are not searched, because archived programs are hidden; Settings → Programs shows them.`
-              : 'Nothing in the corpus matches the current filters.'
-        }
-        toolbar={
-          activeCollection ? (
-            <button
-              className="chip chip-active"
-              onClick={() => setCollectionFilter(null)}
-              title="Remove the collection filter"
-            >
-              <Layers size={12} /> {activeCollection.name}
-              <span className="font-num text-caption text-ink-soft">
-                {shownIn(activeCollection.paperIds)}
-              </span>
-              <X size={11} />
-            </button>
-          ) : undefined
-        }
-        bulkActions={(selected, clear) => (
+        emptyTitle="No papers match"
+        emptyBody="Nothing in the corpus matches the current filters."
+        bulkActions={(selected) => (
           <>
             <Button size="sm" onClick={() => exportSelected(selected)}>
               <Download size={13} /> Export metadata

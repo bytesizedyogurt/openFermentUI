@@ -4,10 +4,8 @@
 // src/screens/Guild.tsx shares only the tab strip.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Download, UserPlus, X } from 'lucide-react';
-import type { Check as GuildCheck, DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Skill } from '@/data/types';
-import { useStore, guildView, actingIdOf, useProgramFilter } from '@/store';
-import { SKILLS, SKILL_BY_ID } from '@/data/skills';
-import { PROTOCOLS } from '@/data/protocols';
+import type { Check as GuildCheck, DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Protocol, Skill } from '@/data/types';
+import { useStore, guildView, actingIdOf, useSkillById } from '@/store';
 import { GUILD_TABS } from '@/data/tabs';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { Button, Callout, Card, PageHeader, Sheet, cx } from '@/components/ui';
@@ -38,16 +36,19 @@ export interface GuildContext {
   /** Active people who can hold skills: everyone but auditors and the inactive. */
   members: GuildPerson[];
   personById: Map<string, GuildPerson>;
+  /** The lab's skills by id, as the store holds them. */
+  skillById: Record<string, Skill>;
 }
 
 export function useGuild(): GuildContext {
+  const SKILL_BY_ID = useSkillById();
   const guild = useStore((s) => guildView(s));
   const actingId = useStore((s) => actingIdOf(s));
   const today = localToday();
-  const status = useMemo(() => competenceOf(guild.evidence, guild.people, SKILL_BY_ID, today), [guild, today]);
+  const status = useMemo(() => competenceOf(guild.evidence, guild.people, SKILL_BY_ID, today), [guild, today, SKILL_BY_ID]);
   const personById = useMemo(() => new Map(guild.people.map((p) => [p.id, p])), [guild.people]);
   const members = useMemo(() => guild.people.filter((p) => p.active && p.role !== 'auditor'), [guild.people]);
-  return { guild, status, today, actingId, acting: (actingId && personById.get(actingId)) || null, members, personById };
+  return { guild, status, today, actingId, acting: (actingId && personById.get(actingId)) || null, members, personById, skillById: SKILL_BY_ID };
 }
 
 // ── checks, as every Guild view reads them (OF-BLD-013 §5.4) ──────────
@@ -181,6 +182,7 @@ export function EvidenceRow({
   showPerson?: boolean;
   showSkill?: boolean;
 }) {
+  const SKILL_BY_ID = useSkillById();
   const withdraw = useStore((s) => s.guildWithdraw);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -317,10 +319,10 @@ const SIGN_HINT: Record<SignKind, string> = {
   witnessed: 'You watched them perform it against every criterion below.',
 };
 
-function stepsNeeding(skillId: string, shows: (kind: 'protocol', id: string) => boolean): { ref: string; stepId: string; text: string }[] {
+/** The steps of the lab's protocols, at each one's current version, that need this skill. */
+function stepsNeeding(skillId: string, protocols: readonly Protocol[]): { ref: string; stepId: string; text: string }[] {
   const out: { ref: string; stepId: string; text: string }[] = [];
-  for (const p of PROTOCOLS) {
-    if (!shows('protocol', p.id)) continue;
+  for (const p of protocols) {
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
     for (const st of v.steps) if (st.skills?.includes(skillId)) out.push({ ref: p.id, stepId: st.id, text: st.text });
   }
@@ -333,6 +335,7 @@ export function SignoffSheet({ personId, skillId, onClose }: { personId: string 
 }
 
 function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: string; onClose: () => void }) {
+  const SKILL_BY_ID = useSkillById();
   const ctx = useGuild();
   const record = useStore((s) => s.guildRecord);
   const toast = useStore((s) => s.toast);
@@ -340,8 +343,8 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
   const person = ctx.personById.get(personId);
   const st = statusOf(ctx.status, personId, skillId);
   const entries = ctx.guild.evidence.filter((e) => e.personId === personId && e.skillId === skillId).slice().reverse();
-  const shows = useProgramFilter();
-  const steps = useMemo(() => stepsNeeding(skillId, shows), [skillId, shows]);
+  const protocols = useStore((s) => s.protocols);
+  const steps = useMemo(() => stepsNeeding(skillId, protocols), [skillId, protocols]);
 
   const [kind, setKind] = useState<SignKind>(() =>
     !skill || !st.knowledgeComplete ? 'knowledge' : readyForCheck(st, skill) || st.level >= 3 ? 'witnessed' : 'supervised',
@@ -720,7 +723,7 @@ export function exportLedger(ctx: GuildContext, personId: string) {
     .filter((e) => e.personId === personId)
     .map((e) => [
       e.at.slice(0, 10),
-      SKILL_BY_ID[e.skillId]?.name ?? e.skillId,
+      ctx.skillById[e.skillId]?.name ?? e.skillId,
       kindLabel(e),
       e.outcome,
       nameOf(ctx, e.observerId),
@@ -729,7 +732,7 @@ export function exportLedger(ctx: GuildContext, personId: string) {
       e.recordedAt ?? 'not yet on the service',
       e.withdrawnAt ? `withdrawn ${e.withdrawnAt.slice(0, 10)} by ${nameOf(ctx, e.withdrawnBy)}: ${e.withdrawReason}` : '',
     ]);
-  const levels = Object.values(SKILL_BY_ID).map((sk) => {
+  const levels = Object.values(ctx.skillById).map((sk) => {
     const st = statusOf(ctx.status, personId, sk.id);
     return `#   ${sk.name}: ${LEVEL_NAME[st.level]}${st.suspended ? ', suspended' : ''}${st.lapsed ? ', lapsed' : ''}`;
   });
@@ -767,6 +770,7 @@ const CALM = new Set(['ready for a witnessed check', 'checks open in the assesso
  * deviations runs wrote this week. Each line opens the view that acts on it.
  */
 export function WorkforceCard() {
+  const SKILL_BY_ID = useSkillById();
   const ctx = useGuild();
   const { all, loaded } = useChecks();
   if (ctx.guild.people.length === 0) {

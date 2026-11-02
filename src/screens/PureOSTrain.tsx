@@ -10,8 +10,7 @@
 //
 // A unit whose BioSTEAM class is a step in the unit-operation vocabulary
 // (`biosteamClasses` in src/data/vocabulary.ts) links to that step on pureOS's
-// front page. A deep link to an archived program's train opens under the
-// banner naming it, as every page opened by id does.
+// front page.
 //
 // PROPERTIES (§4.2, D9): the broth and the product stream, and any other
 // stream a person picks, as thermosteam answers for them at the stream's own
@@ -41,7 +40,6 @@ import { href, useRoute } from '@/router';
 import { Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ComponentTag } from '@/components/ComponentTag';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { RecoveryByUnit } from '@/components/figures';
 
 const mass = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? '—' : fmt(v, 3));
@@ -75,8 +73,6 @@ export default function PureOSTrain({ scenarioId }: { scenarioId: string }) {
       <a href={href('/pureos')} className="inline-flex items-center gap-1 text-caption text-ink-soft hover:text-accent mb-2">
         <ArrowLeft size={13} aria-hidden /> pureOS
       </a>
-      <ArchivedBanner kind="scenario" id={scenarioId} />
-      {train?.scenarioId && train.scenarioId !== scenarioId && <ArchivedBanner kind="scenario" id={train.scenarioId} />}
       <PageHeader
         eyebrow="pureOS · Train"
         title={train ? (train.scenarioName ?? train.trainName ?? train.flowsheet ?? train.artifactId) : scenarioId}
@@ -114,14 +110,14 @@ export default function PureOSTrain({ scenarioId }: { scenarioId: string }) {
   );
 }
 
-/** Back to the Builder for a train this browser saved; for any other run, a fresh train read from its units. */
+/** Back to the Builder for a train the project saved; for any other run, a fresh train read from its units. */
 function BuilderLink({ train }: { train: Train }) {
   const saved = useStore((s) => (train.trainId ? (s.trainsMade[train.trainId] ?? null) : null));
   if (train.tool === 'pureos.train_run') {
     if (!train.trainId || !saved)
       return (
         <span className="text-caption text-ink-soft" data-testid="train-builder-elsewhere">
-          Built in pureOS, but not saved in this browser.
+          Built in pureOS, but not saved in this project.
         </span>
       );
     return (

@@ -1,0 +1,529 @@
+{
+  "kind": "retrieval",
+  "generated_at": "2026-10-30T08:55:58.096625+00:00",
+  "git_commit": "55ca3b3",
+  "snapshot": null,
+  "provenance": {
+    "embedding": "fastembed:BAAI/bge-small-en-v1.5@384",
+    "models": "none asked",
+    "corpus": "Sci RAG Kit 0.5.0 demo corpus (data/demo at 26b3990)"
+  },
+  "corpus": {
+    "documents": 5,
+    "chunks": 34,
+    "entities": 0,
+    "relationships": 0,
+    "communities": 0,
+    "latest_ingested_at": "2026-10-30T08:55:57.406485+00:00",
+    "embedding_versions": [
+      "fastembed:BAAI/bge-small-en-v1.5@384"
+    ]
+  },
+  "ground_truth": {
+    "drafted": 0,
+    "reviewed": 10
+  },
+  "configs": [
+    {
+      "name": "interactive",
+      "description": "Vector + keyword only, as interactive callers see it",
+      "metrics": {
+        "n": 9.0,
+        "hit_at_5": 1.0,
+        "hit_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.9432067013623221
+      },
+      "metrics_ci": {
+        "n": 9,
+        "hit_at_5": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0,
+          "n": 9.0
+        },
+        "hit_at_10": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0,
+          "n": 9.0
+        },
+        "mrr": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0,
+          "n": 9.0
+        },
+        "ndcg_at_10": {
+          "mean": 0.9432067013623221,
+          "lo": 0.8903539649758884,
+          "hi": 0.9822070555205805,
+          "n": 9.0
+        }
+      },
+      "records": [
+        {
+          "question_id": "rice-straw-generated",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            8
+          ]
+        },
+        {
+          "question_id": "rice-straw-baled",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        {
+          "question_id": "rice-straw-ash",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            4,
+            5,
+            7,
+            8,
+            9,
+            10
+          ]
+        },
+        {
+          "question_id": "almond-pruning-yield",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            7,
+            9,
+            10
+          ]
+        },
+        {
+          "question_id": "biogas-yield-pretreated",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            6,
+            8,
+            9
+          ]
+        },
+        {
+          "question_id": "chipping-cost",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            8,
+            10
+          ]
+        },
+        {
+          "question_id": "chip-moisture-limit",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        {
+          "question_id": "ruc-payment",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            3
+          ]
+        },
+        {
+          "question_id": "digester-siting",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            9,
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vector_only",
+      "description": "Dense vectors alone",
+      "metrics": {
+        "n": 9.0,
+        "hit_at_5": 1.0,
+        "hit_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.9432067013623221
+      },
+      "metrics_ci": {
+        "n": 9,
+        "hit_at_5": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0,
+          "n": 9.0
+        },
+        "hit_at_10": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0,
+          "n": 9.0
+        },
+        "mrr": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0,
+          "n": 9.0
+        },
+        "ndcg_at_10": {
+          "mean": 0.9432067013623221,
+          "lo": 0.8903539649758884,
+          "hi": 0.9822070555205805,
+          "n": 9.0
+        }
+      },
+      "records": [
+        {
+          "question_id": "rice-straw-generated",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            8
+          ]
+        },
+        {
+          "question_id": "rice-straw-baled",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        {
+          "question_id": "rice-straw-ash",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            4,
+            5,
+            7,
+            8,
+            9,
+            10
+          ]
+        },
+        {
+          "question_id": "almond-pruning-yield",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            7,
+            9,
+            10
+          ]
+        },
+        {
+          "question_id": "biogas-yield-pretreated",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            6,
+            8,
+            9
+          ]
+        },
+        {
+          "question_id": "chipping-cost",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            8,
+            10
+          ]
+        },
+        {
+          "question_id": "chip-moisture-limit",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        {
+          "question_id": "ruc-payment",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            3
+          ]
+        },
+        {
+          "question_id": "digester-siting",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 10,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1,
+            9,
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "name": "keyword_only",
+      "description": "Full-text search alone",
+      "metrics": {
+        "n": 9.0,
+        "hit_at_5": 0.3333333333333333,
+        "hit_at_10": 0.3333333333333333,
+        "mrr": 0.3333333333333333,
+        "ndcg_at_10": 0.3333333333333333
+      },
+      "metrics_ci": {
+        "n": 9,
+        "hit_at_5": {
+          "mean": 0.3333333333333333,
+          "lo": 0.0,
+          "hi": 0.6666666666666666,
+          "n": 9.0
+        },
+        "hit_at_10": {
+          "mean": 0.3333333333333333,
+          "lo": 0.0,
+          "hi": 0.6666666666666666,
+          "n": 9.0
+        },
+        "mrr": {
+          "mean": 0.3333333333333333,
+          "lo": 0.0,
+          "hi": 0.6666666666666666,
+          "n": 9.0
+        },
+        "ndcg_at_10": {
+          "mean": 0.3333333333333333,
+          "lo": 0.0,
+          "hi": 0.6666666666666666,
+          "n": 9.0
+        }
+      },
+      "records": [
+        {
+          "question_id": "rice-straw-generated",
+          "first_relevant_rank": null,
+          "hit_at_5": false,
+          "hit_at_10": false,
+          "retrieved": 0,
+          "degraded_stages": [],
+          "relevant_ranks": []
+        },
+        {
+          "question_id": "rice-straw-baled",
+          "first_relevant_rank": null,
+          "hit_at_5": false,
+          "hit_at_10": false,
+          "retrieved": 0,
+          "degraded_stages": [],
+          "relevant_ranks": []
+        },
+        {
+          "question_id": "rice-straw-ash",
+          "first_relevant_rank": null,
+          "hit_at_5": false,
+          "hit_at_10": false,
+          "retrieved": 0,
+          "degraded_stages": [],
+          "relevant_ranks": []
+        },
+        {
+          "question_id": "almond-pruning-yield",
+          "first_relevant_rank": null,
+          "hit_at_5": false,
+          "hit_at_10": false,
+          "retrieved": 0,
+          "degraded_stages": [],
+          "relevant_ranks": []
+        },
+        {
+          "question_id": "biogas-yield-pretreated",
+          "first_relevant_rank": null,
+          "hit_at_5": false,
+          "hit_at_10": false,
+          "retrieved": 0,
+          "degraded_stages": [],
+          "relevant_ranks": []
+        },
+        {
+          "question_id": "chipping-cost",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 1,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1
+          ]
+        },
+        {
+          "question_id": "chip-moisture-limit",
+          "first_relevant_rank": null,
+          "hit_at_5": false,
+          "hit_at_10": false,
+          "retrieved": 0,
+          "degraded_stages": [],
+          "relevant_ranks": []
+        },
+        {
+          "question_id": "ruc-payment",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 1,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1
+          ]
+        },
+        {
+          "question_id": "digester-siting",
+          "first_relevant_rank": 1,
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "retrieved": 1,
+          "degraded_stages": [],
+          "relevant_ranks": [
+            1
+          ]
+        }
+      ]
+    }
+  ]
+}

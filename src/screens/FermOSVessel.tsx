@@ -47,7 +47,6 @@ import { Button, Callout, EmptyState, SectionTitle } from '@/components/ui';
 import { NewScenarioDialog } from '@/components/NewScenarioDialog';
 import { ParameterPanel } from '@/components/ParameterPanel';
 import { ProvenanceBadge } from '@/components/Provenance';
-import { SubsystemReference } from '@/components/ReferenceView';
 import { OxygenBalance } from '@/components/figures';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
@@ -301,7 +300,6 @@ function Result({ design }: { design: VesselDesign }) {
 
 export default function FermOSVessel() {
   const route = useRoute();
-  const showArchived = useStore((s) => s.showArchived);
   const [simulations, setSimulations] = useState<SimulationSummary[] | null>(null);
   const [fits, setFits] = useState<FermosFitInfo[]>([]);
   const [listProblem, setListProblem] = useState<string | null>(null);
@@ -309,7 +307,7 @@ export default function FermOSVessel() {
   useEffect(() => {
     const ctrl = new AbortController();
     setListProblem(null);
-    fermosSimulations(showArchived, ctrl.signal)
+    fermosSimulations(ctrl.signal)
       .then(setSimulations)
       .catch((e: unknown) => {
         if (ctrl.signal.aborted) return;
@@ -319,11 +317,11 @@ export default function FermOSVessel() {
     // The fits list also carries kept simulations (OF-BLD-020 §3.3: a
     // simulation feeds Proforma as a fit does); a simulation is chosen above
     // as itself, so the fits offered here are the kinetic fits and forecasts.
-    fermosFits(VESSEL_FIT_FLOWSHEET, showArchived, ctrl.signal)
+    fermosFits(VESSEL_FIT_FLOWSHEET, ctrl.signal)
       .then((all) => setFits(all.filter((f) => f.tool !== 'fermos.simulation')))
       .catch(() => !ctrl.signal.aborted && setFits([]));
     return () => ctrl.abort();
-  }, [showArchived]);
+  }, []);
 
   const askedSim = route.query.get('simulation');
   const askedFit = route.query.get('fit');
@@ -389,7 +387,7 @@ export default function FermOSVessel() {
     const mine = asked;
     setBusy(true);
     setRefused(null);
-    designVessel(vesselRequest(chosen.kind === 'simulation' ? { simulation: chosen.id } : { fit: chosen.id }, overrides, showArchived), ctrl.signal)
+    designVessel(vesselRequest(chosen.kind === 'simulation' ? { simulation: chosen.id } : { fit: chosen.id }, overrides), ctrl.signal)
       .then((d) => {
         if (ctrl.signal.aborted) return;
         setDesign({ asked: mine, design: d });
@@ -500,11 +498,6 @@ export default function FermOSVessel() {
           {shownDesign && <Result design={shownDesign} />}
         </>
       )}
-
-      <section className="mt-8" aria-label="What the field says">
-        <SubsystemReference id="fermos.transport" />
-        <SubsystemReference id="fermos.scale" />
-      </section>
     </div>
   );
 }

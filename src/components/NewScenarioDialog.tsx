@@ -1,14 +1,13 @@
 // New scenario (OF-BLD-019 §3.1, D2, D5, D6): pick a flowsheet from the
-// service's shelf, name the scenario, choose its program, and it opens.
+// service's shelf, name the scenario, and it opens.
 //
-// The shelf is the service's (`GET /api/proforma/shelf`): with archived
-// programs hidden it lists only the active program's flowsheets and the
-// general ones, and the toy never. A reference biorefinery runs whole on its
+// The shelf is the service's (`GET /api/proforma/shelf`): every flowsheet a
+// scenario can name, and the toy never. A reference biorefinery runs whole on its
 // package's own defaults, so it is not offered here: a scenario is made on a
 // flowsheet whose inputs bind to records or to a named person's assumption.
-// What is made is a `biosteam` scenario and nothing else (D5), held in this
-// browser's Durable tier under a time-based id (D6); it carries no input
-// value of its own.
+// What is made is a `biosteam` scenario and nothing else (D5), kept in the
+// open project's rows under a time-based id (D6; lib/projectState.ts); it
+// carries no input value of its own.
 //
 // Proforma's index opens this, and so does the palette's "New Proforma
 // scenario" (through `ui.newScenarioOpen`); fermOS → Forecast's "Send to
@@ -19,16 +18,14 @@
 // built from kept artifacts (`builtFrom`: `custom_train_v1`, a fermOS vessel
 // design and a pureOS train run) asks for both: a chooser over the vessel
 // designs the service keeps (`GET /api/fermos/vessels`) and one over its
-// train runs (`GET /api/pureos/train-runs`), the active program's unless the
-// switch shows archived ones. An empty list says why in words and where one
-// is made, and Make the scenario waits, saying what for; nothing is silent.
-// The scenario is filed in its train run's program and keeps both ids
-// (Durable `createdScenarios`). fermOS → Vessel's **Price this in Proforma**
-// opens this with its design chosen (`initialVessel`).
+// train runs (`GET /api/pureos/train-runs`). An empty list says why in words
+// and where one is made, and Make the scenario waits, saying what for;
+// nothing is silent. The scenario keeps both ids in its row (`vessel`,
+// `trainRun`). fermOS → Vessel's **Price this in Proforma** opens
+// this with its design chosen (`initialVessel`).
 import { useEffect, useMemo, useState } from 'react';
-import type { FlowsheetInfo, ProgramId, TrainSummary, VesselSummary } from '@/data/types';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { activePrograms, useStore } from '@/store';
+import type { FlowsheetInfo, TrainSummary, VesselSummary } from '@/data/types';
+import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { Button, Modal } from './ui';
 import {
@@ -36,8 +33,6 @@ import {
   builtFromParts,
   compositeTrainRuns,
   compositeVessels,
-  defaultProgram,
-  programsFor,
   proformaShelf,
   sendFitPath,
   trainRunWords,
@@ -45,25 +40,11 @@ import {
 } from '@/lib/proforma';
 
 /** The line a shelf with nothing to start a scenario from shows, here and on the index. */
-export function NoFlowsheetLine({ showArchived }: { showArchived: boolean }) {
-  const active = activePrograms();
+export function NoFlowsheetLine() {
   return (
     <span data-testid="no-flowsheet">
-      No flowsheet of {active.map((p) => p.name).join(' or ') || 'an active program'} is on this service&rsquo;s shelf
-      yet, so there is nothing to start a scenario from.
-      {active.some((p) => p.id === 'yeast') &&
-        ' Glucose to ethanol, the yeast program’s own flowsheet, is still to be added to it.'}{' '}
-      The reference biorefineries run whole on their package&rsquo;s defaults and are not a starting point.
-      {!showArchived && (
-        <>
-          {' '}
-          Flowsheets of archived programs show when{' '}
-          <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
-            Settings → Programs
-          </a>{' '}
-          shows archived programs.
-        </>
-      )}
+      No flowsheet is on this service&rsquo;s shelf yet, so there is nothing to start a scenario from. The reference
+      biorefineries run whole on their package&rsquo;s defaults and are not a starting point.
     </span>
   );
 }
@@ -100,7 +81,6 @@ export function NewScenarioDialog({
   /** The train run chosen when it opens. */
   initialTrainRun?: string | null;
 }) {
-  const showArchived = useStore((s) => s.showArchived);
   const createScenario = useStore((s) => s.createScenario);
   const toast = useStore((s) => s.toast);
   const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
@@ -108,7 +88,6 @@ export function NewScenarioDialog({
   const [chosen, setChosen] = useState<string | null>(initialFlowsheet);
   const [name, setName] = useState('');
   const [named, setNamed] = useState(false);
-  const [program, setProgram] = useState<ProgramId | null>(null);
   // OF-BLD-020 §6.1: the kept vessel designs and train runs a composite is made from, and the two chosen.
   const [vessels, setVessels] = useState<VesselSummary[] | null>(null);
   const [trainRuns, setTrainRuns] = useState<TrainSummary[] | null>(null);
@@ -120,14 +99,14 @@ export function NewScenarioDialog({
     if (!open) return;
     const ctrl = new AbortController();
     setProblem(null);
-    proformaShelf(showArchived, ctrl.signal)
+    proformaShelf(ctrl.signal)
       .then(setShelf)
       .catch(
         (e: unknown) =>
           !ctrl.signal.aborted && setProblem(e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : String(e instanceof Error ? e.message : e)),
       );
     return () => ctrl.abort();
-  }, [open, showArchived]);
+  }, [open]);
 
   // A fresh dialog each time it opens, on the flowsheet it was opened for.
   useEffect(() => {
@@ -150,34 +129,22 @@ export function NewScenarioDialog({
     setPartsProblem(null);
     const said = (e: unknown) =>
       !ctrl.signal.aborted && setPartsProblem(e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : String(e instanceof Error ? e.message : e));
-    compositeVessels(showArchived, ctrl.signal)
+    compositeVessels(ctrl.signal)
       .then(setVessels)
       .catch((e: unknown) => {
         said(e);
         if (!ctrl.signal.aborted) setVessels([]);
       });
-    compositeTrainRuns(showArchived, ctrl.signal)
+    compositeTrainRuns(ctrl.signal)
       .then(setTrainRuns)
       .catch((e: unknown) => {
         said(e);
         if (!ctrl.signal.aborted) setTrainRuns([]);
       });
     return () => ctrl.abort();
-  }, [open, composite, showArchived]);
-  const offered = useMemo(
-    () => PROGRAMS.filter((p) => p.status === 'active' || showArchived),
-    [showArchived],
-  );
+  }, [open, composite]);
   const flowsheet = choices.find((f) => f.id === chosen) ?? (choices.length === 1 ? choices[0] : null);
   const needsParts = builtFromParts(flowsheet);
-  const chosenRun = (trainRuns ?? []).find((t) => t.artifactId === trainRun) ?? null;
-  // A flowsheet that belongs to a program files its scenarios there alone
-  // (OF-BLD-019 §3.R, finding 3); a general one under any program offered;
-  // a composite in its train run's program (OF-BLD-020 §6.1).
-  const fileable = useMemo(() => {
-    const ids = programsFor(needsParts && chosenRun?.program ? { program: chosenRun.program } : flowsheet, offered.map((p) => p.id));
-    return offered.filter((p) => ids.includes(p.id));
-  }, [flowsheet, offered, needsParts, chosenRun]);
   // What a composite still waits for, in words (never a silent empty).
   const partsWait = !needsParts
     ? null
@@ -189,19 +156,17 @@ export function NewScenarioDialog({
           ? `Choose ${!vessel && !trainRun ? 'a vessel design and a train run' : !vessel ? 'a vessel design' : 'a train run'} to make the scenario from.`
           : null;
 
-  // The name follows the flowsheet until a person types one; the program is
-  // the flowsheet's own when it is offered, else the active program.
+  // The name follows the flowsheet until a person types one.
   useEffect(() => {
     if (!flowsheet) return;
     if (!named) setName(flowsheet.title);
-    setProgram(defaultProgram(flowsheet, offered.map((p) => p.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowsheet?.id, open]);
 
   const parts = needsParts && vessel && trainRun ? { vessel, trainRun } : null;
   const create = () => {
     if (!flowsheet || !name.trim() || (needsParts && !parts)) return;
-    const id = createScenario(flowsheet.id, name, fileable.some((p) => p.id === program) ? program : (fileable[0]?.id ?? program), parts);
+    const id = createScenario(flowsheet.id, name, parts);
     onClose();
     navigate(attachFit ? sendFitPath(id, attachFit) : `/proforma/scenario/${id}`);
     toast({ text: `Scenario made on ${flowsheet.title}; it has not run yet`, kind: 'success' });
@@ -218,7 +183,7 @@ export function NewScenarioDialog({
         {!problem && shelf === null && <p className="text-body text-ink-soft">Reading the shelf…</p>}
         {shelf !== null && choices.length === 0 && (
           <p className="text-body mb-2">
-            <NoFlowsheetLine showArchived={showArchived} />
+            <NoFlowsheetLine />
           </p>
         )}
         {choices.length > 0 && (
@@ -243,8 +208,7 @@ export function NewScenarioDialog({
                       <span className="min-w-0">
                         <span className="block font-medium">{f.title}</span>
                         <span className="block text-caption text-ink-soft">
-                          <span className="font-num">{f.id}</span> · {f.source}
-                          {f.program && <> · {PROGRAMS.find((p) => p.id === f.program)?.name ?? f.program}</>} ·{' '}
+                          <span className="font-num">{f.id}</span> · {f.source} ·{' '}
                           <span className="font-num">{f.inputs.length}</span> inputs
                           {builtFromParts(f) && <> · built from {f.builtFrom.map((t) => BUILT_FROM_WORDS[t] ?? t).join(' and ')}</>}
                         </span>
@@ -335,38 +299,19 @@ export function NewScenarioDialog({
                 ))}
               </ul>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-3 mb-3">
-              <label className="text-caption text-ink-soft">
-                <span className="block mb-0.5">Name</span>
-                <input
-                  className="input w-full"
-                  aria-label="Scenario name"
-                  data-testid="new-scenario-name"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    setNamed(true);
-                  }}
-                />
-              </label>
-              <label className="text-caption text-ink-soft">
-                <span className="block mb-0.5">Program</span>
-                <select
-                  className="input w-full"
-                  aria-label="Program"
-                  data-testid="new-scenario-program"
-                  value={program ?? ''}
-                  onChange={(e) => setProgram((e.target.value || null) as ProgramId | null)}
-                >
-                  {fileable.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                      {p.status === 'archived' ? ' (archived)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <label className="block text-caption text-ink-soft mb-3">
+              <span className="block mb-0.5">Name</span>
+              <input
+                className="input w-full"
+                aria-label="Scenario name"
+                data-testid="new-scenario-name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNamed(true);
+                }}
+              />
+            </label>
           </>
         )}
         <div className="flex justify-end gap-2">

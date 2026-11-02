@@ -27,11 +27,6 @@ needs_key = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(autouse=True)
-def _store(monkeypatch, tmp_path):
-    monkeypatch.setattr(practice, "PATH", tmp_path / "practice.json")
-
-
 def bench_run() -> PracticeDeposition:
     """A run as an operator might have recorded it: one reading above the
     linear range, and a note saying it was read without dilution."""

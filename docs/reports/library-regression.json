@@ -1,0 +1,210 @@
+{
+  "package": "biorefineries 2.35.1",
+  "simulator": "biosteam 2.54.0",
+  "thermosteam": "thermosteam 0.54.2",
+  "testFile": "biorefineries/tests/test_biorefineries.py",
+  "rows": [
+    {
+      "plant": "corn",
+      "configuration": null,
+      "test": "test_corn",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "cornstover",
+      "configuration": null,
+      "test": "test_cornstover",
+      "within": 9,
+      "of": 11,
+      "outside": [
+        {
+          "expression": "tea.installed_equipment_cost",
+          "measured": 192647846.3,
+          "package": 209112840.52373964,
+          "relDiff": 0.07873736582842902,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_consumption()",
+          "measured": 20.91491945,
+          "package": 22.05578511575179,
+          "relDiff": 0.0517263683774742,
+          "rtol": 0.05
+        }
+      ]
+    },
+    {
+      "plant": "lactic",
+      "configuration": null,
+      "test": "test_lactic",
+      "error": "Refused: biorefineries.lactic could not be built under biosteam 2.54.0: IndexError: list assignment index out of range"
+    },
+    {
+      "plant": "lipidcane",
+      "configuration": null,
+      "test": "test_lipidcane",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "S1",
+      "test": "test_oilcane_S1",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "S2",
+      "test": "test_oilcane_S2",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "O1",
+      "test": "test_oilcane_O1",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "O2",
+      "test": "test_oilcane_O2",
+      "within": 9,
+      "of": 11,
+      "outside": [
+        {
+          "expression": "tea.utility_cost",
+          "measured": -7262554.704,
+          "package": -5953751.651936062,
+          "relDiff": 0.219828291231855,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_production()",
+          "measured": 58.41621314,
+          "package": 53.74711851318012,
+          "relDiff": 0.08687153387906567,
+          "rtol": 0.05
+        }
+      ]
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "O3",
+      "test": "test_oilcane_O3",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "O4",
+      "test": "test_oilcane_O4",
+      "within": 9,
+      "of": 11,
+      "outside": [
+        {
+          "expression": "tea.utility_cost",
+          "measured": -6347130.044,
+          "package": -5403704.210478699,
+          "relDiff": 0.17458872595058741,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_production()",
+          "measured": 54.80023827,
+          "package": 51.43526492864981,
+          "relDiff": 0.06542152249080532,
+          "rtol": 0.05
+        }
+      ]
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "S1*",
+      "test": "test_oilcane_S1_agile",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "S2*",
+      "test": "test_oilcane_S2_agile",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "O1*",
+      "test": "test_oilcane_O1_agile",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "O2*",
+      "test": "test_oilcane_O2_agile",
+      "within": 9,
+      "of": 11,
+      "outside": [
+        {
+          "expression": "tea.utility_cost",
+          "measured": -8255221.673,
+          "package": -6961298.235638824,
+          "relDiff": 0.1858738691494138,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_production()",
+          "measured": 59.05074867,
+          "package": 55.11560474413598,
+          "relDiff": 0.07139799960704772,
+          "rtol": 0.05
+        }
+      ]
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "O6",
+      "test": "test_oilcane_O6",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "O8",
+      "test": "test_oilcane_O8",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    },
+    {
+      "plant": "oilcane",
+      "configuration": "O9",
+      "test": "test_oilcane_O9",
+      "within": 10,
+      "of": 10,
+      "outside": []
+    },
+    {
+      "plant": "sugarcane",
+      "configuration": null,
+      "test": "test_sugarcane",
+      "within": 11,
+      "of": 11,
+      "outside": []
+    }
+  ]
+}

@@ -16,6 +16,7 @@ import re
 
 import pytest
 
+from openferment_core import units
 from openferment_core.units import tables
 from openferment_core.validate import (
     ANCHOR_RULES,
@@ -62,6 +63,15 @@ SECTIONS = [
         ),
     },
     {
+        "id": "s5",
+        "heading": "Results \u203a What the medium held",
+        "text": (
+            "No secreted product was detected in the medium of the parent strain. "
+            "On the solid medium, colonies appeared after eight days. "
+            "It secreted the same share of its protein as the parent strain."
+        ),
+    },
+    {
         "id": "t1",
         "heading": "Table 1 Titres by condition",
         "text": "Condition | Titre | Unit\nFed-batch | 4200 | mg L-1\nShake flask | 150 | mg L-1",
@@ -69,6 +79,27 @@ SECTIONS = [
 ]
 
 ONTOLOGY = tables()["ontology"]
+
+# A categorical field that requires a method, for the rules a categorical
+# value keeps. The record fields hold none at present (alpha 2.0 removed the
+# families that had them, ADR-010), so a test hands the engine one of its own.
+TEST_CATEGORICAL = {
+    "id": "test_enzyme_identity",
+    "family": "expression",
+    "name": "Enzyme identity (test field)",
+    "definition": "A named enzyme, as the paper states it. Written for these tests.",
+    "canonicalUnit": "",
+    "categorical": True,
+    "requiresMethod": True,
+    "refuseConversionTo": [],
+}
+
+
+@pytest.fixture
+def categorical(monkeypatch):
+    real = units.tables()
+    monkeypatch.setattr(units, "tables", lambda path=None: {**real, "ontology": {**real["ontology"], TEST_CATEGORICAL["id"]: TEST_CATEGORICAL}})
+    return TEST_CATEGORICAL["id"]
 
 
 def good(**overrides):
@@ -210,10 +241,9 @@ def test_a_soft_hyphen_in_the_text_does_not_break_a_quote():
     assert rule == "value", detail
 
 
-def test_a_categorical_candidate_anchors_case_insensitively():
-    cat = next(k for k, d in ONTOLOGY.items() if d["categorical"] and "kinase" in k)
+def test_a_categorical_candidate_anchors_case_insensitively(categorical):
     c, rule, detail = anchor(
-        good(field=cat, value="fam20c", unit="", quote="The kinase responsible was Fam20C.")
+        good(field=categorical, value="fam20c", unit="", method="undetermined", quote="The kinase responsible was Fam20C.")
     )
     assert rule is None, detail
     assert c.value == "fam20c" and c.unit == "" and c.si.unit == ""
@@ -221,10 +251,9 @@ def test_a_categorical_candidate_anchors_case_insensitively():
 
 def test_undetermined_is_a_valid_method():
     # Any numeric field that requires a method, with a sentence written for it
-    # in its own canonical unit at the middle of its range.
+    # in its own canonical unit.
     needs, spec = next((k, d) for k, d in ONTOLOGY.items() if d["requiresMethod"] and not d["categorical"])
-    low, high = spec["range"]
-    value = (low + high) / 2
+    value = 7
     sentence = f"The measured value was {value:g} {spec['canonicalUnit']} by the stated method."
     sections = SECTIONS + [{"id": "s9", "heading": "Extra", "text": sentence}]
     raw = good(sectionId="s9", field=needs, value=value, unit=spec["canonicalUnit"],
@@ -271,9 +300,8 @@ def test_rule_3_value_must_be_in_the_quote_within_half_a_percent():
     assert anchor(good(value=4.1))[1] == "value"
 
 
-def test_rule_3_categorical_value_must_be_in_the_quote():
-    cat = next(k for k, d in ONTOLOGY.items() if d["categorical"] and "kinase" in k)
-    _, rule, _ = anchor(good(field=cat, value="CK2", unit="", quote="The kinase responsible was Fam20C."))
+def test_rule_3_categorical_value_must_be_in_the_quote(categorical):
+    _, rule, _ = anchor(good(field=categorical, value="CK2", unit="", method="undetermined", quote="The kinase responsible was Fam20C."))
     assert rule == "value"
 
 
@@ -290,22 +318,6 @@ def test_rule_4_unit_must_be_in_the_fields_family_with_the_reason():
     assert "total soluble protein" in detail  # the recorded refusal reason
 
 
-def test_rule_5_value_must_be_in_range_in_canonical_units():
-    # expression_pct_tsp tops out at 40. The quote states 4200 and the
-    # candidate's unit does not convert into the quote's, so rule 3 compares
-    # the bare number and passes it — and rule 5 is what refuses it.
-    _, rule, detail = anchor(
-        good(
-            sectionId="t1",
-            field="expression_pct_tsp",
-            value=4200,
-            unit="% TSP",
-            quote="Fed-batch | 4200 | mg L-1",
-            method="undetermined",
-        )
-    )
-    assert rule == "range", detail
-
 
 def test_a_candidate_whose_unit_disagrees_with_the_quotes_refuses_on_the_value():
     # The row says 4200 mg L-1. A candidate calling that 4200 g/L is claiming
@@ -316,10 +328,9 @@ def test_a_candidate_whose_unit_disagrees_with_the_quotes_refuses_on_the_value()
     assert rule == "value", detail
 
 
-def test_rule_6_a_method_is_required_where_the_ontology_says_so():
-    needs = next(k for k, d in ONTOLOGY.items() if d["requiresMethod"] and d["categorical"])
+def test_rule_6_a_method_is_required_where_the_ontology_says_so(categorical):
     _, rule, detail = anchor(
-        good(field=needs, value="fam20c", unit="", quote="The kinase responsible was Fam20C.")
+        good(field=categorical, value="fam20c", unit="", quote="The kinase responsible was Fam20C.")
     )
     assert rule == "method", detail
 
@@ -472,12 +483,11 @@ def test_a_range_the_quote_does_not_state_refuses():
 def test_a_negative_result_reads_zero_from_the_sentence_that_states_the_absence():
     c, rule, detail = anchor(
         good(
-            sectionId="s4",
-            field="phosphorylation_degree",
+            sectionId="s5",
+            field="titer_secreted",
             value=0,
-            unit="% of native sites",
-            quote="The recombinant protein was not phosphorylated",
-            method="undetermined",
+            unit="g/L",
+            quote="No secreted product was detected in the medium of the parent strain",
             negativeResult=True,
         )
     )
@@ -489,10 +499,10 @@ def test_a_negative_result_needs_a_marker_in_the_quote():
     _, rule, detail = anchor(
         good(
             sectionId="s4",
-            field="phosphorylation_degree",
+            field="titer_secreted",
             value=0,
-            unit="% of native sites",
-            quote="All eight phosphoserine sites were substituted with aspartate",
+            unit="g/L",
+            quote="Secretion improved roughly three-fold over the parent strain",
             negativeResult=True,
         )
     )
@@ -503,11 +513,11 @@ def test_a_negative_result_flag_does_not_license_a_number():
     # negativeResult is about zero. A non-zero value is held to the ordinary rule.
     _, rule, detail = anchor(
         good(
-            sectionId="s4",
-            field="phosphorylation_degree",
+            sectionId="s5",
+            field="titer_secreted",
             value=40,
-            unit="% of native sites",
-            quote="The recombinant protein was not phosphorylated",
+            unit="g/L",
+            quote="No secreted product was detected in the medium of the parent strain",
             negativeResult=True,
         )
     )
@@ -517,12 +527,11 @@ def test_a_negative_result_flag_does_not_license_a_number():
 def test_a_number_the_paper_wrote_in_words_anchors():
     c, rule, detail = anchor(
         good(
-            sectionId="s4",
-            field="phosphate_count",
+            sectionId="s5",
+            field="time_to_colony",
             value=8,
-            unit="mol mol-1",
-            quote="All eight phosphoserine sites were substituted with aspartate",
-            method="undetermined",
+            unit="d",
+            quote="On the solid medium, colonies appeared after eight days",
         )
     )
     assert rule is None, detail
@@ -566,29 +575,29 @@ def test_a_unit_the_quote_spells_differently_anchors_as_converted():
 
 
 def test_a_value_derived_from_the_quotes_numbers_still_refuses():
-    # r-E2-1: a diameter of 140 nm read off "radius ~70 nm". Doubling is
-    # arithmetic the sentence did not do, and no flag licenses it.
+    # A rate of 0.24 h-1 read off "0.12 h-1": doubling is arithmetic the
+    # sentence did not do, and no flag licenses it.
     _, rule, detail = anchor(
         good(
-            sectionId="s4",
-            field="micelle_diameter",
-            value=140,
-            unit="nm",
-            quote="The particle was approximately spherical, radius ~70 nm",
+            sectionId="s3",
+            field="growth_rate_mu",
+            value=0.24,
+            unit="h-1",
+            quote="The specific growth rate was 0.12 h-1",
         )
     )
     assert rule == "value", detail
 
 
 def test_a_value_read_from_a_comparison_still_refuses():
-    # r-H4-4: "the same degree of phosphorylation as" is not the number 100.
+    # "the same share of its protein as" is a comparison, and no number 100.
     _, rule, detail = anchor(
         good(
-            sectionId="s4",
-            field="phosphorylation_degree",
+            sectionId="s5",
+            field="secreted_fraction",
             value=100,
-            unit="% of native sites",
-            quote="It carried the same degree of phosphorylation as the animal-derived protein",
+            unit="% of total expressed",
+            quote="It secreted the same share of its protein as the parent strain",
         )
     )
     assert rule == "value", detail

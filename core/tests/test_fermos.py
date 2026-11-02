@@ -121,8 +121,8 @@ def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
     # No record binds here: a simulation's parameters come from what each
     # test types (test_fermos_bind holds the binding from records).
-    empty = SimpleNamespace(records=[], records_by_id={}, hidden={})
-    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: empty)
+    empty = SimpleNamespace(records=[], records_by_id={})
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: empty)
     return tmp_path
 
 
@@ -139,7 +139,7 @@ def test_a_fit_is_kept_with_the_deposition_as_its_source(store):
 def test_a_sample_run_is_kept_nowhere(store):
     out = fermos.fit("sample", batch(np.linspace(0, 30, 10)), sample=True)
     assert out.kineticArtifactId is None and out.sample
-    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+    assert artifacts.all_artifacts() == []
 
 
 def test_the_endpoint(store):
@@ -205,7 +205,7 @@ def test_a_forecast_that_exhausts_its_substrate_ends_at_that_hour():
     assert sub["median"][-1] <= 0 < sub["median"][-2]
 
 
-def test_a_kept_forecast_is_computed_and_a_changed_start_makes_it_demo(store):
+def test_a_kept_forecast_is_computed_and_a_changed_start_makes_it_assumed(store):
     fit = fermos.fit("dep-f", batch(T, np.random.default_rng(4), SD))
     kept = fermos.forecast_run(fit_artifact=fit.kineticArtifactId)
     assert kept.evidence.provenance == "computed" and kept.evidence.figure == "trajectory" and kept.artifactId
@@ -213,14 +213,14 @@ def test_a_kept_forecast_is_computed_and_a_changed_start_makes_it_demo(store):
     with pytest.raises(fermos.FitRefused, match="needs the name"):
         fermos.forecast_run(fit_artifact=fit.kineticArtifactId, start=fermos.StartValues(S0=60.0))
     changed = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, start=fermos.StartValues(S0=60.0), changed_by="Sean Creighton")
-    assert changed.evidence.provenance == "demo"
+    assert changed.evidence.provenance == "assumed"
 
 
 def test_the_sample_forecast_is_inline_and_kept_nowhere(store):
     k = fermos.kinetic_fit(batch(T, np.random.default_rng(6), SD))
     out = fermos.forecast_run(fit_inline=k, sample=True)
-    assert out.artifactId is None and out.sample and out.evidence.provenance == "demo"
-    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+    assert out.artifactId is None and out.sample and out.evidence.provenance == "assumed"
+    assert artifacts.all_artifacts() == []
 
 
 def test_the_forecast_endpoint_and_the_tool(store):
@@ -246,6 +246,7 @@ def test_the_forecast_endpoint_and_the_tool(store):
 
 from openferment_core import artifacts, kinetics  # noqa: E402
 from openferment_core.models import Override, SimulationRequest  # noqa: E402
+from test_fermos_bind import catalogue  # noqa: E402, F401  (the test strain catalogue fixture)
 
 BY = "openFerment test fixture"
 BATCH = "batch_v1"
@@ -329,8 +330,8 @@ def test_a_simulation_is_kept_with_every_parameter_and_override_named(store):
     art = artifacts.get(r.artifactId)
     assert art.tool == fermos.SIMULATION and set(art.output) == OUTPUT_KEYS
     assert art.toolVersion == f"kinetics {BATCH} {fermos.SIMULATION_RUN} · scipy {kinetics.versions()['scipy']}"
-    # An override is a named person's assumption, so the simulation is demo.
-    assert r.provenance == "demo" == art.provenance
+    # An override is a named person's assumption, so the simulation is standins.
+    assert r.provenance == "assumed" == art.provenance
     by_name = {i.name: i for i in art.inputs}
     for key in STANDIN_TYPED:
         assert by_name[key].source.kind == "assumption" and by_name[key].source.by == BY, key
@@ -377,13 +378,13 @@ def test_a_waiting_parameter_refuses_the_simulation_naming_it_and_its_field(stor
     ):
         with pytest.raises(fermos.SimulationRefused, match=words):
             fermos.simulate(req)
-    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+    assert artifacts.all_artifacts() == []
 
 
-def test_yps_is_set_beside_the_newest_stored_ceiling_and_flagged_above_it(store):
-    from openferment_core import demo
-
-    demo.standin_ceiling("Yeast9", "ethanol", "glucose", STANDIN_TYPED["yps"] * 0.9)
+def test_yps_is_set_beside_the_newest_stored_ceiling_and_flagged_above_it(store, catalogue):  # noqa: F811
+    # The strain's species is read from the test's own strain catalogue.
+    import standins
+    standins.standin_ceiling("Yeast9", "ethanol", "glucose", STANDIN_TYPED["yps"] * 0.9)
     req = SimulationRequest(family=BATCH, strain="s-cerevisiae-cenpk113-7d", product="ethanol", sugar="glucose",
                             overrides=typed(**STANDIN_TYPED))
     r = fermos.simulate(req)
@@ -409,11 +410,9 @@ def test_the_family_endpoints_and_the_simulation_endpoints(store):
     listed = c.get("/api/fermos/families")
     assert listed.status_code == 200
     ids = [f["id"] for f in listed.json()]
-    assert ids == ["batch_v1", "fedbatch_v1", "chemostat_v1", "light_v1"], "storage_v1 is archived with PHA"
-    assert "storage_v1" in [f["id"] for f in c.get("/api/fermos/families?includeArchived=true").json()]
+    assert ids == ["batch_v1", "fedbatch_v1", "chemostat_v1", "light_v1"]
     one = c.get("/api/fermos/families/batch_v1").json()
     assert one["groups"][0] == "Growth" and "dX/dt = μ·X − kd·X" in one["equations"] and not one["socket"]
-    assert c.get("/api/fermos/families/storage_v1").json()["program"] == "pha"
     missing = c.get("/api/fermos/families/nowhere_v1")
     assert missing.status_code == 404 and "there is no model family" in missing.json()["detail"]
     scope = c.get(f"/api/params/{SCOPE}")
@@ -421,14 +420,14 @@ def test_the_family_endpoints_and_the_simulation_endpoints(store):
     assert "mu_max" in scope.json()["waiting"] and "kd" not in scope.json()["waiting"]
     body = {"family": BATCH, "overrides": [o.model_dump(mode="json") for o in typed(**STANDIN_TYPED)]}
     ok = c.post("/api/fermos/simulate", json=body)
-    assert ok.status_code == 200 and ok.json()["provenance"] == "demo" and ok.json()["basis"]["tool"] == fermos.SIMULATION
+    assert ok.status_code == 200 and ok.json()["provenance"] == "assumed" and ok.json()["basis"]["tool"] == fermos.SIMULATION
     for bad, words in (({"family": BATCH}, "cannot run yet"), ({"family": "light_v1"}, "not built"),
                        ({**body, "overrides": body["overrides"][:1] + [{**body["overrides"][1], "value": "words"}]},
                         "takes a number")):
         r = c.post("/api/fermos/simulate", json=bad)
         assert r.status_code == 422 and words in r.json()["detail"], (bad, r.json())
     kept = c.get("/api/fermos/simulations").json()
-    assert [k["artifactId"] for k in kept] == [ok.json()["artifactId"]] and kept[0]["provenance"] == "demo"
+    assert [k["artifactId"] for k in kept] == [ok.json()["artifactId"]] and kept[0]["provenance"] == "assumed"
     assert c.post("/api/fermos/simulate", json=body, headers={"Origin": "https://evil.example"}).status_code == 403
 
 

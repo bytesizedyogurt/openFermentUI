@@ -27,8 +27,8 @@ named in the note, never offered). `tau`, the reacting time, is the
 simulation's harvest hour (or the fit's batch time) and the peak and
 batch-average oxygen uptake are the simulation's, each source `simulation`
 and overridable. `plant_scale` and `batch_volume` wait for a named person;
-one of the two is needed. `check:seed` holds every declaration to a bounds
-reason through `params.check()`, which reads them here with no worker; a sim
+one of the two is needed. `params.check()`, run by test_params.py, holds
+every declaration to a bounds reason, reading them here with no worker; a sim
 test holds the declarations to the class (every key one the class takes).
 
 THE DEMAND. BioSTEAM's aerated class takes no oxygen demand: it sizes the
@@ -45,7 +45,7 @@ the utility prices and cost index (`model`), the vessel type and the unit id
 (`convention`), every design parameter with its source (`params.basis_inputs`:
 an override an `assumption` by the person; a class default `model`; the
 simulation's values `artifact`), and what a plant scale reads (the corn
-TEA's operating hours). Its provenance is `basis_provenance`'s: `demo` with
+TEA's operating hours). Its provenance is `basis_provenance`'s: `assumed` with
 any assumption, which a plant scale or batch volume always is.
 
     GET  /api/fermos/vessel/specs?simulation=&vesselType=   the ParamScope
@@ -103,8 +103,8 @@ from .models import (
 )
 
 TOOL = "fermos.vessel"
-# The program whose chemicals the vessel is built on (its cells Yeast, its
-# product ethanol), by its id in programs.ts (§8.R, finding 6).
+# The chemical set the vessel is built on (its cells Yeast, its product
+# ethanol), by its key in pureos/train_spec.PROGRAM_CHEMICALS (§8.R, finding 6).
 YEAST_PROGRAM = "yeast"
 # 2 since §4.R: the cross-check's oxygen, the scale at every size, the
 # duty's words and the stated peak changed what a design computes. 3 since
@@ -348,7 +348,7 @@ def fit_inputs(art: Artifact) -> dict[str, Any]:
     }
 
 
-def _source_of(aid: str, include_archived: bool = True) -> tuple[Artifact, dict[str, Any]]:
+def _source_of(aid: str) -> tuple[Artifact, dict[str, Any]]:
     from . import artifacts
 
     try:
@@ -356,16 +356,6 @@ def _source_of(aid: str, include_archived: bool = True) -> tuple[Artifact, dict[
     except artifacts.ArtifactNotFound:
         raise VesselNotFound(f"no artifact {aid!r} is on file here: a vessel is designed for a fermOS simulation "
                              "(fermOS → Simulate keeps one) or, anaerobic, a kinetic fit or forecast") from None
-    if not include_archived:
-        from . import module_stores, programs
-
-        try:
-            program = module_stores.artifact_program(art)
-            if programs.hides(program, False):
-                raise VesselRefused(f"artifact {aid} belongs to the archived program {program}; turn on Show archived "
-                                    "programs and examples in Settings → Programs to design for it")
-        except FileNotFoundError:
-            pass
     if art.tool == SIMULATION:
         return art, simulation_inputs(art)
     if art.tool in FIT_TOOLS:
@@ -623,7 +613,7 @@ def _held(kind: str, ws: dict[str, Any], overrides: Iterable[Override]) -> None:
 
 
 def _static() -> Iterable[tuple[str, list[ParameterSpec]]]:
-    """Every declaration, read with no worker (check:seed): each kind's specs
+    """Every declaration, read with no worker (params.check()): each kind's specs
     as declared, a choice's offered words left to the worker."""
     for kind in (AEROBIC, ANAEROBIC):
         yield f"fermos vessel ({kind})", [_spec(d, [] if d.choice else None) for d in _decls(kind)]
@@ -710,14 +700,14 @@ def _kla_method(kind: str, design: str | None, ws: dict[str, Any], kla_method: s
     return kla_method
 
 
-def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True, overrides: Iterable[Override] = (),
+def provided(aid: str, vessel_type: str | None, overrides: Iterable[Override] = (),
              kla_method: str | None = None) -> tuple[params.Provided, dict]:
     """The scope's specs and the candidates for each, and what was read.
     The vessel type is the request's `vesselType` or a person's override
     of `design` (they must agree); `kla_method` is a request's named kLa
     correlation, a convention of that request."""
     overrides = list(overrides)
-    art, src = _source_of(aid, include_archived)
+    art, src = _source_of(aid)
     kind = AEROBIC if src["aerobic"] else ANAEROBIC
     ws = worker_specs(kind)
     vessel_type, design_from = _chosen_type(vessel_type, overrides)
@@ -844,7 +834,7 @@ def basis_inputs(req: VesselRequest) -> tuple[list[BasisInput], list[ParameterSp
     if len(named) != 1:
         raise VesselRefused("a vessel is designed for one simulation or one fit: name exactly one")
     aid = named[0]
-    got, read = provided(aid, req.vesselType, include_archived=req.includeArchived, overrides=req.overrides,
+    got, read = provided(aid, req.vesselType, overrides=req.overrides,
                          kla_method=req.klaMethod)
     art, kind = read["artifact"], read["kind"]
     if req.fit and art.tool == SIMULATION:
@@ -1075,7 +1065,8 @@ def _parameters(inputs: list[BasisInput], kind: str, source_id: str, source_tool
     default beside it, and a value outside its bounds flagged. A default
     BioSTEAM leaves as None (the class decides at run time) is in no basis,
     and reads here as that default."""
-    origin = {"assumption": "assumption", "model": "library-default", "convention": "convention"}
+    origin = {"assumption": "assumption", "model-estimate": "model-estimate", "model": "library-default",
+              "convention": "convention"}
     ws = worker_specs(kind)
     given = {i.name: i for i in inputs}
     design = _named(inputs, "vessel type")
@@ -1102,7 +1093,7 @@ def _parameters(inputs: list[BasisInput], kind: str, source_id: str, source_tool
         low, high = given.get(f"{d.key} low"), given.get(f"{d.key} high")
         v = ParameterValue(key=d.key, value=i.value, low=float(low.value) if low else None,
                            high=float(high.value) if high else None, source=i.source, origin=o,
-                           overriddenBy=i.source.by if o == "assumption" else None,
+                           overriddenBy=i.source.by if o in ("assumption", "model-estimate") else None,
                            libraryDefault=lib, detail=i.source.note)
         v.outOfBounds = params.bounds_check(_spec(d, [] if d.choice else None, bounds=_class_bounds(d, ws)), v.value,
                                             v.low, v.high)
@@ -1155,25 +1146,12 @@ def summary(a: Artifact) -> VesselSummary:
         installed=(o.get("cost") or {}).get("installed"))
 
 
-def designs(include_archived: bool = False) -> list[VesselSummary]:
+def designs() -> list[VesselSummary]:
     """GET /api/fermos/vessels: every kept vessel design, newest first; a
-    read, which starts no simulator. A design for an archived program's
-    simulation (`module_stores.artifact_program`, which follows the
-    simulation it rests on) is left out unless asked (§8.R, finding 3)."""
-    from . import artifacts, module_stores, programs
+    read, which starts no simulator."""
+    from . import artifacts
 
-    out = []
-    for a in artifacts.all_artifacts():
-        if a.tool != TOOL:
-            continue
-        if not include_archived:
-            try:
-                if programs.hides(module_stores.artifact_program(a), False):
-                    continue
-            except FileNotFoundError:
-                pass
-        out.append(summary(a))
-    return out
+    return [summary(a) for a in artifacts.all_artifacts() if a.tool == TOOL]
 
 
 # ── what a design cites (OF-BLD-020 §4.2, D13) ─────────────────────────

@@ -2,17 +2,17 @@
 //
 // The rail chord keys are initials of the names a user reads, so the chord is
 // learnable from the rail itself rather than from this sheet: i for Intake,
-// b for BioRepo, f for fermOS, d for Dominion, g for Guild. Three cannot be
-// initials and are not: Postdoc takes 'o' because 'p' reads as a word nobody
-// types; Proforma takes 'c' for cost; Primer keeps 'n'. Twelve keys, all
-// distinct, which is the actual requirement.
+// b for BioRepo, f for fermOS, g for Guild. Three cannot be initials and are
+// not: Postdoc takes 'o' because 'p' reads as a word nobody types; Proforma
+// takes 'c' for cost; Primer keeps 'n'. Every key distinct, which is the
+// actual requirement.
 export const SHORTCUTS: { context: string; keys: { key: string; does: string }[] }[] = [
   {
     context: 'Global',
     keys: [
       { key: '⌘K', does: 'Command palette' },
       { key: '/', does: 'Focus search' },
-      { key: 'g then h/i/b/o/e/f/u/c/r/d/n/g', does: 'Go to one of the twelve' },
+      { key: 'g then h/i/b/o/e/f/u/c/r/n/g', does: 'Go to Home or one of the ten destinations' },
       { key: '⇧D', does: 'Toggle density' },
       { key: '⇧T', does: 'Toggle theme' },
       { key: '?', does: 'This shortcut sheet' },

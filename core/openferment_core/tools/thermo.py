@@ -39,28 +39,8 @@ class ThermoPropsInput(BaseModel):
     recordId: str = Field(description=f"An ethanol titre record's id (field {thermo.TITRE_FIELD}), for {thermo.BEER}; or an empty string.")
 
 
-def _hidden_run(aid: str, ctx: ToolContext) -> str | None:
-    """With the switch off, a run of an archived program is refused as its
-    train is hidden (OF-BLD-016 §2.R); the switch is never an input. The rule
-    is every reader's (`module_stores.hidden_run_refusal`, OF-BLD-019 §6.R)."""
-    from .. import artifacts, module_stores
-
-    if ctx.include_archived or not aid:
-        return None
-    try:
-        art = artifacts.get(aid)
-    except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged):
-        return None  # said by the service below, in its words
-    if art.tool != thermo.RUN:
-        return None
-    return module_stores.hidden_run_refusal(NAME, art, ctx.include_archived)
-
-
 def _run(inp: ThermoPropsInput, ctx: ToolContext) -> ToolResult:
     req = ThermoPropsRequest(artifactId=inp.artifactId, streamId=inp.streamId, preset=inp.preset, recordId=inp.recordId)
-    refused = _hidden_run(inp.artifactId.strip(), ctx)
-    if refused:
-        return ToolResult(error=refused)
     try:
         kind, _ = thermo.question(req)
         art = thermo.props(req, pool=ctx.pool if kind == thermo.BEER else None)

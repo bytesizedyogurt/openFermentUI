@@ -1,6 +1,5 @@
-// Guided tour (OF-DES-001 §8.1, §19 fallback narrator). Six stops that walk
-// the golden path. Every stop opens a route that exists (OF-BLD-016
-// §3.2), and none stands on content a program switch can hide.
+// Guided tour (OF-DES-001 §8.1, §19 fallback narrator). Six stops through
+// the platform. Every stop opens a route that exists (OF-BLD-016 §3.2).
 //
 // It is also the first place a new reader meets the vocabulary, so every stop
 // names the surface it is standing on. Six stops is six names learned in
@@ -23,8 +22,8 @@ const STOPS: Stop[] = [
   {
     route: '/',
     surface: 'Home',
-    title: 'Corpus vitals',
-    body: 'Home answers three questions in five seconds: what is in the corpus, what needs your attention, and where you left off. Every tile is ticked by the provenance of the data behind it, and clicks through to its home screen.',
+    title: 'Project vitals',
+    body: 'Home answers three questions in five seconds: what the project holds, what needs your attention, and where you left off. Every tile is ticked by the provenance of the data behind it, and clicks through to its home screen.',
   },
   {
     route: '/postdoc',
@@ -36,7 +35,7 @@ const STOPS: Stop[] = [
     route: '/biorepo/search',
     surface: 'BioRepo · Search',
     title: 'Evidence in context',
-    body: 'BioRepo is the corpus and everything retrieved from it. Search finds passages in the papers’ own words; open a hit and the reader marks the sentence in its section, beside every extraction anchored to that paper. A chip’s promise is kept the same way: it resolves to a source span.',
+    body: 'BioRepo holds the project’s records and search over its documents. Search finds passages in the papers’ own words; open a hit and the reader marks the sentence in its passage, beside every extraction anchored to that paper. A chip’s promise is kept the same way: it resolves to a source span.',
   },
   {
     route: '/guild',
@@ -54,7 +53,7 @@ const STOPS: Stop[] = [
     route: '/biorepo/witness',
     surface: 'BioRepo · Witness',
     title: 'How we know, and how we’re honest when we’re wrong',
-    body: 'Witness asks whether it reproduces. It scores the extractor\'s run against the curated records on the papers the service fetched, labels each figure provisional with the records it stands on, and lists the real values the ontology has no field for. A metric it has not earned is not displayed: with no run, it says so and shows no figure.',
+    body: 'Witness asks whether it reproduces. It scores the extractor\'s run against the values reviewers typed on the documents the project holds, and lists the values the extractor found that no reviewer has typed. A metric it has not earned is not displayed: with no run, it says so and shows no figure.',
   },
 ];
 

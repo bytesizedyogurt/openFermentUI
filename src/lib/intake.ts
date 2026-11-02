@@ -1,8 +1,8 @@
 // The browser's side of Intake (OF-BLD-012 §5.4).
 //
-// Three calls, no key. The service fetches from Europe PMC, splits the JATS,
-// and caches the result; this asks for one paper, asks what has been fetched,
-// and asks for the overlay the store applies at load.
+// Calls with no key: extract one of the project's documents, post a review
+// decision, and ask for the overlay the store applies at load. Collecting a
+// document into the project is lib/literature.ts's.
 //
 // SAME DISCIPLINE AS lib/postdoc.ts. When the service is unreachable this says
 // so and says how to start it, and it never quietly substitutes the timer
@@ -12,20 +12,33 @@
 import type {
   DecisionCheck,
   ExtractResponse,
-  FetchResult,
   FetchSource,
-  IntakeStatus,
   Overlay,
   ReviewDecision,
 } from '@/data/types';
 import { START_COMMAND, postdocHealth } from './postdoc';
+import { apiFetch } from './project';
 
 /** Who served a fetched text, in the words the reader is shown. */
 const SOURCE_NAMES: Record<FetchSource, string> = {
   europepmc: 'Europe PMC',
   osti: 'OSTI',
   sgd: 'Saccharomyces Genome Database',
+  upload: 'an uploaded file',
+  paste: 'pasted text',
 };
+
+/** A licence class the kit keeps (`collectors.licence_class`), in the words the reader is shown. */
+const LICENCE_WORDS: Record<string, string> = {
+  public: 'public domain',
+  open_commercial: 'open licence',
+  open_noncommercial: 'open licence, non-commercial',
+  unknown: 'licence unknown',
+};
+
+export function licenceWords(licenceClass: string): string {
+  return LICENCE_WORDS[licenceClass] ?? licenceClass.replace(/_/g, ' ');
+}
 
 /** The name of a fetched text's source; absent is Europe PMC, the one source an older service knew. */
 export function fetchSourceName(source: FetchSource | undefined): string {
@@ -51,7 +64,7 @@ export class IntakeDown extends Error {
  * and 422 are statuses our own service produces (unknown paper; bad body) and
  * mean it is up; anything else is ambiguous, so ask health which it was.
  */
-async function explain(response: Response, signal?: AbortSignal): Promise<never> {
+export async function explain(response: Response, signal?: AbortSignal): Promise<never> {
   if (response.status !== 404 && response.status !== 422) {
     try {
       await postdocHealth(signal);
@@ -96,7 +109,7 @@ export class DecisionRefused extends Error {
 export async function postDecision(decision: ReviewDecision, signal?: AbortSignal): Promise<ReviewDecision> {
   let response: Response;
   try {
-    response = await fetch('/api/biorepo/decisions', {
+    response = await apiFetch('/api/biorepo/decisions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(decision),
@@ -131,7 +144,7 @@ export async function postDecision(decision: ReviewDecision, signal?: AbortSigna
 export async function checkDecision(decision: ReviewDecision, signal?: AbortSignal): Promise<DecisionCheck> {
   let response: Response;
   try {
-    response = await fetch('/api/biorepo/check', {
+    response = await apiFetch('/api/biorepo/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(decision),
@@ -146,31 +159,6 @@ export async function checkDecision(decision: ReviewDecision, signal?: AbortSign
 }
 
 /**
- * Fetch one paper's full text through the service.
- *
- * A FAILED FETCH IS A SUCCESS OF THIS CALL: the result carries `failed:fetch`
- * or `failed:parse` and a reason, and the board renders it. Only the service
- * being unreachable throws.
- */
-export async function fetchPaper(
-  paperId: string,
-  opts: { force?: boolean; signal?: AbortSignal } = {},
-): Promise<FetchResult> {
-  let response: Response;
-  try {
-    response = await fetch(
-      `/api/intake/${encodeURIComponent(paperId)}/fetch${opts.force ? '?force=true' : ''}`,
-      { method: 'POST', signal: opts.signal },
-    );
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') throw e;
-    throw new IntakeDown('Intake service not running.');
-  }
-  if (!response.ok) await explain(response, opts.signal);
-  return (await response.json()) as FetchResult;
-}
-
-/**
  * Extract one fetched paper through the service (OF-BLD-012 §6.3): one
  * structured model response, every candidate anchored, the refusals counted. 422 when
  * the paper has no full text and 503 when there is no key both surface as
@@ -182,7 +170,7 @@ export async function extractPaper(
 ): Promise<ExtractResponse> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await apiFetch(
       `/api/intake/${encodeURIComponent(paperId)}/extract${opts.force ? '?force=true' : ''}`,
       { method: 'POST', signal: opts.signal },
     );
@@ -194,31 +182,19 @@ export async function extractPaper(
   return (await response.json()) as ExtractResponse;
 }
 
-/** Every paper the service has a cached fetch for, success or failure. */
-export async function intakeStatus(signal?: AbortSignal): Promise<Record<string, IntakeStatus>> {
-  let response: Response;
-  try {
-    response = await fetch('/api/intake/status', { signal });
-  } catch {
-    throw new IntakeDown('Intake service not running.');
-  }
-  if (!response.ok) await explain(response, signal);
-  return (await response.json()) as Record<string, IntakeStatus>;
-}
-
 /**
  * The overlay, or null when there is no service to ask.
  *
  * Deliberately never throws: this runs at every page load, and a page that
  * fails to load because an optional service is absent has the priorities
- * backwards. The built artifact has no server at all — the fetch answers 404
- * from whatever static host it sits on, and the app is exactly the seed.
+ * backwards. Served from a static host with no service, the fetch answers 404,
+ * and the screens show their empty states.
  */
 export async function loadOverlay(signal?: AbortSignal): Promise<Overlay | null> {
   try {
     const health = await postdocHealth(signal);
     if (!health.ok) return null;
-    const response = await fetch('/api/biorepo/overlay', { signal });
+    const response = await apiFetch('/api/biorepo/overlay', { signal });
     if (!response.ok) return null;
     return (await response.json()) as Overlay;
   } catch {

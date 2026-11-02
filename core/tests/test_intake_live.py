@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from openferment_core.intake import fetch_fulltext, split_jats
+from openferment_core.literature.collectors import fetch_fulltext, split_jats
 
 pytestmark = pytest.mark.live
 

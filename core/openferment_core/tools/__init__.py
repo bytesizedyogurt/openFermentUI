@@ -17,15 +17,29 @@ Messages API refuses a dot in a tool name, and its write pair (§7.3); then
 then pureOS's `pureos_build` (OF-BLD-020 §5.4), a free write through
 `pureos_write`'s train actions that builds and runs a train from unit type
 names and record ids; then `pureos_propose` (§7.2), a read: a train proposed
-by written rules, each naming the property it read. Thirty-six names. A tool
-outside it is a new document. `test_tools.NAMES` is the one literal list the
-tests hold the registry to; every other count is derived from `WHITELIST`.
+by written rules, each naming the property it read; then the study tools of
+alpha 2.0 stage 6 (execution prompt §4.6, §10 stage 6): `engine_plants`,
+`engine_parameters`, `engine_run` and `engine_report` over the library shelf
+and the project's runs, `study_scenario`, `study_compare` and `study_read`
+over its studies, and `literature_sources` and `literature_document` over the
+documents it holds. Forty-three names. A tool outside it is a new decision.
+`test_tools.NAMES` is the one literal list the tests hold the registry to;
+every other count is derived from `WHITELIST`. `docs/TOOLS.md` is written
+from this registry (`pnpm gen:tools`).
 
-TOOL INPUTS CARRY IDS AND WORDS. A model names a record, an artifact, a model
-file, a field or a scenario, and the service looks the quantity up. A JSON
-number anywhere in a tool's input, outside the two count fields `k` and
-`limit`, refuses the call; the refusal reaches the model as the result's
-`error`, and nothing runs.
+TOOL INPUTS CARRY IDS, WORDS AND QUANTITIES (ADR-006). A model names a
+record, an artifact, a model file, a field or a scenario, and the service
+looks the quantity up. A number stands only inside a quantity, an object of
+`value` and `unit` (and `low` and `high` for a range), and only where a tool
+asks for one; a JSON number anywhere else, outside the two count fields `k`
+and `limit`, refuses the call, the refusal reaching the model as the result's
+`error`, and nothing runs. The service writes each quantity's origin from who
+called (`ToolContext.author`): the answering model's estimate, with its id,
+or a named person's assumption; of what the caller wrote there, the note
+alone is kept. A quantity nobody can be named for is refused.
+
+EVERY TOOL ACTS IN ONE PROJECT (ADR-005): the request's, the question's, or
+the one the MCP server was started in (`ToolContext.project`).
 
 TOOL OUTPUT DISCIPLINE. A tool summarises in code before a model reads
 anything. `summary` is at most `MAX_SUMMARY_CHARS` as JSON; a tool that
@@ -33,22 +47,22 @@ returns more is a defect in the tool, and the result says so in place of the
 oversized summary. A tool whose whole output is larger (a stream table) cuts
 its own summary, says how much it left out, and carries the whole in `data`,
 which the endpoint and the MCP server return and no model reads.
-
-THE PROGRAM SWITCH (OF-BLD-016 §2.3) is not a tool input: no model sets it.
-It rides in `ToolContext.include_archived`, from the request that started the
-run (`AskRequest.includeArchived`, `?includeArchived=` on
-`POST /api/tools/{name}`, the MCP server's environment), and the pool, the
-passages and every module's rows read through it. Off is the default.
 """
 from __future__ import annotations
 
+import contextlib
+import functools
 import json
+import math
+import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Callable
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic.json_schema import SkipJsonSchema
 
-from ..models import ToolInfo, ToolResult
+from ..models import Origin, Quantity, ToolInfo, ToolResult
 
 # The names E.6, OF-BLD-015, OF-BLD-019 §6.1 and OF-BLD-020 allow, whichever have been built.
 WHITELIST = (
@@ -60,7 +74,6 @@ WHITELIST = (
     "selling_price",
     "draft_runbook",
     # OF-BLD-015 §7.2 — one read tool per module, in the rail's order.
-    "dominion_read",
     "runbooks_read",
     "geneos_read",
     "fermos_read",
@@ -72,7 +85,6 @@ WHITELIST = (
     "intake_read",
     "home_read",
     # OF-BLD-015 §7.3 — its pair, one write tool per module.
-    "dominion_write",
     "runbooks_write",
     "geneos_write",
     "fermos_write",
@@ -101,9 +113,22 @@ WHITELIST = (
     # OF-BLD-020 §7.2 — a train proposed by written rules that each name the
     # property they read: a read, loose, ids and words in.
     "pureos_propose",
+    # Alpha 2.0 stage 6 — the library shelf and the project's runs, its
+    # studies, and the documents it holds; loose like the module tools.
+    "engine_plants",
+    "engine_parameters",
+    "engine_run",
+    "engine_report",
+    "study_scenario",
+    "study_compare",
+    "study_read",
+    "literature_sources",
+    "literature_document",
 )
-# The only fields a number may stand in: how many results to return.
+# The fields a number may stand in outside a quantity: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})
+# The fields a number may stand in inside a quantity (ADR-006): its value and its range.
+QUANTITY_FIELDS = frozenset({"value", "low", "high"})
 MAX_SUMMARY_CHARS = 9_000
 
 
@@ -129,10 +154,23 @@ class ToolContext:
     # tools, so an audit line names the model that asked for the write and
     # not the chain's first name; empty for a call from outside the app.
     model: str = ""
-    # The browser's "show archived programs" switch, from the request
-    # (OF-BLD-016 §2.3). Off, the pool, the passages and the module rows
-    # leave archived programs out. Never a tool input.
-    include_archived: bool = False
+    # The person calling, named at the HTTP endpoint (`?by=`): the author of a
+    # quantity the call types when no model is answering.
+    person: str = ""
+    # The project the call acts in; None acts in the current one (the
+    # request's or the command's, projects.current).
+    project: str | None = None
+
+    def author(self) -> Origin | None:
+        """The origin of a number this call types into a tool (ADR-006): the
+        answering model's estimate, or the named person's assumption; None
+        when nobody can be named."""
+        at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        if self.model.strip():
+            return Origin(kind="model-estimate", by=self.model.strip(), at=at)
+        if self.person.strip():
+            return Origin(kind="person-assumption", by=self.person.strip(), at=at)
+        return None
 
     @property
     def pool(self) -> Any:
@@ -140,7 +178,7 @@ class ToolContext:
             if self.pool_factory is None:
                 from .. import evidence_pool
 
-                self.pool_factory = lambda: evidence_pool.load(include_archived=self.include_archived)
+                self.pool_factory = lambda: evidence_pool.load()
             self._pool = self.pool_factory()
         return self._pool
 
@@ -150,8 +188,7 @@ class ToolContext:
             if self.stores_factory is None:
                 from .. import module_stores
 
-                self.stores_factory = lambda: module_stores.Stores(pool_factory=lambda: self.pool,
-                                                                   include_archived=self.include_archived)
+                self.stores_factory = lambda: module_stores.Stores(pool_factory=lambda: self.pool)
             self._stores = self.stores_factory()
         return self._stores
 
@@ -168,9 +205,41 @@ class Tool:
     # every strict tool in a request and refuses one that grows too large;
     # `run` validates the input of every tool alike, strict or not.
     strict: bool = True
+    # Whether it keeps something new in the project (a run, a scenario, a
+    # train, a candidate, a proposal), audited as its caller's; a read keeps
+    # nothing but the computations it caches.
+    writes: bool = False
+    # Every tool acts in one project (ADR-005; acceptance A5): the request's,
+    # the question's, or the MCP server's. None acts across projects.
+    scope: str = "project"
 
     def info(self) -> ToolInfo:
         return ToolInfo(name=self.name, description=self.description, inputSchema=self.input_model.model_json_schema())
+
+
+# A number as a caller types it into a tool (ADR-006). The registry writes
+# its origin from who called (`stamped`), so the caller's own is never read.
+class QuantityIn(BaseModel):
+    """A number you type: a value in a unit, and in words what it rests on.
+    The service marks it with who typed it."""
+
+    # A range or any other field is refused in words, never dropped unread.
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str = Field(max_length=40, description="The value's unit, as the tool names it.")
+    note: str = Field(default="", max_length=600, description="What the value rests on, in words.")
+    origin: SkipJsonSchema[Origin | None] = None
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _a_number(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("a quantity's value is a number, never true or false")
+        return v
+
+    def quantity(self) -> Quantity:
+        return Quantity(value=self.value, unit=self.unit, origin=self.origin)
 
 
 REGISTRY: dict[str, Tool] = {}
@@ -183,48 +252,143 @@ def register(tool: Tool) -> Tool:
     return tool
 
 
-def numbers_in(value: Any, path: str = "") -> list[str]:
-    """Where a JSON number stands in `value`, outside the count fields."""
+def is_quantity(value: Any) -> bool:
+    """A quantity as a caller types one: an object with a `value` and a
+    `unit` in words."""
+    return isinstance(value, dict) and "value" in value and isinstance(value.get("unit"), str)
+
+
+def quantity_paths(schema: dict[str, Any]) -> frozenset[str]:
+    """Where a tool's input schema asks for a quantity: the path of each
+    object of `value` and a string `unit`, a list's items written `[]`
+    (`values[].quantity`)."""
+    defs = schema.get("$defs") or {}
+    found: set[str] = set()
+
+    def walk(node: Any, path: str, seen: frozenset[str]) -> None:
+        if not isinstance(node, dict):
+            return
+        if "$ref" in node:
+            name = str(node["$ref"]).rsplit("/", 1)[-1]
+            if name not in seen:
+                walk(defs.get(name) or {}, path, seen | {name})
+            return
+        for key in ("anyOf", "oneOf", "allOf"):
+            for sub in node.get(key) or []:
+                walk(sub, path, seen)
+        props = node.get("properties") or {}
+        if "value" in props and (props.get("unit") or {}).get("type") == "string":
+            found.add(path)
+        for name, sub in props.items():
+            walk(sub, f"{path}.{name}" if path else name, seen)
+        if isinstance(node.get("items"), dict):
+            walk(node["items"], f"{path}[]", seen)
+
+    walk(schema, "", frozenset())
+    return frozenset(found)
+
+
+@functools.lru_cache(maxsize=None)
+def _quantity_paths_of(name: str) -> frozenset[str]:
+    return quantity_paths(REGISTRY[name].input_model.model_json_schema())
+
+
+def _shape(path: str) -> str:
+    return re.sub(r"\[\d+\]", "[]", path)
+
+
+def numbers_in(value: Any, path: str = "", quantities: frozenset[str] = frozenset()) -> list[str]:
+    """Where a JSON number stands in `value`, outside the count fields and
+    outside the value and range of a quantity standing where the tool asks
+    for one (`quantities`, from `quantity_paths`)."""
     found: list[str] = []
     if isinstance(value, bool) or value is None or isinstance(value, str):
         return found
     if isinstance(value, (int, float)):
         return [path or "input"]
     if isinstance(value, dict):
+        quantity = _shape(path) in quantities and is_quantity(value)
         for k, v in value.items():
             if k in COUNT_FIELDS and isinstance(v, int) and not isinstance(v, bool) and not path:
                 continue
-            found += numbers_in(v, f"{path}.{k}" if path else str(k))
+            if quantity and k in QUANTITY_FIELDS and isinstance(v, (int, float)) and not isinstance(v, bool):
+                if not math.isfinite(float(v)):
+                    found.append(f"{path}.{k}" if path else str(k))
+                continue
+            found += numbers_in(v, f"{path}.{k}" if path else str(k), quantities)
     elif isinstance(value, list):
         for n, v in enumerate(value):
-            found += numbers_in(v, f"{path}[{n}]")
+            found += numbers_in(v, f"{path}[{n}]", quantities)
     return found
 
 
+def quantities_in(value: Any, quantities: frozenset[str], path: str = "") -> bool:
+    """Whether a quantity stands in `value` where the tool asks for one."""
+    if _shape(path) in quantities and is_quantity(value):
+        return True
+    if isinstance(value, dict):
+        return any(quantities_in(v, quantities, f"{path}.{k}" if path else str(k)) for k, v in value.items())
+    if isinstance(value, list):
+        return any(quantities_in(v, quantities, f"{path}[{n}]") for n, v in enumerate(value))
+    return False
+
+
+def stamped(value: Any, origin: Origin, quantities: frozenset[str], path: str = "") -> Any:
+    """`value` with the origin of every quantity standing where the tool asks
+    for one written by the service: `origin`, with the note the caller wrote
+    beside the value (or in its origin), and nothing else the caller wrote
+    there (ADR-006)."""
+    if isinstance(value, list):
+        return [stamped(v, origin, quantities, f"{path}[{n}]") for n, v in enumerate(value)]
+    if not isinstance(value, dict):
+        return value
+    out = {k: stamped(v, origin, quantities, f"{path}.{k}" if path else str(k)) for k, v in value.items()}
+    if _shape(path) in quantities and is_quantity(value):
+        wrote = value.get("origin")
+        note = value.get("note") if isinstance(value.get("note"), str) else (
+            wrote.get("note") if isinstance(wrote, dict) and isinstance(wrote.get("note"), str) else None)
+        out["origin"] = origin.model_copy(update={"note": (note or "").strip() or None}).model_dump(
+            mode="json", exclude_none=True)
+    return out
+
+
 def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
-    """Run one tool on a raw input as a model or a client sent it. Every
-    refusal is a result with `error` set; nothing here raises."""
+    """Run one tool on a raw input as a model or a client sent it, in the
+    context's project. Every refusal is a result with `error` set; nothing
+    here raises."""
+    ctx = ctx or ToolContext()
     tool = REGISTRY.get(name)
     if tool is None:
         return ToolResult(error=f"There is no tool named {name!r}. The tools are: {', '.join(sorted(REGISTRY))}.")
     if not isinstance(raw, dict):
         return ToolResult(error=f"{name} takes an object of named fields.")
-    numbers = numbers_in(raw)
+    quantities = _quantity_paths_of(name)
+    numbers = numbers_in(raw, quantities=quantities)
     if numbers:
         return ToolResult(
             error=(
-                f"{name} refused: a number was typed into {', '.join(numbers)}. Tool inputs carry ids and words; "
-                "name a record, an artifact, a model, a field or a scenario, and the service looks the quantity up. "
-                "Only k and limit may be numbers."
+                f"{name} refused: a number was typed into {', '.join(numbers)}. Tool inputs carry ids, words and "
+                "quantities; name a record, an artifact, a model, a field or a scenario, and the service looks the "
+                "value up. A number stands only inside a quantity (value and unit, low and high) where a tool asks "
+                "for one, and k and limit are counts."
             )
         )
+    if quantities_in(raw, quantities):
+        author = ctx.author()
+        if author is None:
+            return ToolResult(error=f"{name} refused: a quantity typed into a tool names who typed it, a model or a "
+                                    "named person (at the HTTP endpoint, ?by= with the person's name)")
+        raw = stamped(raw, author, quantities)
     try:
         parsed = tool.input_model.model_validate(raw)
     except ValidationError as e:
         problems = "; ".join(f"{'.'.join(str(p) for p in err['loc']) or 'input'}: {err['msg']}" for err in e.errors())
         return ToolResult(error=f"{name} refused its input: {problems}")
     try:
-        result = tool.run(parsed, ctx or ToolContext())
+        from .. import projects
+
+        with projects.using(ctx.project) if ctx.project else contextlib.nullcontext():
+            result = tool.run(parsed, ctx)
     except Exception as e:  # a defect or an outage, said in words to the caller
         return ToolResult(error=f"{name} failed: {type(e).__name__}: {e}")
     size = len(json.dumps(result.summary, ensure_ascii=False, default=str))
@@ -250,8 +414,10 @@ def infos() -> list[ToolInfo]:
 
 
 # The tools this phase builds register on import.
+from . import engine as _engine  # noqa: E402,F401
 from . import fermos as _fermos  # noqa: E402,F401
 from . import geneos as _geneos  # noqa: E402,F401
+from . import literature as _literature  # noqa: E402,F401
 from . import modules as _modules  # noqa: E402,F401
 from . import writes as _writes  # noqa: E402,F401
 from . import passages as _passages  # noqa: E402,F401
@@ -259,5 +425,6 @@ from . import proforma as _proforma  # noqa: E402,F401
 from . import pureos as _pureos  # noqa: E402,F401
 from . import records as _records  # noqa: E402,F401
 from . import runbook as _runbook  # noqa: E402,F401
+from . import studies as _studies  # noqa: E402,F401
 from . import thermo as _thermo  # noqa: E402,F401
 from . import units as _units  # noqa: E402,F401

@@ -1,23 +1,11 @@
 // The review boundary, browser side (OF-BLD-012 §7.3).
 //
-// Pure functions over a record, its paper and the extractor's candidates:
-// how a quote is looked for in the fetched text, what the card shows beside
-// a curated record, what a promotion carries, and why the service would
-// refuse a decision before the reviewer presses the key. `biorepo.write` on
-// the service is the authority (§2.3); these exist so the screen says the
-// same thing the service would, one keystroke earlier, and so the store and
-// the card cannot disagree about which candidate is "the extractor's best".
-import type { Candidate, DecisionCheck, ExtractionRecord, Paper, ReviewDecision } from '@/data/types';
-import { convert, normalizeUnit, quantityEquals, sameFamily } from '@/engine/units';
-
-/** The extractor's run, the only one that ever ran (§6). */
-export const EXTRACTOR_RUN = 'claude-1';
-
-/** Match tolerance, the same 2 % Witness scores with (§6.2). */
-export const AGREE_PCT = 2;
-
-type Quoted = Pick<ExtractionRecord, 'quote' | 'sectionId'>;
-type Valued = Pick<ExtractionRecord, 'value' | 'unit'>;
+// Pure functions over a record and its paper: how a quote is looked for in
+// the document's text, and why the service would refuse a decision before the
+// reviewer presses the key. `biorepo.write` on the service is the authority
+// (§2.3); these exist so the screen says the same thing the service would, one
+// keystroke earlier.
+import type { DecisionCheck, ExtractionRecord, Paper, ReviewDecision } from '@/data/types';
 
 // ── §2.4 rule 2's normalisation, the browser's copy ─────────────────────
 //
@@ -25,8 +13,7 @@ type Valued = Pick<ExtractionRecord, 'value' | 'unit'>;
 // validate.normalize_text: soft hyphens dropped, every dash variant to '-',
 // a superscript on a unit to '-1', a superscript on a number to '^6',
 // whitespace runs to one space. The browser must look the same way, or a
-// candidate the service anchored renders as "quote not located" here and a
-// curated quote the service would accept is refused by goldRefusal below.
+// candidate the service anchored renders as "quote not located" here.
 // Kept in step with validate.py by hand; the smoke test's candidate quotes
 // and test_anchor's cases are the shared examples.
 
@@ -156,124 +143,12 @@ export function paperFetched(paper: Paper | undefined): paper is Paper {
   return !!paper && paper.textSource === 'full-text' && paper.sections.length > 0;
 }
 
-export function paperIdentified(paper: Paper | undefined): boolean {
-  return !!paper && !!(paper.pmcid || paper.doi || paper.pmid);
-}
-
 /**
- * Whether the record's own quote is in its section of the FETCHED text, the
- * way the service looks for it. null when the paper has no fetched text:
- * there is nothing to anchor to, which is a different fact from "not found".
+ * Whether the project holds the paper, the service's rule for a decision
+ * (`biorepo._held`): a decision stands on a document a reader can look up.
  */
-export function quoteAnchors(record: Quoted, paper: Paper | undefined): boolean | null {
-  if (!paperFetched(paper)) return null;
-  const section = paper.sections.find((s) => s.id === record.sectionId);
-  return !!section && locateQuote(section.text, record.quote) !== null;
-}
-
-/**
- * A candidate for a field the seed has no record of on that paper — the
- * corpus growing (§6.2). These join the review queue after the seed records;
- * a candidate that matches a seed record's field is evidence about that
- * record and stays beside it instead.
- */
-export function isNewCandidate(c: Pick<Candidate, 'paperId' | 'field'>, records: ExtractionRecord[]): boolean {
-  return !records.some(
-    (r) => r.extractorRun !== EXTRACTOR_RUN && r.paperId === c.paperId && r.field === c.field,
-  );
-}
-
-/** Two values agree: strings case-insensitively, numbers within AGREE_PCT after conversion. */
-export function agrees(a: Valued, b: Valued): boolean {
-  if (typeof a.value === 'string' || typeof b.value === 'string') {
-    return String(a.value).trim().toLowerCase() === String(b.value).trim().toLowerCase();
-  }
-  return quantityEquals({ value: b.value, unit: b.unit }, { value: a.value, unit: a.unit }, AGREE_PCT);
-}
-
-/** The candidate's value relative to the curated one, in percent, after conversion; null when not comparable. */
-export function relativeDelta(curated: Valued, candidate: Valued): number | null {
-  if (typeof curated.value !== 'number' || typeof candidate.value !== 'number') return null;
-  if (!sameFamily(candidate.unit, curated.unit) || curated.value === 0) return null;
-  try {
-    const cv = convert(candidate.value, candidate.unit, curated.unit);
-    return ((cv - curated.value) / Math.abs(curated.value)) * 100;
-  } catch {
-    return null;
-  }
-}
-
-export interface CandidateMatch {
-  candidate: Candidate;
-  /** Its value agrees with the curated one within AGREE_PCT. */
-  agrees: boolean;
-  deltaPct: number | null;
-}
-
-/**
- * The extractor's best candidate for a curated record: same paper and field;
- * one that agrees with the curated value if there is one, otherwise the most
- * confident. null when the extractor produced nothing for that field.
- */
-export function bestCandidate(record: ExtractionRecord, candidates: Candidate[]): CandidateMatch | null {
-  const pool = candidates.filter(
-    (c) => c.id !== record.id && c.paperId === record.paperId && c.field === record.field,
-  );
-  if (pool.length === 0) return null;
-  const agreeing = pool.find((c) => agrees(record, c));
-  const candidate = agreeing ?? [...pool].sort((a, b) => b.confidence - a.confidence)[0];
-  return { candidate, agrees: !!agreeing, deltaPct: relativeDelta(record, candidate) };
-}
-
-export interface CarriedSpan {
-  quote: string;
-  sectionId: string;
-  candidateId: string;
-  /**
-   * The number as the paper's sentence writes it. The service anchors a
-   * promotion's value inside its quote to 0.5 % with no unit conversion
-   * (§2.4 rule 3), so a record re-anchored to a candidate's sentence takes
-   * the candidate's value and unit — within 2 % of the curated one, which is
-   * why the span was carried at all — as its correction.
-   */
-  value: number | string;
-  unit: string;
-}
-
-/**
- * The span a promotion carries (§7.3): when the curated quote is NOT in the
- * fetched text and an agreeing candidate's is, accept and gold re-anchor the
- * record to the candidate's quote, section, value and unit, so the promoted
- * record stands in the paper's own words and says the paper's own number.
- * null when the record's quote already anchors, when nothing is fetched, or
- * when no candidate agrees — a disagreeing span is not carried, because the
- * reviewer is promoting the curated value.
- */
-export function carryOverSpan(
-  record: ExtractionRecord,
-  paper: Paper | undefined,
-  candidates: Candidate[],
-): CarriedSpan | null {
-  if (quoteAnchors(record, paper) !== false) return null;
-  const best = bestCandidate(record, candidates);
-  if (!best || !best.agrees) return null;
-  const c = best.candidate;
-  return { quote: c.quote, sectionId: c.sectionId, candidateId: c.id, value: c.value, unit: c.unit };
-}
-
-/**
- * Whether a carried span changes the record's number: the candidate wrote a
- * different value, or the same value in a unit that does not normalise to
- * the record's. A categorical value never does — it agreed case-insensitively
- * to be carried at all, and a string is not a correction. 'g/L' against
- * 'g L⁻¹' is the same unit spelled twice, not a correction either.
- */
-export function spanChangesNumber(record: Valued, span: Pick<CarriedSpan, 'value' | 'unit'>): boolean {
-  if (typeof record.value !== 'number' || typeof span.value !== 'number') return false;
-  if (record.value !== span.value) return true;
-  const a = normalizeUnit(record.unit);
-  const b = normalizeUnit(span.unit);
-  return a === null || b === null ? record.unit !== span.unit : a !== b;
+export function paperHeld(paper: Paper | undefined): boolean {
+  return !!paper?.held;
 }
 
 export type ReviewAction = 'accept' | 'reject' | 'gold';
@@ -286,7 +161,7 @@ export type ReviewAction = 'accept' | 'reject' | 'gold';
  * two mean the action cannot be taken at all until something changes.
  */
 /** The rules `biorepo.write` refuses under (§2.3). The service names one; the fallback below can only see three of them. */
-export type RefusalRule = 'record' | 'reviewer' | 'fulltext' | 'quote' | 'paper' | 'range' | 'status';
+export type RefusalRule = 'record' | 'reviewer' | 'fulltext' | 'quote' | 'paper' | 'unit' | 'status';
 
 export interface Refusal {
   rule: RefusalRule;
@@ -304,10 +179,12 @@ export interface Refusal {
  * four conditions the browser has the facts for:
  *
  *   reviewer  nobody has set a name in Settings (F2)
- *   paper     no PMCID, DOI or PMID — the committed file may not name it;
- *             decided in this browser only
- *   fulltext  a promotion (accept, gold) needs the paper's fetched text
- *   quote     gold needs a sentence in that text that says this number
+ *   paper     a document the project does not hold; decided in this
+ *             browser only
+ *   fulltext  a promotion (accept, gold) needs the document's text
+ *
+ * A candidate's quote anchored in that text when it was extracted, so gold
+ * asks nothing more here.
  *
  * It cannot see `range`, `status` or `record`, and it does not try: those
  * come back from the check.
@@ -316,26 +193,25 @@ export function writeRefusal(
   action: ReviewAction,
   record: ExtractionRecord,
   paper: Paper | undefined,
-  candidates: Candidate[],
   serviceUp: boolean | null,
   reviewer: string | null,
 ): Refusal | null {
   if (!serviceUp) return null;
-  // A decision the committed file cannot attribute is not a decision it can
-  // keep (OF-BLD-012.1 F2). Asked first, because it is the one refusal the
+  // A decision nobody signed is not a decision the project can keep
+  // (OF-BLD-012.1 F2). Asked first, because it is the one refusal the
   // reviewer can clear in five seconds.
   if (!reviewer || !reviewer.trim()) {
     return {
       rule: 'reviewer',
       browserOnly: false,
-      why: 'Set your reviewer name in Settings before deciding — the committed file records who decided what.',
+      why: 'Set your reviewer name in Settings before deciding — the project records who decided what.',
     };
   }
-  if (!paperIdentified(paper)) {
+  if (!paperHeld(paper)) {
     return {
       rule: 'paper',
       browserOnly: true,
-      why: `${record.paperId} carries no PMCID, DOI or PMID, so the service keeps no decision about it. It is reviewed in this browser only.`,
+      why: `${record.paperId} is not a document this project holds, so the service keeps no decision about it. It is reviewed in this browser only.`,
     };
   }
   if (action === 'reject') return null;
@@ -343,19 +219,10 @@ export function writeRefusal(
     return {
       rule: 'fulltext',
       browserOnly: false,
-      why: `${action === 'gold' ? 'Gold' : 'Accept'} needs the paper's full text, and ${record.paperId} has not been fetched. Fetch it from Intake first.`,
+      why: `${action === 'gold' ? 'Gold' : 'Accept'} needs the document's text, and the project holds none for ${record.paperId}. Collect it again from Intake first.`,
     };
   }
-  if (action !== 'gold') return null;
-  // A candidate's quote anchored when it was extracted; the service will find it.
-  if (record.extractorRun === EXTRACTOR_RUN) return null;
-  if (quoteAnchors(record, paper)) return null;
-  if (carryOverSpan(record, paper, candidates)) return null;
-  return {
-    rule: 'quote',
-    browserOnly: false,
-    why: 'Gold needs a sentence in the fetched text that says this number. The curated quote is not in it, and the extractor found no span that agrees.',
-  };
+  return null;
 }
 
 /**
@@ -382,16 +249,8 @@ export function refusalOf(check: DecisionCheck, fallback: Refusal | null): Refus
  * The decision an action would post, built the way the store builds it, so
  * the question the screen asks is the decision it would send (F1.5).
  */
-export function decisionToCheck(
-  action: 'accept' | 'gold',
-  record: ExtractionRecord,
-  paper: Paper | undefined,
-  candidates: Candidate[],
-  reviewer: string,
-): ReviewDecision {
-  const span = carryOverSpan(record, paper, candidates);
-  const carried = span && spanChangesNumber(record, span);
-  const corrected = carried && span ? { value: span.value as number, unit: span.unit } : record.corrected;
+export function decisionToCheck(action: 'accept' | 'gold', record: ExtractionRecord, reviewer: string): ReviewDecision {
+  const corrected = record.corrected;
   return {
     status: 'verified',
     provenance: record.provenance,
@@ -404,22 +263,10 @@ export function decisionToCheck(
     reviewer,
     recordId: record.id,
     at: new Date().toISOString(),
-    ...(span ? { quote: span.quote, sectionId: span.sectionId } : {}),
   };
 }
 
 /** A refusal that stops the action, as opposed to one that only keeps it out of the service. */
 export function blocks(refusal: Refusal | null): boolean {
   return !!refusal && !refusal.browserOnly;
-}
-
-/** Kept for callers that only ask about gold. */
-export function goldRefusal(
-  record: ExtractionRecord,
-  paper: Paper | undefined,
-  candidates: Candidate[],
-  serviceUp: boolean | null,
-  reviewer: string | null,
-): Refusal | null {
-  return writeRefusal('gold', record, paper, candidates, serviceUp, reviewer);
 }

@@ -2,8 +2,8 @@
 // one `provenance` value so they can never disagree (OF-DES-001 §7.4).
 import type { ReactNode } from 'react';
 import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban, BookMarked, Microscope, TrendingUp, Calculator } from 'lucide-react';
-import type { Provenance } from '@/data/types';
-import { referenceFor } from '@/data/reference';
+import type { ExtractionRecord, Provenance } from '@/data/types';
+import { aggregateExclusion } from '@/store';
 import { Explain, cx } from './ui';
 
 export type ProvKind = Provenance | 'rejected';
@@ -15,10 +15,10 @@ const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string;
     color: 'text-gold',
     tick: 'tick-measured',
   },
-  gold: { label: 'Curated · gold set', Icon: Award, color: 'text-gold', tick: 'tick-gold' },
+  gold: { label: 'Gold · a value a reviewer typed', Icon: Award, color: 'text-gold', tick: 'tick-gold' },
   verified: { label: 'Verified against source', Icon: ShieldCheck, color: 'text-accent', tick: 'tick-verified' },
   curated: {
-    label: 'Curated · pending source check',
+    label: 'Curated · written by hand',
     Icon: BookMarked,
     color: 'text-accent/70',
     tick: 'tick-curated',
@@ -42,7 +42,7 @@ const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string;
     tick: 'tick-unverified',
   },
   user: { label: 'User-entered', Icon: UserPen, color: 'text-signal-info', tick: 'tick-user' },
-  demo: { label: 'Modeled · not measured', Icon: FlaskConical, color: 'text-signal-warn', tick: 'tick-demo' },
+  assumed: { label: 'Assumed · not measured', Icon: FlaskConical, color: 'text-signal-warn', tick: 'tick-assumed' },
   rejected: { label: 'Rejected', Icon: Ban, color: 'text-signal-error', tick: 'tick-rejected' },
 };
 
@@ -103,7 +103,7 @@ export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
     'industry-estimate': 'bg-ink-soft/60',
     unverified: 'bg-ink-soft',
     user: 'bg-signal-info',
-    demo: 'bg-signal-warn',
+    assumed: 'bg-signal-warn',
     rejected: 'bg-signal-error',
   };
   return (
@@ -115,46 +115,57 @@ export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
   );
 }
 
+/** The levels in the order the legend shows them. */
+const LEGEND_ORDER: ProvKind[] = ['measured', 'gold', 'verified', 'curated', 'computed', 'unverified', 'industry-estimate', 'user', 'assumed'];
+
+/**
+ * Whether a verified primary record at this level enters a median, a range
+ * or a count: `aggregateExclusion()` answers, so the legend states the rule
+ * the aggregates apply.
+ */
+const entersAggregates = (p: Provenance): boolean =>
+  aggregateExclusion({ provenance: p, status: 'verified', isPrimary: true } as ExtractionRecord) === null;
+
 /**
  * The legend, and — behind a disclosure — what each level means for aggregates.
  *
- * OF-BLD-010 §5 puts the `biorepo.audit` provenance table here, because a
- * legend that names nine levels without saying which of them are held out of a
- * median is telling a reader half of what the tick means. The rows come from
- * `reference.ts` so there is ONE source rather than a copy per screen, and
- * `pnpm check:reference` fails the build if that source disagrees with
- * `PROVENANCE_LABEL` or with what `aggregateExclusion()` actually does.
+ * OF-BLD-010 §5 puts the provenance table here, because a legend that names
+ * nine levels without saying which of them are held out of a median is
+ * telling a reader half of what the tick means. Each row's label is the
+ * level's own and its last column is computed by `aggregateExclusion()`, so
+ * the table and the aggregates have one source.
  *
  * Collapsed by default. Nine levels inline is the compact form eight screens
  * already rely on; the table is for the reader who stops to ask.
  */
 export function ProvenanceLegend() {
-  const table = referenceFor('biorepo.audit')?.tables.find((t) => t.title === 'Provenance levels');
-  const excluded = (table?.rows ?? []).filter((r) => r[2] === 'No');
+  const rows = LEGEND_ORDER.filter((p): p is Provenance => p !== 'rejected').map((p) => ({
+    p,
+    label: META[p].label,
+    counted: entersAggregates(p),
+  }));
+  const excluded = rows.filter((r) => !r.counted);
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-ink-soft">
-      {(
-        ['measured', 'gold', 'verified', 'curated', 'computed', 'unverified', 'industry-estimate', 'user', 'demo'] as ProvKind[]
-      ).map((p) => (
+      {LEGEND_ORDER.map((p) => (
         <span key={p} className="inline-flex items-center gap-1.5">
           <ProvDot p={p} />
           {META[p].label}
         </span>
       ))}
-      {table && (
+      {excluded.length > 0 && (
         <Explain label={`${excluded.length} of these are held out of aggregates`}>
           <div className="text-body">
             <p className="mb-2 text-ink">
-              A tick says where a number came from. Three of these levels are excluded from any
-              aggregate: an industry estimate is not evidence, a modelled value is not a
-              measurement, and a computed value is derived from values already counted. Counting
-              any of them would overstate what the corpus knows.
+              A tick says where a number came from. A level marked No is excluded from any aggregate:
+              an industry estimate is no evidence, and a computed value is derived from values already
+              counted. Counting either would overstate what the corpus knows.
             </p>
             <table className="w-full border-collapse text-body">
               <thead>
                 <tr className="border-b border-line">
-                  {table.cols.map((c) => (
+                  {['Level', 'Shown as', 'In aggregates'].map((c) => (
                     <th key={c} className="text-caption font-medium text-ink-soft px-1.5 py-1 text-left">
                       {c}
                     </th>
@@ -162,17 +173,12 @@ export function ProvenanceLegend() {
                 </tr>
               </thead>
               <tbody>
-                {table.rows.map((r) => (
-                  <tr key={r[0]} className="border-b border-line/60 last:border-0">
-                    <td className="font-num px-1.5 py-1 text-ink whitespace-nowrap">{r[0]}</td>
-                    <td className="px-1.5 py-1 text-ink-soft">{r[1]}</td>
-                    <td
-                      className={cx(
-                        'px-1.5 py-1 font-num',
-                        r[2] === 'No' ? 'text-signal-warn' : 'text-ink-soft',
-                      )}
-                    >
-                      {r[2]}
+                {rows.map((r) => (
+                  <tr key={r.p} className="border-b border-line/60 last:border-0">
+                    <td className="font-num px-1.5 py-1 text-ink whitespace-nowrap">{r.p}</td>
+                    <td className="px-1.5 py-1 text-ink-soft">{r.label}</td>
+                    <td className={cx('px-1.5 py-1 font-num', r.counted ? 'text-ink-soft' : 'text-signal-warn')}>
+                      {r.counted ? 'Yes' : 'No'}
                     </td>
                   </tr>
                 ))}

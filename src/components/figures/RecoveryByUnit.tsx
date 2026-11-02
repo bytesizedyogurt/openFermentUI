@@ -87,7 +87,7 @@ export function emptyOf(props: RecoveryByUnitProps): { what: string; where: stri
   if (props.units.length === 0)
     return {
       what: 'this run kept no unit table.',
-      where: props.why || 'Run the scenario again in Proforma; a run keeps its tables from OF-BLD-019 on.',
+      where: props.why || 'Run the scenario again in Proforma: every run keeps its tables.',
     };
   if (!props.product)
     return { what: 'this run names no product, so no recovery is read.', where: 'A run whose flowsheet prices a product stream names one; Proforma runs it.' };

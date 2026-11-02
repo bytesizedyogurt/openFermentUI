@@ -1,0 +1,19 @@
+# What a person knows of openFerment's cellulosic_ethanol_v0 that a BioSTEAM
+# system cannot carry, read by the SFF toolkit's runner
+# (pisces_sff.export._runner.load_extended_metadata) and by openFerment's own
+# exports. Its keys are the toolkit's exporter's keyword arguments.
+#
+# The plant is the BioSTEAM authors' cellulosic ethanol design as
+# biorefineries.cellulosic composes it, which follows the NREL 2011 design
+# report for corn stover (Humbird et al., NREL/TP-5100-47764).
+source_doi: "https://doi.org/10.2172/1013269"
+#
+process_title: "Corn stover to ethanol (openFerment cellulosic_ethanol_v0, composed from biorefineries.cellulosic)"
+#
+flowsheet_designers: "openFerment, composing the biorefineries.cellulosic factories of the BioSTEAM authors"
+#
+# A BioSTEAM system names no host. The package's seed train and
+# co-fermentation reactions grow Z_mobilis cell mass: one host.
+microorganisms:
+  - name: "Zymomonas mobilis"
+    label: "ethanologen"

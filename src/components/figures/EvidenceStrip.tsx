@@ -49,6 +49,7 @@ const EXCLUSION_WORDS: Record<string, string> = {
   rejected: 'rejected by a reviewer',
   'industry-estimate': 'an industry estimate, never evidence',
   computed: 'computed from values already counted',
+  assumed: 'assumed, never evidence',
   'not-primary': 'cites another paper’s measurement',
 };
 
@@ -86,7 +87,7 @@ export function stripPoints(props: EvidenceStripProps): { points: StripPoint[]; 
       value,
       provenance: prov,
       // A modeled value is never evidence (E.8), so it stays out of the median.
-      heldOut: excl ? EXCLUSION_WORDS[excl] ?? excl : prov === 'demo' ? 'modeled, never evidence' : null,
+      heldOut: excl ? EXCLUSION_WORDS[excl] ?? excl : null,
       above: lowest !== null && overRule.length ? `above ${overRule.map((x) => x.label).join(', ')}` : null,
     });
   }

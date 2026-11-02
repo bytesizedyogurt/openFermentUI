@@ -12,6 +12,7 @@
 // stored. While the service is up, the sign-off sheet asks /api/guild/check.
 import type { DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/data/types';
 import { IntakeDown } from './intake';
+import { apiFetch } from './project';
 
 /** The service stored nothing and said which rule held. Not an outage. */
 export class GuildRefused extends Error {
@@ -29,7 +30,7 @@ export const EMPTY_GUILD: Guild = { version: 1, people: [], evidence: [] };
 async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(
+    response = await apiFetch(
       path,
       body === undefined
         ? { signal }

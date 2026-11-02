@@ -5,16 +5,17 @@
 // and this panel renders any scope the same way: Proforma's scenarios
 // (`proforma:<scenario id>`) now, fermOS's Simulate and Vessel and pureOS's
 // Builder in later steps, unchanged. A screen never hand-writes a form for a
-// parameter, and `check:seed` (E.1‴) fails on a numeric control in a
-// module's screens outside this file and ParameterRow.tsx.
+// parameter (E.1‴): a numeric control in a module's screens stands in this
+// file and ParameterRow.tsx alone.
 //
 //   the caller   fetches the scope (`GET /api/params/{scope}`, lib/params.ts)
 //                and passes it in as `data`, with what it binds by (a
 //                scenario made in a browser names its flowsheet; host, fits);
 //   the person   types a value, a low, a high and what it rests on: each
 //                change is an `Override` under the reviewer name, at now,
-//                kept in the Durable tier (`setOverride`), never anywhere
-//                else; Reset to source drops it (`clearOverride`). With no
+//                kept in the open project's rows (`setOverride`;
+//                lib/projectState.ts); Reset to source drops it
+//                (`clearOverride`). With no
 //                reviewer name every edit control is disabled and the row
 //                says where to set one;
 //   the service  is asked after each change, debounced, to lay the scope's
@@ -159,7 +160,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
       {problem && (
         <p className="text-caption text-signal-warn mb-2" role="status" data-testid="param-problem" data-down={problem.down ? 'true' : 'false'}>
           {problem.down
-            ? `The service could not check these values: ${problem.words} Your changes are kept in this browser and go with the run.`
+            ? `The service could not check these values: ${problem.words} Your changes are kept in the project and go with the run.`
             : `The service refused these values: ${problem.words}`}
         </p>
       )}

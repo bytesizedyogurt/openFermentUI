@@ -14,6 +14,11 @@
  *   3. A key is committed anywhere. Scans every tracked file for the key
  *      prefix — a leaked key in a test fixture is as leaked as one in main.
  *
+ * The database address (alpha 2.0, ADR-001) carries a password: the browser
+ * never names it or holds one, and no tracked file holds a password for a
+ * database anywhere but loopback. The development role in compose.yaml
+ * answers on 127.0.0.1 alone, so its password guards nothing worth hiding.
+ *
  * Runs offline, needs no key, and passes whether or not core/.env exists.
  */
 import { execFileSync } from 'node:child_process';
@@ -56,6 +61,8 @@ const BROWSER_FORBIDDEN = [
   { re: /\bapi[_-]?key\s*[:=]\s*['"][^'"]{8,}/i, why: 'assigns a literal-looking key' },
   { re: /from\s+['"]dotenv['"]|require\(['"]dotenv['"]\)/, why: 'loads a .env file' },
   { re: /api\.anthropic\.com/, why: 'calls the Anthropic API directly from the browser' },
+  { re: /OPENFERMENT_DATABASE_URL|SCI_RAG_DATABASE_URL/, why: 'names the database address variable' },
+  { re: /postgres(?:ql)?(?:\+\w+)?:\/\/[^\s'"`/@]+:[^\s'"`@]+@/, why: 'holds a database address with a password' },
 ];
 for (const file of tracked) {
   if (!existsSync(file)) continue;
@@ -73,6 +80,15 @@ const leaked = git(['grep', '-l', '-E', 'sk-ant-[A-Za-z0-9_-]{16}', '--', '.'])
   .filter(Boolean);
 for (const file of leaked) fail(`${file} contains a live-looking API key`);
 
+// A database password in a tracked file, for a server that is not loopback.
+const DB_ADDRESS = /postgres(?:ql)?(?:\+\w+)?:\/\/[^\s'"`/@:]+:[^\s'"`@]+@(\[[^\]]+\]|[^\s'"`:/?]+)/g;
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
+for (const file of git(['grep', '-l', '-E', 'postgres(ql)?(\\+[a-z0-9]+)?://[^ :/@]+:[^ @]+@', '--', '.']).split('\n').filter(Boolean)) {
+  for (const m of readFileSync(file, 'utf8').matchAll(DB_ADDRESS)) {
+    if (!LOOPBACK_HOSTS.has(m[1])) fail(`${file} holds a database password for ${m[1]}, which is not loopback`);
+  }
+}
+
 // A key pasted into a committed env file is the classic version of this.
 for (const f of git(['ls-files']).split('\n').filter(Boolean)) {
   if (/(^|\/)\.env(\.|$)/.test(f) && !f.endsWith('.example')) {
@@ -85,6 +101,7 @@ console.log('──────────────────────�
 console.log(`  ignore rules      ${MUST_IGNORE.length} env paths ignored, .env.example kept`);
 console.log(`  browser surface   ${tracked.length} tracked files under src/ scanned, none name a key`);
 console.log(`  tracked files     no key-shaped string in any file git tracks`);
+console.log(`  database          no database password in a tracked file for a server off loopback`);
 console.log(
   `  core/.env         ${existsSync('core/.env') ? 'present locally and ignored' : 'absent — the service will refuse to start rather than guess'}`,
 );

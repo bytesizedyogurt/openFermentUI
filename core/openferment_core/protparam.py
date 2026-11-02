@@ -16,11 +16,10 @@ signature and named in the basis, and the answer is what it returns.
 
 A SEQUENCE IS NAMED, NEVER TYPED BY A MODEL. A product entry carries its own
 chain (`sequence`, with `sequenceSource` saying where it was read, a UniProt
-accession say) in the products seed, which `pnpm export:corpus` carries into
-corpus.json; the endpoints take a product id, and `protparam()` takes a
-sequence only from a caller that names its source. No product entry carries a
-sequence tonight (none is invented), so every product's properties are
-missing: `ProtParamMissing`, a 404 whose words say the entry carries none.
+accession say) in the products catalogue (`products()`); the endpoints take a
+product id, and `protparam()` takes a sequence only from a caller that names
+its source. No store holds a products catalogue yet and none is invented, so
+every product's properties are missing: `ProtParamMissing`, a 404 in words.
 
 REFUSED WHOLE. A sequence holding anything but the twenty standard amino
 acids' one-letter codes (the library's own `protein_letters`), in upper case,
@@ -40,7 +39,6 @@ settings. A product entry's sequence is a `convention` input, so the answer is
 from __future__ import annotations
 
 import inspect
-import json
 from importlib.metadata import version as _version
 from typing import Any, Mapping
 
@@ -248,13 +246,10 @@ def protparam(sequence: str, *, source: BasisSource, product: str | None = None,
 
 
 def products() -> list[dict[str, Any]]:
-    """The products seed as corpus.json carries it (`pnpm export:corpus`):
-    each entry's id and name, and its sequence and source when it has one."""
-    from .corpus import DATA
-
-    if not DATA.exists():
-        raise FileNotFoundError(f"{DATA} not found. Generate it with `pnpm export:corpus` from the repository root")
-    return list(json.loads(DATA.read_text(encoding="utf-8")).get("products") or [])
+    """The products catalogue: each entry's id and name, and its sequence and
+    source when it has one. No store holds a product catalogue yet, so it is
+    empty; tests supply one here."""
+    return []
 
 
 def sequence_of(product: str) -> tuple[str, BasisSource]:
@@ -266,17 +261,17 @@ def sequence_of(product: str) -> tuple[str, BasisSource]:
         raise ProtParamRefused("a product's properties name the product by its id")
     entry = next((p for p in products() if p.get("id") == pid), None)
     if entry is None:
-        raise ProtParamMissing(f"there is no product {pid!r} in the products seed, so it carries no sequence to compute from")
+        raise ProtParamMissing(f"there is no product {pid!r} in the products catalogue, so it carries no sequence to compute from")
     seq = entry.get("sequence")
     if not seq:
         raise ProtParamMissing(f"product {pid}'s entry carries no sequence, so its molecular weight, isoelectric point, "
-                               "extinction coefficients and GRAVY are not computed: a sequence enters the products seed "
+                               "extinction coefficients and GRAVY are not computed: a sequence enters the products catalogue "
                                "with where it was read (sequenceSource), never invented")
     where = (entry.get("sequenceSource") or "").strip()
     if not where:
         raise ProtParamRefused(f"product {pid}'s entry carries a sequence and names no source for it; a sequence enters "
                                "with where it was read (sequenceSource), so nothing is computed from this one")
-    return str(seq), BasisSource(kind="convention", note=f"product {pid}'s own sequence in the products seed, read from {where}")
+    return str(seq), BasisSource(kind="convention", note=f"product {pid}'s own sequence in the products catalogue, read from {where}")
 
 
 def of_product(product: str) -> Artifact:

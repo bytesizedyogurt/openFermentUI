@@ -4,7 +4,7 @@
 // A forecast is drawn from one kept fit's covariance by the service, under the
 // fitted run's own starting values and length unless a person changes them;
 // a changed value is that person's assumption, and the forecast becomes
-// `demo`. The band leaves out run-to-run variation, and says so.
+// `assumed`. The band leaves out run-to-run variation, and says so.
 //
 // THE CONDITIONS ARE THE PANEL'S (OF-BLD-020 §3.3, E.1‴). A logistic_v0 fit's
 // start values and length are the scope `fermos:forecast:<fit id>`, served
@@ -27,13 +27,13 @@
 // person typed goes with that person's name (`durationBy`).
 //
 // Send to Proforma (OF-BLD-019 §5.1, D10): the fit in hand, the forecast
-// just made from it, or the simulation, goes to a Proforma scenario of the
-// active program, or to a new one made in the New scenario chooser, whose
+// just made from it, or the simulation, goes to a Proforma scenario, or to a
+// new one made in the New scenario chooser, whose
 // page attaches it to the inputs it can feed (titre, yield, productivity);
 // the service computes each value from the artifact there.
 import { useEffect, useMemo, useState } from 'react';
 import type { ForecastResult, ParamScope, SimulationResult } from '@/data/types';
-import { overridesFor, useStore, useProgramFilter } from '@/store';
+import { overridesFor, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { Button, Callout } from '@/components/ui';
 import { NewScenarioDialog } from '@/components/NewScenarioDialog';
@@ -71,16 +71,14 @@ const problemOf = (e: unknown) =>
   e instanceof FermosDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof FermosRefused ? e.message : String(e);
 
 /**
- * Send a kept fit, forecast or simulation to Proforma: a scenario the
- * program switch shows, or a new one; the scenario page attaches it to what
- * it can feed.
+ * Send a kept fit, forecast or simulation to Proforma: a BioSTEAM scenario
+ * on file, or a new one; the scenario page attaches it to what it can feed.
  */
 export function SendToProforma({ artifactId, tool }: { artifactId: string; tool: string }) {
   const scenarios = useStore((s) => s.scenarios);
-  const shows = useProgramFilter();
   const [open, setOpen] = useState(false);
   const [making, setMaking] = useState(false);
-  const offered = scenarios.filter((sc) => sc.kind === 'biosteam' && shows('scenario', sc.id));
+  const offered = scenarios.filter((sc) => sc.kind === 'biosteam');
   return (
     <div className="card p-3" data-testid="send-to-proforma">
       <div className="flex flex-wrap items-center gap-2">
@@ -107,7 +105,7 @@ export function SendToProforma({ artifactId, tool }: { artifactId: string; tool:
               <span className="text-caption text-ink-soft font-num">{sc.flowsheetId ?? sc.modelId}</span>
             </li>
           ))}
-          {offered.length === 0 && <li className="text-caption text-ink-soft">No Proforma scenario of the active program is in this browser yet.</li>}
+          {offered.length === 0 && <li className="text-caption text-ink-soft">No Proforma scenario is in this project yet.</li>}
           <li>
             <Button onClick={() => setMaking(true)}>New scenario…</Button>
           </li>
@@ -122,7 +120,6 @@ export default function FermOSForecast() {
   const fits = useStore((s) => s.fermosFits);
   const depositions = useStore((s) => s.depositions);
   const runbooks = useStore((s) => s.runbooks);
-  const showArchived = useStore((s) => s.showArchived);
   const usable = Object.entries(fits).filter(([, f]) => f.kinetic?.params.length);
   const [chosen, setChosen] = useState<string>(usable[0]?.[0] ?? '');
   const [result, setResult] = useState<ForecastResult | null>(null);
@@ -138,7 +135,7 @@ export default function FermOSForecast() {
   const fitId = fit?.kineticArtifactId ?? null;
   const batchAsk: SimulateAsk | null =
     fitId && model !== LOGISTIC
-      ? { family: model, strain: null, product: null, sugar: null, fitArtifact: fitId, startFrom: 'fit', durationPreset: FIT_LENGTH, includeArchived: showArchived }
+      ? { family: model, strain: null, product: null, sugar: null, fitArtifact: fitId, startFrom: 'fit', durationPreset: FIT_LENGTH }
       : null;
   const scope = !fitId ? '' : model === LOGISTIC ? forecastScope(fitId) : familyScope(model);
   const scoped = useStore(overridesFor(scope));

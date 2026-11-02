@@ -2,14 +2,12 @@
 before its fix. STAND-IN text, not a paper's words."""
 from __future__ import annotations
 
-import importlib.util
-import json
-from pathlib import Path
 
 import pytest
 
-from openferment_core import llm, postdoc_agent, retrieve, tools
-from openferment_core.models import Passage, PassageHit, PriorTurn, ToolResult, Usage
+from openferment_core import llm, postdoc_agent, tools
+from openferment_core.tools import passages as passages_tool
+from openferment_core.models import Passage, PriorTurn, ToolResult, Usage
 from openferment_core.validate import SeenSet, validate_plan
 from test_postdoc_agent import SENTENCE, Script, claim, papers, passages_found, plan, records, two_models  # noqa: F401
 from test_tools import pool  # noqa: F401
@@ -61,10 +59,10 @@ def test_an_oversized_summary_keeps_no_ids(pool, monkeypatch):  # noqa: F811
 
 # R3 — what a search lane spends counts against the question.
 def test_a_searchs_model_spend_is_the_questions(pool, monkeypatch):  # noqa: F811
-    hit = PassageHit(passage=Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
-                                     text=SENTENCE, start=0, end=len(SENTENCE)), score=1.0, lanes={"bm25": 1})
-    monkeypatch.setattr(retrieve, "search_detail", lambda q, k=8, lane=None, ask=None, include_archived=False: retrieve.Detail(
-        hits=[hit], lane="bm25+rerank", usage=Usage(costUsd=0.05, models=["claude-haiku-5-5"])))
+    hit = Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
+                                     text=SENTENCE, start=0, end=len(SENTENCE))
+    monkeypatch.setattr(passages_tool, "search", lambda q, k: passages_tool.Found(
+        passages=[hit], engine="stand-in", usage=Usage(costUsd=0.05, models=["claude-haiku-5-5"])))
     monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.04")
     script = Script([papers()], [papers("again")], plan())
     out = postdoc_agent.ask("q?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
@@ -74,10 +72,10 @@ def test_a_searchs_model_spend_is_the_questions(pool, monkeypatch):  # noqa: F81
 
 
 def test_a_cached_search_is_not_charged_twice(pool, monkeypatch):  # noqa: F811
-    hit = PassageHit(passage=Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
-                                     text=SENTENCE, start=0, end=len(SENTENCE)), score=1.0, lanes={"bm25": 1})
-    monkeypatch.setattr(retrieve, "search_detail", lambda q, k=8, lane=None, ask=None, include_archived=False: retrieve.Detail(
-        hits=[hit], lane="bm25+rerank", usage=Usage(costUsd=0.01)))
+    hit = Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
+                                     text=SENTENCE, start=0, end=len(SENTENCE))
+    monkeypatch.setattr(passages_tool, "search", lambda q, k: passages_tool.Found(
+        passages=[hit], engine="stand-in", usage=Usage(costUsd=0.01)))
     script = Script([papers()], [papers()], plan())
     out = postdoc_agent.ask("q?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
     assert out.usage.costUsd == pytest.approx(0.01 + 0.001 * 3)
@@ -97,7 +95,7 @@ def test_the_stream_cancels_its_question_when_the_reader_goes(monkeypatch):
 
     seen = {}
 
-    def fake(question, on_step=None, cancelled=None, history=None, include_archived=False):
+    def fake(question, on_step=None, cancelled=None, history=None, **_):
         seen["cancelled"] = cancelled
         seen["history"] = history
         on_step(postdoc_agent.TraceStep(n=1, kind="tool", tool="t", input={}, summary="s", ms=0, ok=True))
@@ -111,10 +109,16 @@ def test_the_stream_cancels_its_question_when_the_reader_goes(monkeypatch):
     monkeypatch.setattr(api, "_ask_agent", fake)
     earlier = PriorTurn(question="Which strains?", claims=["A strain was named."])
     body = api._stream_events(api.AskRequest(question="q?", history=[earlier]))
+    assert next(body).startswith("event: turn")
     assert next(body).startswith("event: step")
     body.close()
     assert seen["cancelled"]() is True
-    # A follow-up's earlier turns reach the loop as the browser sent them.
+    # The question ends on its own thread, which keeps the turn as it stopped.
+    import threading
+    for t in threading.enumerate():
+        if t.name == "ask-stream":
+            t.join(timeout=10)
+    # A question that names no conversation reads its earlier turns as the caller sent them.
     assert seen["history"] == [earlier]
 
 
@@ -133,29 +137,6 @@ def test_a_restart_gets_its_own_call_budget(pool, two_models):  # noqa: F811
     assert sum(s.kind == "restart" for s in out.trace) == 1
     assert out.stopped == "done", "the second model's three calls fit its own twelve"
     assert sum(s.kind == "tool" for s in out.trace) == 12
-
-
-# R8 — ask:batch counts rounds, and survives a missing corpus.
-ROOT = Path(__file__).resolve().parents[2]
-_spec = importlib.util.spec_from_file_location("ask_batch_r", ROOT / "scripts" / "ask-batch.py")
-ask_batch = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(ask_batch)
-
-
-def test_ask_batch_rounds_are_tool_rounds_of_the_answering_conversation(pool, tmp_path, two_models):  # noqa: F811
-    script = Script([records()], llm.ModelUnavailable("overloaded"), [records()], plan())
-    ctx = tools.ToolContext(pool_factory=lambda: pool)
-    rows = ask_batch.run(["q"], tmp_path / "out", ask=lambda q, converse: postdoc_agent.ask(q, converse=converse, ctx=ctx),
-                         converse=script, echo=lambda _: None)
-    assert rows[0]["rounds"] == 2, "one tool round and the answer, on the second model"
-    assert two_models[1] in rows[0]["models"]
-
-
-def test_ask_batch_says_so_when_there_is_no_corpus(monkeypatch, capsys):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-stand-in")
-    monkeypatch.setattr(ask_batch, "pool_or_none", lambda: None)
-    assert ask_batch.main(["docs/build/questions-pha.txt"]) == 2
-    assert "export:corpus" in capsys.readouterr().err
 
 
 # R9 — a gap is held to Rule 1 like a claim.

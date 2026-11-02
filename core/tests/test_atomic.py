@@ -15,9 +15,10 @@ import time
 
 import pytest
 
-from openferment_core import atomic, biorepo, extract, intake
-from openferment_core.corpus import load_corpus
-from openferment_core.models import ReviewDecision
+from openferment_core import atomic, biorepo, db, extract, projects
+from openferment_core.literature import kit
+from openferment_core.models import Candidate, ExtractResponse, Quantity, ReviewDecision, Usage
+from openferment_core.units import to_si
 
 
 def test_replaces_the_whole_file(tmp_path):
@@ -64,25 +65,25 @@ def test_a_new_file_is_readable_by_others(tmp_path):
 @pytest.fixture
 def scratch_repo(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
-    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
-    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
 
 
-def _identified_seed_records(n: int) -> list[str]:
-    corpus = load_corpus()
-    out = []
-    for r in corpus.records:
-        p = corpus.paper(r["paperId"]) or {}
-        if p.get("pmcid") or p.get("doi") or p.get("pmid"):
-            out.append(r["id"])
-        if len(out) == n:
-            return out
-    pytest.skip(f"fewer than {n} seed records on identified papers")
+def _planted(n: int) -> list[str]:
+    """n candidates on one document the project holds, each one a decision
+    may name."""
+    paper = "A1"
+    db.run(kit._link(projects.current(), paper, {}, "test"))
+    candidates = []
+    for i in range(n):
+        sv, su = to_si(i + 1, "g L⁻¹")
+        candidates.append(Candidate(id=f"cl1-{paper}-{i:08x}", paperId=paper, sectionId="s1", quote=f"a titre, row {i}",
+                                    field="titer_secreted", value=i + 1, unit="g L⁻¹", si=Quantity(value=sv, unit=su)))
+    extract._persist(ExtractResponse(paperId=paper, extractedAt="2026-10-07T12:00:00Z", candidates=candidates,
+                                     audit=[], usage=Usage(), calls=0))
+    return [c.id for c in candidates]
 
 
 def test_decisions_posted_together_all_survive(scratch_repo, monkeypatch):
-    ids = _identified_seed_records(6)
+    ids = _planted(6)
     real_read = biorepo.read
 
     def slow_read():

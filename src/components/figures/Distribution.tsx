@@ -1,7 +1,7 @@
 // A price as a distribution (OF-BLD-014 §8.4). The histogram of every
 // feasible sample, with the 5th, 25th, 50th, 75th and 95th percentiles as
 // rules, all in the stroke the run's provenance gives it: a run that rests on
-// an assumption is demo, and draws amber and dashed like every modeled thing.
+// an assumption is assumed, and draws amber and dashed like every modeled thing.
 // The infeasible samples are counted beside it, never drawn.
 import type { ComputedBasis, HistogramBin, Provenance } from '@/data/types';
 import { fmt } from '@/engine/units';

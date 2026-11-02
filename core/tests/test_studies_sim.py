@@ -1,0 +1,82 @@
+"""Studies in the real worker (studies/; execution prompt §9.1 step 5).
+
+Marked `sim`. openFerment's cellulosic ethanol flowsheet on the library's
+own defaults, and a scenario on it with one person's assumption and one
+model's estimate, run as engine runs and compared: the comparison holds the
+price and the flowsheet's outputs in their units with the scenario's change
+from the base, each value the scenario set with its origin beside the
+library's default, and it is `assumed`. A runbook made from the scenario's
+run predicts its selling price and locks under the browser's digest, and the
+export package holds each run's SFF file as the project holds it.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+
+import pytest
+
+from openferment_core import llm, proforma
+from openferment_core.engine import runs
+from openferment_core.models import (ComparisonCreate, Origin, PredictedOutput, Quantity, RunbookCreate, ScenarioCreate,
+                                     ScenarioValue)
+from openferment_core.runbook_lock import lock_hash
+from openferment_core.studies import comparisons, exports, runbooks, scenarios
+
+pytestmark = pytest.mark.sim
+
+FLOWSHEET = "cellulosic_ethanol_v0"
+# The model the service calls first: the one whose estimates these are.
+MODEL = llm.DEFAULT_PRIMARY
+
+
+@pytest.fixture(scope="module")
+def warm():
+    proforma.start(background=False)
+    assert proforma.status()["status"] == "ready", proforma.status()
+
+
+def study():
+    base = runs.run(FLOWSHEET, by="Ada Moreno").run
+    made = scenarios.make(ScenarioCreate(title="Dearer stover, two-day co-fermentation", plant=FLOWSHEET, by="Ada Moreno",
+                                         values=[
+        ScenarioValue(key="stream.cornstover.price", quantity=Quantity(value=0.08, unit="USD/kg", origin=Origin(
+            kind="person-assumption", by="Ada Moreno", at="2026-10-30", note="a delivered price quoted to us"))),
+        ScenarioValue(key="unit.R303.tau_cofermentation", quantity=Quantity(value=48.0, unit="hr", origin=Origin(
+            kind="model-estimate", by=MODEL, at="2026-10-30T12:00:00Z", note="two days, as such plants are often run"))),
+    ]))
+    return base, made, scenarios.run(made.id, by="Ada Moreno")
+
+
+def test_a_scenario_on_the_flowsheet_runs_assumed_and_compares_with_its_base(warm):
+    base, made, rep = study()
+    assert rep.run.provenance == "assumed" and rep.run.scenarioId == made.id and rep.run.sff.valid
+    compared = comparisons.make(ComparisonCreate(title="The scenario against the flowsheet as built",
+                                                 runIds=[base.id, rep.run.id], by="Ada Moreno"))
+    out = compared.artifact.output
+    assert compared.comparison.provenance == "assumed"
+    rows = {r["key"]: r for r in out["rows"]}
+    mesp = rows["outputs.mespUsdPerKg"]
+    assert mesp["unit"] == "USD/kg" and mesp["values"][1] > mesp["values"][0] and mesp["change"][1] > 0
+    assert rows["price.solvedPrice"]["unit"] == "USD/kg" and rows["price.TCI"]["unit"] == "USD"
+    values = {v["key"]: v["values"] for v in out["values"]}
+    stover = values["stream.cornstover.price"]
+    assert [c["origin"] for c in stover] == ["library-default", "person-assumption"] and stover[1]["value"] == 0.08
+    defaults = runs.report(base.id).artifact.output["libraryDefaults"]
+    assert stover[0]["value"] == defaults["stream.cornstover.price"] and stover[0]["unit"] == "USD/kg"
+    assert [c["origin"] for c in values["unit.R303.tau_cofermentation"]] == ["library-default", "model-estimate"]
+    book = runbooks.make(RunbookCreate(title="Dearer stover at the bench", runId=rep.run.id, by="Ada Moreno", predict=[
+        PredictedOutput(output="outputs.mespUsdPerKg", label="Minimum ethanol selling price")]))
+    (mesp_at_bench,) = book.predictions
+    assert (mesp_at_bench.value, mesp_at_bench.unit) == (mesp["values"][1], "USD/kg") and "assumed" in mesp_at_bench.basis
+    locked = runbooks.lock(book.id, by="Ada Moreno")
+    assert locked.lockedAt and locked.lockHash == lock_hash(
+        [p.model_dump(exclude_unset=True) for p in locked.predictions],
+        [m.model_dump(exclude_unset=True) for m in locked.measurementSchema])
+    package = exports.files(by="Ada Moreno")
+    for run in (base, rep.run):
+        held = hashlib.sha256(package[f"sff/{run.id}.sff.json"]).hexdigest()
+        assert held == runs.report(run.id).flowsheet.sha256
+    exported = json.loads(package["study.json"])
+    assert [r["id"] for r in exported["runs"]] == [base.id, rep.run.id]
+    assert exported["runbooks"][0]["lockHash"] == locked.lockHash

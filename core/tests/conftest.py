@@ -1,19 +1,236 @@
 """Shared test setup.
 
 Every model call is charged to the day's spend (OF-BLD-014 §3.3). An offline
-test's stand-in calls are charged to a file of its own, so no test ever moves
-this machine's real total in core/data/spend.json, and no real total can make
-an offline test refuse. A `live` test spends real money and is charged to the
-real file.
+test's stand-in calls are charged inside the test's own rolled-back database
+transaction, so no test ever moves this machine's real total, and no real
+total can make an offline test refuse. A `live` test spends real money and is
+charged to the machine's real database, the one core/.env names.
 """
 from __future__ import annotations
 
+import asyncio
+import functools
+import json
+import os
+import secrets
+import threading
+from pathlib import Path
+
 import pytest
+
+# Sci RAG Kit's settings, before any test module imports the kit (openferment_core/__init__.py).
+import openferment_core  # noqa: F401, E402
 
 
 @pytest.fixture(autouse=True)
-def _spend_kept_apart(request, monkeypatch, tmp_path):
+def _spend_kept_apart(request, monkeypatch):
     if request.node.get_closest_marker("live") is None:
-        monkeypatch.setenv("OPENFERMENT_SPEND_FILE", str(tmp_path / "spend.json"))
         monkeypatch.delenv("OPENFERMENT_DAILY_BUDGET_USD", raising=False)
+        yield
+        return
+    from dotenv import dotenv_values
+
+    from openferment_core import db, spend
+
+    address = os.environ.get(db.URL_SETTING) or dotenv_values(Path(__file__).parent.parent / ".env").get(db.URL_SETTING)
+    if not address:
+        yield
+        return
+    real = db.make_engine(address)
+    monkeypatch.setattr(spend, "_ENGINE", real)
     yield
+    db.run(real.dispose())
+
+
+# Guild's skills, protocol step tags and lessons: the service ships with none
+# (alpha 2.0 deleted the seed, ADR-010), so the tests read the frozen fixture
+# alpha 1.0's export wrote, handed in place of `guild.projection`.
+GUILD_PROJECTION = json.loads((Path(__file__).parent / "fixtures" / "guild-projection.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture(autouse=True)
+def _guild_projection(monkeypatch):
+    from openferment_core import guild
+
+    monkeypatch.setattr(guild, "projection", lambda: GUILD_PROJECTION)
+
+
+# ── PostgreSQL (alpha 2.0, ADR-001; execution prompt §8.1) ─────────────────
+#
+# One disposable database per test session, made on the server that
+# OPENFERMENT_TEST_DATABASE_URL names (its database part is the prefix of the
+# name made), migrated to head, and dropped when the session ends. Each test
+# runs inside one transaction on one connection, rolled back when the test
+# ends, so no test sees another's rows. Nothing connects until a test first
+# touches the database: a test of a pure function needs no server.
+TEST_DATABASE_SETTING = "OPENFERMENT_TEST_DATABASE_URL"
+DEFAULT_TEST_DATABASE = "postgresql://openferment:openferment@127.0.0.1:5432/openferment_test"
+
+
+class TestDatabase:
+    """The session's database, made the first time a test needs it."""
+
+    __test__ = False
+
+    def __init__(self) -> None:
+        from openferment_core.db import as_async
+
+        self.server = as_async(os.environ.get(TEST_DATABASE_SETTING, "").strip() or DEFAULT_TEST_DATABASE)
+        self.name = f"{self.server.database or 'openferment_test'}_{os.getpid()}_{secrets.token_hex(3)}"
+        self.url = None
+        self.engine = None
+        self._lock = threading.Lock()
+
+    def open(self):
+        """Make, migrate and connect the database once; its engine. Both
+        schemas are migrated, and Sci RAG Kit is pointed at the database."""
+        from openferment_core import migrations
+        from openferment_core.db import migrate
+        from openferment_core.db.engine import make_engine
+        from openferment_core.literature import kit
+
+        with self._lock:
+            if self.engine is None:
+                try:
+                    url = migrate.create(self.name, self.server)
+                except Exception as e:
+                    raise RuntimeError(
+                        f"PostgreSQL did not answer at {self.server.render_as_string(hide_password=True)} "
+                        f"({e.__class__.__name__}: {e}). Start it with `pnpm db:up`, or set {TEST_DATABASE_SETTING}."
+                    ) from e
+                self.url = url
+                migrations.upgrade(url)
+                kit.use_database(url)
+                self.engine = make_engine(url, pool_size=2, max_overflow=2)
+            return self.engine
+
+    async def engine_now(self):
+        """`open`, from the database loop: the work runs on a thread of its
+        own, because alembic runs its own event loop."""
+        return await asyncio.to_thread(self.open)
+
+    def close(self) -> None:
+        from openferment_core import db
+        from openferment_core.db import migrate
+
+        if self.engine is not None:
+            from openferment_core.literature import kit
+
+            kit.use_database(None)
+            db.run(self.engine.dispose())
+            migrate.drop(self.name, self.server)
+
+
+@pytest.fixture(autouse=True)
+def _kit_embedder(request):
+    """Sci RAG Kit embeds with FastEmbed in a test marked `lit`, as the
+    service does. Every other test embeds with the kit's deterministic local
+    embedder, which needs no model file, so test:core stays offline; the two
+    kinds of test store texts of their own, so neither reads the other's
+    vectors."""
+    from openferment_core.literature import kit
+
+    kit.use_embedder(None if request.node.get_closest_marker("lit") else _local_embedder())
+    yield
+
+
+@functools.cache
+def _local_embedder():
+    from sci_rag.embed import LocalHashEmbedder
+
+    from openferment_core.literature import EMBEDDING_DIM
+
+    return LocalHashEmbedder(EMBEDDING_DIM)
+
+
+@pytest.fixture(scope="session")
+def test_database():
+    held = TestDatabase()
+    yield held
+    held.close()
+
+
+@pytest.fixture
+def held_documents(monkeypatch):
+    """Documents the test's project holds, id → passages, served to
+    extraction and to BioRepo through `extract.passages` in place of Sci RAG
+    Kit, so a rule can be pinned on text a human reads in one screen. The
+    kit's own passages are tested in test_literature_kit.py."""
+    from openferment_core import extract
+
+    held: dict[str, list[dict]] = {}
+
+    def passages(document_id: str) -> list[dict]:
+        if document_id not in held:
+            raise extract.NothingToAnchor(
+                f"this project holds no document {document_id}. Collect it first — there is nothing to anchor to."
+            )
+        if not held[document_id]:
+            raise extract.NothingToAnchor(f"{document_id} holds no text — there is nothing to anchor to.")
+        return held[document_id]
+
+    monkeypatch.setattr(extract, "passages", passages)
+    return held
+
+
+def structural_passages() -> list[dict]:
+    """The structural JATS fixture's sections, as a held document's passages."""
+    from openferment_core.literature.collectors import FIXTURE_ROOT, split_jats
+
+    xml = (FIXTURE_ROOT / "jats" / "structural.xml").read_text(encoding="utf-8")
+    return [section.model_dump() for section in split_jats(xml).sections]
+
+
+@pytest.fixture
+def kit_database(test_database):
+    """The session's database, made now: Sci RAG Kit is pointed at it when it
+    is made, and a test that reaches the kit before anything else touched the
+    database would find no address."""
+    test_database.open()
+    return test_database
+
+
+# Every test acts in one project, as every request names one (ADR-005): the
+# test's own thread through `projects.using`, a thread it starts through
+# OPENFERMENT_PROJECT, and every TestClient it makes through the header, the
+# way the browser sends it. The project's row is written in the test's
+# transaction when the database is first touched.
+TEST_PROJECT = "test-project"
+
+
+async def _test_project_row(connection) -> None:
+    from sqlalchemy import insert
+
+    from openferment_core.db import models as t
+
+    await connection.execute(insert(t.projects).values(id=TEST_PROJECT, name="Test project", created_by="test"))
+
+
+@pytest.fixture(autouse=True)
+def _database(test_database, monkeypatch):
+    """Every session of this test: a savepoint on one rolled-back transaction,
+    in the test project."""
+    from fastapi.testclient import TestClient
+
+    from openferment_core import db, projects
+
+    made = TestClient.__init__
+
+    def naming_the_project(self, *args, headers=None, **kwargs):
+        made(self, *args, headers={projects.HEADER: TEST_PROJECT, **(headers or {})}, **kwargs)
+
+    monkeypatch.setattr(TestClient, "__init__", naming_the_project)
+    # A thread a test starts begins outside the test's context, like a
+    # command's, and finds the project where a command does.
+    monkeypatch.setenv(projects.ENV, TEST_PROJECT)
+    binding = db.Binding(test_database.engine_now, prepare=_test_project_row)
+    previous = db.bind(binding)
+    with projects.using(TEST_PROJECT):
+        yield binding
+    # A turn the test began is answered by nobody once its transaction is gone.
+    from openferment_core.postdoc import conversations
+
+    conversations._answering.clear()
+    db.bind(previous)
+    if binding.connection is not None:
+        db.run(binding.close())

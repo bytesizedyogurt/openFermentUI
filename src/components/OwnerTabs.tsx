@@ -8,7 +8,7 @@
 // React looks identical and is broken in three ways a reader will hit within a
 // minute: the tab cannot be linked, the back button leaves the page instead of
 // the tab, and a reload lands somewhere else. Every tab here is a real route,
-// so `/dominion/clearance` is a thing you can send somebody.
+// so `/runbooks/depositions` is a thing you can send somebody.
 //
 // Tabs mount the EXISTING screens unmodified. Moving a screen under an owner
 // is a routing change, not a rewrite — Organisms.tsx is the same file it was.

@@ -1,24 +1,49 @@
 // Hash-based router (OF-DES-001 §13.2) — self-contained, no history API,
 // so deep links survive inside an embedded artifact frame.
-import { useEffect, useState, useCallback } from 'react';
+//
+// A PROJECT'S VIEWS (execution prompt §8.5). `/p/:project` is a project's home,
+// and `/p/:project/<path>` a module screen as a view inside that project. The
+// prefix is read off here: `project` names it, and `path` and `segments` are
+// the module's own, so every screen reads the path it always read. A link or a
+// navigation to a plain path from inside a project stays inside it.
+import { useEffect, useState } from 'react';
 
 export interface Route {
-  path: string; // "/biorepo/paper/SP-004"
+  path: string; // "/biorepo/paper/SP-004", the project's prefix read off
   segments: string[];
   query: URLSearchParams;
   hash: string; // full raw hash
+  /** The project the address names (`/p/:project/...`), or null. */
+  project: string | null;
 }
+
+const PREFIX = /^\/p\/([^/?]+)(\/[^?]*)?$/;
 
 function parseHash(): Route {
   const raw = window.location.hash.replace(/^#/, '') || '/';
   const [pathPart, queryPart] = raw.split('?');
-  const path = pathPart || '/';
+  const whole = pathPart || '/';
+  const named = PREFIX.exec(whole);
+  const path = named ? named[2] || '/' : whole;
   return {
     path,
     segments: path.split('/').filter(Boolean),
     query: new URLSearchParams(queryPart ?? ''),
     hash: raw,
+    project: named ? decodeURIComponent(named[1]) : null,
   };
+}
+
+/** The project the current address names, or null. */
+function addressedProject(): string | null {
+  if (typeof window === 'undefined') return null;
+  return parseHash().project;
+}
+
+/** `to` inside the project the address names, when it is a plain app path. */
+export function inProject(to: string, project: string | null = addressedProject()): string {
+  if (!project || !to.startsWith('/') || to.startsWith('/p/')) return to;
+  return `/p/${encodeURIComponent(project)}${to === '/' ? '' : to}`;
 }
 
 let listeners: (() => void)[] = [];
@@ -43,7 +68,7 @@ export function useRoute(): Route {
 }
 
 export function navigate(to: string, opts?: { replace?: boolean }) {
-  const target = to.startsWith('#') ? to : `#${to}`;
+  const target = to.startsWith('#') ? `#${inProject(to.slice(1))}` : `#${inProject(to)}`;
   if (opts?.replace) {
     window.location.replace(target);
   } else {
@@ -57,11 +82,7 @@ export function navigate(to: string, opts?: { replace?: boolean }) {
   }
 }
 
-export function useNavigate() {
-  return useCallback(navigate, []);
-}
-
 /** <a href> that routes internally; keeps middle-click / cmd-click semantics. */
 export function href(path: string): string {
-  return `#${path}`;
+  return `#${inProject(path)}`;
 }

@@ -18,7 +18,7 @@ core/.env is read with their permissions and nobody else's.
 
 The server binds to loopback. The service has no login of its own (Guild's
 write endpoint answers whoever reaches it), so the bind address IS the access
-control, the rule scripts/lib/serve-dist.mjs follows for the test servers
+control, the rule scripts/lib/serve-dist.mjs follows for the prototype's server
 (OF-BLD-012.1 §6.9). `tailscale serve`, which install.sh sets up, publishes
 the loopback port over HTTPS to the devices the owner's tailnet allows.
 

@@ -1,0 +1,176 @@
+{
+  "repository": "https://github.com/sustainability-software-lab/pisces-standard-flowsheet-format",
+  "revision": "e236e3250414f45cf9fd7b8b854f1afc67fc2cad",
+  "schema": "0.2.4",
+  "licence": "MIT",
+  "registry": {
+    "id": "all_models",
+    "path": "pisces_sff/export/models/all_models.yaml",
+    "sha256": "f2052a42e4fb5e1d01c8e63c7aa36b618d653a548b6336fa4382f0f1855db39d",
+    "bytes": 726
+  },
+  "flowsheets": [
+    {
+      "id": "SF_BST_01",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_01.json",
+      "sha256": "f9d0ac8162d24c6f56975c4b64438cc5210b5cb98bc71737a20b2b7ee2bd5644",
+      "bytes": 400985,
+      "title": "Corn → Ethanol + Crude oil + DDGS",
+      "sffVersion": "0.2.3",
+      "model": "M_BST_01"
+    },
+    {
+      "id": "SF_BST_02",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_02.json",
+      "sha256": "5bdb46986663fdd97194a659a3eb7de41281e0d5a559213b355b641357aeca1f",
+      "bytes": 686823,
+      "title": "Corn → Acrylic acid",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_03",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_03.json",
+      "sha256": "23f069a8a05d10f8bfd50f1787685b94eaaa04726518dd9c8b1adff2c36ba071",
+      "bytes": 609112,
+      "title": "Corn → Succinic acid",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_04",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_04.json",
+      "sha256": "23e7095f281750ee65d7dbdc81c1a992765b1f7632917a300b249adc18bd08eb",
+      "bytes": 691091,
+      "title": "Corn → Triacetic acid lactone",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_05",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_05.json",
+      "sha256": "3c59a271854110740fac9db0b6965f7f86a2014dc0f321827af127243869f360",
+      "bytes": 932578,
+      "title": "Corn → Potassium sorbate",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_06",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_06.json",
+      "sha256": "b40b912e872a1fce7057ed0413418b74cb67d7bca07b4aa1d38431c36773fe8b",
+      "bytes": 822859,
+      "title": "Corn stover → Acrylic acid",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_07",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_07.json",
+      "sha256": "853539c6d64ec4a54be68f4a1ef9fdb021d0839e34814e4b6a572e4a4e62ba22",
+      "bytes": 785941,
+      "title": "Corn stover → Succinic acid",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_08",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_08.json",
+      "sha256": "2b4b4fd8e8cd6fb532c5c950961ccb506767a5a4a9f158fbffd248b031e40781",
+      "bytes": 858585,
+      "title": "Corn stover → Triacetic acid lactone",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_09",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_09.json",
+      "sha256": "32e8f0ecc4a8c671c823b7160e2ada52ac8b3f07f3dd67af38a7e2244f13ee6d",
+      "bytes": 1156763,
+      "title": "Corn stover → Potassium sorbate",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_10",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_10.json",
+      "sha256": "bf446e5f2e52d0de685a9739d5eeef9ac108226dd3834944a9b507658e8c1f9d",
+      "bytes": 550822,
+      "title": "Dextrose → Acrylic acid",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_11",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_11.json",
+      "sha256": "2c55b7965af7873df7ff8d7dcc150b3fdfe20ba502280c76d8ee3e9449cb333a",
+      "bytes": 444588,
+      "title": "Dextrose → Succinic acid",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_12",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_12.json",
+      "sha256": "58d993df1cbd7932edba196be358047d429c7dcef8739894e094a192af4d0d72",
+      "bytes": 532676,
+      "title": "Dextrose → Triacetic acid lactone",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_13",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_13.json",
+      "sha256": "a7b5437c4eed18ee38802b873c1ab3e4e56d2e94a200231d4350d2946008f2cf",
+      "bytes": 744637,
+      "title": "Dextrose → Potassium sorbate",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_14",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_14.json",
+      "sha256": "6ccb7e5c335af3b19fa4a859c65035173f0d57cdbfb9fe03257da2464919d9db",
+      "bytes": 652365,
+      "title": "Sugarcane → Acrylic acid",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_15",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_15.json",
+      "sha256": "be74817c298f211b93dcf1660cb0ff95148a3c5f89d56f311971174ebad5fd5f",
+      "bytes": 246632,
+      "title": "Sugarcane → Ethanol",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_16",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_16.json",
+      "sha256": "44ff87eecf306ac5098c7af83aec40c9ccc9417dc19d1e948819e3a355ab1a6b",
+      "bytes": 542584,
+      "title": "Sugarcane → Succinic acid",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_17",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_17.json",
+      "sha256": "67822ed0aed7b75646317e154e5e5395b7895fec098618b194316b9554b2f173",
+      "bytes": 639197,
+      "title": "Sugarcane → Triacetic acid lactone",
+      "sffVersion": "0.0.3",
+      "model": null
+    },
+    {
+      "id": "SF_BST_18",
+      "path": "pisces_sff/export/exported_flowsheets/bioindustrial_park/SF_BST_18.json",
+      "sha256": "3fb0405dc87a7394e9a0f884c7e5ea7fd14ab02b36bc355323bac0e1afa5c554",
+      "bytes": 867221,
+      "title": "Sugarcane → Potassium sorbate",
+      "sffVersion": "0.0.3",
+      "model": null
+    }
+  ]
+}

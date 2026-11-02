@@ -5,8 +5,8 @@ this module holds the one `SimWorker` that runs it, tells the worker where a
 fetched model file lives, and fetches those files:
 
     pnpm geneos:fetch     every fetched model on the shelf into core/data/models/,
-                          checked against its sha256: RehMBEL1391 and Yeast9 at
-                          their pinned commits by git, iMM904 from BiGG's address
+                          checked against its sha256: Yeast9 at its pinned
+                          commit by git, iMM904 from BiGG's address
 
 A hash that does not match is a stop condition (§6.2): the file is moved
 aside, never used, and the command fails.
@@ -25,9 +25,9 @@ from . import artifacts, atomic, geneos_models as shelf
 from .models import BasisInput, BasisSource, Evidence, GeneosModelInfo, GeneosResult
 from .workers import SimWorker
 
-# Loading iJO1366 takes a few seconds, Yeast9 (an 11.5 MB file) a few more,
-# and a frontier a little longer; the first call on a cold worker pays both.
-# A setting, not a measurement.
+# Loading Yeast9 (an 11.5 MB file) takes a few seconds, and a frontier a
+# little longer; the first call on a cold worker pays both. A setting, not a
+# measurement.
 WORKER_TIMEOUT_S = 180.0
 
 _WORKER: SimWorker | None = None
@@ -94,7 +94,7 @@ def version() -> str:
 
 def _model_input(model_id: str) -> BasisInput:
     if model_id == TOY:
-        # An assumption, so whatever is computed on it is modeled (demo),
+        # An assumption, so whatever is computed on it is assumed,
         # never computed evidence (basis_provenance; §6.R).
         return BasisInput(name="model", value="toy", unit="", source=BasisSource(
             kind="assumption", id=TOY, by="openFerment test fixture",
@@ -207,7 +207,7 @@ def _label(model_id: str, what: str) -> str:
 
 
 def _named(product: str) -> str:
-    """The product as a result's label names it: PHB, ethanol."""
+    """The product as a result's label names it: ethanol."""
     return shelf.PRODUCTS[product]["label"]
 
 
@@ -297,7 +297,7 @@ def download(url: str) -> bytes:
     return response.content
 
 
-def fetch(model: shelf.ShelfModel = shelf.SHELF["RehMBEL1391"], *, run=subprocess.run, get=download) -> Path:
+def fetch(model: shelf.ShelfModel, *, run=subprocess.run, get=download) -> Path:
     """Bring the model's file and verify its hash: for a file in git, clone
     the pinned commit without its blobs and check out the one file; for a
     file at an address, download it and write it whole (atomic.write_bytes).

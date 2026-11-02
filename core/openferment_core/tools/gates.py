@@ -38,7 +38,7 @@ class Gate:
 
 GATES: tuple[Gate, ...] = (
     Gate("publish", "publish to the commons",
-         (("biorepo", "publish"), ("dominion", "publish"), ("runbooks", "publish")),
+         (("biorepo", "publish"), ("runbooks", "publish")),
          "publish it from the module, in your name", "/biorepo", False),
     Gate("spend", "spend past the ask or the daily budget",
          (("intake", "extract"),),

@@ -36,8 +36,8 @@ act on, because `afterUnitId` names where a unit goes and not which one, and
 Every action is a free write through `tools/writes.py` (the same function as
 `pureos_write`'s `new_train`, `add_unit`, `remove_unit`, `set_from_record` and
 `run_train`), at no gate, audited with the model as agent. The train itself is
-kept on the service (`pureos.kept`, `core/data/pureos-trains.json`), marked as
-the model's; a person's trains stay in their browser. The service holds no
+kept on the service (`pureos.kept`, rows of the `trains` table), marked as
+the model's; a person's trains are the project's rows the Builder keeps. The service holds no
 person's value, so a value nothing binds waits at the run, and the call returns
 the refusal's words: a person types it in pureOS → Builder.
 
@@ -48,7 +48,7 @@ no field of its schema is numeric (E.4‴, `check:tools` rule 6), and a number
 anywhere refuses the call as the registry does for every tool. The service
 reads the product's class and the properties its class's rule splits on
 (`pureos.proposer`: thermosteam's volatility, ProtParam on the entry's
-sequence, where the products seed says the product is) and proposes a
+sequence, where the products catalogue says the product is) and proposes a
 `TrainSpec` whose units are catalogue types in order, every parameter at its
 library default or waiting for a person, each unit with one reason naming the
 rule, the property it read and the artifact that holds it; or none, naming
@@ -166,6 +166,7 @@ BUILD_TOOL = register(
         input_model=PureosBuildInput,
         run=_build,
         strict=False,
+        writes=True,
     )
 )
 
@@ -179,8 +180,8 @@ class PureosProposeInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     product: str = Field(description=(
-        "The product's id: a products seed entry (Dominion's molecules), or a product thermosteam's library is asked "
-        "about by name (ethanol)."))
+        "The product's id: an entry of the products catalogue, or a product thermosteam's library is asked about "
+        "by name (ethanol)."))
     host: str = Field(description="The host strain's id on geneOS's shelf of hosts: the cells the product is made in.")
     inletRef: str = Field(default="", description=(
         "The train's inlet: a kept fermOS simulation's artifact id (its broth at harvest), or a kept run's artifact id "
@@ -191,7 +192,7 @@ def _run(inp: PureosProposeInput, ctx: ToolContext) -> ToolResult:
     from .. import artifacts
 
     try:
-        p = pureos.propose(inp.product, inp.host, inp.inletRef or None, include_archived=ctx.include_archived)
+        p = pureos.propose(inp.product, inp.host, inp.inletRef or None)
         evidence = pureos.proposer.evidence(p)
     except (pureos.ProposeUnknown, pureos.ProposeRefused) as e:
         return ToolResult(error=f"{NAME} refused: {e}")

@@ -1,6 +1,0 @@
-# Thread P include list (OF-BLD-014 §2.3).
-#
-# One PMCID, DOI or PMID per line. `pnpm thread:propose` looks each one up on
-# Europe PMC and marks it INCLUDE, whatever the selection rule says about it.
-# One with no open-access text is still catalogued, with openAccess: false.
-# Everything after a # is a comment. Sean edits this file; nothing else does.

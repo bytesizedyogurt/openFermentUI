@@ -21,8 +21,8 @@ function sourceWords(input: BasisInput): string {
 
 /**
  * A ceiling drawn beside every reported yield of its product (OF-BLD-014
- * §6.4): a PHB ceiling beside PHA yields, an ethanol ceiling beside ethanol
- * yields. The product is the one the ceiling's basis names.
+ * §6.4): an ethanol ceiling beside ethanol yields. The product is the one the
+ * ceiling's basis names.
  */
 function InlineCeiling({ evidence }: { evidence: Evidence }) {
   const records = useStore((s) => s.records);

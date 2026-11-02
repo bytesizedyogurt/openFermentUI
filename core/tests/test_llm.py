@@ -80,7 +80,6 @@ class FakeClient:
     def stream(self, **kwargs):
         self.requests.append(kwargs)
         outcome = self.script[kwargs["model"]]
-        client = self
 
         class Stream:
             def __enter__(self_inner):
@@ -315,51 +314,7 @@ def test_no_key_is_unavailable(monkeypatch):
     assert "ANTHROPIC_API_KEY" in str(e.value)
 
 
-# ── the two callers ────────────────────────────────────────────────────
-
-
-def test_postdoc_turns_a_refusal_into_a_declined_plan_it_still_pays_for(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
-    spent = Usage(inputTokens=10, outputTokens=0, costUsd=0.01, models=[OPUS, SONNET])
-
-    def refused(**_):
-        raise llm.ModelRefused("bio", [OPUS, SONNET], spent)
-
-    monkeypatch.setattr(llm, "call", refused)
-    raw, usage = postdoc.ask_model("what is the titre", [], corpus=None)
-    assert raw["claims"] == [] and "declined" in raw["declined"] and "bio" in raw["declined"]
-    assert usage == spent
-
-
-def test_postdoc_reports_an_unavailable_model_as_the_service_being_unavailable(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
-
-    def down(**_):
-        raise llm.ModelUnavailable("claude-opus-5-5 answered 529")
-
-    monkeypatch.setattr(llm, "call", down)
-    with pytest.raises(postdoc.PostdocUnavailable, match="529"):
-        postdoc.ask_model("q", [], corpus=None)
-
-
-def test_a_plan_that_failed_after_a_billed_refusal_still_shows_the_cost(monkeypatch):
-    from openferment_core import api
-    from openferment_core.models import AskRequest
-
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
-    spent = Usage(inputTokens=3000, outputTokens=0, costUsd=0.012, models=[OPUS])
-
-    def down(**_):
-        raise llm.ModelUnavailable("claude-sonnet-5-5 answered 529", spent)
-
-    monkeypatch.setattr(llm, "call", down)
-    with pytest.raises(postdoc.PostdocUnavailable) as e:
-        postdoc.ask_model("q", [], corpus=None)
-    assert e.value.usage == spent
-
-    monkeypatch.setattr(api, "load_corpus", lambda: SimpleNamespace(search=lambda q, limit: []))
-    plan = api.ask(AskRequest(question="what is the titre", mode="single"))
-    assert "529" in plan.declined and plan.usage == spent
+# ── extraction, a caller ───────────────────────────────────────────────
 
 
 def test_extract_names_what_was_spent_before_an_outage(monkeypatch):
@@ -519,15 +474,27 @@ def test_a_rejected_key_through_the_sdk_does_not_fall_back():
 # ── a cache from before the move ───────────────────────────────────────
 
 
-def test_an_extraction_cached_by_an_earlier_run_is_extracted_again(monkeypatch, tmp_path):
-    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path)
-    old = {"paperId": "B5", "run": "haiku-1", "extractedAt": "2026-09-01T00:00:00Z", "candidates": [], "dropped": []}
-    (tmp_path / "B5.json").write_text(json.dumps(old))
-    assert extract.cached("B5") is None, "another run's file is not this run's extraction"
+def test_an_extraction_kept_by_an_earlier_run_is_extracted_again():
+    from sqlalchemy import delete, insert
+
+    from openferment_core import db, projects
+    from openferment_core.db import models as t
+
+    def keep(body: dict) -> None:
+        async def put() -> None:
+            async with db.session() as s:
+                await s.execute(delete(t.candidates))
+                await s.execute(insert(t.candidates).values(project_id=projects.current(), document_id="B5",
+                                                            source=extract.MODEL, body=body, created_by="test"))
+
+        db.run(put())
+
+    keep({"paperId": "B5", "run": "haiku-1", "extractedAt": "2026-09-01T00:00:00Z", "candidates": [], "dropped": []})
+    assert extract.cached("B5") is None, "another run's row is not this run's extraction"
     assert extract.all_cached() == []
 
     current = extract.ExtractResponse(paperId="B5", run=extract.RUN, extractedAt="2026-10-08T00:00:00Z")
-    (tmp_path / "B5.json").write_text(current.model_dump_json())
+    keep(current.model_dump(mode="json"))
     assert extract.cached("B5") == current and extract.all_cached() == [current]
 
 
@@ -701,3 +668,104 @@ def test_every_response_is_charged_to_its_role():
     llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: client, role="index")
     assert spend.state()["byRole"]["index"] == llm.cost_usd(HAIKU, 1000, 500)
     assert spend.state()["byRole"]["answer"] == 0.0
+
+
+# ── the routing table (execution prompt §4.8; ADR-008; alpha 2.0 stage 6.3) ──
+
+
+def test_the_routing_table_names_each_familys_models_and_effort(monkeypatch):
+    table = llm.routes()
+    assert set(table) == set(llm.FAMILIES) == {"plan", "explain", "extract", "index", "judge"}
+    assert table == llm.ROUTES, "with core/.env silent, the table is ROUTES"
+    assert table["plan"].models == (OPUS, SONNET) and table["index"].models == (HAIKU, OPUS, SONNET)
+    assert {f: llm.SPEND_ROLES[f] for f in llm.FAMILIES} == {"plan": "answer", "explain": "answer", "extract": "answer",
+                                                            "index": "index", "judge": "answer"}
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"judge": {"models": [f"anthropic:{SONNET}"], "effort": "low"},
+                                                         "index": {"effort": "high"}}))
+    table = llm.routes()
+    assert table["judge"] == llm.Route((f"anthropic:{SONNET}",), "low")
+    assert table["index"] == llm.Route((HAIKU, OPUS, SONNET), "high") and table["plan"] == llm.ROUTES["plan"]
+    assert llm.chain("judge") == [f"anthropic:{SONNET}"] and llm.chain("answer") == llm.chain("plan")
+
+
+@pytest.mark.parametrize("raw, says", [
+    ("not json", "is not JSON"),
+    ('["plan"]', "an object of family to route"),
+    ('{"answer": {}}', "names 'answer'"),
+    ('{"plan": {"models": []}}', "a list of model specs"),
+    ('{"plan": {"models": ["nonesuch:model"]}}', "names the provider 'nonesuch'"),
+    ('{"plan": {"models": ["anthropic:"]}}', "names a provider and no model"),
+    ('{"plan": {"effort": "huge"}}', "effort is one of"),
+    ('{"plan": {"temperature": 1}}', "an object of models and effort"),
+])
+def test_a_routing_table_that_cannot_route_says_why(monkeypatch, raw, says):
+    monkeypatch.setenv("OPENFERMENT_ROUTES", raw)
+    with pytest.raises(llm.RoutesInvalid, match=says):
+        llm.routes()
+
+
+def test_a_spec_is_the_kits_provider_and_model_and_a_bare_id_is_anthropics():
+    assert llm.spec(OPUS) == ("anthropic", OPUS) and llm.spec(f"anthropic:{OPUS}") == ("anthropic", OPUS)
+    assert llm.spec("openai-compatible:qwen3-32b") == ("openai-compatible", "qwen3-32b")
+
+
+def test_a_call_runs_at_its_familys_effort_on_its_anthropic_spec_and_passes_over_a_provider_that_waits(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps(
+        {"extract": {"models": ["openai-compatible:qwen3-32b", f"anthropic:{SONNET}"], "effort": "high"}}))
+    client = FakeClient({SONNET: answer(SONNET)})
+    result = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: client,
+                      family="extract")
+    assert result.model == SONNET and result.tried == [SONNET] and client.asked == [SONNET]
+    assert client.requests[0]["output_config"]["effort"] == "high"
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"extract": {"models": ["openai-compatible:qwen3-32b"]}}))
+    with pytest.raises(llm.ModelUnavailable, match="waits for the owner"):
+        llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: FakeClient({}),
+                 family="extract")
+
+
+def test_a_turn_on_a_provider_that_waits_is_unavailable_in_words():
+    with pytest.raises(llm.ModelUnavailable, match="waits for the owner"):
+        llm.converse(system="s", messages=[{"role": "user", "content": "q"}], tools=[], schema=None, max_tokens=10,
+                     model="openai-compatible:qwen3-32b", ask=lambda request: None)
+
+
+def test_a_grammar_too_large_sends_the_tools_loose_and_is_remembered(monkeypatch):
+    """The API compiles one grammar for the answer schema and every strict
+    tool and refuses one too large (measured 2026-10-30 on Postdoc's plan
+    schema beside seven strict tools): the request goes again with its tools
+    loose and its answer schema strict, and the next turn goes loose at once."""
+    import anthropic
+    import httpx
+
+    monkeypatch.setattr(llm, "_TOO_LARGE", set())
+    refusal = anthropic.BadRequestError(
+        message="The compiled grammar is too large, which would cause performance issues.",
+        response=httpx.Response(400, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages")), body=None)
+    sent = []
+
+    def ask(request):
+        sent.append([t["strict"] for t in request["tools"]])
+        if len(sent) == 1:
+            raise refusal
+        return _turn([SimpleNamespace(type="text", text='{"candidates": []}')])
+
+    assert _converse(ask).data == {"candidates": []}
+    _converse(ask)
+    assert sent == [[True], [False], [False]]
+
+
+def test_any_other_malformed_request_is_unavailable_as_before():
+    import anthropic
+    import httpx
+
+    refusal = anthropic.BadRequestError(message="messages: at least one message is required",
+                                        response=httpx.Response(400, request=httpx.Request("POST", "https://x")), body=None)
+    sent = []
+
+    def ask(request):
+        sent.append(request)
+        raise refusal
+
+    with pytest.raises(llm.ModelUnavailable) as e:
+        _converse(ask)
+    assert not isinstance(e.value, llm.GrammarTooLarge) and len(sent) == 1

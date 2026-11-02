@@ -78,7 +78,7 @@ export const ENCODING: Record<Provenance, MarkStyle> = {
     amber: false,
     words: 'hollow diamond, dashed outline; long dashes',
   },
-  demo: {
+  assumed: {
     point: { shape: 'circle', filled: false, ring: false, outline: 'dashed' },
     line: { dash: 'short', weight: 'normal' },
     amber: true,
@@ -87,7 +87,7 @@ export const ENCODING: Record<Provenance, MarkStyle> = {
 };
 
 /** The two classes that are never evidence (E.8 rule 2). */
-export const NEVER_EVIDENCE: Provenance[] = ['industry-estimate', 'demo'];
+export const NEVER_EVIDENCE: Provenance[] = ['industry-estimate', 'assumed'];
 
 /** What makes a point distinct; two provenances may never share one. */
 export function pointKey(p: Provenance): string {

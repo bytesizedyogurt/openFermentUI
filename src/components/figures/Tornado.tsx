@@ -2,7 +2,7 @@
 // it moves the price, each bar drawn from zero. A row names where its input
 // came from (records, a person's assumption, a reference model), so a long
 // bar resting on an assumption reads as the question to ask next. The bars
-// take the stroke of the result's provenance: demo for an authored surface
+// take the stroke of the result's provenance: assumed for an authored surface
 // or a run that rests on an assumption.
 import type { Provenance } from '@/data/types';
 import { fmt } from '@/engine/units';

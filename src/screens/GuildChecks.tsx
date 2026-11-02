@@ -11,10 +11,8 @@
 // record is theirs to read like anyone's. Every rule that decides a write is
 // the service's.
 import { useEffect, useMemo, useState } from 'react';
-import type { Check, CheckBrief } from '@/data/types';
-import { useStore } from '@/store';
-import { SKILL_BY_ID } from '@/data/skills';
-import { PROTOCOLS } from '@/data/protocols';
+import type { Check, CheckBrief, Protocol } from '@/data/types';
+import { useSkillById, useStore } from '@/store';
 import { Button, Callout, Card, EmptyState, LinkButton, SectionTitle, cx } from '@/components/ui';
 import { EvidenceRow, GuildHeader, nameOf, useChecks, useGuild, type GuildContext } from '@/components/GuildBits';
 import { isOpen, mayQueue, shownTo } from '@/engine/checks';
@@ -311,6 +309,7 @@ function CheckCard({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
 }
 
 function SkillReasons({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
+  const SKILL_BY_ID = useSkillById();
   return (
     <div className="space-y-2">
       {c.skillIds.map((k) => {
@@ -341,14 +340,16 @@ function SkillReasons({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
 }
 
 /** A step a brief names, as its protocol's current version words it. */
-export function stepWords(protocolId: string, stepId: string): string {
-  const p = PROTOCOLS.find((x) => x.id === protocolId);
+export function stepWords(protocols: readonly Protocol[], protocolId: string, stepId: string): string {
+  const p = protocols.find((x) => x.id === protocolId);
   const v = p?.versions.find((x) => x.version === p.currentVersion) ?? p?.versions[0];
   const st = v?.steps.find((x) => x.id === stepId);
   return st && v ? renderStepText(st, v, 1) : '';
 }
 
 export function BriefView({ brief, large }: { brief: CheckBrief; large?: boolean }) {
+  const SKILL_BY_ID = useSkillById();
+  const protocols = useStore((s) => s.protocols);
   // Large is the bench: words on ink, and step refs as text, since a link there would leave the takeover.
   const text = large ? 'text-reading text-ink' : 'text-body';
   const label = large ? 'text-body text-ink font-medium' : 'text-caption text-ink-soft';
@@ -369,7 +370,7 @@ export function BriefView({ brief, large }: { brief: CheckBrief; large?: boolean
                     {s.protocolId} · {s.stepId}
                   </a>
                 )}
-                {stepWords(s.protocolId, s.stepId)}
+                {stepWords(protocols, s.protocolId, s.stepId)}
               </li>
             ))}
           </ul>
@@ -416,6 +417,7 @@ function outcomes(c: Check): { skillId: string; met: boolean }[] {
 }
 
 function Finished({ ctx, checks, intro }: { ctx: GuildContext; checks: Check[]; intro?: string }) {
+  const SKILL_BY_ID = useSkillById();
   const closed = useMemo(() => checks.filter((c) => !isOpen(c)).sort((a, b) => ((a.closedAt ?? '') < (b.closedAt ?? '') ? 1 : -1)), [checks]);
   return (
     <div>
@@ -480,6 +482,7 @@ function Finished({ ctx, checks, intro }: { ctx: GuildContext; checks: Check[]; 
 // ── one check ──────────────────────────────────────────────────────────
 
 function OneCheck({ ctx, check: c, id, asked, down }: { ctx: GuildContext; check: Check | null; id: string; asked: boolean; down: boolean }) {
+  const SKILL_BY_ID = useSkillById();
   // An open check is the queue's; one that has been run or dismissed is the record's, and anyone reads it.
   if (!c || (isOpen(c) && !mayQueue(ctx.acting, ctx.status))) {
     return (

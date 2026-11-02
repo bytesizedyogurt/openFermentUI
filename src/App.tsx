@@ -1,5 +1,7 @@
 // App shell (OF-DES-001 §7.1): left rail + top utility bar + content region,
 // with the reviewer line, jobs tray, palette, and global shortcuts.
+import { ProjectHome } from '@/screens/ProjectHome';
+import { FlowsheetPage } from '@/screens/FlowsheetPage';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlaskConical,
@@ -11,7 +13,6 @@ import {
   Moon,
   Rows3,
   Rows4,
-  X,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -21,8 +22,8 @@ import { cx, Popover, Toasts, Sheet } from '@/components/ui';
 import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
 import { GuidedTour } from '@/components/GuidedTour';
+import { ProjectNeeded, ProjectSwitch } from '@/components/ProjectSwitch';
 import { SHORTCUTS } from '@/data/shortcuts';
-import { MODULES } from '@/data/learn';
 import { RAIL, redirectFor } from '@/data/nav';
 
 import Home from '@/screens/Home';
@@ -40,10 +41,7 @@ import BenchCheck from '@/screens/BenchCheck';
 import Witness from '@/screens/Witness';
 import BioRepoArtifacts from '@/screens/BioRepoArtifacts';
 import BioRepoSearch from '@/screens/BioRepoSearch';
-import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
-import Molecules from '@/screens/Molecules';
-import MoleculeDetail from '@/screens/MoleculeDetail';
 import Runbooks from '@/screens/Runbooks';
 import RunbookDetail from '@/screens/RunbookDetail';
 import Protocols from '@/screens/Protocols';
@@ -54,6 +52,9 @@ import DepositionDetail from '@/screens/DepositionDetail';
 import Proforma from '@/screens/Proforma';
 import ProformaScenario from '@/screens/ProformaScenario';
 import ProformaReference from '@/screens/ProformaReference';
+import ProformaRun from '@/screens/ProformaRun';
+import ProformaComparison from '@/screens/ProformaComparison';
+import ProformaStudies from '@/screens/ProformaStudies';
 import Compare from '@/screens/Compare';
 import Primer from '@/screens/Primer';
 import PrimerLesson from '@/screens/PrimerLesson';
@@ -66,7 +67,6 @@ import PureOS from '@/screens/PureOS';
 import PureOSTrain from '@/screens/PureOSTrain';
 import PureOSBuilder from '@/screens/PureOSBuilder';
 import FermOS from '@/screens/FermOS';
-import Dominion from '@/screens/Dominion';
 import Depositions from '@/screens/Depositions';
 import RunbookLedger from '@/screens/RunbookLedger';
 
@@ -131,6 +131,13 @@ class ScreenBoundary extends Component<{ children: ReactNode }, { error: Error |
 function Screen() {
   const route = useRoute();
   const [a, b, c, d, e] = route.segments;
+  const projectId = useStore((s) => s.projectId);
+  const openProject = useStore((s) => s.openProject);
+
+  // A project's address opens the project (§8.5): the page reloads in it.
+  useEffect(() => {
+    if (route.project && route.project !== projectId) openProject(route.project);
+  }, [route.project, projectId, openProject]);
 
   // §8 — an old path lands on the new screen rather than the not-found page.
   // Replace rather than push, so Back does not bounce the reader between the
@@ -150,11 +157,20 @@ function Screen() {
     );
   }
 
-  // ── the eleven, and what each one owns (OF-BLD-008 §3) ──────────────
+  // ── the destinations, and what each one owns (OF-BLD-008 §3) ────────
   // Sub-views are paths UNDER their owner, so a URL says where a thing lives:
   // /geneos/hosts/cw15 rather than /organisms/cw15. Nothing was deleted —
   // every screen below is the same file it was, mounted somewhere else.
+  if (route.project && route.project !== projectId) {
+    return (
+      <div className="p-8 text-ink-soft text-body" data-testid="opening-project">
+        Opening project <span className="font-num text-ink">{route.project}</span>…
+      </div>
+    );
+  }
+  if (route.project && !a) return <ProjectHome project={route.project} />;
   if (!a) return <Home />;
+  if (a === 'flowsheets' && b) return <FlowsheetPage recordId={b} />;
   switch (a) {
     case 'intake':
       if (b === 'ingest') return <IntakeIngest />;
@@ -207,6 +223,13 @@ function Screen() {
       // when the reader moves to the other reference lands on the page that
       // asked, never on this one.
       if (b === 'reference') return c ? <ProformaReference key={c} flowsheetId={c} /> : <Proforma />;
+      // Execution prompt §9.1 step 5 — 'studies', 'runs' and 'comparisons' are
+      // reserved too: the project's studies, an engine run by its id, a
+      // comparison by its artifact's id. Keyed by id, so one page opened over
+      // another starts from its own state.
+      if (b === 'studies') return <ProformaStudies />;
+      if (b === 'runs') return c ? <ProformaRun key={c} runId={c} /> : <ProformaStudies />;
+      if (b === 'comparisons') return c ? <ProformaComparison key={c} comparisonId={c} /> : <ProformaStudies />;
       return <Proforma />;
     case 'runbooks':
       // 'protocols' and 'depositions' are reserved second segments. Runbook ids
@@ -217,23 +240,20 @@ function Screen() {
         return c ? <ProtocolDetail protocolId={c} /> : <Protocols />;
       }
       if (b === 'depositions') return c ? <DepositionDetail depositionId={c} /> : <Depositions />;
-      // OF-BLD-014 §9.3 — 'ledger' is reserved too; check:seed refuses a runbook with that id.
+      // OF-BLD-014 §9.3 — 'ledger' is reserved too: a runbook with that id would be unreachable.
       if (b === 'ledger') return <RunbookLedger />;
       return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
-    case 'dominion':
-      if (b === 'molecules' && c) return <MoleculeDetail productId={c} />;
-      return <Dominion />;
     case 'primer':
       // Lesson ids are globally unique, so /primer/l0-1 addresses a lesson on
       // its own. /primer/m0/l0-1 still resolves — an old deep link should not
       // need a redirect when the id it carries is enough. 'path' and
       // 'practice' are reserved before the lesson lookup (OF-BLD-013 §3.3,
-      // §4.3), and check:seed refuses a lesson that takes either as an id.
+      // §4.3), so a lesson that took either as an id would be unreachable.
       if (b === 'path') return <PrimerPath />;
       if (b === 'practice') return <PrimerPractice id={c} />;
       if (b && c) return <PrimerLesson moduleId={b} lessonId={c} />;
       if (b) {
-        const owner = MODULES.find((m) => m.lessons.some((l) => l.id === b));
+        const owner = useStore.getState().modules.find((m) => m.lessons.some((l) => l.id === b));
         if (owner) return <PrimerLesson moduleId={owner.id} lessonId={b} />;
       }
       return <Primer />;
@@ -317,10 +337,11 @@ export default function App() {
   const setUI = useStore((s) => s.setUI);
   const jobs = useStore((s) => s.jobs);
   const activeRunId = useStore((s) => s.activeRunId);
-  const tickJobs = useStore((s) => s.tickJobs);
   const tickTimers = useStore((s) => s.tickTimers);
   const hydrateDurable = useStore((s) => s.hydrateDurable);
   const hydrateOverlay = useStore((s) => s.hydrateOverlay);
+  const loadProjects = useStore((s) => s.loadProjects);
+  const hydrateProjectState = useStore((s) => s.hydrateProjectState);
   const route = useRoute();
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
@@ -336,11 +357,14 @@ export default function App() {
   // Asynchronous and best-effort: if IndexedDB is unavailable the app runs on
   // memory and Settings says so, rather than blocking the screen on storage.
   useEffect(() => {
-    void hydrateDurable();
-    // OF-BLD-012 §2.1 — the service's overlay, applied over the seed when the
-    // service answers. Silent when it does not: the app is then the seed.
-    void hydrateOverlay();
-  }, [hydrateDurable, hydrateOverlay]);
+    // alpha 2.0 (ADR-005) — the projects first, so every later call to the
+    // service names the open one; then the service's overlay, applied when
+    // the service answers and silent when it does not; then, with what this
+    // browser still owes the service read, the open project's rows.
+    const projects = loadProjects();
+    void projects.then(() => hydrateOverlay());
+    void Promise.all([hydrateDurable(), projects]).then(() => hydrateProjectState());
+  }, [hydrateDurable, hydrateOverlay, loadProjects, hydrateProjectState]);
 
   // Theme / density / motion applied at the document root.
   useEffect(() => {
@@ -349,21 +373,20 @@ export default function App() {
     document.documentElement.dataset.reducedMotion = String(ui.reducedMotion);
   }, [ui.theme, ui.density, ui.reducedMotion]);
 
-  // Single animation loop drives job stages and run timers.
+  // Single animation loop drives the run timers.
   useEffect(() => {
     let raf = 0;
     const loop = (now: number) => {
       const dt = now - lastFrame.current;
       lastFrame.current = now;
       if (dt > 0 && dt < 2000) {
-        if (useStore.getState().jobs.some((j) => j.status === 'running')) tickJobs(dt);
         tickTimers(dt);
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [tickJobs, tickTimers]);
+  }, [tickTimers]);
 
   // Warn before losing an active run (§21 no-persistence confusion).
   useEffect(() => {
@@ -501,8 +524,8 @@ export default function App() {
                       {/* §7 — the gloss. Eight invented words with no
                           explanation is friction the names have not earned
                           yet, and this is the cheapest possible fix. */}
-                      {/* Wraps to two lines rather than truncating. Twelve
-                          entries at two lines still fits the shortest rail
+                      {/* Wraps to two lines rather than truncating. Eleven
+                          entries at two lines still fit the shortest rail
                           this ships on. */}
                       <span
                         className={cx(
@@ -618,11 +641,13 @@ export default function App() {
             >
               {ui.theme === 'bench' ? <Sun size={14} /> : <Moon size={14} />}
             </button>
+            <ProjectSwitch />
             <SignedIn />
           </header>
 
           <main id="of-main" className="flex-1 overflow-y-auto of-grid">
             <div className="p-5 max-w-[1600px]">
+              <ProjectNeeded />
               <ScreenBoundary key={route.segments[0] ?? 'home'}>
                 <Screen />
               </ScreenBoundary>

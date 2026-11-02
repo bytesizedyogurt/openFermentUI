@@ -13,9 +13,8 @@
 // below Supervised. `useGateHold` is what Deposition asks before completing.
 import { useMemo, useState } from 'react';
 import { ShieldAlert, ShieldCheck, UserCheck } from 'lucide-react';
-import type { Step } from '@/data/types';
-import { useStore, guildView } from '@/store';
-import { SKILL_BY_ID } from '@/data/skills';
+import type { Skill, Step } from '@/data/types';
+import { useStore, guildView, skillById, useSkillById } from '@/store';
 import {
   competenceOf,
   gateFor,
@@ -29,10 +28,12 @@ import {
 } from '@/engine/competence';
 import { Button, cx } from '@/components/ui';
 
-const names = (ids: string[]) => ids.map((s) => SKILL_BY_ID[s]?.name ?? s).join(', ');
+/** Skill ids in words, by the map given, else by the store's skills as they stand. */
+const names = (ids: string[], byId: Record<string, Skill> = skillById(useStore.getState().skills)) =>
+  ids.map((s) => byId[s]?.name ?? s).join(', ');
 
 /** Why a cosign is asked: each skill named with the state the operator is in on it. */
-function cosignReason(map: StatusMap, personId: string, skills: string[]): string {
+function cosignReason(map: StatusMap, personId: string, skills: string[], byId: Record<string, Skill>): string {
   const by: Record<string, string[]> = {};
   for (const s of skills) {
     const st = statusOf(map, personId, s);
@@ -40,12 +41,13 @@ function cosignReason(map: StatusMap, personId: string, skills: string[]): strin
     (by[why] ??= []).push(s);
   }
   return Object.entries(by)
-    .map(([why, ids]) => `${why} on ${names(ids)}`)
+    .map(([why, ids]) => `${why} on ${names(ids, byId)}`)
     .join('; ');
 }
 
 /** What holds this step in enforce mode, or null. */
 export function useGateHold(runId: string, step: Step | undefined): Hold | null {
+  const SKILL_BY_ID = useSkillById();
   const run = useStore((s) => s.runs[runId]);
   const ledger = useStore((s) => guildView(s));
   return useMemo(() => {
@@ -54,18 +56,19 @@ export function useGateHold(runId: string, step: Step | undefined): Hold | null 
     const named = (id: string | null | undefined) => (id && people.some((p) => p.id === id) ? id : null);
     const map = competenceOf(ledger.evidence, ledger.people, SKILL_BY_ID, localToday());
     return holdFor(step, named(run.operatorId), named(run.cosigned?.[step.id]), map, SKILL_BY_ID, policyOf(ledger), people.length > 0);
-  }, [run, step, ledger]);
+  }, [run, step, ledger, SKILL_BY_ID]);
 }
 
 /** The hold in words, for the button and for a screen reader. */
-export function holdText(hold: Hold): string {
-  const which = names(hold.skills);
+export function holdText(hold: Hold, byId?: Record<string, Skill>): string {
+  const which = names(hold.skills, byId);
   if (hold.kind === 'operator') return `Held: name who is performing this step first (${which} is enforced).`;
   if (hold.kind === 'qualified') return `Held: ${which} needs someone qualified. Hand over to complete it.`;
   return `Held: ${which} needs a cosigner beside the operator. Record one to complete it.`;
 }
 
 export function GuildGate({ runId, step }: { runId: string; step: Step | undefined }) {
+  const SKILL_BY_ID = useSkillById();
   const run = useStore((s) => s.runs[runId]);
   const ledger = useStore((s) => guildView(s));
   const setOperator = useStore((s) => s.setRunOperator);
@@ -136,7 +139,7 @@ export function GuildGate({ runId, step }: { runId: string; step: Step | undefin
         <div className="rounded-card border border-accent/50 bg-accent-wash px-3 py-2 text-reading text-ink flex items-start gap-2">
           <ShieldCheck size={20} className="text-accent shrink-0 mt-[3px]" aria-hidden />
           <span>
-            {operator.name} holds every skill this step needs: {names(step.skills ?? [])}. Completing it records a run alone.
+            {operator.name} holds every skill this step needs: {names(step.skills ?? [], SKILL_BY_ID)}. Completing it records a run alone.
           </span>
         </div>
       )}
@@ -146,7 +149,7 @@ export function GuildGate({ runId, step }: { runId: string; step: Step | undefin
           <div className="text-reading text-ink flex items-start gap-2">
             <UserCheck size={20} className="text-signal-warn shrink-0 mt-[3px]" aria-hidden />
             <span>
-              <strong>Cosign needed.</strong> {operator.name} is {cosignReason(map, operator.id, gate.cosign)}.
+              <strong>Cosign needed.</strong> {operator.name} is {cosignReason(map, operator.id, gate.cosign, SKILL_BY_ID)}.
             </span>
           </div>
           {cosigner ? (
@@ -185,7 +188,7 @@ export function GuildGate({ runId, step }: { runId: string; step: Step | undefin
           {!cosigner && (
             <p className="text-body text-ink">
               {hold?.kind === 'cosigner'
-                ? `The lead set ${names(hold.skills)} to enforce, so this step waits for a cosigner.`
+                ? `The lead set ${names(hold.skills, SKILL_BY_ID)} to enforce, so this step waits for a cosigner.`
                 : `Completing it without one records a deviation on ${operator.name}\u2019s ledger.`}
             </p>
           )}
@@ -197,7 +200,7 @@ export function GuildGate({ runId, step }: { runId: string; step: Step | undefin
           <div className="text-reading text-ink flex items-start gap-2">
             <ShieldAlert size={20} className="text-signal-error shrink-0 mt-[3px]" aria-hidden />
             <span>
-              <strong>Needs a qualified operator.</strong> {operator.name} is below Supervised on {names(gate.blocked)}.
+              <strong>Needs a qualified operator.</strong> {operator.name} is below Supervised on {names(gate.blocked, SKILL_BY_ID)}.
             </span>
           </div>
           <p className="text-body text-ink">
@@ -214,7 +217,7 @@ export function GuildGate({ runId, step }: { runId: string; step: Step | undefin
           )}
           <p className="text-body text-ink">
             {hold?.kind === 'qualified'
-              ? `The lead set ${names(hold.skills)} to enforce, so this step waits for someone qualified to take over.`
+              ? `The lead set ${names(hold.skills, SKILL_BY_ID)} to enforce, so this step waits for someone qualified to take over.`
               : `Completing it anyway records a deviation on ${operator.name}\u2019s ledger.`}
           </p>
         </div>

@@ -51,6 +51,10 @@ allowed = [
   # The Biopython License Agreement: use, copy, modify and distribute for any purpose without fee, keeping the
   # notices (its LICENSE.rst, read 2026-10-21, also offers some files under BSD-3-Clause).
   "LicenseRef-Biopython-License-Agreement",  # biopython, in its License-Expression
+  # Added 2026-10-30 with PostgreSQL (alpha 2.0, ADR-001): SQLAlchemy, alembic and Mako are MIT,
+  # asyncpg Apache-2.0, MarkupSafe BSD-3-Clause, all allowed above; greenlet, under SQLAlchemy's
+  # asyncio layer, joins the two allowed licences it carries.
+  "MIT AND PSF-2.0",              # greenlet
 ]
 
 [accepted.certifi]
@@ -96,15 +100,6 @@ why = "Reads SBML model files for cobra in the geneOS worker process alone; acce
 
 # Model files are data (E.9): read by the geneOS worker, never imported.
 
-[data.RehMBEL1391]
-licence = "GPL-3.0"
-source = "github.com/m-jahn/genome-scale-models, Ralstonia_eutropha/sbml/RehMBEL1391_sbml_L3V1.xml"
-revision = "00c70c5"
-sha256 = "85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89"
-by = "Sean Creighton"
-date = 2026-10-15
-why = "The genome-scale reconstruction of Cupriavidus necator H16, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker; accepted under D4 for this research prototype."
-
 [data.Yeast9]
 licence = "CC-BY-4.0"
 source = "github.com/SysBioChalmers/yeast-GEM, model/yeast-GEM.xml (release v9.1.1)"
@@ -123,26 +118,38 @@ by = "Sean Creighton"
 date = 2026-10-20
 why = "The genome-scale reconstruction of Saccharomyces cerevisiae S288C as BiGG Models serves it, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker for an ethanol ceiling. Sean named it in his instruction of 2026-10-20 for the yeast-ethanol demo. BiGG's terms (bigg.ucsd.edu/license, read 2026-10-20) permit educational, research and non-profit use without fee, require the copyright notice and the paragraphs after it to travel with every copy, and leave commercial use to an agreement with UC San Diego's Technology Transfer and Intellectual Property Services. Not a permissive licence: the file is not committed, and data-sync carries no model file, so no copy leaves the machine that fetched it. Commercial use is a question for Sean before any such use."
 
-[data.iJO1366]
-licence = "as BiGG publishes it; ships inside cobra 0.32.1"
-source = "BiGG Models, bundled with cobra as iJO1366"
-revision = "cobra 0.32.1"
-sha256 = "inside the cobra package"
-by = "Sean Creighton"
-date = 2026-10-15
-why = "The genome-scale E. coli K-12 MG1655 model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use."
-
-[data.e_coli_core]
-licence = "as BiGG publishes it; ships inside cobra 0.32.1"
-source = "BiGG Models, bundled with cobra as textbook"
-revision = "cobra 0.32.1"
-sha256 = "inside the cobra package"
-by = "Sean Creighton"
-date = 2026-10-15
-why = "The 95-reaction E. coli core model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use."
-
 [accepted.pyglet]
 licence = "no licence metadata"
 by = "Sean Creighton"
 date = 2026-10-15
 why = "thermosteam's dependency, pulled in by BioSTEAM in the sim extra and loaded in the Proforma worker; its metadata states no licence, and its repository (github.com/pyglet/pyglet) carries a BSD 3-clause LICENSE, read 2026-10-15."
+
+# Vendored code (alpha 2.0, ADR-003): source copied into the repository
+# unmodified at a pinned commit, with its LICENSE beside it. `pnpm
+# check:licences` holds each entry to its directory: the directory and its
+# LICENSE are there, and the licence is one `allowed` lists.
+
+[vendored.pisces_sff]
+licence = "MIT"
+source = "github.com/sustainability-software-lab/pisces-standard-flowsheet-format, the pisces_sff package (SFF schema 0.2.4)"
+revision = "e236e3250414f45cf9fd7b8b854f1afc67fc2cad"
+schema = "0.2.4"
+path = "core/vendor/pisces_sff"
+left_out = "export/exported_flowsheets/ and export/models/: the reference flowsheets and the model registry are fetched on demand from the same commit by engine/sff.py, each checked against the sha256 in core/openferment_core/engine/sff_library.json"
+why = "The PISCES Standard Flowsheet Format toolkit exports a BioSTEAM system to an SFF file, validates it and scores its completeness; it ships no packaging metadata, so it is vendored (execution prompt of 29 October 2026, §4.3 and §8.3). It runs in the Proforma worker alone."
+
+[vendored.sci_rag_migrations]
+licence = "BSD-3-Clause"
+source = "github.com/sustainability-software-lab/sci-rag-kit, its alembic migrations (Sci RAG Kit 0.5.0)"
+revision = "26b3990c6264b68f29e833e22b04eb323e06e11b"
+path = "core/openferment_core/literature/kit_alembic/versions"
+left_out = "everything but the six migrations: the kit itself is the PyPI package sci-rag-kit 0.5.0 (BSD-3-Clause, held by this ledger like every installed package), and env.py and script.py.mako beside versions/ are openFerment's"
+why = "Sci RAG Kit's wheel carries src/sci_rag alone, and its schema is made by these migrations, run in a schema of its own by `pnpm db:migrate` (execution prompt of 29 October 2026, §8.2; ADR-002)."
+
+[vendored.sci_rag_prompts]
+licence = "BSD-3-Clause"
+source = "github.com/sustainability-software-lab/sci-rag-kit, the prompt templates of its domain pack"
+revision = "26b3990c6264b68f29e833e22b04eb323e06e11b"
+path = "core/openferment_core/literature/domain/prompts"
+left_out = "the kit's own domain.yaml: domain.yaml beside prompts/ is openFerment's, naming the kinds of things bioprocess development reads about"
+why = "Sci RAG Kit loads a domain pack from a directory, its prompts by name (`sci_rag.domain.load_domain`); openFerment's pack keeps the kit's prompts beside its own domain file (ADR-002)."

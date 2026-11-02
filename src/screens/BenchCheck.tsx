@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check as Tick, X } from 'lucide-react';
 import type { Check, CheckResult } from '@/data/types';
 import { useStore } from '@/store';
-import { SKILL_BY_ID } from '@/data/skills';
+import { useSkillById } from '@/store';
 import { Button, cx } from '@/components/ui';
 import { nameOf, useChecks, useGuild, type GuildContext } from '@/components/GuildBits';
 import { isOpen, shownTo } from '@/engine/checks';
@@ -93,6 +93,7 @@ function Shell({ title, sub, onExit, children }: { title: string; sub?: string; 
 }
 
 function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
+  const SKILL_BY_ID = useSkillById();
   const record = useStore((s) => s.checksRecord);
   const setActing = useStore((s) => s.guildSetActing);
   const person = nameOf(ctx, check.personId);

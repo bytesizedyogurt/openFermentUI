@@ -191,7 +191,7 @@ def _record(rid: str, pool: Any) -> dict[str, Any]:
     r = pool.record(rid) if pool is not None else None
     if r is None:
         raise ThermoNotFound(f"no record {rid!r} is in the evidence pool this reads: an ethanol titre extracted from a "
-                             "thread Q paper and anchored to its sentence fills this")
+                             "paper the project holds and anchored to its sentence fills this")
     if r.get("field") != TITRE_FIELD:
         raise ThermoRefused(f"record {rid} is a {r.get('field')}, not an ethanol titre ({TITRE_FIELD}); "
                             f"{BEER} reads a titre")
@@ -324,8 +324,8 @@ _register_lazy()
 
 def props(req: ThermoPropsRequest, pool: Any = None) -> Artifact:
     """Answer the question, or return the answer stored for it. The pool
-    resolves a record id (the endpoint's reads archived programs too, since a
-    person names the record; a tool passes its own)."""
+    resolves a record id (the endpoint reads the whole pool, since a person
+    names the record; a tool passes its own)."""
     from . import artifacts
 
     inputs, records = basis_inputs(req, pool)
@@ -384,8 +384,7 @@ VOLATILITY_WORDS = "thermo volatility 1"
 # The library's own name for each product thermosteam is asked about, by the
 # product id fermOS, geneOS and Proforma use (the shelf's products). A product
 # not named here is missing: its volatility is not computed, and nothing is
-# guessed from its name. The products seed carries no small molecule with a
-# library name yet, and no ethanol entry.
+# guessed from its name.
 CHEMICALS: dict[str, str] = {"ethanol": ETHANOL}
 # An azeotrope is asked with water, the solvent a broth mostly is.
 PARTNER = WATER

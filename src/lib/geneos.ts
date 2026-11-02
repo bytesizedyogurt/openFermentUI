@@ -2,27 +2,27 @@
 //
 // The shelf, and a ceiling, a frontier or a sugar mix for one model. The
 // service computes and keeps each as an artifact; with it down this says so,
-// and nothing stands in for a result (E.2). Shares lib/rag.ts's call, so the
+// and nothing stands in for a result (E.2). Shares lib/http.ts's call, so the
 // two failures are the same two: down, or refused in words.
 import type { ExtractionRecord, FieldId, GeneosModelInfo, GeneosResult, ParameterDef } from '@/data/types';
 import { ONTOLOGY_BY_ID } from '@/data/ontology';
 import { carbonSourceId } from '@/data/vocabulary';
-import { RagDown, RagRefused, call } from './rag';
+import { ServiceDown, ServiceRefused, call } from './http';
 
-export { RagDown as GeneosDown, RagRefused as GeneosRefused };
+export { ServiceDown as GeneosDown, ServiceRefused as GeneosRefused };
 
 const post = <T>(path: string, body: unknown, signal?: AbortSignal) =>
   call<T>(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
 
 export const geneosModels = (signal?: AbortSignal) => call<GeneosModelInfo[]>('/api/geneos/models', { signal });
 
-export const geneosCeiling = (modelId: string, substrate: string, product = 'phb', signal?: AbortSignal) =>
+export const geneosCeiling = (modelId: string, substrate: string, product = 'ethanol', signal?: AbortSignal) =>
   post<GeneosResult>('/api/geneos/ceiling', { modelId, product, substrate }, signal);
 
-export const geneosFrontier = (modelId: string, substrate: string, product = 'phb', signal?: AbortSignal) =>
+export const geneosFrontier = (modelId: string, substrate: string, product = 'ethanol', signal?: AbortSignal) =>
   post<GeneosResult>('/api/geneos/frontier', { modelId, product, substrate }, signal);
 
-export const geneosMix = (modelId: string, a: string, b: string, product = 'phb', signal?: AbortSignal) =>
+export const geneosMix = (modelId: string, a: string, b: string, product = 'ethanol', signal?: AbortSignal) =>
   post<GeneosResult>('/api/geneos/mix', { modelId, product, a, b }, signal);
 
 /** The sugars geneOS's shelf knows, in the order a view offers them. */
@@ -30,12 +30,10 @@ export const SUBSTRATES = ['glucose', 'xylose', 'fructose'] as const;
 
 /**
  * Each product a ceiling is computed for, and the ontology field its reported
- * yields are recorded under: a PHB ceiling is held against PHA yields, an
- * ethanol ceiling against ethanol yields. A product with no entry has no
- * reported yields to draw.
+ * yields are recorded under: an ethanol ceiling is held against ethanol
+ * yields. A product with no entry has no reported yields to draw.
  */
 export const YIELD_FIELD: Record<string, FieldId> = {
-  phb: 'pha_yield_substrate',
   ethanol: 'ethanol_yield_substrate',
 };
 
@@ -43,16 +41,15 @@ export const YIELD_FIELD: Record<string, FieldId> = {
 export interface ProductWords {
   /** The picker's option. */
   option: string;
-  /** In a sentence: "How much PHB…", "How much ethanol…". */
+  /** In a sentence: "How much ethanol…". */
   short: string;
   /** The ceiling's quantity, on an axis and in a table. */
   quantity: string;
-  /** What the drawn records are, singular: "PHA yield", "ethanol yield". */
+  /** What the drawn records are, singular: "ethanol yield". */
   reported: string;
 }
 
 export const PRODUCT_WORDS: Record<string, ProductWords> = {
-  phb: { option: 'PHB (poly-3-hydroxybutyrate)', short: 'PHB', quantity: 'PHB yield on substrate', reported: 'PHA yield' },
   ethanol: { option: 'Ethanol', short: 'ethanol', quantity: 'Ethanol yield on substrate', reported: 'ethanol yield' },
 };
 
@@ -66,9 +63,9 @@ export function yieldFieldKnown(product: string): boolean {
   return !!field && !!(ONTOLOGY_BY_ID as Record<string, ParameterDef | undefined>)[field];
 }
 
-/** The product a ceiling's basis names, `phb` where it names none. */
+/** The product a ceiling's basis names, `ethanol` where it names none (the service's default). */
 export const productOfBasis = (inputs: { name: string; value: unknown }[]): string =>
-  String(inputs.find((i) => i.name === 'product')?.value ?? 'phb');
+  String(inputs.find((i) => i.name === 'product')?.value ?? 'ethanol');
 
 /** A frontier's or a mix's points, as the worker returns them. */
 export interface FrontierPointOut {
@@ -94,7 +91,7 @@ export interface MixPointOut {
 export function yieldsOnSugar(
   records: ExtractionRecord[],
   sugar: string,
-  product = 'phb',
+  product = 'ethanol',
 ): { on: ExtractionRecord[]; elsewhere: number } {
   if (!yieldFieldKnown(product)) return { on: [], elsewhere: 0 };
   const field = YIELD_FIELD[product];

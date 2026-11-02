@@ -1,14 +1,18 @@
-"""BioRepo keeps what was computed, and can replay it (OF-BLD-014 §3.2, E.5)."""
+"""BioRepo keeps what was computed, and can replay it (OF-BLD-014 §3.2, E.5).
+
+The store is the `artifacts` table, one row per artifact and project
+(ADR-001); each test's rows are rolled back when it ends.
+"""
 from __future__ import annotations
 
-import json
 import threading
 
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, intake
-from openferment_core.models import BasisInput, BasisSource
+from openferment_core import artifacts, projects
+from openferment_core.models import BasisInput, BasisSource, ProjectCreate
+from standins import plant_damaged
 
 CALLS: list[int] = []
 
@@ -19,12 +23,11 @@ def _count(inputs, seed):
 
 
 @pytest.fixture(autouse=True)
-def _store(monkeypatch, tmp_path):
-    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+def _store():
     saved = dict(artifacts._REGISTRY)
     artifacts.register("t_count", "v1", _count)
     CALLS.clear()
-    yield tmp_path
+    yield
     artifacts._REGISTRY.clear()
     artifacts._REGISTRY.update(saved)
 
@@ -33,24 +36,25 @@ def _in(name: str, kind: str = "convention", id: str | None = None) -> BasisInpu
     return BasisInput(name=name, value=name, unit="", source=BasisSource(kind=kind, id=id, note="a convention"))
 
 
-def _files(root):
-    return sorted(p.name for p in (root / "artifacts").glob("*.json"))
+def _kept() -> list[str]:
+    """The ids the current project's store holds."""
+    return sorted(a.id for a in artifacts.all_artifacts())
 
 
-def test_same_inputs_give_the_same_id_and_one_file(_store):
+def test_same_inputs_give_the_same_id_and_one_row():
     a = artifacts.compute("t_count", [_in("x"), _in("y")])
     b = artifacts.compute("t_count", [_in("x"), _in("y")])
     assert a.id == b.id and len(a.id) == 16
-    assert _files(_store) == [f"{a.id}.json"]
+    assert _kept() == [a.id] and artifacts.count() == 1
     assert len(CALLS) == 1, "the second call returned the stored artifact and computed nothing"
     assert b == a
 
 
-def test_a_changed_input_gives_a_new_id(_store):
+def test_a_changed_input_gives_a_new_id():
     a = artifacts.compute("t_count", [_in("x")])
     b = artifacts.compute("t_count", [_in("z")])
     assert a.id != b.id
-    assert len(_files(_store)) == 2
+    assert len(_kept()) == 2
 
 
 def test_a_changed_version_or_seed_gives_a_new_id():
@@ -68,12 +72,12 @@ def test_the_artifact_carries_its_provenance_from_its_inputs():
     c = artifacts.compute("t_count", [_in("a", "artifact", b.id)])
     assert c.provenance == "computed"
     d = artifacts.compute("t_count", [_in("guess", "assumption")])
-    assert d.provenance == "demo"
+    assert d.provenance == "assumed"
 
 
-def test_keep_false_writes_nothing(_store):
+def test_keep_false_writes_nothing():
     a = artifacts.compute("t_count", [_in("x")], keep=False)
-    assert a.id and not (_store / "artifacts").exists()
+    assert a.id and _kept() == []
 
 
 def test_replay_of_an_unchanged_tool_says_identical():
@@ -82,9 +86,9 @@ def test_replay_of_an_unchanged_tool_says_identical():
     assert r.identical and r.differences == [] and r.storedHash == r.replayedHash == a.outputHash
 
 
-def test_replay_after_the_function_changes_says_what_differs(_store):
+def test_replay_after_the_function_changes_says_what_differs():
     a = artifacts.compute("t_count", [_in("x"), _in("y")])
-    stored = (_store / "artifacts" / f"{a.id}.json").read_text(encoding="utf-8")
+    stored = artifacts.get(a.id)
 
     def changed(inputs, seed):
         return {"label": "count", "value": len(inputs) + 1, "unit": "inputs", "names": [i.name for i in inputs]}
@@ -94,7 +98,7 @@ def test_replay_after_the_function_changes_says_what_differs(_store):
     assert not r.identical
     assert [(d.path, d.stored, d.replayed) for d in r.differences] == [("value", 2, 3)]
     # A replay never rewrites what was stored.
-    assert (_store / "artifacts" / f"{a.id}.json").read_text(encoding="utf-8") == stored
+    assert artifacts.get(a.id) == stored
 
 
 def test_replay_names_a_changed_version():
@@ -113,7 +117,10 @@ def test_replay_of_an_unregistered_tool_is_refused():
         artifacts.replay(a.id)
 
 
-def test_a_concurrent_double_write_leaves_one_valid_file(_store):
+def test_a_concurrent_double_write_leaves_one_valid_row():
+    """Eight threads compute the same thing at once; the first to keep it
+    wins and every one returns its row. (Each thread finds the test project
+    through OPENFERMENT_PROJECT, as a command does.)"""
     barrier = threading.Barrier(8)
     results = []
 
@@ -132,15 +139,12 @@ def test_a_concurrent_double_write_leaves_one_valid_file(_store):
     for t in threads:
         t.join()
     assert len({r.id for r in results}) == 1
-    files = list((_store / "artifacts").iterdir())
-    assert [p.name for p in files if p.suffix == ".json"] == [f"{results[0].id}.json"]
-    assert not [p for p in files if p.name.endswith(".tmp")]
-    stored = json.loads((_store / "artifacts" / f"{results[0].id}.json").read_text(encoding="utf-8"))
-    assert stored["id"] == results[0].id
+    assert _kept() == [results[0].id]
+    assert artifacts.get(results[0].id) == results[0]
     assert len({r.createdAt for r in results}) == 1, "every caller got the one stored artifact"
 
 
-def test_an_id_that_is_not_hex_names_no_file():
+def test_an_id_that_is_not_hex_names_no_artifact():
     for bad in ("../../x", "ABCDEF0123456789", "0123", "0123456789abcdef.json"):
         with pytest.raises(artifacts.ArtifactNotFound):
             artifacts.get(bad)
@@ -152,10 +156,29 @@ def test_a_tool_must_return_json():
         artifacts.compute("t_bad", [_in("x")])
 
 
-def test_all_artifacts_skips_a_bad_file_and_lists_newest_first(_store):
+def test_all_artifacts_skips_a_damaged_row_and_lists_newest_first():
     a = artifacts.compute("t_count", [_in("x")])
-    (_store / "artifacts" / "0000000000000000.json").write_text("not json", encoding="utf-8")
+    plant_damaged("0" * 16)
     assert [x.id for x in artifacts.all_artifacts()] == [a.id]
+
+
+def test_a_damaged_row_is_refused_in_words_naming_it():
+    plant_damaged("0" * 16)
+    with pytest.raises(artifacts.ArtifactDamaged, match=f"artifact {'0' * 16} is damaged on disk"):
+        artifacts.get("0" * 16)
+
+
+def test_an_artifact_is_kept_in_its_project_and_read_in_no_other():
+    other = projects.create(ProjectCreate(name="Other project", by="Ada Moreno"))
+    with projects.using(other.id):
+        theirs = artifacts.compute("t_count", [_in("x")])
+        assert [a.id for a in artifacts.all_artifacts()] == [theirs.id]
+    assert _kept() == []
+    with pytest.raises(artifacts.ArtifactNotFound):
+        artifacts.get(theirs.id)
+    # The same computation here is the same id, kept again in this project.
+    mine = artifacts.compute("t_count", [_in("x")])
+    assert mine.id == theirs.id and _kept() == [mine.id] and artifacts.count() == 2
 
 
 # ── the endpoints ─────────────────────────────────────────────────────

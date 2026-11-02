@@ -10,28 +10,41 @@ dependencies = [
     "pydantic>=2.9",
     "rank-bm25>=0.2.2",
     "python-dotenv>=1.0",
-    # OF-BLD-012 §5.1 — Intake fetches from Europe PMC. Was a dev-only
-    # dependency for FastAPI's test client; the service itself needs it now.
+    # OF-BLD-012 §5.1 — Intake's collectors fetch from Europe PMC, OSTI and SGD.
     "httpx>=0.27",
-    # Thread Q — Intake reads the text layer of an OSTI report's PDF, one
-    # section per page. Pure Python; `pnpm intake:fetch` runs without extras.
+    # Intake reads the text layer of a report's PDF (OSTI's), one section per
+    # page. Pure Python.
     "pypdf>=5",
     # OF-BLD-020 §7.1 — a protein product's molecular weight, isoelectric
     # point, extinction coefficients and GRAVY from its sequence, through
     # Biopython's ProtParam (protparam.py). Imported by the service itself,
     # not a worker.
     "biopython>=1.88",
+    # alpha 2.0 — the record fields and the vocabulary are YAML under
+    # openferment_core/schema/, read by units.py and validate.py.
+    "pyyaml>=6",
+    # alpha 2.0 (ADR-001) — PostgreSQL is the one store: SQLAlchemy 2 async
+    # over asyncpg, the driver Sci RAG Kit uses, and alembic for our schema.
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29",
+    "alembic>=1.13",
+    # alpha 2.0 (ADR-002) — Intake takes an uploaded file (FastAPI's forms).
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3"]
-# OF-BLD-014 §4.2 — the meaning lane: passage vectors, computed on this machine.
-rag = ["fastembed==0.9.0"]
-# OF-BLD-014 §6.2 — flux balance analysis, in the geneOS worker alone; scipy
-# also serves fermOS's fits (§7.2).
-# OF-BLD-014 §10.1 — the MCP server that opens the tool registry to outside assistants.
+# alpha 2.0 (ADR-002) — the literature layer: Sci RAG Kit as a library, with
+# passage vectors computed on this machine by FastEmbed.
+lit = ["sci-rag-kit==0.5.0", "fastembed==0.9.0"]
+# OF-BLD-014 §10.1 — the MCP servers that open the tool registry and the kit to
+# outside assistants (.mcp.json).
 agent = ["mcp>=2.3,<3"]
-sim = ["cobra==0.32.1", "scipy", "biosteam==2.54.0", "biorefineries==2.35.1"]
+# The workers: flux balance analysis in the geneOS worker (cobra; scipy also
+# serves fermOS's fits), BioSTEAM and its library in the Proforma worker, and
+# the vendored SFF toolkit (core/vendor/pisces_sff/, ADR-003) beside it, which
+# needs jsonschema and pyyaml (pyyaml is also a base dependency).
+sim = ["cobra==0.32.1", "scipy", "biosteam==2.54.0", "biorefineries==2.35.1", "jsonschema>=4.23", "pyyaml>=6"]
 
 [build-system]
 requires = ["hatchling"]
@@ -53,4 +66,8 @@ markers = [
     "sim: starts the BioSTEAM worker (the sim extra)",
     # §8.6 — the published benchmark and other runs too long for verify.
     "slow: a simulation run too long for verify (pnpm test:slow)",
+    # alpha 2.0 (ADR-002) — Sci RAG Kit with FastEmbed's model, as the service
+    # runs it: the model file comes from Hugging Face the first time and is
+    # cached after. `pnpm test:lit` runs these in verify; test:core leaves them out.
+    "lit: embeds with FastEmbed's model (the lit extra; the model file cached once)",
 ]

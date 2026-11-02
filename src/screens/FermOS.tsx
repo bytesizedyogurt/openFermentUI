@@ -11,8 +11,8 @@
 // Fits tab — and keeps each fit as an artifact with the deposition as its
 // source (§7.2); a forecast is a band drawn from one fit's covariance (§7.3).
 // Simulate (OF-BLD-020 §3.3, FermOSSimulate.tsx) integrates a model family
-// (batch, fed-batch, chemostat; storage with the PHA program; light as a
-// socket that refuses) from its parameters. Vessel (OF-BLD-020 §4.2,
+// (batch, fed-batch, chemostat; light as a socket that refuses) from its
+// parameters. Vessel (OF-BLD-020 §4.2,
 // FermOSVessel.tsx) is the vessel BioSTEAM sizes for a kept simulation, with
 // the oxygen balance, so transport and scale are live. Fits is the default
 // view; Simulate, Vessel and Forecast sit beside it, in the order a run is
@@ -28,15 +28,14 @@
 // person's assumption, or from a stated convention, each labelled with its
 // source in the parameter panel and in the artifact's basis; its provenance is
 // basis_provenance over all of them, so a simulation from unverified records
-// shows as unverified and one with any typed value as modeled (demo). A
+// shows as unverified and one with any typed value as assumed. A
 // simulation never pretends to be a measurement: its curves are computed
 // lines, and its card says what it was built from. With no deposition to fit,
 // the Fits tab names the readings to deposit and where (OF-BLD-016 §3.2: the
-// invented sample run left the screen; demo.py still writes it for the service
-// double).
+// invented sample run left the screen).
 //
 // PROPERTIES OF A BROTH (OF-BLD-019 §4.2, D9). Below the fits, a person picks
-// an ethanol titre record of the active program, and thermosteam (BioSTEAM's
+// an ethanol titre record, and thermosteam (BioSTEAM's
 // property engine, in the Proforma worker) gives the density, heat capacity
 // and boiling point of water and ethanol at that titre (the preset
 // `beer-at-titre-of`). A titre is a measured value, not a kinetic parameter:
@@ -45,15 +44,14 @@
 // record on file the card says what would fill it.
 //
 // RESERVED SEGMENTS. `simulate`, `vessel` and `forecast` are views under
-// /fermos (nav.ts, check-seed's RESERVED); Simulate's "Design the vessel" links
+// /fermos (nav.ts); Simulate's "Design the vessel" links
 // to `/fermos/vessel?simulation=`, which FermOSVessel reads as its source.
 //
 // This screen may be extended. Keep this header's reasoning with it.
 import { useEffect, useMemo, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
 import type { FermosFitResponse, FermosSeries, FitParam, UnidentifiedReason } from '@/data/types';
-import { useProgramFilter, useStore } from '@/store';
-import { ArchivedBanner } from '@/components/ArchivedBanner';
+import { useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState, PageHeader, SectionTitle } from '@/components/ui';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
@@ -144,15 +142,10 @@ function Fits() {
   const runbooks = useStore((s) => s.runbooks);
   const keepFit = useStore((s) => s.keepFermosFit);
   const route = useRoute();
-  // The runs Runbooks → Depositions shows (OF-BLD-016 §2): a deposition of an
-  // archived program's runbook or protocol waits for the program switch.
-  const shows = useProgramFilter();
+  // The runs Runbooks → Depositions shows (OF-BLD-016 §2) whose readings can be fitted.
   const qualifying = useMemo(
-    () =>
-      depositions.filter(
-        (d) => shows('deposition', d.id) && qualifies(d, runbooks.find((r) => r.id === d.runbookId)),
-      ),
-    [depositions, runbooks, shows],
+    () => depositions.filter((d) => qualifies(d, runbooks.find((r) => r.id === d.runbookId))),
+    [depositions, runbooks],
   );
   const options = qualifying.map((d) => d.id);
   const chosen = route.query.get('run') ?? options[0] ?? null;
@@ -229,7 +222,6 @@ function Fits() {
         </label>
         {busy && <span className="text-caption text-ink-soft">Fitting…</span>}
       </div>
-      {chosen && !options.includes(chosen) && <ArchivedBanner kind="deposition" id={chosen} />}
 
       {options.length === 0 && (
         <div data-testid="fermos-empty">
@@ -319,13 +311,9 @@ function Fits() {
 
 function BrothProperties() {
   const records = useStore((s) => s.records);
-  const shows = useProgramFilter();
   const titres = useMemo(
-    () =>
-      records.filter(
-        (r) => r.field === TITRE_FIELD && typeof r.value === 'number' && r.status !== 'rejected' && shows('record', r.id),
-      ),
-    [records, shows],
+    () => records.filter((r) => r.field === TITRE_FIELD && typeof r.value === 'number' && r.status !== 'rejected'),
+    [records],
   );
   const [picked, setPicked] = useState('');
   const chosen = titres.find((r) => r.id === picked) ?? null;
@@ -357,7 +345,7 @@ function BrothProperties() {
       </p>
       {titres.length === 0 ? (
         <p className="text-body text-ink-soft" data-testid="broth-properties-empty">
-          No ethanol titre record of an active program is on file yet. A titre extracted from a thread Q paper in{' '}
+          No ethanol titre record is on file yet. A titre extracted from a paper in{' '}
           <a href={href('/intake')} className="text-accent hover:underline">
             Intake
           </a>

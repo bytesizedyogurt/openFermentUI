@@ -1,18 +1,13 @@
 // Module map (OF-DES-001 §8.14).
 //
-// PROGRAMS (OF-BLD-016 §2.2). The modules, their lessons and the lessons-
-// complete count read through the store's program filter: a module or lesson
-// in an archived program leaves the map while the switch is off (the casein
-// primer, modules 0 to 5), and its link still opens the lesson under the
-// banner. With the switch on, the map is exactly what it was.
-import { useMemo } from 'react';
+// The modules, their lessons and the lessons-complete count are the store's.
+// No module ships with the app (alpha 2.0, ADR-010): until the lab adds one,
+// the map says so.
 import { BookOpen, Check, Clock, Lock } from 'lucide-react';
-import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { programOf, useProgramFilter, useStore } from '@/store';
+import { useSkillById, useStore } from '@/store';
 import { PageHeader, Card, EmptyState, LinkButton, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { PRIMER_TABS } from '@/data/tabs';
-import { SKILL_BY_ID } from '@/data/skills';
 
 /** Completion ring — session-scoped progress, no persistence (§9.5). */
 function Ring({ done, total }: { done: number; total: number }) {
@@ -42,27 +37,9 @@ function Ring({ done, total }: { done: number; total: number }) {
 }
 
 export default function Primer() {
-  const allModules = useStore((s) => s.modules);
+  const SKILL_BY_ID = useSkillById();
+  const modules = useStore((s) => s.modules);
   const progress = useStore((s) => s.learnProgress);
-  const shows = useProgramFilter();
-  const modules = useMemo(
-    () =>
-      allModules
-        .filter((m) => shows('module', m.id))
-        .map((m) => {
-          const lessons = m.lessons.filter((l) => shows('lesson', l.id));
-          return lessons.length === m.lessons.length ? m : { ...m, lessons };
-        }),
-    [allModules, shows],
-  );
-  const hiddenPrograms = useMemo(() => {
-    const ids = new Set(
-      allModules
-        .filter((m) => !shows('module', m.id))
-        .map((m) => programOf('module', m.id, { modules: allModules })),
-    );
-    return PROGRAMS.filter((p) => ids.has(p.id));
-  }, [allModules, shows]);
 
   const totalDone = modules.reduce(
     (n, m) => n + m.lessons.filter((l) => progress[l.id]).length,
@@ -85,19 +62,17 @@ export default function Primer() {
       <OwnerTabs tabs={PRIMER_TABS} />
 
       <div className="max-w-[860px] space-y-4">
-        {modules.length === 0 && hiddenPrograms.length > 0 && (
+        {modules.length === 0 && (
           <Card>
             <EmptyState
               icon={<BookOpen size={22} />}
-              title="Every module here is in an archived program"
+              title="No modules yet"
               body={
-                <span data-testid="hidden-by-archive">
-                  The modules in this session belong to {hiddenPrograms.map((p) => p.name).join(' and ')}, and{' '}
-                  {hiddenPrograms.length === 1 ? 'that program is archived' : 'those programs are archived'}, so the
-                  map hides them. Settings → Programs shows archived programs again; a link to a lesson still opens it.
+                <span data-testid="primer-empty">
+                  No module ships with the app. A module the lab adds appears here, with its lessons, the skills
+                  each counts toward and its checkpoints.
                 </span>
               }
-              action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
             />
           </Card>
         )}

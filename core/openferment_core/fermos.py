@@ -2,11 +2,11 @@
 from its sources (OF-BLD-020 §3.1).
 
 THE RULE, AS OF-BLD-020 D1 AMENDS IT. A *fit* takes only a deposition's
-measured series: the browser sends a deposition's own readings, the way
+measured series: the page sends a deposition's own readings, the way
 Practice sends runs, and the service fits them and keeps the fit as an
-artifact. Depositions live in the browser's Durable tier, which the service
-cannot see, so it takes the readings as sent and says so in each fit's basis
-(§7.R). A *simulation* (kinetics.py's model families) may take its
+artifact. The project keeps its depositions as rows (project_state.py); a
+fit takes the readings the page sends, and each fit's basis says so (§7.R;
+its note is hashed into the fit's id, and keeps its alpha 1.0 words). A *simulation* (kinetics.py's model families) may take its
 parameters from records through the aggregate gate, a fit or forecast, a
 kept simulation, a named person's assumption or a stated convention, each
 named in its basis, and its provenance is basis_provenance over them
@@ -68,24 +68,23 @@ by its `sourceRule`, in order: the parameter of the fit a person chose (a
 what it carries: μ, α, β, the start values, and Yp/s through its forecast as
 `proforma.fit_info` reads it), with its interval and whether its run
 identified it; the records of each `record:<field>` entry in the evidence
-pool, on the program's papers, through Proforma's aggregate gate and its
-statistic (binding.py, moved there from proforma.py) and units.py into the
-spec's unit, held to the strain chosen (its aliases) or to every strain of
-the program's organism, and to the sugar (kinetics.CARBON_RULE says which
-fields are held otherwise, kinetics.STRAIN_FREE which no strain sets, and
-kinetics.PRODUCT_OWN which are one product's own); a kept simulation's value
-when the request starts from one; then a named person's override, which wins
-over all of them (params.resolve); then the spec's stated convention. A
-parameter with none waits, and a run refuses naming it and the field that
-would bind it. Every record that is left out is counted and said: another
-strain or organism, no carbon source or another one, a unit units.py cannot
-convert.
+pool, through Proforma's aggregate gate and its statistic (binding.py, moved
+there from proforma.py) and units.py into the spec's unit, held to the strain
+chosen (its aliases) or to every strain, and to the sugar
+(kinetics.CARBON_RULE says which fields are held otherwise,
+kinetics.STRAIN_FREE which no strain sets, and kinetics.PRODUCT_OWN which are
+one product's own); a kept simulation's value when the request starts from
+one; then a named person's override, which wins over all of them
+(params.resolve); then the spec's stated convention. A parameter with none
+waits, and a run refuses naming it and the field that would bind it. Every
+record that is left out is counted and said: another strain or none, no
+carbon source or another one, a unit units.py cannot convert.
 
 NAMED RECORDS (OF-BLD-020 §3.4, D13). A request may bind a parameter to
 exactly the records it names (`recordsByParam`, spec key to record ids):
 what Postdoc's `fermos_simulate` sends, ids and never values. Each must be
-in the evidence pool the switch shows, a record of a field the spec binds
-from, through the aggregate gate, and convert into the spec's unit; one
+in the evidence pool, a record of a field the spec binds from, through the
+aggregate gate, and convert into the spec's unit; one
 that is not refuses the request, naming it and why. They bind ahead of a fit
 or a kept simulation (a person's override still wins), their value is the
 same statistic, the basis names each as a `record` input, and `<key> origin`
@@ -115,8 +114,8 @@ from scipy.optimize import least_squares, lsq_linear
 from scipy.stats import t as student_t
 
 from . import artifacts, binding, kinetics, params, units
+from .basis import ASSUMED_KINDS
 from .models import (
-    Band,
     BasisInput,
     BasisSource,
     Evidence,
@@ -126,7 +125,6 @@ from .models import (
     FermosHarvest,
     FermosPoint,
     ForecastResult,
-    Interval,
     MassBalance,
     Override,
     OxygenUptake,
@@ -404,8 +402,8 @@ artifacts.register(KINETIC, KINETIC_VERSION, _run_kinetic)
 
 G_L = kinetics.G_L
 # The fit families: the logistic, and the kinetics families a deposition's
-# series can carry. A fed-batch, a chemostat and a storage run need what a
-# deposition does not record (the feed, the dilution, the second nutrient).
+# series can carry. A fed-batch and a chemostat run need what a deposition
+# does not record (the feed, the dilution).
 FIT_FAMILIES = (LOGISTIC, "batch_v1")
 STATE_OF_ROLE = {"biomass": "X", "substrate": "S", "product": "P"}
 # What one batch's readings cannot pin, held in a family fit, each a
@@ -643,8 +641,8 @@ def fit(deposition_id: str, series: list[FermosSeries], *, sample: bool = False,
         if known is not None and known.socket:
             raise FitRefused(known.refusal())
         raise FitRefused(f"a run's series fit {' or '.join(FIT_FAMILIES)}; {family!r} is not one"
-                         + (": a fed-batch, a chemostat and a storage run need what a deposition does not record "
-                            "(the feed, the dilution, the second nutrient)" if known is not None else ""))
+                         + (": a fed-batch and a chemostat run need what a deposition does not record "
+                            "(the feed, the dilution)" if known is not None else ""))
     series = [s.model_copy(update={"points": sorted(s.points, key=lambda p: p.t)}) for s in series]
     bio = _role(series, "biomass")
     if bio is None and family == LOGISTIC:
@@ -833,7 +831,7 @@ def _forecast_inputs(fit_artifact: str | None, fit_inline: KineticFit | None, st
                                  source=BasisSource(kind="assumption", by=changed_by.strip(), note=f"{key} set on screen")))
     if duration_h is not None:
         # A length a person typed is that person's assumption, named, and
-        # makes the forecast demo (OF-BLD-020 §3.R, findings 7 and 11; D3,
+        # makes the forecast assumed (OF-BLD-020 §3.R, findings 7 and 11; D3,
         # E.2‴): the person who set it (`duration_by`), else the one who
         # changed a start value. A length nobody is named for is the caller's
         # convention, as asked (a test, a stand-in, a fixed check).
@@ -1084,29 +1082,19 @@ def family_scope(family_id: str) -> str:
 def family_info(family_id: str) -> FamilyInfo:
     fam = kinetics.family(family_id)
     return FamilyInfo(id=fam.id, title=fam.title, what=fam.what, equations=fam.equations, states=list(fam.states),
-                      stateUnits=fam.state_units, socket=fam.socket, specs=fam.specs(), groups=fam.groups(),
-                      program=fam.program)
+                      stateUnits=fam.state_units, socket=fam.socket, specs=fam.specs(), groups=fam.groups())
 
 
-def families(include_archived: bool = False) -> list[FamilyInfo]:
-    """Every model family, a family of an archived program (storage_v1,
-    PHA's) left out unless asked; GET /api/fermos/families/{id} serves any."""
-    from . import programs
-
-    def hidden(program: str | None) -> bool:
-        try:
-            return programs.hides(program, include_archived)
-        except FileNotFoundError:  # no corpus exported here: nothing is known to be archived
-            return False
-
-    return [family_info(f) for f, fam in kinetics.FAMILIES.items() if not hidden(fam.program)]
+def families() -> list[FamilyInfo]:
+    """Every model family; GET /api/fermos/families/{id} serves one."""
+    return [family_info(f) for f in kinetics.FAMILIES]
 
 
 def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
     """The `fermos-family` scope (`fermos:family:<id>`): the family's specs,
     bound as a simulation binds them (bind_parameters) from the request's
     strain, product, sugar, fit, kept simulation and run-length preset over
-    the evidence pool the program switch shows; a person's overrides lie on
+    the evidence pool; a person's overrides lie on
     them (params.resolve), and a person's X0 rescales a gauged fit's Yx/s,
     α and β here as in the run (§3.R), so the panel shows what runs."""
     (fid,) = ids
@@ -1116,10 +1104,10 @@ def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Pr
     sim = SimulationRequest(family=fid, strain=req.strain, product=req.product, sugar=req.sugar,
                             fitArtifact=req.fit, startFrom=req.startFrom or "records",
                             durationPreset=req.durationPreset or UNTIL_RUN_OUT_PRESET,
-                            includeArchived=req.includeArchived, overrides=list(req.overrides))
+                            overrides=list(req.overrides))
     try:
         _check_request(sim)
-        got = _bound(fam, sim, _load_pool(sim.includeArchived))
+        got = _bound(fam, sim, _load_pool())
     except SimulationRefused as e:
         raise params.ParamRefused(str(e)) from None
     return params.Provided(title=f"{fam.title} ({fam.id})", specs=got.specs, sources=got.sources, notes=got.notes,
@@ -1161,7 +1149,7 @@ FORECAST_KEYS = (("x0", "X0", "biomass"), ("s0", "S0", "substrate"), ("p0", "P0"
 FORECAST_SCOPE_NOTES = [
     "A forecast starts from the fitted run's own values and runs its own length unless a person names others here: "
     "a changed start value or length is that person's assumption, named in the forecast's basis, and the forecast it "
-    "makes is demo.",
+    "makes is assumed.",
     "A low and a high typed here are not read: a forecast starts from one value, and its band comes from the fit.",
 ]
 
@@ -1408,17 +1396,17 @@ NAMED_NOTE = ("where the value came from (OF-BLD-020 §3.4): the records the req
               "program filter chose them")
 
 
-def _load_pool(include_archived: bool) -> Any:
-    """The evidence pool the switch shows, or an empty one when no corpus is
-    exported here (nothing is known, so nothing binds)."""
+def _load_pool() -> Any:
+    """The evidence pool, or an empty one when none can be read here
+    (nothing is known, so nothing binds)."""
     from types import SimpleNamespace
 
     from . import evidence_pool
 
     try:
-        return evidence_pool.load(include_archived=include_archived)
+        return evidence_pool.load()
     except FileNotFoundError:
-        return SimpleNamespace(records=[], records_by_id={}, hidden={})
+        return SimpleNamespace(records=[], records_by_id={})
 
 
 def _sugars() -> set[str]:
@@ -1439,70 +1427,24 @@ def _g(x: float) -> str:
 
 
 class _Context:
-    """Who and what a binding is for: the program whose papers bind, its one
-    species, the strain chosen or none, the sugar, the product, and the
-    words that say each."""
+    """Who and what a binding is for: the strain chosen or none, the sugar,
+    the product, and the words that say each. Every record the evidence pool
+    holds may bind."""
 
     def __init__(self, fam: kinetics.Family, req: SimulationRequest) -> None:
-        from . import module_stores, programs, proforma
+        from . import module_stores, proforma
 
-        self.labels, species_of_program = proforma._strain_labels()
+        self.labels, _ = proforma._strain_labels()
         self.strain, self.sugar, self.product = req.strain, req.sugar, req.product
-        self.include_archived = req.includeArchived
-        hosts: dict[str, str | None] = {}
-        try:
-            hosts = {h["id"]: h.get("program") for h in module_stores._projection()["geneos"]["hosts"] if h.get("id")}
-        except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
-            pass
+        hosts = [h["id"] for h in module_stores._projection()["geneos"]["hosts"] if h.get("id")]
         if self.strain and hosts and self.strain not in hosts:
             raise SimulationRefused(f"there is no catalogued strain {self.strain}: a strain is named by its id in "
-                                    f"geneOS's hosts, such as {', '.join(sorted(k for k, v in hosts.items() if v)[:4])}")
-        flowsheet_programs: dict[str, str | None] = {}
-        from .flowsheets import shelf
-
-        for fid, made in proforma.PRODUCTS.items():
-            if fid in shelf.SHELF:
-                flowsheet_programs[made] = shelf.SHELF[fid].program
-        try:
-            active = [p.id for p in programs.active_programs()]
-        except FileNotFoundError:
-            active = []
-        if self.strain and hosts.get(self.strain):
-            self.program, why = hosts[self.strain], "the strain's program"
-        elif fam.program:
-            self.program, why = fam.program, "the family's program"
-        elif self.product and flowsheet_programs.get(self.product):
-            self.program, why = flowsheet_programs[self.product], f"the program whose flowsheet makes {self.product}"
-        elif len(active) == 1:
-            self.program, why = active[0], "the one active program"
-        else:
-            self.program, why = None, "no one program"
-        held = None
-        try:
-            held = programs.program_by_id(self.program) if self.program else None
-        except FileNotFoundError:
-            pass
-        self.program_name = held.name if held else (self.program or "")
-        self.program_words = (f"the {self.program_name} program's papers ({why})" if self.program
-                              else "every paper the evidence pool holds (no one program is named: no strain of one, "
-                                   "no family of one, and not one active program)")
-        self.species = species_of_program.get(self.program or "")
+                                    f"geneOS's hosts, such as {', '.join(sorted(hosts)[:4])}")
+        # Every record the pool holds may bind; projects scope the pool from
+        # alpha 2.0 stage 2 on (ADR-005).
+        self.pool_words = "every paper the evidence pool holds"
         self.strain_label = self.labels.get(self.strain or "", self.strain or "")
-        self.organism_words = (
-            f"every strain of the {self.program_name} program's organism, {self.species[:1].upper() + self.species[1:]}"
-            if self.species else f"every strain on {self.program_words}")
-
-    def on_program(self, r: dict[str, Any]) -> bool:
-        return binding.in_program(str(r.get("paperId") or ""), self.program) if self.program else True
-
-    def species_of(self, r: dict[str, Any]) -> str | None:
-        """A record's species as the ceiling check reads it: its strain's,
-        else what its paper's words name; None when nothing can be read."""
-        from . import module_stores
-
-        if r.get("strainId"):
-            return module_stores.species_of(self.labels.get(str(r["strainId"]), "")) or None
-        return module_stores.species_of(r.get("organismText") or "")
+        self.organism_words = f"every strain on {self.pool_words}"
 
     def of_strain(self, r: dict[str, Any]) -> bool:
         from . import validate
@@ -1543,20 +1485,14 @@ def _field_records(field: str, unit: str, ctx: _Context, pool: Any) -> _Bound:
     by_strain = bool(ctx.strain) and field not in kinetics.STRAIN_FREE
     out = _Bound()
     for r in pool.records:
-        if r.get("field") != field or not ctx.on_program(r):
+        if r.get("field") != field:
             continue
         if binding.exclusion(r):
             out.leave("kept out by the aggregate gate")
             continue
-        if by_strain:
-            if not ctx.of_strain(r):
-                out.leave("of another strain or of none")
-                continue
-        elif ctx.species:
-            sp = ctx.species_of(r)
-            if sp is not None and sp != ctx.species:
-                out.leave("of another organism")
-                continue
+        if by_strain and not ctx.of_strain(r):
+            out.leave("of another strain or of none")
+            continue
         if rule != "any":
             carbon = r.get("carbonSource")
             if not carbon:
@@ -1640,12 +1576,12 @@ def _record_fields(spec: ParameterSpec, ctx: _Context) -> tuple[list[str], list[
 def _named_records(spec: ParameterSpec, ids: list[str], ctx: _Context, pool: Any) -> ParameterValue:
     """A parameter bound to exactly the records a request named for it
     (`recordsByParam`, OF-BLD-020 §3.4, D13): each must be in the evidence
-    pool the switch shows, be a record of a field the spec binds from, pass
+    pool, be a record of a field the spec binds from, pass
     the aggregate gate and convert into the spec's unit; any one that does
     not refuses the request, naming the record and why. Their value is
     Proforma's statistic over them, as the records the rule finds bind; no
-    strain, sugar or program filter is applied, since the records were
-    chosen by id, and the detail says they were named."""
+    strain or sugar filter is applied, since the records were chosen by id,
+    and the detail says they were named."""
     if not ids:
         raise SimulationRefused(f"recordsByParam names no record for {spec.key}: name the records that bind it, or "
                                 "leave it out and the records the rule finds bind it")
@@ -1666,9 +1602,8 @@ def _named_records(spec: ParameterSpec, ids: list[str], ctx: _Context, pool: Any
         seen.add(rid)
         r = by_id.get(rid)
         if r is None:
-            raise SimulationRefused(f"record {rid}, named for {spec.key}, is not in the evidence pool"
-                                    + ("" if ctx.include_archived else " the program switch shows")
-                                    + ": search_records finds the records that are")
+            raise SimulationRefused(f"record {rid}, named for {spec.key}, is not in the evidence pool: "
+                                    "search_records finds the records that are")
         field = str(r.get("field") or "")
         if field not in fields:
             raise SimulationRefused(f"record {rid} is a record of {field or 'no field'}, and {spec.key} ({spec.label}) "
@@ -1708,26 +1643,6 @@ def _identified(p: FitParam) -> bool | None:
     return None
 
 
-def _shown(art: Any, what: str, include_archived: bool) -> None:
-    """A kept simulation, fit or forecast a request starts from, refused in
-    words when it belongs to an archived program and the switch is off
-    (OF-BLD-020 §3.R, findings 6 and 18; CLAUDE.md *Programs*): the API, the
-    panel's scope and fermos_simulate alike, as a read tool names a hidden
-    row's program. Nothing is known to be archived with no projection."""
-    if include_archived:
-        return
-    from . import module_stores, programs
-
-    try:
-        pid = module_stores.artifact_program(art)
-        if not programs.hides(pid, False):
-            return
-        p = programs.program_by_id(pid)
-    except FileNotFoundError:
-        return
-    raise SimulationRefused(f"{what} belongs to {p.name if p else pid}, archived (hidden). {programs.SWITCH}")
-
-
 def _fit_art(fit_id: str) -> Any:
     try:
         art = artifacts.get(fit_id)
@@ -1742,7 +1657,7 @@ def _fit_art(fit_id: str) -> Any:
 
 
 def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, ParameterSpec], ctx: _Context,
-                    preset: str, include_archived: bool = False,
+                    preset: str,
                     x0: float | None = None) -> tuple[dict[str, ParameterValue], list[str]]:
     """What a chosen fit gives each parameter it carries, in the spec's unit,
     with its interval and whether its run identified it, and why not (the
@@ -1762,7 +1677,6 @@ def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, Paramete
     from . import proforma
 
     art = _fit_art(fit_id)
-    _shown(art, f"{art.tool} {fit_id}", include_archived)
     try:
         fit_ = fit_of(art)
     except FitRefused as e:
@@ -1905,14 +1819,11 @@ def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, Paramete
     return out, notes
 
 
-def _simulation_candidates(sim_id: str, specs: dict[str, ParameterSpec],
-                           include_archived: bool = False) -> tuple[dict[str, ParameterValue], list[str]]:
+def _simulation_candidates(sim_id: str, specs: dict[str, ParameterSpec]) -> tuple[dict[str, ParameterValue], list[str]]:
     """A kept simulation's values for the keys this family shares with it:
     each one it took from a fit, the records, another simulation or a named
-    person (a convention binds here as its spec says). One of an archived
-    program is refused with the switch off (§3.R, findings 6 and 18)."""
+    person (a convention binds here as its spec says)."""
     art = kept_simulation(sim_id)
-    _shown(art, f"kept simulation {sim_id}", include_archived)
     fid = _named(art.inputs, "family")
     other = kinetics.family(str(fid.value)) if fid else None
     if other is None:
@@ -1960,13 +1871,13 @@ def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any) -> _Binding:
         notes.append(fam.refusal())
     fits: dict[str, ParameterValue] = {}
     if req.fitArtifact:
-        fits, said = _fit_candidates(req.fitArtifact, fam, by_key, ctx, req.durationPreset, req.includeArchived,
+        fits, said = _fit_candidates(req.fitArtifact, fam, by_key, ctx, req.durationPreset,
                                      _persons_x0(fam, req))
         notes += said
     start = req.startFrom or "records"
     kept: dict[str, ParameterValue] = {}
     if start.startswith(SIM_PREFIX):
-        kept, said = _simulation_candidates(start[len(SIM_PREFIX):], by_key, req.includeArchived)
+        kept, said = _simulation_candidates(start[len(SIM_PREFIX):], by_key)
         notes += said
     named = dict(req.recordsByParam or {})
     stray = [k for k in named if k not in by_key]
@@ -2008,16 +1919,12 @@ def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any) -> _Binding:
                                               detail=said[:1].upper() + said[1:])
         sources[spec.key] = cands
     sugar = f", naming {ctx.sugar} as their carbon source" if ctx.sugar else ", and no sugar is named"
-    notes.insert(0, f"Records bind from {ctx.program_words}, through the aggregate gate, of "
+    notes.insert(0, f"Records bind from {ctx.pool_words}, through the aggregate gate, of "
                     + (f"{ctx.strain_label} (by its aliases; the medium's records of {ctx.organism_words})"
                        if ctx.strain else ctx.organism_words)
                     + f"{sugar}; each is converted into its parameter's unit, and the value is their median with their "
                       "range (Proforma's statistic). A fit a person chose comes first; a person's override wins over "
                       "all of them.")
-    hidden = getattr(pool, "hidden", None) or {}
-    if hidden and ctx.program in hidden:
-        notes.append(f"{_plural(hidden[ctx.program], 'record')} of the archived {ctx.program_name} program "
-                     "are hidden: Settings → Programs has the switch that shows archived programs.")
     return _Binding(specs, sources, notes, ctx, named)
 
 
@@ -2071,12 +1978,12 @@ def _waiting(fam: kinetics.Family, specs: list[ParameterSpec], values: list[Para
 def bind(req: SimulationRequest, *, pool: Any = None) -> FermosBinding:
     """GET /api/fermos/bind: a family's parameters bound for a strain,
     product and sugar, from a fit or a kept simulation when one is named,
-    over the evidence pool the switch shows; what waits; and the notes that
+    over the evidence pool; what waits; and the notes that
     say what bound from where. Starts no integration and keeps nothing."""
     fam = kinetics.family(req.family)
     _check_request(req)
     _own_scope(fam, req.overrides)
-    got = _bound(fam, req, pool if pool is not None else _load_pool(req.includeArchived))
+    got = _bound(fam, req, pool if pool is not None else _load_pool())
     values, waiting = _resolved(fam, got, req.overrides, None)
     refused = None if waiting else run_refusal(fam, got.specs, values)
     return FermosBinding(values=values, waiting=waiting, refused=refused, notes=got.notes)
@@ -2102,7 +2009,7 @@ def _binding_inputs(got: _Binding, values: list[ParameterValue]) -> list[BasisIn
         whose = (f"{ctx.strain} by its aliases, and the medium's records of {ctx.organism_words}" if ctx.strain
                  else ctx.organism_words)
         out.append(BasisInput(name=RECORDS_OF, value=whose, unit="", source=BasisSource(
-            kind="convention", note=f"whose records bound the values bound to records: {ctx.program_words}, through "
+            kind="convention", note=f"whose records bound the values bound to records: {ctx.pool_words}, through "
                                     "the aggregate gate (OF-BLD-020 §3.2)")))
     for v in values:
         if v.origin == "fit":
@@ -2121,7 +2028,7 @@ def _binding_inputs(got: _Binding, values: list[ParameterValue]) -> list[BasisIn
 def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult:
     """One simulation, kept as a `fermos.simulation` artifact. The family's
     specs bind as `bind_parameters` binds them (D6): a fit a person chose,
-    the records of the evidence pool the switch shows (`by_pool`, else
+    the records of the evidence pool (`by_pool`, else
     evidence_pool.load), a kept simulation, a person's override (an
     `assumption` by name, which wins), the spec's stated convention; a
     parameter with none refuses the run naming it and the record field that
@@ -2132,7 +2039,7 @@ def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult
         raise SimulationRefused(fam.refusal())
     _check_request(req)
     _own_scope(fam, req.overrides)
-    pool = by_pool if by_pool is not None else _load_pool(req.includeArchived)
+    pool = by_pool if by_pool is not None else _load_pool()
     got = _bound(fam, req, pool)
     specs = got.specs
     values, _ = _resolved(fam, got, req.overrides, None)
@@ -2178,12 +2085,13 @@ def _values_of(specs: list[ParameterSpec], inputs: list[BasisInput]) -> list[Par
         word = str(said.value) if said is not None and said.source.kind == "convention" else None
         identified = ORIGIN_WORDS.get(word) if word in ORIGIN_WORDS else None
         origin = ("record" if records else "assumption" if kind == "assumption"
+                  else "model-estimate" if kind == "model-estimate"
                   else "fit" if word in ORIGIN_WORDS or kind == "deposition"
                   else "simulation" if word == "simulation" else "artifact" if kind == "artifact" else "convention")
         v = ParameterValue(key=spec.key, value=i.value, low=float(low.value) if low else None,
                            high=float(high.value) if high else None, source=i.source, origin=origin,
                            identified=identified if origin == "fit" else None,
-                           overriddenBy=i.source.by if kind == "assumption" else None, recordIds=records,
+                           overriddenBy=i.source.by if kind in ASSUMED_KINDS else None, recordIds=records,
                            detail=i.source.note)
         v.outOfBounds = params.bounds_check(spec, v.value, v.low, v.high)
         out.append(v)
@@ -2332,7 +2240,7 @@ def _run_simulation(inputs, seed):
               f"{_why_unidentified(v)}" for v in values if v.origin == "fit" and v.identified is False]
     if not ok:
         flags.append(f"The mass balance does not close: {mb['closure']:.2g} against {kinetics.BALANCE_TOL:.0%}.")
-    if traj.runout_h is None and fam.id in ("batch_v1", "storage_v1"):
+    if traj.runout_h is None and fam.id == "batch_v1":
         flags.append("The sugar did not run out within the run length; the harvest is at the run's end.")
     yps = p.get("yps")
     ceiling = _ceiling_block(inputs, yps, achieved)
@@ -2350,11 +2258,6 @@ def _run_simulation(inputs, seed):
         notes.append("A chemostat's productivity is D·P at its steady state, given with the steady state; the end "
                      "state's productivity is the final titre over the run's hours, a batch's measure, not a "
                      "chemostat's.")
-    if isinstance(fam, kinetics.StorageV1):
-        notes.append("Q starts at zero, said so (Appendix 2 §A names no starting store).")
-        if (p.get("kd") or 0) > 0:
-            notes.append("With kd set, the decay of the cells alone lifts the store's share of the dry weight past "
-                          "Qmax: the share is read as Q/(X + Q).")
     for v in values:
         if v.origin == "convention" and isinstance(v.value, str) and v.detail:
             notes.append(f"{v.key}: {v.detail}")
@@ -2446,30 +2349,22 @@ def _no_broth_product(art: Any, family: str, fam: Any, kept: list[str]) -> str:
     it lacks and what it keeps."""
     if fam is None:
         what = f"its family {family or 'unnamed'} is none fermOS has"
-    elif fam.product_state() not in (None, BROTH_PRODUCT):
-        what = (f"its family {fam.id} keeps its product as a store inside the cells ({fam.product_state()}), not in "
-                "the broth")
-    elif fam.product_state() is None:
-        what = f"its family {fam.id} has no product state"
     else:
         what = f"its family {fam.id} has one, and the artifact keeps no series of it"
     return (f"simulation {art.id} keeps no product series ({BROTH_PRODUCT}, the product in the broth): {what}; it "
             f"keeps {', '.join(kept) or 'no state'}, so its broth is no train's inlet")
 
 
-def harvest(simulation_artifact: Any, hour: float | None = None, *, include_archived: bool = True) -> FermosHarvest:
+def harvest(simulation_artifact: Any, hour: float | None = None) -> FermosHarvest:
     """A kept simulation's broth at an hour (its id, or the artifact): its
     own harvest hour when none is named (the hour its sugar runs out, else
     its run's end), else the hour a person named, read from the series the
     artifact keeps, each state in its unit. An artifact-free read: nothing
     is integrated again and nothing is kept. Refused in words: an hour
     outside the simulated span, a simulation that keeps no product series
-    in the broth (P), one of an archived program with the switch off, a
-    file whose series cannot be read, and, at its own harvest hour, one kept
+    in the broth (P), a file whose series cannot be read, and, at its own harvest hour, one kept
     before that hour was a kept point (OF-BLD-020 §6.R)."""
     art = kept_simulation(simulation_artifact)
-    if not include_archived:
-        _shown(art, f"simulation {art.id}", False)
     o = art.output if isinstance(art.output, dict) else {}
     family = str(o.get("family") or "")
     fam = kinetics.FAMILIES.get(family)
@@ -2525,21 +2420,13 @@ def harvest(simulation_artifact: Any, hour: float | None = None, *, include_arch
         absent=kinetics.ABSENT)
 
 
-def simulations(include_archived: bool = False) -> list[SimulationSummary]:
-    """The kept simulations, newest first; one of an archived program (what
-    its basis names) left out unless asked. A file that does not read as a
+def simulations() -> list[SimulationSummary]:
+    """The kept simulations, newest first. A file that does not read as a
     simulation is skipped."""
-    from . import module_stores, programs
-
     out = []
     for a in artifacts.all_artifacts():
         if a.tool != SIMULATION:
             continue
-        try:
-            if programs.hides(module_stores.artifact_program(a), include_archived):
-                continue
-        except FileNotFoundError:
-            pass
         o = a.output
         try:
             out.append(SimulationSummary(artifactId=a.id, family=o["family"], title=o.get("title") or o["family"],

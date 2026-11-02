@@ -31,11 +31,6 @@ chemostat_v1
     dilution D on every state, feed Sf, steady state solved and the dynamic
     path integrated; washout reported when D ≥ μmax·Sf/(Ks + Sf)
 
-storage_v1
-    a second substrate N with its own Monod term limiting growth, a storage
-    product Q accumulating when N is exhausted at rate
-    qQ,max·S/(Ks+S)·(1 − Q/Qmax)
-
 light_v1
     declared with its parameters (incident irradiance, path length,
     attenuation coefficient, photoinhibition constant) and no `rhs`: a socket
@@ -60,8 +55,7 @@ each as this step's choice)
 2. "The hour the sugar runs out" is the first hour S falls to RUN_OUT_SHARE
    of its start. Under Monod with no maintenance and no β the sugar decays
    toward zero and never reaches it, and the hour S crosses zero wanders
-   with the solver's tolerance; the share's hour does not. N in storage_v1
-   is exhausted at RUN_OUT_SHARE of KN, where N/(KN + N) has stopped growth.
+   with the solver's tolerance; the share's hour does not.
    "Until the sugar runs out" integrates over horizons doubling from 1/μmax,
    at most HORIZON_DOUBLINGS times, and a run whose sugar stops falling
    (growth stopped at Pmax, or by the second nutrient) is refused in words.
@@ -91,16 +85,6 @@ each as this step's choice)
    and the culture is a batch.
 7. A feed's start and end split the integration, so LSODA never steps over
    a change of feed.
-8. storage_v1, where Appendix 2 §A is silent: Yps is the store's yield on S
-   (the store is the product here), so α, β, Pmax and n are not this
-   family's; Q starts at zero, said so; Q/Qmax reads Q as a share of the
-   cell dry weight, Q/(X + Q), X the residual biomass, because Qmax's source
-   is pha_content_cdw. With kd set, decay of X alone lifts that share past
-   Qmax (measured): the flag says so.
-       μ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · N/(KN + N)
-       dN/dt = −(1/Yx/N)·μ·X
-       dQ/dt = qQ,max·S/(Ks+S)·(1 − (Q/(X + Q))/Qmax)·X   once N is exhausted
-       dS/dt = −(1/Yxs)·μ·X − (1/Yps)·dQ/dt − m·X
 9. The mass balance is checked after every integration on cumulative
    consumption states (grams of sugar to growth, to product, to the store,
    to maintenance; grams fed and drawn off), and again through X, P and Q
@@ -435,29 +419,12 @@ def _rhs(fam: "Family", v: dict[str, Any], mode: Mode, t_regime: float, counter:
 # ── the parameters (Appendix 2 §A) ─────────────────────────────────────
 
 
-def _ontology_bounds(field_id: str, unit: str) -> tuple[float | None, float | None, str] | None:
-    """The ontology's plausibility range of a field, in `unit`, with its
-    reason; None when it is not exported here or does not convert."""
-    from . import params, units
-
-    f = params._ontology(field_id)
-    if f is None:
-        return None
-    lo, hi = f["range"]
-    try:
-        low, high = units.convert(float(lo), f["canonicalUnit"], unit), units.convert(float(hi), f["canonicalUnit"], unit)
-    except (TypeError, ValueError):
-        return None
-    return low, high, (f"the ontology's plausibility range for {field_id} ({f['name']}), {lo:g} to {hi:g} "
-                       f"{f['canonicalUnit']}: the range that refuses an implausible extraction, not a result")
-
-
 def _spec(key: str, label: str, symbol: str, gloss: str, dimension: str, unit: str, group: str, rule: list[str], *,
           bounds: str = "nonnegative", reason: str = "", scale: str = "linear", choices: list[str] | None = None,
           convention: float | str | None = None, note: str | None = None, kept: bool = True) -> ParameterSpec:
-    """One ParameterSpec. `bounds`: 'ontology' (the first record field's
-    plausibility range, else the physical limit), 'share' (0 to 1),
-    'nonnegative' (at least 0) or 'none' (a word). `kept`: a kept
+    """One ParameterSpec. `bounds`: 'share' (0 to 1), 'nonnegative' (at
+    least 0) or 'none' (a word); a record field carries no range (alpha 2.0,
+    ADR-010), so a bound is a physical limit. `kept`: a kept
     simulation's value is a source just before a person's (D6, §3.2), so
     `simulation` enters the rule ahead of `assumption`; the run length and
     the light socket's parameters take none."""
@@ -466,15 +433,6 @@ def _spec(key: str, label: str, symbol: str, gloss: str, dimension: str, unit: s
     low: float | None = None
     high: float | None = None
     why = reason
-    if bounds == "ontology":
-        fields = [e.split(":", 1)[1] for e in rule if e.startswith("record:")]
-        found = _ontology_bounds(fields[0], unit) if fields else None
-        if found is not None:
-            low, high, why = found
-        else:
-            bounds = "nonnegative"
-            reason = reason or (f"a physical limit: no negative {label}"
-                                + (f" (the ontology's range for {fields[0]} is not exported here)" if fields else ""))
     if bounds == "share":
         low, high = 0.0, 1.0
         why = reason or "a physical limit: a share lies between none and the whole"
@@ -503,8 +461,8 @@ OPTIONAL = ("ki_substrate", "p_max", "yxo", "feed_end_h")
 
 # ── where a record binds (OF-BLD-020 §3.2, D6) ─────────────────────────
 # `fermos.bind_parameters` binds a spec's `record:<field>` entries over the
-# evidence pool: the program's papers, the aggregate gate, the strain chosen
-# (its aliases) or every strain of the program's organism, and the sugar.
+# evidence pool: the aggregate gate, the strain chosen (its aliases) or every
+# strain, and the sugar.
 # What departs from that, field by field, is declared here, and each spec
 # whose field departs says so in its note.
 #
@@ -515,25 +473,25 @@ OPTIONAL = ("ki_substrate", "p_max", "yxo", "feed_end_h")
 # "any": whatever carbon source it names, or none.
 CARBON_RULE: dict[str, str] = {"ethanol_max_conc": "any", "substrate_inhibition_ki": "sugar or none"}
 # Fields no strain sets: the medium is the experimenter's, so a record binds
-# over every strain of the program's organism whatever strain is chosen.
+# over every strain whatever strain is chosen.
 STRAIN_FREE = ("medium_component_conc",)
-MEDIUM_NOTE = ("A record of medium_component_conc that names the sugar binds it, over every strain of the program's "
-               "organism whatever strain is chosen: the medium is the experimenter's, not the strain's (STRAIN_FREE).")
+MEDIUM_NOTE = ("A record of medium_component_conc that names the sugar binds it, over every strain whatever strain "
+               "is chosen: the medium is the experimenter's, not the strain's (STRAIN_FREE).")
 # Record fields one product owns (Appendix 2 §A names ethanol's): a field in
 # PRODUCT_OWN binds only for its product; another product binds its own field
 # in its place where the ontology holds one (PRODUCT_FIELDS), else none, and
 # with no product named it binds none.
 PRODUCT_OWN: dict[str, str] = {"ethanol_yield_substrate": "ethanol", "ethanol_lp_alpha": "ethanol",
                                "ethanol_lp_beta": "ethanol", "ethanol_max_conc": "ethanol"}
-PRODUCT_FIELDS: dict[str, dict[str, str]] = {"phb": {"ethanol_yield_substrate": "pha_yield_substrate"}}
+PRODUCT_FIELDS: dict[str, dict[str, str]] = {}
 
 
 def _growth() -> list[ParameterSpec]:
     return [
         _spec("mu_max", "maximum specific growth rate", "μmax", "the fastest the cells can grow with nothing limiting",
-              "rate", "h⁻¹", "Growth", ["fit", "record:growth_rate_mu", "assumption"], bounds="ontology", scale="log"),
+              "rate", "h⁻¹", "Growth", ["fit", "record:growth_rate_mu", "assumption"], scale="log"),
         _spec("ks", "half-saturation constant", "Ks", "the substrate concentration at which growth runs at half speed",
-              "massConc", G_L, "Growth", ["fit", "record:monod_ks", "assumption"], bounds="ontology", scale="log"),
+              "massConc", G_L, "Growth", ["fit", "record:monod_ks", "assumption"], scale="log"),
         _spec("kd", "death rate", "kd", "the death or decay rate of cells", "rate", "h⁻¹", "Growth",
               ["fit", "assumption", "convention"], convention=0, note=f"No death or decay term: {ZERO_SAID}."),
         _spec("yxs", "biomass yield on substrate", "Yx/s", "grams of cells made per gram of substrate used", "yield",
@@ -567,7 +525,7 @@ def _product() -> list[ParameterSpec]:
 def _inhibition() -> list[ParameterSpec]:
     return [
         _spec("p_max", "maximum product concentration", "Pmax", "the product concentration at which growth stops",
-              "massConc", G_L, "Inhibition", ["fit", "record:ethanol_max_conc", "assumption"], bounds="ontology",
+              "massConc", G_L, "Inhibition", ["fit", "record:ethanol_max_conc", "assumption"],
               note=("A record of ethanol_max_conc binds whatever carbon source it names, or none: the concentration "
                     "at which the product stops growth is the product's, not the sugar's (CARBON_RULE). It is "
                     "ethanol's own field, so another product binds none (PRODUCT_FIELDS).")),
@@ -580,7 +538,7 @@ def _inhibition() -> list[ParameterSpec]:
                       "but its solver's settings")),
         _spec("ki_substrate", "substrate inhibition constant", "Ki",
               "the substrate concentration above which it inhibits (Haldane)", "massConc", G_L, "Inhibition",
-              ["fit", "record:substrate_inhibition_ki", "assumption", "convention"], bounds="ontology", scale="log",
+              ["fit", "record:substrate_inhibition_ki", "assumption", "convention"], scale="log",
               convention=OFF, note=("Off when absent, said so: Ki → ∞, the Haldane term 1, never Ki = 0, which "
                                     "would stop growth (D5 as built, 4). A record of substrate_inhibition_ki binds "
                                     "when it names the sugar or no carbon source; one naming another is the constant "
@@ -666,29 +624,6 @@ def _feed_specs() -> list[ParameterSpec]:
     ]
 
 
-def _storage_specs() -> list[ParameterSpec]:
-    return [
-        _spec("n_initial", "second nutrient at the start", "N0", "the second nutrient at the start", "massConc", G_L,
-              "Storage", ["assumption"],
-              note=("No record binds it. Appendix 2 §A names medium_component_conc, but a record of that field names a "
-                    "carbon source and never the second nutrient, so bound on the sugar it would put the sugar's "
-                    "concentration in N0's place (OF-BLD-020 §3.2). A named person gives it.")),
-        _spec("k_n", "half-saturation constant of the second nutrient", "KN",
-              "half-speed concentration of the second nutrient", "massConc", G_L, "Storage", ["fit", "assumption"]),
-        _spec("yxn", "biomass yield on the second nutrient", "Yx/N", "cells per gram of the second nutrient",
-              "yield", "g g⁻¹", "Storage", ["fit", "assumption"]),
-        _spec("q_storage_max", "maximum storage rate", "qQ,max",
-              "the fastest storage-product formation per gram of cells", "specProd", "g g⁻¹ h⁻¹", "Storage",
-              ["fit", "assumption"],
-              note=("Appendix 2 §A derives it from pha_productivity, which is per litre of broth: deriving it needs "
-                    "the run's biomass, so no record binds it directly.")),
-        _spec("q_max", "most storage product the cells hold", "Qmax", "the most storage product the cells can hold",
-              "yield", "g g⁻¹", "Storage", ["fit", "record:pha_content_cdw", "assumption"], bounds="share",
-              reason=("a physical limit: a share of the cell dry weight lies between none and the whole; the "
-                      "ontology's range for pha_content_cdw is in % CDW, which units.py does not convert into a share")),
-    ]
-
-
 def _light_specs() -> list[ParameterSpec]:
     return [
         _spec("irradiance", "incident irradiance", "I0", "the light reaching the culture's surface", "light",
@@ -739,7 +674,6 @@ class Family:
     what = ""
     states: tuple[str, ...] = ()
     socket = False
-    program: str | None = None
     feed = "none"
     has_P = True
     has_N = False
@@ -1231,43 +1165,6 @@ class ChemostatV1(Family):
         return "washout" if x_end <= SETTLED_SHARE * max(float(traj.y0[_X]), 0.0) else None
 
 
-class StorageV1(Family):
-    """storage_v1 — two-phase growth then storage: a second substrate N
-    with its own Monod term limiting growth, a storage product Q
-    accumulating when N is exhausted at rate qQ,max·S/(Ks+S)·(1 − Q/Qmax);
-    the PHA and lipid shape, archived with the PHA program but general.
-
-    μ = μmax · S/(Ks + S) · 1/(1 + S/Ki) · N/(KN + N)
-    dX/dt = μ·X − kd·X
-    dN/dt = −(1/Yx/N)·μ·X
-    dQ/dt = qQ,max·S/(Ks+S)·(1 − (Q/(X + Q))/Qmax)·X   once N is exhausted, else 0
-    dS/dt = −(1/Yxs)·μ·X − (1/Yps)·dQ/dt − m·X
-    states X, S, N, Q
-    qO2 = μ/Yxo + mo
-    OUR(t) = qO2·X
-
-    As built: Yps is the store's yield on S, so α, β, Pmax and n are not this
-    family's; Q starts at zero, said so; Q/Qmax is the store's share of the
-    cell dry weight, X the residual biomass; N is exhausted at RUN_OUT_SHARE
-    of KN; with kd set, decay of X alone lifts the share past Qmax.
-    """
-
-    id = "storage_v1"
-    title = "Growth then storage"
-    what = "Cells grow until a second nutrient runs out, then store a product (the PHA and lipid shape)."
-    states = ("X", "S", "N", "Q")
-    program = "pha"
-    has_P = False
-    has_N = True
-    has_Q = True
-
-    def specs(self) -> list[ParameterSpec]:
-        product = [s for s in _product() if s.key in ("yps", "maintenance")]
-        inhibition = [s for s in _inhibition() if s.key == "ki_substrate"]
-        return [*_growth(), *product, *inhibition, *_oxygen(), *_storage_specs(), *_start(volume=False, product=False),
-                _run_length(until_run_out=True)]
-
-
 class LightV1(Family):
     """light_v1 — light-limited growth: declared with its parameters
     (incident irradiance, path length, attenuation coefficient,
@@ -1290,7 +1187,7 @@ class LightV1(Family):
                 "photobioreactor run, and a deposition that records irradiance.")
 
 
-FAMILIES: dict[str, Family] = {f.id: f for f in (BatchV1(), FedBatchV1(), ChemostatV1(), StorageV1(), LightV1())}
+FAMILIES: dict[str, Family] = {f.id: f for f in (BatchV1(), FedBatchV1(), ChemostatV1(), LightV1())}
 
 
 def family(family_id: str) -> Family:

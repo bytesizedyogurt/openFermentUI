@@ -1,18 +1,16 @@
 // Guild · Skills (OF-BLD-013 §1.4). What each skill is, what an assessor
 // watches for, which protocol steps need it, and who holds it at each level.
-// Skills are reference data: their definitions change by commit to
-// src/data/skills.ts, so every ledger entry points at a definition someone can
-// read in the history.
+// The skills are the store's: none ship with the app (alpha 2.0, ADR-010), so
+// until the lab adds its own the index says so.
 import type { ReactNode } from 'react';
 import { Card, EmptyState, LinkButton, SectionTitle, cx } from '@/components/ui';
 import { GuildHeader, useGuild } from '@/components/GuildBits';
 import { LevelGlyph } from '@/components/LevelGlyph';
-import { FAMILIES, FAMILY_BY_ID, SKILLS, SKILL_BY_ID } from '@/data/skills';
-import { PROTOCOLS } from '@/data/protocols';
+import { FAMILIES, FAMILY_BY_ID } from '@/data/skillFamilies';
+import { useSkillById, useSkills, useStore } from '@/store';
 import { LEVEL_NAME, statusOf, type Level } from '@/engine/competence';
 import { renderStepText } from '@/engine/scale';
 import { href } from '@/router';
-import { useProgramFilter } from '@/store';
 
 export default function GuildSkills({ skillId }: { skillId?: string }) {
   if (skillId) return <SkillPage skillId={skillId} />;
@@ -20,15 +18,21 @@ export default function GuildSkills({ skillId }: { skillId?: string }) {
 }
 
 function SkillsIndex() {
+  const SKILLS = useSkills();
   const ctx = useGuild();
   return (
     <>
-      <GuildHeader
-        title="Skills"
-        subtitle="The trunk skills that protocol steps need. Working definitions until the skills content pass."
-      />
+      <GuildHeader title="Skills" subtitle="The trunk skills that protocol steps need." />
       <div className="space-y-5 max-w-[960px]">
-        {FAMILIES.map((f) => (
+        {SKILLS.length === 0 && (
+          <Card>
+            <EmptyState
+              title="No skills yet"
+              body="No skill ships with the app. A skill the lab adds appears here under its family, with what an assessor watches for, the protocol steps that need it and who holds it."
+            />
+          </Card>
+        )}
+        {FAMILIES.filter((f) => SKILLS.some((s) => s.family === f.id)).map((f) => (
           <div key={f.id}>
             <SectionTitle>{f.name}</SectionTitle>
             <Card>
@@ -61,20 +65,21 @@ function SkillsIndex() {
 const LADDER: Level[] = [4, 3, 2, 1];
 
 function SkillPage({ skillId }: { skillId: string }) {
+  const SKILL_BY_ID = useSkillById();
   const ctx = useGuild();
-  const shows = useProgramFilter();
+  const protocols = useStore((s) => s.protocols);
   const skill = SKILL_BY_ID[skillId];
   if (!skill) {
     return (
       <>
         <GuildHeader title="Skills" subtitle="The trunk skills that protocol steps need." />
         <Card className="max-w-2xl">
-          <EmptyState title="No such skill" body={`${skillId} is not in src/data/skills.ts.`} action={<LinkButton to="/guild/skills">All skills</LinkButton>} />
+          <EmptyState title="No such skill" body={`${skillId} is not among the lab’s skills.`} action={<LinkButton to="/guild/skills">All skills</LinkButton>} />
         </Card>
       </>
     );
   }
-  const uses = PROTOCOLS.filter((p) => shows('protocol', p.id)).flatMap((p) => {
+  const uses = protocols.flatMap((p) => {
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
     return v.steps.filter((st) => st.skills?.includes(skillId)).map((st) => ({ p, st, v }));
   });
@@ -177,9 +182,6 @@ function SkillPage({ skillId }: { skillId: string }) {
                       </span>
                     ))}
               </Row>
-              <p className="text-caption text-ink-soft pt-1">
-                Defined in src/data/skills.ts and changed by commit, so every entry on the ledger points at a definition with a history.
-              </p>
             </Card>
           </div>
         </div>

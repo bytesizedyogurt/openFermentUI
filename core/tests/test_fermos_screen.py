@@ -43,7 +43,7 @@ EMPTY = SimpleNamespace(records=[], records_by_id={}, hidden={})
 @pytest.fixture()
 def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(fermos, "_load_pool", lambda include_archived: EMPTY)
+    monkeypatch.setattr(fermos, "_load_pool", lambda *a, **k: EMPTY)
     return tmp_path
 
 
@@ -59,9 +59,9 @@ def simulate(family=BATCH, product="ethanol", **over):
 
 def test_a_kept_simulation_feeds_titre_yield_and_productivity_from_its_end_state(store):
     sim = simulate()
-    assert sim.provenance == "demo", "every value a person typed makes the simulation demo"
+    assert sim.provenance == "assumed", "every value a person typed makes the simulation assumed"
     info = proforma.fit_info(artifacts.get(sim.artifactId), ETHANOL)
-    assert info.tool == fermos.SIMULATION and info.refused is None and info.provenance == "demo"
+    assert info.tool == fermos.SIMULATION and info.refused is None and info.provenance == "assumed"
     feeds = {f.key: f for f in info.feeds}
     assert feeds["titre"].value == pytest.approx(sim.finalTitre)
     assert feeds["yield"].value == pytest.approx(sim.yieldAchieved)
@@ -209,5 +209,5 @@ def test_a_forecast_from_the_panels_values_names_the_person_as_it_did_before(sto
                              start=fermos.StartValues(S0=80.0), changed_by=BY, duration_h=40.0)
     names = {i.name: i for i in artifacts.get(fc.artifactId).inputs}
     assert names["start S0"].source.kind == "assumption" and names["start S0"].source.by == BY
-    assert names["duration"].value == 40.0 and fc.evidence.provenance == "demo"
+    assert names["duration"].value == 40.0 and fc.evidence.provenance == "assumed"
     assert names["duration"].source.kind == "assumption" and names["duration"].source.by == BY

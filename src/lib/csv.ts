@@ -1,25 +1,24 @@
-// CSV export. Every export carries the demo disclosure header so a file can't
-// launder synthetic data into a real analysis (OF-DES-001 §20.7).
+// CSV export. Every export carries the disclosure header so a file can't
+// launder a modeled or unchecked value into a real analysis (OF-DES-001 §20.7).
 import { useStore } from '@/store';
 
 /**
- * Export disclosure (OF-DES-001 §20.7, revised by OF-COR-001 §20).
+ * Export disclosure (OF-DES-001 §20.7).
  *
- * The corpus is real, so a blanket "this is fictional" header would now be a
- * lie in the other direction. What a downstream reader actually needs to know
- * is which rows carry what weight — hence the per-class note.
+ * The literature is real, so a blanket "this is fictional" header would be a
+ * lie. What a downstream reader needs to know is which rows carry what
+ * weight, hence the per-class note.
  */
 export const DISCLOSURE = [
-  '# openFerment export — corpus OF-COR-001 v1.0',
-  '# Literature entries, authors, venues and DOIs are REAL and citable.',
+  '# openFerment export',
+  "# Literature entries, authors, venues and DOIs are REAL and citable: the documents the project holds.",
   '# Provenance classes in this file:',
-  '#   gold              hand-curated reference annotation',
-  '#   verified          checked against the source document',
-  '#   curated           transcribed from the curation document, NOT yet checked',
-  '#                     against the source PDF — verify before citing',
-  '#   unverified        extractor output, not reviewed',
+  '#   gold              a value a reviewer typed against the paper\'s sentence',
+  '#   verified          checked against the source document by a named reviewer',
+  '#   curated           written by hand, as the vocabulary and the fields are',
+  '#   unverified        the extractor\'s reading, not reviewed — verify before citing',
   '#   industry-estimate non-peer-reviewed market/vendor figure — not evidence',
-  '#   demo              modeled, not measured (simulation outputs)',
+  '#   assumed           rests on an assumption or an estimate, not measured',
   '# Simulation economics are illustrative models, not validated.',
 ];
 
@@ -35,7 +34,11 @@ export function toCSV(headers: string[], rows: unknown[][]): string {
 }
 
 export function download(filename: string, content: string, mime = 'text/csv') {
-  const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+  downloadBlob(filename, new Blob([content], { type: `${mime};charset=utf-8` }));
+}
+
+/** A file the service answered, handed to the person as it came. */
+export function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

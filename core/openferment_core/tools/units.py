@@ -110,8 +110,8 @@ def _run(inp: ConvertUnitsInput, ctx: ToolContext) -> ToolResult:
     )
 
 
-# The version reads the unit tables in corpus.json, which a fresh clone lacks
-# until `pnpm export:corpus`; so the tool registers on first use, not import.
+# The version reads the unit tables (schema/units.json), so the tool registers
+# on first use, after import has finished.
 artifacts.register_lazy(NAME, lambda: artifacts.register(NAME, version(), _convert))
 
 TOOL = register(

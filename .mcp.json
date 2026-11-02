@@ -3,6 +3,10 @@
     "openferment": {
       "command": "uv",
       "args": ["run", "--project", "core", "--all-extras", "python", "-m", "openferment_core.mcp_server"]
+    },
+    "sci-rag": {
+      "command": "uv",
+      "args": ["run", "--project", "core", "--all-extras", "python", "-m", "openferment_core.literature_mcp"]
     }
   }
 }

@@ -30,8 +30,8 @@
  *
  * Runs with no service and no network: the service is a stub `fetch` here.
  */
-import { useStore, guildView, actingIdOf, checksView } from '../src/store';
-import { SKILLS, SKILL_BY_ID } from '../src/data/skills';
+import { useStore, guildView, actingIdOf } from '../src/store';
+import { TEST_PROTOCOLS, TEST_SKILLS as SKILLS, TEST_SKILL_BY_ID as SKILL_BY_ID } from './lib/guild-test-skills';
 import { sampleGuild, SAMPLE_LEAD } from './lib/guild-ladder';
 import { offlineRefusal } from '../src/lib/guild';
 import { REFRESH_WINDOW, pathOf } from '../src/engine/path';
@@ -43,13 +43,12 @@ import {
   holdFor,
   policyOf,
   isAssessor,
-  localToday,
   readyForCheck,
   statusOf,
   verdictFor,
 } from '../src/engine/competence';
-import type { Check, CheckResult, Checks, Guild, GuildEvidence, GuildPerson, LiveConversation, Proposal } from '../src/data/types';
-import { mayQueue, proposeChecks, shownTo } from '../src/engine/checks';
+import type { Checks, Guild, GuildEvidence, GuildPerson, Proposal } from '../src/data/types';
+import { mayQueue, proposeChecks } from '../src/engine/checks';
 import { needsActing, shownProposals } from '../src/lib/proposals';
 
 let fails = 0;
@@ -208,7 +207,9 @@ check('the sample lead is a lead and is added by nobody', sample.people.find((p)
 const s = () => useStore.getState();
 
 async function main() {
-  useStore.setState({ serviceUp: false });
+  // The store holds the test skills and the protocols they tag: the authored
+  // catalogue left with the seed (ADR-010).
+  useStore.setState({ serviceUp: false, skills: SKILLS, protocols: TEST_PROTOCOLS });
   const lead = await s().guildAddPerson({ name: 'Ada Lead', title: 'Lead', role: 'lead', joinedAt: '2026-01-01' });
   check('the first person is added by nobody and becomes who is signing', lead?.addedBy === null && s().guildActingId === lead?.id);
   const tom = await s().guildAddPerson({ name: 'Tom Trainee', title: 'Trainee', role: 'member', joinedAt: '2026-06-01' });
@@ -271,6 +272,8 @@ async function main() {
   // ── 4. a run writes to the ledger (OF-BLD-013 §2) ───────────────────
   useStore.setState({
     serviceUp: false,
+    skills: SKILLS,
+    protocols: TEST_PROTOCOLS,
     guild: {
       version: 1,
       people: [person('p-lead', 'lead'), person('p-ann'), person('p-tom')],
@@ -329,10 +332,23 @@ async function main() {
     guildPending: [],
     guildActingId: 'p-tom',
     learnProgress: {},
+    // Two test lessons on the test skills: the authored lessons left with the seed (ADR-010).
+    modules: [
+      {
+        id: 'm-test',
+        index: 1,
+        title: 'Test module',
+        blurb: '',
+        lessons: [
+          { id: 'l-bench', title: 'A lesson toward two skills', minutes: 1, blocks: [], checkpoint: [], skills: ['SK-CIP', 'SK-OD'] },
+          { id: 'l-plain', title: 'A lesson toward none', minutes: 1, blocks: [], checkpoint: [] },
+        ],
+      },
+    ],
   });
   const bench = s().modules.flatMap((m) => m.lessons).find((l) => (l.skills ?? []).length >= 2);
   const plain = s().modules.flatMap((m) => m.lessons).find((l) => (l.skills ?? []).length === 0);
-  check('the seed has a lesson that counts toward skills, and one that counts toward none', !!bench && !!plain);
+  check('the test module has a lesson that counts toward skills, and one that counts toward none', !!bench && !!plain);
   const wrote = await s().recordLessonForGuild(bench!.id);
   const lessonEntries = () => s().guild.evidence.filter((e) => e.source.kind === 'lesson');
   check(
@@ -639,76 +655,6 @@ async function main() {
     check('a check proposal shows to the lead', seen(who('p-sean', 'lead')) === 'pr-g,pr-l');
     check('a check proposal never shows to the person it names', seen(who('p-alex', 'lead')) === 'pr-l');
     check('carrying out a check proposal needs who is acting, and a lock does not', needsActing(checkP) && !needsActing(lockP));
-  }
-
-  // OF-BLD-016 review 23: every Guild and Primer screen that reads protocol
-  // steps reads them through the program filter, so an archived program's
-  // protocol (PR-SEED-01, casein) never shows on a default view.
-  {
-    const { readFileSync } = await import('node:fs');
-    for (const f of ['src/screens/GuildSkills.tsx', 'src/screens/GuildMatrix.tsx', 'src/components/GuildBits.tsx', 'src/screens/PrimerPractice.tsx']) {
-      const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-      const reads = /\bPROTOCOLS\b/.test(src.replace(/^import .*$/gm, ''));
-      check(`${f} reads protocols through the program filter`, !reads || /useProgramFilter\(\)/.test(src) && /shows\('protocol'/.test(src));
-    }
-    // The service drafts from no archived protocol unless the switch is sent.
-    const practice = readFileSync(new URL('../src/screens/PrimerPractice.tsx', import.meta.url), 'utf8');
-    const client = readFileSync(new URL('../src/lib/practice.ts', import.meta.url), 'utf8');
-    check('Practice sends the switch with a draft', /draftScenario\([\s\S]*?showArchived\s*\)/.test(practice) && /\?includeArchived=true/.test(client));
-  }
-
-  // OF-BLD-016 review 23: the guided tour stands on nothing an archived
-  // program holds, and promises nothing the default view hides.
-  {
-    const { readFileSync } = await import('node:fs');
-    const { PROTOCOLS } = await import('../src/data/protocols');
-    const { archivedProgramOf } = await import('../src/store');
-    const src = readFileSync(new URL('../src/components/GuidedTour.tsx', import.meta.url), 'utf8');
-    const routes = [...src.matchAll(/route: '([^']+)'/g)].map((m) => m[1]);
-    for (const r of routes) {
-      const pid = /^\/runbooks\/protocols\/([^/?]+)/.exec(r)?.[1];
-      const p = pid ? PROTOCOLS.find((x) => x.id === pid) : undefined;
-      const archived = p
-        ? [...new Set(JSON.stringify(p).match(/\br-[A-Z]\d*-\d+\b/g) ?? [])].filter((id) => archivedProgramOf('record', id))
-        : [];
-      check(`the tour's stop ${r} cites no record of an archived program`, archived.length === 0, archived.join(', '));
-    }
-    check('the tour promises no gold-set plan', !/gold-set plan/.test(src));
-  }
-
-  // OF-BLD-016 review 23: a Live conversation or a proposal that names an
-  // archived program's record hides by default, on Home and in Postdoc.
-  {
-    const { readFileSync } = await import('node:fs');
-    const { conversationShows, proposalShows } = await import('../src/lib/programShows');
-    const { programVisible } = await import('../src/store');
-    const off = (kind: Parameters<typeof programVisible>[0], id: string) => programVisible(kind, id, { showArchived: false });
-    const on = (kind: Parameters<typeof programVisible>[0], id: string) => programVisible(kind, id, { showArchived: true });
-    const turn = (recordIds: string[]) => ({
-      id: 't', question: 'q', askedAt: '', steps: [], error: null, status: 'answered',
-      plan: { question: 'q', claims: [{ id: 'c', text: 't', recordIds, paperIds: [], support: 'supported', provenance: 'curated' }],
-        gaps: [], declined: null, rejected: 0, rejectionReasons: [] },
-    });
-    const conv = (recordIds: string[]) => ({ id: 'lc', title: 'q', startedAt: '', turns: [turn(recordIds)] }) as unknown as LiveConversation;
-    check('a conversation citing a casein record hides with the switch off', !conversationShows(conv(['r-M5-1']), off));
-    check('the same conversation shows with the switch on', conversationShows(conv(['r-M5-1']), on));
-    check('a conversation citing nothing archived shows', conversationShows(conv([]), off));
-    const prop = (target: string | null) => ({ id: 'p', target, fields: {} }) as unknown as Proposal;
-    check('a proposal targeting a casein record hides with the switch off', !proposalShows(prop('r-M5-1'), off) && proposalShows(prop('r-M5-1'), on));
-    check('a proposal with no target shows', proposalShows(prop(null), off));
-    for (const f of ['src/screens/Postdoc.tsx', 'src/screens/Home.tsx', 'src/components/ProposalsCard.tsx']) {
-      const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-      check(`${f} filters what it lists through the program filter`, /conversationShows\(|proposalShows\(/.test(src));
-    }
-  }
-
-  // OF-BLD-016 review 23: records the switch brings back before any card of
-  // the session is decided take their seed places, as a fresh session would.
-  {
-    const { rejoinQueue } = await import('../src/lib/programShows');
-    const order = ['r-a', 'r-b', 'r-c', 'r-d'];
-    check('an untouched queue takes back the seed order', rejoinQueue(['r-b', 'r-d'], ['r-a', 'r-c'], order, true).join() === order.join());
-    check('a queue already worked keeps its order and appends', rejoinQueue(['r-b', 'r-d'], ['r-a', 'r-c'], order, false).join() === 'r-b,r-d,r-a,r-c');
   }
 
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');

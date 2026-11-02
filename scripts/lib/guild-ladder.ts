@@ -9,8 +9,7 @@
 // ladder a working test of the engine: every level, a suspension, a lapse and
 // a prerequisite holding a skill back.
 import type { Guild, GuildEvidence, GuildPerson } from '../../src/data/types';
-import { SKILLS, SKILL_BY_ID } from '../../src/data/skills';
-import { PROTOCOLS } from '../../src/data/protocols';
+import { TEST_SKILLS as SKILLS, TEST_SKILL_BY_ID as SKILL_BY_ID, TEST_STEP_FOR } from './guild-test-skills';
 import { DEFAULT_POLICY, addDays } from '../../src/engine/competence';
 
 export const SAMPLE_LEAD = 'p-sample-lead';
@@ -57,10 +56,7 @@ const codeOf = (personId: string, skillId: string): Code =>
   ((TARGETS[personId] ?? '').split(' ')[ORDER.indexOf(skillId)] ?? '-') as Code;
 
 function stepFor(skillId: string): { ref: string; stepId: string } {
-  for (const p of PROTOCOLS)
-    for (const v of p.versions)
-      for (const st of v.steps) if (st.skills?.includes(skillId)) return { ref: p.id, stepId: st.id };
-  return { ref: 'induction', stepId: '' };
+  return TEST_STEP_FOR[skillId] ?? { ref: 'induction', stepId: '' };
 }
 
 const daysInOf = (id: string): number => PEOPLE.find((p) => p[0] === id)?.[4] ?? 0;

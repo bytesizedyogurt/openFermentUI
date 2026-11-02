@@ -7,19 +7,16 @@
 // arrive. There is no scripted player behind it and no mode to switch. With
 // the service down the screen says so and how to start it, the conversations
 // stay where they were, and a question typed meanwhile stays in the box.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageSquarePlus, PanelLeft, RefreshCw, Send, Sparkles, Square } from 'lucide-react';
-import { useStore, timeId, useProgramFilter, archivedProgramOf } from '@/store';
-import { href, navigate, useRoute } from '@/router';
-import { conversationShows } from '@/lib/programShows';
+import { useStore, timeId, reviewerName } from '@/store';
+import { navigate, useRoute } from '@/router';
 import type { LiveConversation, LiveTurn } from '@/data/types';
-import { SUGGESTED_PROMPTS, suggestedPrompts } from '@/data/flows';
-import { LIVE_PROMPT_LIST, YEAST_PROMPT_COUNT, type PromptSubject } from '@/data/livePrompts';
-import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
 import { Button, Card, cx, EmptyState, Callout } from '@/components/ui';
 import { AnswerPlanView, PostdocDownNotice } from '@/components/AnswerPlanView';
-import { askPostdocStream, postdocHealth, PostdocDown, priorTurns, type PostdocHealth } from '@/lib/postdoc';
+import { askPostdocStream, fetchConversation, postdocHealth, PostdocDown, type PostdocHealth } from '@/lib/postdoc';
 import { PlanTrace } from '@/components/PlanTrace';
+import { stamp } from '@/lib/proforma';
 
 /**
  * A conversation of questions, each answered by Postdoc's bounded loop
@@ -27,63 +24,25 @@ import { PlanTrace } from '@/components/PlanTrace';
  * searched, what came back, how long it took.
  *
  * A turn is a question and the AnswerPlan the service returned (LiveTurn), in
- * its own list (`liveConversations`), in the Durable tier: a citation followed
- * and returned from, or a reload, finds the conversation where it was, and a
- * follow-up sends the earlier turns' words with its question (`priorTurns`).
- * The service keeps no history; the browser sends it.
+ * its own list (`liveConversations`), kept in the open project's rows
+ * (lib/projectState.ts): a citation followed and returned from, or a reload,
+ * finds the conversation where it was. Each question names its conversation
+ * and its turn, and the service keeps it as that turn (postdoc/conversations.py):
+ * a follow-up's history is what the service keeps of the conversation, and a
+ * turn the service is still answering after a reload is followed there until
+ * it ends (`fetchConversation`).
  */
 
-// ── programs (OF-BLD-016 §2.2) ─────────────────────────────────────────
-//
-// Every question this screen offers passes through the program selector
-// (`suggestedPrompts`, over the subjects each question in livePrompts.ts
-// names). What a conversation already holds is history and stays as it was
-// asked; what the screen offers next does not.
-
-/** The archived programs some hidden questions are about, by name, in the order they are met. */
-function hiddenProgramNames(about: PromptSubject[][]): string[] {
-  const names = new Set<string>();
-  for (const subjects of about)
-    for (const a of subjects) {
-      const p = archivedProgramOf(a.kind, a.id);
-      if (p) names.add(p.name);
-    }
-  return [...names];
-}
-
-/** "Casein", "Casein and PHA", "Casein, PHA and X". */
-function joinNames(names: string[]): string {
-  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
-
-/**
- * The line a list of questions shows when the program filter emptied it:
- * what is hidden, and where the switch is.
- */
-function HiddenQuestionsNote({ about, className }: { about: PromptSubject[][]; className?: string }) {
-  const names = hiddenProgramNames(about);
-  return (
-    <p className={cx('text-caption text-ink-soft text-center', className)} data-testid="prompts-hidden">
-      {names.length === 0
-        ? 'The suggested questions here are about archived programs, which are hidden.'
-        : names.length === 1
-          ? `The suggested questions here are about ${names[0]}, an archived program, and are hidden.`
-          : `The suggested questions here are about ${joinNames(names)}, archived programs, and are hidden.`}{' '}
-      <a className="text-accent hover:underline" href={href(PROGRAMS_SETTINGS_PATH)}>
-        Settings → Programs
-      </a>{' '}
-      shows them again.
-    </p>
-  );
-}
+/** How often a turn the service is answering for another page, or from before a reload, is looked at. */
+const FOLLOW_MS = 2000;
 
 /** The streams in flight, by turn id. Module-level, so Stop still reaches a
  * question asked before the page last mounted. */
 const inflight = new Map<string, AbortController>();
 
 const TURN_NOTE: Record<Exclude<LiveTurn['status'], 'running' | 'answered' | 'failed'>, string> = {
-  stopped: 'Stopped before an answer came back. Nothing was kept from this question.',
-  interrupted: 'The page reloaded before this answer came back, so it never arrived. Ask it again.',
+  stopped: 'Stopped before an answer came back. The turn keeps the steps it took until then.',
+  interrupted: 'Cut short before an answer came back: the service stopped while answering it, or the page closed before asking it. Ask it again.',
 };
 
 function LiveTurnView({
@@ -101,20 +60,10 @@ function LiveTurnView({
   const steps = turn.plan?.trace ?? turn.steps;
   return (
     <article className="space-y-3" data-testid="live-turn">
-      {turn.replay && (
-        <div className="rounded-input border border-signal-warn/50 px-3 py-2 text-caption text-signal-warn" data-testid="replay-label">
-          {/* §10.R: a stand-in recording's date is fixed to keep the fixture
-              stable, so it claims none; a real recording names its day. */}
-          {turn.replay.standIn
-            ? 'Replay of a recorded test run, made with a scripted stand-in in place of the model.'
-            : `Replay of a run on ${turn.replay.recordedAt.slice(0, 10)}.`}{' '}
-          Nothing is being asked now.
-        </div>
-      )}
       <div className="flex items-baseline gap-2">
         <span className="text-caption uppercase tracking-wide text-ink-soft shrink-0">Asked</span>
         <p className="text-reading text-ink flex-1">{turn.question}</p>
-        <span className="font-num text-caption text-ink-soft shrink-0">{turn.askedAt}</span>
+        <span className="font-num text-caption text-ink-soft shrink-0">{shownAt(turn.askedAt)}</span>
       </div>
 
       {(running || steps.length > 0) && (
@@ -169,22 +118,6 @@ function LiveTurnView({
   );
 }
 
-/** A question offered on the empty state, asked when pressed. */
-function PromptChip({ text, onAsk }: { text: string; onAsk: (q: string) => void }) {
-  return (
-    // A whole question, so it wraps rather than running off the column. The
-    // style, not a utility class: .chip's nowrap is declared after Tailwind's.
-    <button
-      className="chip hover:border-accent hover:bg-accent-wash text-left max-w-full py-1"
-      style={{ whiteSpace: 'normal' }}
-      data-testid="suggested-prompt"
-      onClick={() => onAsk(text)}
-    >
-      {text}
-    </button>
-  );
-}
-
 function LivePanel({
   conversation,
   health,
@@ -195,13 +128,6 @@ function LivePanel({
   onAsk: (q: string) => void;
 }) {
   const turns = conversation?.turns ?? [];
-  // Only the questions whose program shows are offered (§2.2).
-  const shows = useProgramFilter();
-  const offered = suggestedPrompts(shows);
-  const hiddenAbout = LIVE_PROMPT_LIST.filter((p) => !offered.includes(p.text)).map((p) => p.about);
-  // The yeast five first, then the questions that read across the modules.
-  const yeast = SUGGESTED_PROMPTS.slice(0, YEAST_PROMPT_COUNT).filter((p) => offered.includes(p));
-  const across = SUGGESTED_PROMPTS.slice(YEAST_PROMPT_COUNT).filter((p) => offered.includes(p));
   return (
     <div className="space-y-3 pt-1">
       {/* The service is up but cannot answer. A different problem from being
@@ -220,14 +146,6 @@ function LivePanel({
           </p>
         </Callout>
       )}
-      {health && !health.ok && health.corpusError && (
-        <Callout kind="warn" title="Postdoc is running without a corpus">
-          <p className="text-ink">
-            Run <span className="font-num">pnpm export:corpus</span> from the repository root and
-            restart the service.
-          </p>
-        </Callout>
-      )}
 
       {turns.map((t, i) => (
         <div key={t.id} className={cx(i > 0 && 'pt-4 border-t border-line')}>
@@ -242,49 +160,28 @@ function LivePanel({
             body="Postdoc searches the records and the papers' own text with its tools, then writes claims that carry no numbers of their own: every value is rendered from the record it cites, and every quoted sentence was checked word for word against its paper. A question the corpus cannot support gets an explicit decline. Ask a follow-up and it reads this conversation first."
             icon={<Sparkles size={28} />}
           />
-          {yeast.length > 0 && (
-            <div className="flex flex-wrap gap-2 justify-center mt-2" data-testid="prompts-yeast">
-              {yeast.map((p) => (
-                <PromptChip key={p} text={p} onAsk={onAsk} />
-              ))}
-            </div>
-          )}
-          {yeast.length === 0 && hiddenAbout.length > 0 && <HiddenQuestionsNote about={hiddenAbout} className="mt-2" />}
-          {across.length > 0 && (
-            <>
-              <div className="text-caption uppercase tracking-wide text-ink-soft text-center mt-5 mb-2">
-                Across the modules
-              </div>
-              <div className="flex flex-wrap gap-2 justify-center" data-testid="prompts-across">
-                {across.map((p) => (
-                  <PromptChip key={p} text={p} onAsk={onAsk} />
-                ))}
-              </div>
-            </>
-          )}
         </div>
       )}
     </div>
   );
 }
 
-/** A turn's time, as the conversations list writes it. */
+/** A turn's time, written as the service writes one: ISO, in UTC. */
 function askedAt(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return new Date().toISOString();
+}
+
+/** A conversation's or a turn's time on the page: an ISO time to the minute,
+ *  marked UTC; a time an earlier page wrote as a local minute, as it was written. */
+function shownAt(at: string): string {
+  return at.includes('T') ? stamp(at) : at;
 }
 
 /** What `activeId` holds after "New conversation", before its first question. */
 const NEW_CONVERSATION = 'new';
 
 export default function Postdoc({ sessionId, initialQuery }: { sessionId?: string; initialQuery?: string }) {
-  const kept = useStore((s) => s.liveConversations);
-  // A conversation citing an archived program hides while archived programs
-  // are hidden; a link to it by id still opens it.
-  const showsProgram = useProgramFilter();
-  const liveConversations = useMemo(() => kept.filter((c) => conversationShows(c, showsProgram)), [kept, showsProgram]);
-  const hiddenConversations = kept.length - liveConversations.length;
+  const liveConversations = useStore((s) => s.liveConversations);
   const sessionsOpen = useStore((s) => s.ui.sessionsOpen);
   const setUI = useStore((s) => s.setUI);
   const route = useRoute();
@@ -331,9 +228,34 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   // With nothing chosen, the latest conversation is resumed; "New
   // conversation" shows an empty one until its first question.
   const conversation =
-    kept.find((c) => c.id === activeId) ?? (activeId === null ? (liveConversations[0] ?? null) : null);
+    liveConversations.find((c) => c.id === activeId) ?? (activeId === null ? (liveConversations[0] ?? null) : null);
   const running = !!conversation?.turns.some((t) => t.status === 'running' && inflight.has(t.id));
   const down = healthChecked && health === null && !reached;
+
+  // A turn running with no stream in this page (asked before a reload, or in
+  // another tab) is being answered on the service: follow it there, and take
+  // the service's turn once it ends.
+  const followed = (conversation?.turns ?? [])
+    .filter((t) => t.status === 'running' && !inflight.has(t.id))
+    .map((t) => t.id)
+    .join(' ');
+  useEffect(() => {
+    const id = conversation?.id;
+    if (!followed || !id) return;
+    const ac = new AbortController();
+    const timer = setInterval(() => {
+      fetchConversation(id, ac.signal)
+        .then((held) => {
+          for (const t of held.turns)
+            if (followed.split(' ').includes(t.id) && t.status !== 'running') useStore.getState().patchLiveTurn(id, t.id, t);
+        })
+        .catch(() => undefined);
+    }, FOLLOW_MS);
+    return () => {
+      ac.abort();
+      clearInterval(timer);
+    };
+  }, [followed, conversation?.id]);
 
   // A question handed over in the address (?q=) is asked once, after the
   // health probe has settled, and then leaves the address so a reload or
@@ -370,9 +292,9 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
     const store = useStore.getState();
     const before = { activeId, path: route.path };
     const current = fresh ? null : conversation;
-    const history = current ? priorTurns(current.turns) : [];
     const convId = current?.id ?? store.startLiveConversation(text.slice(0, 60));
     const turnId = timeId('lt');
+    const by = reviewerName() ?? undefined;
     store.addLiveTurn(convId, {
       id: turnId,
       question: text,
@@ -381,7 +303,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
       plan: null,
       error: null,
       status: 'running',
-      replay: null,
+      by,
     });
     setActiveId(convId);
     if (route.path !== `/postdoc/${convId}` || route.query.has('q')) navigate(`/postdoc/${convId}`, { replace: true });
@@ -396,11 +318,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
           setReached(true);
           patch(convId, turnId, { step });
         },
-        {
-          signal: ac.signal,
-          history,
-          onReplay: (replay) => patch(convId, turnId, { replay }),
-        },
+        { signal: ac.signal, conversationId: convId, turnId, by },
       );
       setReached(true);
       patch(convId, turnId, { plan, status: 'answered' });
@@ -445,7 +363,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
 
   return (
     <div className="flex gap-4 items-start" style={{ height: 'calc(100vh - 132px)' }}>
-      {/* Conversations, newest first, kept in this browser. */}
+      {/* Conversations, newest first, kept with the project. */}
       {sessionsOpen && (
         <aside className="w-[240px] shrink-0 hidden lg:flex flex-col h-full">
           <Button
@@ -460,18 +378,8 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
           <div className="flex-1 overflow-y-auto space-y-1" data-testid="live-conversations">
             {liveConversations.length === 0 && (
               <p className="text-caption text-ink-soft px-2.5 py-2">
-                Conversations asked here are kept in this browser, across reloads.
-              </p>
-            )}
-            {hiddenConversations > 0 && (
-              <p className="text-caption text-ink-soft px-2.5 py-2" data-testid="live-conversations-hidden">
-                <span className="font-num">{hiddenConversations}</span>{' '}
-                {hiddenConversations === 1 ? 'conversation cites' : 'conversations cite'} archived programs and{' '}
-                {hiddenConversations === 1 ? 'is' : 'are'} hidden;{' '}
-                <a className="text-accent hover:underline" href={href(PROGRAMS_SETTINGS_PATH)}>
-                  Settings → Programs
-                </a>{' '}
-                shows them.
+                No conversation yet: a person asks the first question. Conversations asked here are kept in
+                this browser, across reloads.
               </p>
             )}
             {liveConversations.map((c) => (
@@ -488,7 +396,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
               >
                 <div className="text-body truncate">{c.title}</div>
                 <div className="text-caption text-ink-soft">
-                  <span className="font-num">{c.startedAt}</span> · <span className="font-num">{c.turns.length}</span>{' '}
+                  <span className="font-num">{shownAt(c.startedAt)}</span> · <span className="font-num">{c.turns.length}</span>{' '}
                   {c.turns.length === 1 ? 'question' : 'questions'}
                 </div>
               </button>
@@ -522,7 +430,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
               <Callout kind="warn" title="Postdoc needs the service">
                 <p className="text-ink">
                   Start it with <code className="font-num text-caption bg-surface-1 rounded px-1">pnpm prototype:up</code>{' '}
-                  from the repository root, then send the question again. The conversations here stay in this browser,
+                  from the repository root, then send the question again. The conversations are kept with the project,
                   and a question typed meanwhile stays in the box.
                 </p>
                 <button className="btn btn-sm mt-2" onClick={() => void probeHealth()}>
