@@ -243,8 +243,8 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 | `proforma._strain_labels`' per-program species map serves the vessel's organism check; with no catalogue it is empty in production, and its two notes are hashed into vessel designs | with the `program` key above |
 | A retrieval report over a project's own corpus with the lanes that call a model (the graph, HyDE, a judge grading the answers): alpha 1.0's paid lanes (Live owed, §4.5) | after alpha 2.0, with the key: `pnpm lit:report` extended to a project and a judge route |
 | The kit's `search_entities` and `get_entity_relationships` read the concept graph whole (every project's entities, relationships and evidence quotes), so the kit's MCP server leaves them off; nothing in openFerment builds the graph yet | before a graph is built: scope both to the project's chunks, or serve them from openFerment's registry |
-| Catalogues that left with the seed are empty in production and supplied by fixtures in tests: the strain catalogue and its aliases, the proposer's products and hosts, Guild's skills, protocol steps and lessons, Primer's lessons. Until a store holds them, every pureOS proposal is refused for want of a host on file and Guild refuses an entry that names a skill | after alpha 2.0, each catalogue's store with its project |
-| `stream_table` on a scenario's kept run lost its test with the seed scenarios; `run_flowsheet` and `selling_price` on a scenario the project keeps have theirs again (8.5) | a test that reads the stream table of the run `test_tools` now makes |
+| Paid in part: the catalogues are project stores (migration 0007, `catalogues.py`): strains and their aliases, products, Guild's skills and Primer's lessons, each with a route, `catalogue_read` and `catalogue_write`, and an Intake path for a file of entries; the proposer, ProtParam, Guild and the module reads read them. Still open: the protocol steps' skills (Guild's `steps`), a screen for the catalogues, and Primer's screen, which reads its lessons from the browser | alpha 2.1, D.1; the rest after alpha 2.1 |
+| Paid: `stream_table` on a scenario's kept run lost its test with the seed scenarios; `test_tools` reads the stream table of the run it makes of a kept scenario, from the run's artifact | alpha 2.1, D.6 |
 | The module reads leave a project's depositions and measured evidence out (`module_stores.PARTIAL` says so in every read's footer); the Runbooks page shows them | a `deposition` kind in the runbooks read |
 | Proforma's screens keep alpha 1.0's split between a held scenario and one made here (`createdScenarioIds`, the index's `needsBinding`, the `/api/proforma/scenarios` path); every scenario is the project's now, so the held path is never taken | the screens read every scenario as the project's |
 | `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's research funnel, whose words still speak of a clearance reading and a molecule | after alpha 2.0 (stage 7 left the module screens as they were, now views inside a project) |
@@ -959,6 +959,12 @@ holds the numbers, the tables and the judgements).
 - D.4 A local model behind an OpenAI-compatible endpoint (`53c123c`; ADR-008, Implementation 11):
   `OPENFERMENT_LOCAL_BASE_URL` serves `openai-compatible:<model>` in single calls through the kit's
   adapter (its `openai` extra, Apache-2.0, now locked); Postdoc's loop passes it over in words.
+- D.1 The catalogues as project stores (`a0c33bb`): the `catalogue` table (migration 0007) of
+  strains, products, skills and lessons, read by the proposer, ProtParam, Guild and the module
+  reads; `GET`/`POST /api/catalogues/{kind}`, `POST /api/intake/catalogue` for a JSON or CSV file,
+  and `catalogue_read` and `catalogue_write` (48 tools). The protocol steps' skills and a
+  catalogue screen are still open.
+- D.6 The stream table of a kept scenario's run has its test again (`test_tools.py`).
 - Departure: debts 2 and 4 were paid before debt 1, the catalogues, because every live step after
   them waits on the account's usage limit and these two needed no model call; the catalogues,
   Quantity runs (3), the screens on the generated types (5) and the small debts (6) follow in

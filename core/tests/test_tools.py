@@ -458,6 +458,14 @@ def test_proforma_tools_run_a_scenario_the_project_keeps_as_its_page_runs_it(pro
     cited = tools.run("selling_price", {"scenarioId": sid}, c)
     assert cited.error is None, cited.error
     assert cited.evidence[0].id == ev.id == r.summary["artifactId"] == cited.summary["evidenceId"]
+    # The run's stream table, read from its kept artifact and never simulated
+    # again (a debt since the seed's scenarios left; paid in alpha 2.1).
+    table = tools.run("stream_table", {"artifactId": r.summary["artifactId"]}, c)
+    assert table.error is None, table.error
+    t = table.summary
+    assert (t["artifactId"], t["scenarioId"], t["provenance"]) == (ev.id, sid, "assumed")
+    assert t["streamCount"] == len(t["streams"]) > 0 and t["evidenceId"] == ev.id
+    assert all(row.get("id") or row.get("name") for row in t["streams"])
 
 
 @pytest.mark.parametrize("name, raw", [
