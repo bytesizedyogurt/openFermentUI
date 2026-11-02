@@ -182,13 +182,41 @@ def test_the_cost_budget_ends_the_loop_keeping_back_what_the_final_turn_could_co
     assert ask(script, pool).stopped == "cost" and len(script.calls) == 4, "nothing kept back, a round more"
 
 
-def test_the_final_turns_worst_case_is_its_conversation_and_every_output_token():
+def test_the_final_turns_worst_case_is_its_conversation_and_the_answer_every_turn_has():
     said = [{"role": "user", "content": "q?"}]
     held = postdoc_agent._final_turn_usd(llm.DEFAULT_PRIMARY, said, [])
     assert held == llm.worst_case_usd(llm.DEFAULT_PRIMARY, {"system": postdoc_agent.AGENT_SYSTEM, "messages": said,
-                                                            "tools": []}, postdoc_agent.MAX_TOKENS) > 0
+                                                            "tools": []}, postdoc_agent.MIN_TOKENS) > 0
     assert postdoc_agent._final_turn_usd(f"anthropic:{llm.DEFAULT_PRIMARY}", said, []) == held
     assert postdoc_agent._final_turn_usd("an-unpriced-model", said, []) == 0.0
+
+
+def test_a_turn_may_write_what_the_questions_budget_has_left_to_pay_for():
+    # Alpha 2.1: asked on Opus at effort high, an answer over a project's 22
+    # documents ran out of room at the old ceiling of 8,000 tokens.
+    said = [{"role": "user", "content": "q?"}]
+    request = {"system": postdoc_agent.AGENT_SYSTEM, "messages": said, "tools": []}
+    run = postdoc_agent._Run(question="q?", ctx=tools.ToolContext(), converse=None, clock=lambda: 0.0, started=0.0)
+    whole = llm.worst_case_usd(llm.DEFAULT_PRIMARY, request, postdoc_agent.MAX_TOKENS)
+    assert postdoc_agent._turn_tokens(run, llm.DEFAULT_PRIMARY, said, [], whole + 1) == postdoc_agent.MAX_TOKENS
+    assert postdoc_agent._turn_tokens(run, llm.DEFAULT_PRIMARY, said, [], 0.0) == postdoc_agent.MIN_TOKENS, "the floor"
+    halfway = llm.worst_case_usd(llm.DEFAULT_PRIMARY, request, 20_000)
+    got = postdoc_agent._turn_tokens(run, llm.DEFAULT_PRIMARY, said, [], halfway)
+    assert postdoc_agent.MIN_TOKENS < got <= 20_000 and got >= 19_990, got
+    run.spent = Usage(costUsd=halfway)
+    assert postdoc_agent._turn_tokens(run, llm.DEFAULT_PRIMARY, said, [], halfway) == postdoc_agent.MIN_TOKENS, "spent"
+    assert postdoc_agent._turn_tokens(run, "an-unpriced-model", said, [], 100.0) == postdoc_agent.MIN_TOKENS
+
+
+def test_each_turn_is_asked_with_the_ceiling_its_budget_allows(pool, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "6")
+    script = Script([records()], plan())
+    ask(script, pool)
+    assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MAX_TOKENS] * 2
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.003")
+    script = Script(plan())
+    ask(script, pool)
+    assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MIN_TOKENS]
 
 
 def test_wall_time_ends_the_loop(pool):  # noqa: F811

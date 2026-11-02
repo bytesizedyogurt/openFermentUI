@@ -132,6 +132,12 @@ const NORMALIZE_INPUTS = [
   'g g-1 h-1',
   'g g\u22121 h\u22121',
   'h-1',
+  // A plant's rates and a yield in kilograms (alpha 2.1): a runbook of a plant's run.
+  'kg/h',
+  'kg/hr',
+  'kg h-1',
+  'kg/kg',
+  't/d',
 ];
 
 const normalize = NORMALIZE_INPUTS.map((raw) => ({
@@ -165,6 +171,10 @@ const CONVERT_INPUTS: [number, string, string][] = [
   [2.5, '$/gal', 'USD gal⁻¹'],
   [2.5, '$/gal', 'USD/kg'], // needs the product's density — must throw
   [0.4, 'g/g/h', 'g g⁻¹ h⁻¹'],
+  [24, 't d⁻¹', 'kg/h'],
+  [1, 'kg/s', 'kg h⁻¹'],
+  [0.3, 'kg/kg', 'g/g'],
+  [1, 'kg/h', 'g/L'], // a rate of mass is not a titre — must throw
 ];
 
 const conversions = CONVERT_INPUTS.map(([value, from, to]) => {
@@ -184,6 +194,7 @@ const SI_INPUTS: [number, string][] = [
   [62, 'wt%'], // OF-BLD-014 §2.1
   [450000, 'g mol⁻¹'],
   [2.5, '$/gal'], // a techno-economic price
+  [1000, 'g h⁻¹'], // a plant's rate of mass
 ];
 const si = SI_INPUTS.map(([value, unit]) => ({ value, unit, si: toSI(value, unit) }));
 

@@ -150,7 +150,15 @@ calls and 360 s (`postdoc_agent.MAX_ROUNDS`, `MAX_TOOL_CALLS`, `MAX_SECONDS`); t
 their budgets from the constants. The ask's cost cap (`OPENFERMENT_ASK_BUDGET_USD`) bounds what one
 question spends, and its reservation for the final turn stands as 6.3 built it. The same asking
 added `flowsheet_library`, `flowsheet_import` and `flowsheet_read` to the registry (46 names), and
-the plan prompt now names ordinals and table labels as the numbers they are.
+the plan prompt now names ordinals, fractions and table labels as the numbers they are.
+
+Asked again, the answer over the project's 22 documents ran out of room: a turn's ceiling of 8,000
+tokens holds the model's thinking as well as its plan. A turn now writes as much as the question's
+budget has left to pay for, between `MIN_TOKENS` (8,000) and `MAX_TOKENS` (32,000)
+(`postdoc_agent._turn_tokens`), and the loop holds back a `MIN_TOKENS` answer before it asks
+another round, as 6.3 held back the whole ceiling. On the owner's default ask budget (0.75 USD,
+D8's figure) a turn on Opus still gets what the budget left pays for; on the 6 USD core/.env names
+for real work, every turn gets the whole ceiling.
 
 ## Evidence
 

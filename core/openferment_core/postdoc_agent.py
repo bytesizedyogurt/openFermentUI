@@ -20,7 +20,10 @@ with the earlier answers.
 
 THE BUDGET. `MAX_ROUNDS` model turns, `MAX_TOOL_CALLS` tool calls,
 `OPENFERMENT_ASK_BUDGET_USD` (spend.ask_budget) and `MAX_SECONDS` of wall
-time. Whichever is spent first names the plan's `stopped`.
+time. Whichever is spent first names the plan's `stopped`. Each turn may
+write as much as the budget has left to pay for, between `MIN_TOKENS` and
+`MAX_TOKENS` (`_turn_tokens`), and the loop holds back a `MIN_TOKENS` answer
+before it asks another round.
 
 A REFUSAL OR AN OUTAGE mid-loop restarts the question once on the next model
 in the answer chain, with a fresh conversation; tool results come from the
@@ -61,7 +64,7 @@ from typing import Any, Callable
 
 from . import llm, module_stores, spend, tools
 from .models import AnswerPlan, CoverageMap, PriorTurn, RunbookDraft, ToolResult, TraceStep, Usage
-from .postdoc import MAX_TOKENS, SYSTEM as PLAN_SYSTEM, TOOL as PLAN_TOOL
+from .postdoc import MAX_TOKENS, MIN_TOKENS, SYSTEM as PLAN_SYSTEM, TOOL as PLAN_TOOL
 from .validate import SeenSet, decline_reason, find_number, validate_plan
 
 log = logging.getLogger("openferment.postdoc_agent")
@@ -491,12 +494,32 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
 def _final_turn_usd(model: str, messages: list[dict[str, Any]], defs: list[dict[str, Any]]) -> float:
     """The most the final turn could cost, held back from the question's
     budget before another round is asked (execution prompt §10 stage 6.3):
-    the conversation so far read as input, and every output token it allows.
-    Nothing for a model with no price on file, which the daily cap refuses."""
+    the conversation so far read as input, and the MIN_TOKENS of output every
+    turn has. Nothing for a model with no price on file, which the daily cap
+    refuses."""
     _, model_id = llm.spec(model)
     if model_id not in llm.PRICES:
         return 0.0
-    return llm.worst_case_usd(model_id, {"system": AGENT_SYSTEM, "messages": messages, "tools": defs}, MAX_TOKENS)
+    return llm.worst_case_usd(model_id, {"system": AGENT_SYSTEM, "messages": messages, "tools": defs}, MIN_TOKENS)
+
+
+def _turn_tokens(run: _Run, model: str, messages: list[dict[str, Any]], defs: list[dict[str, Any]],
+                 budget_usd: float) -> int:
+    """A turn's ceiling on what it writes, its thinking included (alpha 2.1):
+    as many tokens as the question's budget has left to pay for after the
+    conversation so far is read, at least MIN_TOKENS, which the loop holds
+    back for the answer, and at most MAX_TOKENS. A model with no price on
+    file gets MIN_TOKENS; the daily cap refuses it anyway."""
+    _, model_id = llm.spec(model)
+    if model_id not in llm.PRICES:
+        return MIN_TOKENS
+    request = {"system": AGENT_SYSTEM, "messages": messages, "tools": defs}
+    read = llm.worst_case_usd(model_id, request, 0)
+    per_token = (llm.worst_case_usd(model_id, request, MAX_TOKENS) - read) / MAX_TOKENS
+    left = budget_usd - run.spent.costUsd - read
+    if per_token <= 0:
+        return MAX_TOKENS
+    return max(MIN_TOKENS, min(MAX_TOKENS, int(left / per_token)))
 
 
 def _out_of_budget(run: _Run, rounds: int, budget_usd: float, final_usd: float = 0.0) -> str | None:
@@ -539,7 +562,7 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
             raise Cancelled()
         turn = run.converse(
             system=AGENT_SYSTEM, messages=messages, tools=defs, schema=PLAN_SCHEMA,
-            max_tokens=MAX_TOKENS, model=model, tool_choice="auto",
+            max_tokens=_turn_tokens(run, model, messages, defs, budget_usd), model=model, tool_choice="auto",
         )
         run.spent = llm.add(run.spent, turn.usage)
         if not turn.toolCalls:
@@ -560,7 +583,7 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
             messages.append({"role": "user", "content": blocks})
             last = run.converse(
                 system=AGENT_SYSTEM, messages=messages, tools=defs, schema=PLAN_SCHEMA,
-                max_tokens=MAX_TOKENS, model=model, tool_choice="none",
+                max_tokens=_turn_tokens(run, model, messages, defs, budget_usd), model=model, tool_choice="none",
             )
             run.spent = llm.add(run.spent, last.usage)
             return last, stopped

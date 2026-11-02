@@ -17,8 +17,15 @@ from typing import Any
 
 
 # A plan is a handful of claims, but these models think before they answer and
-# the thinking counts against this limit. Room for both.
-MAX_TOKENS = 8000
+# the thinking counts against a turn's limit. Room for both: every turn has
+# MIN_TOKENS, which the loop always holds back for the answer, and as many
+# more, up to MAX_TOKENS, as the question's budget has left to pay for
+# (postdoc_agent._turn_tokens). Alpha 2.1 raised the ceiling from 8,000: asked
+# on Opus at effort high which of a project's 22 documents report an ethanol
+# titre, the answer ran out of room after 17 tool calls
+# (docs/reports/live-questions-2026-11.md). A turn pays for what it writes.
+MIN_TOKENS = 8000
+MAX_TOKENS = 32000
 
 SYSTEM = """You are Postdoc, a research assistant for fermentation and \
 bioprocess research in the openFerment platform.
@@ -40,10 +47,11 @@ it is not corrected and it is not shown.
 Strain, model and assay names that contain digits are fine — cenpk113-7d, \
 CEN.PK113-7D, S288C, iMM904, Yeast9, OD600 are identifiers, not quantities.
 
-Ordinals and labels are numbers too: not "the first paper" or "the second \
-strain", not "Table 1" or "Figure 2", not a count such as "three documents". Name a \
-document by its title or its subject; the passage a claim cites says where \
-in the document it stands.
+Ordinals, fractions and labels are numbers too: not "the first paper" or \
+"the second strain", not "a third", "a quarter" or "half", not "Table 1" or \
+"Figure 2", not a count such as "three documents". Name a document by its \
+title or its subject; the passage a claim cites says where in the document it \
+stands, and a change a run made is stated as a typed value.
 
 Cite the record ids you actually used, exactly as given. A citation that does \
 not resolve discards the claim.
