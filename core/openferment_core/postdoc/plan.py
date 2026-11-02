@@ -40,6 +40,11 @@ it is not corrected and it is not shown.
 Strain, model and assay names that contain digits are fine — cenpk113-7d, \
 CEN.PK113-7D, S288C, iMM904, Yeast9, OD600 are identifiers, not quantities.
 
+Ordinals and labels are numbers too: not "the first paper" or "the second \
+strain", not "Table 1" or "Figure 2", not a count such as "three documents". Name a \
+document by its title or its subject; the passage a claim cites says where \
+in the document it stands.
+
 Cite the record ids you actually used, exactly as given. A citation that does \
 not resolve discards the claim.
 

@@ -67,9 +67,14 @@ from .validate import SeenSet, decline_reason, find_number, validate_plan
 log = logging.getLogger("openferment.postdoc_agent")
 
 # The loop's bounds (Part G, rule 4): conventions, settings of the software.
-MAX_ROUNDS = 6
-MAX_TOOL_CALLS = 12
-MAX_SECONDS = 180.0
+# Alpha 2.1 raised them from 6, 12 and 180 s: asked live on Opus, four of the
+# owner's twelve questions spent their tool calls before they covered the
+# project's documents, and two their rounds before a scenario ran or a draft
+# was written (docs/reports/live-questions-2026-11.md). The ask's cost cap
+# (OPENFERMENT_ASK_BUDGET_USD) still bounds what a question spends.
+MAX_ROUNDS = 10
+MAX_TOOL_CALLS = 24
+MAX_SECONDS = 360.0
 # How much of a conversation a follow-up reads: its last few turns, each cut
 # to a length, so a long conversation costs what a short one does.
 MAX_HISTORY_TURNS = 4

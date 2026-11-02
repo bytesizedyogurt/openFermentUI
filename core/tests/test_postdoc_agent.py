@@ -142,29 +142,31 @@ def test_a_number_in_a_claim_is_dropped(pool):  # noqa: F811
     assert out.claims == [] and out.rejected == 1
 
 
-def test_twelve_tool_calls_end_the_loop(pool):  # noqa: F811
-    # Three calls a turn: the twelfth lands in the fourth round, before the rounds run out.
-    turns = [[records(f"query {chr(97 + 3 * t + i)}") for i in range(3)] for t in range(4)]
+def test_the_tool_call_budget_ends_the_loop(pool):  # noqa: F811
+    # Three calls a turn: the last call the budget allows lands before the rounds run out.
+    rounds = -(-postdoc_agent.MAX_TOOL_CALLS // 3)
+    assert rounds < postdoc_agent.MAX_ROUNDS
+    turns = [[records(f"query {t}-{i}") for i in range(3)] for t in range(rounds)]
     script = Script(*turns, plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
     assert out.stopped == "calls"
-    assert len(script.calls) == 5
-    assert [c["tool_choice"] for c in script.calls] == ["auto"] * 4 + ["none"]
+    assert len(script.calls) == rounds + 1
+    assert [c["tool_choice"] for c in script.calls] == ["auto"] * rounds + ["none"]
     assert sum(1 for s in out.trace if s.kind == "tool") == postdoc_agent.MAX_TOOL_CALLS
     note = script.calls[-1]["messages"][-1]["content"][-1]
     assert note["type"] == "text" and "budget is spent" in note["text"]
 
 
 def test_calls_past_the_budget_in_one_turn_are_not_run(pool):  # noqa: F811
-    script = Script([records(f"q {chr(97 + i)}") for i in range(14)], plan(claim(records=["r-X1-1"])))
+    script = Script([records(f"q {i}") for i in range(postdoc_agent.MAX_TOOL_CALLS + 2)], plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
-    assert out.stopped == "calls" and sum(1 for s in out.trace if s.kind == "tool") == 12
+    assert out.stopped == "calls" and sum(1 for s in out.trace if s.kind == "tool") == postdoc_agent.MAX_TOOL_CALLS
     results = script.calls[-1]["messages"][-1]["content"]
     assert sum(1 for b in results if b.get("is_error")) == 2, "every tool_use still gets its tool_result"
 
 
 def test_rounds_end_the_loop(pool):  # noqa: F811
-    script = Script(*[[records(f"r {chr(97 + i)}")] for i in range(6)], plan())
+    script = Script(*[[records(f"r {i}")] for i in range(postdoc_agent.MAX_ROUNDS)], plan())
     out = ask(script, pool)
     assert out.stopped == "rounds" and script.calls[-1]["tool_choice"] == "none"
 

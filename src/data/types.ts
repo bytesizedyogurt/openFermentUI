@@ -2319,6 +2319,7 @@ export interface DraftMeasure {
 /** Assembled by the service; a person adopts it as a research runbook and locks it. */
 export interface RunbookDraft {
   title: string;
+  /** Empty for a runbook of a plant's run, which names no product or strain. */
   productId: string;
   strainId: string;
   predictions: Prediction[];

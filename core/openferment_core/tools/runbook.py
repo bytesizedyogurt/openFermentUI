@@ -1,7 +1,8 @@
 """`draft_runbook`: Postdoc drafts a runbook, and the service writes every
 number (OF-BLD-014 §9.2).
 
-Ids and words in: a title, a product id, a strain id, items that each point
+Ids and words in: a title, a product id and a strain id when the runbook
+tests one the project's catalogues hold (empty for a plant's run), items that each point
 at one computed evidence item or at records of one field, and measures that
 each name the item they test at one of four timepoints. `runbook_draft.build`
 writes the predictions' values and intervals from the artifacts and records,
@@ -23,8 +24,8 @@ class DraftRunbookInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(description="What the runbook tests, in words with no number.")
-    productId: str = Field(description="A product id.")
-    strainId: str = Field(description="A strain id.")
+    productId: str = Field(default="", description="A product id from the project's catalogue; empty when the runbook tests a plant's run.")
+    strainId: str = Field(default="", description="A strain id from the project's catalogue; empty when the runbook tests a plant's run.")
     items: list[DraftItem] = Field(description="Each prediction: one evidence id, or a field with record ids this run returned.")
     measures: list[DraftMeasure] = Field(description="What the bench records, each naming the item label it tests.")
 
@@ -59,7 +60,8 @@ TOOL = register(
     Tool(
         name=NAME,
         description=(
-            "Draft a runbook from what this run found: a title, a product id and a strain id, items that each name one "
+            "Draft a runbook from what this run found: a title, a product id and a strain id when it tests one the "
+            "project's catalogues hold (both empty for a runbook of a plant's run), items that each name one "
             "evidence id or a field with record ids returned earlier in this run, and measures (label, unit, one of "
             "start, mid-run, harvest, after recovery, and the item label they test). Send no numbers: the service writes "
             "each prediction's value and interval from the evidence and the records. A person adopts and locks it."

@@ -429,6 +429,32 @@ def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note
     return run_result(report)
 
 
+def import_flowsheet(tool: str, file_id: str, note: str, ctx: ToolContext) -> ToolResult:
+    """Import one of the toolkit's reference SFF files into the project and
+    mark it as the caller's (alpha 2.1 stage B): fetched at the pinned commit,
+    its hash checked, checked by the toolkit, drawn and kept with origin
+    `library`."""
+    from .. import projects
+    from ..engine import sff
+    from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
+    from .flowsheets import record_result
+
+    _, who = _actor(ctx)
+    fid = file_id.strip()
+    try:
+        record = sff.import_library(fid, project_id=ctx.project or projects.current(), by=who)
+    except (sff.FlowsheetNotFound, KeyError) as e:
+        return ToolResult(error=f"{tool} refused: {str(e).strip(chr(39))} (flowsheet_library lists the reference files)")
+    except sff.SFFRefused as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    except sff.LibraryUnavailable as e:
+        return ToolResult(error=f"{tool} could not fetch {fid}: {e}")
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        return ToolResult(error=f"{tool} could not check {fid}: {e}")
+    _audit_as(ctx, "proforma", "flowsheet_import", "open", record.id, {"tool": tool, "libraryId": fid, "note": note})
+    return record_result(record)
+
+
 def make_scenario(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
     """Keep a study scenario whose values the caller typed, each marked by
     the registry as the caller's (ADR-006), and audit it as theirs."""

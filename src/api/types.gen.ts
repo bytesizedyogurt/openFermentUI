@@ -5298,9 +5298,15 @@ export interface components {
             measures: components["schemas"]["Measure"][];
             /** Predictions */
             predictions: components["schemas"]["Prediction"][];
-            /** Productid */
+            /**
+             * Productid
+             * @default
+             */
             productId: string;
-            /** Strainid */
+            /**
+             * Strainid
+             * @default
+             */
             strainId: string;
             /** Title */
             title: string;

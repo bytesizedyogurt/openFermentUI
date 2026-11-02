@@ -22,7 +22,7 @@ the registry holds, it holds for each of them.
 - **Writes**: a tool marked *writes* keeps something new in the project, audited as its caller's,
   through `tools/writes.py`; a read keeps nothing but the computations it caches.
 
-43 tools.
+46 tools.
 
 ## The registry
 
@@ -71,6 +71,9 @@ the registry holds, it holds for each of them.
 | `study_read` | Studies | read | project |
 | `literature_sources` | Literature | read | project |
 | `literature_document` | Literature | read | project |
+| `flowsheet_library` | flowsheets | read | project |
+| `flowsheet_import` | flowsheets | writes | project |
+| `flowsheet_read` | flowsheets | read | project |
 
 ## Records
 
@@ -178,11 +181,13 @@ Run a plant from the library shelf at the library's defaults, or a study scenari
 
 *read · scope: project · loose*
 
-Read a kept engine run by its id: what ran, the values it set with their origins, its provenance, and each number its price and its flowsheet's outputs hold as an evidence id to cite; for a refused run, the plant's own words.
+Read a kept engine run by its id: what ran, the values it set with their origins, its provenance, and each number its price block, its flowsheet's outputs and its TEA breakdown hold as an evidence id to cite; with words in `parameters`, the parameters the run read back from the plant (its feed's composition, moisture and price, the chemicals' prices, the finance terms), each as an evidence id with its origin. For a refused run, the plant's own words.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
 | `run` | string | yes | A kept run's id, as engine_run or study_read gives it. |
+| `parameters` | string | no | Words to read the parameters the run read back from the plant by (its feed, a unit, a price, a finance term): each one matched comes back as an evidence id with its value, its unit and its origin. Empty for none. |
+| `limit` | integer | no | How many parameters at most. A count. |
 
 ## Studies
 
@@ -379,13 +384,13 @@ Density, heat capacity, viscosity, and bubble and dew points of a mixture alread
 
 *read · scope: project · strict*
 
-Draft a runbook from what this run found: a title, a product id and a strain id, items that each name one evidence id or a field with record ids returned earlier in this run, and measures (label, unit, one of start, mid-run, harvest, after recovery, and the item label they test). Send no numbers: the service writes each prediction's value and interval from the evidence and the records. A person adopts and locks it.
+Draft a runbook from what this run found: a title, a product id and a strain id when it tests one the project's catalogues hold (both empty for a runbook of a plant's run), items that each name one evidence id or a field with record ids returned earlier in this run, and measures (label, unit, one of start, mid-run, harvest, after recovery, and the item label they test). Send no numbers: the service writes each prediction's value and interval from the evidence and the records. A person adopts and locks it.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
 | `title` | string | yes | What the runbook tests, in words with no number. |
-| `productId` | string | yes | A product id. |
-| `strainId` | string | yes | A strain id. |
+| `productId` | string | no | A product id from the project's catalogue; empty when the runbook tests a plant's run. |
+| `strainId` | string | no | A strain id from the project's catalogue; empty when the runbook tests a plant's run. |
 | `items` | list of `DraftItem` | yes | Each prediction: one evidence id, or a field with record ids this run returned. |
 | `measures` | list of `DraftMeasure` | yes | What the bench records, each naming the item label it tests. |
 

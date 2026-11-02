@@ -146,6 +146,7 @@ One tool registry, three callers (OF-BLD-014 §3.4, E.6).
 |---|---|
 | `engine.py` | The library shelf and the project's engine runs, for Postdoc (alpha 2.0 stage 6; execution prompt §4.6, §9.1 step 6; ADR-004, ADR-006). |
 | `fermos.py` | fermOS's tools: `growth_forecast` (OF-BLD-014 §7.3), `fermos_simulate` (OF-BLD-020 §3.4) and `fermos_vessel` (OF-BLD-020 §4.2). |
+| `flowsheets.py` | SFF flowsheets, for Postdoc (alpha 2.1 stage B; ADR-003): the toolkit's reference files, a reference file imported into the project, and a kept record read back. |
 | `gates.py` | The gates (OF-BLD-015 §7.4): one table, one row a gate. |
 | `geneos.py` | `yield_ceiling`: the most product a published reaction network can make from a feed (OF-BLD-014 §6.3). |
 | `literature.py` | The documents a project holds, for Postdoc (alpha 2.0 stage 6; ADR-002). |

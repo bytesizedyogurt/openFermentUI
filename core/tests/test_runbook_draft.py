@@ -81,6 +81,21 @@ def test_words_with_a_number_and_unknown_ids_are_refused(pool):  # noqa: F811
         build(pool, s, item, [DraftMeasure(label="Yield", unit="furlongs", timepoint="harvest", itemLabel="Yield ceiling")])
 
 
+def test_a_draft_of_a_plants_run_names_no_product_or_strain(pool):  # noqa: F811
+    # Alpha 2.1, stage B: draft_runbook refused every draft, "there is no product",
+    # for the catalogues are empty in production and a plant's run tests a plant.
+    s = seen_with(ev("ev-p", 0.848, figure=None, unit="USD/kg"))
+    d, left = runbook_draft.build("Selling price with glucose fermented alone", "", "",
+                                  [DraftItem(label="Minimum selling price", evidenceId="ev-p")], [], s, pool, set(), set())
+    assert (d.productId, d.strainId, left) == ("", "", [])
+    p = d.predictions[0]
+    assert (p.kind, p.value, p.unit, p.confidence, p.artifactId) == ("point", 0.848, "USD/kg", "low", "art-ev-p"), \
+        "an engine run's number is a point at low confidence, as a run's runbook writes it"
+    with pytest.raises(runbook_draft.DraftRefused, match="no strain"):
+        runbook_draft.build("t", "", "nothing", [DraftItem(label="Minimum selling price", evidenceId="ev-p")], [], s, pool,
+                            set(), set())
+
+
 def test_a_typed_number_in_the_tool_input_is_refused_by_the_registry(pool):  # noqa: F811
     r = tools.run("draft_runbook", {"title": "t", "productId": PRODUCT, "strainId": STRAIN,
                                     "items": [{"label": "x", "evidenceId": "", "field": "titer_secreted", "recordIds": [], "value": 8}],

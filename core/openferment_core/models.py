@@ -2512,8 +2512,9 @@ class DraftMeasure(BaseModel):
 
 class RunbookDraft(BaseModel):
     title: str
-    productId: str
-    strainId: str
+    # Empty for a runbook of a plant's run, which names no product or strain.
+    productId: str = ""
+    strainId: str = ""
     predictions: list[Prediction]
     measures: list[Measure]
 

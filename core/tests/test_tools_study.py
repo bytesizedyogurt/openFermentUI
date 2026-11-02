@@ -122,6 +122,44 @@ def test_a_model_keeps_a_scenario_of_its_estimates_runs_it_and_cites_the_runs_nu
     assert [(r["id"], r["runIds"]) for r in read.summary["rows"]] == [(sid, [s["runId"]])]
 
 
+class Itemised(Priced):
+    """Priced, with the TEA breakdown the worker reads from BioSTEAM's TEA: two lines."""
+
+    def __call__(self, op: str, args: dict):
+        out = super().__call__(op, args)
+        if op == "library_run":
+            out = {**out, "tableUnits": {"annual": "USD/yr"}, "tea": {"basis": "kg of the ethanol stream", "lines": [
+                {"key": "feedstock", "label": "Main feedstock", "usdPerYear": 1.0e7, "perUnit": 0.2,
+                 "reads": "the feedstock stream's market value"},
+                {"key": "utilities", "label": "Utilities", "usdPerYear": -2.0e6, "perUnit": -0.04, "reads": "TEA.utility_cost"},
+            ]}}
+        return out
+
+
+def test_a_runs_tea_lines_and_the_parameters_it_read_back_are_evidence(monkeypatch):
+    # Alpha 2.1, stage B: asked what drives a plant's price and what it assumes of
+    # its feed, Postdoc could cite neither, for neither came with an evidence id.
+    monkeypatch.setattr(simulator, "call", Itemised())
+    monkeypatch.setattr(library, "_PARAMETERS", {})
+    made = tools.run("study_scenario", dearer_cane(), as_model())
+    ran = tools.run("engine_run", {"plant": "", "configuration": "", "scenario": made.summary["scenarioId"], "note": ""},
+                    as_model())
+    art = ran.summary["artifactId"]
+    held = {e.id: e for e in ran.evidence}
+    assert (held[f"{art}:tea.feedstock"].value, held[f"{art}:tea.feedstock"].unit) == (0.2, "USD per kg of the ethanol stream")
+    assert (held[f"{art}:tea.utilities.year"].value, held[f"{art}:tea.utilities.year"].unit) == (-2.0e6, "USD/yr")
+    assert "a line of the TEA's breakdown" in held[f"{art}:tea.feedstock"].label
+
+    read = tools.run("engine_report", {"run": ran.summary["runId"], "parameters": "sugarcane", "limit": 10}, as_model())
+    assert read.error is None, read.error
+    by_id = {e.id: e for e in read.evidence}
+    price, flow = by_id[f"{art}:parameters.stream.sugarcane.price"], by_id[f"{art}:parameters.stream.sugarcane.F_mass"]
+    assert (price.value, price.unit, price.provenance) == (0.05, "USD/kg", "assumed"), "the scenario set it: assumed"
+    assert (flow.unit, flow.provenance) == ("kg/hr", "computed") and "the package's own value" in flow.label
+    assert {p["id"] for p in read.summary["parameters"]} == {price.id, flow.id}
+    assert "valuesSet" in read.summary and "evidence" not in read.summary, "the parameters take the summary's room"
+
+
 def test_a_plant_runs_at_the_librarys_defaults_and_two_runs_compare(worker):
     base = tools.run("engine_run", {"plant": "sugarcane"}, as_model())
     assert base.error is None and base.summary["provenance"] != "assumed" and base.summary["valuesSet"] == []

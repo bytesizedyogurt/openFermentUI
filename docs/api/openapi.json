@@ -7397,10 +7397,12 @@
             "type": "array"
           },
           "productId": {
+            "default": "",
             "title": "Productid",
             "type": "string"
           },
           "strainId": {
+            "default": "",
             "title": "Strainid",
             "type": "string"
           },
@@ -7411,8 +7413,6 @@
         },
         "required": [
           "title",
-          "productId",
-          "strainId",
           "predictions",
           "measures"
         ],

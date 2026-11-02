@@ -140,6 +140,18 @@ with its tools loose and its answer schema strict, and remembers its shape, so t
 loose at once (`GrammarTooLarge`; `test_llm.py`). `tools.run` validates every tool's input alike,
 strict or not. The offline suites could not see it: the API compiles the grammar.
 
+## Implementation 9 (alpha 2.1 stage B: the owner's questions on Opus)
+
+The owner's twelve questions, asked live on `claude-opus-5-5` through the Postdoc screen
+(`docs/reports/live-questions-2026-11.md`), found the loop's bounds too tight for real work: four
+answers spent their 12 tool calls before they covered the project's 22 documents, and two spent
+their 6 rounds before a scenario ran or a draft was written. The bounds are now 10 rounds, 24 tool
+calls and 360 s (`postdoc_agent.MAX_ROUNDS`, `MAX_TOOL_CALLS`, `MAX_SECONDS`); the tests derive
+their budgets from the constants. The ask's cost cap (`OPENFERMENT_ASK_BUDGET_USD`) bounds what one
+question spends, and its reservation for the final turn stands as 6.3 built it. The same asking
+added `flowsheet_library`, `flowsheet_import` and `flowsheet_read` to the registry (46 names), and
+the plan prompt now names ordinals and table labels as the numbers they are.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.
