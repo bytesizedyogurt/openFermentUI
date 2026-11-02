@@ -4,7 +4,9 @@
  * wait in, the rows laid over a load, and a flush that drops a refusal and
  * keeps everything from the first write the service did not answer; and the
  * overlay a project's pages load (src/lib/intake.ts), where a service that
- * answers and refuses is running and says why. Run by `pnpm check:state`,
+ * answers and refuses is running and says why; the configurations a plant
+ * is offered in (src/lib/library.ts), and the refusals an SFF import answers
+ * in the service's words (src/lib/http.ts). Run by `pnpm check:state`,
  * offline: the service is a stand-in for `fetch`.
  */
 import {
@@ -18,6 +20,8 @@ import {
 } from '../src/lib/projectState';
 import type { Deposition, LiveConversation, Scenario } from '../src/data/types';
 import { loadOverlay } from '../src/lib/intake';
+import { ServiceDown, ServiceRefused, call } from '../src/lib/http';
+import { runnable, type LibraryPlant } from '../src/lib/library';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -119,6 +123,54 @@ async function overlayAgainst(health: Answer, overlay: Answer) {
 {
   const got = await overlayAgainst({ status: 200, body: { ok: true } }, { status: 200, body: { papers: {}, records: {} } });
   check('an overlay that loads is the overlay', 'overlay' in got, JSON.stringify(got));
+}
+
+// ── what a person may run, and what an import's refusal says (alpha 2.1 stage B) ──
+
+{
+  const plant = (builds: { configuration?: string | null; ok: boolean; error?: string | null }[], defaultConfiguration: string | null = null) =>
+    ({ id: 'p', module: 'biorefineries.p', kind: 'flowsheet', defaultConfiguration, builds }) as unknown as LibraryPlant;
+  const composed = runnable(
+    plant(
+      [
+        { configuration: 'hot water, IB', ok: true },
+        { configuration: 'dilute acid, IB', ok: true },
+        { configuration: 'AFEX, IB', ok: false, error: 'infeasible here' },
+      ],
+      'dilute acid, IB',
+    ),
+  );
+  check('a plant is offered in the configurations it built in, its default first', JSON.stringify(composed.configurations) === '["dilute acid, IB","hot water, IB"]', JSON.stringify(composed));
+  check('a configuration that did not build is named with the package’s words', composed.failed.length === 1 && composed.failed[0].error === 'infeasible here', JSON.stringify(composed.failed));
+  const own = runnable(plant([{ configuration: null, ok: true }]));
+  check('a plant that takes no configuration runs in its own', JSON.stringify(own.configurations) === '[null]', JSON.stringify(own));
+  check('a plant that never built is offered in none', runnable(plant([{ ok: false, error: 'no' }])).configurations.length === 0);
+}
+
+async function callAgainst(answer: { status: number; body?: unknown }, healthy = true): Promise<unknown> {
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    if (String(input).startsWith('/api/health')) {
+      if (!healthy) throw new TypeError('fetch failed');
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    return new Response(answer.body === undefined ? 'Bad Gateway' : JSON.stringify(answer.body), { status: answer.status });
+  }) as typeof fetch;
+  try {
+    return await call('/api/flowsheets/import', { method: 'POST' });
+  } catch (e) {
+    return e;
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+{
+  const big = await callAgainst({ status: 413, body: { detail: 'plant.json is larger than 8 MB' } });
+  check('an upload past the size an import takes is refused in the service’s words', big instanceof ServiceRefused && big.message === 'plant.json is larger than 8 MB', String(big));
+  const unfetched = await callAgainst({ status: 502, body: { detail: 'the reference file could not be fetched' } });
+  check('a source the service could not fetch is its refusal, in its words', unfetched instanceof ServiceRefused && unfetched.status === 502, String(unfetched));
+  const proxy = await callAgainst({ status: 502 }, false);
+  check('a 502 with no words and no health is the service down', proxy instanceof ServiceDown, String(proxy));
 }
 
 console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');

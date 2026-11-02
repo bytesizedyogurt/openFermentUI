@@ -2,6 +2,7 @@
 // with the reviewer line, jobs tray, palette, and global shortcuts.
 import { ProjectHome } from '@/screens/ProjectHome';
 import { FlowsheetPage } from '@/screens/FlowsheetPage';
+import Flowsheets from '@/screens/Flowsheets';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlaskConical,
@@ -170,7 +171,7 @@ function Screen() {
   }
   if (route.project && !a) return <ProjectHome project={route.project} />;
   if (!a) return <Home />;
-  if (a === 'flowsheets' && b) return <FlowsheetPage recordId={b} />;
+  if (a === 'flowsheets') return b ? <FlowsheetPage recordId={b} /> : <Flowsheets />;
   switch (a) {
     case 'intake':
       if (b === 'ingest') return <IntakeIngest />;
