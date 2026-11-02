@@ -13,6 +13,7 @@ import {
   EMPTY_STATE,
   applyEntries,
   changes,
+  conversationsHeld,
   enqueue,
   flush,
   type OutboxEntry,
@@ -50,6 +51,21 @@ check(
 check('each write names its project and its signer', sent.every((e) => e.project === 'p' && e.by === 'Ada'));
 const gone = changes(before, { ...before, depositions: [], conversations: [] }, 'p', 'Ada');
 check('a deposition and a conversation that leave the page are never taken back', gone.length === 0, JSON.stringify(gone));
+
+// ── the conversations a page holds (alpha 2.1 stage F) ─────────────────
+// The service lists a project's conversations oldest first; the page held only
+// the 30 newest, so stage C's 31 evaluation runs left every earlier answer
+// unreachable, and a link to one opened an empty pane.
+
+const kept = Array.from({ length: 51 }, (_, i) => ({ id: `lc-${i}`, turns: [] }) as unknown as LiveConversation);
+const begun = { id: 'lc-new', turns: [] } as unknown as LiveConversation;
+const held = conversationsHeld(kept, [begun]);
+check(
+  'every conversation the service keeps is held, newest first, after those the page began: a link to the oldest finds it',
+  held.length === 52 && held[0] === begun && held[1].id === 'lc-50' && held[51].id === 'lc-0',
+  JSON.stringify([held.length, held[0]?.id, held[1]?.id, held[held.length - 1]?.id]),
+);
+check('a conversation the page began and the service also keeps is held once', conversationsHeld([begun, ...kept], [begun]).length === 52);
 
 // ── the outbox ─────────────────────────────────────────────────────────
 

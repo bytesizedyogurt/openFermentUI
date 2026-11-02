@@ -79,6 +79,7 @@ import {
   EMPTY_STATE,
   applyEntries,
   changes,
+  conversationsHeld,
   enqueue,
   flush,
   loadProjectState,
@@ -125,9 +126,6 @@ export const nextId = (prefix: string) => `${prefix}-${++seq}`;
 
 /** An id that stays unique across reloads: the time, and a counter for ties. */
 export const timeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq}`;
-
-/** How many Live conversations the page holds, newest first; the project keeps every one. */
-const MAX_LIVE_CONVERSATIONS = 30;
 
 /** Deterministic clock-free timestamp label for audit entries. */
 function stamp(): string {
@@ -976,7 +974,7 @@ export const useStore = create<OFState>()((set, get) => ({
         createdScenarioIds: [...made],
         trainsMade: state.trains,
         // A turn the service reads as running is being answered there; the screen follows it.
-        liveConversations: mergeConversations(state.conversations, []),
+        liveConversations: conversationsHeld(state.conversations, []),
       };
     }),
 
@@ -2125,7 +2123,7 @@ export const useStore = create<OFState>()((set, get) => ({
   startLiveConversation: (title) => {
     const id = timeId('lc');
     const conversation: LiveConversation = { id, title, startedAt: new Date().toISOString(), turns: [] };
-    set((s) => ({ liveConversations: [conversation, ...s.liveConversations].slice(0, MAX_LIVE_CONVERSATIONS) }));
+    set((s) => ({ liveConversations: [conversation, ...s.liveConversations] }));
     return id;
   },
 
@@ -3401,11 +3399,6 @@ const STATE_RETRY_MS = 15_000;
  * answering reads `running`, and one nobody is answering any longer reads
  * `interrupted` (postdoc/conversations.py).
  */
-function mergeConversations(saved: LiveConversation[], current: LiveConversation[]): LiveConversation[] {
-  const ids = new Set(current.map((c) => c.id));
-  return [...current, ...saved.filter((c) => !ids.has(c.id)).reverse()].slice(0, MAX_LIVE_CONVERSATIONS);
-}
-
 // Every change to the open project's rows goes to the outbox and is sent
 // (lib/projectState.ts); nothing is compared before the rows have loaded.
 if (typeof window !== 'undefined') {

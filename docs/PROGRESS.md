@@ -158,6 +158,7 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-02 20:58 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 66 of 66 checks hold; no call in the proof's spend table. `pnpm prove --live` was not run: the account's usage limit refuses every call (Blockers) | 2 min 6 s | `32b95f1` |
 | 2026-11-02 21:29 | Alpha 2.1 F.2, A→B→A held within one part in 10¹²: `pnpm test:sim` | 132 passed, 2339 deselected | 4 min 9 s | F.2 |
 | 2026-11-02 21:35 | `pnpm test:core` | 2302 passed, 1 skipped, 168 deselected | 3 min 59 s | F.2 |
+| 2026-11-02 22:07 | Alpha 2.1 F.3, every conversation held: `typecheck`, `check:state`, `gen:components --check`, `check:plan`, `build`, `pnpm test:core`, `pnpm smoke` | all passed; 2302 passed, 1 skipped, 168 deselected; 12 of 12 screens open | 4 min 13 s (`test:core`) | F.3 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -1002,3 +1003,9 @@ holds the numbers, the tables and the judgements).
   installed costs over a set, in the set's order; the test now holds A again within one part in
   10¹² of A, about 700 times the drift CI saw and 2,000 times or more below what a plant that
   keeps its recycles moves (ADR-004, alpha 2.1).
+- F3. The Postdoc screen held the 30 newest conversations (`MAX_LIVE_CONVERSATIONS`, from alpha 1.0,
+  when the browser kept them), though `GET /api/state` returns every one. Stage C's 31 evaluation
+  runs were all newer than stage B's answers, so the Ethanol project's answers were out of reach and
+  a link to one opened an empty pane. The page now holds every conversation the service keeps
+  (`projectState.conversationsHeld`; `check:state` holds a project of 51); the browser's snapshot
+  keeps no conversation, so nothing grows there.
