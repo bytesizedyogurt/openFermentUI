@@ -156,6 +156,8 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-02 19:43 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 66 of 66 checks hold, the walk's scenario begun from a run, Studies' plants and Flowsheets among them; no call in the proof's spend table | 2 min 11 s | `2d2ca61` |
 | 2026-11-02 20:55 | Alpha 2.1 stage F on `32b95f1`, the Opus `core/.env` in place: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2302 passed, 1 skipped, 168 deselected; `test:sim` 132 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 9 min 32 s | `32b95f1` |
 | 2026-11-02 20:58 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 66 of 66 checks hold; no call in the proof's spend table. `pnpm prove --live` was not run: the account's usage limit refuses every call (Blockers) | 2 min 6 s | `32b95f1` |
+| 2026-11-02 21:29 | Alpha 2.1 F.2, A→B→A held within one part in 10¹²: `pnpm test:sim` | 132 passed, 2339 deselected | 4 min 9 s | F.2 |
+| 2026-11-02 21:35 | `pnpm test:core` | 2302 passed, 1 skipped, 168 deselected | 3 min 59 s | F.2 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -989,3 +991,14 @@ holds the numbers, the tables and the judgements).
   the key and the account's own limit, `core/.env`, `scripts/host/install.sh` (the database, the
   two LaunchDaemons, the power settings, `tailscale serve`), `pnpm ready`, alpha 1.0's records,
   the first project, and what `deploy.sh` does after. None of it has run on macOS.
+
+### Alpha 2.1 — Stage F — 2026-11-02
+
+- F1. `pnpm verify` green on all sixteen stages and `pnpm prove` 66 of 66 offline on `32b95f1`
+  (Last green runs); pull request #16 to `main` with the §9 completion report.
+- F2. CI's push run of `b6dccdb` failed `test:sim` on A→B→A: A again's capital numbers came back
+  one unit in the last place from A's (the NPV 1.5e-15 relative), where the test held seventeen
+  digits equal; the pull-request run of the same commit passed. BioSTEAM sums its units'
+  installed costs over a set, in the set's order; the test now holds A again within one part in
+  10¹² of A, about 700 times the drift CI saw and 2,000 times or more below what a plant that
+  keeps its recycles moves (ADR-004, alpha 2.1).

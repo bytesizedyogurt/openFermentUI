@@ -115,8 +115,9 @@ determinism after `empty_recycles()` and `tea._sales = 0`.
   in the module or its recipe (a test reads every literal).
 - Gates: the dry shares sum to one and the moisture lies in [0, 1); no reactant's conversions sum
   past one; an infeasible case is refused with BioSTEAM's words; a warm plant set B and back to A
-  returns A's answer exactly (`library_cases`: every parameter reset to its default, the recycles
-  emptied and the TEA's sales guess cleared before each case). Measured on dilute acid and IB: a
+  returns A's answer within one part in 10¹² (alpha 2.1, below) (`library_cases`: every parameter
+  reset to its default, the recycles emptied and the TEA's sales guess cleared before each
+  case). Measured on dilute acid and IB: a
   fresh build prices ethanol at 0.6588136420 USD/kg; simulating the same plant again without
   settling it gives 0.6588285541; a settled plant gives 0.6589116596 every time, defaults re-applied
   or not. The spread (1.5e-4 relative) is where the wastewater recycle stops within the tolerance
@@ -182,6 +183,20 @@ determinism after `empty_recycles()` and `tea._sales = 0`.
   starts every build from the stream prices BioSTEAM imports with (`DEFAULT_STREAM_PRICES`) and
   puts back what the worker held after; the flowsheet replays identical after sugarcane
   (`test_library_sim.py`), and the proof's A→B→A check holds it identical.
+
+### Alpha 2.1 (2026-11-02): A→B→A within one part in 10¹²
+
+- CI's push run of `b6dccdb` found A again's installed equipment cost, FCI, TCI and FOC one unit
+  in the last place from A's, and its NPV 1.5e-15 from A's (relative), where the test held
+  seventeen digits equal; the pull-request run of the same commit held every digit, as this
+  container does under four hash seeds. BioSTEAM sums its units' installed costs over a set
+  (`System.cost_units`), in the set's order, and two orders in three of the plant's 47 units move
+  the sum by one to three units in the last place (measured); CI's two values are this
+  container's and its neighbour one unit away.
+- The gate holds A again within one part in 10¹² of A, read at seventeen digits
+  (`test_cellulosic_sim.py`, `WARM_REL`): a plant that keeps its recycles from B moves the price
+  3.6e-5 and the installed cost 2e-9 (measured), and every number it moves is outside; the TEA's
+  sales guess kept alone moves nothing.
 
 ## Revisit condition
 
