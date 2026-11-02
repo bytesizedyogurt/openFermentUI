@@ -262,6 +262,8 @@ def test_both_unavailable_is_unavailable():
     [
         (lambda: status_error(anthropic.AuthenticationError, 401), "rejected the key"),
         (lambda: status_error(anthropic.BadRequestError, 400), "malformed"),
+        (lambda: anthropic.BadRequestError(USAGE_LIMIT_SAID, response=_http().Response(400, request=_http().Request(
+            "POST", URL)), body=None), "usage limit is reached"),
         (lambda: anthropic.APIConnectionError(request=_http().Request("POST", URL)), "Could not reach"),
     ],
 )
@@ -752,6 +754,29 @@ def test_a_grammar_too_large_sends_the_tools_loose_and_is_remembered(monkeypatch
     assert _converse(ask).data == {"candidates": []}
     _converse(ask)
     assert sent == [[True], [False], [False]]
+
+
+USAGE_LIMIT_SAID = ("You have reached your specified API usage limits. You will regain access on "
+                    "2026-12-01 at 00:00 UTC.")
+
+
+def test_an_account_past_its_usage_limit_is_said_so_and_never_called_malformed():
+    """Measured 2026-11-02: the account's own usage limit answers every call
+    with a 400, which the service had called a malformed request."""
+    import anthropic
+    import httpx
+
+    refusal = anthropic.BadRequestError(message=USAGE_LIMIT_SAID,
+                                        response=httpx.Response(400, request=httpx.Request("POST", "https://x")), body=None)
+
+    def ask(request):
+        raise refusal
+
+    with pytest.raises(llm.UsageLimitReached) as e:
+        _converse(ask)
+    said = str(e.value)
+    assert "usage limit is reached" in said and "2026-12-01" in said and "Anthropic console" in said
+    assert "malformed" not in said
 
 
 def test_any_other_malformed_request_is_unavailable_as_before():

@@ -283,6 +283,31 @@ class GrammarTooLarge(ModelUnavailable):
     """The API refused a request because its compiled grammar is too large."""
 
 
+#: What the API answers (HTTP 400) once the Anthropic account's own usage
+#: limit is reached, measured 2026-11-02: "You have reached your specified API
+#: usage limits. You will regain access on <date>." Every model of every route
+#: answers it alike until that date or until the account's owner raises the
+#: limit in the Anthropic console; openFerment's daily cap is another limit.
+USAGE_LIMIT = "usage limit"
+
+
+class UsageLimitReached(ModelUnavailable):
+    """The Anthropic account's own usage limit is reached: no model answers."""
+
+
+def _bad_request(e: Any, usage: Usage | None = None) -> ModelUnavailable:
+    """A 400 in words: the account's usage limit, a grammar too large, or a
+    request the API could not take."""
+    message = str(getattr(e, "message", e))
+    low = message.lower()
+    if USAGE_LIMIT in low:
+        return UsageLimitReached(
+            f"The Anthropic account's usage limit is reached, so no model can answer: {message} The account's "
+            "owner raises the limit in the Anthropic console; openFerment's daily cap is a separate limit.", usage)
+    kind = GrammarTooLarge if GRAMMAR_TOO_LARGE in low else ModelUnavailable
+    return kind(f"The Anthropic API refused the request as malformed: {message}", usage)
+
+
 #: Requests found too large, by their answer schema and strict tools: their
 #: tools go out loose from then on, so no turn pays the refusal twice.
 _TOO_LARGE: set[str] = set()
@@ -596,7 +621,7 @@ def call(
             except anthropic.APIConnectionError as e:
                 raise ModelUnavailable(f"Could not reach the Anthropic API: {e}", spent) from e
             except anthropic.BadRequestError as e:
-                raise ModelUnavailable(f"The Anthropic API refused the request as malformed: {e.message}", spent) from e
+                raise _bad_request(e, spent) from e
             except (anthropic.NotFoundError, anthropic.PermissionDeniedError) as e:
                 why = f"{model} is not available to this key ({e.status_code})"
                 if last:
@@ -787,8 +812,7 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
     except anthropic.APIConnectionError as e:
         raise ModelUnavailable(f"Could not reach the Anthropic API: {e}") from e
     except anthropic.BadRequestError as e:
-        refused = GrammarTooLarge if GRAMMAR_TOO_LARGE in str(e.message).lower() else ModelUnavailable
-        raise refused(f"The Anthropic API refused the request as malformed: {e.message}") from e
+        raise _bad_request(e) from e
     except (anthropic.NotFoundError, anthropic.PermissionDeniedError) as e:
         raise ModelUnavailable(f"{model} is not available to this key ({e.status_code})") from e
     except (anthropic.APIError, _http.TransportError) as e:
