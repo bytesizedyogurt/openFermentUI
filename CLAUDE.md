@@ -100,11 +100,12 @@
 
 ## Open questions
 
-- C: The owner's questions 1 to 10 stand in `docs/PROGRESS.md` (execution prompt §13), each with the default this build took; none is answered yet.
-- C: Q1 PostgreSQL as the one database — default yes. Q2 the kit in process with a local embedder — yes. Q3 delete thread Q's TypeScript list and keep `docs/corpus/ethanol-sources.txt` — yes.
-- C: Q4 delete Dominion with its return condition recorded — yes. Q5 rename `demo` to `assumed` — yes. Q6 a Python pin — none needed: the kit's suite passed on 3.13.17.
-- C: Q7 the kit's REST under `/rag` on the same port — yes, behind `OPENFERMENT_RAG_KEY`. Q8 a licence — none added (ADR-012). Q9 accounts — tables and a membership stub only.
-- C: Q10 the per-request key override (§4.8) and keys for a route's other-provider model — neither built, since each changes how a key is read (§11.1; ADR-008, Implementation 6.3).
+- R: The owner answered questions 1 to 9 on 2 November 2026, confirming each default below, and authorized question 10 (alpha 2.1 execution prompt §3; `docs/PROGRESS.md`).
+- R: Q1 PostgreSQL as the one database — yes. Q2 the kit in process with a local embedder — yes. Q3 delete thread Q's TypeScript list and keep `docs/corpus/ethanol-sources.txt` — yes.
+- R: Q4 delete Dominion with its return condition recorded — yes. Q5 rename `demo` to `assumed` — yes. Q6 a Python pin — none needed: the kit's suite passed on 3.13.17.
+- R: Q7 the kit's REST under `/rag` on the same port — yes, behind `OPENFERMENT_RAG_KEY`. Q8 a licence — none added (ADR-012). Q9 accounts — tables and a membership stub only.
+- R: Q10 the per-request key override — authorized: a key sent on a request serves that request's model calls, openFerment's and the kit's, and is never stored, logged or echoed; the audit row says an override was used (prompt §3).
+- R: A local model behind an OpenAI-compatible endpoint named in `core/.env` may stand in a route through the kit's adapter; nothing else about keys changes (prompt §3).
 
 ## Revisit conditions
 

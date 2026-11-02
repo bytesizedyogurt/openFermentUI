@@ -1,12 +1,14 @@
-# openFerment alpha 2.0 — progress
+# openFerment — progress
 
-The resume point for every session of the alpha 2.0 foundation build. Keep it current at every
-checkpoint. A fresh session continues from this file and `git log` alone.
+The resume point for every session: the alpha 2.0 foundation build (stages 0 to 8, merged into
+`main` as #15 on 2026-11-02) and the alpha 2.1 work that makes it functional on real work (the
+execution prompt of 2 November 2026, stages A to F). Keep it current at every checkpoint. A fresh
+session continues from this file and `git log` alone.
 
 ## Resume
 
-1. Branch: `claude/alpha-2-foundation` (cut from `main` at `d19224f`). `git fetch origin
-   claude/alpha-2-foundation && git checkout claude/alpha-2-foundation`.
+1. Branch: `claude/alpha-2-1-functional`, cut from `main` at `7f990f8` (the merge of #15).
+   `git fetch origin claude/alpha-2-1-functional && git checkout claude/alpha-2-1-functional`.
 2. Environment:
    - `pnpm install --frozen-lockfile`
    - `cd core && uv sync --all-extras`
@@ -16,16 +18,26 @@ checkpoint. A fresh session continues from this file and `git log` alone.
      database of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names; the default is the
      compose role on 127.0.0.1:5432.
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: the owner's.** The alpha 2.0 foundation build is complete (stages 0 to 8), and its
-   pull request, [#15](https://github.com/bytesizedyogurt/openFermentUI/pull/15), carries the
-   completion report. What waits is the owner's: owner questions 1 to 10
-   below, the tag push and the live Mini's first alpha 2.0 install (Blockers), then the review. A
-   session that continues the work starts from the Known debts, each naming what pays it, and runs
-   `pnpm verify` and `pnpm build && pnpm prove` first; `pnpm prove --live` needs the key in
-   `core/.env` (`bash scripts/session-start.sh` writes it from `OPENFERMENT_API_KEY`).
+4. **Next step: stage B** of alpha 2.1: the project "Ethanol" made on the screens, the ethanol
+   sources collected through Intake, extraction over every held document on the `extract` route,
+   the twelve questions through the Postdoc screen (`docs/reports/live-questions-2026-11.md`), then
+   the Runs, Studies and Flowsheets paths. Stage A is done (Log, alpha 2.1). For real work set
+   `core/.env` as the prompt's §4 names (the Opus routes, `OPENFERMENT_DAILY_BUDGET_USD=150`,
+   `OPENFERMENT_ASK_BUDGET_USD=6`). The service reads `core/.env` with `override=False`, so a cloud
+   session whose environment sets `OPENFERMENT_MODEL` and kin to Haiku runs every command with those
+   four unset (`env -u OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
+   OPENFERMENT_EFFORT <command>`), or the environment wins.
 5. Files in flight: none.
 
 ## Current stage
+
+Alpha 2.1, stage A (2026-11-02): #15 is merged into `main` with a merge commit (`7f990f8`), and
+the work continues on `claude/alpha-2-1-functional`. The tag push was refused again (Blockers).
+`core/.env` names the Opus routes and the alpha 2.1 budgets; `pnpm ready` is green on them.
+`pnpm verify` first failed 19 offline tests, which read the routing table and budgets of the
+`core/.env` set for real work; conftest now clears those settings for every test not marked live,
+as CI runs with none, and verify is green on all sixteen stages. `pnpm prove` holds 63 of 63
+offline and `pnpm prove --live` 46 of 46 on the Opus routes, for 10 calls and 0.6601 USD.
 
 The alpha 2.0 foundation build is complete: stages 0 to 8. Stage 8 reconciled the guidance
 (`CLAUDE.md`, 134 lines, every line labelled, held by `test_guidance.py`; `README.md`;
@@ -110,8 +122,20 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-10-31 02:00 | `pnpm test:slow` (by hand, outside verify), on the 8.5 gate's head | 8 passed, 2418 deselected | 1 min 55 s | `74381fb` (8.5 gate) |
 | 2026-10-31 02:59 | `pnpm build`, then `pnpm prove --keep` on `b72fd12`; the tour's eleven screenshots in Chromium on the kept service | 63 of 63 checks hold; every page opens, and the shots show what the second pass fixed | 2 min 24 s (prove) | `b72fd12` |
 | 2026-10-31 03:12 | `test:core`, typecheck, plan, figures, state, reconcile, `gen:components --check`, `gen:api --check`, `pnpm smoke` on the second pass; the shots again on the rebuilt client | 2257 passed, 1 skipped, 168 deselected; all passed; 12 of 12 screens open | 4 min 37 s | `d0bda01` |
-| 2026-10-31 03:22 | `pnpm prove` with its data directory removed at the end; `test:core` | 63 of 63 checks hold, and the run's directory is gone from `/tmp`; 2257 passed, 1 skipped, 168 deselected | 2 min 20 s; 4 min 36 s | (this commit) |
+| 2026-10-31 03:22 | `pnpm prove` with its data directory removed at the end; `test:core` | 63 of 63 checks hold, and the run's directory is gone from `/tmp`; 2257 passed, 1 skipped, 168 deselected | 2 min 20 s; 4 min 36 s | `724843d` |
+| 2026-11-02 11:52 | Alpha 2.1 stage A on `7f990f8` with conftest's isolation fix, the Opus `core/.env` in place: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2257 passed, 1 skipped, 168 deselected; `test:sim` 132 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 11 min 12 s | `d30fb63` |
+| 2026-11-02 11:56 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 63 of 63 checks hold, no call in the proof's spend table | 2 min 41 s | `d30fb63` |
+| 2026-11-02 12:05 | `pnpm prove --live`, steps 1 to 8, every route on the alpha 2.1 table (`plan`, `explain`, `extract` and `judge` on `claude-opus-5-5`, `index` on `claude-haiku-5-5`): 22 of 22 ethanol sources, 814 chunks; PMC4842200 extracted by `claude-opus-5-5` for 0.1898 USD (26 candidates kept, 12 refused); the evaluation set asked of `claude-opus-5-5` | 46 of 46 checks hold; 10 calls, 0.6601 USD from the proof's spend table; scored by code `eq-price` tools 1, citations 1, estimates 1, bare numbers 0 (one claim dropped for a number), `eq-dearer` tools 1, citations 1, estimates 0, bare numbers 1 | 7 min 54 s | `d30fb63` |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
+
+## Spend (alpha 2.1)
+
+From the spend tables (`spend.state()`; a proof reads its own before its database is dropped). The day's
+cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
+
+| Stage | Calls | USD | What |
+|---|---|---|---|
+| A | 10 | 0.6601 | `pnpm prove --live` on the Opus routes |
 
 ## Decisions
 
@@ -184,7 +208,7 @@ DOI or PMID. Each now reads the project's rows.
 |---|---|---|
 | 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. Nothing is lost by waiting: the service no longer writes them | On the Mini: `brew install postgresql@17 pgvector && brew services start postgresql@17`; `scripts/host/install.sh` (makes the database `openferment` and names it in `core/.env`; when `core/data/biorepo.json` holds uncommitted decisions, the old deploy asks to commit and push them first, which keeps them); then `pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, and `OPENFERMENT_PROJECT=<the id it prints>` in `core/.env` for the nightly extraction |
 | 2026-10-31 | Owner decision: the live instance's PostgreSQL has no backup. `pnpm ready` used to say a git push "backs up" Guild's decisions, which stopped being true when they moved into the database at stage 2; the row is gone (8.5). Guild's ledger is personnel data and never enters git | Choose where a dump of the database goes, then add it to the nightly (`scripts/host/nightly.sh`): `pg_dump openferment` to that place |
-| 2026-10-30 | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0` ends with "unexpected disconnect while reading sideband packet", lightweight and annotated alike. The tag exists in this container only. Commit `d19224f` stays reachable as an ancestor of `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git push origin alpha-1.0` |
+| 2026-10-30, again 2026-11-02 (HTTP 403) | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0` ends with "unexpected disconnect while reading sideband packet", lightweight and annotated alike. The tag exists in this container only. Commit `d19224f` stays reachable as an ancestor of `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git push origin alpha-1.0` |
 
 ## Known debts (each names the stage that pays it)
 
@@ -237,16 +261,16 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
 
 | # | Question | Default taken | Answered |
 |---|---|---|---|
-| 1 | PostgreSQL as the one database | yes | no |
-| 2 | Kit in-process with a local FastEmbed embedder | yes | no |
-| 3 | Delete thread Q's TypeScript list, keep `docs/corpus/ethanol-sources.txt` | yes | no |
-| 4 | Delete Dominion, return condition recorded | yes | no |
-| 5 | Rename `demo` → `assumed` | yes | no |
-| 6 | Python pin 3.12 if the kit fails on 3.13 | no pin: the kit's suite passed on 3.13.17 (1584 passed, 31 skipped) | measured |
-| 7 | Kit REST under `/rag` on the same port | yes, behind `OPENFERMENT_RAG_KEY` | no |
-| 8 | Licence | none added | no |
-| 9 | Accounts: tables and a membership stub only | yes | no |
-| 10 | §11.1, asked at stage 6.3: the per-request key override (§4.8), and keys for a route's non-Anthropic model (read through Sci RAG Kit's settings). Each changes how a key is read | neither built: a route's other-provider model is passed over in words, every key is core/.env's; the design the override would take is in ADR-008, Implementation 6.3 | no |
+| 1 | PostgreSQL as the one database | yes | yes, the default confirmed (2026-11-02) |
+| 2 | Kit in-process with a local FastEmbed embedder | yes | yes, the default confirmed (2026-11-02) |
+| 3 | Delete thread Q's TypeScript list, keep `docs/corpus/ethanol-sources.txt` | yes | yes, the default confirmed (2026-11-02) |
+| 4 | Delete Dominion, return condition recorded | yes | yes, the default confirmed (2026-11-02) |
+| 5 | Rename `demo` → `assumed` | yes | yes, the default confirmed (2026-11-02) |
+| 6 | Python pin 3.12 if the kit fails on 3.13 | no pin: the kit's suite passed on 3.13.17 (1584 passed, 31 skipped) | yes, the default confirmed (2026-11-02) |
+| 7 | Kit REST under `/rag` on the same port | yes, behind `OPENFERMENT_RAG_KEY` | yes, the default confirmed (2026-11-02) |
+| 8 | Licence | none added | yes, the default confirmed (2026-11-02) |
+| 9 | Accounts: tables and a membership stub only | yes | yes, the default confirmed (2026-11-02) |
+| 10 | §11.1, asked at stage 6.3: the per-request key override (§4.8), and keys for a route's non-Anthropic model (read through Sci RAG Kit's settings). Each changes how a key is read | neither built: a route's other-provider model is passed over in words, every key is core/.env's; the design the override would take is in ADR-008, Implementation 6.3 | authorized (2026-11-02) within the alpha 2.1 prompt's §3 rules: a key sent on a request serves that request's calls and is never stored, logged or echoed; built at stage D |
 
 ## Environment facts measured in this container (2026-10-30)
 
@@ -821,3 +845,26 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
     - `pnpm prove` stopped its service and dropped its database at the end, and left its data
       directory in `/tmp` after every run, about 870 KB each. It removes the directory when every
       check holds, and keeps it with the service's log when one fails.
+
+### Alpha 2.1 — Stage A — 2026-11-02
+
+- A1. CI was green on #15's head (`724843d`, runs 294 and 295); the owner's §3 authorized the
+  merge, and #15 is merged into `main` with a merge commit (`7f990f8`). `claude/alpha-2-1-functional`
+  is cut from it. `git push origin alpha-1.0` was refused again, now with HTTP 403 (Blockers).
+- A2. PostgreSQL started; `bash scripts/session-start.sh` found `core/.env` and left the key as it
+  was; `pnpm db:migrate`; `pnpm ready` green: the key accepted, `claude-opus-5-5` then
+  `claude-sonnet-5-5` at effort high, `index` on `claude-haiku-5-5`, the 150 USD cap.
+- A3. `core/.env` holds the prompt's §4 table. `OPENFERMENT_ROUTES` has the shape `llm.routes()`
+  reads (a family to `models` and `effort`), so `core/.env.example` stands. The session's own
+  environment pins `OPENFERMENT_MODEL` and its three kin to Haiku and medium, and the service reads
+  `core/.env` with `override=False`; every command of this work runs with those four unset, so the
+  file decides (Resume).
+  - The first `pnpm verify` failed 19 offline tests (`test_llm`, `test_ready`, `test_spend`,
+    `test_writes`, `test_postdoc_agent`, `test_phase3_review`): `core/.env`, loaded at import, laid
+    `OPENFERMENT_ROUTES` over the models a test set and gave the budgets 150 and 6. CI has no
+    `core/.env`. conftest's autouse fixture, which already cleared the day's budget for a test not
+    marked live, clears every routing and budget setting now (`ROUTING_SETTINGS`), and verify is
+    green.
+  - `pnpm prove` 63 of 63 offline; `pnpm prove --live` 46 of 46 on the Opus routes, 0.6601 USD
+    (Last green runs).
+
