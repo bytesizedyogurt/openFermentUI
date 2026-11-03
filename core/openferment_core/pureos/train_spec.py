@@ -1672,8 +1672,8 @@ def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
             notes.append(f"Unit {u.id} is BioSTEAM's DrumDryer, which burns its fuel without taking the oxygen from its "
                          "gas: its outlets carry that oxygen's mass beyond its inlets (pureOS §5.1). No product is "
                          "counted in it, and the difference is the class's, not a broken balance.")
-    request = {"system": "pureos_" + re.sub(r"[^A-Za-z0-9_]", "_", spec.id), "product": chem, "inlet": inlet,
-               "units": units, "diagram": proforma._draws(inputs)}
+    request = {"system": "pureos_" + re.sub(r"[^A-Za-z0-9_]", "_", spec.id), "inlet": inlet, "units": units,
+               "diagram": proforma._draws(inputs)}
     try:
         said = proforma.call("train_run", request)
     except WorkerError as e:

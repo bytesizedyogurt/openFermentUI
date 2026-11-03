@@ -1,18 +1,26 @@
 """Comparisons (execution prompt §7.4, §9.1 step 5).
 
-Two or more engine runs set side by side: every output the runs answer
-(the price block BioSTEAM's TEA gives, and a flowsheet's own outputs), each
-in its unit, with each run's value and its relative change from the first
-run's; and every value any of the runs set for itself, with each run's value
-and its origin: a person's assumption, a model's estimate, or the library's
-own default where a run set none.
+Two or more engine runs set side by side: every output the runs answer,
+each in its unit, with each run's value and its relative change from the
+first run's; and every value any of the runs set for itself, with each run's
+value and its origin: a person's assumption, a model's estimate, or the
+library's own default where a library run set none. A library run's outputs
+are its price block (BioSTEAM's TEA) and a flowsheet's own outputs, read as
+they have always been read; a run of any other engine's are its
+outputs.values (engine/runs.py `values_of`), so runs of any engine compare.
 
 A comparison is computed as one `study.comparison` artifact whose inputs
 are the runs' artifacts, so its provenance is the weakest of theirs
 (`assumed` when any run rests on an assumption or an estimate) and it
-replays from them. It is kept as a row of `comparisons` under that
-artifact's id, with its title: the same runs in the same order are one
-comparison. A run its plant refused has no artifact and is not compared.
+replays from them. Its version says what it read (`_version_of`): `study
+comparison 1` for library runs alone, read as they have always been read,
+and `study comparison 2` for one that holds a run of another engine (D3),
+whose outputs.values it reads and whose value cells name a default only
+where a library run's plant declares one. A comparison kept at version 1
+over such a run replays at version 2 and says so. It is kept as a row of
+`comparisons` under that artifact's id, with its title: the same runs in
+the same order are one comparison. A run its plant refused has no artifact
+and is not compared.
 
     GET  /api/studies/comparisons
     POST /api/studies/comparisons        {title, runIds, by}
@@ -20,6 +28,7 @@ comparison. A run its plant refused has no artifact and is not compared.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any
 
@@ -27,7 +36,7 @@ from .. import artifacts, db, projects
 from ..basis import ASSUMED_KINDS, origin_of
 from ..db import models as t
 from ..db import rows
-from ..engine import runs
+from ..engine import library, runs
 from ..models import (
     Artifact,
     BasisInput,
@@ -38,7 +47,9 @@ from ..models import (
 )
 
 COMPARISON = "study.comparison"
+# Library runs alone; and a comparison that holds a run of another engine (D3).
 VERSION = "study comparison 1"
+VERSION_ENGINES = "study comparison 2"
 # The price block's entries that are a run's numbers (the rest name things).
 SKIP = {"priced", "teaClass", "product", "feedstock", "units", "why", "solvedPriceRefused"}
 
@@ -61,27 +72,63 @@ def _change(value: Any, first: Any) -> float | None:
     return (value - first) / abs(first)
 
 
+def _block(a: Artifact, name: str) -> dict[str, Any]:
+    """A library run's block of its output (`price`, `outputs`,
+    `outputUnits`); empty for a run of any other engine."""
+    return (a.output.get(name) or {}) if a.tool == library.LIBRARY_RUN else {}
+
+
+def _typed(a: Artifact) -> dict[str, dict[str, Any]]:
+    """The outputs.values of a run of any engine beside BioSTEAM's, each
+    quantity by its output's name; a library run's numbers are its blocks."""
+    return {} if a.tool == library.LIBRARY_RUN else {v["name"]: v["quantity"] for v in runs.values_of(a)}
+
+
 def _rows(arts: list[Artifact]) -> list[dict[str, Any]]:
-    """Each output any run answers, in the order the first run gives them."""
+    """Each output any run answers, in the order the first run gives them:
+    a library run's `price.<key>` and `outputs.<key>`, and any other run's
+    `values.<name>`."""
     keys: list[tuple[str, str]] = []
     for a in arts:
-        price, outputs = a.output.get("price") or {}, a.output.get("outputs") or {}
+        price, outputs = _block(a, "price"), _block(a, "outputs")
         keys += [("price", k) for k in price if k not in SKIP and ("price", k) not in keys]
         keys += [("outputs", k) for k in outputs if ("outputs", k) not in keys]
+        keys += [("values", k) for k in _typed(a) if ("values", k) not in keys]
     out = []
     for block, key in keys:
-        values = [(a.output.get(block) or {}).get(key) for a in arts]
-        units = [((a.output.get("price") or {}).get("units") or {}).get(key) if block == "price"
-                 else (a.output.get("outputUnits") or {}).get(key) for a in arts]
+        if block == "values":
+            held = [_typed(a).get(key) for a in arts]
+            values = [q["value"] if q is not None else None for q in held]
+            units = [q["unit"] if q is not None else None for q in held]
+        else:
+            values = [_block(a, block).get(key) for a in arts]
+            units = [(_block(a, "price").get("units") or {}).get(key) if block == "price"
+                     else _block(a, "outputUnits").get(key) for a in arts]
         unit = next((u for u in units if u is not None), None)
         out.append({"key": f"{block}.{key}", "unit": unit, "values": values,
                     "change": [_change(v, values[0]) for v in values]})
     return out
 
 
+def _declares(a: Artifact, key: str) -> bool:
+    """Whether a run's plant declares the value `key`: a library run whose
+    parameters, as its artifact read them back, name it."""
+    return a.tool == library.LIBRARY_RUN and any(p.get("key") == key for p in a.output.get("parameters") or [])
+
+
+# A run's cell for a value it holds none of (`study comparison 2`).
+NO_VALUE = {"value": None, "unit": None, "origin": None, "by": None}
+
+
 def _set_values(arts: list[Artifact]) -> list[dict[str, Any]]:
-    """Each value any run set for itself, with each run's value and origin;
-    a run that set none has the library's own default, named so."""
+    """Each value any run set for itself, with each run's value and origin.
+    A library run that set none has the library's own default, named so. A
+    comparison that holds a run of another engine (`study comparison 2`)
+    gives that default where the library run's plant declares the value
+    (`_declares`); every other run's cell there is NO_VALUE, its value,
+    unit, origin and `by` null, since its artifact holds no default of that
+    name."""
+    engines = _holds_other_engines(arts)
     keys: list[str] = []
     for a in arts:
         keys += [i.name for i in a.inputs if i.source.kind in ASSUMED_KINDS and i.name not in keys]
@@ -94,6 +141,9 @@ def _set_values(arts: list[Artifact]) -> list[dict[str, Any]]:
                 origin = origin_of(own.source)
                 cells.append({"value": own.value, "unit": own.unit, "origin": origin.kind, "by": origin.by})
                 continue
+            if engines and not _declares(a, key):
+                cells.append(dict(NO_VALUE))
+                continue
             plant = next((i for i in a.inputs if i.name == "plant"), None)
             default = (a.output.get("libraryDefaults") or {}).get(key)
             unit = next((p.get("unit") for p in a.output.get("parameters") or [] if p.get("key") == key), None)
@@ -103,12 +153,36 @@ def _set_values(arts: list[Artifact]) -> list[dict[str, Any]]:
     return out
 
 
+def _ran(a: Artifact) -> Any:
+    """What a run ran, as its basis names it: a library run's `plant`, a
+    contract engine's run's `thing`."""
+    named = {i.name: i.value for i in a.inputs}
+    return named.get("plant", named.get("thing"))
+
+
+def _compared(inputs: Sequence[BasisInput]) -> list[Artifact]:
+    """The runs' artifacts a comparison's basis names, read from the project's store, in order."""
+    return [artifacts.get(str(i.value)) for i in inputs if i.source.kind == "artifact"]
+
+
+def _holds_other_engines(arts: list[Artifact]) -> bool:
+    """Whether any compared run is a run of an engine beside BioSTEAM's library."""
+    return any(a.tool != library.LIBRARY_RUN for a in arts)
+
+
+def _version_of(inputs: Sequence[BasisInput]) -> str:
+    """What a comparison computes, by the runs it compares: VERSION for
+    library runs alone, VERSION_ENGINES when it holds a run of another
+    engine."""
+    return VERSION_ENGINES if _holds_other_engines(_compared(inputs)) else VERSION
+
+
 def _compare(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
     """A comparison from its basis alone: the runs' artifacts, read from
     the project's store, set side by side."""
-    arts = [artifacts.get(str(i.value)) for i in inputs if i.source.kind == "artifact"]
+    arts = _compared(inputs)
     return {
-        "runs": [{"artifactId": a.id, "plant": next((i.value for i in a.inputs if i.name == "plant"), None),
+        "runs": [{"artifactId": a.id, "plant": _ran(a),
                   "configuration": next((i.value for i in a.inputs if i.name == "configuration"), None),
                   "provenance": a.provenance} for a in arts],
         "rows": _rows(arts),
@@ -117,7 +191,7 @@ def _compare(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
 
 
 def _register() -> None:
-    artifacts.register(COMPARISON, VERSION, _compare)
+    artifacts.register(COMPARISON, VERSION, _compare, version_of=_version_of)
 
 
 artifacts.register_lazy(COMPARISON, _register)

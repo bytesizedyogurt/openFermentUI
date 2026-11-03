@@ -4201,7 +4201,7 @@ export interface EngineRun {
   /** The artifact's, computed on its basis; null for a refused run. */
   provenance: Provenance | null;
   artifactId: string | null;
-  /** The price, a flowsheet's own outputs, and how the package's test held it. */
+  /** `values`, each output a typed quantity whose origin is the run's artifact; a library run's price, a flowsheet's own outputs and how the package's test held it beside them. */
   outputs: Record<string, unknown>;
   versions: Record<string, string>;
   sff: RunSFF | null;
@@ -4288,7 +4288,7 @@ export interface ComparisonReport {
   artifact: Artifact;
 }
 
-/** One output of an engine run a runbook predicts: `outputs.<key>` or `price.<key>`, and what the bench calls it. */
+/** One output of an engine run a runbook predicts: `values.<name>` of its outputs.values, or a library run's `outputs.<key>` or `price.<key>`, and what the bench calls it. */
 export interface PredictedOutput {
   output: string;
   label: string;

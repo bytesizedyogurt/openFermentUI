@@ -71,7 +71,7 @@ The engine (execution prompt §7.2; ADR-003, ADR-004, ADR-015): every engine beh
 | `contract.py` | The engine contract (docs/api/engines.md; ADR-015). |
 | `library.py` | The library plant runner (ADR-004; execution prompt §4.4, §8.4). |
 | `registry.py` | The engines this service found (docs/api/engines.md, What the service does with an engine; ADR-015). |
-| `runs.py` | Engine runs (execution prompt §7.4; ADR-004, ADR-003, ADR-006). |
+| `runs.py` | Engine runs (execution prompt §7.4; ADR-004, ADR-003, ADR-006, ADR-015). |
 | `sample.py` | The engine contract's own sample engine (docs/api/engines.md; ADR-015). |
 | `sff.py` | SFF flowsheet records (ADR-003; execution prompt §8.3). |
 | `simulator.py` | The engine's simulator: the Proforma worker, BioSTEAM in a process of its own (OF-BLD-014 §8.1; execution prompt §7.2). |

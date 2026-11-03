@@ -5147,9 +5147,10 @@ export interface components {
         };
         /**
          * PredictedOutput
-         * @description One output of an engine run a runbook predicts: its key in the run's
-         *     artifact (`outputs.<key>` of a flowsheet's outputs, `price.<key>` of the
-         *     price) and what the bench calls it.
+         * @description One output of an engine run a runbook predicts: its key (`values.<name>`
+         *     of the run's outputs.values, for a run of any engine; for a library run
+         *     `outputs.<key>` of a flowsheet's outputs or `price.<key>` of the price as
+         *     well) and what the bench calls it.
          */
         PredictedOutput: {
             /** Label */

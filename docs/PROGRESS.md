@@ -26,19 +26,27 @@ session continues from this file and `git log` alone.
      OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage C, every run one shape**: the `kinetics` engine over fermOS's families and
-   the `train` engine over pureOS, each registered through `core/pyproject.toml` beside `biosteam`;
-   Proforma's shelf flowsheets as things of `biosteam`; every run a `runs` row; the `measurement`
-   origin; import from a URL; the hand-written shelf entries and Proforma's split retired. Stage B
-   (the engine contract) is done: `docs/api/engines.md`, ADR-015, `engine/registry.py`,
-   `python -m openferment_core.engine.conform <name>`, proof step 10. Then stages D and E in the
-   prompt's order. `pnpm ready --probe` found the account answering at
+4. **Next step: stage C, every run one shape**, in seven steps (C.1 done: the pins in
+   `core/tests/test_engine_pins.py`, the handler mismatches, `engine/runs.keep_run`): C.2 the
+   `kinetics` engine over fermOS's families, fermOS's requests on typed quantities and its runs as
+   rows; C.3 the `train` engine over pureOS with a train's SFF file; C.4 Proforma and the library
+   door on quantities, Proforma's shelf flowsheets as things of `biosteam`; C.5 the `measurement`
+   origin; C.6 the hand-written shelf entries and Proforma's split retired, import from a URL; C.7
+   the gate. Every pin holds through each step. Stage B (the engine contract) is done:
+   `docs/api/engines.md`, ADR-015, `engine/registry.py`, `python -m
+   openferment_core.engine.conform <name>`, proof step 10. Then stages D and E in the prompt's
+   order. `pnpm ready --probe` found the account answering at
    23:50 UTC on 2 November, so stage F, the live work, follows E. Alpha 2.1's Ethanol project is
    in this container's `openferment_dev`; a fresh container makes it again on Home from
    `docs/corpus/ethanol-sources.txt` through Intake (about twenty minutes), then extracts.
 5. Files in flight: none.
 
 ## Current stage
+
+Alpha 2.2, stage C (2026-11-03): every run one shape. C.1 pinned sixteen computations to their ids
+and output hashes before anything moved, fixed the worker's handler mismatches, and gave every
+engine's computation one keeper, `engine/runs.keep_run`, with `outputs.values` that comparisons
+and runbooks read for a run of any engine.
 
 Alpha 2.2, stage B (2026-11-03): the engine contract. `docs/api/engines.md` is the page a stranger
 builds an engine from, ADR-015 records the registry on the entry-point group `openferment.engines`,
@@ -172,8 +180,9 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-03 01:24 | Alpha 2.2 stage B gate on `e375ede`: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2328 passed, 1 skipped, 171 deselected; `test:sim` 135 passed (132 and the three of `test_engines_sim.py`); `test:lit` 10 passed; `smoke` 12 of 12 screens | 13 min 56 s | `e375ede` |
 | 2026-11-03 01:28 | `pnpm prove`, offline, steps 1 to 10 | 69 of 69 checks hold: step 10 lists `biosteam`, `conform biosteam` holds all eight, its verdict listed; no call in the proof's spend table | 3 min 35 s | `e375ede` |
 | 2026-11-03 01:50 | `pnpm test:core` on B.5 (the contract's defects the design measured) | 2343 passed, 1 skipped, 172 deselected | 5 min 22 s | B.5 |
-| 2026-11-03 04:12 | `pnpm test:core` on B.6 (the critic's defects and the review's) | 2397 passed, 1 skipped, 172 deselected | 5 min 8 s | B.6 |
-| 2026-11-03 04:24 | B.6: `pnpm test:sim`; verify's fast stages (`check:secrets`, `typecheck`, both `--check`s, `check:plan`, `check:licences`, `check:tools`, `check:guild`, `check:state`, `check:figures`, `test:reconcile`); `build`; `smoke` | 136 passed; every stage green; 12 of 12 screens open | 5 min 14 s (`test:sim`) | B.6 |
+| 2026-11-03 04:03 | `pnpm test:core` on B.6 (the critic's defects and the review's) | 2397 passed, 1 skipped, 172 deselected | 5 min 8 s | B.6 |
+| 2026-11-03 04:08 | B.6: `pnpm test:sim`; verify's fast stages (`check:secrets`, `typecheck`, both `--check`s, `check:plan`, `check:licences`, `check:tools`, `check:guild`, `check:state`, `check:figures`, `test:reconcile`); `build`; `smoke` | 136 passed; every stage green; 12 of 12 screens open | 5 min 14 s (`test:sim`) | B.6 |
+| 2026-11-03 06:16 | C.1: `pnpm test:core`; `test:sim` (the fix round's); `typecheck`, both `--check`s, `check:plan`, `check:tools`, `check:state`, `check:figures`, `check:secrets`; `build`; `smoke` | 2422 passed, 1 skipped, 174 deselected; 138 passed; every stage green; 12 of 12 screens open | 6 min 0 s (`test:core`) | C.1 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -222,6 +231,8 @@ prompt's §4).
 
 | Where | Departure | Why |
 |---|---|---|
+| alpha 2.2 D1, C.1 | D1's amendment, the dispatch: every pin's output hash is computed under one fixed dispatch (`OPENBLAS_CORETYPE=Haswell`, `OPENBLAS_NUM_THREADS=1`, `NPY_DISABLE_CPU_FEATURES="X86_V4 AVX512_ICL AVX512_SPR"`), in a process `test_engine_pins.py` starts with them, and each id in the suite's own process as well; a host that is not x86-64 with AVX2 and FMA3 skips the pins, saying why (the fit's id rests on readings numpy computes in the test). Four literals were captured again from ed33c02's code under the fixed dispatch, on Python 3.13.17 and 3.12.3 alike: `fermos.simulation chemostat_v1` `ea77840641c03bb5…` (first `0cd4343efc7cbfe5…`), `kinetic_fit` `905045fddf738d41…` (first `1a00f394d4c7a1fa…`), `growth_forecast` `5cb631e5e0ae170e…` (first `dc1cf3ef52dd2cbc…`) and the forecast with a changed start `859f488203c5439f…` (first `5d29ef33c8831f7a…`); every id and the other twelve hashes read as first captured. The step counts as green once a CI run passes | The first capture was this AVX-512 Xeon's own dispatch (numpy's X86_V4 loops, OpenBLAS's SkylakeX kernels). The review measured that OpenBLAS's Haswell or Zen kernels move the chemostat's hash, and numpy's dispatch moves the fit's and the forecasts'; CI's runners include AVX2 hosts. The fixed dispatch is the one such a host takes of itself |
+| alpha 2.2 D3, C.1 | `study.comparison` reads its version from the runs it compares: `study comparison 1` for library runs alone, every row, id and pin as before, and `study comparison 2` for a comparison that holds a run of another engine, which reads outputs.values, names a contract run's thing, and gives a library run the library's default only for a value its plant declares (every other such cell null) | Before C.1 such a comparison set no row of a contract run's outputs and gave every run that set a value none a `library-default` cell; reading the new outputs under the old version would replay a kept comparison differently with nothing to say why. Version 2 makes the replay name the change, and the nightly reads a version-1 artifact over such a run as stale. Before C.1 only `biosteam` registered through an entry point, so test databases alone could hold one |
 | alpha 2.2 §6.1, B.2 | `run(thing, configuration, inputs, by)` takes `inputs` as a list of `EngineInput`, each a parameter's key and a `Quantity` (the shape a run's inputs have, `RunInput`), where §6.1 writes `inputs: list[Quantity]` | A `Quantity` carries no name, so the parameter each value sets is named beside it |
 | alpha 2.2 §6.1, B.2 and B.6 | An engine declares `heavy` beside `worker`: the modules its worker alone imports. The registry and conformance check 6 keep the worker module, each module `heavy` names (with every module below it) and `workers.WORKER_LIBRARIES` (BioSTEAM, thermosteam, biorefineries, the SFF toolkit, cobra) out of the service's process for every engine; `worker` may be `None` only with `heavy` empty | §6.1's `worker` names one module, and its name alone cannot say which of the libraries it imports are heavy; check 6 needs the list to hold them out |
 | alpha 2.2 §6.1, B.2 | `engine → api` and `engine → tools` join the package map's exceptions (`test_boundaries.py`) | Conformance check 1 sends a bare number through the service's own route and its tool, the two doors a number enters by, and §6.1 names the command `openferment_core.engine.conform` |
@@ -303,7 +314,8 @@ prompt's §4).
 | The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | when the UI reads the library shelf alone, after alpha 2.0 |
 | A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and not offered | after alpha 2.0 (4.3 composes the cellulosic plant's pretreatment and fermentation instead) |
 | A second organism's reaction set for the composed flowsheet: the package holds one | when a package or a record gives another |
-| Small handler mismatches the worker op reference found (4.4): `train_spec.py` sends `train_run` a `product` its handler reads nowhere; `grid` and `montecarlo` leave out the `structure` that `evaluate` and `run` pass on (both ops are called by tests alone); an unknown flowsheet's refusal arrives quoted (`Refused: 'there is no flowsheet …'`); an unknown catalogue type raises `CatalogueUnknown`, which callers avoid by checking the type first | the next change to those ops |
+| Paid: small handler mismatches the worker op reference found (4.4): `train_spec.py` sent `train_run` a `product` its handler reads nowhere; `grid` and `montecarlo` left out the `structure` that `evaluate` and `run` pass on; an unknown flowsheet's refusal arrived quoted; an unknown catalogue type raised `CatalogueUnknown`. Each is fixed with a test (D11), and `docs/api/workers.md` follows | alpha 2.2, C.1 |
+| A comparison of library runs alone (`study comparison 1`) of two plants gives a run whose plant lacks a value another run set a `library-default` cell, its value and unit null; version 2 (a comparison that holds a run of another engine) names a default only where the plant declares one | the next change to `comparisons._set_values` (C.5, D7), with a version for the comparisons it moves |
 | Paid: a review decision's provenance was the label the browser sent; `biorepo.provenance_of` computes it from the decision (ADR-006) | 8.5 |
 | Paid: the evidence pool put an accepted candidate in front of Postdoc as `unverified`, and Home listed it as awaiting review; the pool applies the standing decisions | 8.5 |
 | Paid: dead service paths the deletions left (Proforma's yield cap, the store branches in fermOS and Proforma, `_example`, the check:seed entry points, `ProjectionMissing`); kinetics' and the hashed texts stay (rows above) | 8.5 |
@@ -1160,3 +1172,24 @@ holds the numbers, the tables and the judgements).
   - `docs/api/engines.md` states the run id's recipe (recomputed from the page alone), the limits
     on names (an engine's 40 characters, a configuration's 80), the reinstall and restart a new
     version needs, and the launcher.
+
+### Alpha 2.2 — Stage C — 2026-11-03
+
+- C.1. The pins, the handler mismatches and one row shape.
+  - `core/tests/test_engine_pins.py` holds sixteen computations stage C carries to their artifact
+    id and output hash, captured at `ed33c02` before a line moved: fermOS's three simulating
+    families, a kinetic fit and two growth forecasts, a vessel design, a train run, a Proforma
+    run, library runs, comparisons of them and a run of the contract's sample engine. Each is
+    built on the existing tests' stand-ins. Output hashes are checked under one fixed CPU dispatch
+    in a process of their own (Departures, D1).
+  - The worker's handler mismatches (debt paid): refusals arrive unquoted, `grid` and
+    `montecarlo` pass `structure`, an unknown catalogue type is refused in words, and the
+    `train_run` request drops the `product` its handler never read.
+  - `engine/runs.keep_run` keeps every engine's computation as one `runs` row, or its receipt. A
+    held row is answered from the store, its first asker's `by` and `at` kept. A row's
+    `outputs.values` holds the numbers its artifact states a unit for, each a quantity whose
+    origin is the run's artifact.
+  - Comparisons and runbooks read `outputs.values` for a run of any engine. A comparison of
+    library runs alone keeps `study comparison 1`, every row and id as before; one holding another
+    engine's run is `study comparison 2` (Departures). The studies export prints any engine's
+    values.

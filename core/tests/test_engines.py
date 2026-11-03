@@ -360,6 +360,32 @@ def test_runs_of_one_engine_are_listed_by_engine(engines):
     assert client.get("/api/runs", params={"engine": "biosteam"}).json() == []
 
 
+def test_a_contract_engines_run_is_kept_by_keep_run_with_its_engines_versions_and_its_job(engines):
+    """D3: run_engine keeps its row through keep_run, the one keeper: the
+    row's versions are the engine's own (its basis names no simulator), and
+    its job is said queued, running and done naming the engine. keep_run
+    given the engine's registered name answers that row as first kept, and
+    keeps a computation of another basis with the registered engine's
+    versions."""
+    start = events.newest()
+    run = SAMPLE.run("placeholder", None, [given("a-parameter", 2.5)], "Ada Moreno")
+    assert run.versions == SAMPLE.version() == {"openferment-core": "0.1.0"}
+    sent = [e for e in events.recent(TEST_PROJECT, start) if e.type.startswith("job.")]
+    assert [e.type for e in sent] == ["job.queued", "job.running", "job.done"]
+    assert {e.data["engine"] for e in sent} == {"sample"} and sent[-1].data["artifactId"] == run.artifactId
+    art = artifacts.get(run.artifactId)
+    start = events.newest()
+    again = runs.keep_run("sample", run.plant, run.configuration, tool=art.tool, version=art.toolVersion,
+                          basis=art.inputs, by="Grace Hopper", art=art, sff_refused=run.sffRefused).run
+    assert again == run and events.recent(TEST_PROJECT, start) == []
+    basis = [i.model_copy(update={"value": 3.5}) if i.name == "value a-parameter" else i for i in art.inputs]
+    other = artifacts.compute(art.tool, basis)
+    kept = runs.keep_run("sample", run.plant, run.configuration, tool=art.tool, version=art.toolVersion, basis=basis,
+                         by="Ada Moreno", art=other, sff_refused=run.sffRefused).run
+    assert (kept.id, kept.engine, kept.versions) == (other.id, "sample", SAMPLE.version()) and kept.id != run.id
+    assert runs.values_of(art) == run.outputs["values"] and runs.parameters_of(run, art) is None
+
+
 def test_an_engines_worker_receives_no_key_and_no_database_address(monkeypatch):
     for name in ("ANTHROPIC_API_KEY", "OPENFERMENT_API_KEY", "OPENFERMENT_DATABASE_URL", "SCI_RAG_DATABASE_URL",
                  "OPENFERMENT_RAG_KEY", "A_SERVICE_TOKEN"):

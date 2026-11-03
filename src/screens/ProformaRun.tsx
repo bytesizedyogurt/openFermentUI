@@ -87,15 +87,16 @@ function Parameters({ runId, data }: { runId: string; data: ParamScope }) {
   );
 }
 
-/** One output a contract engine's run kept (`outputs.values`): its name and the quantity, in its unit, with its origin. */
+/** One output a run kept (`outputs.values`): its name and the quantity, in its unit, with its origin. */
 interface RunOutput {
   name: string;
   quantity: Quantity;
 }
 
-/** The outputs a contract engine's run kept; none for a BioSTEAM run, whose numbers are its artifact's sections. */
-function runOutputs(outputs: Record<string, unknown>): RunOutput[] {
-  const values = outputs.values;
+/** The outputs a contract engine's run kept. A library run keeps its `outputs.values` too, and its page shows them in its artifact's own sections. */
+function runOutputs(run: EngineRunReport['run']): RunOutput[] {
+  if (run.tool === 'library.run') return [];
+  const values = run.outputs.values;
   if (!Array.isArray(values)) return [];
   return values.filter(
     (v): v is RunOutput =>
@@ -105,7 +106,7 @@ function runOutputs(outputs: Record<string, unknown>): RunOutput[] {
 
 /** A contract engine's run (docs/api/engines.md): each output with its value, its unit and its origin, the run's artifact. */
 function Outputs({ report }: { report: EngineRunReport }) {
-  const values = runOutputs(report.run.outputs);
+  const values = runOutputs(report.run);
   if (!values.length) return null;
   const headers = ['Output', 'Value', 'Unit', 'Origin'];
   const originOf = (q: Quantity) => (q.origin?.kind === 'artifact' ? `the run's artifact ${q.origin.ref ?? ''}`.trim() : (ORIGIN_WORDS[q.origin?.kind ?? ''] ?? q.origin?.kind ?? '—'));
@@ -476,7 +477,7 @@ function MakeScenario({ report }: { report: EngineRunReport }) {
 function MakeRunbook({ report }: { report: EngineRunReport }) {
   const reviewer = useStore((s) => s.reviewer).trim();
   const hydrate = useStore((s) => s.hydrateProjectState);
-  const numbers = predictable(report.artifact);
+  const numbers = predictable(report.run, report.artifact);
   const [chosen, setChosen] = useState<Record<string, string>>({});
   const [title, setTitle] = useState(`${report.run.plant} at the bench`);
   const [busy, setBusy] = useState(false);

@@ -4056,7 +4056,9 @@ class EngineRun(BaseModel):
     # The artifact's, computed on its basis; None for a refused run.
     provenance: Provenance | None = None
     artifactId: str | None = None
-    # The price, a flowsheet's own outputs, and how the package's test held it.
+    # `values`, each output a typed quantity whose origin is the run's
+    # artifact (engine/runs.py `values_of`); a library run's price, a
+    # flowsheet's own outputs and how the package's test held it beside them.
     outputs: dict[str, Any] = Field(default_factory=dict)
     versions: dict[str, str] = Field(default_factory=dict)
     sff: RunSFF | None = None
@@ -4360,9 +4362,10 @@ class ComparisonReport(BaseModel):
 
 
 class PredictedOutput(BaseModel):
-    """One output of an engine run a runbook predicts: its key in the run's
-    artifact (`outputs.<key>` of a flowsheet's outputs, `price.<key>` of the
-    price) and what the bench calls it."""
+    """One output of an engine run a runbook predicts: its key (`values.<name>`
+    of the run's outputs.values, for a run of any engine; for a library run
+    `outputs.<key>` of a flowsheet's outputs or `price.<key>` of the price as
+    well) and what the bench calls it."""
 
     model_config = ConfigDict(extra="forbid")
 

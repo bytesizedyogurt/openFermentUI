@@ -161,6 +161,13 @@ class Refused(ValueError):
     """The request cannot be computed, in words."""
 
 
+def _said(e: KeyError) -> str:
+    """A KeyError's own words, as its raiser wrote them: `str()` of a
+    KeyError puts them in quotes (`flowsheets.load` refuses an unknown id
+    with one)."""
+    return str(e.args[0]) if e.args else str(e)
+
+
 # How many plants built from a structure (OF-BLD-020 §6.1: custom_train_v1,
 # one per vessel design, train run and finance) the worker keeps warm; the
 # oldest is let go past it. A setting, not a measurement.
@@ -179,7 +186,7 @@ def built(name: str, structure: dict[str, Any] | None = None) -> tuple[Any, Any]
     try:
         module = flowsheets.load(name)
     except KeyError as e:
-        raise Refused(str(e)) from e
+        raise Refused(_said(e)) from e
     if not hasattr(module, "build"):
         raise Refused(f"{name} is a reference biorefinery: it runs whole on its package's own defaults, "
                       "through its reference run, not case by case")
@@ -695,7 +702,7 @@ def reference(name: str, digits: int, draw: bool | None = None) -> dict[str, Any
     try:
         module = flowsheets.load(name)
     except KeyError as e:
-        raise Refused(str(e)) from e
+        raise Refused(_said(e)) from e
     if not hasattr(module, "load"):
         raise Refused(f"{name} is not a reference biorefinery: it is run case by case, on its inputs")
     if not 1 <= digits <= 17:
@@ -1005,12 +1012,12 @@ def _op_evaluate(args):
 
 
 def _op_grid(args):
-    return grid(str(args["flowsheet"]), dict(args["axes"]), dict(args.get("base") or {}))
+    return grid(str(args["flowsheet"]), dict(args["axes"]), dict(args.get("base") or {}), args.get("structure"))
 
 
 def _op_montecarlo(args):
     return montecarlo(str(args["flowsheet"]), dict(args["specs"]), int(args.get("n", 500)), int(args.get("seed", 0)),
-                      dict(args.get("base") or {}))
+                      dict(args.get("base") or {}), args.get("structure"))
 
 
 def _op_benchmark(args):
@@ -1041,10 +1048,14 @@ def _op_vessel_design(args):
 
 def unit_class(type_id: str) -> tuple[Any, Any]:
     """A catalogue entry and its class: BioSTEAM's by name, or the in-house
-    one, which only this worker imports (E.3‴)."""
+    one, which only this worker imports (E.3‴). A type the catalogue does
+    not hold is refused in the catalogue's words."""
     from ..pureos import catalogue, inhouse
 
-    e = catalogue.entry(type_id)
+    try:
+        e = catalogue.entry(type_id)
+    except catalogue.CatalogueUnknown as ex:
+        raise Refused(str(ex)) from ex
     if e.inhouse:
         return e, getattr(inhouse, e.inhouse)
     return e, getattr(bst, e.biosteam)
@@ -1217,7 +1228,7 @@ def _op_sff_export(args):
     try:
         module = flowsheets.load(name)
     except KeyError as e:
-        raise Refused(str(e)) from e
+        raise Refused(_said(e)) from e
     if hasattr(module, "load"):
         with package_defaults():
             b = module.load()

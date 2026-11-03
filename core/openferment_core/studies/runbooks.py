@@ -2,14 +2,16 @@
 
 A runbook commits, before a fermenter is touched, to what a run predicts and
 what the bench will measure. A study makes one from an engine run: each
-output the request names (`outputs.<key>` of a flowsheet's outputs, or
-`price.<key>` of the price block) becomes a point prediction whose value
-and unit are the run's, whose basis names the run (its id, its plant and
+output the request names becomes a point prediction whose value and unit
+are the run's, whose basis names the run (its id, its plant and
 configuration, its provenance) and whose artifact is the run's, at
 confidence `low`: a model's answer on its basis, which the bench has not
-tested. Each prediction gets a measure the bench records at harvest. The
-runbook is a row of `runbooks` in the shape the runbook page keeps
-(`src/data/types.ts` `Runbook`), so it lists and opens there beside a
+tested. An output is `values.<name>`, an entry of a run's outputs.values
+(engine/runs.py `values_of`), for a run of any engine, and for a library
+run `outputs.<key>` of a flowsheet's outputs or `price.<key>` of the price
+block as well. Each prediction gets a measure the bench records at
+harvest. The runbook is a row of `runbooks` in the shape the runbook page
+keeps (`src/data/types.ts` `Runbook`), so it lists and opens there beside a
 person's.
 
 Locking freezes it. The service writes the digest the browser's own code
@@ -39,7 +41,7 @@ from pydantic import ValidationError
 
 from .. import project_state
 from ..engine import runs
-from ..models import Measure, Prediction, Runbook, RunbookCreate
+from ..models import Artifact, Measure, Prediction, Runbook, RunbookCreate
 from ..runbook_lock import lock_hash
 
 PREFIX = "rb-study-"
@@ -75,9 +77,14 @@ def _held(rid: str) -> dict[str, Any] | None:
     return None if row is None else _laid(row, state["runbookLocks"])
 
 
-def _value(output: dict[str, Any], key: str) -> tuple[Any, str | None]:
-    """A run's `outputs.<key>` or `price.<key>`, with its unit."""
+def _value(art: Artifact, key: str) -> tuple[Any, str | None]:
+    """A run's `values.<name>` (its outputs.values entry of that name), or a
+    library run's `outputs.<key>` or `price.<key>`, with its unit."""
     block, _, name = key.partition(".")
+    if block == "values":
+        q = next((v["quantity"] for v in runs.values_of(art) if v["name"] == name), None)
+        return (q["value"], q["unit"]) if q is not None else (None, None)
+    output = art.output
     if block == "outputs":
         return (output.get("outputs") or {}).get(name), (output.get("outputUnits") or {}).get(name)
     if block == "price":
@@ -114,10 +121,11 @@ def make(asked: RunbookCreate) -> Runbook:
     where = run.plant + (f" ({run.configuration})" if run.configuration else "")
     predictions, measures = [], []
     for n, item in enumerate(asked.predict, start=1):
-        value, unit = _value(art.output, item.output)
+        value, unit = _value(art, item.output)
         if not isinstance(value, (int, float)) or isinstance(value, bool) or unit is None:
-            raise RunbookRefused(f"run {run.id} answers no number with a unit for {item.output}; it answers "
-                                 "outputs.<key> of a flowsheet's outputs and price.<key> of its price")
+            raise RunbookRefused(f"run {run.id} answers no number with a unit for {item.output}; a run answers "
+                                 "values.<name> of its outputs.values, and a library run outputs.<key> of a "
+                                 "flowsheet's outputs and price.<key> of its price")
         predictions.append(Prediction(
             id=f"p{n}", label=item.label, value=float(value), unit=unit, confidence="low", artifactId=art.id,
             basis=f"engine run {run.id} of {where}, {run.provenance}: its {item.output}"))

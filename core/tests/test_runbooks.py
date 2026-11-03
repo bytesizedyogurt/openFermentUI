@@ -10,6 +10,9 @@ holds the digest the browser's own code writes, a runbook the page made
 included, and from then on the store refuses a row whose predictions or
 measures differ. A second lock, a runbook with no prediction, a refused
 run, an output that is no number and an unknown run are refused in words.
+A run of any engine is predicted by its outputs.values (`values.<name>`):
+the contract's sample engine's, and a library run's, whose `price.<key>`
+and `outputs.<key>` keep their runbook ids and predictions.
 """
 from __future__ import annotations
 
@@ -19,12 +22,14 @@ from fastapi.testclient import TestClient
 from openferment_core import audit, project_state
 from openferment_core.api import app
 from openferment_core.engine import library, runs, simulator
+from openferment_core.engine.sample import SAMPLE
 from openferment_core.models import PredictedOutput, RunbookCreate
 from openferment_core.runbook_lock import lock_hash
 from openferment_core.studies import runbooks, scenarios
 from openferment_core.workers import WorkerError
 
 from test_comparisons import PricedStandIn
+from test_engines import given
 from test_runbook_lock import cases
 from test_studies import asked
 
@@ -175,3 +180,27 @@ def test_the_routes_make_read_list_and_lock_a_runbook_as_it_is_kept(worker):
     assert client.post("/api/studies/runbooks/rb-none/lock", json={}).status_code == 404
     assert client.post("/api/studies/runbooks", json={**body, "predict": []}).status_code == 422
     assert client.post("/api/studies/runbooks", json={**body, "runId": "0000000000000000"}).status_code == 422
+
+
+# ── a run of any engine (alpha 2.2 stage C, D3) ────────────────────────
+
+
+def test_a_runbook_predicts_any_engines_run_by_its_outputs_values(worker):
+    cane = runs.run("sugarcane", by="Ada Moreno").run
+    by_price = made(cane.id)
+    assert by_price.id == runbooks.runbook_id(cane.id, ["price.solvedPrice", "outputs.ethanolKgPerH"]), "its id holds"
+    by_values = made(cane.id, predict=[PredictedOutput(output="values.price.solvedPrice", label="Minimum selling price"),
+                                       PredictedOutput(output="values.outputs.ethanolKgPerH", label="Ethanol made")])
+    assert by_values.id != by_price.id
+    assert [(p.value, p.unit) for p in by_values.predictions] == [(p.value, p.unit) for p in by_price.predictions]
+    sample = SAMPLE.run("placeholder", None, [given("a-parameter", 2.5, note="a placeholder")], "Ada Moreno")
+    book = made(sample.id, predict=[PredictedOutput(output="values.given a-parameter", label="The value given back"),
+                                    PredictedOutput(output="values.count", label="How many values were given")],
+                title="A placeholder at the bench")
+    given_back, count = book.predictions
+    assert (given_back.value, given_back.unit, given_back.artifactId) == (2.5, "placeholder-unit", sample.artifactId)
+    assert (count.value, count.unit) == (1.0, "1") and f"engine run {sample.id} of placeholder" in count.basis
+    assert [(m.unit, m.timepoint) for m in book.measurementSchema] == [("placeholder-unit", "harvest"), ("1", "harvest")]
+    for output in ("values.nothing", "price.solvedPrice"):
+        with pytest.raises(runbooks.RunbookRefused, match="a run answers values.<name> of its outputs.values"):
+            made(sample.id, predict=[PredictedOutput(output=output, label="Nothing it answers")])

@@ -37,6 +37,14 @@ def test_the_flowsheet_on_library_defaults_is_kept_with_its_sff_file(warm):
     assert {i.quantity.origin.kind for i in run.inputs} <= {"library-default", "convention"}
     assert run.versions["biosteam"] == "2.54.0" and run.versions["biorefineries"] == "2.35.1"
     assert run.outputs["outputs"]["mespUsdPerKg"] == rep.artifact.output["outputs"]["mespUsdPerKg"] > 0
+    # D3: its outputs.values, each a quantity in the unit the artifact states, its origin the artifact.
+    values = {v["name"]: v["quantity"] for v in run.outputs["values"]}
+    art = rep.artifact.output
+    assert values["outputs.mespUsdPerKg"] == {"value": art["outputs"]["mespUsdPerKg"],
+                                              "unit": art["outputUnits"]["mespUsdPerKg"],
+                                              "origin": {"kind": "artifact", "ref": run.artifactId}}
+    assert values["price.solvedPrice"]["value"] == art["price"]["solvedPrice"]
+    assert values["price.solvedPrice"]["unit"] == art["price"]["units"]["solvedPrice"]
     assert run.sff.valid and run.sff.score > 0.5 and rep.flowsheet.completeness.recipe["digests_valid"]
     assert runs.listed()[0] == run and runs.report(run.id).run == run
 

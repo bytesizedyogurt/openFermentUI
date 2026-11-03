@@ -13,7 +13,9 @@
 //   the rows     every number of the price block and of a flowsheet's outputs,
 //                in its unit, each run's value and its change;
 //   the values   every value any run set for itself, each run's with its
-//                origin, the library's default where a run set none.
+//                origin, the library's default where a library run set none;
+//                a dash marks a run that holds no such value (a comparison
+//                that holds a run of another engine, `study comparison 2`).
 import { useEffect, useState } from 'react';
 import { BookOpen, Download } from 'lucide-react';
 import type { ComparisonReport } from '@/data/types';
@@ -42,7 +44,7 @@ interface ComparedRow {
 }
 interface ComparedValue {
   key: string;
-  values: { value: number | string | null; unit: string; origin: string; by: string | null }[];
+  values: { value: number | string | null; unit: string | null; origin: string | null; by: string | null }[];
 }
 
 /** The artifact's output as the comparison computed it (studies/comparisons.py `_compare`). */
@@ -90,7 +92,9 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
   const valuesHead = ['Value', ...names];
   const valuesBody = (out?.values ?? []).map((v) => [
     v.key,
-    ...v.values.map((x) => `${shown(x.value)} ${x.unit} (${ORIGIN_WORDS[x.origin] ?? x.origin}${x.by ? `, ${x.by}` : ''})`),
+    ...v.values.map((x) =>
+      x.origin == null ? '— (this run holds no such value)' : `${shown(x.value)} ${x.unit ?? ''} (${ORIGIN_WORDS[x.origin] ?? x.origin}${x.by ? `, ${x.by}` : ''})`,
+    ),
   ]);
 
   return (
@@ -203,7 +207,7 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
             </div>
             {valuesBody.length ? (
               <>
-                <p className="text-caption text-ink-soft mb-2">Each value any run set for itself, each run&rsquo;s with its origin; a run that set none ran on the library&rsquo;s default.</p>
+                <p className="text-caption text-ink-soft mb-2">Each value any run set for itself, each run&rsquo;s with its origin. A library run that set none ran on the library&rsquo;s default, and a dash marks a run that holds no such value.</p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-caption">
                     <thead>

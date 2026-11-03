@@ -93,8 +93,8 @@ the engine has no plant, which the service keeps as the run's `sffRefused`.
 ## Proforma's flowsheet ops (Proforma worker; OF-BLD-014 §8, OF-BLD-019 §2, `proforma.py`)
 
 A flowsheet is an id in `flowsheets.KNOWN`: the shelf's ids and the test-only `toy`. Every op that
-names a `flowsheet` refuses an id outside it with the words of `flowsheets.load`'s `KeyError`,
-which `str()` quotes: `Refused: 'there is no flowsheet x; there are …'`. The toy,
+names a `flowsheet` refuses an id outside it in the words of `flowsheets.load`'s `KeyError`, as
+written: `Refused: there is no flowsheet x; there are …`. The toy,
 `ethanol_glucose_v0` and `custom_train_v1` run case by case: the worker builds each once inside
 `package_defaults()` and keeps it warm, and each case sets its inputs on the built objects and
 simulates again. A scenario flowsheet prices every case on BioSTEAM's default utility prices and
@@ -135,26 +135,26 @@ it with the case.
 
 ### `grid`
 
-Request `{"flowsheet", "axes": {input key: [number, …]}, "base": {input key: number}}`, with one
-to three axes; each cell is `base` with one value of each axis set over it. Result `{"axes",
+Request `{"flowsheet", "axes": {input key: [number, …]}, "base": {input key: number},
+"structure"}`, with one to three axes; each cell is `base` with one value of each axis set over it,
+and `structure` is `custom_train_v1`'s, as `evaluate` takes it. Result `{"axes",
 "base", "cells": [{"at": {input key: number}, "outputs", "infeasible"}, …]}`, the cells in
 `itertools.product` order over the axes as given. `outputs` is `evaluate`'s result, null for a case
 the flowsheet cannot hold. `infeasible` is null for a case that ran and `{"reason", "detail"}` for
 one that did not: `reason` is the flowsheet's `Infeasible.reason`, or `error` for any other
-exception, whose `detail` is then `"<ExceptionType>: <words>"`. The handler passes no
-`structure`, so `custom_train_v1` is refused here. Fewer than one axis or more than three is
-refused, and a refusal in any case ends the op.
+exception, whose `detail` is then `"<ExceptionType>: <words>"`. Fewer than one axis or more than
+three is refused, and a refusal in any case ends the op.
 
 ### `montecarlo`
 
 Request `{"flowsheet", "specs": {input key: spec}, "n" (default 500), "seed" (default 0), "base":
-{input key: number}}`. A spec is `{"kind": "fixed", "value"}`, `{"kind": "uniform", "low",
-"high"}` or `{"kind": "triangular", "low", "mode", "high"}`. The `n` samples are a Latin hypercube
+{input key: number}, "structure"}`, `structure` as `evaluate` takes it. A spec is `{"kind":
+"fixed", "value"}`, `{"kind": "uniform", "low", "high"}` or `{"kind": "triangular", "low",
+"mode", "high"}`. The `n` samples are a Latin hypercube
 over the spec keys (`scipy.stats.qmc.LatinHypercube`, seeded with `seed`); each sample's inputs
 are `base` with every spec's draw set over it. Result `{"n", "seed", "samples": [{"inputs",
 "outputs", "infeasible"}, …]}`, with `outputs` and `infeasible` as `grid`'s cells hold them. A
-spec of another kind is refused. The handler passes no `structure`, and a refusal in any sample
-ends the op.
+spec of another kind is refused, and a refusal in any sample ends the op.
 
 ### `run`
 
@@ -545,8 +545,8 @@ are keyed by the class's own parameter names, and `defaults`, `choices` and `ref
 catalogue's keys. A value is plain: null, a number as a float, a bool as `"true"` or `"false"`, and
 anything else as its text. A per-component split the class fills itself adds `byComponent`
 (`{chemical: share}`) to its `defaults` entry. `chemicals` is the yeast program's chemical IDs.
-`catalogue.specs_of` serves the answer as `UnitSpecs`. An unknown type is an error
-`CatalogueUnknown: there is no unit type …`.
+`catalogue.specs_of` serves the answer as `UnitSpecs`. A type the catalogue does not hold is
+refused in the catalogue's words: `Refused: there is no unit type …`.
 
 ### `catalogue_unit_check`
 
@@ -564,9 +564,9 @@ lists. Result `{"unitClass", "ins": [stream, …], "outs": [stream, …], "desig
 "purchaseCost", "installedCost", "utilityCost", "power", "heatDuties": [number, …], "held":
 {attribute: value}}`, each stream `{"id", "massFlow", "phase", "massFlows": {chemical: kg/hr}}`.
 Costs are in USD, `utilityCost` in USD/hr, `power` in kW and each heat duty in kJ/hr. `held` gives
-each attribute as the built unit holds it, or `"unreadable: <ExceptionType>"`. The op raises no
-`Refused`: an unknown type is `CatalogueUnknown: …`, and a unit that cannot be built or simulated
-is the class's own exception and words.
+each attribute as the built unit holds it, or `"unreadable: <ExceptionType>"`. A type the catalogue
+does not hold is refused in the catalogue's words (`Refused: there is no unit type …`); a unit that
+cannot be built or simulated is the class's own exception and words.
 
 ## pureOS train ops (Proforma worker; OF-BLD-020 §5.2, `pureos/train_spec.py`)
 
@@ -595,7 +595,8 @@ from `LHK`, an evaporator's pressures come as `P.<n>` with `effects`, and a bool
 or `"false"`. `unread` names, with why, each parameter the unit holds as None or as something
 other than a number or a word; the class's own default stands for it. The op refuses
 `custom_train_v1` (its units are the fermenter's and a train run's own), a reference biorefinery,
-a unit ID the flowsheet lacks, and a unit that is not an instance of the catalogue type's class.
+a type the catalogue does not hold, a unit ID the flowsheet lacks, and a unit that is not an
+instance of the catalogue type's class.
 
 ### `train_run`
 
@@ -605,7 +606,7 @@ prices and cost index, and a fresh flowsheet. `train_spec.py` builds the request
 (`_run_train`) and keeps the answer as one `pureos.train_run` artifact. Request:
 
 ```
-{"system", "product", "diagram",
+{"system", "diagram",
  "inlet": {"flows": {chemical: kg/hr} | null, "concentrations": {chemical: g L⁻¹} | null,
            "brothFlow": m³/hr | null, "balance": chemical | null, "T", "P", "phase"},
  "units": [{"id", "type", "values": {key: value},
@@ -621,8 +622,8 @@ brings the mixture's volume, as thermosteam computes it at the inlet's `T` and `
 before it (the train's inlet for the first); an outlet routed `recycle:<unit id>` joins the inlet
 from upstream of the unit it names; a side port takes the flows `sides` gives it; a port the unit
 sizes itself is an empty stream; and every outlet is a stream named `<unit id>_<port>`. `diagram`
-is as `run` takes it. `train_spec.py` also sends `product`, the chemical the train traces; the
-handler does not read it, and the product stream is the last unit's onward outlet. Result
+is as `run` takes it. The product stream is the last unit's onward outlet, and `train_spec.py`
+reads the chemical the train traces from the run's basis. Result
 `{"tablesSource", "streams", "units", "utilities", "diagram", "diagramNote", "unitOrder",
 "tableUnits"}` as the tables (above) hold them, with no `tea`, `utilities` over every unit of the
 train and `unitOrder` the system's units; and beside them `"inlet": {"flows", "T", "P", "phase",
@@ -630,10 +631,11 @@ train and `unitOrder` the system's units; and beside them `"inlet": {"flows", "T
 `"costs": [{"unit", "unitClass", "purchaseCost", "installedCost", "items": {item: USD},
 "utilityCost"}, …]`, `"utilitySettings"` and `"versions"`. `inlet` is the inlet as built, with its
 `volume` in m³/hr, `water` the balance's mass in kg/hr (null for given flows) and `waterNote` how
-it was found. The op refuses, in `flowsheets/train.py`'s words (its own `Refused`): an inlet whose
-other components take the whole broth flow, or whose balance chemical cannot fill it; a unit that
-cannot be built (`unit <id> (<type>, <class>) could not be built: BioSTEAM said: …`); a unit that
-does not converge; and a train that does not converge as a whole.
+it was found. The op refuses a unit type the catalogue does not hold in the catalogue's words
+(`Refused: there is no unit type …`), and refuses in `flowsheets/train.py`'s words (its own
+`Refused`): an inlet whose other components take the whole broth flow, or whose balance chemical
+cannot fill it; a unit that cannot be built (`unit <id> (<type>, <class>) could not be built:
+BioSTEAM said: …`); a unit that does not converge; and a train that does not converge as a whole.
 
 ## geneos ops (geneos worker; OF-BLD-014 §6.2, §6.3, `geneos.py`)
 

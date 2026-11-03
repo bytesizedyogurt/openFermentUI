@@ -6595,7 +6595,7 @@
       },
       "PredictedOutput": {
         "additionalProperties": false,
-        "description": "One output of an engine run a runbook predicts: its key in the run's\nartifact (`outputs.<key>` of a flowsheet's outputs, `price.<key>` of the\nprice) and what the bench calls it.",
+        "description": "One output of an engine run a runbook predicts: its key (`values.<name>`\nof the run's outputs.values, for a run of any engine; for a library run\n`outputs.<key>` of a flowsheet's outputs or `price.<key>` of the price as\nwell) and what the bench calls it.",
         "properties": {
           "label": {
             "maxLength": 200,

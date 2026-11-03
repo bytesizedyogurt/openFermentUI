@@ -1,30 +1,39 @@
-"""Engine runs (execution prompt §7.4; ADR-004, ADR-003, ADR-006).
+"""Engine runs (execution prompt §7.4; ADR-004, ADR-003, ADR-006, ADR-015).
 
-An engine run is one run of a library plant or an openFerment flowsheet
-(engine/library.py) in a project, kept as a row of the `runs` table:
+An engine run is one computation of one engine in a project, kept as a row
+of the `runs` table in the shape every engine's run has (docs/api/runs.md):
 
-    the plant and its configuration
-    its inputs, each a `Quantity` with its origin (ADR-006): the package's own
+    what ran    the engine, its thing (a library plant or an openFerment
+                flowsheet for BioSTEAM, engine/library.py) and the
+                configuration it ran in
+    its inputs  each a `Quantity` with its origin (ADR-006): the package's own
                 settings as `library-default`, a person's value as a
                 `person-assumption`, a model's as a `model-estimate`, a
                 convention the run states as a `convention`
-    its computation: the `library.run` artifact (the basis, the output and
+    its computation  the artifact of its basis (the basis, the output and
                 its hash, replayable within the precision the basis states)
                 and the provenance computed on it
-    its outputs (the price, and a flowsheet's own) and the versions it ran on
-    the SFF file it wrote (engine/sff.py `export`: a `run` record, validated,
-                scored and tagged in the worker), or the words that say why
-                none could be written
-    its status: `done`, or `refused` with the plant's own words (a receipt:
+    its outputs `values`, each output a typed quantity in the unit its
+                artifact states, its origin the run's artifact (`values_of`);
+                a library run keeps its price, a flowsheet's own outputs and
+                how the package's test held it beside them
+    its versions  the simulator, its property engine and the package, as
+                its basis names them, or the engine's own `version()`
+    its SFF file  (engine/sff.py: a `run` record, validated, scored and
+                tagged in the worker), or the words that say why none could
+                be written
+    its status  `done`, or `refused` with the engine's own words (a receipt:
                 BioSTEAM's InfeasibleRegion naming its unit, a gate the values
                 failed) and no artifact
 
 A run's id is its computation's (the artifact id of its basis), so the same
 run asked twice is one row, and a refused one is answered from its receipt.
-A request the runner refuses before any plant is built (an unknown key, a
-range, a scope the plant does not have) keeps nothing. The tables and the
-read-back stay in the artifact; `report` reads the run, its artifact and its
-SFF record together.
+A request refused before anything computes (an unknown key, a range, a scope
+the plant does not have) keeps nothing. `keep_run` keeps the row of any
+engine's computation: BioSTEAM's library run (`run`) and the run of every
+engine built on `contract.WorkerEngine` (`run_engine`) are kept through it.
+The tables and the read-back stay in the artifact; `report` reads the run,
+its artifact and its SFF record together.
 
     GET  /api/runs                 the project's runs, newest first (?engine= one engine's)
     GET  /api/runs/{id}            one run's report: the run, its artifact, its SFF record,
@@ -32,10 +41,10 @@ SFF record together.
     POST /api/library/{plant}/run  a library plant or a flowsheet run and kept (api.py)
     POST /api/engines/{name}/run   any registered engine's thing run and kept (api.py)
 
-Every engine's run is a row of the same shape (docs/api/engines.md;
-ADR-015). BioSTEAM's is computed by `run` above; an engine built on
+BioSTEAM's run is computed by `run`; an engine built on
 `contract.WorkerEngine` computes in its own worker, and `run_engine` keys,
-keeps, files and reports its run here, the same for every such engine.
+files and reports its run here, the same for every such engine
+(docs/api/engines.md).
 """
 from __future__ import annotations
 
@@ -52,7 +61,8 @@ from ..basis import ASSUMED_KINDS, assumption_source, estimate_source, origin_of
 from ..db import models as t
 from ..db import rows
 from ..models import (Artifact, BasisInput, BasisSource, EngineInput, EngineParameter, EngineRun, EngineThing, Origin,
-                      Override, ParameterValue, ParamScope, Quantity, ReplayTolerance, RunInput, RunReport, RunSFF)
+                      Override, ParameterValue, ParamScope, Quantity, ReplayTolerance, RunInput, RunReport, RunSFF,
+                      SFFFlowsheet)
 from ..params import bounds_check
 from ..workers import WorkerError
 from . import Engine, EngineBroken, EngineRefused, contract, library, sff
@@ -61,6 +71,10 @@ from . import Engine, EngineBroken, EngineRefused, contract, library, sff
 # "thermosteam 0.54.2" as values, "<module>@2.35.1" as the plant's source.
 _NAMED = re.compile(r"^(\S+) (\S+)$")
 PACKAGE = "biorefineries"
+# The engine a library run is kept under, as BioSTEAM registers (engine/biosteam.py).
+LIBRARY_ENGINE = "biosteam"
+# The stem of a contract engine's artifact tool (`engine_tool`): `engine.<name>`.
+CONTRACT_TOOL = "engine."
 
 
 class RunNotFound(KeyError):
@@ -80,8 +94,10 @@ def _inputs(inputs: list[BasisInput]) -> list[RunInput]:
             for i in inputs]
 
 
-def _versions(inputs: list[BasisInput]) -> dict[str, str]:
-    """The simulator, its property engine and the package, as the basis names them."""
+def _versions(inputs: Sequence[BasisInput], engine: Any = None) -> dict[str, str]:
+    """The distributions a run ran on: the simulator, its property engine
+    and the package, as its basis names them; for a basis that names no
+    simulator, the engine's own `version()` (`_engine_versions`)."""
     out = {}
     for i in inputs:
         if i.name in ("simulator", "thermodynamics") and isinstance(i.value, str) and _NAMED.match(i.value):
@@ -89,12 +105,87 @@ def _versions(inputs: list[BasisInput]) -> dict[str, str]:
             out[name] = v
         if i.name == "plant" and i.source.id and "@" in i.source.id:
             out[PACKAGE] = i.source.id.rsplit("@", 1)[1]
-    return out
+    if any(i.name == "simulator" for i in inputs):
+        return out
+    return _engine_versions(engine)
+
+
+def _engine_versions(engine: Any) -> dict[str, str]:
+    """An engine's `version()`: the engine's own when the engine is given,
+    the registered engine's when it is named (engine/registry.py); empty for
+    a name no usable engine registers here."""
+    if engine is None:
+        return {}
+    if isinstance(engine, str):
+        from . import registry
+
+        try:
+            engine = registry.get(engine)
+        except (registry.EngineNotFound, registry.EngineUnavailable):
+            return {}
+    return dict(engine.version())
+
+
+def _engine_name(engine: Any) -> str:
+    """The name a run is kept under: the engine's own for an engine given
+    whole; a name given is BioSTEAM's (`LIBRARY_ENGINE`, whose library run
+    `run` computes here) or one the registry holds (engine/registry.py),
+    usable or set aside. Any other name is refused in words (ValueError), so
+    every row is filed under an engine `GET /api/engines` lists."""
+    if not isinstance(engine, str):
+        return engine.name
+    name = engine.strip()
+    if name == LIBRARY_ENGINE:
+        return name
+    from . import registry
+
+    if name not in registry.found():
+        raise ValueError(f"no engine named {name!r} is registered here, so no run is kept under it; the engines are "
+                         f"{', '.join(registry.names()) or 'none'}")
+    return name
+
+
+def _number(x: Any) -> bool:
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def values_of(art: Artifact) -> list[dict[str, Any]]:
+    """A run's outputs as typed quantities, read from its artifact alone:
+    each `{name, quantity}`, the quantity in the unit the artifact states
+    for it and its origin the artifact (`{"kind": "artifact", "ref": <its
+    id>}`). A library run's are each number of its price block in the unit
+    `price.units` names (`price.<key>`) and each of its flowsheet's own
+    outputs that `outputUnits` names a unit for (`outputs.<key>`), in the
+    artifact's order; a contract engine's run's are its worker's outputs,
+    each by its own name, in the worker's order. Any other tool's artifact
+    answers an empty list."""
+    origin = Origin(kind="artifact", ref=art.id)
+
+    def typed(name: str, value: Any, unit: str) -> dict[str, Any]:
+        return {"name": name, "quantity": Quantity(value=value, unit=unit, origin=origin).model_dump(
+            mode="json", exclude_none=True)}
+
+    o = art.output
+    if art.tool == library.LIBRARY_RUN:
+        price = o.get("price") or {}
+        out = [typed(f"price.{k}", price[k], u) for k, u in (price.get("units") or {}).items()
+               if isinstance(u, str) and _number(price.get(k))]
+        units = o.get("outputUnits") or {}
+        out += [typed(f"outputs.{k}", v, units[k]) for k, v in (o.get("outputs") or {}).items()
+                if isinstance(units.get(k), str) and (_number(v) or isinstance(v, str))]
+        return out
+    if art.tool.startswith(CONTRACT_TOOL):
+        return [typed(v["name"], v["value"], v["unit"]) for v in o.get("values") or []]
+    return []
 
 
 def _outputs(art: Artifact) -> dict[str, Any]:
-    """What a run answers, small enough for a listing: the price, a
-    flowsheet's own outputs, and how the package's test held it."""
+    """What a run answers, small enough for a listing: `values`, its outputs
+    as typed quantities (`values_of`), and for a library run its price, a
+    flowsheet's own outputs and how the package's test held it as well."""
+    values = values_of(art)
+    if art.tool != library.LIBRARY_RUN:
+        return {"values": values}
     o = art.output
     out: dict[str, Any] = {"price": o.get("price")}
     if o.get("outputs") is not None:
@@ -102,6 +193,7 @@ def _outputs(art: Artifact) -> dict[str, Any]:
     held = o.get("checks") or []
     if held:
         out["regression"] = {"within": sum(bool(c.get("within")) for c in held), "of": len(held)}
+    out["values"] = values
     return out
 
 
@@ -150,7 +242,10 @@ def parameters_of(run: EngineRun, art: Artifact) -> ParamScope | None:
     """The run's parameters as the parameter panel reads them: each as its
     plant declares it (library._spec), its value the run's, a person's
     assumption or a model's estimate where the run set one and the library's
-    own default elsewhere, read from the run's artifact alone."""
+    own default elsewhere, read from the run's artifact alone. A library
+    run's alone: a run of any other tool answers None."""
+    if art.tool != library.LIBRARY_RUN:
+        return None
     read = art.output.get("parameters")
     if not isinstance(read, list):
         return None
@@ -195,13 +290,95 @@ def report(run_id: str) -> RunReport:
     return _report(run, art, flowsheet)
 
 
+def _job(run_id: str, engine: str, thing: str, configuration: str | None, scenario_id: str | None,
+         by: str) -> dict[str, Any]:
+    """What the event stream says of a run's job (`job.*`, docs/api/postdoc.md)."""
+    return {"id": run_id, "kind": "engine.run", "engine": engine, "plant": thing, "configuration": configuration,
+            "scenarioId": scenario_id, "by": by}
+
+
+def _failed(job: dict[str, Any], e: BaseException, project_id: str) -> None:
+    """The job said failed on the event stream, in the error's type and words; no row is kept."""
+    events.publish("job.failed", {**job, "status": "failed", "words": f"{type(e).__name__}: {e}"}, project=project_id)
+
+
+def keep_run(engine: Any, thing: str, configuration: str | None, *, tool: str, version: str,
+             basis: Sequence[BasisInput], by: str = "", art: Artifact | None = None, refused: str | None = None,
+             flowsheet: SFFFlowsheet | None = None, sff_refused: str | None = None,
+             scenario_id: str | None = None, seed: int | None = None) -> RunReport:
+    """Keep one run of any engine's computation as its `runs` row, in the
+    shape every run has (docs/api/runs.md, Keeping a run), say so on the
+    project's event stream, and answer the run's report.
+
+    `engine` is the engine that ran it, as the engine itself or by its
+    registered name (`_engine_name`: a name no engine registered here has
+    is refused). `tool`, `version`, `basis` and `seed` are its
+    computation's, and the run's id is the artifact id of that basis.
+    A computation that ran gives `art`, the artifact it kept: the row is
+    `done`, its outputs read from the artifact (`values_of`), its SFF file
+    the record `flowsheet` or the words `sff_refused` for why none was
+    written (one of the two), and `job.done` says it. An engine that
+    refused the values inside its computation gives `refused`, its words:
+    the row is a receipt the same request is answered from, it keeps no SFF
+    file, and `job.failed` says it. Exactly one of `art` and `refused` is
+    given, and an `art` is the computation of this basis; a call outside
+    these rules is refused (ValueError) and keeps nothing.
+
+    The same run kept twice is one row, answered as it was first kept: a
+    held row that is done with its file or its words, or a held receipt, is
+    answered from the store, and nothing is written or said. A held row
+    with neither is written whole again with its first asker's `by`, `at`
+    and scenario. The row's versions are the distributions its basis
+    names, or the engine's own `version()` for a basis that names no
+    simulator. `by` is who asked, `this browser` when the request names no
+    one; `scenario_id` the study scenario that asked for it."""
+    if (art is None) == (refused is None):
+        raise ValueError("a run is kept with the artifact its computation kept, or with the words its engine "
+                         "refused it in: one of the two")
+    basis = list(basis)
+    run_id = artifacts.artifact_id(tool, version, basis, seed)
+    if art is not None and (art.id, art.tool, art.toolVersion) != (run_id, tool, version):
+        raise ValueError(f"artifact {art.id} ({art.tool}, {art.toolVersion}) is no computation of run {run_id}'s "
+                         f"basis ({tool}, {version})")
+    if art is not None and (flowsheet is None) == (sff_refused is None):
+        raise ValueError("a run that computed is kept with its SFF record, or with the words for why its engine "
+                         "wrote none: one of the two")
+    if art is None and (flowsheet is not None or sff_refused is not None):
+        raise ValueError("a receipt keeps no SFF file: the engine refused the values, and nothing was computed "
+                         "to write one for")
+    name = _engine_name(engine)
+    project_id = projects.current()
+    held = db.run(_get(project_id, run_id))
+    if held is not None and (held.status == "refused" or held.sff is not None or held.sffRefused is not None):
+        return report(run_id)
+    who = (by or "").strip() or "this browser"
+    first, when, asked = (held.by, held.at, held.scenarioId) if held is not None else (who, _now(), scenario_id)
+    base = dict(id=run_id, engine=name, plant=thing, configuration=configuration, tool=tool, toolVersion=version,
+                inputs=_inputs(basis), versions=_versions(basis, engine), by=first, at=when, scenarioId=asked)
+    job = _job(run_id, name, thing, configuration, scenario_id, who)
+    if art is None:
+        receipt = EngineRun(**base, status="refused", refused=refused)
+        db.run(_put(project_id, receipt, first))
+        events.publish("job.failed", {**job, "status": "refused", "words": refused}, project=project_id)
+        return _report(receipt, None, None)
+    kept = EngineRun(**base, status="done", provenance=art.provenance, artifactId=art.id, outputs=_outputs(art),
+                     durationMs=art.durationMs, sffRefused=sff_refused,
+                     sff=RunSFF(recordId=flowsheet.id, valid=flowsheet.validation.valid,
+                                score=flowsheet.completeness.score,
+                                tags=sorted(k for k, v in flowsheet.tags.items() if v.earned)) if flowsheet else None)
+    db.run(_put(project_id, kept, first))
+    events.publish("job.done", {**job, "status": "done", "provenance": kept.provenance, "artifactId": kept.artifactId,
+                                "sffRecordId": kept.sff.recordId if kept.sff else None}, project=project_id)
+    return _report(kept, art, flowsheet)
+
+
 def run(plant_id: str, configuration: str | None = None, overrides: list[Override] | None = None, *,
         by: str = "", scenario_id: str | None = None) -> RunReport:
     """Run a library plant or an openFerment flowsheet, write its SFF file
-    and keep the run; a run of the same basis kept already is answered from
-    its row. A plant that refuses the values is kept as a receipt and
-    refused (`RunRefused`, the plant's words and the receipt's id). A run a
-    study's scenario asks for names it (`scenario_id`)."""
+    and keep the run (`keep_run`); a run of the same basis kept already is
+    answered from its row. A plant that refuses the values is kept as a
+    receipt and refused (`RunRefused`, the plant's words and the receipt's
+    id). A run a study's scenario asks for names it (`scenario_id`)."""
     who = (by or "").strip() or "this browser"
     inputs = library.run_inputs(plant_id, configuration, list(overrides or []))
     project_id = projects.current()
@@ -213,21 +390,18 @@ def run(plant_id: str, configuration: str | None = None, overrides: list[Overrid
     if held is not None and (held.sff is not None or held.sffRefused is not None):
         return report(run_id)
     named = _named(inputs, "configuration")
-    base = dict(id=run_id, plant=plant_id, configuration=str(named) if named is not None else None,
-                tool=library.LIBRARY_RUN, toolVersion=version, inputs=_inputs(inputs), versions=_versions(inputs),
-                by=who, at=_now(), scenarioId=scenario_id)
-    job = {"id": run_id, "kind": "engine.run", "plant": plant_id, "configuration": base["configuration"],
-           "scenarioId": scenario_id, "by": who}
+    cfg = str(named) if named is not None else None
+    job = _job(run_id, LIBRARY_ENGINE, plant_id, cfg, scenario_id, who)
     events.publish("job.queued", job, project=project_id)
     events.publish("job.running", job, project=project_id)
     try:
         art = artifacts.compute(library.LIBRARY_RUN, inputs)
     except library.LibraryRefused as e:
-        db.run(_put(project_id, EngineRun(**base, status="refused", refused=str(e)), who))
-        events.publish("job.failed", {**job, "status": "refused", "words": str(e)}, project=project_id)
-        raise RunRefused(str(e), run_id) from None
+        receipt = keep_run(LIBRARY_ENGINE, plant_id, cfg, tool=library.LIBRARY_RUN, version=version, basis=inputs,
+                           by=who, refused=str(e), scenario_id=scenario_id).run
+        raise RunRefused(str(e), receipt.id) from None
     except Exception as e:
-        events.publish("job.failed", {**job, "status": "failed", "words": f"{type(e).__name__}: {e}"}, project=project_id)
+        _failed(job, e, project_id)
         raise
     flowsheet, refused = None, None
     try:
@@ -240,18 +414,10 @@ def run(plant_id: str, configuration: str | None = None, overrides: list[Overrid
         if isinstance(e, WorkerError) and str(e).startswith("Refused: "):
             refused = str(e).removeprefix("Refused: ")
         else:
-            events.publish("job.failed", {**job, "status": "failed", "words": f"{type(e).__name__}: {e}"},
-                           project=project_id)
+            _failed(job, e, project_id)
             raise
-    kept = EngineRun(**base, status="done", provenance=art.provenance, artifactId=art.id, outputs=_outputs(art),
-                     durationMs=art.durationMs, sffRefused=refused,
-                     sff=RunSFF(recordId=flowsheet.id, valid=flowsheet.validation.valid,
-                                score=flowsheet.completeness.score,
-                                tags=sorted(k for k, v in flowsheet.tags.items() if v.earned)) if flowsheet else None)
-    db.run(_put(project_id, kept, who))
-    events.publish("job.done", {**job, "status": "done", "provenance": kept.provenance, "artifactId": kept.artifactId,
-                                "sffRecordId": kept.sff.recordId if kept.sff else None}, project=project_id)
-    return _report(kept, art, flowsheet)
+    return keep_run(LIBRARY_ENGINE, plant_id, cfg, tool=library.LIBRARY_RUN, version=version, basis=inputs, by=who,
+                    art=art, flowsheet=flowsheet, sff_refused=refused, scenario_id=scenario_id)
 
 
 # ── a contract engine's run (docs/api/engines.md; ADR-015) ──────────────
@@ -423,19 +589,20 @@ def parameters_with(engine: Any, thing: str, configuration: str | None) -> tuple
 def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Sequence[EngineInput] = (), *,
                by: str = "", scenario_id: str | None = None) -> RunReport:
     """One run of a contract engine (docs/api/engines.md), kept as one
-    `runs` row of the shape every run has. Its id is the artifact id of its
-    basis: the engine, the thing, the configuration, the precision the thing
-    states and every value set, with its source. The same request twice is
-    that one row, answered as it was first kept (its `by` the first asker's);
-    a run the engine refuses is kept as a receipt and answered from it. Every
-    ask, a repeat included, first checks its values against the worker's
-    `parameters` op, so a row or a receipt is answered while the worker
-    answers. After the run the engine is asked once for its SFF file, kept as
-    `run-<id>`, or its words kept as `sffRefused`. A worker that fails, or
-    answers outside the protocol (EngineBroken), keeps no row: its job is
-    said failed on the event stream and the error raised. A failure of the
-    SFF step leaves the run's artifact kept, and the next ask answers the
-    computation from it and asks for the file again."""
+    `runs` row of the shape every run has (`keep_run`). Its id is the
+    artifact id of its basis: the engine, the thing, the configuration, the
+    precision the thing states and every value set, with its source. The
+    same request twice is that one row, answered as it was first kept (its
+    `by` the first asker's); a run the engine refuses is kept as a receipt
+    and answered from it. Every ask, a repeat included, first checks its
+    values against the worker's `parameters` op, so a row or a receipt is
+    answered while the worker answers. After the run the engine is asked
+    once for its SFF file, kept as `run-<id>`, or its words kept as
+    `sffRefused`. A worker that fails, or answers outside the protocol
+    (EngineBroken), keeps no row: its job is said failed on the event stream
+    and the error raised. A failure of the SFF step leaves the run's
+    artifact kept, and the next ask answers the computation from it and asks
+    for the file again."""
     who = (by or "").strip() or "this browser"
     found, cfg = thing_of(engine, thing, configuration)
     thing_id = found.id
@@ -467,20 +634,17 @@ def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Seque
         raise RunRefused(held.refused or f"the {engine.name} engine refused these values", held.id)
     if held is not None and (held.sff is not None or held.sffRefused is not None):
         return report(run_id)
-    base = dict(id=run_id, engine=engine.name, plant=thing_id, configuration=cfg, tool=tool, toolVersion=version,
-                inputs=_inputs(basis), versions=engine.version(), by=who, at=_now(), scenarioId=scenario_id)
-    job = {"id": run_id, "kind": "engine.run", "engine": engine.name, "plant": thing_id, "configuration": cfg,
-           "scenarioId": scenario_id, "by": who}
+    job = _job(run_id, engine.name, thing_id, cfg, scenario_id, who)
     events.publish("job.queued", job, project=project_id)
     events.publish("job.running", job, project=project_id)
     try:
         art = artifacts.compute(tool, basis)
     except EngineRefused as e:
-        db.run(_put(project_id, EngineRun(**base, status="refused", refused=str(e)), who))
-        events.publish("job.failed", {**job, "status": "refused", "words": str(e)}, project=project_id)
-        raise RunRefused(str(e), run_id) from None
+        receipt = keep_run(engine, thing_id, cfg, tool=tool, version=version, basis=basis, by=who, refused=str(e),
+                           scenario_id=scenario_id).run
+        raise RunRefused(str(e), receipt.id) from None
     except Exception as e:
-        events.publish("job.failed", {**job, "status": "failed", "words": f"{type(e).__name__}: {e}"}, project=project_id)
+        _failed(job, e, project_id)
         raise
     flowsheet, refused = None, None
     try:
@@ -498,22 +662,10 @@ def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Seque
         if isinstance(e, WorkerError) and str(e).startswith("Refused: "):
             refused = str(e).removeprefix("Refused: ")
         else:
-            events.publish("job.failed", {**job, "status": "failed", "words": f"{type(e).__name__}: {e}"},
-                           project=project_id)
+            _failed(job, e, project_id)
             raise
-    values_out = [{"name": o["name"], "quantity": Quantity(value=o["value"], unit=o["unit"],
-                                                            origin=Origin(kind="artifact", ref=art.id)).model_dump(
-                      mode="json", exclude_none=True)}
-                  for o in art.output.get("values", [])]
-    kept = EngineRun(**base, status="done", provenance=art.provenance, artifactId=art.id,
-                     outputs={"values": values_out}, durationMs=art.durationMs, sffRefused=refused,
-                     sff=RunSFF(recordId=flowsheet.id, valid=flowsheet.validation.valid,
-                                score=flowsheet.completeness.score,
-                                tags=sorted(k for k, v in flowsheet.tags.items() if v.earned)) if flowsheet else None)
-    db.run(_put(project_id, kept, who))
-    events.publish("job.done", {**job, "status": "done", "provenance": kept.provenance, "artifactId": kept.artifactId,
-                                "sffRecordId": kept.sff.recordId if kept.sff else None}, project=project_id)
-    return _report(kept, art, flowsheet)
+    return keep_run(engine, thing_id, cfg, tool=tool, version=version, basis=basis, by=who, art=art,
+                    flowsheet=flowsheet, sff_refused=refused, scenario_id=scenario_id)
 
 
 def run_with(engine: Any, thing: str, configuration: str | None, inputs: Sequence[EngineInput] = (), *,

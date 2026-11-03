@@ -9,14 +9,23 @@ is answered from its row; a plant's refusal is kept as a receipt and
 answered from it; a request the runner refuses keeps nothing; a file that
 cannot be written leaves the run standing with the words why; a model's
 estimate reaches a run, which is `assumed`; a replay holds a run to the
-precision its basis states. The real worker is test_runs_sim.py.
+precision its basis states. A run's outputs.values are the numbers its
+artifact states a unit for, each a quantity of the artifact; `keep_run` keeps
+any engine's computation, or its receipt, in the one shape, and says so on
+the event stream; it answers a run kept already as it was first kept, and
+refuses in words, keeping nothing, a call outside its rules or an engine
+name nothing registers; a run's parameters are a library run's alone. The
+real worker is test_runs_sim.py.
 """
 from __future__ import annotations
+
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import artifacts, llm
+from conftest import TEST_PROJECT
+from openferment_core import artifacts, events, llm
 from openferment_core.api import app
 from openferment_core.engine import library, runs, sff, simulator
 from openferment_core.models import BasisInput, BasisSource, ReplayTolerance
@@ -190,3 +199,146 @@ def test_the_routes_run_list_report_and_refuse(worker):
     assert client.get("/api/runs/0000000000000000").status_code == 404
     refused = client.post("/api/library/sugarcane/run", json={"overrides": [over("stream.nosuch.price", 1.0).model_dump()]})
     assert refused.status_code == 422 and "no parameter" in refused.json()["detail"]
+
+
+# ── one shape for every run (alpha 2.2 stage C, D3) ────────────────────
+
+
+class ValuedStandIn(StandIn):
+    """test_runs' stand-in, its run answering a price block and a
+    flowsheet's outputs of placeholders in a placeholder unit: numbers and
+    words the artifact states a unit for, and one of each it states none for."""
+
+    def __call__(self, op: str, args: dict):
+        out = super().__call__(op, args)
+        if op == "library_run":
+            out = {**out, "price": {"priced": True, "a-number": 1.5, "a-word": "placeholder", "unstated": 2.5,
+                                    "units": {"a-number": "placeholder-unit", "a-word": "placeholder-unit"}},
+                   "outputs": {"an-output": 3.5, "a-label": "placeholder", "unstated": 4.5},
+                   "outputUnits": {"an-output": "placeholder-unit", "a-label": ""}}
+        return out
+
+
+def test_a_library_runs_outputs_values_are_the_numbers_its_artifact_states_a_unit_for(monkeypatch):
+    monkeypatch.setattr(simulator, "call", ValuedStandIn())
+    monkeypatch.setattr(library, "_PARAMETERS", {})
+    rep = runs.run("sugarcane", by="Ada Moreno")
+    run, art = rep.run, rep.artifact
+    origin = {"kind": "artifact", "ref": art.id}
+    assert run.outputs["values"] == [
+        {"name": "price.a-number", "quantity": {"value": 1.5, "unit": "placeholder-unit", "origin": origin}},
+        {"name": "outputs.an-output", "quantity": {"value": 3.5, "unit": "placeholder-unit", "origin": origin}},
+        {"name": "outputs.a-label", "quantity": {"value": "placeholder", "unit": "", "origin": origin}}]
+    # What a library run kept before, as it was kept.
+    assert run.outputs["price"] == art.output["price"] and run.outputs["outputs"] == art.output["outputs"]
+    assert run.outputs["regression"]["of"] == len(art.output["checks"])
+    assert runs.values_of(art) == run.outputs["values"] and runs.report(run.id).run == run
+
+
+def test_keep_run_keeps_any_engines_computation_or_its_receipt_in_one_shape_and_says_so(monkeypatch):
+    def basis(value: float) -> list[BasisInput]:
+        return [BasisInput(name="a-value", value=value, unit="placeholder-unit",
+                           source=BasisSource(kind="convention", note="a placeholder"))]
+
+    monkeypatch.setitem(artifacts._REGISTRY, "test.kept", artifacts.Registered(
+        "test.kept", "1", lambda i, seed: {"answer": 2.5}))
+    art = artifacts.compute("test.kept", basis(1.0))
+    engine = SimpleNamespace(name="placeholder-engine", version=lambda: {"placeholder-distribution": "0.0"})
+    start = events.newest()
+    rep = runs.keep_run(engine, "a-thing", None, tool="test.kept", version="1", basis=basis(1.0), by=" Ada Moreno ",
+                        art=art, sff_refused="the placeholder engine has no plant")
+    run = rep.run
+    assert (run.id, run.engine, run.plant, run.configuration, run.status, run.by) == (
+        art.id, "placeholder-engine", "a-thing", None, "done", "Ada Moreno")
+    assert run.versions == {"placeholder-distribution": "0.0"}, "a basis that names no simulator: the engine's own"
+    assert run.outputs == {"values": []} and run.sffRefused == "the placeholder engine has no plant"
+    assert [i.quantity.origin.kind for i in run.inputs] == ["convention"] and rep.parameters is None
+    assert runs.listed("placeholder-engine") == [run] and runs.report(run.id).run == run
+    (done,) = events.recent(TEST_PROJECT, start)
+    assert (done.type, done.data["status"], done.data["engine"], done.data["artifactId"]) == (
+        "job.done", "done", "placeholder-engine", art.id)
+    # A refusal inside the computation is kept as its receipt, under the id of its basis.
+    start = events.newest()
+    receipt = runs.keep_run(engine, "a-thing", None, tool="test.kept", version="1", basis=basis(2.0),
+                            refused="the placeholder engine refuses these values, in these words").run
+    assert receipt.id == artifacts.artifact_id("test.kept", "1", basis(2.0)) and receipt.by == "this browser"
+    assert (receipt.status, receipt.artifactId, receipt.provenance, receipt.outputs) == ("refused", None, None, {})
+    (failed,) = events.recent(TEST_PROJECT, start)
+    assert (failed.type, failed.data["status"], failed.data["words"]) == ("job.failed", "refused", receipt.refused)
+    with pytest.raises(ValueError, match="one of the two"):
+        runs.keep_run(engine, "a-thing", None, tool="test.kept", version="1", basis=basis(3.0))
+    with pytest.raises(ValueError, match="one of the two"):
+        runs.keep_run(engine, "a-thing", None, tool="test.kept", version="1", basis=basis(1.0), art=art, refused="words")
+    with pytest.raises(ValueError, match="is no computation of run"):
+        runs.keep_run(engine, "a-thing", None, tool="test.kept", version="1", basis=basis(3.0), art=art)
+    assert {r.id for r in runs.listed()} == {run.id, receipt.id}
+
+
+def test_a_runs_parameters_are_a_library_runs_alone(monkeypatch):
+    """parameters_of reads a library run alone: a run of another tool whose
+    output holds parameters in a shape of its own answers none."""
+    inputs = [BasisInput(name="a-value", value=1.0, unit="placeholder-unit",
+                         source=BasisSource(kind="convention", note="a placeholder"))]
+    monkeypatch.setitem(artifacts._REGISTRY, "test.parameters", artifacts.Registered(
+        "test.parameters", "1", lambda i, seed: {"parameters": [{"unit": "U1", "values": []}]}))
+    art = artifacts.compute("test.parameters", inputs)
+    engine = SimpleNamespace(name="placeholder-engine", version=lambda: {})
+    rep = runs.keep_run(engine, "a-thing", None, tool="test.parameters", version="1", basis=inputs, art=art,
+                        sff_refused="no plant")
+    assert rep.parameters is None and runs.report(rep.run.id).parameters is None
+    assert rep.run.versions == {}, "an engine whose version() names nothing: the basis names none either"
+
+
+def _kept_basis(value: float) -> list[BasisInput]:
+    return [BasisInput(name="a-value", value=value, unit="placeholder-unit",
+                       source=BasisSource(kind="convention", note="a placeholder"))]
+
+
+@pytest.fixture
+def kept_tool(monkeypatch):
+    """A tool of the test's own, computing a placeholder from its basis, and an engine that names itself."""
+    monkeypatch.setitem(artifacts._REGISTRY, "test.kept", artifacts.Registered(
+        "test.kept", "1", lambda i, seed: {"answer": 2.5}))
+    return SimpleNamespace(name="placeholder-engine", version=lambda: {"placeholder-distribution": "0.0"})
+
+
+def test_keep_run_answers_a_run_kept_already_as_it_was_first_kept(kept_tool):
+    """The same run kept twice is one row: the second keeper is answered the
+    first keeper's row, its `by` and `at` the first asker's, and nothing is
+    written or said on the event stream. A receipt kept twice is the first
+    receipt."""
+    art = artifacts.compute("test.kept", _kept_basis(1.0))
+    first = runs.keep_run(kept_tool, "a-thing", None, tool="test.kept", version="1", basis=_kept_basis(1.0),
+                          by="First Person", art=art, sff_refused="the placeholder engine has no plant")
+    start = events.newest()
+    again = runs.keep_run(kept_tool, "a-thing", None, tool="test.kept", version="1", basis=_kept_basis(1.0),
+                          by="Second Person", art=art, sff_refused="other words", scenario_id="a-scenario")
+    assert again.run == first.run and again.run.by == "First Person" and again.run.scenarioId is None
+    assert again.run.sffRefused == "the placeholder engine has no plant"
+    assert events.recent(TEST_PROJECT, start) == [], "the row as first kept: no second job.done"
+    receipt = runs.keep_run(kept_tool, "a-thing", None, tool="test.kept", version="1", basis=_kept_basis(2.0),
+                            by="First Person", refused="the placeholder engine refuses these values").run
+    start = events.newest()
+    held = runs.keep_run(kept_tool, "a-thing", None, tool="test.kept", version="1", basis=_kept_basis(2.0),
+                         by="Second Person", refused="other words").run
+    assert held == receipt and held.refused == "the placeholder engine refuses these values"
+    assert events.recent(TEST_PROJECT, start) == []
+    assert [(r.id, r.by) for r in runs.listed()] == [(receipt.id, "First Person"), (first.run.id, "First Person")]
+
+
+def test_keep_run_refuses_a_call_outside_its_rules_and_keeps_nothing(kept_tool):
+    """A run that computed names its SFF record or the words for why none
+    was written, one of the two; a receipt names neither; an engine given by
+    name is one registered here. Each refusal keeps nothing."""
+    art = artifacts.compute("test.kept", _kept_basis(1.0))
+    asked = dict(tool="test.kept", version="1", basis=_kept_basis(1.0))
+    with pytest.raises(ValueError, match="its SFF record, or with the words for why its engine wrote none"):
+        runs.keep_run(kept_tool, "a-thing", None, **asked, art=art)
+    flowsheet = SimpleNamespace(id="run-placeholder")
+    with pytest.raises(ValueError, match="its SFF record, or with the words for why its engine wrote none"):
+        runs.keep_run(kept_tool, "a-thing", None, **asked, art=art, flowsheet=flowsheet, sff_refused="words")
+    with pytest.raises(ValueError, match="a receipt keeps no SFF file"):
+        runs.keep_run(kept_tool, "a-thing", None, **asked, refused="words", sff_refused="words")
+    with pytest.raises(ValueError, match="no engine named 'placeholder-engine' is registered here"):
+        runs.keep_run("placeholder-engine", "a-thing", None, **asked, art=art, sff_refused="words")
+    assert runs.listed() == []

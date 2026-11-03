@@ -35,13 +35,17 @@ is `assumed` and names the scenario (`scenarioId`).
 `StudyComparison`, a row of `comparisons` under the id of the `study.comparison` artifact that
 computes it. Its inputs are the runs' artifacts, in the order given, so its provenance is the
 weakest of theirs (`assumed` when any run rests on an assumption or an estimate) and it replays
-from them; the same runs in the same order are one comparison. The artifact's output:
+from them; the same runs in the same order are one comparison. Runs of any engine compare, one
+engine's beside another's. Its version says what it read: `study comparison 1` for library runs
+alone, read as they have been read since stage 5, and `study comparison 2` for a comparison that
+holds a run of another engine (alpha 2.2 D3). A comparison kept at version 1 over such a run
+replays at version 2, and its first difference names the two versions. The artifact's output:
 
 | Key | What it is |
 |---|---|
-| `runs` | Each run's artifact id, plant, configuration and provenance |
-| `rows` | `[{key, unit, values, change}]`: every number of the price block (`price.<key>`, in BioSTEAM's TEA units) and of a flowsheet's outputs (`outputs.<key>`), each run's value, and its relative change from the first run's |
-| `values` | `[{key, values: [{value, unit, origin, by}]}]`: every value any run set for itself, each run's value with its origin; a run that set none has the library's own default (`library-default`, `by` the package module) |
+| `runs` | Each run's artifact id, plant (a contract engine's run names its thing), configuration and provenance |
+| `rows` | `[{key, unit, values, change}]`: every output any run answers, each run's value (null for a run with no output of that key), and its relative change from the first run's. A library run's are every number of its price block (`price.<key>`, in BioSTEAM's TEA units) and of a flowsheet's outputs (`outputs.<key>`), read from its artifact as they have always been read; a run of any other engine's are its outputs.values (`values.<name>`, each in its unit; `docs/api/runs.md`, Outputs) |
+| `values` | `[{key, values: [{value, unit, origin, by}]}]`: every value any run set for itself (a contract engine's run's by its basis name, `value <key>`), each run's value with its origin. At version 1, a run that set none has the library's own default (`library-default`, `by` the package module). At version 2, a library run that set none has that default where its plant declares the value, and every other cell of a value its run holds none of has `value`, `unit`, `origin` and `by` null: a contract engine's artifact keeps no default |
 
 A run its plant refused has no artifact and is refused here in words; so are one run alone, a run
 named twice, and a run the project does not hold.
@@ -60,8 +64,8 @@ it lists and opens there beside a person's. Made from one engine run (`RunbookCr
 
 | Field | What it is |
 |---|---|
-| `id` | `rb-study-` and the first twelve hex of the sha256 of the run and the outputs it predicts: the same run and outputs asked again are the runbook kept already, as it stands (a person may have revised a draft) |
-| `predictions` | One point per output asked (`outputs.<key>` of a flowsheet's outputs, `price.<key>` of the price), its value and unit the run's, `confidence` `low`, `basis` naming the run, its plant and configuration and its provenance, `artifactId` the run's artifact |
+| `id` | `rb-study-` and the first twelve hex of the sha256 of the run and the outputs it predicts, each key as asked: the same run and outputs asked again are the runbook kept already, as it stands (a person may have revised a draft), so a runbook of `price.<key>` or `outputs.<key>` keeps its id |
+| `predictions` | One point per output asked, its value and unit the run's, `confidence` `low`, `basis` naming the run, its plant and configuration and its provenance, `artifactId` the run's artifact. An output is `values.<name>`, an entry of the run's outputs.values (`docs/api/runs.md`, Outputs), for a run of any engine; a library run also answers `outputs.<key>` of a flowsheet's outputs and `price.<key>` of the price, as it always has, and names the same numbers `values.price.<key>` and `values.outputs.<key>` |
 | `measurementSchema` | One measure per prediction, in its unit, at `harvest` |
 | `status`, `kind` | `draft`, `research` |
 | `lockedAt`, `lockHash` | Null until locked |
@@ -116,6 +120,6 @@ The browser reads every list and report above and computes nothing of its own (`
 | Path | Screen | What it shows |
 |---|---|---|
 | `#/proforma/studies` | `ProformaStudies.tsx` | The project's runs (two or more compared from here), scenarios (each run again from here), comparisons and study runbooks; the export package to download |
-| `#/proforma/runs/{id}` | `ProformaRun.tsx` | One run: its parameters in the parameter panel, read-only (the values the run set first, all of them on asking), its basis with each origin, the package's own test, the `RunReport` sections over its artifact as one case, its SFF file, and a runbook made from its numbers |
+| `#/proforma/runs/{id}` | `ProformaRun.tsx` | One run: its parameters in the parameter panel, read-only (the values the run set first, all of them on asking), its basis with each origin, the package's own test, the `RunReport` sections over its artifact as one case, a contract engine's run's outputs, its SFF file, and a runbook made from its numbers (a library run's `price.<key>` and `outputs.<key>`, any other run's `values.<name>`) |
 | `#/proforma/comparisons/{id}` | `ProformaComparison.tsx` | The runs in order, each output's change from the first as a `Tornado` in the figure grammar's `FigureFrame` (the comparison's provenance on every bar), every number run by run, and the values the runs set with their origins |
 | `#/runbooks/{id}` | `RunbookDetail.tsx` | A study's runbook beside a person's: each prediction links to the run it came from, and the page locks it under the same digest the service writes |

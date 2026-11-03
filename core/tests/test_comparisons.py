@@ -8,7 +8,13 @@ and value by value with each origin, the library's default where a run set
 none; the comparison is one `study.comparison` artifact whose provenance is
 the weakest of the runs', and it replays; the same runs in the same order
 are one comparison; a refused run, an unknown run or one run alone is
-refused in words.
+refused in words. Runs of a contract engine (the contract's sample, whose
+worker computes nothing) compare by their outputs.values, and beside a
+library run's price and outputs, at `study comparison 2`: there a library
+run has the library's default for a value its plant declares, and every
+other cell of a value its run holds none of is empty. Library runs alone
+keep `study comparison 1`, and a comparison kept there over another
+engine's run replays at version 2 and says so.
 """
 from __future__ import annotations
 
@@ -18,10 +24,12 @@ from fastapi.testclient import TestClient
 from openferment_core import artifacts
 from openferment_core.api import app
 from openferment_core.engine import library, runs, simulator
-from openferment_core.models import ComparisonCreate
+from openferment_core.engine.sample import SAMPLE
+from openferment_core.models import BasisInput, BasisSource, ComparisonCreate, ReplayDifference
 from openferment_core.studies import comparisons, scenarios
 from openferment_core.workers import WorkerError
 
+from test_engines import given
 from test_library import SUGARCANE_PARAMETERS
 from test_runs import StandIn
 from test_studies import asked
@@ -139,3 +147,80 @@ def test_the_routes_make_list_read_and_refuse(worker):
     assert client.get("/api/studies/comparisons/0000000000000000").status_code == 404
     one = client.post("/api/studies/comparisons", json={"title": "t", "runIds": [base.id]})
     assert one.status_code == 422
+
+
+# ── runs of any engine (alpha 2.2 stage C, D3) ─────────────────────────
+
+
+def _sample_run(value: float):
+    return SAMPLE.run("placeholder", None, [given("a-parameter", value, note="a placeholder")], "Ada Moreno")
+
+
+def test_runs_of_a_contract_engine_compare_by_their_outputs_values():
+    first, second = _sample_run(2.5), _sample_run(3.5)
+    rep = comparisons.make(ComparisonCreate(title="Two placeholder runs", runIds=[first.id, second.id], by="Ada Moreno"))
+    out = rep.artifact.output
+    assert rep.artifact.toolVersion == comparisons.VERSION_ENGINES == "study comparison 2"
+    assert [r["key"] for r in out["rows"]] == ["values.given a-parameter", "values.count"]
+    given_back, count = out["rows"]
+    assert (given_back["unit"], given_back["values"], given_back["change"]) == (
+        "placeholder-unit", [2.5, 3.5], [0.0, pytest.approx(0.4)])
+    assert (count["unit"], count["values"], count["change"]) == ("1", [1.0, 1.0], [0.0, 0.0])
+    assert [(r["artifactId"], r["plant"]) for r in out["runs"]] == [(first.artifactId, "placeholder"),
+                                                                    (second.artifactId, "placeholder")]
+    (set_here,) = out["values"]
+    assert set_here["key"] == "value a-parameter"
+    assert [(c["value"], c["unit"], c["origin"], c["by"]) for c in set_here["values"]] == [
+        (2.5, "placeholder-unit", "person-assumption", "Ada Moreno"),
+        (3.5, "placeholder-unit", "person-assumption", "Ada Moreno")]
+    assert rep.comparison.provenance == "assumed" and artifacts.replay(rep.artifact.id).identical
+
+
+def test_a_library_run_and_a_contract_engines_run_compare_side_by_side(worker):
+    """A comparison that holds a run of another engine gives a library run
+    the library's default for a value its plant declares, and an empty cell
+    (value, unit, origin and by null) for any value its run holds none of:
+    the plant's run beside the sample's value, the sample's run beside the
+    plant's."""
+    base, scen = base_and_scenario()
+    sample = _sample_run(2.5)
+    rep = comparisons.make(ComparisonCreate(title="A plant beside a placeholder", runIds=[base.id, scen.id, sample.id]))
+    assert rep.artifact.toolVersion == comparisons.VERSION_ENGINES
+    rows = {r["key"]: r for r in rep.artifact.output["rows"]}
+    assert list(rows) == ["price.IRR", "price.solvedPrice", "values.given a-parameter", "values.count"]
+    assert rows["price.solvedPrice"]["values"] == [pytest.approx(0.0691), pytest.approx(0.1), None]
+    assert rows["price.solvedPrice"]["unit"] == "USD/kg" and rows["price.IRR"]["unit"] == ""
+    assert rows["values.given a-parameter"]["values"] == [None, None, 2.5]
+    assert rows["values.given a-parameter"]["change"] == [None, None, None], "a change is reckoned from the first run's value"
+    assert [r["plant"] for r in rep.artifact.output["runs"]] == ["sugarcane", "sugarcane", "placeholder"]
+    values = {v["key"]: v["values"] for v in rep.artifact.output["values"]}
+    assert set(values) == {"stream.sugarcane.price", "stream.sugarcane.F_mass", "value a-parameter"}
+    assert list(values)[-1] == "value a-parameter", "in the order the runs give them"
+    default, person, beside = values["stream.sugarcane.price"]
+    assert (default["value"], default["origin"]) == (DEFAULTS["stream.sugarcane.price"], "library-default")
+    assert (person["value"], person["origin"]) == (0.05, "person-assumption") and beside == comparisons.NO_VALUE
+    assert values["value a-parameter"][:2] == [comparisons.NO_VALUE, comparisons.NO_VALUE]
+    assert values["value a-parameter"][2]["origin"] == "person-assumption"
+
+
+def test_a_comparison_of_library_runs_keeps_version_1_and_one_kept_there_over_another_engine_replays_at_version_2(
+        worker, monkeypatch):
+    """Library runs alone compare at `study comparison 1`, as they always
+    have. A comparison over a run of another engine kept at version 1 (as
+    stage B kept one) replays at version 2, and its first difference says so."""
+    base, scen = base_and_scenario()
+    library_only = comparisons.make(ComparisonCreate(title="Dearer cane", runIds=[base.id, scen.id])).artifact
+    assert library_only.toolVersion == comparisons.VERSION
+    first, second = _sample_run(2.5), _sample_run(3.5)
+    basis = [BasisInput(name=f"run {n}", value=r.artifactId, unit="", source=BasisSource(
+        kind="artifact", id=r.artifactId, note=f"engine run of {r.plant}")) for n, r in enumerate((first, second), 1)]
+    now = artifacts.registered(comparisons.COMPARISON)
+    monkeypatch.setitem(artifacts._REGISTRY, comparisons.COMPARISON, artifacts.Registered(
+        comparisons.COMPARISON, comparisons.VERSION, lambda inputs, seed: {"runs": [], "rows": [], "values": []}))
+    kept = artifacts.compute(comparisons.COMPARISON, basis)
+    monkeypatch.setitem(artifacts._REGISTRY, comparisons.COMPARISON, now)
+    assert kept.toolVersion == comparisons.VERSION
+    replayed = artifacts.replay(kept.id)
+    assert not replayed.identical
+    assert replayed.differences[0] == ReplayDifference(path="toolVersion", stored=comparisons.VERSION,
+                                                       replayed=comparisons.VERSION_ENGINES)

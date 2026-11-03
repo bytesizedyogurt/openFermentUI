@@ -123,9 +123,9 @@ answer to, is refused with a 403 in words; an empty header with a 422.
 
 | Type | Said when | `data` |
 |---|---|---|
-| `job.queued`, `job.running` | An engine run begins (`engine/runs.py`) | `{id, kind: "engine.run", plant, configuration, scenarioId, by}`, `id` the run's |
+| `job.queued`, `job.running` | An engine run begins (`engine/runs.py`) | `{id, kind: "engine.run", engine, plant, configuration, scenarioId, by}`, `id` the run's and `engine` the registered name of the engine that runs it (`biosteam` for a library run) |
 | `job.done` | The run is kept | the job, `status: "done"`, `provenance`, `artifactId`, `sffRecordId` |
-| `job.failed` | The plant refused the values, or the run failed | the job, `status` `refused` or `failed`, `words` (the plant's own, for a refusal) |
+| `job.failed` | The engine refused the values, or the run failed | the job, `status` `refused` or `failed`, `words` (the engine's own, for a refusal) |
 | `artifact.kept` | A computed artifact is kept (`artifacts.compute`) | `{id, tool, toolVersion, provenance, durationMs}` |
 | `turn.started` | A question is kept as a turn | `{conversationId, turnId, seq, question, by}` |
 | `tool.call` | The loop calls a tool | `{conversationId, turnId, tool, input}` |

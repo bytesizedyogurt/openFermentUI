@@ -133,8 +133,25 @@ export const downloadExport = (by: string) => fetchFile(`/api/studies/export?by=
 /** A run's SFF file, byte for byte as the project holds it. */
 export const downloadFlowsheet = (recordId: string) => fetchFile(`/api/flowsheets/${id(recordId)}/file`, `${recordId}.sff.json`);
 
-/** The numbers a run answers that a runbook may predict: each `price.<key>` and `outputs.<key>` with its unit, in the artifact's order. */
-export function predictable(art: { output: Record<string, unknown> } | null): { output: string; value: number; unit: string }[] {
+/**
+ * The numbers a run answers that a runbook may predict, each with its unit, in the order the service gives them:
+ * a library run's `price.<key>` and `outputs.<key>` from its artifact, and any other engine's run's `values.<name>`
+ * from its outputs.values (docs/api/runs.md, Outputs).
+ */
+export function predictable(
+  run: { tool: string; outputs: Record<string, unknown> },
+  art: { output: Record<string, unknown> } | null,
+): { output: string; value: number; unit: string }[] {
+  if (run.tool !== 'library.run') {
+    const values = Array.isArray(run.outputs.values) ? (run.outputs.values as { name?: unknown; quantity?: { value?: unknown; unit?: unknown } }[]) : [];
+    return values.flatMap((v) => {
+      const value = v.quantity?.value;
+      const unit = v.quantity?.unit;
+      return typeof v.name === 'string' && typeof value === 'number' && Number.isFinite(value) && typeof unit === 'string'
+        ? [{ output: `values.${v.name}`, value, unit }]
+        : [];
+    });
+  }
   if (!art) return [];
   const out: { output: string; value: number; unit: string }[] = [];
   const price = (art.output.price ?? {}) as Record<string, unknown>;

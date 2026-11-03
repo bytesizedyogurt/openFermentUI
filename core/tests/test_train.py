@@ -87,6 +87,10 @@ VERSIONS = {"biosteam": "0.0-standin", "thermosteam": "0.0-standin", "biorefiner
 STREAM_T, STREAM_P = 298.15, 101325.0
 # The share of the product a stand-in unit sends off its path.
 LOSS = 0.1
+# The chemical a stand-in unit loses LOSS of: every train these tests run
+# traces ethanol, and the train_run request names no product (its handler
+# reads none; the product stream is the last unit's onward outlet).
+TRACED = "Ethanol"
 # A STAND-IN of a class's own split table, by component (as PressureFilter
 # fills one when none is given): invented for the test, none a result.
 TABLE = {"Water": 0.04, "Ethanol": 0.04, "Glucose": 0.03, "Yeast": 0.98, "Octane": 0.04}
@@ -141,7 +145,7 @@ class TrainWorker(StandInWorker):
         flows = dict(inlet["flows"] or {k: v * inlet["brothFlow"] for k, v in inlet["concentrations"].items()})
         if inlet.get("balance"):
             flows[inlet["balance"]] = 1000.0 * inlet["brothFlow"]  # a STAND-IN balance
-        product = args["product"]
+        product = TRACED
         streams = [{"id": "inlet", "source": None, "sink": args["units"][0]["id"], "phase": "l", "T": inlet["T"],
                     "P": inlet["P"], "massFlow": sum(flows.values()), "massFlows": flows, "price": None}]
         units, outlets, costs, current = [], {}, [], flows
@@ -479,6 +483,8 @@ def test_a_run_keeps_one_artifact_whose_basis_names_every_unit_and_source(store,
     assert json.loads(by["train"].value)["units"][0]["id"] == "C1"
     # A class's own default is left to the class; every other value is passed.
     [(_, sent)] = [c for c in worker.calls if c[0] == "train_run"]
+    # D11: the request holds what the handler reads; the chemical the train traces stays in the basis.
+    assert set(sent) == {"system", "inlet", "units", "diagram"} and by["product chemical"].value == "Ethanol"
     assert sent["units"][1]["values"] == {"P": 101325.0, "V": 0.2}
     assert sent["units"][0]["outlets"] == {"cake": "waste", "liquid": "onward"}
     assert sent["inlet"]["concentrations"] == {"Ethanol": 50.0, "Glucose": 5.0, "Yeast": 10.0}
