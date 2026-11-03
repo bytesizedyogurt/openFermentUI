@@ -74,6 +74,12 @@ class Registered:
     # A tool whose basis states the precision its numbers keep (a library
     # run's significant digits) reads the tolerance a replay holds them to.
     tolerance_of: Callable[[Sequence[BasisInput]], ReplayTolerance] | None = None
+    # A tool whose output states its numbers with their units reads them as a
+    # run's typed outputs (engine/runs.py `values_of`): each (name, value,
+    # unit), read from the artifact alone. The module that registers the tool
+    # reads them, so the engine package imports none of it (a pureOS train
+    # run's recoveries are pureOS's own reading of its stream table).
+    values_of: Callable[[Artifact], list[tuple[str, Any, str]]] | None = None
 
     def version_for(self, inputs: Sequence[BasisInput]) -> str:
         return self.version_of(inputs) if self.version_of is not None else self.version
@@ -87,14 +93,16 @@ _LAZY: dict[str, Callable[[], None]] = {}
 
 def register(tool: str, version: str, fn: ToolFn,
              version_of: Callable[[Sequence[BasisInput]], str] | None = None,
-             tolerance_of: Callable[[Sequence[BasisInput]], ReplayTolerance] | None = None) -> None:
+             tolerance_of: Callable[[Sequence[BasisInput]], ReplayTolerance] | None = None,
+             values_of: Callable[[Artifact], list[tuple[str, Any, str]]] | None = None) -> None:
     """Make `tool` computable and replayable. Registering a name again replaces
     it: that is how a tool's code changes between versions. `version_of`,
     when given, reads the version from the inputs, so one tool name can
     carry what it computes in its version (`version` is then its stem).
     `tolerance_of` reads the precision the basis states, which a replay
-    holds each number to."""
-    _REGISTRY[tool] = Registered(tool, version, fn, version_of, tolerance_of)
+    holds each number to. `values_of` reads the artifact's numbers with
+    their units as a run's typed outputs."""
+    _REGISTRY[tool] = Registered(tool, version, fn, version_of, tolerance_of, values_of)
 
 
 def register_lazy(tool: str, registrar: Callable[[], None]) -> None:

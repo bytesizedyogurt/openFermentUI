@@ -77,7 +77,8 @@ class Worker:
         self.calls.append((op, args))
         if op.startswith("vessel_"):
             return self.vessel(op, args)
-        if op in ("catalogue_specs", "train_specs", "flowsheet_unit_values", "train_run"):
+        if op in ("catalogue_specs", "train_specs", "flowsheet_unit_values", "train_run") or (
+                op == "sff_export" and isinstance(args.get("train"), dict)):
             return self.train(op, args)
         return standins._standin_call(op, args)
 

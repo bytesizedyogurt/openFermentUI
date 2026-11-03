@@ -14,13 +14,13 @@ to. The code is `core/openferment_core/engine/runs.py`; BioSTEAM's computation i
 |---|---|
 | `id` | The artifact id of the run's basis (`artifacts.artifact_id`): the first 16 hex characters of the sha256 of the UTF-8 canonical JSON (keys sorted, no spaces, every character outside ASCII kept as itself) of `{"tool", "toolVersion", "inputs"}`, with `"seed"` beside them when the computation takes one, each input `{"name", "value", "unit", "source"}`; `docs/api/engines.md` gives a contract engine's inputs in full. The same run asked twice is one row |
 | `engine` | The engine that ran it, as it registered (`GET /api/engines`); the `runs.engine` column. A row kept before engines registered is `biosteam`'s |
-| `plant`, `configuration` | What the engine ran and the configuration it ran in: for `biosteam` the plant on the shelf (`/api/library`), a flowsheet's default named; for `kinetics` a family, `forecast` with the kept fit it drew from, or `vessel` with the kept simulation, fit or forecast it was designed for; for another engine one of its things |
+| `plant`, `configuration` | What the engine ran and the configuration it ran in: for `biosteam` the plant on the shelf (`/api/library`), a flowsheet's default named; for `kinetics` a family, `forecast` with the kept fit it drew from, or `vessel` with the kept simulation, fit or forecast it was designed for; for `train` the train's id, with no configuration; for another engine one of its things |
 | `status` | `done`, or `refused` with the engine's own words in `refused` (a receipt: BioSTEAM's InfeasibleRegion naming its unit, a gate the values failed) |
-| `tool`, `toolVersion` | The artifact tool its computation is kept and replayed as, and the tool's version: `library.run` and its version for a BioSTEAM run; `fermos.simulation`, `growth_forecast` or `fermos.vessel` at the artifact's own version for a kinetics run |
+| `tool`, `toolVersion` | The artifact tool its computation is kept and replayed as, and the tool's version: `library.run` and its version for a BioSTEAM run; `fermos.simulation`, `growth_forecast` or `fermos.vessel` at the artifact's own version for a kinetics run; `pureos.train_run` at its own version for a train run |
 | `inputs` | Every input of the basis as `{name, quantity}`, the quantity carrying its origin (ADR-006): `library-default` (the plant, the simulator, the settings, all read from the package), `person-assumption` (a value a named person set), `model-estimate` (a value a named model estimated), `convention` (a change the plant needs to build here, the precision kept) |
-| `provenance`, `artifactId` | The artifact the run's own tool kept (`library.run` for a BioSTEAM run, `engine.<name>` for a contract engine's, fermOS's for a kinetics run) and the provenance computed on its basis: `assumed` when any input is a person's assumption or a model's estimate. A row held done follows its artifact's provenance when a record the basis rests on is reviewed or demoted since (Keeping a run, below). None for a refused run |
+| `provenance`, `artifactId` | The artifact the run's own tool kept (`library.run` for a BioSTEAM run, `engine.<name>` for a contract engine's, fermOS's for a kinetics run, pureOS's for a train run) and the provenance computed on its basis: `assumed` when any input is a person's assumption or a model's estimate. A row held done follows its artifact's provenance when a record the basis rests on is reviewed or demoted since (Keeping a run, below). None for a refused run |
 | `outputs` | `values`: each output as `{name, quantity}`, the quantity in the unit the run's artifact states, its origin the artifact (Outputs, below); a library run also keeps its price block, a flowsheet's own outputs (its MESP and yields) and, for a run with no value of its own, how many of the package test's values it holds. A receipt computed nothing, and its `outputs` is `{}` |
-| `versions` | The distributions it ran on: biosteam, thermosteam and biorefineries as a library run's basis names them; for a kinetics run, what its thing ran on (A kinetics run, below); for a basis that names no simulator, the engine's own `version()` |
+| `versions` | The distributions it ran on: biosteam, thermosteam and biorefineries as a library run's basis names them; for a kinetics run, what its thing ran on (A kinetics run, below); for a train run, the versions its basis names, the worker's (A train run, below); for a basis that names no simulator, the engine's own `version()` |
 | `sff` | The SFF file the run wrote: its flowsheet record (`run-<id>`, `docs/api/sff.md`), whether it validates, its completeness score and the tags it earns. `sffRefused` holds the words when no file could be written; the run stands |
 | `by`, `at`, `durationMs` | Who asked for the run first, when it was first kept, how long its computation took |
 | `scenarioId` | The study scenario that asked for it first (`docs/api/studies.md`); null for a run asked for directly |
@@ -70,13 +70,37 @@ take, a fit a forecast cannot draw from, a design with no scale) keeps nothing. 
 forecast keeps nothing. A fermOS artifact kept before its runs were rows has none of its own; the
 same request asked again keeps its row.
 
+## A train run
+
+The train engine (`core/openferment_core/pureos/engine.py`; `docs/api/engines.md`, The core's
+`train`) keeps each run of a pureOS train as a row of the same `EngineRun`, whichever door asked
+for it (`POST /api/pureos/train/run`, the tools `pureos_build` and `pureos_write`, MCP, or `POST
+/api/engines/train/run`); `pureos/train_spec.run_train` keeps it, through `compute_kept`:
+
+| Field | What it is |
+|---|---|
+| `engine`, `plant`, `configuration` | `train`; the train's id; no configuration |
+| `id`, `artifactId` | The `pureos.train_run` artifact's id: the same train with the same values at any door is one row |
+| `tool`, `toolVersion` | `pureos.train_run` at its own version (`train run 2 · biosteam <version> · thermosteam <version> · biorefineries <version>`) |
+| `inputs` | The artifact's basis as quantities with their origins: the train as data, the program and the chemical traced, the inlet with every source (`inlet.<key>`), and each unit's type, class, outlets and every parameter with its source (`<unit id>.<key>`), a value a request set among them (`inputs` named `<unit id>.<key>` or `inlet.<key>`, converted at pureOS's door into the Override of the place's scope) |
+| `outputs` | `values`, pureOS's own reading of the run's tables (Outputs, below) |
+| `versions` | biosteam, thermosteam and biorefineries as the run's basis names them: the versions the Proforma worker ran |
+| `sff`, `sffRefused` | The file asked of the Proforma worker from the run's own basis (`docs/api/sff.md`), kept as `run-<id>`; or the worker's words for why it has none. A train carries no TEA, and the schema the toolkit ships at its pinned commit requires every file's `metadata.TEA_year`, which its exporter reads from the system's TEA, so a train run keeps those words, the reason first, and the worker builds nothing for the file |
+| `status`, `refused` | `done`, or `refused` with the Proforma worker's words for a train BioSTEAM cannot build or run (a unit that does not converge, a balance the inlet cannot meet), a receipt the same request is answered from |
+| `by` | The person the route's request names (`by`), or the caller the tool names (`tools/writes._actor`); `this browser` for a request naming no one |
+
+A request pureOS refuses before anything runs (an input that names no place or no parameter, a
+value its parameter cannot take, the validation's refusals, a value that waits naming what would
+bind it, a unit's needs) keeps nothing. A train run kept before its runs were rows has none of its
+own; the same request asked again keeps its row.
+
 ## Keeping a run
 
 `keep_run(engine, thing, configuration, *, tool, version, basis, by, art | refused, flowsheet |
 sff_refused, scenario_id, seed, versions)` keeps one run of any engine's computation as its row,
 the one public way a row is kept: the library path (`runs.run`), every contract engine's run
-(`run_engine`) and the kinetics engine's computations (`compute_kept`, below) keep theirs through
-it.
+(`run_engine`), the kinetics engine's computations and the train engine's runs (`compute_kept`,
+below) keep theirs through it.
 
 | Argument | What it is |
 |---|---|
@@ -89,17 +113,22 @@ it.
 | `by`, `scenario_id` | Who asked (`this browser` when the request names no one), and the study scenario that asked for it |
 | `versions` | What the thing's computation ran on, when the keeper names it (the kinetics engine names each thing's); otherwise the distributions the basis names, or the engine's own `version()` |
 
-`compute_kept(engine, thing, configuration, *, tool, basis, refusal, sff_refused, by, seed,
-records_by_id, scenario_id, versions)` is the library path's shape for an engine that computes in
-the service's process (the kinetics engine): a receipt the project holds for the basis is
+`compute_kept(engine, thing, configuration, *, tool, basis, refusal, sff_refused | write_sff, by,
+seed, records_by_id, scenario_id, versions)` is the library path's shape for an engine that
+computes in the service's process (the kinetics engine) or through a worker of the core's own (the
+train engine): a receipt the project holds for the basis is
 answered without computing, raising `refusal` in the receipt's words; a row held done answers
 its artifact, whose provenance `artifacts.compute` brings up to date when a record the basis rests
 on was reviewed or demoted since, and the row's provenance follows it, with nothing else written
 and nothing said; otherwise the job is said queued and running, the computation runs through
 `artifacts.compute`, a refusal of `refusal`'s kind raised inside it is kept as a receipt and raised
 again, any other error says the job failed and keeps no row, and the computation is kept with
-`sff_refused` and `versions`. A refusal it raises carries the receipt's id as `run_id`. It answers
-the artifact.
+its SFF file and `versions`. The file is one of two: a thing that is no plant gives `sff_refused`,
+its words; a thing that is a plant gives `write_sff(art, project_id, by)`, which writes and keeps
+the record `run-<id>`, the toolkit's or the worker's refusal kept as `sffRefused` and any other
+failure (a worker that crashed or timed out) said as the job failed and raised with no row kept, so
+the next ask answers the computation from its artifact and writes the file again. A refusal it
+raises carries the receipt's id as `run_id`. It answers the artifact.
 
 A call outside these rules is refused (`ValueError`) and keeps nothing. The same run kept twice
 is one row, answered as it was first kept: when the project holds the row already, done with its
@@ -126,7 +155,8 @@ no row.
 | `fermos.simulation` | `end.<state>` for each state of the end state in the unit `units` states for it, and `end.t`, the last hour, in hours; then `harvestH` and, where the sugar runs out, `sugarRunsOutH`, in hours | nothing |
 | `growth_forecast` | `finals.<role>` for each final of the band (biomass, product, substrate): its median as the value, its 5th and 95th percentiles as `low` and `high`, in the series' unit | nothing |
 | `fermos.vessel` | `design.<label>` for each row of the design table holding a number or words, in BioSTEAM's unit for it; a label two rows share carries its unit too (`design.<label> (<unit>)`) | nothing |
-| any other tool | an empty list | nothing |
+| `pureos.train_run` | pureOS's reading of the run's tables, by pass (`pureos.train_of`), registered with the tool (`artifacts.register`'s `values_of`), since the engine package reads no pureOS module: `recovery.<unit id>` for each unit whose recovery is read and `overallRecovery`, each a share with no unit; `productOut`, the product the train delivers, in the stream table's unit of mass flow; then for each stream `massFlow.<stream id>` in that unit, and `purity.<stream id>`, its product share by mass, for each stream that carries product (a share above zero) | nothing |
+| any other tool | an empty list, or what the module that registered the tool reads (`values_of`) | nothing |
 
 A row kept before `values` existed lacks the key, and so does a receipt (`outputs` `{}`); a reader
 reads its absence as no outputs. A comparison sets runs' outputs side by side, and a runbook
@@ -137,8 +167,11 @@ predicts an entry by `values.<name>` (`docs/api/studies.md`).
 `POST /api/biorepo/artifacts/{id}/replay` runs a run's artifact again from its basis alone. A
 library run states its precision (`precision`, ten significant digits), and the replay holds each
 number to it: within `atol + rtol·|stored|`, `rtol` one unit in the last kept digit and `atol` the
-package test's absolute tolerance (1e-8). A contract engine's run is held to the precision its
-thing states (`precision.rtol` and `precision.atol` in its basis). `ReplayResult.identical` says
+package test's absolute tolerance (1e-8). A train run keeps every digit BioSTEAM gives and states
+no precision, so the same rule holds it exactly: its tool registers no tolerance, a replay of it is
+`identical` or names its differences, and the train engine's things state rtol 0, atol 0
+(`train_spec.replay_precision`). A contract engine's run is held to the precision its thing states
+(`precision.rtol` and `precision.atol` in its basis). `ReplayResult.identical` says
 whether the output hashes the same; `withinTolerance` whether every difference is a number within
 that tolerance; `tolerance` says what was held. A replay computes with the tool registered now:
 when its version differs from the one the run was kept at, the first of `differences` is
@@ -151,5 +184,6 @@ Lists are compared in order.
 |---|---|
 | `POST /api/library/{plant}/run` | `{configuration?, overrides?, by?}`: one engine run, kept; answers the run's report. Values the plant refuses: 422 in its words, the receipt kept |
 | `POST /api/engines/{name}/run` | `{thing, configuration?, inputs?, by?}`: one run of any registered engine's thing, kept; answers the run's report (`docs/api/engines.md`) |
+| `POST /api/pureos/train/run` | `{train, inputs?, by?}`: one run of a train, kept as a row of the engine `train`; answers the train run (`TrainRun`) |
 | `GET /api/runs` | The project's runs, newest first; `?engine=<name>` the runs one engine made |
 | `GET /api/runs/{id}` | `{run, artifact, flowsheet, parameters}`: one run's report; 404 for a run the project does not hold. `parameters` is a library run's parameters as the parameter panel reads them (a `ParamScope` of kind `library`): each as its plant declares it, its value the run's, a person's assumption or a model's estimate where the run set one and the library's own default elsewhere, a value outside its bounds flagged (`outOfBounds`) and kept as set, built from the run's artifact alone (`engine/runs.py` `parameters_of`); null for a refused run and for a run of any other tool |

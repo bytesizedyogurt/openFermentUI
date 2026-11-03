@@ -274,8 +274,10 @@ def info(name: str) -> EngineInfo:
     except Exception as ex:  # a worker that fails or keeps the listing waiting is said
         things = []
         errors.append(f"its things could not be listed: {_words(ex)}")
+    things_are = getattr(e, "things_are", None)
     return EngineInfo(name=name, entryPoint=f.entry, version=version, worker=e.worker, workerStatus=status_of(e),
-                      heavy=list(e.heavy), things=things, conformance=verdict, error="; ".join(errors) or None)
+                      heavy=list(e.heavy), things=things, thingsAre=str(things_are) if things_are else None,
+                      conformance=verdict, error="; ".join(errors) or None)
 
 
 def _listed_things(engine: Any) -> list[Any]:

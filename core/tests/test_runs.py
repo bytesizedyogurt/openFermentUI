@@ -34,7 +34,7 @@ from openferment_core.engine import library, runs, sff, simulator
 from openferment_core.models import Artifact, BasisInput, BasisSource, ReplayTolerance
 
 from test_library import SUGARCANE_PARAMETERS, StandInWorker, over
-from test_sff import StandInToolkit
+from test_sff import StandInToolkit, as_bytes, small_doc
 
 # The model the service calls first: the one whose estimates these are.
 MODEL = llm.DEFAULT_PRIMARY
@@ -485,3 +485,71 @@ def test_a_keeper_names_what_its_thing_ran_on_as_the_rows_versions(in_process):
     plain = runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(4.0),
                               refusal=Refused, sff_refused="no plant")
     assert runs.get(plain.id).versions == {"placeholder-distribution": "0.0"}, "the engine's own version() by default"
+
+
+# ── a keeper whose thing is a plant, and a tool reading its own outputs (alpha 2.2 D3, D5) ──
+
+
+def test_a_computation_whose_thing_is_a_plant_is_kept_with_the_file_its_writer_keeps_or_its_words(in_process,
+                                                                                                   monkeypatch):
+    """The train engine's keeper: `write_sff` writes and keeps the run's SFF
+    file; the toolkit's or the worker's refusal is kept as `sffRefused`, and
+    a writer that fails keeps no row, so the next ask writes the file again."""
+    from openferment_core.workers import WorkerCrashed
+
+    engine, calls = in_process
+    written: list[str] = []
+
+    def writes(art, project_id, by):
+        written.append(by)
+        return sff.import_sff(as_bytes(small_doc()), "placeholder.sff.json", project_id=project_id, by=by)
+
+    monkeypatch.setattr(simulator, "call", StandInToolkit())
+    with pytest.raises(ValueError, match="one of the two"):
+        runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(1.0), refusal=Refused)
+    with pytest.raises(ValueError, match="one of the two"):
+        runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(1.0), refusal=Refused,
+                          sff_refused="no plant", write_sff=writes)
+    art = runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(1.0), refusal=Refused,
+                            write_sff=writes, by="Ada Moreno")
+    held = runs.get(art.id)
+    assert held.sff is not None and held.sffRefused is None and written == ["Ada Moreno"]
+
+    def refuses(art, project_id, by):
+        raise sff.SFFRefused("the toolkit could not write this placeholder plant")
+
+    plain = runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(4.0), refusal=Refused,
+                              write_sff=refuses, by="Ada Moreno")
+    assert (runs.get(plain.id).sff, runs.get(plain.id).sffRefused) == (None, "the toolkit could not write this "
+                                                                             "placeholder plant")
+
+    def crashes(art, project_id, by):
+        raise WorkerCrashed("the placeholder worker ended", "")
+
+    with pytest.raises(WorkerCrashed):
+        runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(5.0), refusal=Refused,
+                          write_sff=crashes, by="Ada Moreno")
+    assert sorted(r.id for r in runs.listed()) == sorted([art.id, plain.id]), "a writer that fails keeps no row"
+    again = runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(5.0), refusal=Refused,
+                              write_sff=writes, by="Grace Hopper")
+    assert runs.get(again.id).sff is not None and calls.count(5.0) == 1, "the artifact answers; the file is written"
+
+
+def test_a_tool_that_registers_its_reader_has_its_outputs_read_by_it(monkeypatch):
+    """A tool whose module reads its own outputs (the train engine's,
+    registered with `pureos.train_run`) is read by its reader, each value
+    typed with its artifact as its origin; what is no number or words, or has
+    no unit, is left out."""
+    def reads(art):
+        return [("a-share", 0.5, ""), ("a-flow", 2.0, "placeholder-unit"), ("a-word", "placeholder", ""),
+                ("no-unit", 1.0, None), ("a-switch", True, ""), ("unset", None, "")]
+
+    monkeypatch.setitem(artifacts._REGISTRY, "test.reads-itself", artifacts.Registered(
+        "test.reads-itself", "1", lambda inputs, seed: {}, values_of=reads))
+    origin = {"kind": "artifact", "ref": "00000000000000aa"}
+    assert runs.values_of(_art("test.reads-itself", {})) == [
+        {"name": "a-share", "quantity": {"value": 0.5, "unit": "", "origin": origin}},
+        {"name": "a-flow", "quantity": {"value": 2.0, "unit": "placeholder-unit", "origin": origin}},
+        {"name": "a-word", "quantity": {"value": "placeholder", "unit": "", "origin": origin}}]
+    assert runs.values_of(_art("test.no-such-tool", {})) == [], "a tool nothing registers reads as none"
+    assert runs.TRAIN_TOOL == "pureos.train_run"

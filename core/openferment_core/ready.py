@@ -294,14 +294,51 @@ CONFORM_INPUTS = {"kinetics": "openferment_core.fermos_engine.write_placeholder_
 CALLS_WORKER = {"kinetics": "a vessel design runs in the Proforma worker"}
 
 
+def things_are(name: str) -> str | None:
+    """What an engine's things are, in words, for an engine every one of
+    whose things is a project's own (it declares `things_are`: the train
+    engine's are a project's trains); None for any other."""
+    from .engine import registry
+
+    found = registry.found().get(name)
+    said = getattr(found.engine, "things_are", None) if found is not None else None
+    return str(said) if said else None
+
+
+def on_production() -> bool:
+    """Whether the configured database is the production one, which the
+    checks of an engine whose things are a project's own refuse
+    (engine/conform.py `in_project`), as `pnpm db:reset` refuses it."""
+    from .db.engine import PRODUCTION_NAME, database_url
+
+    try:
+        return (database_url().database or "") == PRODUCTION_NAME
+    except db.DatabaseUnavailable:
+        return False
+
+
 def conform_command(name: str) -> str:
     """The command that checks an engine here, in words: with `--inputs
     <file>` and the builder that writes the file, for an engine whose things
-    wait for values (CONFORM_INPUTS)."""
+    wait for values (CONFORM_INPUTS); with `--project <id>` for an engine
+    whose things are a project's own (`things_are`), in a project of this
+    database that holds one of them."""
     command = f"python -m openferment_core.engine.conform {name}"
     if name in CONFORM_INPUTS:
         return f"{command} --inputs <file>, the file {CONFORM_INPUTS[name]} writes"
+    held = things_are(name)
+    if held:
+        return f"{command} --project <id>, in a project of this database that holds one of its things ({held})"
     return command
+
+
+def unchecked_on_production(name: str) -> str:
+    """Where an engine whose things are a project's own is checked, in
+    words, when the configured database is the production one: in a project
+    of a development database, and by `pnpm prove` in the proof's own."""
+    return (f"checked in a project of a development database that holds one of its things ({things_are(name)}): "
+            f"python -m openferment_core.engine.conform {name} --project <id> there, and pnpm prove makes the checks "
+            "in the proof's own project (step 10); the checks make runs in the project they check")
 
 
 def check_engines() -> list[Check]:
@@ -327,7 +364,9 @@ def check_engines() -> list[Check]:
                                                                        if name in CALLS_WORKER else ""))
         verdict = conform.latest(name)
         again = conform_command(name)
-        if verdict is None:
+        if verdict is None and things_are(name) and on_production():
+            mark, said = "skip", unchecked_on_production(name)
+        elif verdict is None:
             mark, said = "warn", f"never checked here: {again}"
         elif verdict.version != version:
             mark, said = "warn", f"checked at {verdict.version}; check it again: {again}"

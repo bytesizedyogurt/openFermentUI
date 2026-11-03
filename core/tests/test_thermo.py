@@ -177,8 +177,28 @@ def test_a_stream_not_on_file_or_not_one_phase_is_refused_before_the_worker(stor
 
 def test_an_artifact_that_is_no_run_has_no_stream_table(store, worker):
     _keep(_run("bbbbbbbbbbbbbbb3", tool="geneos.ceiling"))
-    with pytest.raises(thermo.ThermoRefused, match="geneos.ceiling artifact, not a Proforma run"):
+    with pytest.raises(thermo.ThermoRefused, match="geneos.ceiling artifact; a stream is read from the stream table of "
+                                                   "a run: a proforma.run, proforma.reference, pureos.train_run or "
+                                                   "library.run artifact"):
         thermo.props(ThermoPropsRequest(artifactId="bbbbbbbbbbbbbbb3", streamId="beer"))
+
+
+def test_a_stream_of_any_run_a_trains_inlet_reads_is_read_as_a_proforma_runs(store, worker):
+    """pureOS → Train asks the properties of a train run's streams: every
+    run whose stream table a train's inlet reads is read here too, its
+    question said with its tool, and the run the answer's source."""
+    from openferment_core.pureos import train_spec
+
+    assert set(thermo.STREAM_RUNS) == set(train_spec.STREAM_TOOLS)
+    for aid, tool in (("bbbbbbbbbbbbbbb6", "pureos.train_run"), ("bbbbbbbbbbbbbbb7", "library.run")):
+        _keep(_run(aid, tool=tool))
+        art = thermo.props(ThermoPropsRequest(artifactId=aid, streamId="beer"))
+        by = {i.name: i for i in art.inputs}
+        assert by["stream"].source.id == aid and by["question"].source.note.startswith(f"a stream of a kept run ({tool})")
+    assert len(worker.calls) == 2
+    # A Proforma run's question keeps its words, so a kept answer keeps its id.
+    kept = thermo.props(ThermoPropsRequest(artifactId=RUN_ID, streamId="beer"))
+    assert {i.name: i for i in kept.inputs}["question"].source.note.startswith("a stream of a Proforma run")
 
 
 def test_a_stream_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, worker):

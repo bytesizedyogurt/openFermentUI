@@ -31,9 +31,10 @@ run asked twice is one row, and a refused one is answered from its receipt.
 A request refused before anything computes (an unknown key, a range, a scope
 the plant does not have) keeps nothing. `keep_run` keeps the row of any
 engine's computation: BioSTEAM's library run (`run`), the run of every
-engine built on `contract.WorkerEngine` (`run_engine`) and the kinetics
-engine's computations in the service's own process (`compute_kept`,
-fermos_engine.py) are kept through it. The tables and the read-back stay in
+engine built on `contract.WorkerEngine` (`run_engine`), the kinetics
+engine's computations in the service's own process and the train engine's
+runs in the Proforma worker (`compute_kept`, fermos_engine.py and
+pureos/engine.py) are kept through it. The tables and the read-back stay in
 the artifact; `report` reads the run, its artifact and its SFF record
 together.
 
@@ -56,7 +57,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from .. import artifacts, db, events, projects
 from ..basis import ASSUMED_KINDS, assumption_source, estimate_source, origin_of
@@ -82,6 +83,10 @@ CONTRACT_TOOL = "engine."
 SIMULATION_TOOL = "fermos.simulation"
 FORECAST_TOOL = "growth_forecast"
 VESSEL_TOOL = "fermos.vessel"
+# The train engine's artifact tool (pureos/engine.py), read here by its name:
+# the engine package imports no pureOS module either. Its outputs are read by
+# pureOS, registered with the tool (`values_of`).
+TRAIN_TOOL = "pureos.train_run"
 
 
 class RunNotFound(KeyError):
@@ -171,7 +176,12 @@ def values_of(art: Artifact) -> list[dict[str, Any]]:
     forecast's finals, each its median with its 5th and 95th percentiles as
     the quantity's low and high (`finals.<role>`); and a vessel design's
     rows in BioSTEAM's units (`design.<label>`, the unit beside a label two
-    rows share). Any other tool's artifact answers an empty list."""
+    rows share). A tool whose module registers how its outputs read
+    (artifacts.register's `values_of`) is read by that module: a pureOS
+    train run's each unit's recovery, the overall recovery and the product
+    delivered, and each stream's mass flow and product share (the train
+    engine, pureos/engine.py). Any other tool's artifact answers an empty
+    list."""
     origin = Origin(kind="artifact", ref=art.id)
 
     def typed(name: str, value: Any, unit: str, low: Any = None, high: Any = None) -> dict[str, Any]:
@@ -207,7 +217,16 @@ def values_of(art: Artifact) -> list[dict[str, Any]]:
         shared = {lb for lb in (r["label"] for r in rows) if sum(r["label"] == lb for r in rows) > 1}
         return [typed(f"design.{r['label']}" + (f" ({r['unit']})" if r["label"] in shared and r["unit"] else ""),
                       r["value"], r["unit"]) for r in rows]
-    return []
+    # A tool whose module reads its own outputs, registered with the tool
+    # (artifacts.register's `values_of`): a pureOS train run's, read by pureOS.
+    try:
+        reader = artifacts.registered(art.tool).values_of
+    except artifacts.ToolNotRegistered:
+        reader = None
+    if reader is None:
+        return []
+    return [typed(name, value, unit) for name, value, unit in reader(art)
+            if isinstance(name, str) and isinstance(unit, str) and (_number(value) or isinstance(value, str))]
 
 
 def _outputs(art: Artifact) -> dict[str, Any]:
@@ -407,14 +426,35 @@ def keep_run(engine: Any, thing: str, configuration: str | None, *, tool: str, v
     return _report(kept, art, flowsheet)
 
 
+def _sff_file(job: dict[str, Any], art: Artifact, write: Callable[[Artifact, str, str], SFFFlowsheet],
+              project_id: str, who: str) -> tuple[SFFFlowsheet | None, str | None]:
+    """A computed run's SFF file, written and kept by `write(art,
+    project_id, by)`: the record, or the words the toolkit or the worker
+    refused it in (`sffRefused`). Any other failure (a worker that crashed or
+    timed out) says the job failed on the event stream and is raised, with no
+    row kept, so the next ask answers the computation from its artifact and
+    writes the file again."""
+    try:
+        return write(art, project_id, who), None
+    except sff.SFFRefused as e:
+        return None, str(e)
+    except Exception as e:
+        if isinstance(e, WorkerError) and str(e).startswith("Refused: "):
+            return None, str(e).removeprefix("Refused: ")
+        _failed(job, e, project_id)
+        raise
+
+
 def compute_kept(engine: Any, thing: str, configuration: str | None, *, tool: str, basis: Sequence[BasisInput],
-                 refusal: type[Exception], sff_refused: str, by: str = "", seed: int | None = None,
-                 records_by_id: Mapping[str, Any] | None = None, scenario_id: str | None = None,
-                 versions: Mapping[str, str] | None = None) -> Artifact:
-    """An engine's computation in the service's own process (the kinetics
-    engine's, fermos_engine.py), computed through `artifacts.compute` and kept
-    as its run (`keep_run`), the artifact answered; a library run's path
-    (`run`) for an engine that computes here.
+                 refusal: type[Exception], sff_refused: str | None = None,
+                 write_sff: Callable[[Artifact, str, str], SFFFlowsheet] | None = None, by: str = "",
+                 seed: int | None = None, records_by_id: Mapping[str, Any] | None = None,
+                 scenario_id: str | None = None, versions: Mapping[str, str] | None = None) -> Artifact:
+    """An engine's computation in the service's process (the kinetics
+    engine's, fermos_engine.py), or one whose module calls a worker of the
+    core's own (the train engine's, pureos/engine.py), computed through
+    `artifacts.compute` and kept as its run (`keep_run`), the artifact
+    answered; a library run's path (`run`) for an engine that computes here.
 
     The run's id is the artifact id of `tool`, its version for `basis`, the
     basis and `seed`. A receipt the project holds for that id is answered
@@ -426,11 +466,18 @@ def compute_kept(engine: Any, thing: str, configuration: str | None, *, tool: st
     computation runs: a `refusal` it raises is the engine's refusal of these
     values, kept as a receipt and raised again; any other error says the job
     failed and is raised, with no row kept. A refusal raised here carries the
-    receipt's id as `run_id`. The computation is kept with `sff_refused`, the
-    engine's words for why it writes no SFF file, and with `versions` (the
+    receipt's id as `run_id`. The run's SFF file is one of two: a thing that
+    is a plant gives `write_sff(art, project_id, by)`, which writes and keeps
+    the file as the record `run-<id>` (`_sff_file`: the toolkit's or the
+    worker's refusal kept as `sffRefused`, any other failure raised with no
+    row kept); a thing that is no plant gives `sff_refused`, the engine's
+    words for why it writes none. The row keeps `versions` (the
     distributions this thing ran on; `keep_run`). `by` is who asked;
     `records_by_id` the provenance of the basis's record inputs, as
     `artifacts.compute` takes it."""
+    if (sff_refused is None) == (write_sff is None):
+        raise ValueError("a computation is kept with the function that writes its SFF file, or with the words for "
+                         "why its engine writes none: one of the two")
     basis = list(basis)
     version = artifacts.registered(tool).version_for(basis)
     run_id = artifacts.artifact_id(tool, version, basis, seed)
@@ -459,8 +506,9 @@ def compute_kept(engine: Any, thing: str, configuration: str | None, *, tool: st
     except Exception as e:
         _failed(job, e, project_id)
         raise
+    flowsheet, words = (None, sff_refused) if write_sff is None else _sff_file(job, art, write_sff, project_id, who)
     keep_run(engine, thing, configuration, tool=tool, version=version, basis=basis, by=who, art=art,
-             sff_refused=sff_refused, scenario_id=scenario_id, seed=seed, versions=versions)
+             flowsheet=flowsheet, sff_refused=words, scenario_id=scenario_id, seed=seed, versions=versions)
     return art
 
 
@@ -495,19 +543,10 @@ def run(plant_id: str, configuration: str | None = None, overrides: list[Overrid
     except Exception as e:
         _failed(job, e, project_id)
         raise
-    flowsheet, refused = None, None
-    try:
-        flowsheet = sff.export(library.plant_of(art), project_id=project_id, run_artifact_id=art.id, by=who)
-    except sff.SFFRefused as e:
-        refused = str(e)
-    except Exception as e:
-        # The worker's words for the file are kept with the run; any other
-        # failure is said on the event stream and raised, with no row kept.
-        if isinstance(e, WorkerError) and str(e).startswith("Refused: "):
-            refused = str(e).removeprefix("Refused: ")
-        else:
-            _failed(job, e, project_id)
-            raise
+    # The worker's words for the file are kept with the run; any other
+    # failure is said on the event stream and raised, with no row kept.
+    flowsheet, refused = _sff_file(job, art, lambda a, project, by_: sff.export(
+        library.plant_of(a), project_id=project, run_artifact_id=a.id, by=by_), project_id, who)
     return keep_run(LIBRARY_ENGINE, plant_id, cfg, tool=library.LIBRARY_RUN, version=version, basis=inputs, by=who,
                     art=art, flowsheet=flowsheet, sff_refused=refused, scenario_id=scenario_id)
 

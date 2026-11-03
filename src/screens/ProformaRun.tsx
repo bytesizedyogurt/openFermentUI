@@ -6,6 +6,9 @@
 //
 //   the run         its plant and configuration, its status and provenance,
 //                   who asked and when, the study scenario that asked for it;
+//                   a train run names its train's name beside its id, links
+//                   to the train on pureOS → Train, and shows the `train`
+//                   input as its name and units, the train as data on asking;
 //   its outputs     a contract engine's or a kinetics run (docs/api/engines.md,
 //                   docs/api/runs.md): each output its name, value and unit,
 //                   with its interval where it carries one (a forecast's
@@ -44,6 +47,7 @@ import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';
 import { runViewOfRun, stamp } from '@/lib/proforma';
+import { trainOfRun } from '@/lib/pureos';
 import { StudiesDown, downloadFlowsheet, makeRunbook, makeScenario, predictable, runReport, runScenario } from '@/lib/studies';
 import { Button, Callout, Card, LinkButton, PageHeader, cx } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
@@ -193,7 +197,26 @@ function Outputs({ report }: { report: EngineRunReport }) {
   );
 }
 
+/** A train run's `train` input as a person reads it: the train's name and units, the train as data on asking. */
+function TrainInput({ value, train }: { value: unknown; train: { name: string; units: number } }) {
+  let held = String(value);
+  try {
+    held = JSON.stringify(JSON.parse(held), null, 1);
+  } catch {
+    // shown as kept
+  }
+  return (
+    <details data-testid="run-input-train">
+      <summary className="cursor-pointer">
+        {train.name}: {train.units} unit{train.units === 1 ? '' : 's'}
+      </summary>
+      <pre className="text-caption whitespace-pre-wrap break-all max-h-64 overflow-auto mt-1">{held}</pre>
+    </details>
+  );
+}
+
 function Inputs({ report }: { report: EngineRunReport }) {
+  const train = trainOfRun(report.run);
   const rows = report.run.inputs.map((i) => [
     i.name,
     String(i.quantity.value),
@@ -227,8 +250,14 @@ function Inputs({ report }: { report: EngineRunReport }) {
             {rows.map((r, i) => (
               <tr key={r[0]} className="border-b border-line/50 align-top" data-testid="run-input" data-origin={report.run.inputs[i]?.quantity.origin?.kind}>
                 {r.map((c, j) => (
-                  <td key={j} className={cx('py-1 pr-2', j < 3 && 'font-num')} title={j === 1 ? c : undefined}>
-                    {j === 1 ? shown(report.run.inputs[i]?.quantity.value ?? c) : c}
+                  <td key={j} className={cx('py-1 pr-2', j < 3 && 'font-num')} title={j === 1 && !(train && r[0] === 'train') ? c : undefined}>
+                    {j === 1 && train && r[0] === 'train' ? (
+                      <TrainInput value={report.run.inputs[i]?.quantity.value} train={train} />
+                    ) : j === 1 ? (
+                      shown(report.run.inputs[i]?.quantity.value ?? c)
+                    ) : (
+                      c
+                    )}
                   </td>
                 ))}
               </tr>
@@ -603,7 +632,8 @@ export default function ProformaRun({ runId }: { runId: string }) {
   const view = report?.artifact ? runViewOfRun(report.artifact) : null;
   const price = (report?.artifact?.output?.price ?? {}) as Record<string, unknown>;
   const product = typeof price.product === 'string' ? price.product : 'the product';
-  const where = run ? run.plant + (run.configuration ? ` (${run.configuration})` : '') : runId;
+  const train = run ? trainOfRun(run) : null;
+  const where = run ? (train ? `${train.name} (${run.plant})` : run.plant + (run.configuration ? ` (${run.configuration})` : '')) : runId;
 
   return (
     <div data-testid="proforma-run" data-run={runId} data-status={run?.status ?? ''}>
@@ -633,6 +663,7 @@ export default function ProformaRun({ runId }: { runId: string }) {
             {run?.artifactId && (
               <LinkButton to={`/biorepo/artifacts/${run.artifactId}`}>Its artifact</LinkButton>
             )}
+            {train && <LinkButton to={`/pureos/train/${encodeURIComponent(train.id)}`}>Its train on pureOS</LinkButton>}
             <LinkButton to="/proforma/studies">
               <BookOpen size={14} /> Studies
             </LinkButton>

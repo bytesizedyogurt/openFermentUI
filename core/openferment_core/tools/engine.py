@@ -79,10 +79,11 @@ def run_evidence(report: RunReport) -> list[Evidence]:
         if isinstance(v, dict) and isinstance(v.get("name"), str) and (_number(v.get("value")) or isinstance(v.get("value"), str)):
             out.append(Evidence(id=f"{art.id}:values.{v['name']}", label=f"{name}: {v['name']}", value=v["value"],
                                 unit=str(v.get("unit") or ""), provenance=art.provenance, basis=basis))
-    # The kinetics engine's (fermos_engine.py): each of the run's outputs.values, read from its artifact by name.
+    # The kinetics engine's (fermos_engine.py) and the train engine's (pureos/engine.py): each of the run's
+    # outputs.values, read from its artifact (engine/runs.py `values_of`).
     from ..engine import runs
 
-    if art.tool in (runs.SIMULATION_TOOL, runs.FORECAST_TOOL, runs.VESSEL_TOOL):
+    if art.tool in (runs.SIMULATION_TOOL, runs.FORECAST_TOOL, runs.VESSEL_TOOL, runs.TRAIN_TOOL):
         for v in runs.values_of(art):
             q = v["quantity"]
             out.append(Evidence(id=f"{art.id}:values.{v['name']}", label=f"{name}: {v['name']}", value=q["value"],

@@ -30,13 +30,34 @@ and the page sends it with a run; the service keeps the runs.
                              its broth (`brothStream`), refused in words naming
                              the run's streams when it names none; the basis's
                              `inlet source` says which source was read
-    run_train(spec, overrides=None, by=None)
+    overrides_of(spec, inputs)
+                             the values a request sets (alpha 2.2 D2), each an
+                             `EngineInput` named `<unit id>.<key>` or
+                             `inlet.<key>`, as the Overrides of the place's
+                             own scope (`scope_of`), each converted by
+                             basis.override_of in its parameter's unit; the
+                             one door a typed value enters a train by, at
+                             every door alike (the routes, the tools, the
+                             engine `train`); `converted` keeps its refusals
+                             beside them, by place
+    run_train(spec, inputs=None, by=None)
                              resolve every parameter of every unit with its
                              source, refuse what waits in words, and keep one
-                             `pureos.train_run` artifact; the Proforma worker
-                             builds and runs the train (op `train_run`,
-                             flowsheets/train.py), and nothing here imports
-                             BioSTEAM (E.3‴)
+                             `pureos.train_run` artifact and its run of the
+                             engine `train` (pureos/engine.py, one `runs` row
+                             created by `by`, its SFF file `run-<id>` or the
+                             toolkit's words for why it has none); the
+                             Proforma worker builds and runs the train (op
+                             `train_run`, flowsheets/train.py), and nothing
+                             here imports BioSTEAM (E.3‴)
+    check_train(spec, inputs=None, by=None)
+                             everything a run would refuse, at once, by place:
+                             the inputs' refusals beside the train's own
+    resolved(spec)           every place's values as a run resolves them with
+                             no request's value (the train engine's
+                             parameters)
+    plant_of(art)            what the worker rebuilds a train run's train from
+                             for its SFF file (op `sff_export`)
     train_runs()  every kept train run, newest first
     program_of_run(art)      a train run's chemical set: the train's, its
                              inlet's and what its records name
@@ -51,7 +72,7 @@ own; else a person's, else thermosteam's Stream default), and for a typed
 inlet `conc.<chemical>` (g L⁻¹, each a person's assumption).
 
 WHERE A UNIT'S VALUE COMES FROM, IN ORDER: a person's override (the train's
-typed value, or the run request's override of the same key); a shelf
+typed value, or the run request's input of the same key); a shelf
 flowsheet's own unit the train reads (`readFrom`: the value the built unit
 holds, a `model` source naming the package's version, first in the rule);
 records of the parameter's ontology field (catalogue.py's source rules) in the
@@ -84,7 +105,13 @@ holds the tables as `proforma.tables_of` reads them (so `pureos.train_of`
 reads a train run as it reads a Proforma run), the product and its stream, the
 purity of every stream, each unit's costs or *no cost model*, the inlet as
 built, every parameter as the basis holds it, notes and flags. A train runs
-each value as given: an interval stays in the basis and is not sampled.
+each value as given: an interval stays in the basis and is not sampled. A
+train run keeps every digit BioSTEAM gives, so a replay holds each number
+exactly (`replay_precision`, the library run's last-kept-digit rule read for
+a run that rounds nothing), and the run's typed outputs are pureOS's own
+reading of its tables (`output_values`: each unit's recovery and the overall
+one, the product delivered, each stream's mass flow, and the product share of
+each stream that carries product).
 
 Rule 1: no process number here. The constants below are a structural word
 list, a unit's definition (`PER_CENT`) and a reading convention
@@ -98,7 +125,7 @@ import threading
 from typing import Any, Iterable, NamedTuple, NoReturn
 
 from .. import params
-from ..basis import ASSUMED_KINDS
+from ..basis import ASSUMED_KINDS, InputRefused, override_of
 from ..models import (
     Artifact,
     BasisInput,
@@ -108,6 +135,7 @@ from ..models import (
     ParameterSpec,
     ParameterValue,
     ParamResolveRequest,
+    SFFFlowsheet,
     StreamImpurity,
     StreamPurity,
     TrainInletRead,
@@ -138,8 +166,9 @@ UNIT_ID = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,31}")
 ARTIFACT_ID = re.compile(r"[0-9a-f]{16}")
 SIMULATION = "fermos.simulation"
 VESSEL = "fermos.vessel"
-# The artifacts whose stream table a run-stream inlet reads.
-STREAM_TOOLS = ("proforma.run", "proforma.reference", TRAIN_RUN)
+# The artifacts whose stream table a run-stream inlet reads: a library
+# plant's run among them (alpha 2.2 D8), so a train can stand on one.
+STREAM_TOOLS = ("proforma.run", "proforma.reference", TRAIN_RUN, "library.run")
 # The chemical sets pureOS builds a train on, by key, in words: the worker
 # builds every train on the one there is (flowsheets/ethanol_glucose_v0.
 # create_chemicals). `chemical_set` reads the one a train builds on.
@@ -307,6 +336,30 @@ def _key_words(e: catalogue.Entry, key: str) -> str | None:
     return ""
 
 
+def _no_unit_key(u: TrainUnitSpec, e: catalogue.Entry, key: str, why: str) -> str:
+    """A key a unit has no parameter for, in words naming its parameters
+    (`why` the more `_key_words` says)."""
+    return (f"unit {u.id} ({e.id}) has no parameter {key!r}; its parameters are "
+            f"{', '.join(p.key + (catalogue.SEP + '<' + p.per + '>' if p.per else '') for p in e.params)}"
+            + (f" and the side inlets' {', '.join(p.name + '.<chemical>' for p in _side_ports(e))}"
+               if _side_ports(e) else "") + (f" ({why})" if why else ""))
+
+
+# The keys a person sets on an inlet, by its kind; a typed inlet's
+# concentrations besides, `conc.<chemical>`. A run's stream carries its own.
+INLET_KEYS = {"simulation": ("broth_flow", "harvest_hour", "T", "P"), "run-stream": (), "typed": ("broth_flow", "T", "P")}
+
+
+def _no_inlet_key(kind: str, key: str) -> str | None:
+    """None when a person sets `key` on an inlet of this kind; else why not,
+    in words naming the keys it takes."""
+    if key in INLET_KEYS[kind] or (kind == "typed" and key.startswith(f"conc{catalogue.SEP}") and len(key) > len("conc.")):
+        return None
+    return (f"the inlet ({kind}) has no parameter {key!r}; its parameters are "
+            + (", ".join(INLET_KEYS[kind]) + (", conc.<chemical>" if kind == "typed" else "")
+               if INLET_KEYS[kind] else "none a person sets: a run's stream carries its own"))
+
+
 def refusals_by_place(spec: TrainSpec) -> list[tuple[str, str]]:
     """Every reason the train cannot be built, at once, in words, each with
     the place it belongs to (a unit's id, `inlet`, or `train`); empty when it
@@ -345,14 +398,10 @@ def refusals_by_place(spec: TrainSpec) -> list[tuple[str, str]]:
     for ref, what in ((None if inlet.kind == "run-stream" else inlet.ref, "ref"), (inlet.vessel, "vessel")):
         if ref and not ARTIFACT_ID.fullmatch(ref):
             at("inlet", f"the inlet's {what} is an artifact id (16 hex); {ref!r} is not one")
-    allowed = {"simulation": ("broth_flow", "harvest_hour", "T", "P"), "run-stream": (), "typed": ("broth_flow", "T", "P")}
     for key in inlet.params:
-        if key in allowed[inlet.kind] or (inlet.kind == "typed" and key.startswith(f"conc{catalogue.SEP}")
-                                          and len(key) > len("conc.")):
-            continue
-        at("inlet", f"the inlet ({inlet.kind}) has no parameter {key!r}; its parameters are "
-                    + (", ".join(allowed[inlet.kind]) + (", conc.<chemical>" if inlet.kind == "typed" else "")
-                       if allowed[inlet.kind] else "none a person sets: a run's stream carries its own"))
+        words = _no_inlet_key(inlet.kind, key)
+        if words:
+            at("inlet", words)
     if not spec.units:
         at("train", "a train holds at least one unit")
     order = [u.id for u in spec.units]
@@ -407,10 +456,7 @@ def refusals_by_place(spec: TrainSpec) -> list[tuple[str, str]]:
             why = _key_words(e, key)
             if why is None:
                 continue
-            at(u.id, f"unit {u.id} ({e.id}) has no parameter {key!r}; its parameters are "
-                        f"{', '.join(p.key + (catalogue.SEP + '<' + p.per + '>' if p.per else '') for p in e.params)}"
-                        + (f" and the side inlets' {', '.join(p.name + '.<chemical>' for p in _side_ports(e))}"
-                           if _side_ports(e) else "") + (f" ({why})" if why else ""))
+            at(u.id, _no_unit_key(u, e, key, why))
         for key, ids in u.records.items():
             base = key.partition(catalogue.SEP)[0]
             if not any(r.startswith("record:") for r in rules.get(base, ())):
@@ -874,22 +920,31 @@ def chemicals_of(spec: TrainSpec, overrides: Iterable[Override] = ()) -> list[st
     return sorted(c for c, m in row.massFlows.items() if m > 0)
 
 
+def inlet_static(kind: str) -> list[ParameterSpec]:
+    """The inlet's specs by its kind, read with no worker; a typed
+    concentration one template (`conc`, expanded per chemical when a train
+    is resolved)."""
+    if kind == "simulation":
+        return [_flow_spec(["artifact", "assumption"], "From a vessel design of the simulation the train names; else a "
+                                                       "person's."),
+                _spec("harvest_hour", "Harvest hour", "the hour of the simulation the broth is taken at", "time", "h",
+                      ["simulation", "assumption"], (0, None, "a physical limit: an hour of the run is not negative")),
+                *_tp_specs(["assumption", "library-default"])]
+    if kind == "run-stream":
+        return _tp_specs(["artifact"])
+    conc = _spec("conc", "Concentration", "a component's mass in each litre of the inlet", "massConc", "g L⁻¹",
+                 ["assumption"], (0, None, "a physical limit: no negative concentration"),
+                 note="Per component: a key conc.<chemical> for each chemical of the program's set but water, the balance.")
+    return [_flow_spec(["assumption"], "A person's."), conc, *_tp_specs(["assumption", "library-default"])]
+
+
 def static_specs() -> Iterable[tuple[str, list[ParameterSpec]]]:
     """Every spec a train adds to the catalogue's, read with no worker, for
     `params.check()` (each held to a written bounds reason, D4):
     the inlet's, by kind, a typed concentration and a side inlet's flow each
     one template (expanded per chemical when a train is resolved)."""
-    conc = _spec("conc", "Concentration", "a component's mass in each litre of the inlet", "massConc", "g L⁻¹",
-                 ["assumption"], (0, None, "a physical limit: no negative concentration"),
-                 note="Per component: a key conc.<chemical> for each chemical of the program's set but water, the balance.")
-    yield "pureos train inlet (simulation)", [
-        _flow_spec(["artifact", "assumption"], "From a vessel design of the simulation the train names; else a person's."),
-        _spec("harvest_hour", "Harvest hour", "the hour of the simulation the broth is taken at", "time", "h",
-              ["simulation", "assumption"], (0, None, "a physical limit: an hour of the run is not negative")),
-        *_tp_specs(["assumption", "library-default"])]
-    yield "pureos train inlet (run-stream)", _tp_specs(["artifact"])
-    yield "pureos train inlet (typed)", [_flow_spec(["assumption"], "A person's."), conc,
-                                         *_tp_specs(["assumption", "library-default"])]
+    for kind in ("simulation", "run-stream", "typed"):
+        yield f"pureos train inlet ({kind})", inlet_static(kind)
     for e in catalogue.UNIT_TYPES:
         for p in _side_ports(e):
             yield f"pureos unit {e.id} side inlet {p.name}", [
@@ -1321,6 +1376,83 @@ def _unit_overrides(spec: TrainSpec, unit: TrainUnitSpec, inputs: Iterable[Engin
     return params.overrides_of(scope_of(spec.id, unit.id), [i for i in inputs if i.name in named], named)
 
 
+def _unit_units(e: catalogue.Entry) -> dict[str, str]:
+    """Each parameter's unit on a unit of this type, read with no worker: a
+    key's own, a template's (`<key>.<item>` takes it) and a side inlet's
+    flow (`<port>.<chemical>`)."""
+    units = {s.key: s.unit for s in catalogue.static_specs(e)}
+    units.update({p.name: "kg h⁻¹" for p in _side_ports(e)})
+    return units
+
+
+def overrides_of(spec: TrainSpec, inputs: Iterable[EngineInput] | None) -> list[Override]:
+    """The values a request sets on a train (alpha 2.2 D2), each an
+    `EngineInput` named `<unit id>.<key>` or `inlet.<key>`, as the Overrides
+    of the place's own scope (`scope_of`: `pureos:unit:<train id>:<unit id |
+    inlet>`), each converted by basis.override_of in the unit of the
+    parameter it keys: a unit's catalogue key's own, a key expanded per
+    chemical or per effect its template's, a side inlet's flow the side
+    inlet's, an inlet's by the inlet's kind. Every refusal at once, each with
+    its place (`converted`)."""
+    out, refused = converted(spec, inputs)
+    if refused:
+        _refuse(refused)
+    return out
+
+
+def converted(spec: TrainSpec, inputs: Iterable[EngineInput] | None) -> tuple[list[Override], list[tuple[str, str]]]:
+    """`overrides_of` with its refusals kept beside the Overrides that
+    converted, each with its place, so a run or a check says them with
+    everything else it refuses (`_prepared`): a name that names no place of
+    the train, a key the place has no parameter for (in the words validate
+    says it in), a key set twice (in the words every engine's door says it
+    in, runs.check_inputs), and a value its parameter cannot take as an
+    Override (another unit, a basis, an origin that is no person's or
+    model's, no day)."""
+    places = {u.id: u for u in spec.units}
+    out: list[Override] = []
+    refused: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for i in inputs or ():
+        place, sep, key = i.name.partition(catalogue.SEP)
+        if not sep or not key:
+            refused.append(("train", f"{i.name}: a value a train's run sets is named <unit id>.<key> or "
+                                     f"{INLET}.<key>"))
+            continue
+        if i.name in seen:
+            refused.append((place if place == INLET or place in places else "train", f"{i.name} is set twice"))
+            continue
+        seen.add(i.name)
+        if place == INLET:
+            where = "the inlet"
+            words = _no_inlet_key(spec.inlet.kind, key)
+            units = {s.key: s.unit for s in inlet_static(spec.inlet.kind)}
+        elif place in places:
+            u = places[place]
+            where = f"unit {u.id}"
+            try:
+                e = catalogue.entry(u.type)
+            except catalogue.CatalogueUnknown as ex:
+                refused.append((u.id, f"unit {u.id}: {ex}"))
+                continue
+            why = _key_words(e, key)
+            words = None if why is None else _no_unit_key(u, e, key, why)
+            units = _unit_units(e)
+        else:
+            refused.append(("train", f"{i.name} names {place!r}, which is no unit of train {spec.id} and not its "
+                                     f"inlet; its places are {', '.join([INLET, *places])}"))
+            continue
+        if words:
+            refused.append((place, words))
+            continue
+        unit = units.get(key, units.get(key.partition(catalogue.SEP)[0], ""))
+        try:
+            out.append(override_of(scope_of(spec.id, place), i.model_copy(update={"name": key}), unit))
+        except InputRefused as e:
+            refused.append((place, f"{where}: {e}"))
+    return out, refused
+
+
 # ── the run ────────────────────────────────────────────────────────────
 
 
@@ -1461,27 +1593,84 @@ def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | No
     return _Prepared(basis, pool)
 
 
-def run_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None) -> TrainRun:
-    """Resolve every value of the train with its source, refuse in words what
-    cannot run (the validation's refusals, a value that waits naming what
-    would bind it, a unit's needs, every one at once), and keep one
-    `pureos.train_run` artifact, or return the one kept for the same basis."""
-    from .. import artifacts
+def _prepared(spec: TrainSpec, inputs: Iterable[EngineInput] | None, by: str | None) -> _Prepared:
+    """`_prepare` on the Overrides the request's inputs convert to
+    (`converted`): an input that cannot stand is refused together with
+    everything else the run would refuse, the inputs' refusals first, each
+    by its place, so a bad value hides none of the train's own refusals."""
+    overrides, refused = converted(spec, inputs)
+    try:
+        got = _prepare(spec, overrides, by)
+    except TrainRefused as e:
+        if refused:
+            _refuse([*refused, *e.places])
+        raise
+    if refused:
+        _refuse(refused)
+    return got
 
-    got = _prepare(spec, overrides, by)
-    art = artifacts.compute(TRAIN_RUN, got.basis, records_by_id=got.pool.records_by_id if got.pool is not None else {})
+
+def run_train(spec: TrainSpec, inputs: Iterable[EngineInput] | None = None, by: str | None = None) -> TrainRun:
+    """Resolve every value of the train with its source, the values the
+    request sets laid on (`converted`), refuse in words what cannot run
+    (the inputs' refusals, the validation's, a value that waits naming what
+    would bind it, a unit's needs, every one at once, `_prepared`), and keep
+    one `pureos.train_run` artifact and its run of the engine `train`
+    (pureos/engine.py `keep_train_run`: one `runs` row created by `by`, its
+    SFF file or the toolkit's words for why it has none, the worker's
+    refusal kept as a receipt and raised with its id as `run_id`); or answer
+    the one kept for the same basis."""
+    from . import engine
+
+    got = _prepared(spec, inputs, by)
+    art = engine.keep_train_run(spec, got.basis, by=by or "",
+                                records_by_id=got.pool.records_by_id if got.pool is not None else {})
     return run_of(art)
 
 
-def check_train(spec: TrainSpec, overrides: Iterable[Override] | None = None, by: str | None = None) -> TrainValidation:
+def check_train(spec: TrainSpec, inputs: Iterable[EngineInput] | None = None, by: str | None = None) -> TrainValidation:
     """POST /api/pureos/train/check (OF-BLD-020 §5.3): everything a run of the
-    train would refuse, at once, in the run's words, each by its place; runs
-    no train and keeps nothing. The Builder holds Run on it."""
+    train with these inputs would refuse, at once, in the run's words, each
+    by its place (`_prepared`); runs no train and keeps nothing. The Builder
+    holds Run on it."""
     try:
-        _prepare(spec, overrides, by)
+        _prepared(spec, inputs, by)
     except TrainRefused as e:
         return TrainValidation(ok=False, refusals=[w for _, w in e.places], places=_placed(e.places))
     return TrainValidation(ok=True)
+
+
+def resolved(spec: TrainSpec) -> list[tuple[str, list[ParameterSpec], list[ParameterValue]]]:
+    """Every place of the train with its values as a run of it resolves them
+    with no request's value (the train engine's parameters, pureos/engine.py):
+    the inlet, then each unit in order, each value with its source (the
+    train's typed value, a shelf flowsheet's own unit, its records, the
+    class's default, the inlet's run, simulation or vessel) or, waiting or
+    left unread, with none. Refused in words, by place, where the train
+    cannot be read: the validation's refusals, an inlet that cannot be read,
+    a typed value its parameter refuses. Runs no train: the worker is asked
+    only what the scopes read, as a check asks it."""
+    said = refusals_by_place(spec)
+    if said:
+        _refuse(said)
+    got = _inlet_read(spec)
+    try:
+        values = params.resolve(got.provided.specs, got.provided.sources,
+                                _as_overrides(scope_of(spec.id, INLET), spec.inlet.params), None)
+    except params.ParamRefused as e:
+        _refuse([(INLET, f"the inlet: {e}")])
+    out = [(INLET, got.provided.specs, params._not_read(got.provided, values))]
+    chemicals = chemicals_of(spec)
+    pool = _pool()
+    chem = _product_chemical(spec.product)
+    for unit in spec.units:
+        us = unit_scope(spec, unit, chemicals, pool, (), chem)
+        try:
+            values = params.resolve(us.provided.specs, us.provided.sources, us.overrides, None)
+        except params.ParamRefused as e:
+            _refuse([(unit.id, f"unit {unit.id}: {e}")])
+        out.append((unit.id, us.provided.specs, params._not_read(us.provided, values)))
+    return out
 
 
 # ── the artifact ───────────────────────────────────────────────────────
@@ -1663,16 +1852,11 @@ def worker_units(art: Artifact) -> dict[str, Any]:
     return {"train": spec, "product": chem, "units": units}
 
 
-def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
-    """The run, from its basis alone: the train as data, every value as the
-    basis holds it, the inlet; the worker builds and runs it, and this reads
-    what it gives. A value whose source is the class's own default is left
-    to the class; every other one is passed."""
-    from .. import proforma
-    from ..workers import WorkerError
-
-    spec = TrainSpec.model_validate_json(str(_named(inputs, "train").value))  # type: ignore[union-attr]
-    chem = str(_named(inputs, "product chemical").value)  # type: ignore[union-attr]
+def _inlet_request(inputs: list[BasisInput]) -> tuple[dict[str, BasisInput], dict[str, float], dict[str, float],
+                                                       BasisInput | None, dict[str, Any]]:
+    """The inlet as the worker builds it, read from a run's basis alone: the
+    inlet's inputs by key, its concentrations and flows by chemical, its
+    balance chemical, and the `inlet` of the worker's `train_run` request."""
     given = _prefixed(inputs, f"{INLET}{catalogue.SEP}")
     conc = {k.split(catalogue.SEP, 1)[-1]: float(i.value) for k, i in given.items()  # type: ignore[arg-type]
             if k.startswith(f"conc{catalogue.SEP}") and not k.endswith(_SUFFIXES)}
@@ -1684,6 +1868,25 @@ def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
              "balance": str(balance.value) if balance is not None else None,
              "T": float(given["T"].value), "P": float(given["P"].value),  # type: ignore[arg-type]
              "phase": str(_named(inputs, "inlet phase").value)}  # type: ignore[union-attr]
+    return given, conc, flows, balance, inlet
+
+
+def _system_of(spec: TrainSpec) -> str:
+    """The system and flowsheet a train is built under in the worker."""
+    return "pureos_" + re.sub(r"[^A-Za-z0-9_]", "_", spec.id)
+
+
+def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
+    """The run, from its basis alone: the train as data, every value as the
+    basis holds it, the inlet; the worker builds and runs it, and this reads
+    what it gives. A value whose source is the class's own default is left
+    to the class; every other one is passed."""
+    from .. import proforma
+    from ..workers import WorkerError
+
+    spec = TrainSpec.model_validate_json(str(_named(inputs, "train").value))  # type: ignore[union-attr]
+    chem = str(_named(inputs, "product chemical").value)  # type: ignore[union-attr]
+    given, conc, flows, balance, inlet = _inlet_request(inputs)
     units = []
     parameters: list[TrainUnitParameters] = []
     notes: list[str] = []
@@ -1701,8 +1904,7 @@ def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
             notes.append(f"Unit {u.id} is BioSTEAM's DrumDryer, which burns its fuel without taking the oxygen from its "
                          "gas: its outlets carry that oxygen's mass beyond its inlets (pureOS §5.1). No product is "
                          "counted in it, and the difference is the class's, not a broken balance.")
-    request = {"system": "pureos_" + re.sub(r"[^A-Za-z0-9_]", "_", spec.id), "inlet": inlet, "units": units,
-               "diagram": proforma._draws(inputs)}
+    request = {"system": _system_of(spec), "inlet": inlet, "units": units, "diagram": proforma._draws(inputs)}
     try:
         said = proforma.call("train_run", request)
     except WorkerError as e:
@@ -1769,10 +1971,78 @@ def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
     }
 
 
+def replay_precision() -> tuple[float, float]:
+    """The precision a train run replays to, (rtol, atol): the library run's
+    rule, one unit in the last digit the run keeps (engine/library.py
+    `tolerance`), read for a train run. A library run rounds its outputs to
+    the significant digits its `precision` input states; a train run keeps
+    every digit BioSTEAM gives and states no precision, so its replay holds
+    each number exactly, as it has since train runs were kept: (0, 0), and
+    the tool registers no tolerance (`ReplayResult.identical`)."""
+    return 0.0, 0.0
+
+
+def output_values(art: Artifact) -> list[tuple[str, Any, str]]:
+    """A train run's numbers with their units, as pureOS reads the run
+    (`pureos.train_of`, by pass), for its row's `outputs.values`
+    (engine/runs.py `values_of`): each unit's recovery where one is read
+    (`recovery.<unit id>`) and the overall recovery (`overallRecovery`), each
+    a share with no unit; the product the train delivers (`productOut`), and
+    each stream's mass flow (`massFlow.<stream id>`), in the stream table's
+    unit of mass flow; each stream's product share by mass where it carries
+    any (`purity.<stream id>`). A run whose tables do not read answers none."""
+    from . import train_of
+
+    try:
+        tr = train_of(art)
+    except (KeyError, TypeError, ValueError):
+        return []
+    flow = str(tr.tableUnits.get("massFlow") or "")
+    out: list[tuple[str, Any, str]] = [(f"recovery.{u.id}", u.recovery, "") for u in tr.units if u.recovery is not None]
+    if tr.overallRecovery is not None:
+        out.append(("overallRecovery", tr.overallRecovery, ""))
+    if tr.productOut is not None and flow:
+        out.append(("productOut", tr.productOut, flow))
+    purity = {s.get("stream"): s.get("productFraction") for s in ((art.output or {}).get("purity") or {}).get("streams") or []
+              if isinstance(s, dict)}
+    for s in tr.streams:
+        if flow:
+            out.append((f"massFlow.{s.id}", s.massFlow, flow))
+        share = purity.get(s.id)
+        if isinstance(share, (int, float)) and not isinstance(share, bool) and share > 0:
+            out.append((f"purity.{s.id}", share, ""))
+    return out
+
+
+def plant_of(art: Artifact) -> dict[str, Any]:
+    """What the worker rebuilds a train run's train from for its SFF file
+    (engine/sff.py `export`, the worker's `sff_export`): the `train_run`
+    request its basis gives (the inlet and every unit as the run built them),
+    the train's id, and its name as the file's title."""
+    if art.tool != TRAIN_RUN:
+        raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact, and a train's SFF file is written from a "
+                           f"train run ({TRAIN_RUN})")
+    spec = TrainSpec.model_validate_json(str(_named(art.inputs, "train").value))  # type: ignore[union-attr]
+    *_, inlet = _inlet_request(art.inputs)
+    return {"train": {"system": _system_of(spec), "inlet": inlet, "units": worker_units(art)["units"]},
+            "trainId": spec.id, "title": spec.name}
+
+
+def export_sff(art: Artifact, *, project_id: str, by: str) -> SFFFlowsheet:
+    """A train run's SFF file, written by the toolkit in the Proforma worker
+    from the run's own basis (`plant_of`), checked there, drawn and kept as
+    the record `run-<id>` with origin `run` (engine/sff.py `export`),
+    through the door pureOS reaches the worker by (`proforma.call`)."""
+    from .. import proforma
+    from ..engine import sff
+
+    return sff.export(plant_of(art), project_id=project_id, run_artifact_id=art.id, by=by, call=proforma.call)
+
+
 def _register() -> None:
     from .. import artifacts
 
-    artifacts.register(TRAIN_RUN, _version(), _run_train)
+    artifacts.register(TRAIN_RUN, _version(), _run_train, values_of=output_values)
 
 
 def _register_lazy() -> None:

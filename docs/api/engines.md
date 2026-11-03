@@ -47,9 +47,10 @@ example = "openferment_engine_example.engine:ENGINE"
 - Installing an engine trusts its code with whatever the service's user can read, `core/.env`
   included: its entry module runs in the service's process, and its worker runs as the same user.
 - The engines in the repository register the same way, from `core/pyproject.toml`: `biosteam`
-  (the library plants and openFerment's composed flowsheet) and `kinetics` (fermOS's model
-  families, its forecasts of a kept fit and its vessel designs). The section The core's
-  `kinetics`, below, describes the kinetics engine's runs.
+  (the library plants and openFerment's composed flowsheet), `kinetics` (fermOS's model
+  families, its forecasts of a kept fit and its vessel designs) and `train` (pureOS's trains,
+  each a project's own). The sections The core's `kinetics` and The core's `train`, below,
+  describe those engines' runs.
 
 ## What it declares
 
@@ -57,7 +58,7 @@ An engine from outside the core is built on `openferment_core.engine.WorkerEngin
 implements every method over four worker ops: the package declares the engine's name, its worker,
 its distributions and the heavy modules its worker computes with (`heavy`, which conformance
 check 6 holds), and writes the worker. The table lists what the service asks of every engine, the
-core's own `biosteam` and `kinetics` among them.
+core's own `biosteam`, `kinetics` and `train` among them.
 
 | Name | Type | What it is |
 |---|---|---|
@@ -65,7 +66,8 @@ core's own `biosteam` and `kinetics` among them.
 | `worker` | `str` or `None` | The dotted module of the engine's worker: the service runs it as `python -m <worker>` would (The worker, below) and speaks the protocol of `docs/api/workers.md`. Heavy imports live here alone. `None` for an engine that computes in the service's own process with nothing heavy, whose `heavy` is then `()`, as the core's `kinetics` is; `GET /api/engines` lists its worker's status as `none`. Such an engine's computation may call a worker of the core's own (the kinetics engine's vessel design runs in the Proforma worker), and a route that worker cannot answer is a 503 naming the worker its computation called |
 | `heavy` | `tuple[str, ...]` | The modules the worker computes with, which the service keeps out of its process (conformance check 6); each name covers its module and every module below it (`a.b` covers `a.b` and `a.b.c`). `()` for an engine that computes with nothing heavy. The service keeps `biosteam`, `thermosteam`, `biorefineries`, `pisces_sff` and `cobra` out for every engine, whatever it declares |
 | `version()` | `dict[str, str]` | The distributions the engine runs on, each with the version its installed metadata records: `{"openferment-engine-example": "0.1.0"}`; a distribution that is not installed reads `"not installed"`, and enters the version string so. It is the run's `versions`, and it enters every run's id. It changes whenever the engine's computation changes: an editable install keeps its version across edits of its code, so a new version goes with every change to what a run computes (installed again, as above), and the service then computes the request afresh |
-| `things()` | `list[EngineThing]` | What the engine can run, each with its configurations and its precision. The service asks it afresh on every listing and every run, in the request's project, so an engine may list what the project holds: the kinetics engine lists its forecast while the project keeps a fit. A `WorkerEngine` keeps its worker's first answer for the life of the process (below) |
+| `things()` | `list[EngineThing]` | What the engine can run, each with its configurations and its precision. The service asks it afresh on every listing and every run, in the request's project, so an engine may list what the project holds: the kinetics engine lists its forecast while the project keeps a fit, and the train engine lists each train the project holds. A `WorkerEngine` keeps its worker's first answer for the life of the process (below) |
+| `things_are` | `str`, optional | Words saying what the engine's things are, declared by an engine every one of whose things is a project's own: the train engine's are `a project's trains, each saved in pureOS's Builder or built by a model`. `GET /api/engines` lists them as `thingsAre`, so a project that holds none of the things says what one would be. A database made for the checks holds none of them, so such an engine is checked in a project named (`--project`, Conformance, below), and `pnpm ready` names that command (on the production database it says where the checks run). An engine that declares none is checked on a database of its own |
 | `parameters(thing, configuration)` | `list[EngineParameter]` | What one thing takes: each parameter a `ParameterSpec` with its default and the default's origin, or with none for a parameter a run sets |
 | `run(thing, configuration, inputs, by)` | `EngineRun` | One run, kept as one `runs` row. `inputs` is a list of `EngineInput`, each a named `Quantity`; `by` names the person or the model asking |
 | `replay(run)` | `ReplayResult` | The run computed again from its basis alone, each output held within the stated precision |
@@ -124,17 +126,26 @@ origin:
   number in that unit.
 - `origin` says where the default comes from: `library-default` with `ref` naming the package
   and version it was read from, or `convention` with a `note` for a software setting (a step
-  count, a tolerance). Every default carries one.
+  count, a tolerance). Every default carries one. A thing the project holds (The core's `train`,
+  below) has defaults the project holds too: `record` with `ref` naming the records that bound
+  it, its `sourceRule` naming the field it binds from (`record:<field id>`); `artifact` with
+  `ref` naming the run, simulation or design it was read from; or `person-assumption` with `by`
+  naming the person who typed it into the thing, and `at` the day. Those five are a default's
+  origins; a model's estimate reaches a run as a value the run sets (`EngineInput`, below).
 - A parameter with no default has `value` and `origin` null, and its `sourceRule` names
-  `assumption` (given when the parameter names no rule): a run sets it, or the engine binds it
+  `assumption` (given when the parameter names no rule): a run sets it, the engine binds it
   from what the project holds (the kinetics engine binds a family's parameter from the project's
-  records, or from the fit or the simulation a configuration names). A run that leaves it with
-  neither is refused in words and keeps nothing.
+  records, or from the fit or the simulation a configuration names), or the thing fills it
+  itself when a run leaves it unset, which the parameter's `note` then says with the reason
+  (the train engine's: a value the unit's class decides at run time, a component the inlet
+  does not carry, a split left to the class). A run that leaves unset a parameter none of
+  these gives is refused in words and keeps nothing.
 - `min` and `max`, when given, bound what a run may set; `boundsReason` says why, in words, and
   every parameter carries one, a parameter with no bounds included.
 - The panel's other fields may be left out: `symbol`, `gloss`, `dimension`, `step`, `scale`
-  (`linear` or `log`), `group` (`parameters`) and `note`. `sourceRule` defaults to the origin's
-  kind.
+  (`linear` or `log`), `group` (`parameters`) and `note`. `sourceRule` defaults to the rule
+  entry the origin's kind stands for (`assumption` for a person's), and a record's default
+  names it (`record:<field id>`).
 
 ### `EngineInput`
 
@@ -381,6 +392,70 @@ the simulator starts; a vessel's route that worker cannot answer is a 503 naming
   forecast's draws, BioSTEAM's refusal of a design) is kept as a receipt. A kinetics run writes no
   SFF file, and `sffRefused` says why. `docs/api/runs.md` gives the outputs each tool keeps.
 
+## The core's `train`
+
+`openferment_core.pureos.engine:ENGINE`, registered by `core/pyproject.toml`, puts pureOS's
+trains behind the contract as pureOS runs them. `worker` and `heavy` are the biosteam engine's: a
+train is built and run in the Proforma worker, and importing the module imports neither. Every
+thing is a project's own, so the engine declares `things_are`.
+
+| Thing | Configurations | A run of it |
+|---|---|---|
+| Each train the project holds: each pureOS's Builder saved (the project's `trains` rows, `PUT /api/state/trains/{id}`, `kind` `made`) and each a model built (`pureos_build`, `kind` `kept`), its id the train's and its title the train's name, a model's train naming who built it | none | `pureos/train_spec.run_train`, the train with the run's inputs and `by`; the tool `pureos.train_run` |
+
+- The things are read afresh in the request's project on every listing and every run, and none
+  is kept: a project that holds no train lists none. A run names a train the project holds, and
+  one it lacks is refused naming those it holds; a train takes no configuration, and a
+  configuration named is refused in words.
+- Each thing's precision is exact (`rtol` 0, `atol` 0; `train_spec.replay_precision`). The
+  library run's rule holds a run to one unit in the last digit it keeps; a library run rounds
+  its outputs to the digits its `precision` input states, and a train run keeps every digit
+  BioSTEAM gives, so its replay is identical, as train runs have replayed since they were kept
+  (`docs/api/runs.md`, Replay).
+- `parameters(thing)` is each place's values as a run of the train resolves them with nothing set
+  (`train_spec.resolved`): the inlet's, then each unit's in the train's order, keyed `inlet.<key>`
+  and `<unit id>.<key>`. Each default carries the origin its resolution names: a unit class's own
+  (`library-default`, its `ref` naming BioSTEAM), a shelf flowsheet's own unit (`library-default`,
+  its `ref` naming the package), the inlet's T and P from thermosteam's Stream defaults
+  (`library-default`, its `ref` naming thermosteam), a convention (its note), the records that
+  bound it (`record`, its `ref` naming them), the inlet's run, simulation or design (`artifact`,
+  its `ref` naming it), or a value a person typed into the train (`person-assumption`, naming
+  the person and the day).
+- A parameter with no default is one of two. A value that waits for what would bind it: a run
+  sets it, or the run is refused naming what would bind it. A value the train fills itself when
+  a run leaves it unset: one the unit's class decides at run time (a flash's temperature beside
+  its pressure and vapour fraction), a component a typed inlet does not carry, a split of a
+  component the train leaves to the class; its `note` ends `A run may leave it unset, and the
+  train then fills it itself (<the resolution's reason>).`
+- A run's values are checked and converted at pureOS's own door, the same at every door (the
+  engine's run route, `POST /api/pureos/train/run` and `/check`, the tools): each through
+  `basis.override_of` in its place's scope (`pureos:unit:<train>:<unit id>` or
+  `pureos:unit:<train>:inlet`, `train_spec.converted`), the one converter every door shares. A
+  name of neither form, a place the train lacks, a key its place lacks, a key set twice and a
+  value its parameter cannot take (another unit, words for a number, a choice not offered, an
+  origin that is no person's or model's) are refused together with everything else the run would
+  refuse, the inputs' refusals first, each in words by its place, and keep nothing. A value
+  outside its bounds is kept as set and flagged on the run, as pureOS has always flagged one.
+- A run's id is its `pureos.train_run` artifact's (`train run 2 · biosteam <version> · thermosteam
+  <version> · biorefineries <version>` over pureOS's basis), so the same train with the same values
+  is one row at every door: `POST /api/pureos/train/run`, the tools `pureos_build` and
+  `pureos_write`, MCP, and `POST /api/engines/train/run`. Each keeps the row in the name of the
+  person the request names (`by`) or the caller the tool names. A value that waits refuses the run
+  in words naming what would bind it, and keeps nothing; the Proforma worker's refusal of a train
+  BioSTEAM cannot build or run is kept as a receipt in its words.
+- `version()` names the simulator's distributions (biosteam, thermosteam, biorefineries) as their
+  installed metadata records them, and the train run's own version (`train run`), and starts no
+  worker. Each row's `versions` names what its basis names, the versions the worker ran.
+- The run's SFF file is asked of the Proforma worker from the run's own basis (`sff_export`,
+  `docs/api/sff.md`), and kept as `run-<id>`. A train carries no TEA, and the schema the toolkit
+  ships at its pinned commit requires every file's `metadata.TEA_year`, which its exporter reads
+  from the system's TEA (`tea.duration[0]`, `export/_export.py`). While the schema requires the
+  year, the worker refuses a train's file in those words before it builds anything, each train
+  run keeps them as `sffRefused`, and check 5 holds by them; once the schema leaves the year to
+  the file, the worker rebuilds the train from the run's basis, simulates it and writes it as a
+  library plant's is. `docs/api/runs.md` (A train run) gives the row and the outputs a train run
+  keeps.
+
 ## Conformance
 
 `python -m openferment_core.engine.conform <name>` checks an installed engine against this page
@@ -403,11 +478,35 @@ registered.
   engine lists only while the project holds what it takes is left out of them: the kinetics
   engine's `forecast` and `vessel`, whose parameters and runs `core/tests/test_engines.py`
   holds.
+- `--project <id>` makes the checks in that existing project of the configured database
+  (`core/.env`), for an engine whose things are a project's own (`things_are`): the train
+  engine's things are a project's trains, so `conform train --project <id>` runs a train that
+  project holds. The checks run one thing there: the first `--thing` names, else the first the
+  project holds that runs. A thing passed over before it (one whose parameters cannot be read, a
+  saved draft with no unit among them, or one whose run is refused in words with nothing kept, a
+  value that waits) is said in check 3's words. They run it on a basis of their own: with no
+  `--inputs`, check 3's run sets one parameter at its own default, the first with a default
+  whose source rule takes a run's value, as the checks' assumption (`by` `conformance check of
+  train`, dated the day they run), so check 8's model sets that value as its estimate on the same
+  thing. The checks' runs and the runs a person of the project asks for keep rows of their own,
+  in either order. The runs the checks make stay in the project, each in the name of the checks or
+  of check 8's model.
+- The production database (`openferment`) is refused in words, as `pnpm db:reset` refuses it,
+  and so is a project the database does not hold; either refusal exits 2. On the production
+  database a project's things are checked elsewhere: in a project of a development database, and
+  by `pnpm prove` step 10, which makes a train in its own project on its own database and checks
+  the train engine there; `pnpm ready` says so in the engine's row there (`·`, checked in a
+  project of a development database). An engine that declares `things_are`, checked with no
+  `--project`, is refused in words saying what its things are and naming the command, and exits
+  2.
 - Each thing is checked in its default configuration, or in the first it names when it has no
   default.
-- Check 2 holds every default to its origin, and every parameter with no default to a source
-  rule naming `assumption`. Check 3 holds the run's id to the artifact id of its basis (its seed
-  joining it where the computation takes one). Check 6 imports the entry point's module in a
+- Check 2 holds every default to an origin naming what it rests on (a library-default, a record
+  or an artifact its `ref`, a convention its `note`, a person's assumption its `by`), and every
+  parameter with no default to a source rule naming `assumption`: it takes a run's value, which a
+  run sets, the engine binds or the thing fills itself (`EngineParameter`). Check 3 holds the
+  run's id to the artifact id of its basis (its seed joining it where the computation takes
+  one). Check 6 imports the entry point's module in a
   process of its own and holds out of it the worker module, every module `heavy` covers, and the
   five libraries the service keeps out for every engine, an engine whose worker is `None` among
   them. Check 7 offers a
@@ -417,13 +516,15 @@ registered.
   engine (`biosteam`) refuses the unknown thing in words, keeping nothing. Check 8 asks a second
   run in a model's name, on a basis of its own: with no values set, through the `engine_run` tool
   on another thing checked, or else another configuration of the first; with values set, or with
-  no second basis, through the run itself, the checked run's values (or the thing's first
-  parameter at its own default) as the model's estimates, dated the day the check runs.
+  no second basis, through the run itself, the checked run's values as the model's estimates,
+  or, with none set, one parameter at its own default: the first whose source rule takes a run's
+  value (`assumption`), else the first with a default. Each estimate is dated the day the check
+  runs.
 
 | # | Check |
 |---|---|
 | 1 | A JSON number outside a `quantity` is refused in words before the worker is reached |
-| 2 | Every default carries an origin, `library-default` with `ref` or `convention` with `note`, and a parameter with none says a run sets it |
+| 2 | Every default carries an origin naming what it rests on (`library-default`, `record` or `artifact` with `ref`, `convention` with `note`, `person-assumption` with `by`), and a parameter with none takes a run's value |
 | 3 | A run writes one `runs` row keyed by its basis, and the same request twice is that one row |
 | 4 | A replay holds every output within the precision the thing states |
 | 5 | The run's SFF file validates and scores, or `sffRefused` holds words |

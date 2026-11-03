@@ -3507,17 +3507,21 @@ class TrainValidation(BaseModel):
 
 
 class TrainRunRequest(BaseModel):
-    """POST /api/pureos/train/run."""
+    """POST /api/pureos/train/run and POST /api/pureos/train/check. It holds
+    these fields alone: a field it does not name is refused."""
 
     model_config = ConfigDict(extra="forbid")
 
     train: TrainSpec
-    # A person's changes in a unit's or the inlet's panel, each an Override
-    # of `pureos:unit:<train id>:<unit id | inlet>`: laid over the values the
-    # train carries, an override replacing the train's value of its key.
-    overrides: list[Override] = Field(default_factory=list)
-    # The person an override that names nobody is by.
-    by: str | None = None
+    # The values a person or a model sets in a unit's or the inlet's panel,
+    # each named `<unit id>.<key>` or `inlet.<key>` with a typed quantity in
+    # that parameter's unit and its origin (alpha 2.2 D2). pureOS converts
+    # each into the Override of `pureos:unit:<train id>:<unit id | inlet>`
+    # (train_spec.overrides_of), laid over the values the train carries: an
+    # input replaces the train's value of its key.
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking: the run's row is created by them.
+    by: str = Field(default="", max_length=200)
 
 
 class StreamImpurity(BaseModel):
@@ -4169,6 +4173,16 @@ THING_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
 # route, the tools and the thing's own list.
 CONFIGURATION_MAX = 80
 ConfigurationName = Annotated[str, Field(min_length=1, max_length=CONFIGURATION_MAX)]
+# What a thing's default may rest on (`EngineParameter.origin`): a package's
+# own value or a stated convention, and for a thing the project holds, a
+# record, an artifact or a person's typed value. A model's estimate reaches a
+# run as a value the run sets (ADR-006); a default rests on one of these five.
+DEFAULT_ORIGINS = ("library-default", "convention", "record", "artifact", "person-assumption")
+# The source-rule entry a default's origin stands for, when a parameter names
+# no rule of its own; a record's names the field it binds from
+# (`record:<field id>`), which only the parameter can say.
+RULE_OF_ORIGIN = {"library-default": "library-default", "convention": "convention", "artifact": "artifact",
+                  "person-assumption": "assumption"}
 
 
 class EnginePrecision(BaseModel):
@@ -4202,13 +4216,23 @@ class EngineParameter(ParameterSpec):
     """One parameter a thing takes: a `ParameterSpec` (the panel's shape,
     its bounds with their written reason) with its default value and where
     the default comes from, `library-default` naming the package it was read
-    from or a `convention` saying what the setting is. A parameter with no
-    default has `value` and `origin` null: a run sets it, or the engine binds
-    it from what the project holds (the kinetics engine binds a family's
-    parameter from the project's records), and a run that leaves it with
-    neither is refused in words, keeping nothing. The panel's fields an
-    engine may leave unset default here; `sourceRule` is the origin's kind,
-    and `assumption` (a run's value) for a parameter with no default."""
+    from or a `convention` saying what the setting is. A thing the project
+    holds (the train engine's trains) has defaults the project holds too: a
+    `record` naming the records that bound it, an `artifact` naming the
+    run, simulation or design it was read from, or a `person-assumption`
+    naming the person who typed it into the thing. A parameter with no
+    default has `value` and `origin` null: a run sets it, the engine binds it
+    from what the project holds (the kinetics engine binds a family's
+    parameter from the project's records), or the thing fills it itself when
+    a run leaves it unset, which its `note` then says with the reason (the
+    train engine's: a value the unit's class decides at run time, a component
+    the inlet does not carry, a split left to the class). A run that leaves
+    unset a parameter none of these gives is refused in words, keeping
+    nothing. The panel's fields an
+    engine may leave unset default here; `sourceRule` is the rule entry the
+    origin's kind stands for (`assumption` for a person's), and `assumption`
+    (a run's value) for a parameter with no default; a record's default
+    names its field in the rule (`record:<field id>`)."""
 
     key: str = Field(min_length=1, max_length=200)
     symbol: str = ""
@@ -4227,17 +4251,21 @@ class EngineParameter(ParameterSpec):
         if isinstance(data, dict):
             origin = data.get("origin")
             kind = origin.get("kind") if isinstance(origin, dict) else getattr(origin, "kind", None)
-            if kind is not None and kind not in ("library-default", "convention"):
-                raise ValueError(f"{data.get('key')}'s default is a library-default or a convention, never {kind}")
+            if kind is not None and kind not in DEFAULT_ORIGINS:
+                raise ValueError(f"{data.get('key')}'s default names the origin {kind}, and a default's origin is a "
+                                 "library-default, a convention, a record, an artifact or a person's assumption")
             if not data.get("sourceRule"):
-                data = {**data, "sourceRule": [kind] if kind else ["assumption"]}
+                if kind == "record":
+                    raise ValueError(f"{data.get('key')}'s default is a record's: its sourceRule names the field it "
+                                     "binds from (record:<field id>)")
+                data = {**data, "sourceRule": [RULE_OF_ORIGIN[kind]] if kind else ["assumption"]}
         return data
 
     @model_validator(mode="after")
     def _default_has_its_origin(self) -> "EngineParameter":
         if (self.value is None) != (self.origin is None):
-            raise ValueError(f"{self.key}: a default carries its origin (library-default or convention), and a "
-                             "parameter with no default has value and origin null")
+            raise ValueError(f"{self.key}: a default carries its origin, and a parameter with no default has value "
+                             "and origin null")
         if self.origin is not None and self.origin.kind == "convention" and not (self.origin.note or "").strip():
             raise ValueError(f"{self.key}'s convention says what it is (note)")
         if self.choices is not None and self.value is not None and self.value not in self.choices:
@@ -4299,6 +4327,11 @@ class EngineInfo(BaseModel):
     workerStatus: str = "cold"
     heavy: list[str] = Field(default_factory=list)
     things: list[EngineThing] = Field(default_factory=list)
+    # What the engine's things are, in words, for an engine every one of
+    # whose things is a project's own (the train engine's: a project's
+    # trains); None for any other. A project holding none of them lists no
+    # thing, and these words say what one would be.
+    thingsAre: str | None = None
     conformance: EngineConformance | None = None
     # Why the engine cannot be used, in words: it failed to load, or a
     # declared method failed. The service runs on without it.

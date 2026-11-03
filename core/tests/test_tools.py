@@ -539,8 +539,8 @@ def test_stream_table_refuses_what_is_not_a_proforma_run_in_words(pool, proforma
     assert conv.error is None
     kept = conv.evidence[0].basis.artifactId
     other = tools.run("stream_table", {"artifactId": kept}, _pcx(proforma_store))
-    assert other.error == (f"stream_table refused: {kept} is a convert_units artifact, not a Proforma run; "
-                           f"it reads the stream table of a {proforma.RUN} or {proforma.REFERENCE} artifact")
+    assert other.error == (f"stream_table refused: {kept} is a convert_units artifact, and stream_table reads the "
+                           f"stream table of a {proforma.RUN}, {proforma.REFERENCE} or library.run artifact")
     assert "no kept artifact" in tools.run("stream_table", {"artifactId": "0123456789abcdef"}, _pcx(proforma_store)).error
     assert "no kept artifact" in tools.run("stream_table", {"artifactId": "../corpus"}, _pcx(proforma_store)).error
     assert other.evidence == [] and other.data is None

@@ -45,8 +45,9 @@ a forecast (alpha 2.2 D3): `fermos_write`'s `forecast` and the registry's
 `growth_forecast` (tools/fermos.py) both forecast through `run_forecast`
 below, the one call to `fermos.forecast_run`, whose kept forecast is a run of
 the kinetics engine in its caller's name. A simulation, a vessel design and a
-kept forecast each keep one runs row (fermos_engine.py), its created_by the
-caller `_actor` names.
+kept forecast each keep one runs row (fermos_engine.py), and so does a
+train's run (the train engine, pureos/engine.py), its created_by the caller
+`_actor` names.
 
 THE STUDY TOOLS (alpha 2.0 stage 6). `engine_run` (tools/engine.py) runs
 through `run_engine` below, the one call to `engine.runs.run` and to
@@ -932,12 +933,15 @@ def set_from_record(tool: str, train_id: str, unit_id: str, records_by_param: di
 
 def run_train(tool: str, train_id: str, note: str, ctx: ToolContext) -> ToolResult:
     """Run a kept train in the Proforma worker as the service binds it and
-    keep the run as one `pureos.train_run` artifact (pureos_build run,
-    pureos_write run_train). The service holds no person's value, so none is
-    passed: a value nothing binds waits, and the refusal is run_train's own
-    words (what `POST /api/pureos/train/run` answers with a 422). Returns the
-    run as one Evidence whose id is the artifact's, a summary a model reads,
-    and the whole run in `data`, which no model reads."""
+    keep the run as one `pureos.train_run` artifact and as a run of the
+    train engine in its caller's name (`_actor`; alpha 2.2 D3: one `runs`
+    row, its SFF file written) (pureos_build run, pureos_write run_train).
+    The tool takes ids and words (rule E.4‴), and the service holds no
+    person's value, so no value is passed: a value nothing binds waits, and
+    the refusal is run_train's own words (what `POST /api/pureos/train/run`
+    answers with a 422). Returns the run as one Evidence whose id is the
+    artifact's, a summary a model reads, and the whole run in `data`, which
+    no model reads."""
     from .. import artifacts
     from ..pureos import build, train_spec
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
@@ -947,7 +951,7 @@ def run_train(tool: str, train_id: str, note: str, ctx: ToolContext) -> ToolResu
     except build.BuildRefused as e:
         return _train_refused(tool, e)
     try:
-        r = train_spec.run_train(k.spec, None, None)
+        r = train_spec.run_train(k.spec, None, _actor(ctx)[1])
     except train_spec.TrainRefused as e:
         waits = f" {TRAIN_WAITS}" if " waits" in str(e) else ""
         return ToolResult(error=f"{tool} refused: {str(e).rstrip('.')}.{waits}")

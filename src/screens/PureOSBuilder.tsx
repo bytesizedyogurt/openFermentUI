@@ -51,8 +51,11 @@
 // is the service's answer (`POST /api/pureos/train/validate`, then
 // `/check`), each refusal on the card of the unit it belongs to, and Run
 // stays off while any stands, saying what. Run posts the whole train and
-// every override of its scopes; the result is the one `pureos.train_run`
-// artifact the service keeps: purity by stream (PurityByStream), recovery by
+// every override of its scopes as typed inputs, each in the unit its place's
+// panel read for it (lib/pureos.trainInputs); the result is the one
+// `pureos.train_run` artifact the service keeps, with its run of the engine
+// `train` on the project's Runs, linked from the result (/proforma/runs/<id>,
+// the run's id the artifact's): purity by stream (PurityByStream), recovery by
 // unit (RecoveryByUnit), the stream table, the unit table with BioSTEAM's
 // costs or *no cost model*, the utilities, the diagram or the units in order
 // with the words why, the parameters with their sources, the basis naming
@@ -68,11 +71,12 @@
 // one the inlet names, else one designed for the inlet's simulation, chosen
 // first), and opens it; while either is missing it says, in words, what it
 // needs and how one is made (Run here; fermOS → Vessel).
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Download, Plus, Trash2 } from 'lucide-react';
 import type {
   FermosHarvest,
   KeptTrain,
+  ParameterSpec,
   ParamScope,
   ProposalReason,
   SimulationSummary,
@@ -114,6 +118,7 @@ import {
   sameTrain,
   share,
   trainFromRun,
+  trainInputs,
   trainOverrides,
   trainSpecOf,
   unitOf,
@@ -452,8 +457,16 @@ function Builder({
     [overridesAll, prefix],
   );
   const spec = useMemo(() => trainSpecOf(draft, mine), [draft, mine]);
-  const specKey = JSON.stringify(spec);
   const overrides = useMemo(() => trainOverrides(spec, mine), [spec, mine]);
+  // Each place's specs as its panel read them: the units its values are sent in as inputs (lib/pureos.trainInputs).
+  const [placeSpecs, setPlaceSpecs] = useState<Record<string, ParameterSpec[]>>({});
+  const readSpecs = useCallback(
+    (scope: string, specs: ParameterSpec[]) => setPlaceSpecs((was) => (was[scope] === specs ? was : { ...was, [scope]: specs })),
+    [],
+  );
+  const inputs = useMemo(() => trainInputs(spec, overrides, placeSpecs), [spec, overrides, placeSpecs]);
+  // The train and the inputs a check or a run sends: the check is asked again when either changes.
+  const specKey = JSON.stringify([spec, inputs]);
 
   const [catalogue, setCatalogue] = useState<UnitType[] | null>(null);
   const [catalogueProblem, setCatalogueProblem] = useState<string | null>(null);
@@ -475,7 +488,7 @@ function Builder({
     const asked = specKey;
     const timer = window.setTimeout(() => {
       validateTrain(spec, ctrl.signal)
-        .then((v) => (v.ok ? checkTrain({ train: spec, overrides, by: reviewer || null }, ctrl.signal) : v))
+        .then((v) => (v.ok ? checkTrain({ train: spec, inputs, by: reviewer }, ctrl.signal) : v))
         .then((answer) => setCheck({ key: asked, answer }))
         .catch((e: unknown) => !ctrl.signal.aborted && setCheckProblem(problemOf(e)));
     }, CHECK_AFTER_MS);
@@ -483,7 +496,7 @@ function Builder({
       window.clearTimeout(timer);
       ctrl.abort();
     };
-    // `specKey` names the train and its values; the overrides are in it.
+    // `specKey` names the train, its values and the inputs sent with it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [specKey]);
   const fresh = check && check.key === specKey ? check.answer : null;
@@ -510,7 +523,7 @@ function Builder({
     inFlight.current = ctrl;
     setBusy(true);
     setRunProblem(null);
-    runTrain({ train: spec, overrides, by: reviewer || null }, ctrl.signal)
+    runTrain({ train: spec, inputs, by: reviewer }, ctrl.signal)
       .then((r) => !ctrl.signal.aborted && setRun(r))
       .catch((e: unknown) => {
         if (ctrl.signal.aborted) return;
@@ -601,7 +614,7 @@ function Builder({
 
       {proposal && <ProposalNote proposal={proposal} />}
 
-      <InletSection draft={draft} spec={spec} change={change} clearInlet={() => clearScope(INLET)} refusals={placeRefusals(INLET)} />
+      <InletSection draft={draft} spec={spec} change={change} clearInlet={() => clearScope(INLET)} refusals={placeRefusals(INLET)} onSpecs={readSpecs} />
 
       <section aria-labelledby="builder-steps" data-testid="builder-steps">
         <SectionTitle right={<span className="font-num text-caption text-ink-soft">{draft.units.length} units</span>}>
@@ -627,6 +640,7 @@ function Builder({
               move={(by) => moveUnit(i, by)}
               remove={() => removeUnit(i)}
               route={(port, to) => routeOutlet(i, port, to)}
+              onSpecs={readSpecs}
             />
           ))}
         </div>
@@ -769,8 +783,21 @@ function PriceInProforma({ run, spec, changed }: { run: TrainRun | null; spec: T
   );
 }
 
-/** One place's parameters, as the service binds them with the train: the panel, asked again as the train changes. */
-function PlacePanel({ scope, ask, groups }: { scope: string; ask: ParamAsk; groups?: string[] }) {
+/**
+ * One place's parameters, as the service binds them with the train: the panel, asked again as the train changes. The
+ * specs it reads go to `onSpecs`, so a run sends the place's values in the units its parameters are in.
+ */
+function PlacePanel({
+  scope,
+  ask,
+  groups,
+  onSpecs,
+}: {
+  scope: string;
+  ask: ParamAsk;
+  groups?: string[];
+  onSpecs?: (scope: string, specs: ParameterSpec[]) => void;
+}) {
   const [data, setData] = useState<ParamScope | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const askKey = JSON.stringify(ask);
@@ -781,6 +808,7 @@ function PlacePanel({ scope, ask, groups }: { scope: string; ask: ParamAsk; grou
         .then((d) => {
           setData(d);
           setProblem(null);
+          onSpecs?.(scope, d.specs);
         })
         .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     }, SCOPE_AFTER_MS);
@@ -834,12 +862,14 @@ function InletSection({
   change,
   clearInlet,
   refusals,
+  onSpecs,
 }: {
   draft: TrainSpec;
   spec: TrainSpec;
   change: (patch: Partial<TrainSpec>) => void;
   clearInlet: () => void;
   refusals: string[];
+  onSpecs: (scope: string, specs: ParameterSpec[]) => void;
 }) {
   const inlet = draft.inlet;
   const [sims, setSims] = useState<SimulationSummary[] | null>(null);
@@ -1016,7 +1046,7 @@ function InletSection({
       )}
       {complete ? (
         <div className="card p-3 mt-2">
-          <PlacePanel scope={unitScope(draft.id, INLET)} ask={{ train: spec }} />
+          <PlacePanel scope={unitScope(draft.id, INLET)} ask={{ train: spec }} onSpecs={onSpecs} />
         </div>
       ) : (
         <p className="text-caption text-ink-soft mt-1">Choose the {inlet.kind === 'simulation' ? 'simulation' : 'run and its stream'} the broth is; its values then show here, each with its source.</p>
@@ -1082,6 +1112,7 @@ function UnitCard({
   move,
   remove,
   route,
+  onSpecs,
 }: {
   unit: TrainUnitSpec;
   index: number;
@@ -1095,6 +1126,7 @@ function UnitCard({
   move: (by: -1 | 1) => void;
   remove: () => void;
   route: (port: string, to: string) => void;
+  onSpecs: (scope: string, specs: ParameterSpec[]) => void;
 }) {
   const ports = (type?.insOuts ?? []).filter((p) => p.side === 'out');
   const choices = routeChoices(units, index);
@@ -1160,7 +1192,7 @@ function UnitCard({
       )}
       <details className="mt-2" open data-testid="unit-params">
         <summary className="cursor-pointer text-caption text-ink-soft hover:text-accent inline-flex items-center min-h-[44px]">Its parameters, each with its source</summary>
-        <PlacePanel scope={unitScope(spec.id, unit.id)} ask={{ train: spec, unitType: unit.type }} />
+        <PlacePanel scope={unitScope(spec.id, unit.id)} ask={{ train: spec, unitType: unit.type }} onSpecs={onSpecs} />
       </details>
     </Card>
   );
@@ -1330,7 +1362,10 @@ function RunResult({ run, changed }: { run: TrainRun; changed: boolean }) {
             <a className="font-num text-ink hover:text-accent" href={href(`/biorepo/artifacts/${run.artifactId}`)}>
               {run.artifactId}
             </a>{' '}
-            on {stamp(run.createdAt)} · {t.tablesSource ?? 'tables'}
+            on {stamp(run.createdAt)} · {t.tablesSource ?? 'tables'} ·{' '}
+            <a className="text-ink hover:text-accent underline underline-offset-2" href={href(`/proforma/runs/${encodeURIComponent(run.artifactId)}`)} data-testid="builder-result-run">
+              its run of the engine train
+            </a>
           </span>
           <a className="chip" href={href(`/pureos/train/${encodeURIComponent(run.spec.id)}`)} data-testid="builder-open-train">
             Open as a train

@@ -1171,24 +1171,33 @@ def _op_flowsheet_unit_values(args):
     return {"flowsheet": name, "units": out, "versions": _versions()}
 
 
-def _op_train_run(args):
-    """One train built and run (OF-BLD-020 §5.2): inside `package_defaults()`
-    on the yeast program's chemicals, BioSTEAM's default utility prices and
-    cost index set as every scenario flowsheet sets them, a fresh flowsheet;
-    the train built by `flowsheets/train.Built` and simulated whole; then its
-    tables read with this worker's own readers (no TEA: a train is not priced
-    here) and each unit's costs. A train that cannot be built or run is the
+def _simulated_train(spec: dict[str, Any]) -> Any:
+    """A train built from its plain spec and simulated whole, inside the
+    caller's `package_defaults()`: on the yeast program's chemicals,
+    BioSTEAM's default utility prices and cost index set as every scenario
+    flowsheet sets them, a fresh flowsheet, the train built by
+    `flowsheets/train.Built`. A train that cannot be built or run is the
     module's refusal, in words naming the unit and BioSTEAM's error."""
     from ..flowsheets import train as train_fs
 
+    chems = yeast_chemicals()
+    bst.settings.set_thermo(chems)
+    bst.process_tools.default_utilities()
+    bst.process_tools.default_CEPCI()
+    bst.main_flowsheet.set_flowsheet(bst.Flowsheet(str(spec["system"])))
+    b = train_fs.Built(dict(spec), unit_class, chems)
+    b.simulate()
+    return b
+
+
+def _op_train_run(args):
+    """One train built and run (OF-BLD-020 §5.2): inside `package_defaults()`,
+    built and simulated whole (`_simulated_train`); then its tables read with
+    this worker's own readers (no TEA: a train is not priced here) and each
+    unit's costs. A train that cannot be built or run is the module's
+    refusal, in words naming the unit and BioSTEAM's error."""
     with package_defaults():
-        chems = yeast_chemicals()
-        bst.settings.set_thermo(chems)
-        bst.process_tools.default_utilities()
-        bst.process_tools.default_CEPCI()
-        bst.main_flowsheet.set_flowsheet(bst.Flowsheet(str(args["system"])))
-        b = train_fs.Built(dict(args), unit_class, chems)
-        b.simulate()
+        b = _simulated_train(args)
         system = b.system
         return {
             "tablesSource": f"BioSTEAM {version('biosteam')}, thermosteam {version('thermosteam')}",
@@ -1207,16 +1216,57 @@ def _op_train_run(args):
         }
 
 
+# The metadata field a file holds that only a TEA gives: the year its costs
+# are reported in, which the toolkit's exporter reads from the system's TEA
+# (`tea.duration[0]`, export/_export.py) and its schema may require.
+TEA_YEAR = "TEA_year"
+
+
+def _train_needs_tea() -> str:
+    """Why the toolkit writes no file for a train while its schema requires
+    the TEA year, in words, the reason first."""
+    return (f"a train carries no TEA, and the SFF schema the toolkit ships ({sff_toolkit.SCHEMA_VERSION}) requires "
+            f"every file's metadata.{TEA_YEAR}, the year its costs are reported in, which the toolkit's exporter reads "
+            "from the system's TEA (export/_export.py)")
+
+
+def _train_export(spec: dict[str, Any], path: str, meta: dict[str, Any] | None, title: str | None) -> dict[str, Any]:
+    """A pureOS train run's train written as an SFF file and checked, as a
+    library plant's is. A train carries no TEA (no TEA prices a train here),
+    so while the schema the toolkit ships requires every file's TEA year
+    (`sff_toolkit.metadata_required`), the train is refused in those words
+    before anything is built (`_train_needs_tea`), and a run's file costs no
+    second build. Once the schema leaves the year to the file, the train is
+    rebuilt from the train_run request its run's basis gives, inside
+    `package_defaults()`, simulated whole as `train_run` simulates it
+    (`_simulated_train`) and written by the toolkit with no TEA; what the
+    toolkit cannot write then is refused with its own words quoted after.
+    The run keeps the words as its `sffRefused`."""
+    if TEA_YEAR in sff_toolkit.metadata_required():
+        raise Refused(_train_needs_tea())
+    with package_defaults():
+        b = _simulated_train(spec)
+        try:
+            return sff_toolkit.export_checked(b.system, None, path, metadata=meta, process_title=title)
+        except Exception as e:  # noqa: BLE001 (the toolkit's words are the run's, kept with it)
+            raise Refused(f"the toolkit's exporter could not write the train's file ({type(e).__name__}: {e})") from e
+
+
 def _op_sff_export(args):
     """A run's base case written as an SFF file at the path the service names,
     with openFerment's block in its metadata, then checked (ADR-003). A
     reference biorefinery is built afresh inside `package_defaults()`, as
     its reference run builds it; a shelf flowsheet's warm plant is set to
     the run's base values and simulated, as `run` sets its base case, and
-    its solved price stands on the product while the file is written."""
+    its solved price stands on the product while the file is written; a
+    library plant is built afresh and set as its run set it; a pureOS train
+    is rebuilt from its run's train_run request and simulated
+    (`_train_export`)."""
     path = str(args["path"])
     meta = args.get("metadata") or None
     title = args.get("title") or None
+    if isinstance(args.get("train"), dict):
+        return _train_export(args["train"], path, meta, title)
     if args.get("library"):
         try:
             return library_plants.export(str(args["library"]), args.get("configuration"),

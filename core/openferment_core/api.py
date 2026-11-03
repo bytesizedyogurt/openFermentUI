@@ -877,22 +877,33 @@ def flowsheets_import(file: UploadFile = File(...), by: str = Form(..., min_leng
 @app.post("/api/flowsheets/export", response_model=SFFFlowsheet)
 def flowsheets_export(request: SFFExportRequest) -> SFFFlowsheet:
     """A kept run's base case written as an SFF file by the toolkit in the
-    worker, checked, drawn and kept with origin `run`. 404 for a run the
-    project does not hold; 422 for an artifact that is not a run."""
+    worker, checked, drawn and kept with origin `run`: a shelf run, a
+    reference run, a library run or a pureOS train run. 404 for a run the
+    project does not hold; 422 for an artifact that is not a run; 409 in the
+    worker's words for a base case that cannot be built or a file the
+    toolkit cannot write (a train run's, while its schema requires a TEA
+    year: docs/api/sff.md)."""
     from . import proforma
     from .engine import sff
+    from .pureos import train_spec
 
     try:
         art = artifacts.get(request.artifactId)
     except artifacts.ArtifactNotFound as e:
         raise HTTPException(status_code=404, detail=f"the project holds no run {request.artifactId}") from e
     try:
+        if art.tool == train_spec.TRAIN_RUN:
+            return train_spec.export_sff(art, project_id=projects.current(), by=request.by)
         plant = _library.plant_of(art) if art.tool == _library.LIBRARY_RUN else proforma.plant_of(art)
         return sff.export(plant, project_id=projects.current(), run_artifact_id=art.id, by=request.by)
-    except (proforma.ScenarioRefused, sff.SFFRefused, _library.LibraryRefused) as e:
+    except (proforma.ScenarioRefused, sff.SFFRefused, _library.LibraryRefused, train_spec.TrainRefused) as e:
         raise _sff_refused(e) from e
     except WorkerError as e:
-        raise HTTPException(status_code=409, detail=f"the run's base case could not be exported: {e}") from e
+        # The worker's refusal in its own words, as a run keeps them (engine/runs.py `_sff_file`).
+        said = str(e).removeprefix("Refused: ")
+        what = ("the toolkit wrote no SFF file for the train run" if art.tool == train_spec.TRAIN_RUN
+                else "the run's base case could not be exported")
+        raise HTTPException(status_code=409, detail=f"{what}: {said}") from e
     except (WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not export the run: {e}") from e
 
@@ -2193,16 +2204,18 @@ def pureos_train_validate(train: TrainSpec) -> dict:
 def pureos_train_check(req: TrainRunRequest) -> dict:
     """Everything a run of the train would refuse, at once, in the run's
     words, each by the place it belongs to (`TrainValidation`: a unit's id,
-    `inlet`, or `train`): the validation's refusals, a value that waits naming
-    what would bind it, a unit's needs (OF-BLD-020 §5.3). Runs no train and
-    keeps nothing; it reads what the scopes read (the program's chemicals,
-    each class's defaults), which a cold worker starts for. 409 for an
-    artifact the train names that is damaged on disk; 503 when the worker
+    `inlet`, or `train`): an input that names no place or no parameter, a
+    key set twice, a value its parameter cannot take, then the validation's
+    refusals, a value that waits naming what would bind it, a unit's needs
+    (OF-BLD-020 §5.3). Runs no
+    train and keeps nothing; it reads what the scopes read (the program's
+    chemicals, each class's defaults), which a cold worker starts for. 409 for
+    an artifact the train names that is damaged on disk; 503 when the worker
     cannot answer."""
     from . import artifacts, pureos
 
     try:
-        return pureos.check_train(req.train, req.overrides, req.by).model_dump(mode="json")
+        return pureos.check_train(req.train, req.inputs, req.by).model_dump(mode="json")
     except artifacts.ArtifactDamaged as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
@@ -2234,17 +2247,24 @@ def pureos_train_from_run(req: TrainFromRunRequest) -> dict:
 
 @app.post("/api/pureos/train/run")
 def pureos_train_run(req: TrainRunRequest) -> dict:
-    """Run a train (`TrainRun`): every value resolved with its source, the
-    train built and run in the Proforma worker, one `pureos.train_run`
-    artifact kept (or the one kept for the same basis returned). 422 in words
-    for every refusal (the validation's, a value that waits naming what would
-    bind it, a unit's needs, a unit that does not converge, with BioSTEAM's
-    words); 409 for an artifact the train names that is damaged on disk; 503
-    when the worker cannot answer (OF-BLD-020 §5.2)."""
+    """Run a train (`TrainRun`): every value resolved with its source, each
+    value the request sets (`inputs`, each named `<unit id>.<key>` or
+    `inlet.<key>`) laid on, the train built and run in the Proforma worker,
+    one `pureos.train_run` artifact kept with its run of the engine `train`
+    (one `runs` row created by `by`, keeping its SFF file or the toolkit's
+    words for why it has none; `GET /api/runs/{id}` serves it), or the one
+    kept for the same basis returned.
+    422 in words for every refusal, all of them at once (an input that names
+    no place or no parameter, a key set twice, a value its parameter cannot
+    take, the validation's, a value that waits naming what would bind it, a
+    unit's needs, and, kept as a receipt the same request is answered from, a
+    unit that does not converge, with BioSTEAM's words); 409 for an artifact
+    the train names that is damaged on disk; 503 when the worker cannot
+    answer (OF-BLD-020 §5.2)."""
     from . import artifacts, pureos
 
     try:
-        return pureos.run_train(req.train, req.overrides, req.by).model_dump(mode="json")
+        return pureos.run_train(req.train, req.inputs, req.by).model_dump(mode="json")
     except pureos.TrainRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except artifacts.ArtifactDamaged as e:

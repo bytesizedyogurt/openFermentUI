@@ -3857,12 +3857,17 @@ export interface TrainValidation {
   places: Record<string, string[]>;
 }
 
-/** `POST /api/pureos/train/run`. */
+/** `POST /api/pureos/train/run` and `POST /api/pureos/train/check`. */
 export interface TrainRunRequest {
   train: TrainSpec;
-  /** Overrides of `pureos:unit:<train id>:<unit id | inlet>`, each replacing the train's value of its key. */
-  overrides?: Override[];
-  by?: string | null;
+  /**
+   * The values a person or a model sets, each named `<unit id>.<key>` or `inlet.<key>`, a typed quantity in its
+   * parameter's unit with its origin (alpha 2.2 D2), each replacing the train's value of its key. The browser keeps a
+   * person's change as an Override and sends it here through `lib/pureos.ts` `trainInputs`.
+   */
+  inputs?: EngineInput[];
+  /** The person or the model asking: the run's row is created by them. */
+  by?: string;
 }
 
 export interface StreamImpurity {

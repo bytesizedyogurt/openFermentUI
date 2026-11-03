@@ -550,26 +550,37 @@ def library_flowsheets(ids: list[str] | None = None, *, get: Callable[[str], byt
 
 
 def export(plant: dict[str, Any], *, project_id: str, run_artifact_id: str, by: str,
-           title: str | None = None) -> SFFFlowsheet:
+           title: str | None = None, call: Callable[[str, dict[str, Any]], Any] | None = None) -> SFFFlowsheet:
     """A run's base case written as an SFF file by the toolkit in the worker,
     checked there, drawn and kept with origin `run`. `plant` is what the
     worker builds the base case from: the shelf flowsheet's id and, for a
     flowsheet run case by case, its base values (and a structured
-    flowsheet's structure). The file's metadata carries openFerment's block
-    (docs/api/sff.md): the project, the run's artifact and the origin."""
+    flowsheet's structure); or a pureOS train, `train` the train_run request
+    its run's basis gives, with `trainId` and `title`, its name
+    (pureos/train_spec.py `plant_of`). The file's metadata carries
+    openFerment's block (docs/api/sff.md): the project, the run's artifact,
+    the origin, and the flowsheet or the train written. `title` is the
+    file's process title, the plant's own `title` when none is given.
+    `call` is the door the run's module reaches the Proforma worker by
+    (pureOS's `proforma.call`), the simulator's own when none is given."""
     flowsheet = str(plant.get("flowsheet") or "")
-    if not flowsheet:
-        raise SFFRefused("an export names the flowsheet whose base case it writes")
-    meta = {"project_id": project_id, "run_artifact_id": run_artifact_id, "origin": "run", "flowsheet": flowsheet}
+    train = plant.get("train") if isinstance(plant.get("train"), dict) else None
+    if not flowsheet and train is None:
+        raise SFFRefused("an export names the flowsheet or the train whose base case it writes")
+    train_id = str(plant.get("trainId") or "")
+    named = {"flowsheet": flowsheet} if flowsheet else {"train": train_id}
+    written = flowsheet or f"train {train_id}"
+    meta = {"project_id": project_id, "run_artifact_id": run_artifact_id, "origin": "run", **named}
+    title = title if title is not None else (str(plant["title"]) if plant.get("title") else None)
     with tempfile.TemporaryDirectory(prefix="openferment-sff-") as tmp:
         path = Path(tmp) / f"{run_artifact_id}.sff.json"
-        out = simulator.call("sff_export", {**plant, "path": str(path), "metadata": meta, "title": title})
+        out = (call or simulator.call)("sff_export", {**plant, "path": str(path), "metadata": meta, "title": title})
         data = path.read_bytes()
     text, doc = parsed(data, f"the export of run {run_artifact_id}")
     checked = {"validation": out["validation"], "completeness": out["completeness"], "tags": out["tags"],
                "toolkit": out["toolkit"]}
     record = _record(doc, data, checked, record_id=f"run-{run_artifact_id}", origin="run",
-                     source=f"exported from run {run_artifact_id} of {flowsheet}", fallback_title=flowsheet, by=by,
+                     source=f"exported from run {run_artifact_id} of {written}", fallback_title=written, by=by,
                      run_artifact_id=run_artifact_id, simulator_said=out.get("simulator"))
     return db.run(_put(project_id, record, text))
 

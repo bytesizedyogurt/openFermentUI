@@ -29,7 +29,8 @@ session continues from this file and `git log` alone.
 4. **Next step: stage C, every run one shape**, in seven steps (C.1 done: the pins in
    `core/tests/test_engine_pins.py`, the handler mismatches, `engine/runs.keep_run`; C.2 done: the
    `kinetics` engine over fermOS's families, fermOS's requests on typed quantities and its runs as
-   rows): C.3 the `train` engine over pureOS with a train's SFF file; C.4 Proforma and the library
+   rows; C.3 done: the `train` engine over pureOS's trains, a train's requests on typed inputs, its
+   runs as rows with their SFF file or the toolkit's words): C.4 Proforma and the library
    door on quantities, Proforma's shelf flowsheets as things of `biosteam`; C.5 the `measurement`
    origin; C.6 the hand-written shelf entries and Proforma's split retired, import from a URL; C.7
    the gate. Every pin holds through each step. Stage B (the engine contract) is done:
@@ -49,7 +50,11 @@ engine's computation one keeper, `engine/runs.keep_run`, with `outputs.values` t
 and runbooks read for a run of any engine. C.2 registered fermOS as the engine `kinetics`: its
 requests take typed quantities with their origins, each simulation, kept forecast and vessel
 design is one `runs` row at every door, and `conform kinetics --inputs <file>` holds all eight
-checks, which `pnpm prove` step 10 makes with the placeholders it writes.
+checks, which `pnpm prove` step 10 makes with the placeholders it writes. C.3 registered pureOS's
+trains as the engine `train`: a train's requests take typed inputs named by place, each run is one
+`runs` row at every door with the values pureOS reads and its SFF file or the toolkit's words, and
+`conform train --project <id>` holds all eight checks in a project with a train, which `pnpm prove`
+step 10 makes from step 4's corn stover run.
 
 Alpha 2.2, stage B (2026-11-03): the engine contract. `docs/api/engines.md` is the page a stranger
 builds an engine from, ADR-015 records the registry on the entry-point group `openferment.engines`,
@@ -187,6 +192,8 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-03 04:08 | B.6: `pnpm test:sim`; verify's fast stages (`check:secrets`, `typecheck`, both `--check`s, `check:plan`, `check:licences`, `check:tools`, `check:guild`, `check:state`, `check:figures`, `test:reconcile`); `build`; `smoke` | 136 passed; every stage green; 12 of 12 screens open | 5 min 14 s (`test:sim`) | B.6 |
 | 2026-11-03 06:10 | C.1: `pnpm test:core`; `test:sim` (the fix round's); `typecheck`, both `--check`s, `check:plan`, `check:tools`, `check:state`, `check:figures`, `check:secrets`; `build`; `smoke` | 2422 passed, 1 skipped, 174 deselected; 138 passed; every stage green; 12 of 12 screens open | 6 min 0 s (`test:core`) | C.1 |
 | 2026-11-03 10:52 | C.2: `pnpm test:core`; `test:sim`; the pins; `typecheck`, the three `--check`s, `check:tools`, `check:plan`, `check:state`; `build`; `smoke`; `pnpm prove --steps 10`; `pnpm prove`, offline, steps 1 to 10 | 2458 passed, 1 skipped, 174 deselected; 138 passed; 13 passed; every stage green; 12 of 12 screens open; 11 of 11 checks, `conform kinetics` and `conform biosteam` 8 of 8 each; 71 of 71 checks | 7 min 38 s (`test:core`); 265 s (the proof) | C.2 |
+| 2026-11-03 12:42 | C.3: `pnpm test:core`; `test:sim`; the pins; `typecheck`, the three `--check`s, `check:tools`, `check:plan`, `check:state`, `check:secrets`, `check:figures`, `check:guild`, `check:licences`, `test:reconcile`; `build`; `smoke`; `pnpm prove --steps 10`; `pnpm prove`, offline, steps 1 to 10 | 2474 passed, 1 skipped, 175 deselected; 139 passed; 13 passed; every stage green; 12 of 12 screens open; 22 of 22 checks, `conform train`, `conform kinetics` and `conform biosteam` 8 of 8 each; 75 of 75 checks | 7 min 28 s (`test:core`); 297 s (the proof) | C.3 |
+| 2026-11-03 15:00 | C.3's review round: `pnpm test:sim`; `pnpm test:core`; the touched files and the pins; `typecheck`, the three `--check`s, `check:plan`, `check:state`, `check:tools`, `check:secrets`, `check:figures`; `build`; `smoke`; `pnpm prove`, offline, steps 1 to 10 | 140 passed, 2521 deselected; 2484 passed, 1 skipped, 176 deselected; every file and pin green; every stage green; 12 of 12 screens open; 75 of 75 checks, `conform train`, `conform kinetics` and `conform biosteam` 8 of 8 each | 7 min 5 s (`test:sim`); 7 min 29 s (`test:core`); 299 s (the proof) | C.3 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -245,6 +252,12 @@ prompt's §4).
 | alpha 2.2 D4, C.2 | kinetics' configurations: `forecast` takes a kept logistic_v0 fit, `vessel` a kept batch_v1 simulation, a logistic fit or a forecast, each thing listed while the project holds one, read afresh in the request's project by the artifact store's tool column. Conformance, in a fresh project, checks the three families; `core/tests/test_engines.py` holds the forecast's and the vessel's parameters and runs | The plan left the things' configurations to the step; a thing run on the project's own artifacts has none to list in an empty project |
 | alpha 2.2 D4, C.2 | `version()` reads numpy and scipy from the modules and biosteam and thermosteam from their installed metadata, the versions a vessel design's tool version names, and starts no worker. Each row names what its own thing ran on: numpy and scipy for a family's simulation and a forecast; biosteam, thermosteam and biorefineries for a vessel design | The brief asked for BioSTEAM's version as the simulator reports it, which needs the Proforma worker warm: a listing or a `pnpm ready` row would then start BioSTEAM. A family's simulation and a forecast run on numpy and SciPy alone, and their rows name those |
 | alpha 2.2 D1, C.2 | The forecast that sets a start value moved its id from ed33c02's `611bd4b34eed98fd` to `80ef18a4b9924dba` under D1's amendment: its typed start value writes the day it was set and the unit of the fitted run's series in the basis. Its output hash `859f4882…` holds, and every other pin reads as captured | The amendment; the unit lets a run's page and `GET /api/runs/{id}` read the start value in the unit it was typed in |
+| alpha 2.2 §6.1, C.3 | A default's origin is one of five (`EngineParameter`): a `library-default` and a `convention`, and for a thing the project holds a `record` (its `ref` the records, its `sourceRule` naming the field), an `artifact` (its `ref` the run, simulation or design) or a `person-assumption` (its `by` the person). A parameter with no default takes a run's value: a run sets it, the engine binds it, or the thing fills it itself when a run leaves it unset, which its `note` then says with the reason (the train engine's: a value the unit's class decides at run time, a component the inlet does not carry, a split left to the class). Conformance check 2 reads "every default carries an origin naming what it rests on (a library-default, a record or an artifact its ref, a convention its note, a person's assumption its by), and a parameter with none takes a run's value" | A train's values resolve from the project's records, its inlet's run and what a person typed into the train; §6.1's two origins name a package's default and a software setting. 27 of a stand-in train's 55 parameters have no default and a run computes with them unset (the C.3 review), so the rule names the third case |
+| alpha 2.2 D5, C.3 | An engine whose things are all a project's own declares `things_are`, in words, which `GET /api/engines` lists as `thingsAre`. `conform <name> --project <id>` makes the eight checks in that existing project of the configured database, refusing the production database `openferment` and a project the database lacks (exit 2), and the command with no `--project` refuses in words naming it (exit 2). There the checks run one thing, the first `--thing` names or else the first the project holds that runs, each thing passed over before it said in check 3's words (a draft with no unit, a train whose value waits; nothing is kept for either), on a basis of their own: with no `--inputs`, check 3's run sets one parameter at its own default as the checks' assumption, dated the day they run, and check 8's model sets it as its estimate on the same thing. On the production database `pnpm ready`'s row of such an engine reads `·`: the checks run in a project of a development database and in `pnpm prove` step 10. With no values set elsewhere, check 8's model sets the first parameter whose source rule takes a run's value (`assumption`), else the first with a default | A database made for the checks holds no train. The C.3 review measured the first cut, which ran every train the project held on its own defaults: a person's earlier run of the train answered check 3 and failed check 8 (its created_by the person's), the checks' rows then answered the person's next request, and a saved draft or a train that waits failed checks 2 and 8. The live host's database is the production one, so its checks run elsewhere. A from-run inlet's first values carry the rule `artifact` (read from the inlet's run), which pureOS lets no run's value set |
+| alpha 2.2 D5, C.3 | The proof's train is the tail of the from-run train on step 4's corn stover run: pureOS's from-run reads the units the product passes through whose classes are catalogue types, at their classes' own defaults; the units whose values wait (the check's places) are taken out with every unit before them, and the inlet is the run's own stream entering the first unit kept (`scripts/prove.py`, `make_train`). At these pins the tail is the four units from T701 on, none of them a separation, each passing the whole of the product on (a debt below) | D5 has the proof make a train on the reference run's product stream. The read train's first units wait on values their classes require and no default gives (D402 and D403 six each; H402, U401 and H403 one each); the tail runs on its classes' own values, with nothing the proof types |
+| alpha 2.2 D5, C.3 | Every train run keeps `sffRefused`. The schema the toolkit ships at `e236e32` requires every file's `metadata.TEA_year` (`sff_schema.json`, the metadata's `required`), which the exporter reads from the system's TEA (`metadata['TEA_year'] = tea.duration[0]`, `export/_export.py`), its one read of a TEA; a train run computes no TEA and no TEA year. The Proforma worker's `sff_export` reads that requirement from the toolkit's schema file and, while it stands, refuses a train's file in those words before it builds anything (`a train carries no TEA, and the SFF schema the toolkit ships (0.2.4) requires every file's metadata.TEA_year, …`); once the schema leaves the year to the file, it rebuilds and simulates the train from the run's basis and hands it to the toolkit, whose own words it quotes. Check 5 holds by the words | D5 has a train's run write its file once `sff_export` learns the train. It has learned it; the schema the toolkit ships holds a file to a TEA year a train run never computed. The first cut rebuilt and simulated every train a second time for a file the toolkit always refused, and showed a person its AttributeError (the C.3 review; a debt below) |
+| alpha 2.2 D5, C.3 | A train run replays exactly: `pureos.train_run` registers no tolerance and the train engine's things state rtol 0, atol 0 (`train_spec.replay_precision`), the library run's last-kept-digit rule read for a run that rounds nothing | D5 asked for the library's last-kept-digit precision. A library run rounds its outputs to its `precision` input's digits; a train run keeps every digit BioSTEAM gives. The C.3 review measured train replays identical at 0ad02c9 and in the working tree, in one worker, after another train ran; a rtol of 1e-9 would pass a train run whose last digits move, every one kept before C.3 among them |
+| alpha 2.2 D5, C.3 | The train engine's run checks and converts its values at pureOS's own door (`train_spec.converted`), with `runs.check_inputs` left out: the engine's route and `POST /api/pureos/train/run` and `/check` refuse every bad value at once, by place, with the train's own refusals, in one set of words; a key set twice is refused there too (`F1.V is set twice`) | The first cut checked the engine's values with `runs.check_inputs` first, which says the first key it cannot take and stops, while pureOS's door said every refusal by place; pureOS's door laid a key given twice key by key, the last value kept and no word said (the C.3 review) |
 | alpha 2.2 §6.1, B.2 | `run(thing, configuration, inputs, by)` takes `inputs` as a list of `EngineInput`, each a parameter's key and a `Quantity` (the shape a run's inputs have, `RunInput`), where §6.1 writes `inputs: list[Quantity]` | A `Quantity` carries no name, so the parameter each value sets is named beside it |
 | alpha 2.2 §6.1, B.2 and B.6 | An engine declares `heavy` beside `worker`: the modules its worker alone imports. The registry and conformance check 6 keep the worker module, each module `heavy` names (with every module below it) and `workers.WORKER_LIBRARIES` (BioSTEAM, thermosteam, biorefineries, the SFF toolkit, cobra) out of the service's process for every engine; `worker` may be `None` only with `heavy` empty | §6.1's `worker` names one module, and its name alone cannot say which of the libraries it imports are heavy; check 6 needs the list to hold them out |
 | alpha 2.2 §6.1, B.2 | `engine → api` and `engine → tools` join the package map's exceptions (`test_boundaries.py`) | Conformance check 1 sends a bare number through the service's own route and its tool, the two doors a number enters by, and §6.1 names the command `openferment_core.engine.conform` |
@@ -322,7 +335,10 @@ prompt's §4).
 | `test_biorepo.py::test_the_committed_file_is_the_model_and_starts_empty` holds the shape of a tracked file nothing reads | when `core/data/biorepo.json` leaves git (owner action, Blockers) |
 | The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run only as `bash -n` here: this container is not a Mac | the owner's first install on the Mini |
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | the owner's machine |
-| Paid in part: fermOS's requests take typed quantities with their origins and its runs are rows of the kinetics engine (alpha 2.2 C.2). pureOS and Proforma still take a run's values as `Override`s (a person's assumption or a model's estimate) and name each input's source in the basis, which `basis.origin_of` reads as an `Origin`; their requests are not yet lists of `Quantity` objects, and their runs are artifacts with no row in `runs` | alpha 2.2, C.3 (pureOS) and C.4 (Proforma and the library door) |
+| Paid in part: fermOS's and pureOS's requests take typed quantities with their origins, and their runs are rows of the engines `kinetics` and `train` (alpha 2.2 C.2, C.3). Proforma still takes a run's values as `Override`s (a person's assumption or a model's estimate) and names each input's source in the basis, which `basis.origin_of` reads as an `Origin`; its requests are not yet lists of `Quantity` objects, and its runs are artifacts with no row in `runs` | alpha 2.2, C.4 (Proforma and the library door) |
+| A train run's SFF file: a train carries no TEA, and the schema the toolkit ships at `e236e32` requires every file's `metadata.TEA_year`, which its exporter reads from the system's TEA, so the Proforma worker refuses every train run's file before building it and the run keeps the words as `sffRefused`; the Flowsheets screen lists no record for a train run (Departures, C.3) | when the toolkit's schema leaves the TEA year to a file whose system no TEA prices and its exporter writes one (an upstream change to `export/_export.py` and `sff_schema.json`, offered with the writer's adaptation), or a train carries a TEA of its own |
+| The proof's train (`scripts/prove.py`, `make_train`) is the tail of the train read from step 4's corn stover run: at these pins the four units from T701 on, none a separation, each passing the whole of the product on, so `conform train` in the proof exercises no distillation and no sieve (Departures, C.3) | when a train read from a library run binds its units' values from the run's own read-back parameters, or from a `readFrom` of a library plant's unit (D8, C.6), so the proof's train keeps the distillation and the sieve |
+| pureOS → Train reads a Proforma run and a train run alone (`pureos.TABLE_RUNS`): a library run, which the Builder's run choosers offer (`lib/pureos.runChoices`), and a reference run open no train page, and the Train page's **Build a train from this run** is reached for them through the Builder's **Start from a run's train** | C.6, when the reference runs read the library shelf (D8) |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which only the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | when those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
 | Studies' run card names a kinetics forecast's or vessel's configurations by their bare artifact ids; saying each one's kind and when it was kept needs a title per configuration in `EngineThing`, or a read of each artifact | the screens on the generated types (alpha 2.2 stage E) |
 | The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | when the UI reads the library shelf alone, after alpha 2.0 |
@@ -1251,3 +1267,70 @@ holds the numbers, the tables and the judgements).
     --check`, `check:tools`, `check:plan`, `check:state`, `build` and `smoke` (12 of 12 screens)
     green; `pnpm prove --steps 10` 11 of 11 checks in 123 s, `conform kinetics` 8 of 8 with the
     placeholders it wrote; `pnpm prove`, steps 1 to 10 offline, 71 of 71 checks in 265 s.
+- C.3. The train engine, pureOS's requests on typed inputs, and a train's runs as rows.
+  - pureOS's requests take typed values (D2): `TrainRunRequest`, for `POST /api/pureos/train/run`
+    and `/check`, takes `inputs`, each named `<unit id>.<key>` or `inlet.<key>` with a `Quantity`
+    carrying its origin and its day, and `by`. `train_spec.converted` converts each at pureOS's
+    door through `basis.override_of` in its place's scope, and refuses together, by place, a name of
+    neither form, a place the train lacks, a key its place lacks, a key set twice and a value its
+    parameter cannot take, beside every other refusal the run would say (`_prepared`), at every
+    door, the engine's run route among them (Departures); the resolution is as it was, and the
+    pins hold a request sent as inputs and the same request's Overrides to one artifact id. The
+    Builder sends each place's changes in the units its panel read (`lib/pureos.trainInputs`, held
+    by `check:state`), and Studies' card links a train to the Builder, where its values are set.
+  - A train's runs are rows (D3): `train_spec.run_train` keeps one `runs` row of the engine `train`
+    (`engine/runs.compute_kept`; the tool `pureos.train_run`, the train's id as its thing, no
+    configuration) at every door (the route, `pureos_build`, `pureos_write`, MCP, the engine),
+    created by the request's `by` or the tool's caller; the worker's refusal is a receipt, a value
+    that waits keeps nothing, and a worker that fails while writing the file keeps no row.
+    `outputs.values` holds pureOS's own reading of the run's tables (each unit's recovery and the
+    overall, the product out, each stream's mass flow, and the product share of each stream that
+    carries product), registered with the tool (`artifacts.register`'s `values_of`). A train run
+    replays exactly, as before C.3 (Departures). No backfill.
+  - The train's SFF file: the Proforma worker's `sff_export` takes a train (`train`, the `train_run`
+    request the run's basis gives, `train_spec.plant_of`); `POST /api/flowsheets/export` takes a
+    train run too, its 409 in the worker's words. The schema the toolkit ships at `e236e32`
+    requires every file's TEA year and a train carries no TEA, so the worker refuses the file in
+    those words before it builds anything, and a real train run keeps them as `sffRefused`; the
+    rebuild, the simulation and the toolkit's own words follow once the schema leaves the year to
+    the file (Departures; a debt).
+  - `train` registered (D5; `core/pyproject.toml`, `pureos/engine.py`): its things are the
+    project's trains, saved and built, read afresh; its parameters are each place's values with the
+    origin each resolution names, a default's origin widened to five and check 2 with it, a value
+    the train fills itself marked in its note (Departures). `conform train --project <id>` holds all
+    eight checks in a project with a train, on one train and a basis of its own, refusing the
+    production database, where `pnpm ready` says where the checks run; the command with no
+    `--project` names it, as `pnpm ready` does (Departures). `pnpm prove` step 10 makes a train
+    from step 4's corn stover run through pureOS's from-run and checks it there (Departures; a
+    debt). A train stands on a library run's stream: `STREAM_TOOLS`, from-run's `RUN_TOOLS`,
+    `stream_table` and thermo's stream reader admit `library.run`, and the Builder's run choosers
+    offer the project's library runs (`lib/pureos.runChoices`); pureOS → Train reads a train run's
+    stream properties. The screens name a train run's train: the Runs table and the run's page
+    give its name beside its id and link it, the Builder's result links its run, and Studies' card
+    of an engine with no thing in the project says what one would be (`thingsAre`) and where it is
+    made.
+  - `pnpm test:core` 2474 passed, 1 skipped, 175 deselected (7 min 28 s); `pnpm test:sim` 139
+    passed (7 min 12 s); the pins 13 passed, every literal as captured; `typecheck`, `gen:api`,
+    `gen:tools` and `gen:components --check`, `check:tools`, `check:plan`, `check:state`,
+    `check:secrets`, `check:figures`, `check:guild`, `check:licences`, `test:reconcile`, `build` and
+    `smoke` (12 of 12 screens) green; `pnpm prove --steps 10` 22 of 22 checks in 193 s, `conform
+    train` 8 of 8 in the proof's project beside `conform biosteam` and `conform kinetics`; `pnpm
+    prove`, steps 1 to 10 offline, 75 of 75 checks in 297 s.
+  - The review round: four reviewers read the uncommitted step, and each finding confirmed against
+    the code is fixed, with a test where it is behaviour (Departures, the rows marked by the C.3
+    review; three debts). A train run replays exactly again; an input that cannot stand is said
+    beside every other refusal of the run or the check, and a key set twice is refused, at both
+    doors in one set of words; the worker refuses a train's file before building it while the
+    toolkit's schema requires a TEA year, the reason first, and the export route's 409 says the
+    worker's words; `conform train --project` runs one train on a basis of its own, past a draft
+    and a train that waits; `pnpm ready` on the production database says where the train engine
+    is checked; a parameter the train fills itself says so in its note, and check 2 reads "takes a
+    run's value"; `outputs.values` keeps a stream's product share where it carries product;
+    thermosteam's stream reader takes every run a train's inlet reads; `GET /api/engines` lists
+    `thingsAre`; the Builder's run choosers offer the project's library runs and its result links
+    the run's row; the Runs table, the run's page and Studies' card name a train run's train.
+    `pnpm test:sim` 140 passed (7 min 5 s); `pnpm test:core` 2484 passed, 1 skipped, 176
+    deselected (7 min 29 s); `typecheck`, the three `--check`s, `check:plan`, `check:state`,
+    `check:tools`, `check:secrets`, `check:figures`, `build` and `smoke` (12 of 12 screens) green;
+    `pnpm prove`, steps 1 to 10 offline, 75 of 75 checks in 299 s, `conform train` 8 of 8 in the
+    proof's project beside `conform biosteam` and `conform kinetics`.

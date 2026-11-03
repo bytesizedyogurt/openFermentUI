@@ -1976,6 +1976,17 @@
             "title": "Things",
             "type": "array"
           },
+          "thingsAre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thingsare"
+          },
           "version": {
             "additionalProperties": {
               "type": "string"
@@ -2029,7 +2040,7 @@
         "type": "object"
       },
       "EngineParameter": {
-        "description": "One parameter a thing takes: a `ParameterSpec` (the panel's shape,\nits bounds with their written reason) with its default value and where\nthe default comes from, `library-default` naming the package it was read\nfrom or a `convention` saying what the setting is. A parameter with no\ndefault has `value` and `origin` null: a run sets it, or the engine binds\nit from what the project holds (the kinetics engine binds a family's\nparameter from the project's records), and a run that leaves it with\nneither is refused in words, keeping nothing. The panel's fields an\nengine may leave unset default here; `sourceRule` is the origin's kind,\nand `assumption` (a run's value) for a parameter with no default.",
+        "description": "One parameter a thing takes: a `ParameterSpec` (the panel's shape,\nits bounds with their written reason) with its default value and where\nthe default comes from, `library-default` naming the package it was read\nfrom or a `convention` saying what the setting is. A thing the project\nholds (the train engine's trains) has defaults the project holds too: a\n`record` naming the records that bound it, an `artifact` naming the\nrun, simulation or design it was read from, or a `person-assumption`\nnaming the person who typed it into the thing. A parameter with no\ndefault has `value` and `origin` null: a run sets it, the engine binds it\nfrom what the project holds (the kinetics engine binds a family's\nparameter from the project's records), or the thing fills it itself when\na run leaves it unset, which its `note` then says with the reason (the\ntrain engine's: a value the unit's class decides at run time, a component\nthe inlet does not carry, a split left to the class). A run that leaves\nunset a parameter none of these gives is refused in words, keeping\nnothing. The panel's fields an\nengine may leave unset default here; `sourceRule` is the rule entry the\norigin's kind stands for (`assumption` for a person's), and `assumption`\n(a run's value) for a parameter with no default; a record's default\nnames its field in the rule (`record:<field id>`).",
         "properties": {
           "boundsReason": {
             "title": "Boundsreason",
@@ -9458,24 +9469,19 @@
       },
       "TrainRunRequest": {
         "additionalProperties": false,
-        "description": "POST /api/pureos/train/run.",
+        "description": "POST /api/pureos/train/run and POST /api/pureos/train/check. It holds\nthese fields alone: a field it does not name is refused.",
         "properties": {
           "by": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "By"
+            "default": "",
+            "maxLength": 200,
+            "title": "By",
+            "type": "string"
           },
-          "overrides": {
+          "inputs": {
             "items": {
-              "$ref": "#/components/schemas/Override"
+              "$ref": "#/components/schemas/EngineInput"
             },
-            "title": "Overrides",
+            "title": "Inputs",
             "type": "array"
           },
           "train": {
@@ -12170,7 +12176,7 @@
     },
     "/api/flowsheets/export": {
       "post": {
-        "description": "A kept run's base case written as an SFF file by the toolkit in the\nworker, checked, drawn and kept with origin `run`. 404 for a run the\nproject does not hold; 422 for an artifact that is not a run.",
+        "description": "A kept run's base case written as an SFF file by the toolkit in the\nworker, checked, drawn and kept with origin `run`: a shelf run, a\nreference run, a library run or a pureOS train run. 404 for a run the\nproject does not hold; 422 for an artifact that is not a run; 409 in the\nworker's words for a base case that cannot be built or a file the\ntoolkit cannot write (a train run's, while its schema requires a TEA\nyear: docs/api/sff.md).",
         "operationId": "flowsheets_export_api_flowsheets_export_post",
         "parameters": [
           {
@@ -15757,7 +15763,7 @@
     },
     "/api/pureos/train/check": {
       "post": {
-        "description": "Everything a run of the train would refuse, at once, in the run's\nwords, each by the place it belongs to (`TrainValidation`: a unit's id,\n`inlet`, or `train`): the validation's refusals, a value that waits naming\nwhat would bind it, a unit's needs (OF-BLD-020 §5.3). Runs no train and\nkeeps nothing; it reads what the scopes read (the program's chemicals,\neach class's defaults), which a cold worker starts for. 409 for an\nartifact the train names that is damaged on disk; 503 when the worker\ncannot answer.",
+        "description": "Everything a run of the train would refuse, at once, in the run's\nwords, each by the place it belongs to (`TrainValidation`: a unit's id,\n`inlet`, or `train`): an input that names no place or no parameter, a\nkey set twice, a value its parameter cannot take, then the validation's\nrefusals, a value that waits naming what would bind it, a unit's needs\n(OF-BLD-020 §5.3). Runs no\ntrain and keeps nothing; it reads what the scopes read (the program's\nchemicals, each class's defaults), which a cold worker starts for. 409 for\nan artifact the train names that is damaged on disk; 503 when the worker\ncannot answer.",
         "operationId": "pureos_train_check_api_pureos_train_check_post",
         "parameters": [
           {
@@ -15863,7 +15869,7 @@
     },
     "/api/pureos/train/run": {
       "post": {
-        "description": "Run a train (`TrainRun`): every value resolved with its source, the\ntrain built and run in the Proforma worker, one `pureos.train_run`\nartifact kept (or the one kept for the same basis returned). 422 in words\nfor every refusal (the validation's, a value that waits naming what would\nbind it, a unit's needs, a unit that does not converge, with BioSTEAM's\nwords); 409 for an artifact the train names that is damaged on disk; 503\nwhen the worker cannot answer (OF-BLD-020 §5.2).",
+        "description": "Run a train (`TrainRun`): every value resolved with its source, each\nvalue the request sets (`inputs`, each named `<unit id>.<key>` or\n`inlet.<key>`) laid on, the train built and run in the Proforma worker,\none `pureos.train_run` artifact kept with its run of the engine `train`\n(one `runs` row created by `by`, keeping its SFF file or the toolkit's\nwords for why it has none; `GET /api/runs/{id}` serves it), or the one\nkept for the same basis returned.\n422 in words for every refusal, all of them at once (an input that names\nno place or no parameter, a key set twice, a value its parameter cannot\ntake, the validation's, a value that waits naming what would bind it, a\nunit's needs, and, kept as a receipt the same request is answered from, a\nunit that does not converge, with BioSTEAM's words); 409 for an artifact\nthe train names that is damaged on disk; 503 when the worker cannot\nanswer (OF-BLD-020 §5.2).",
         "operationId": "pureos_train_run_api_pureos_train_run_post",
         "parameters": [
           {

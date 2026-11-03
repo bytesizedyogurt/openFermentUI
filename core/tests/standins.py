@@ -459,6 +459,25 @@ def scope_units(scope: str, **ask: Any) -> dict[str, str]:
     return params.units_of(params.scope(scope, ParamResolveRequest(**ask)).specs)
 
 
+def train_inputs(spec: Any, overrides: Any) -> list[Any]:
+    """A person's overrides of a train's places as the inputs a train run
+    request sends (alpha 2.2 D2), as the browser sends them
+    (src/lib/pureos.ts `trainInputs`): each named `<place>.<key>`, the place
+    its scope `pureos:unit:<train id>:<place>` names, its value in the unit
+    its parameter takes as the place's scope serves its specs with the train
+    (`scope_units`)."""
+    from openferment_core.models import EngineInput
+
+    out = []
+    for o in overrides:
+        place = o.scope.rsplit(":", 1)[-1]
+        unit_type = next((u.type for u in spec.units if u.id == place), None)
+        units = scope_units(o.scope, train=spec, **({"unitType": unit_type} if unit_type else {}))
+        i = as_input(o, unit_for(o.key, units))
+        out.append(EngineInput(name=f"{place}.{i.name}", quantity=i.quantity))
+    return out
+
+
 def family_units(family: str) -> dict[str, str]:
     """Each parameter's unit in a fermOS family's scope, as it declares them."""
     from openferment_core import kinetics, params

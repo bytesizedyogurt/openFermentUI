@@ -24,6 +24,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, audit, intake, module_stores, proposals, pureos, tools
+from openferment_core.engine import conform
+from openferment_core.engine import runs as engine_runs
 from openferment_core.pureos import build, kept, train_spec
 from openferment_core.validate import SeenSet, validate_plan
 from test_module_tools import ctx_for, read
@@ -303,6 +305,12 @@ def test_run_keeps_one_train_run_cited_by_its_artifact_id_with_the_whole_run_in_
     assert audit.read()[-1].detail["tool"] == "pureos_write" and audit.read()[-1].detail["note"] == "again"
     mine = [c for c in worker.calls if c[0] == "train_run" and c[1]["system"] == f"pureos_{tid.replace('-', '_')}"]
     assert len(mine) == 1, "the same train is the same artifact, and the worker is not asked twice"
+    # alpha 2.2 D3: the run is one row of the train engine, created by the caller the tool names, at either tool.
+    row = engine_runs.get(art.id)
+    assert (row.engine, row.plant, row.configuration, row.tool, row.status, row.by) == (
+        "train", tid, None, "pureos.train_run", "done", MODEL)
+    assert conform._created_by(art.id) == MODEL and row.sff is not None and row.sff.recordId == f"run-{art.id}"
+    assert [x.id for x in engine_runs.listed("train") if x.plant == tid] == [art.id]
 
 
 def test_a_run_with_a_value_waiting_returns_the_refusals_words_and_keeps_nothing(store, inlet, worker):
@@ -317,6 +325,7 @@ def test_a_run_with_a_value_waiting_returns_the_refusals_words_and_keeps_nothing
     assert not [c for c in worker.calls if c[0] == "train_run" and c[1]["system"] == f"pureos_{tid.replace('-', '_')}"]
     w = tools.run("pureos_write", {"action": "run_train", "target": tid, "fields": {}, "note": ""}, ctx())
     assert w.error == r.error.replace("pureos_build", "pureos_write", 1)
+    assert not [x for x in engine_runs.listed("train") if x.plant == tid], "a value that waits keeps no row"
 
 
 def test_a_worker_that_cannot_answer_is_said_in_words(store, inlet, monkeypatch):

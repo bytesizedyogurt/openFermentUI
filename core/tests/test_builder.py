@@ -16,7 +16,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, proforma, pureos
-from openferment_core.models import Artifact, BasisInput, BasisSource, InputAssumption, Override, TrainSpec
+from openferment_core.models import (Artifact, BasisInput, BasisSource, EngineInput, InputAssumption, Origin,
+                                     Override, Quantity, TrainSpec)
+from standins import train_inputs
 from test_train import (  # noqa: F401 (the fixtures, by name)
     AT,
     BY,
@@ -76,17 +78,19 @@ def test_check_says_everything_a_run_would_refuse_each_by_its_place_and_runs_no_
     assert not [c for c in worker.calls if c[0] == "train_run"]
 
 
-def test_check_puts_the_validations_refusals_and_a_stray_override_in_their_places(store, worker, no_pool):
+def test_check_puts_the_validations_refusals_and_a_stray_input_in_their_places(store, worker, no_pool):
     bad = spec_of(units=[{"id": "C1", "type": "centrifugation", "outlets": {"cake": "recycle:C1"}}])
     got = pureos.check_train(bad)
     assert not got.ok and list(got.places) == ["C1"] and "recycles to C1, itself" in got.places["C1"][0]
-    stray = pureos.check_train(spec_of(), [Override(scope="pureos:unit:t9:C1", key="split.Yeast", value=0.5, by=BY,
-                                                    at=AT)])
-    assert list(stray.places) == ["train"] and "pureos:unit:t9:C1" in stray.refusals[0]
-    # A request's override settles what the train left waiting, as the run's would.
-    settle = pureos.check_train(_waiting_spec(), [
+    stray = pureos.check_train(spec_of(), [EngineInput(name="C9.split.Yeast", quantity=Quantity(
+        value=0.5, unit="", origin=Origin(kind="person-assumption", by=BY, at=AT)))])
+    assert list(stray.places) == ["train"] and stray.refusals[0].startswith(
+        "C9.split.Yeast names 'C9', which is no unit of train t1 and not its inlet; its places are inlet, C1, F1")
+    # A request's input settles what the train left waiting, as the run's would.
+    waiting = _waiting_spec()
+    settle = pureos.check_train(waiting, train_inputs(waiting, [
         Override(scope="pureos:unit:t1:inlet", key="broth_flow", value=1.0, by=BY, at=AT),
-        Override(scope="pureos:unit:t1:C1", key="split.Ethanol", value=0.05, by=BY, at=AT)])
+        Override(scope="pureos:unit:t1:C1", key="split.Ethanol", value=0.05, by=BY, at=AT)]))
     assert settle.ok, settle.refusals
 
 

@@ -2,9 +2,10 @@
 
     from_run(artifact_id, train_id=None) -> TrainFromRun
 
-A kept run (a `proforma.run`, a `proforma.reference` or a `pureos.train_run`)
-holds its stream and unit tables (`proforma.tables_of`). This reads them into
-a `TrainSpec` the Builder opens, as data, and never computes a quantity:
+A kept run (a `proforma.run`, a `proforma.reference`, a `pureos.train_run` or
+a library plant's `library.run`) holds its stream and unit tables
+(`proforma.tables_of`). This reads them into a `TrainSpec` the Builder
+opens, as data, and never computes a quantity:
 
     which units   every unit the product passes through: on the product's path
                   (pureOS's own reading of the path, by pass: `pureos._leads_on`)
@@ -41,7 +42,9 @@ a `TrainSpec` the Builder opens, as data, and never computes a quantity:
                   the product id `thermo.CHEMICALS` names for it; a run whose
                   product no id names here, or that names no product, is refused
                   in words, as is one naming no chemical set, or with no unit
-                  to take
+                  to take; a library plant's run names its plant and no
+                  program of pureOS's, so its train names none and builds on
+                  the one chemical set pureOS holds
 
 The train's structure is held to `validate` and its refusals are returned
 beside it, for a person to settle in the Builder. Nothing is kept: the
@@ -66,11 +69,13 @@ from ..models import (
 from . import catalogue
 from .train_spec import ONWARD, RECYCLE, UNIT_ID, WASTE, TrainRefused, validate
 
-# The runs whose tables a train is read from.
+# The runs whose tables a train is read from: a library plant's run among
+# them (alpha 2.2 D8), so a train can stand on one.
 RUN = "proforma.run"
 REFERENCE = "proforma.reference"
 TRAIN_RUN = "pureos.train_run"
-RUN_TOOLS = (RUN, REFERENCE, TRAIN_RUN)
+LIBRARY_RUN = "library.run"
+RUN_TOOLS = (RUN, REFERENCE, TRAIN_RUN, LIBRARY_RUN)
 
 
 class RunNotOnFile(LookupError):
@@ -112,6 +117,16 @@ def _read(art: Artifact) -> tuple[Any, str | None, str | None, str | None, str |
         sid, sname = scenario_of(art, scenarios) if art.tool == RUN else (None, None)
         program = program_of(art, sid, scenarios)
         label = sname or t.flowsheet or art.id
+    if art.tool == LIBRARY_RUN:
+        # A library plant's run names its plant and builds on the plant's own
+        # chemicals, which no program of pureOS's names: its train names no
+        # program, as a train made in the Builder names none, and builds on
+        # the one set pureOS holds (train_spec.chemical_set); a run of it
+        # refuses in words a chemical of the inlet that set does not hold.
+        plant = next((str(i.value) for i in art.inputs if i.name == "plant"), None)
+        configuration = next((str(i.value) for i in art.inputs if i.name == "configuration"), None)
+        program = ""
+        label = f"{plant} ({configuration})" if plant and configuration else plant or art.id
     if not chem or not stream_id:
         raise TrainRefused(f"run {art.id} names no product stream, so no train is read from it")
     if not pid:
@@ -119,9 +134,9 @@ def _read(art: Artifact) -> tuple[Any, str | None, str | None, str | None, str |
 
         raise TrainRefused(f"run {art.id} traces {chem}, which no product a train traces here is "
                            f"({', '.join(f'{k}: {v}' for k, v in thermo.CHEMICALS.items())})")
-    if not program:
+    if not program and art.tool != LIBRARY_RUN:
         raise TrainRefused(f"run {art.id} belongs to no program, and a train is one program's")
-    return t, stream_id, chem, pid, program, label
+    return t, stream_id, chem, pid, program or "", label
 
 
 def _reads_from(art: Artifact, flowsheet: str | None) -> str | None:

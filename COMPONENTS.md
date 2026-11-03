@@ -128,6 +128,7 @@ pureOS reads the train a flowsheet ran (OF-BLD-019 §4.1, D1).
 |---|---|
 | `build.py` | What a model's build does to a train, as data (OF-BLD-020 §5.4; D9, D13). |
 | `catalogue.py` | pureOS's unit catalogue (OF-BLD-020 §5.1, D8, E.3‴, Appendix 2 §B). |
+| `engine.py` | pureOS's trains as the engine `train` (docs/api/engines.md; ADR-015; alpha 2.2 D5). |
 | `from_run.py` | A run's train, read into the Builder (OF-BLD-020 §5.3, D9). |
 | `inhouse.py` | The three unit types pureOS's catalogue needs and BioSTEAM lacks (OF-BLD-020 §5.1, D8). |
 | `kept.py` | The trains a model built, kept on the service (OF-BLD-020 §5.4). |

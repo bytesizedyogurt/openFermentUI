@@ -6,7 +6,9 @@ service stays light. An engine registered through the contract (`docs/api/engine
 worker runs in a worker of its own, which speaks this protocol too; an engine whose `worker` is
 `None` computes in the service's process, and its computation may call a worker of the core's
 own: the core's `kinetics` integrates fermOS's families with SciPy in the service, and its vessel
-design runs in the Proforma worker (`vessel_specs`, `vessel_design`). The service's side is
+design runs in the Proforma worker (`vessel_specs`, `vessel_design`). The core's `train` names
+the Proforma worker as its worker: a train is built and run there (`train_run`) and its file
+written there (`sff_export`). The service's side is
 `SimWorker` (`core/openferment_core/workers/__init__.py`);
 the worker's side is `serve`. The Proforma worker is reached through
 `core/openferment_core/engine/simulator.py`, which starts it on first use (or with the service
@@ -261,13 +263,26 @@ Request:
 | `metadata` | object | written as `metadata.openferment` in the file |
 | `title` | string or null | written as `metadata.process_title` |
 | `library` | string | in place of `flowsheet` for a library run: the `biorefineries` plant, with `configuration` and `overrides` as `library_run` takes them |
+| `train` | object | in place of `flowsheet` for a pureOS train run: the `train_run` request its run's basis gives (`system`, `inlet`, `units`, as `train_run` takes them; `train_spec.plant_of`) |
 
 A reference biorefinery (a flowsheet module with `load`) is built afresh inside
 `package_defaults()`; any other is the worker's warm plant set to `base` and simulated, its
 solved price on the product while the file is written; a library plant is built afresh and
-set as its run set it. The toolkit's JSON writer is taught, for the export alone, to write a
-thermosteam reaction in its own words and a stream by its id (`docs/api/sff.md`). Result:
-`checked` (below) plus `"simulator": "BioSTEAM <version>"`.
+set as its run set it; a train is rebuilt from `train` and simulated whole as `train_run`
+simulates it, inside `package_defaults()`, then written with no TEA, once the toolkit's schema
+leaves the TEA year to the file (below). The toolkit's JSON writer is
+taught, for the export alone, to write a thermosteam reaction in its own words and a stream by its
+id (`docs/api/sff.md`). Result: `checked` (below) plus `"simulator": "BioSTEAM <version>"`.
+
+A train carries no TEA. While the schema the toolkit ships requires every file's
+`metadata.TEA_year` (read from its schema file, `sff_toolkit.metadata_required`), which its
+exporter reads from the system's TEA, a train is refused before anything is built: `Refused: a
+train carries no TEA, and the SFF schema the toolkit ships (<schema version>) requires every
+file's metadata.TEA_year, the year its costs are reported in, which the toolkit's exporter reads
+from the system's TEA (export/_export.py)`. Once the schema leaves the year to the file, the train
+is rebuilt and written, and what the toolkit cannot write then is refused with its own words
+quoted after: `Refused: the toolkit's exporter could not write the train's file (<ExceptionType>:
+<words>)`. The run keeps the words as its `sffRefused` (`docs/api/runs.md`, A train run).
 
 ### `sff_validate`
 
@@ -621,7 +636,8 @@ prices and cost index, and a fresh flowsheet. `train_spec.py` builds the request
             "sides": {port: {chemical: kg/hr}}}, …]}
 ```
 
-`system` names the system and its flowsheet (`train_spec.py` sends `pureos_<train id>`). With
+`system` names the system and its flowsheet (`train_spec.py` sends `pureos_<train id>`); `sff_export`
+takes the same request as its `train` (above) to write a kept run's file. With
 `flows`, the inlet carries those flows. With `concentrations` and `brothFlow`, it carries each
 concentration over the broth flow, and the `balance` chemical (`Water` when null) at the mass that
 brings the mixture's volume, as thermosteam computes it at the inlet's `T` and `P`, to

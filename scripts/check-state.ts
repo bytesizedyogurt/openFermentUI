@@ -9,8 +9,9 @@
  * in the service's words (src/lib/http.ts), a refusal of a request's own
  * fields among them; and the unit each person's change is sent in
  * (src/lib/params.ts, `inputsOf`), a panel that shows part of its scope
- * among them. Run by `pnpm check:state`, offline: the service is a stand-in
- * for `fetch`.
+ * among them, and a train's changes named by their place (src/lib/pureos.ts,
+ * `trainInputs`). Run by `pnpm check:state`, offline: the service is a
+ * stand-in for `fetch`.
  */
 import {
   EMPTY_STATE,
@@ -22,11 +23,12 @@ import {
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
-import type { Deposition, LiveConversation, Override, ParameterSpec, Scenario } from '../src/data/types';
+import type { Deposition, LiveConversation, Override, ParameterSpec, Scenario, TrainSpec } from '../src/data/types';
 import { loadOverlay } from '../src/lib/intake';
 import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
 import { inputsOf } from '../src/lib/params';
+import { trainInputs, unitScope } from '../src/lib/pureos';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -228,6 +230,27 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   check('the shown specs alone would send a change typed elsewhere on the scope with no unit', units(shownOnly) === 'x0 placeholder-unit-a, mu_max ', units(shownOnly));
   const expanded = inputsOf([typed('split.Water')], [spec('split', 'placeholder-share', 'Separation')]);
   check('a key expanded per item is sent in its template’s unit', expanded[0]?.quantity.unit === 'placeholder-share', JSON.stringify(expanded));
+}
+
+// ── a train's changes, each named by its place (alpha 2.2 D2; src/lib/pureos.ts) ──
+
+{
+  const spec = (key: string, unit: string) => ({ key, unit, group: 'parameters' }) as unknown as ParameterSpec;
+  const train = { id: 'tr-1', units: [{ id: 'U1' }, { id: 'U2' }] } as unknown as TrainSpec;
+  const typed = (place: string, key: string, trainId = 'tr-1'): Override =>
+    ({ scope: unitScope(trainId, place), key, value: 1, by: 'Ada', at: '2026-11-03T00:00:00Z' }) as Override;
+  const overrides = [typed('U2', 'b'), typed('inlet', 'a'), typed('U1', 'c'), typed('U1', 'a', 'tr-2')];
+  const read = {
+    [unitScope('tr-1', 'inlet')]: [spec('a', 'placeholder-unit-a')],
+    [unitScope('tr-1', 'U2')]: [spec('b', 'placeholder-unit-b')],
+  };
+  const named = trainInputs(train, overrides, read).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check(
+    'a train’s changes are named <place>.<key>, the inlet first and then each unit in order, each in its spec’s unit; a place whose specs are unread sends none yet, and another train’s change none',
+    named === 'inlet.a placeholder-unit-a, U2.b placeholder-unit-b',
+    named,
+  );
+  check('a train with nothing read sends nothing', trainInputs(train, overrides, {}).length === 0);
 }
 
 console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');

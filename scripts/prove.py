@@ -55,7 +55,12 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
        version and worker, none with an error; the eight conformance checks of docs/api/engines.md
        made on each (`python -m openferment_core.engine.conform <name>`, on a scratch database of
        its own; the kinetics engine's with `--inputs`, the placeholders its builder writes as the
-       proof's person's assumptions), and each verdict kept and listed
+       proof's person's assumptions; the train engine's with `--project`, in the proof's own
+       project on its own database, on a train made there first as a person makes one in pureOS's
+       Builder: step 4's cornstover run read into a train (`POST /api/pureos/train/from-run`), the
+       units whose values wait taken out with every unit before them, the inlet the run's stream
+       entering the first unit kept, checked and saved as the project's row), and each verdict
+       kept and listed
 """
 from __future__ import annotations
 
@@ -112,7 +117,7 @@ DEPARTURES = {
 DIGITS = 10
 # A step, and the steps it stands on.
 STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 3: (2,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,), 9: (5, 6),
-                                     10: (2,)}
+                                     10: (2, 4)}
 TITLES = {
     1: "a fresh database, migrated; ready green",
     2: "a project made through the API",
@@ -125,13 +130,18 @@ TITLES = {
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
     9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a conversation, a runbook",
-    10: "the engines: each registered one listed, the eight conformance checks made on it, its verdict kept",
+    10: "the engines: each registered one listed, the eight conformance checks made on it, its verdict kept; a train "
+        "made on step 4's run for the train engine's",
 }
 # How long the conformance checks of one engine may take (BioSTEAM's: a cold import and nine plants' parameters).
 CONFORM_TIMEOUT_S = 1800.0
 # The engines whose things wait for values no default gives, each with the module and the function that
 # write the file `conform --inputs` reads (docs/api/engines.md, Conformance): the core's kinetics engine.
 PLACEHOLDERS = {"kinetics": ("openferment_core.fermos_engine", "write_placeholder_inputs")}
+# The engines whose things are a project's own (each declares `things_are`), checked in the proof's own project
+# (`conform --project`), on what the proof made there for each: the core's train engine, on the train `make_train`
+# makes on step 4's reference run.
+IN_PROJECT = ("train",)
 WRITE_PLACEHOLDERS = "import importlib, sys; getattr(importlib.import_module(sys.argv[1]), sys.argv[2])(sys.argv[3], by=sys.argv[4])"
 RUN_TIMEOUT_S = 1800.0
 
@@ -699,7 +709,47 @@ def step_9(proof: Proof) -> None:
                 f"the walk exited {walked.returncode}: {(walked.stderr or '').strip()[-300:]}")
 
 
+def make_train(proof: Proof) -> str:
+    """A train on step 4's cornstover run in the proof's project, made through the routes a person uses in
+    pureOS's Builder: the run's units read into a train (`POST /api/pureos/train/from-run`, every unit the
+    product passes through whose class is a catalogue type, at its class's own defaults); the units whose
+    values wait (`POST /api/pureos/train/check`, by place) taken out with every unit before them, as a person
+    with no value for them removes them; the inlet the run's own stream entering the first unit kept, read
+    from the run's unit table; checked again, nothing refused; and saved as the project's row, as Save keeps
+    it (`PUT /api/state/trains/<id>`). Its id."""
+    reference = proof.made["reference"]
+    read = api(proof, "POST", "/api/pureos/train/from-run", {"artifactId": reference}, timeout=RUN_TIMEOUT_S)
+    train = read["train"]
+    checked = api(proof, "POST", "/api/pureos/train/check", {"train": train, "by": PERSON}, timeout=RUN_TIMEOUT_S)
+    waiting = [n for n, u in enumerate(train["units"]) if checked["places"].get(u["id"])]
+    kept = train["units"][max(waiting) + 1:] if waiting else train["units"]
+    if not proof.check(bool(kept), f"{REFERENCE_PLANT} run {reference} read into train {train['id']}: "
+                                   f"{len(train['units'])} units ({', '.join(u['id'] for u in train['units'])}), "
+                                   f"{len(waiting)} of them waiting for values its class requires; "
+                                   + (f"kept from {kept[0]['id']} on" if kept else "no unit runs on its own values")):
+        raise Stop("no train to check the train engine on")
+    ins = {u["id"]: u["ins"] for u in api(proof, "GET", f"/api/biorepo/artifacts/{reference}")["output"]["units"]}
+    stream = ins[kept[0]["id"]][0]
+    train = {**train, "name": f"{train['name']}, from {kept[0]['id']} on", "units": kept,
+             "inlet": {**train["inlet"], "streamId": stream}}
+    again = api(proof, "POST", "/api/pureos/train/check", {"train": train, "by": PERSON}, timeout=RUN_TIMEOUT_S)
+    if not proof.check(again["ok"], f"train {train['id']} ({', '.join(u['id'] for u in kept)}) on stream {stream} of "
+                                    f"run {reference}: " + ("nothing a run would refuse" if again["ok"] else
+                                                            "; ".join(again["refusals"])[:300])):
+        raise Stop("the train would be refused")
+    at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    api(proof, "PUT", f"/api/state/trains/{train['id']}", {"by": PERSON, "value": {"train": train, "savedAt": at,
+                                                                                    "by": PERSON}})
+    proof.made["train"] = train["id"]
+    return train["id"]
+
+
 def step_10(proof: Proof) -> None:
+    if "reference" in proof.made:
+        made = make_train(proof)
+        listed = {e["name"]: e for e in api(proof, "GET", "/api/engines")}
+        proof.check(any(t["id"] == made for t in (listed.get("train") or {}).get("things") or []),
+                    f"train {made} saved as the project's row, {PERSON}'s, and listed by the train engine")
     listed = api(proof, "GET", "/api/engines")
     usable = [e for e in listed if not e["error"]]
     broken = [e for e in listed if e["error"]]
@@ -723,6 +773,8 @@ def step_10(proof: Proof) -> None:
                         f"each {BY}'s assumption" if values else
                         f"the {e['name']} engine's placeholders could not be written: {wrote.stderr.strip()[-300:]}")
             command += ["--inputs", str(path)]
+        if e["name"] in IN_PROJECT:
+            command += ["--project", proof.project]
         done = subprocess.run(command, cwd=CORE, text=True, capture_output=True, env=env, timeout=CONFORM_TIMEOUT_S)
         rows = [line for line in done.stdout.splitlines() if line.startswith(("✓", "✗"))]
         failed = [line for line in rows if line.startswith("✗")]

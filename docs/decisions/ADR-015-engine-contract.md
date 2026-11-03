@@ -95,8 +95,38 @@ Option 2.
   project holds what they take, are held by `core/tests/test_engines.py`. fermOS's tools take ids
   and words, as rule E.4‴ has them: a person sets a fermOS value on the screens' routes or at
   the contract's run route.
-- **pureOS** registers `train` over `train_run` through `train_spec.py` (stage C), with the unit
-  types and record ids it takes today.
+- **pureOS** is registered as the engine `train` through the same group, by
+  `core/pyproject.toml` (`train = "openferment_core.pureos.engine:ENGINE"`; stage C of alpha
+  2.2). Its things are the project's own trains, each pureOS's Builder saved and each a model
+  built, read afresh on every ask, none taking a configuration. A database made for the checks
+  holds none, so the engine declares what its things are (`things_are`, listed by `GET
+  /api/engines` as `thingsAre`) and conformance runs it in a project that holds a train
+  (`conform train --project <id>`): one train, the first named or the first that runs, on a basis
+  of the checks' own, so their rows and a person's keep apart. The production database is
+  refused in words, and there `pnpm ready` says where the checks run. The proof makes a train from
+  step 4's corn stover run through pureOS's from-run and checks it there in step 10: the tail of
+  the read train after its last unit whose values wait (at these pins the four units from T701
+  on, none of them a separation, which a debt in `docs/PROGRESS.md` holds). Its parameters are
+  each place's values as a run resolves them, keyed `inlet.<key>` and `<unit id>.<key>`, each
+  default with the origin its resolution names, so a default's origin widens to the five a
+  project's thing holds (a library-default, a convention, a record, an artifact, a person's
+  assumption), and check 2 holds each to what it names; a value the train fills itself when a run
+  leaves it unset says so in its `note`. A run's values are `EngineInput`s named
+  `<unit id>.<key>` or `inlet.<key>` at every door (`TrainRunRequest.inputs`), checked and
+  converted at pureOS's own door through `basis.override_of` in each place's scope, every refusal
+  at once by place in the same words at every door, so the train's artifact ids stand as pinned
+  (`core/tests/test_engine_pins.py`).
+  `train_spec.run_train` keeps the run's row (`runs.compute_kept`), so pureOS's routes, its tools,
+  MCP and the engine make one row for one request: its outputs the values pureOS reads from the
+  run's tables (registered with the tool, `artifacts.register`'s `values_of`, since the engine
+  package reads no pureOS module), its SFF file asked of the Proforma worker from the run's basis.
+  A train carries no TEA, and the schema the toolkit ships at its pinned commit requires every
+  file's TEA year, which its exporter reads from the system's TEA, so the worker refuses a
+  train's file in those words before it builds anything, and every train run keeps them as its
+  `sffRefused`. Its rows replay exactly: a train run keeps every digit BioSTEAM gives, so the
+  library run's last-kept-digit rule holds it at rtol 0, atol 0 (`train_spec.replay_precision`),
+  as train runs replayed before they were rows. Its worker and its heavy modules are the
+  biosteam engine's: a train builds and runs in the Proforma worker.
 - The four engine tools (`engine_plants`, `engine_parameters`, `engine_run`, `engine_report`)
   take `engine`, `biosteam` by default; the tool registry keeps its 48 names.
 - The package map (`core/tests/test_boundaries.py`) holds two exceptions for the conformance
@@ -159,3 +189,18 @@ importer (ADR-003).
   cannot answer is a 503 naming it; and `conform kinetics --inputs <file>` holds all eight checks
   on a scratch database. `pnpm prove` step 10 makes the eight checks on `kinetics` with the
   placeholders it writes.
+- `core/tests/test_engines.py` and `core/tests/test_train.py` (stage C): `GET /api/engines` lists
+  `train` with the project's trains, saved and built; its parameters carry each default's origin;
+  a run is one row at every door (the pureOS route, the tools, the engine's route), the same
+  request twice that row, created by the request's person or the tool's caller; a value that waits
+  keeps nothing and the worker's refusal is a receipt; values are converted by place and refused
+  by place together, with the train's own refusals, in one set of words at both doors; a row keeps
+  its outputs and its file's words, a worker's failure keeping no row; a train run replays
+  identically; a train stands on a library run; `conform train --project` holds all eight checks
+  in a project with a train, beside a person's run of it and past a draft and a train that waits,
+  and with no project names the command in words; `pnpm ready` on the production database says
+  where the checks run. With the `sim` marker, a real train's row, its outputs, the worker's words
+  and its identical replay, and the worker's file step building nothing while the toolkit's
+  schema requires a TEA year. `core/tests/test_engine_pins.py` holds the train's artifact id
+  through the inputs. `pnpm prove` step 10 makes the eight checks on `train` in the proof's
+  project.

@@ -726,8 +726,12 @@ export interface paths {
         /**
          * Flowsheets Export
          * @description A kept run's base case written as an SFF file by the toolkit in the
-         *     worker, checked, drawn and kept with origin `run`. 404 for a run the
-         *     project does not hold; 422 for an artifact that is not a run.
+         *     worker, checked, drawn and kept with origin `run`: a shelf run, a
+         *     reference run, a library run or a pureOS train run. 404 for a run the
+         *     project does not hold; 422 for an artifact that is not a run; 409 in the
+         *     worker's words for a base case that cannot be built or a file the
+         *     toolkit cannot write (a train run's, while its schema requires a TEA
+         *     year: docs/api/sff.md).
          */
         post: operations["flowsheets_export_api_flowsheets_export_post"];
         delete?: never;
@@ -2069,11 +2073,13 @@ export interface paths {
          * Pureos Train Check
          * @description Everything a run of the train would refuse, at once, in the run's
          *     words, each by the place it belongs to (`TrainValidation`: a unit's id,
-         *     `inlet`, or `train`): the validation's refusals, a value that waits naming
-         *     what would bind it, a unit's needs (OF-BLD-020 §5.3). Runs no train and
-         *     keeps nothing; it reads what the scopes read (the program's chemicals,
-         *     each class's defaults), which a cold worker starts for. 409 for an
-         *     artifact the train names that is damaged on disk; 503 when the worker
+         *     `inlet`, or `train`): an input that names no place or no parameter, a
+         *     key set twice, a value its parameter cannot take, then the validation's
+         *     refusals, a value that waits naming what would bind it, a unit's needs
+         *     (OF-BLD-020 §5.3). Runs no
+         *     train and keeps nothing; it reads what the scopes read (the program's
+         *     chemicals, each class's defaults), which a cold worker starts for. 409 for
+         *     an artifact the train names that is damaged on disk; 503 when the worker
          *     cannot answer.
          */
         post: operations["pureos_train_check_api_pureos_train_check_post"];
@@ -2121,13 +2127,20 @@ export interface paths {
         put?: never;
         /**
          * Pureos Train Run
-         * @description Run a train (`TrainRun`): every value resolved with its source, the
-         *     train built and run in the Proforma worker, one `pureos.train_run`
-         *     artifact kept (or the one kept for the same basis returned). 422 in words
-         *     for every refusal (the validation's, a value that waits naming what would
-         *     bind it, a unit's needs, a unit that does not converge, with BioSTEAM's
-         *     words); 409 for an artifact the train names that is damaged on disk; 503
-         *     when the worker cannot answer (OF-BLD-020 §5.2).
+         * @description Run a train (`TrainRun`): every value resolved with its source, each
+         *     value the request sets (`inputs`, each named `<unit id>.<key>` or
+         *     `inlet.<key>`) laid on, the train built and run in the Proforma worker,
+         *     one `pureos.train_run` artifact kept with its run of the engine `train`
+         *     (one `runs` row created by `by`, keeping its SFF file or the toolkit's
+         *     words for why it has none; `GET /api/runs/{id}` serves it), or the one
+         *     kept for the same basis returned.
+         *     422 in words for every refusal, all of them at once (an input that names
+         *     no place or no parameter, a key set twice, a value its parameter cannot
+         *     take, the validation's, a value that waits naming what would bind it, a
+         *     unit's needs, and, kept as a receipt the same request is answered from, a
+         *     unit that does not converge, with BioSTEAM's words); 409 for an artifact
+         *     the train names that is damaged on disk; 503 when the worker cannot
+         *     answer (OF-BLD-020 §5.2).
          */
         post: operations["pureos_train_run_api_pureos_train_run_post"];
         delete?: never;
@@ -3435,6 +3448,8 @@ export interface components {
             name: string;
             /** Things */
             things?: components["schemas"]["EngineThing"][];
+            /** Thingsare */
+            thingsAre?: string | null;
             /** Version */
             version?: {
                 [key: string]: string;
@@ -3466,13 +3481,23 @@ export interface components {
          * @description One parameter a thing takes: a `ParameterSpec` (the panel's shape,
          *     its bounds with their written reason) with its default value and where
          *     the default comes from, `library-default` naming the package it was read
-         *     from or a `convention` saying what the setting is. A parameter with no
-         *     default has `value` and `origin` null: a run sets it, or the engine binds
-         *     it from what the project holds (the kinetics engine binds a family's
-         *     parameter from the project's records), and a run that leaves it with
-         *     neither is refused in words, keeping nothing. The panel's fields an
-         *     engine may leave unset default here; `sourceRule` is the origin's kind,
-         *     and `assumption` (a run's value) for a parameter with no default.
+         *     from or a `convention` saying what the setting is. A thing the project
+         *     holds (the train engine's trains) has defaults the project holds too: a
+         *     `record` naming the records that bound it, an `artifact` naming the
+         *     run, simulation or design it was read from, or a `person-assumption`
+         *     naming the person who typed it into the thing. A parameter with no
+         *     default has `value` and `origin` null: a run sets it, the engine binds it
+         *     from what the project holds (the kinetics engine binds a family's
+         *     parameter from the project's records), or the thing fills it itself when
+         *     a run leaves it unset, which its `note` then says with the reason (the
+         *     train engine's: a value the unit's class decides at run time, a component
+         *     the inlet does not carry, a split left to the class). A run that leaves
+         *     unset a parameter none of these gives is refused in words, keeping
+         *     nothing. The panel's fields an
+         *     engine may leave unset default here; `sourceRule` is the rule entry the
+         *     origin's kind stands for (`assumption` for a person's), and `assumption`
+         *     (a run's value) for a parameter with no default; a record's default
+         *     names its field in the rule (`record:<field id>`).
          */
         EngineParameter: {
             /** Boundsreason */
@@ -6339,13 +6364,17 @@ export interface components {
         };
         /**
          * TrainRunRequest
-         * @description POST /api/pureos/train/run.
+         * @description POST /api/pureos/train/run and POST /api/pureos/train/check. It holds
+         *     these fields alone: a field it does not name is refused.
          */
         TrainRunRequest: {
-            /** By */
-            by?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             train: components["schemas"]["TrainSpec"];
         };
         /**

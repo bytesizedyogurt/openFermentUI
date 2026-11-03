@@ -29,7 +29,7 @@ file, what openFerment adds to a file it writes, and the routes. The code is
 | `id` | `run-<artifact id>` for a run's export; `sff-<first 16 hex of the file's sha256>` for any other file. The same file kept twice is one record; a run exported twice is one record |
 | `origin` | `run` (exported by openFerment from a run of the project), `library` (the file's sha256 is one of the toolkit's reference flowsheets at the pinned commit, whichever route it came by), `imported` (any other file) |
 | `title` | the file's `metadata.process_title`, else its named feedstocks and products (`Corn stover → Ethanol`), else the file's name |
-| `source` | where the file came from, in words |
+| `source` | where the file came from, in words: a run's export says `exported from run <artifact id> of <flowsheet id>`, or `of train <train id>` for a train run |
 | `sha256`, `bytes` | of the file as it came; the file is kept byte for byte (`GET …/file`) |
 | `validation` | `valid` (no schema failure and no error-severity check failed), `summary` (every result counted by severity and status), `findings` (each result that did not pass: check id, severity, status, message, path) |
 | `completeness` | the toolkit's completeness report: `score` (weighted over every scored criterion), `representableScore` (over the criteria the file's own version can state), per category and criticality, each criterion with what it found missing, the re-execution route it found, and the toolkit's text rendering |
@@ -76,10 +76,22 @@ A run's export carries one extra block in `metadata`, which the schema admits
 }
 ```
 
+A pureOS train run's block names its train in that place:
+`"train": "the id of the train whose run was written"`, and its file's process title is the
+train's name.
+
 The export writes the run's base case: a reference biorefinery built afresh inside
 `package_defaults()` as its reference run builds it, a shelf flowsheet's warm plant set to the
-run's base values (with the price the run solved on its product), or a library plant built afresh
-and set as its run set it. It does not write the grid or the samples. A file openFerment imports
+run's base values (with the price the run solved on its product), a library plant built afresh
+and set as its run set it, or a pureOS train rebuilt from the `train_run` request its run's basis
+gives and simulated whole as its run simulated it (`docs/api/workers.md`, `sff_export`). A train
+carries no TEA. The schema the toolkit ships at `e236e32` requires every file's
+`metadata.TEA_year` (`sff_schema.json`), the year its costs are reported in, which the exporter
+reads from the system's TEA (`tea.duration[0]`, `export/_export.py`), and a train run computes
+no TEA and no TEA year. While the schema requires the year, the worker refuses a train's file in
+those words before it builds anything; a train run keeps them as its `sffRefused`
+(`docs/api/runs.md`, A train run), and the record waits on the schema leaving the year to a file
+whose system no TEA prices. It does not write the grid or the samples. A file openFerment imports
 is kept as it came; nothing is added to it.
 
 A run of openFerment's own flowsheet (`cellulosic_ethanol_v0`) also carries its recipe, embedded
@@ -126,7 +138,7 @@ All act in the project the request names (ADR-005).
 | `POST /api/flowsheets/import` | multipart: `file`, `by`. Checked in the worker, drawn, kept. 413, 422, 503 |
 | `GET /api/flowsheets/library` | the reference flowsheets and which are fetched here; fetches nothing |
 | `POST /api/flowsheets/library/{id}` | `{"by"}`: fetched (or found here), hash checked, checked in the worker, kept with origin `library`. 404, 502 (fetch or hash), 503 |
-| `POST /api/flowsheets/export` | `{"artifactId", "by"}`: a kept run (a shelf run, a reference run or the benchmark) exported, checked and kept with origin `run`. 404, 409 (the base case cannot be built), 422, 503 |
+| `POST /api/flowsheets/export` | `{"artifactId", "by"}`: a kept run (a shelf run, a reference run, the benchmark, a library run or a pureOS train run) exported, checked and kept with origin `run`. 404, 409 in the worker's words (the run's base case cannot be built; for a train run, the toolkit wrote no file, at `e236e32` for want of a TEA year), 422, 503 |
 
 ## Measured (2026-10-30, BioSTEAM 2.54.0, biorefineries 2.35.1)
 

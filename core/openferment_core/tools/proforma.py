@@ -33,8 +33,9 @@ override binds waits, and the refusal is `proforma.run`'s own words, the ones
 call to `proforma.run` there.
 
 `stream_table` reads a kept run's stream table: a `proforma.run` artifact
-(a scenario's run) or a `proforma.reference` artifact (a reference
-biorefinery's, §2.2), through `proforma.tables_of`. The summary is the table
+(a scenario's run), a `proforma.reference` artifact (a reference
+biorefinery's, §2.2) or a `library.run` artifact (a library plant's run,
+alpha 2.2 D8), through `proforma.tables_of`. The summary is the table
 cut to the cap (the plant's feeds and products first), saying how many
 streams it left out; the whole table rides in `ToolResult.data`, for the
 endpoint and the MCP server. Both tools return the run as one `Evidence`
@@ -57,6 +58,9 @@ from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 NAME = "selling_price"
 RUN_NAME = "run_flowsheet"
 TABLE_NAME = "stream_table"
+# The runs whose stream table stream_table reads: a library plant's run among
+# them (alpha 2.2 D8), whose tables the Proforma worker reads as a run's.
+TABLE_TOOLS = (proforma.RUN, proforma.REFERENCE, "library.run")
 
 
 class SellingPriceInput(BaseModel):
@@ -249,9 +253,10 @@ class StreamTableInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     artifactId: str = Field(description=(
-        "The artifact id of a kept Proforma run: a proforma.run artifact (a scenario's run, as run_flowsheet, "
-        "selling_price or proforma_read return it) or a proforma.reference artifact (a reference biorefinery's "
-        "run, as proforma_read lists it). Nothing else: no number, no stream, no setting."))
+        "The artifact id of a kept run: a proforma.run artifact (a scenario's run, as run_flowsheet, "
+        "selling_price or proforma_read return it), a proforma.reference artifact (a reference biorefinery's "
+        "run, as proforma_read lists it) or a library.run artifact (a library plant's run, as engine_run and "
+        "engine_report name it). Nothing else: no number, no stream, no setting."))
 
 
 def _sig(v: Any) -> Any:
@@ -311,9 +316,9 @@ def _stream_table(inp: StreamTableInput, ctx: ToolContext) -> ToolResult:
         return ToolResult(error=f"{TABLE_NAME} refused: no kept artifact {aid!r}; proforma_read lists the runs on file")
     except artifacts.ArtifactDamaged as e:
         return ToolResult(error=f"{TABLE_NAME} could not read {aid}: {e}")
-    if art.tool not in (proforma.RUN, proforma.REFERENCE):
-        return ToolResult(error=f"{TABLE_NAME} refused: {aid} is a {art.tool} artifact, not a Proforma run; it reads the "
-                                f"stream table of a {proforma.RUN} or {proforma.REFERENCE} artifact")
+    if art.tool not in TABLE_TOOLS:
+        return ToolResult(error=f"{TABLE_NAME} refused: {aid} is a {art.tool} artifact, and {TABLE_NAME} reads the "
+                                f"stream table of a {', '.join(TABLE_TOOLS[:-1])} or {TABLE_TOOLS[-1]} artifact")
     scenario_id = pureos.scenario_of(art, pureos.held_scenarios())[0] if art.tool == proforma.RUN else None
     t = proforma.tables_of(art)
     if not t.streams:
@@ -344,6 +349,9 @@ def _stream_table(inp: StreamTableInput, ctx: ToolContext) -> ToolResult:
         "streams": rows,
         "meaning": ("the base case's streams as BioSTEAM held them after the run, read from the kept artifact and never "
                     "simulated again; cite the run by its evidence id" if ev else
+                    "the base case's streams as BioSTEAM held them after the run, read from the kept artifact and never "
+                    "simulated again; a library plant's run is cited by the evidence id engine_report names for each "
+                    "of its outputs" if art.tool == "library.run" else
                     "the base case's streams as BioSTEAM held them after the run; this run holds no price, so it has "
                     "no evidence id to cite"),
     }
@@ -367,8 +375,8 @@ TABLE_TOOL = register(
             "Read the stream table a kept Proforma run holds: every stream of the base case with the unit it leaves "
             "and the unit it enters (none for a feed or a product), its phase, temperature, pressure, mass flow, "
             "price and largest components, as BioSTEAM held them after the run. Takes the run's artifact id and "
-            "nothing else (a scenario's proforma.run artifact, or a reference biorefinery's proforma.reference "
-            "artifact); you never type a number. The plant's feeds and products come first; a long table is cut to "
+            "nothing else (a scenario's proforma.run artifact, a reference biorefinery's proforma.reference "
+            "artifact, or a library plant's library.run artifact); you never type a number. The plant's feeds and products come first; a long table is cut to "
             "what a model may read and says how many streams it left out. Returns the run's evidence id to cite: a "
             "price, a cost or a recovery read from a run is cited by it. It runs nothing."
         ),

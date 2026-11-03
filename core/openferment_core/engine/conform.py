@@ -9,12 +9,30 @@ Conformance; ADR-015).
                                engine whose thing waits for values no default gives
                                (the kinetics engine's families: fermos_engine's
                                write_placeholder_inputs writes such a file)
+        [--project <id>]       make the checks in this existing project of the
+                               configured database, for an engine whose things are a
+                               project's own (the train engine's trains)
 
 The checks run on a database of their own, made on the server that
 OPENFERMENT_DATABASE_URL names (core/.env) and dropped after, in a project made
-for them, so nothing a person keeps is touched. The verdict is kept in the
-`engine_checks` table of the configured database, where `GET /api/engines`
-and `pnpm ready` read it. Exits 1 when any check fails.
+for them, so nothing a person keeps is touched. An engine whose things are all
+a project's own (it declares `things_are`, saying what they are: the train
+engine's are a project's trains) lists nothing in a fresh project, so it is
+checked with `--project <id>`, in that project of the configured database
+itself (`in_project`). There the checks run one thing: the first `--thing`
+names, else the first the project holds that runs, each thing passed over
+before it said with its words (a thing whose parameters cannot be read, a
+value that waits; nothing is kept for either). They run it on a basis of
+their own: with no `--inputs`, check 3's run sets one parameter at its own
+default as the checks' assumption, dated the day they run (`_own_basis`), so
+the checks' rows and the rows of the runs the project's people ask for keep
+apart; the rows the checks make stay in the project, each in the name of the
+checks or of check 8's model. The production
+database (`openferment`) is refused, as `pnpm db:reset` refuses it, and so is
+a project the database lacks. Without `--project` such an engine is refused
+in words saying what its things are. The verdict is kept in the
+`engine_checks` table of the configured database, where `GET /api/engines` and
+`pnpm ready` read it. Exits 1 when any check fails.
 
 `checks(engine, ...)` runs the eight in whatever database and project are
 current: a test's, or the proof's (scripts/prove.py).
@@ -40,8 +58,8 @@ from .contract import version_string
 
 CHECKS: dict[int, str] = {
     1: "a JSON number outside a quantity is refused in words before the worker is reached",
-    2: "every default carries an origin, library-default with ref or convention with note, and a parameter with "
-       "none says a run sets it",
+    2: "every default carries an origin naming what it rests on (a library-default, a record or an artifact its ref, "
+       "a convention its note, a person's assumption its by), and a parameter with none takes a run's value",
     3: "a run writes one runs row keyed by its basis, and the same request twice is that one row",
     4: "a replay holds every output within the precision the thing states",
     5: "the run's SFF file validates and scores, or sffRefused holds words",
@@ -137,11 +155,28 @@ def _bare_number(engine: Any, thing: str, by: str) -> tuple[bool, str]:
                 + ("" if ok else f" (route said {json.dumps(detail)[:200]}; tool said {tool.error!r})"))
 
 
+def _names_its_ground(o: Any) -> bool:
+    """Whether a default's origin names what it rests on: a library-default
+    its package and version, a record the records, an artifact the artifact
+    (each `ref`); a convention what it is (`note`); a person's assumption the
+    person who typed it (`by`)."""
+    if o is None:
+        return False
+    if o.kind in ("library-default", "record", "artifact"):
+        return bool((o.ref or "").strip())
+    if o.kind == "convention":
+        return bool((o.note or "").strip())
+    return o.kind == "person-assumption" and bool((o.by or "").strip())
+
+
 def _origins(engine: Any, things: list[Any]) -> tuple[bool, str]:
-    """Check 2. Every default carries an origin naming what it rests on: a
-    library-default its package and version (ref), a convention what it is
-    (note). A parameter with no default (value and origin null) says that a
-    run sets it: `assumption` stands in its source rule."""
+    """Check 2. Every default carries an origin naming what it rests on
+    (`_names_its_ground`): a library-default its package and version, a
+    convention what it is, and for a thing the project holds, the records,
+    the artifact or the person its default was read from. A parameter with no
+    default (value and origin null) takes a run's value: `assumption` stands
+    in its source rule. A run sets it, the engine binds it, or the thing
+    fills it itself when a run leaves it unset (its `note` says so)."""
     count, unset, wrong = 0, 0, []
     for th in things:
         for p in engine.parameters(th.id, _configuration_of(th)):
@@ -153,16 +188,15 @@ def _origins(engine: Any, things: list[Any]) -> tuple[bool, str]:
                 else:
                     wrong.append(f"{th.id}:{p.key}")
                 continue
-            if not (o is not None and ((o.kind == "library-default" and (o.ref or "").strip())
-                                       or (o.kind == "convention" and (o.note or "").strip()))):
+            if not _names_its_ground(o):
                 wrong.append(f"{th.id}:{p.key}")
     names = ", ".join(th.id for th in things)
     if wrong:
         return False, (f"{len(wrong)} of {count} parameters lack an origin with what it names, or a run's value where "
                        f"they have no default: {', '.join(wrong[:6])}")
-    return True, (f"{count} parameters of {len(things)} things ({names}), each in its default configuration or "
-                  f"its first: {count - unset} default{'s' if count - unset != 1 else ''}, each with its origin, and "
-                  f"{unset} a run sets")
+    return True, (f"{count} parameters of {len(things)} thing{'s' if len(things) != 1 else ''} ({names}), each in its "
+                  f"default configuration or its first: {count - unset} default{'s' if count - unset != 1 else ''}, "
+                  f"each with its origin, and {unset} with none, {'each ' if unset != 1 else ''}taking a run's value")
 
 
 def _row_count(run_id: str) -> int:
@@ -194,20 +228,24 @@ def _today() -> str:
 
 def _model_inputs(engine: Any, thing: Any, inputs: list[EngineInput]) -> list[EngineInput] | None:
     """Check 8's model path on a basis of its own: the checked run's values set
-    as the model's estimates, or, with none, the thing's first parameter set to
-    its own default as the model's estimate; None when the thing takes none.
-    Each estimate is dated the day the check runs (its origin's `at`), so the
-    model's run is a basis of that day."""
+    as the model's estimates, or, with none, one of the thing's parameters set
+    to its own default as the model's estimate: the first whose source rule
+    takes a run's value (`assumption`), else the first with a default (a
+    parameter the train engine reads from its inlet's run takes no run's
+    value, and BioSTEAM's rules name the package alone); None when the thing
+    takes none. Each estimate is dated the day the check runs (its origin's
+    `at`), so the model's run is a basis of that day."""
     at = _today()
     if inputs:
         return [EngineInput(name=i.name, quantity=i.quantity.model_copy(update={"origin": Origin(
             kind="model-estimate", by=MODEL, at=at, note="conformance check 8: the checked run's value")}))
             for i in inputs]
-    for p in engine.parameters(thing.id, _configuration_of(thing)):
-        if p.value is not None:
-            return [EngineInput(name=p.key, quantity=Quantity(value=p.value, unit=p.unit, origin=Origin(
-                kind="model-estimate", by=MODEL, at=at, note="conformance check 8: the parameter's own default")))]
-    return None
+    held = [p for p in engine.parameters(thing.id, _configuration_of(thing)) if p.value is not None]
+    p = next((p for p in held if "assumption" in p.sourceRule), held[0] if held else None)
+    if p is None:
+        return None
+    return [EngineInput(name=p.key, quantity=Quantity(value=p.value, unit=p.unit, origin=Origin(
+        kind="model-estimate", by=MODEL, at=at, note="conformance check 8: the parameter's own default")))]
 
 
 def _second_basis(chosen: list[Any], first: Any) -> tuple[str, str | None] | None:
@@ -507,21 +545,121 @@ def _read_inputs(path: str) -> list[EngineInput]:
     return [EngineInput.model_validate(i) for i in raw]
 
 
-def _options(argv: list[str]) -> tuple[list[str], str | None]:
-    """`--thing <id>`, as often as asked, and `--inputs <file>`."""
+def _options(argv: list[str]) -> tuple[list[str], str | None, str | None]:
+    """`--thing <id>`, as often as asked, `--inputs <file>` and `--project <id>`."""
     things: list[str] = []
     inputs: str | None = None
+    project: str | None = None
     rest = list(argv)
     while rest:
         flag = rest.pop(0)
-        if flag not in ("--thing", "--inputs") or not rest:
-            raise ConformRefused(f"{flag!r} is no option here: --thing <id> or --inputs <file>")
+        if flag not in ("--thing", "--inputs", "--project") or not rest:
+            raise ConformRefused(f"{flag!r} is no option here: --thing <id>, --inputs <file> or --project <id>")
         value = rest.pop(0)
         if flag == "--thing":
             things.append(value)
-        else:
+        elif flag == "--inputs":
             inputs = value
-    return things, inputs
+        else:
+            project = value
+    return things, inputs, project
+
+
+# What the value check 3 sets in a named project rests on, in words.
+OWN_BASIS_NOTE = ("conformance check 3: the parameter's own default, set so the checks' runs are a basis of their own "
+                  "in the project they check")
+
+
+def _own_basis(engine: Any, thing: Any, by: str) -> list[EngineInput]:
+    """The value check 3 sets in a named project, so the checks' runs are a
+    basis of their own there: one parameter at its own default, the first
+    with a default whose source rule takes a run's value (`assumption`), as
+    the checks' assumption (`by`) dated the day they run, so the checks'
+    runs and the runs the project's people ask for keep rows of their own.
+    None for a thing with no such parameter."""
+    held = [p for p in engine.parameters(thing.id, _configuration_of(thing))
+            if p.value is not None and "assumption" in p.sourceRule]
+    if not held:
+        return []
+    p = held[0]
+    return [EngineInput(name=p.key, quantity=Quantity(value=p.value, unit=p.unit, origin=Origin(
+        kind="person-assumption", by=by, at=_today(), note=OWN_BASIS_NOTE)))]
+
+
+def _project_thing(engine: Any, by: str, inputs: list[EngineInput]) -> tuple[Any, list[EngineInput], list[str]]:
+    """The thing `--project` checks when none is named, with the values its
+    run sets: the first the project holds that runs, on a basis of its own
+    (`_own_basis`) unless values were given. A thing whose parameters cannot
+    be read, or whose run is refused in words with nothing kept (a value
+    that waits), is passed over, its words kept; the first that runs, or
+    whose run its engine keeps a receipt of, is the one checked, its run the
+    first ask check 3 makes again."""
+    from ..engine import runs
+
+    passed: list[str] = []
+    for th in engine.things():
+        values = list(inputs)
+        try:
+            values = values or _own_basis(engine, th, by)
+            runs.run_with(engine, th.id, _configuration_of(th), values, by=by)
+        except runs.RunRefused:  # a receipt the engine kept: its refusal is check 3's to say
+            return th, values, passed
+        except EngineRefused as e:  # refused in words, nothing kept
+            passed.append(f"{th.id}: {_words(e)[:200]}")
+            continue
+        except Exception:  # anything else is check 3's to say, in its words
+            return th, values, passed
+        return th, values, passed
+    held = "; ".join(passed) or "it holds none"
+    raise ConformRefused(f"the project holds no thing of the {engine.name} engine that runs ({held}): name one with "
+                         "--thing <id>")
+
+
+def in_project(name: str, project_id: str, *, by: str, things: list[str] | None = None,
+               inputs: list[EngineInput] | None = None) -> EngineConformance:
+    """The eight checks on engine `name` in an existing project of the
+    configured database (`--project`), the verdict kept for `GET
+    /api/engines`. The checks run one thing: the first `things` names, else
+    the first the project holds that runs (`_project_thing`), the things
+    passed over said in check 3's words; on a basis of their own (`inputs`,
+    or `_own_basis`), so check 8's model runs that thing too, on its own
+    basis. The production database is refused, as `pnpm db:reset` refuses
+    it, and so is a project the database does not hold, each in words
+    (ConformRefused)."""
+    from ..db.engine import PRODUCTION_NAME, database_url
+    from . import registry
+
+    database = database_url().database or ""
+    if database == PRODUCTION_NAME:
+        raise ConformRefused(f"database {database!r} is the production one, and the checks make runs in the project "
+                             "they check, so they run in a project of a development database (pnpm db:reset refuses "
+                             "the production one too)")
+    if projects.get(project_id) is None:
+        raise ConformRefused(f"database {database!r} holds no project {project_id!r}: name a project it holds")
+    engine = registry.get(name)
+    entry = registry.found()[name].entry
+    passed: list[str] = []
+    with projects.using(project_id):
+        if things:
+            first = {th.id: th for th in engine.things()}.get(things[0])
+            values = list(inputs or [])
+            if not values and first is not None:
+                try:
+                    values = _own_basis(engine, first, by)
+                except EngineRefused:  # its parameters cannot be read: checks 2 and 3 say so in words
+                    values = []
+            named = things
+        else:
+            first, values, passed = _project_thing(engine, by, list(inputs or []))
+            named = [first.id]
+        found = checks(engine, by=by, entry=entry, things=named, inputs=values)
+    if passed:
+        found = [c.model_copy(update={"said": f"{c.said}; passed over before {named[0]}, each refused in words with "
+                                              f"nothing kept: {'; '.join(passed)}"}) if c.number == 3 else c
+                 for c in found]
+    v = verdict(engine, found, by)
+    keep(v)
+    return v
 
 
 def _inside(name: str, by: str, argv: list[str]) -> int:
@@ -529,7 +667,7 @@ def _inside(name: str, by: str, argv: list[str]) -> int:
     from . import registry
     from ..models import ProjectCreate
 
-    things, inputs = _options(argv)
+    things, inputs, _ = _options(argv)
     engine = registry.get(name)
     entry = registry.found()[name].entry
     made = projects.create(ProjectCreate(name=f"Conformance of {name}", by=by))
@@ -549,13 +687,14 @@ def main(argv: list[str]) -> int:
 
     if argv[:1] == ["--inside"] and len(argv) >= 3:
         return _inside(argv[1], argv[2], argv[3:])
-    usage = "usage: python -m openferment_core.engine.conform <engine name> [--thing <id>]... [--inputs <file>]"
+    usage = ("usage: python -m openferment_core.engine.conform <engine name> [--thing <id>]... [--inputs <file>] "
+             "[--project <id>]")
     if not argv or argv[0].startswith("-"):
         print(usage)
         return 2
     name, options = argv[0], argv[1:]
     try:
-        _, inputs = _options(options)
+        things, inputs, project = _options(options)
         if inputs:
             _read_inputs(inputs)
             options = [*options[: options.index("--inputs") + 1], str(Path(inputs).resolve()),
@@ -570,6 +709,20 @@ def main(argv: list[str]) -> int:
         print(f"✗ {_words(e)}")
         return 1
     by = f"conformance check of {name}"
+    if project is not None:
+        try:
+            v = in_project(name, project, by=by, things=things, inputs=_read_inputs(inputs) if inputs else None)
+        except ConformRefused as e:
+            print(f"✗ {_words(e)}")
+            return 2
+        print(table(v))
+        return 0 if v.ok else 1
+    things_are = getattr(engine, "things_are", None)
+    if things_are:
+        print(f"✗ the {name} engine's things are {things_are}. A database made for the checks holds none, so the "
+              f"checks run in a project of the configured database (core/.env) that holds one: python -m "
+              f"openferment_core.engine.conform {name} --project <id>")
+        return 2
     server = database_url()
     scratch = f"openferment_conform_{name.replace('-', '_')}_{secrets.token_hex(4)}"
     url = migrate.create(scratch, server)

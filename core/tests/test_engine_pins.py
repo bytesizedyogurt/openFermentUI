@@ -61,7 +61,10 @@ that decision. The forecast that changes nothing kept its id.
 From C.2 every fermOS request here takes its values as typed inputs (alpha
 2.2 D2), built from the same Overrides the tests typed before
 (`standins.as_inputs`), and fermOS converts each back into that Override at
-its door, so every other pin holds as captured.
+its door, so every other pin holds as captured. From C.3 the train run's
+request does the same, each input named by its place
+(`standins.train_inputs`), converted at pureOS's door
+(`train_spec.overrides_of`).
 
 One pin was captured at C.1 itself: a comparison of two runs of the sample
 engine. From C.1 on, a comparison that holds a run of an engine beside
@@ -93,7 +96,7 @@ from openferment_core.engine.sample import SAMPLE
 from openferment_core.models import ComparisonCreate, Override, ProformaRunRequest, SimulationRequest, VesselRequest
 from openferment_core.pureos import catalogue, train_spec
 from openferment_core.studies import comparisons
-from standins import as_inputs
+from standins import as_inputs, train_inputs
 from test_comparisons import PricedStandIn
 from test_engines import given
 from test_fermos import CHEMO, SD, STANDIN_CHEMOSTAT_TYPED, STANDIN_TYPED, T, batch, forecast_inputs, inputs_for
@@ -283,9 +286,19 @@ def train_worker(monkeypatch):
 
 
 def test_a_train_run_on_the_stand_in_worker_holds_its_pin(train_worker):
-    run = pureos.run_train(spec_of(), [Override(scope="pureos:unit:t1:F1", key="V", value=0.2, by="Another Person",
-                                                at=TRAIN_AT, note=TRAIN_STANDIN)])
+    """From C.3 a train run's request takes typed inputs (alpha 2.2 D2), each
+    named by its place; pureOS converts each at its door into the Override
+    the pin was captured with, so the request sent as inputs and the same
+    request's Overrides are one artifact."""
+    spec = spec_of()
+    changed = [Override(scope="pureos:unit:t1:F1", key="V", value=0.2, by="Another Person", at=TRAIN_AT,
+                        note=TRAIN_STANDIN)]
+    inputs = train_inputs(spec, changed)
+    assert [i.name for i in inputs] == ["F1.V"] and train_spec.overrides_of(spec, inputs) == changed
+    run = pureos.run_train(spec, inputs)
     pinned("pureos.train_run", artifacts.get(run.artifactId))
+    by_overrides = train_spec._prepare(spec, changed, None)
+    assert artifacts.artifact_id(train_spec.TRAIN_RUN, train_spec._version(), by_overrides.basis) == run.artifactId
 
 
 # ── Proforma ───────────────────────────────────────────────────────────

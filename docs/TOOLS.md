@@ -353,11 +353,11 @@ Run one of the project's BioSTEAM scenarios as its page runs it, and keep the ru
 
 *read · scope: project · loose*
 
-Read the stream table a kept Proforma run holds: every stream of the base case with the unit it leaves and the unit it enters (none for a feed or a product), its phase, temperature, pressure, mass flow, price and largest components, as BioSTEAM held them after the run. Takes the run's artifact id and nothing else (a scenario's proforma.run artifact, or a reference biorefinery's proforma.reference artifact); you never type a number. The plant's feeds and products come first; a long table is cut to what a model may read and says how many streams it left out. Returns the run's evidence id to cite: a price, a cost or a recovery read from a run is cited by it. It runs nothing.
+Read the stream table a kept Proforma run holds: every stream of the base case with the unit it leaves and the unit it enters (none for a feed or a product), its phase, temperature, pressure, mass flow, price and largest components, as BioSTEAM held them after the run. Takes the run's artifact id and nothing else (a scenario's proforma.run artifact, a reference biorefinery's proforma.reference artifact, or a library plant's library.run artifact); you never type a number. The plant's feeds and products come first; a long table is cut to what a model may read and says how many streams it left out. Returns the run's evidence id to cite: a price, a cost or a recovery read from a run is cited by it. It runs nothing.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `artifactId` | string | yes | The artifact id of a kept Proforma run: a proforma.run artifact (a scenario's run, as run_flowsheet, selling_price or proforma_read return it) or a proforma.reference artifact (a reference biorefinery's run, as proforma_read lists it). Nothing else: no number, no stream, no setting. |
+| `artifactId` | string | yes | The artifact id of a kept run: a proforma.run artifact (a scenario's run, as run_flowsheet, selling_price or proforma_read return it), a proforma.reference artifact (a reference biorefinery's run, as proforma_read lists it) or a library.run artifact (a library plant's run, as engine_run and engine_report name it). Nothing else: no number, no stream, no setting. |
 
 ## fermOS
 

@@ -25,6 +25,12 @@ listed with no worker, each of its things run as one row at every door, a
 parameter that waits refused with nothing kept, a refusal inside the
 integration kept as a receipt, and the eight checks holding on it with the
 placeholders conformance builds, in the test's database and on a scratch one.
+Stage C (D5): the train engine registered by the core's own entry point, its
+things the project's trains read afresh, its parameters each with the origin
+its resolution names, a run one row at every door, a value that waits keeping
+nothing and the worker's refusal a receipt, the eight checks holding on it in
+a project with a train (`--project`), and the command without one refused in
+words naming it.
 """
 from __future__ import annotations
 
@@ -199,8 +205,17 @@ def test_a_parameter_is_a_parameter_spec_with_its_default_and_where_it_comes_fro
     p = EngineParameter(key="a-parameter", label="A placeholder", unit="placeholder-unit", value=1.0,
                         origin={"kind": "library-default", "ref": "a-package@0.1.0"}, boundsReason="none stated")
     assert isinstance(p, ParameterSpec) and p.sourceRule == ["library-default"] and p.group == "parameters"
+    # A thing the project holds rests a default on its records, an artifact or a person's typed value, each named.
+    for origin, rule in (({"kind": "record", "ref": "a-record"}, ["record:a-field"]),
+                         ({"kind": "artifact", "ref": "0" * 16}, ["artifact"]),
+                         ({"kind": "person-assumption", "by": "Ada Moreno", "at": DAY}, ["assumption"])):
+        held = EngineParameter(**{**p.model_dump(exclude={"sourceRule"}), "origin": origin,
+                                  **({"sourceRule": rule} if origin["kind"] == "record" else {})})
+        assert held.sourceRule == rule and conform._names_its_ground(held.origin)
     for bad, says in [
-        ({"origin": {"kind": "person-assumption", "by": "Ada Moreno"}}, "never person-assumption"),
+        ({"origin": {"kind": "model-estimate", "by": "a-model"}}, "names the origin model-estimate"),
+        ({"origin": {"kind": "record", "ref": "a-record"}}, "names the field it binds from"),
+        ({"origin": {"kind": "record"}, "sourceRule": ["record:a-field"]}, "names what it was read from"),
         ({"origin": {"kind": "convention"}}, "says what it is"),
         ({"value": "sideways", "choices": ["one", "another"]}, "none of its choices"),
         ({"boundsReason": " "}, "written reason"),
@@ -461,8 +476,9 @@ def test_the_checks_run_with_the_values_they_are_given(engines):
                              for i in estimates)
 
 
-def test_the_command_takes_things_and_inputs_and_refuses_anything_else(tmp_path):
-    assert conform._options(["--thing", "a", "--thing", "b", "--inputs", "x.json"]) == (["a", "b"], "x.json")
+def test_the_command_takes_things_inputs_and_a_project_and_refuses_anything_else(tmp_path):
+    assert conform._options(["--thing", "a", "--thing", "b", "--inputs", "x.json"]) == (["a", "b"], "x.json", None)
+    assert conform._options(["--project", "a-project"]) == ([], None, "a-project")
     with pytest.raises(conform.ConformRefused, match="no option here"):
         conform._options(["--things", "a"])
     path = tmp_path / "inputs.json"
@@ -1250,7 +1266,7 @@ def test_a_contract_engines_parameter_with_no_default_waits_for_the_run_to_set_i
     assert set_here.status_code == 200 and len(computed) == 1
     # Check 2 holds a parameter with no default that a run sets, and names one that says nothing of who sets it.
     held, said = conform._origins(SAMPLE, [t for t in SAMPLE.things() if t.id == "placeholder"])
-    assert held and "1 a run sets" in said
+    assert held and "1 with none, taking a run's value" in said
     monkeypatch.setattr(SAMPLE, "parameters", lambda thing, configuration: [
         p.model_copy(update={"sourceRule": ["library-default"]}) for p in no_default(thing, configuration)])
     held, said = conform._origins(SAMPLE, [t for t in SAMPLE.things() if t.id == "placeholder"])
@@ -1549,7 +1565,7 @@ def test_conformance_holds_all_eight_on_kinetics_with_the_placeholders_it_is_giv
     assert all(c.ok for c in found), [(c.number, c.said) for c in found if not c.ok]
     unset = sum(1 for f in FAMILIES for s in kinetics.family(f).specs()
                 if s.convention is None or "convention" not in s.sourceRule)
-    assert f"{unset} a run sets" in found[1].said and "with 9 values set" in found[2].said
+    assert f"{unset} with none, each taking a run's value" in found[1].said and "with 9 values set" in found[2].said
     # Check 6: an engine with no worker holds the worker libraries out of the service's process.
     assert "imported none of biorefineries, biosteam, cobra, pisces_sff, thermosteam" in found[5].said
     # Every family's placeholders compute.
@@ -1568,3 +1584,313 @@ def test_the_conform_command_holds_all_eight_on_kinetics_on_a_scratch_database(k
     assert printed.count("✓") == 8 and "every check holds" in printed
     held = conform.latest("kinetics")
     assert held.ok and held.version == contract.version_string(KINETICS)
+
+
+# ── the train engine (alpha 2.2 D5; pureos/engine.py, ADR-015) ──────────
+#
+# Every train here is test_train's STAND-IN (`spec_of`), run on its
+# TrainWorker with no record pool, as test_train runs it; a record a value
+# binds from is test_pureos_build_tool's STAND-IN.
+
+from openferment_core.pureos import engine as train_engine  # noqa: E402
+from openferment_core.pureos import kept as kept_trains  # noqa: E402
+from openferment_core.pureos import train_spec  # noqa: E402
+from test_train import AT as TRAIN_AT  # noqa: E402
+from test_train import BY as TRAIN_BY  # noqa: E402
+from test_train import VERSIONS as TRAIN_VERSIONS  # noqa: E402
+from test_train import TrainWorker, spec_of  # noqa: E402
+
+TRAIN_ENTRY = "openferment_core.pureos.engine:ENGINE"
+TRAIN = train_engine.ENGINE
+
+
+@pytest.fixture
+def train_engines(monkeypatch, tmp_path):
+    """A registry of BioSTEAM and the train engine, as core/pyproject.toml
+    registers them, over test_train's stand-in worker and no record pool."""
+    from openferment_core.pureos import catalogue
+
+    monkeypatch.setattr(registry, "entry_points", lambda: _points(("biosteam", BIOSTEAM_ENTRY),
+                                                                  ("train", TRAIN_ENTRY)))
+    w = TrainWorker()
+    monkeypatch.setattr(proforma, "call", w)
+    monkeypatch.setattr(catalogue, "_SPECS", {})
+    monkeypatch.setattr(train_spec, "_SPECS", {})
+    monkeypatch.setattr(train_spec, "_UNITS", {})
+    monkeypatch.setattr(train_spec, "_pool", lambda: None)
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    registry.reset()
+    yield w
+    registry.reset()
+
+
+def _saved(spec, by="Ada Moreno"):
+    """A train saved as pureOS's Builder saves it: the project's row (PUT /api/state/trains/<id>)."""
+    r = TestClient(api.app).put(f"/api/state/trains/{spec.id}", json={"by": by, "value": {
+        "train": spec.model_dump(mode="json"), "savedAt": f"{DAY}T00:00:00Z", "by": by}})
+    assert r.status_code == 200, r.text
+
+
+def test_the_service_registers_train_through_its_own_entry_point():
+    registry.reset()
+    try:
+        found = registry.found()["train"]
+        assert (found.entry, found.engine, found.error) == (TRAIN_ENTRY, TRAIN, None)
+        biosteam = registry.get("biosteam")
+        assert (TRAIN.worker, TRAIN.heavy) == (biosteam.worker, biosteam.heavy)
+        assert TRAIN.version() == {**biosteam.version(), "train run": train_spec.VERSION_WORDS.rsplit(" ", 1)[1]}
+        assert ready.conform_command("train") == ("python -m openferment_core.engine.conform train --project <id>, in "
+                                                  "a project of this database that holds one of its things "
+                                                  f"({TRAIN.things_are})")
+        assert ready.things_are("biosteam") is None and ready.conform_command("biosteam") == (
+            "python -m openferment_core.engine.conform biosteam")
+    finally:
+        registry.reset()
+
+
+def test_ready_says_where_the_train_engine_is_checked_when_the_database_is_the_production_one(train_engines,
+                                                                                                test_database,
+                                                                                                monkeypatch):
+    """The checks of an engine whose things are a project's own never run on
+    the production database (conform.in_project), so `pnpm ready` there says
+    where they run."""
+    server = test_database.server.render_as_string(hide_password=False)
+    rows = {c.name: c for c in ready.check_engines()}
+    assert rows["engine train"].mark == "warn" and "never checked here: python -m" in rows["engine train"].detail
+    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", server.rsplit("/", 1)[0] + "/openferment")
+    assert ready.on_production()
+    rows = {c.name: c for c in ready.check_engines()}
+    said = rows["engine train"]
+    assert said.mark == "skip" and said.detail.endswith(
+        "checked in a project of a development database that holds one of its things "
+        f"({TRAIN.things_are}): python -m openferment_core.engine.conform train --project <id> there, and pnpm prove "
+        "makes the checks in the proof's own project (step 10); the checks make runs in the project they check")
+    assert rows["engine biosteam"].mark == "warn" and "never checked here" in rows["engine biosteam"].detail
+
+
+def test_get_api_engines_lists_train_with_the_projects_trains_read_afresh(train_engines):
+    client = TestClient(api.app)
+    listed = {e["name"]: e for e in client.get("/api/engines").json()}
+    t = listed["train"]
+    assert (t["entryPoint"], t["error"], t["worker"], t["things"], t["thingsAre"]) == (
+        TRAIN_ENTRY, None, "openferment_core.workers.proforma_worker", [], TRAIN.things_are)
+    assert listed["biosteam"]["thingsAre"] is None
+    _saved(spec_of())
+    kept_trains.keep_train(None, lambda _: spec_of(id="k-1", name="A model's train"), "a-model")
+    t = {e["name"]: e for e in client.get("/api/engines").json()}["train"]
+    # A train run keeps every digit BioSTEAM gives, so it replays exactly.
+    exact = {"rtol": 0.0, "atol": 0.0}
+    assert [(x["id"], x["title"], x["kind"], x["configurations"], x["defaultConfiguration"], x["precision"])
+            for x in t["things"]] == [
+        ("t1", "A test train", "made", [], None, exact),
+        ("k-1", "A model's train, built by a-model", "kept", [], None, exact)]
+
+
+def test_a_trains_parameters_are_each_places_values_with_the_origins_their_resolution_names(train_engines,
+                                                                                         monkeypatch):
+    from test_pureos_build_tool import stand_in_pool
+
+    monkeypatch.setattr(train_spec, "_pool", stand_in_pool)
+    _saved(spec_of())
+    got = {p.key: p for p in TRAIN.parameters("t1", None)}
+    keys = list(got)
+    assert keys[0].startswith("inlet.") and keys.index("C1.split.Yeast") < keys.index("F1.V")
+    typed = got["inlet.broth_flow"]
+    assert (typed.value, typed.origin.kind, typed.origin.by, typed.origin.at) == (1.0, "person-assumption",
+                                                                                    TRAIN_BY, TRAIN_AT)
+    assert (got["inlet.T"].origin.kind, got["inlet.T"].origin.ref) == ("library-default", "thermosteam@0.0-standin")
+    assert got["F1.vessel_material"].origin.kind == "library-default"
+    # The records that bound a value name it; a value nothing gives has none, and a run sets it.
+    bound = got["C1.split.Ethanol"]
+    assert bound.origin.kind == "record" and bound.origin.ref == "r-st-1, r-st-2"
+    assert got["C1.moisture_content"].origin.kind == "record" and got["C1.moisture_content"].origin.ref == "r-cm-1"
+    # A value the train fills itself when a run leaves it unset says so in its note, with the resolution's reason:
+    # a component the typed inlet does not carry, a value the class decides at run time.
+    absent, decided = got["inlet.conc.Octane"], got["F1.T"]
+    assert (absent.value, absent.origin, decided.value, decided.origin) == (None, None, None, None)
+    assert absent.note.endswith(f"{train_engine.FILLS_ITSELF} (absent from the inlet: a component nobody typed is not "
+                                "in it).")
+    assert f"{train_engine.FILLS_ITSELF} (" in decided.note and "the class decides at run time" in decided.note
+    assert not [p.key for p in got.values() if p.value is not None and train_engine.FILLS_ITSELF in (p.note or "")]
+    held, said = conform._origins(TRAIN, TRAIN.things())
+    assert held, said
+    served = TestClient(api.app).get("/api/engines/train/parameters", params={"thing": "t1"}).json()
+    assert [p["key"] for p in served] == keys
+    with pytest.raises(EngineRefused, match="t1 takes no configuration, and 'a-placeholder' was named"):
+        TRAIN.parameters("t1", "a-placeholder")
+
+
+def test_a_trains_run_is_one_row_at_every_door_and_the_same_request_twice_is_that_row(train_engines):
+    _saved(spec_of())
+    client = TestClient(api.app)
+    first = client.post("/api/engines/train/run", json={"thing": "t1", "by": "Ada Moreno"})
+    assert first.status_code == 200, first.text
+    run = first.json()["run"]
+    assert (run["engine"], run["plant"], run["configuration"], run["tool"], run["status"], run["provenance"],
+            run["by"]) == ("train", "t1", None, train_spec.TRAIN_RUN, "done", "assumed", "Ada Moreno")
+    assert run["versions"] == TRAIN_VERSIONS and run["sff"]["recordId"] == f"run-{run['id']}"
+    assert client.post("/api/engines/train/run", json={"thing": "t1", "by": "Grace Hopper"}).json()["run"] == run
+    # pureOS's own route and its tool make the same run: one row, its first asker kept.
+    again = client.post("/api/pureos/train/run", json={"train": spec_of().model_dump(mode="json"), "by": "Grace Hopper"})
+    assert again.status_code == 200 and again.json()["artifactId"] == run["artifactId"]
+    assert [(r.id, r.by) for r in runs.listed("train")] == [(run["id"], "Ada Moreno")]
+    # A value set at the engine's door is converted at pureOS's: another basis, another row.
+    asked = {"thing": "t1", "by": "Ada Moreno", "inputs": [{"name": "F1.V", "quantity": person(0.2, unit="")}]}
+    changed = client.post("/api/engines/train/run", json=asked)
+    assert changed.status_code == 200, changed.text
+    set_here = next(i["quantity"] for i in changed.json()["run"]["inputs"] if i["name"] == "F1.V")
+    assert (set_here["value"], set_here["origin"]["by"], set_here["origin"]["at"]) == (0.2, "Ada Moreno", DAY)
+    assert len(runs.listed("train")) == 2
+    # The engine tools read it as any engine's run.
+    read = tools.run("engine_report", {"engine": "train", "run": run["id"]}, tools.ToolContext(model=llm.DEFAULT_PRIMARY))
+    assert read.error is None and f"{run['artifactId']}:values.overallRecovery" in [e.id for e in read.evidence]
+    held = runs.get(run["id"])
+    assert TRAIN.replay(held).identical and TRAIN.export_sff(held).id == f"run-{run['id']}"
+
+
+def test_a_train_that_waits_is_refused_with_nothing_kept_and_the_workers_refusal_is_a_receipt(train_engines,
+                                                                                              monkeypatch):
+    _saved(spec_of(units=[{"id": "D1", "type": "distillation"}]))
+    _saved(spec_of(id="t2", name="Another test train"))
+    client = TestClient(api.app)
+    waits = client.post("/api/engines/train/run", json={"thing": "t1", "by": "Ada Moreno"})
+    assert waits.status_code == 422 and "unit D1 (distillation): light_key waits" in waits.json()["detail"]
+    stray = client.post("/api/engines/train/run", json={"thing": "t2", "inputs": [
+        {"name": "F1.Vee", "quantity": person(0.2, unit="")}]})
+    assert stray.status_code == 422 and "unit F1 (flash) has no parameter 'Vee'; its parameters are" in (
+        stray.json()["detail"])
+    # The engine's door refuses as pureOS's does: every refusal at once, a bad input beside a value that waits.
+    both = client.post("/api/engines/train/run", json={"thing": "t1", "inputs": [
+        {"name": "D1.Vee", "quantity": person(0.2, unit="")}]}).json()["detail"]
+    assert both.startswith("unit D1 (distillation) has no parameter 'Vee'") and "D1 (distillation): light_key waits" in both
+    assert "the train engine runs no thing 'nosuch'; it runs t1, t2" in client.post(
+        "/api/engines/train/run", json={"thing": "nosuch"}).json()["detail"]
+    assert runs.listed("train") == []
+    refusing = TrainWorker(fail="Refused: unit F1 (flash, Flash) did not converge: BioSTEAM said: STAND-IN")
+    monkeypatch.setattr(proforma, "call", refusing)
+    refused = client.post("/api/engines/train/run", json={"thing": "t2", "by": "Ada Moreno"})
+    assert refused.status_code == 422 and "did not converge" in refused.json()["detail"]
+    (receipt,) = runs.listed("train")
+    assert (receipt.status, receipt.artifactId, receipt.plant, receipt.by) == ("refused", None, "t2", "Ada Moreno")
+    asked = len([c for c in refusing.calls if c[0] == "train_run"])
+    assert client.post("/api/engines/train/run", json={"thing": "t2"}).status_code == 422
+    assert len([c for c in refusing.calls if c[0] == "train_run"]) == asked, "answered from the receipt"
+
+
+def test_conformance_holds_all_eight_on_train_in_the_project_that_holds_its_train(train_engines):
+    _saved(spec_of())
+    found = conform.checks(TRAIN, by="conformance test", entry=TRAIN_ENTRY)
+    assert [c.number for c in found] == list(range(1, 9))
+    assert all(c.ok for c in found), [(c.number, c.said) for c in found if not c.ok]
+    assert "record run-" in found[4].said and "valid, score 0.5" in found[4].said
+    assert "imported none of the worker openferment_core.workers.proforma_worker" in found[5].said
+    assert "the train engine runs no thing 'conform-no-such-thing'" in found[6].said
+    # The model's run sets the first parameter a run may set, at its own default, as its estimate.
+    assert "a model's run (" in found[7].said and "1 value its estimate" in found[7].said
+    assert [r.by for r in runs.listed("train")] == [conform.MODEL, "conformance test"]
+
+
+def test_the_conform_command_checks_train_in_a_named_project_and_refuses_without_one(train_engines, test_database,
+                                                                                    monkeypatch, capsys):
+    _saved(spec_of())
+    server = test_database.server.render_as_string(hide_password=False)
+    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", server)
+    assert conform.main(["train"]) == 2
+    said = capsys.readouterr().out
+    assert f"the train engine's things are {TRAIN.things_are}. A database made for the checks holds none" in said
+    assert "--project <id>" in said
+    assert conform.main(["train", "--project", TEST_PROJECT]) == 0, capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert printed.count("✓") == 8 and "every check holds" in printed
+    held = conform.latest("train")
+    assert held.ok and held.version == contract.version_string(TRAIN)
+    assert conform.main(["train", "--project", "no-such-project"]) == 2
+    assert "holds no project 'no-such-project'" in capsys.readouterr().out
+    # The production database is refused, as pnpm db:reset refuses it, before anything runs.
+    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", server.rsplit("/", 1)[0] + "/openferment")
+    assert conform.main(["train", "--project", TEST_PROJECT]) == 2
+    assert "database 'openferment' is the production one, and the checks make runs in the project they check" in (
+        capsys.readouterr().out)
+
+
+def test_both_doors_refuse_a_trains_bad_inputs_together_by_place_in_one_set_of_words(train_engines):
+    """The engine's run route and pureOS's own route take a train's values
+    through one door (train_spec.converted): every bad name at once, each by
+    its place, in the same words, and nothing kept."""
+    _saved(spec_of())
+    client = TestClient(api.app)
+    bad = [{"name": n, "quantity": person(0.2, unit="")} for n in ("Z9.V", "V", "F1.nonesuch")]
+    engine = client.post("/api/engines/train/run", json={"thing": "t1", "by": "Ada Moreno", "inputs": bad})
+    own = client.post("/api/pureos/train/run", json={"train": spec_of().model_dump(mode="json"), "by": "Ada Moreno",
+                                                     "inputs": bad})
+    assert engine.status_code == own.status_code == 422
+    said = own.json()["detail"]
+    assert engine.json()["detail"] == said
+    assert "Z9.V names 'Z9', which is no unit of train t1 and not its inlet" in said
+    assert "V: a value a train's run sets is named <unit id>.<key> or inlet.<key>" in said
+    assert "unit F1 (flash) has no parameter 'nonesuch'" in said
+    assert runs.listed("train") == []
+
+
+def _conform_here(test_database, monkeypatch) -> None:
+    """The configured database for the checks' command: the test server, its
+    rows the test's own (the session's binding)."""
+    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", test_database.server.render_as_string(hide_password=False))
+
+
+def test_conform_in_a_project_runs_on_a_basis_of_its_own_beside_a_persons_run_of_the_train(train_engines,
+                                                                                           test_database,
+                                                                                           monkeypatch):
+    """A person of the project ran the train at its own values before the
+    checks, and asks for it again after them: the checks run on a basis of
+    their own (one parameter at its own default as their assumption), so
+    check 8 holds, the person's row stays theirs, and the person's later
+    request is answered from their own row."""
+    _saved(spec_of())
+    client = TestClient(api.app)
+    body = {"train": spec_of().model_dump(mode="json"), "by": "A. Stranger"}
+    mine = client.post("/api/pureos/train/run", json=body).json()["artifactId"]
+    _conform_here(test_database, monkeypatch)
+    v = conform.in_project("train", TEST_PROJECT, by="conformance check of train")
+    assert v.ok, [(c.number, c.said) for c in v.checks if not c.ok]
+    assert "of t1 with 1 value set" in v.checks[2].said
+    held = {r.id: r.by for r in runs.listed("train")}
+    assert held[mine] == "A. Stranger" == conform._created_by(mine)
+    assert sorted(held.values()) == sorted(["A. Stranger", "conformance check of train", conform.MODEL])
+    assert client.post("/api/pureos/train/run", json={**body, "by": "Ada Moreno"}).json()["artifactId"] == mine
+    checked = next(r for r in runs.listed("train") if r.by == "conformance check of train")
+    own = [i for i in checked.inputs if i.quantity.origin is not None and i.quantity.origin.by == checked.by]
+    assert [i.name for i in own] == ["inlet.broth_flow"] and conform.OWN_BASIS_NOTE in (own[0].quantity.origin.note or "")
+
+
+def test_conform_in_a_project_passes_over_a_draft_and_a_train_that_waits_and_checks_the_first_that_runs(
+        train_engines, test_database, monkeypatch):
+    """The checks run one thing in a named project: the first that runs. A
+    saved draft with no unit and a train whose value waits come first here;
+    each is passed over with its words and nothing kept, and every check
+    holds on t1, check 8's model on t1 too."""
+    _saved(spec_of(id="a0", name="A train that waits", units=[{"id": "D1", "type": "distillation"}]))
+    _saved(spec_of(id="b0", name="A draft", units=[]))
+    _saved(spec_of())
+    _conform_here(test_database, monkeypatch)
+    v = conform.in_project("train", TEST_PROJECT, by="conformance check of train")
+    assert v.ok, [(c.number, c.said) for c in v.checks if not c.ok]
+    three = v.checks[2].said
+    assert " of t1 with 1 value set" in three and "passed over before t1, each refused in words with nothing kept: " in three
+    assert "a0: unit D1 (distillation): light_key waits" in three and "b0: a train holds at least one unit" in three
+    assert "(t1)" in v.checks[1].said and "a0" not in v.checks[1].said
+    assert {r.plant for r in runs.listed("train")} == {"t1"}
+    # Named, a thing is checked as named: a train that waits fails check 3 in its words.
+    named = conform.in_project("train", TEST_PROJECT, by="conformance check of train", things=["a0"])
+    assert not named.ok and "light_key waits" in named.checks[2].said
+    assert {r.plant for r in runs.listed("train")} == {"t1"}
+
+
+def test_conform_in_a_project_that_holds_no_train_that_runs_is_refused_in_words(train_engines, test_database,
+                                                                                 monkeypatch):
+    _saved(spec_of(id="b0", name="A draft", units=[]))
+    _conform_here(test_database, monkeypatch)
+    with pytest.raises(conform.ConformRefused, match="the project holds no thing of the train engine that runs "
+                                                     r"\(b0: a train holds at least one unit\): name one with --thing"):
+        conform.in_project("train", TEST_PROJECT, by="conformance check of train")
+    assert runs.listed("train") == []
