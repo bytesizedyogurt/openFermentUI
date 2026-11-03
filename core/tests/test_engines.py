@@ -2469,6 +2469,10 @@ def test_the_two_library_doors_are_one_path(engines, plant_worker):
 # imported, with the engine imported first or second, and once conformance reads the engine as the service holds it.
 PROVIDED = """
 import json, sys
+from openferment_core import project_state
+# The provider lists a kept custom_train_v1 scenario's configurations from the
+# project's rows; this child reads no database, so the project keeps none.
+project_state.kept = lambda kind: []
 order = sys.argv[1]
 listed = []
 def scenario_things(engine):
@@ -2496,7 +2500,8 @@ def test_the_engine_package_reaches_proforma_through_the_provider_proforma_regis
     provider it registers as it is imported (engine/biosteam.py `provide`),
     whichever of the two is imported first; the engine alone lists none, and
     conformance reads the engine as the service's app holds it, Proforma
-    imported (conform.as_served)."""
+    imported (conform.as_served). The child reads no database: what it holds
+    to is the import order, on any host, with or without core/.env."""
     done = subprocess.run([sys.executable, "-c", PROVIDED, order], cwd=ROOT / "core", capture_output=True, text=True,
                           timeout=300)
     assert done.returncode == 0, done.stderr[-2000:]
