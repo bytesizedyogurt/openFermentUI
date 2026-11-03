@@ -33,8 +33,12 @@ from openferment_core.api import app
 from openferment_core.engine import library, runs, sff, simulator
 from openferment_core.models import Artifact, BasisInput, BasisSource, ReplayTolerance
 
+from standins import inputs_json
 from test_library import SUGARCANE_PARAMETERS, StandInWorker, over
 from test_sff import StandInToolkit, as_bytes, small_doc
+
+# The unit the stand-in's sugarcane price is read back in, as its parameters state it.
+PRICE_UNIT = {"stream.sugarcane.price": "USD/kg"}
 
 # The model the service calls first: the one whose estimates these are.
 MODEL = llm.DEFAULT_PRIMARY
@@ -186,7 +190,7 @@ def test_a_tool_that_states_no_precision_replays_identical_or_not_at_all(monkeyp
 def test_the_routes_run_list_report_and_refuse(worker):
     client = TestClient(app)
     ran = client.post("/api/library/sugarcane/run", json={
-        "overrides": [over("stream.sugarcane.price", 0.05).model_dump()], "by": "Ada Moreno"})
+        "inputs": inputs_json([over("stream.sugarcane.price", 0.05)], PRICE_UNIT), "by": "Ada Moreno"})
     assert ran.status_code == 200
     body = ran.json()
     assert body["run"]["status"] == "done" and body["run"]["provenance"] == "assumed"
@@ -200,8 +204,14 @@ def test_the_routes_run_list_report_and_refuse(worker):
     assert report["run"] == body["run"] and report["flowsheet"]["id"] == f"run-{body['run']['id']}"
     assert report["parameters"]["kind"] == "library" and report["parameters"] == body["parameters"]
     assert client.get("/api/runs/0000000000000000").status_code == 404
-    refused = client.post("/api/library/sugarcane/run", json={"overrides": [over("stream.nosuch.price", 1.0).model_dump()]})
+    refused = client.post("/api/library/sugarcane/run", json={
+        "inputs": inputs_json([over("stream.nosuch.price", 1.0)], {"stream.nosuch.price": "USD/kg"})})
     assert refused.status_code == 422 and "no parameter" in refused.json()["detail"]
+    # The request holds its own fields alone: the Overrides it took before alpha 2.2 D2 are refused, nothing run.
+    stale = client.post("/api/library/sugarcane/run", json={"overrides": [over("stream.sugarcane.price", 0.07).model_dump()]})
+    assert stale.status_code == 422 and [(e["type"], e["loc"]) for e in stale.json()["detail"]] == [
+        ("extra_forbidden", ["body", "overrides"])]
+    assert len(client.get("/api/runs").json()) == 1
 
 
 # ── one shape for every run (alpha 2.2 stage C, D3) ────────────────────

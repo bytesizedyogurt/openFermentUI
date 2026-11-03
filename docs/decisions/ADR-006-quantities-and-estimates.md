@@ -143,3 +143,15 @@ task (development plan §8).
   and Home as `verified`. Before 8.5 it reached them as the extractor wrote it, `unverified`.
 - The browser's `provenanceOf` reads a decided record by the same rule; `test_evidence_pool.py`
   holds the service's.
+
+### Alpha 2.2 C.4 (2026-11-03): a Proforma run bases a model's estimate as an estimate
+
+- A Proforma run's value whose origin is `model-estimate` binds as the model's estimate: its
+  basis source is `model-estimate`, the model's id its `by` and the day it was estimated in its
+  note (`basis.estimate_source`), and the run's sensitivity reads the input's source kind as
+  `model-estimate`. Until C.4 the binding based it as a person's assumption naming the model
+  (`basis.assumption_source`). Either way the run is `assumed`. A run a model set a value of is
+  therefore kept afresh under a new id when asked again, its output moving where the sensitivity
+  reads the kind; the earlier artifact stands and replays as it was (`docs/PROGRESS.md`,
+  Departures). A model's id on two lines is refused in words at Proforma's door, a blank one by
+  the request's own origin (`core/tests/test_proforma_overrides.py`).

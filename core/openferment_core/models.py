@@ -1771,6 +1771,10 @@ class ScenarioInput(BaseModel):
 
 
 class InputAssumption(BaseModel):
+    """A named value of a scenario's input, as the binding lays it on: a
+    person's assumption, or a model's estimate (`by` the model's id), with
+    the range the run's samples draw over."""
+
     key: str
     value: float
     low: float
@@ -1778,6 +1782,7 @@ class InputAssumption(BaseModel):
     by: str
     at: str
     note: str | None = None
+    origin: OverrideOrigin = "person-assumption"
 
 
 class ProformaScenarioInfo(BaseModel):
@@ -1794,19 +1799,26 @@ class ProformaScenarioInfo(BaseModel):
 
 
 class ProformaRunRequest(BaseModel):
+    """POST /api/proforma/run. It holds these fields alone: a field it does
+    not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
+
     scenarioId: str
-    # The older field (OF-BLD-014 §8.4): a named person's values by input
-    # key. Accepted for one release as a shim (OF-BLD-020 §2.2): each is read
-    # as an Override of `proforma:<scenarioId>`, and the run's basis says
-    # which field it read.
-    assumptions: list[InputAssumption] = Field(default_factory=list)
-    # A person's changes in the parameter panel (OF-BLD-020 D3), each an
-    # Override of scope `proforma:<scenarioId>`: a named assumption that wins
-    # over the records and any fermOS fit for its input, and that the run's
-    # basis names with the person. The page sends the scenario's own, which
-    # the project keeps (project_state.py); `project_state.run_request`
-    # reads them for a run Postdoc makes.
-    overrides: list[Override] = Field(default_factory=list)
+    # The values a person or a model sets (alpha 2.2 D2): each an input's key
+    # of the scenario's flowsheet, or a key of the Finance group of a
+    # flowsheet built from a vessel and a train, with a typed quantity in that
+    # parameter's unit and its origin; its low and high are the range the
+    # run's samples draw over. Proforma converts each at its door into the
+    # Override of `proforma:<scenarioId>` its binding takes
+    # (proforma.overrides_of): a named assumption that wins over the records
+    # and any fermOS fit for its input, and that the run's basis names with
+    # the person. The page sends the scenario's own, which the project keeps
+    # (project_state.py); `project_state.run_request` reads them for a run
+    # Postdoc makes.
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking: the run's row is created by them.
+    by: str = Field(default="", max_length=200)
     host: str | None = None
     seed: int = 0
     # How many Latin hypercube samples the run draws (OF-BLD-019 D7). The
@@ -3795,8 +3807,6 @@ class ProjectCreate(BaseModel):
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()
-# ProformaRunRequest names Override, which is defined further down (OF-BLD-020 §2.2).
-ProformaRunRequest.model_rebuild()
 # ParamResolveRequest names TrainSpec, defined further down (OF-BLD-020 §5.2).
 ParamResolveRequest.model_rebuild()
 AnswerPlan.model_rebuild()
@@ -4090,11 +4100,18 @@ class LibraryParameters(BaseModel):
 
 class LibraryRunRequest(BaseModel):
     """POST /api/library/{plant}/run: the configuration (None: the plant's
-    own), the values set for the run, each an Override of the plant's scope
-    (a person's assumption or a model's estimate), and who asks for the run."""
+    default, as the biosteam engine names it), the values set for the run,
+    and who asks for the run. It holds these fields alone: a field it does
+    not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
 
     configuration: str | None = Field(default=None, max_length=40)
-    overrides: list[Override] = Field(default_factory=list)
+    # The values a person or a model sets, each a parameter's key and a typed
+    # quantity in its unit with its origin (alpha 2.2 D2), checked and
+    # converted as the biosteam engine's own run checks and converts them
+    # (engine/biosteam.py `run_plant`).
+    inputs: list[EngineInput] = Field(default_factory=list)
     by: str = Field(default="", max_length=200)
 
 

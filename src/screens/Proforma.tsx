@@ -356,9 +356,10 @@ function BiosteamCard({
         {art && (
           <p className="text-caption text-ink-soft mt-1">
             Ran <span className="font-num">{when(art.createdAt)}</span> ·{' '}
-            <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${art.id}`)}>
+            <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/proforma/runs/${art.id}`)}>
               {art.id}
-            </a>
+            </a>{' '}
+            (<a className="hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${art.id}`)}>its artifact</a>)
           </p>
         )}
       </div>

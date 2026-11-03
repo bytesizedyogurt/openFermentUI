@@ -9,9 +9,12 @@
  * in the service's words (src/lib/http.ts), a refusal of a request's own
  * fields among them; and the unit each person's change is sent in
  * (src/lib/params.ts, `inputsOf`), a panel that shows part of its scope
- * among them, and a train's changes named by their place (src/lib/pureos.ts,
- * `trainInputs`). Run by `pnpm check:state`, offline: the service is a
- * stand-in for `fetch`.
+ * among them, a train's changes named by their place (src/lib/pureos.ts,
+ * `trainInputs`), a Proforma scenario's run carrying its changes as typed
+ * inputs (src/lib/proforma.ts, `runBody`) and its ceiling check its typed
+ * yield (`ceilingQuery`), and a run's grid read where it holds a dimension at
+ * one value (src/engine/interp.ts). Run by `pnpm check:state`, offline: the
+ * service is a stand-in for `fetch`.
  */
 import {
   EMPTY_STATE,
@@ -23,12 +26,14 @@ import {
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
-import type { Deposition, LiveConversation, Override, ParameterSpec, Scenario, TrainSpec } from '../src/data/types';
+import type { Deposition, FlowsheetInfo, LiveConversation, Override, ParameterSpec, Scenario, TrainSpec } from '../src/data/types';
 import { loadOverlay } from '../src/lib/intake';
 import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
 import { inputsOf } from '../src/lib/params';
 import { trainInputs, unitScope } from '../src/lib/pureos';
+import { ceilingQuery, runBody, runSpecs } from '../src/lib/proforma';
+import { interpolate } from '../src/engine/interp';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -251,6 +256,68 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
     named,
   );
   check('a train with nothing read sends nothing', trainInputs(train, overrides, {}).length === 0);
+}
+
+// ── a Proforma scenario's run, its changes sent as typed inputs (alpha 2.2 D2; src/lib/proforma.ts) ──
+
+{
+  const typed = (key: string, value: number, low?: number): Override =>
+    ({ scope: 'proforma:sc-1', key, value, ...(low != null ? { low } : {}), by: 'Ada', at: '2026-11-03T00:00:00Z', origin: 'person-assumption' }) as Override;
+  const changes = [typed('a', 1, 0.5), typed('b', 2)];
+  const panel = { specs: [{ key: 'a', unit: 'placeholder-unit-a' }, { key: 'b', unit: 'placeholder-unit-b' }] as ParameterSpec[] };
+  const shelfOnly = { inputs: [{ key: 'a', unit: 'placeholder-unit-c' }] } as unknown as FlowsheetInfo;
+  const ask = { scenarioId: 'sc-1', overrides: changes, by: 'Ada', host: null };
+  const body = runBody({ ...ask, specs: runSpecs(panel, shelfOnly) }) as unknown as Record<string, unknown>;
+  const sent = (body.inputs as { name: string; quantity: { unit: string; low?: number } }[]) ?? [];
+  check(
+    'a scenario’s run sends each change as a typed input in its panel spec’s unit, with its range, by the person asking, and neither older field',
+    sent.map((i) => `${i.name} ${i.quantity.unit}`).join(', ') === 'a placeholder-unit-a, b placeholder-unit-b' &&
+      sent[0]?.quantity.low === 0.5 && body.by === 'Ada' && !('overrides' in body) && !('assumptions' in body),
+    JSON.stringify(body),
+  );
+  const early = (runBody({ ...ask, specs: runSpecs(null, shelfOnly) }).inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('before the panel answers, the shelf’s inputs name each unit, and a key they lack goes with none for the service to refuse', early === 'a placeholder-unit-c, b ', early);
+  // Before the panel answers, the inputs as the service bound them name each unit, the shelf's a key they lack.
+  const bound = { inputs: [{ key: 'a', unit: 'placeholder-unit-e' }, { key: 'b', unit: 'placeholder-unit-d' }] };
+  const boundFirst = (runBody({ ...ask, specs: runSpecs(null, shelfOnly, bound) }).inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('before the panel answers, the inputs as bound name each unit, the shelf’s only a key they lack', boundFirst === 'a placeholder-unit-e, b placeholder-unit-d', boundFirst);
+  const partly = (runBody({ ...ask, specs: runSpecs(null, shelfOnly, { inputs: [bound.inputs[1]] }) }).inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('a key the binding lacks takes the shelf’s unit', partly === 'a placeholder-unit-c, b placeholder-unit-d', partly);
+  const neither = (runBody({ ...ask, specs: runSpecs(null, null, { inputs: [bound.inputs[1]] }) }).inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('with no shelf yet, the inputs as bound still name theirs', neither === 'a , b placeholder-unit-d', neither);
+  // A composite's Finance value goes in the unit its panel names (OF-BLD-020 §6.1).
+  const composite = { specs: [{ key: 'a', unit: 'placeholder-unit-a' }, { key: 'fin', unit: 'placeholder-unit-per-year' }] as ParameterSpec[] };
+  const fin = runBody({ ...ask, overrides: [typed('a', 1), typed('fin', 3)], specs: runSpecs(composite, shelfOnly, bound) });
+  const finSent = (fin.inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('a composite’s Finance value goes in the unit its panel names', finSent === 'a placeholder-unit-a, fin placeholder-unit-per-year', finSent);
+  // The ceiling check sends the yield's change as a typed input in its unit, and neither older field.
+  const q = ceilingQuery({ scenarioId: 'sc-1', host: null, overrides: [typed('yield', 0.4)], specs: [{ key: 'yield', unit: 'placeholder-share' }] });
+  const asked = JSON.parse(q.get('inputs') ?? '[]') as { name: string; quantity: { value: number; unit: string } }[];
+  check(
+    'the ceiling check sends the yield as a typed input in its unit, and neither older field',
+    asked.length === 1 && asked[0].name === 'yield' && asked[0].quantity.unit === 'placeholder-share' && !q.has('overrides') && !q.has('assumptions'),
+    q.toString(),
+  );
+  check('a ceiling check with no typed yield sends no inputs', !ceilingQuery({ scenarioId: 'sc-1', host: null }).has('inputs'));
+}
+
+// ── a run's grid with a dimension of one value (src/engine/interp.ts) ──
+
+{
+  // Two dimensions held at one value each and one swept over three: the base point reads the grid's own number.
+  const grid = {
+    dims: [
+      { key: 'held-a', values: [45] },
+      { key: 'held-b', values: [0.45] },
+      { key: 'swept', values: [0.3, 0.4, 0.5] },
+    ],
+    data: [1.0, 1.5, 2.0],
+  };
+  const base = interpolate(grid, { 'held-a': 45, 'held-b': 0.45, swept: 0.4 });
+  const between = interpolate(grid, { 'held-a': 45, 'held-b': 0.45, swept: 0.45 });
+  check('a grid holding a dimension at one value reads its own number at the base point', base === 1.5, String(base));
+  check('and interpolates along the dimension it sweeps', Math.abs(between - 1.75) < 1e-12, String(between));
+  check('a point off a held dimension is held to its one value', interpolate(grid, { 'held-a': 50, 'held-b': 0.45, swept: 0.3 }) === 1.0);
 }
 
 console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');

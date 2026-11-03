@@ -27,7 +27,15 @@ export interface TornadoProps {
   provenance: Provenance;
   notes?: string[];
   csvName?: string;
+  /** What the frame says when there is no row to draw; a scenario's sensitivity says it of its inputs by default. */
+  empty?: { what: string; where: string };
 }
+
+/** The words for a sensitivity with no row: what a scenario's own Tornado says. */
+export const NOTHING_VARIES = {
+  what: 'nothing varies in this run.',
+  where: 'An input with a range moves the price; a fixed input draws no bar.',
+};
 
 const magnitude = (r: TornadoRow) => Math.max(...r.values.map(Math.abs));
 
@@ -65,7 +73,7 @@ export function Tornado(props: TornadoProps) {
       table={toTable(props)}
       csvName={props.csvName ?? 'tornado'}
       notes={props.notes}
-      empty={rows.length ? null : { what: 'nothing varies in this run.', where: 'An input with a range moves the price; a fixed input draws no bar.' }}
+      empty={rows.length ? null : (props.empty ?? NOTHING_VARIES)}
     >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={props.title} data-testid="tornado">
         <line x1={mid} x2={mid} y1={T} y2={H - T} stroke="currentColor" strokeOpacity={0.4} />

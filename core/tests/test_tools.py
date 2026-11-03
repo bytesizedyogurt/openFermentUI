@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from openferment_core import artifacts, evidence_pool, intake, tools
 from openferment_core.engine import runs
 from openferment_core.models import Candidate, Quantity, ReviewDecision
+from standins import assumed_inputs
 
 STAND_IN = "STAND-IN for test_tools: invented records, not a paper's values."
 
@@ -292,8 +293,8 @@ def test_selling_price_cites_the_newest_run_of_a_seed_scenario(proforma_store, m
     pool = _yeast_pool()
     stamps = iter(["2026-10-20T10:00:00Z", "2026-10-20T11:00:00Z"])
     monkeypatch.setattr(artifacts, "_now", lambda: next(stamps))
-    older = proforma.run(ProformaRunRequest(scenarioId=test_seed, assumptions=_yeast_assumed(), samples=8), pool=pool)
-    newer = proforma.run(ProformaRunRequest(scenarioId=test_seed, assumptions=_yeast_assumed(), samples=12), pool=pool)
+    older = proforma.run(ProformaRunRequest(scenarioId=test_seed, inputs=assumed_inputs(_yeast_assumed()), samples=8), pool=pool)
+    newer = proforma.run(ProformaRunRequest(scenarioId=test_seed, inputs=assumed_inputs(_yeast_assumed()), samples=12), pool=pool)
     assert older.artifactId != newer.artifactId
     monkeypatch.setattr(proforma, "call", lambda op, args: pytest.fail("selling_price ran something"))
     r = tools.run("selling_price", {"scenarioId": test_seed}, _pcx(pool))
@@ -456,6 +457,12 @@ def test_proforma_tools_run_a_scenario_the_project_keeps_as_its_page_runs_it(pro
     (ev,) = r.evidence
     assert r.summary["scenarioId"] == sid and r.summary["provenance"] == "assumed" == ev.provenance
     assert any(a.action == "run" and a.target == sid and a.agent == "model" for a in audit.read())
+    # The run is one row of the biosteam engine (alpha 2.2 D6), created by the tool's caller, the model.
+    from openferment_core.engine import runs
+
+    row = runs.get(r.summary["artifactId"])
+    assert (row.engine, row.tool, row.plant, row.scenarioId, row.by) == (
+        "biosteam", "proforma.run", TEST_SEED[0]["modelId"], sid, c.model)
     cited = tools.run("selling_price", {"scenarioId": sid}, c)
     assert cited.error is None, cited.error
     assert cited.evidence[0].id == ev.id == r.summary["artifactId"] == cited.summary["evidenceId"]
@@ -719,3 +726,26 @@ def test_fermos_write_simulate_refuses_a_field_it_does_not_take(fermos_store):
                                         "fields": {"durationPreset": "forever"}}, _pcx(fermos_store))
     assert preset.error and "until-sugar-runs-out or fit-length" in preset.error
     assert "simulate:" in tools.REGISTRY["fermos_write"].description
+
+
+def test_a_scenario_run_by_a_tool_is_one_row_created_by_its_caller(proforma_store):
+    """proforma_write's run and run_flowsheet keep the one row of the
+    scenario's run (alpha 2.2 D3), created by the caller the tool names: a
+    person at the HTTP door, a model in a loop; the same run asked again is
+    that row, its first asker's."""
+    from openferment_core import project_state
+    from openferment_core.engine import runs
+
+    sid, scope, who, at = "sc-kept-2", "proforma:sc-kept-2", "Ada Moreno", "2026-10-31T00:00:00Z"
+    project_state.put("scenarios", sid, _kept_scenario(sid), who)
+    project_state.put("overrides", scope, [
+        {"scope": scope, "key": "plant_scale", "value": 100000.0, "by": who, "at": at},
+        {"scope": scope, "key": "glucose_price", "value": 0.4, "low": 0.3, "high": 0.5, "by": who, "at": at}], who)
+    person = tools.ToolContext(pool_factory=lambda: _yeast_pool(), person=who)
+    made = tools.run("proforma_write", {"action": "run", "target": sid, "fields": {}, "note": ""}, person)
+    assert made.error is None, made.error
+    row = runs.get(made.summary["artifactId"])
+    assert (row.engine, row.scenarioId, row.by, row.status) == ("biosteam", sid, who, "done")
+    again = tools.run("run_flowsheet", {"scenarioId": sid}, _pcx(_yeast_pool()))
+    assert again.summary["artifactId"] == row.id and runs.get(row.id).by == who
+    assert [r.id for r in runs.listed("biosteam")] == [row.id]

@@ -24,7 +24,7 @@
 // and clamps nothing.
 import { useEffect, useMemo, useState } from 'react';
 import { Calculator } from 'lucide-react';
-import type { CeilingCheck, ExtractionRecord, GeneosModelInfo, GeneosResult, Scenario } from '@/data/types';
+import type { CeilingCheck, ExtractionRecord, FlowsheetInfo, GeneosModelInfo, GeneosResult, Scenario } from '@/data/types';
 import { proformaScope, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState } from '@/components/ui';
@@ -43,7 +43,7 @@ import {
   type FrontierPointOut,
   type MixPointOut,
 } from '@/lib/geneos';
-import { ceilingCheck } from '@/lib/proforma';
+import { ceilingCheck, proformaShelf } from '@/lib/proforma';
 
 const UNIT = 'g g⁻¹';
 
@@ -78,6 +78,8 @@ export default function GeneOSModel() {
   const parameterOverrides = useStore((s) => s.parameterOverrides);
   const proformaFits = useStore((s) => s.proformaFits);
   const [aboveCeiling, setAboveCeiling] = useState<{ scenario: Scenario; check: CeilingCheck }[]>([]);
+  // Proforma's shelf, which names the unit a scenario's typed yield is sent in (alpha 2.2 D2).
+  const [flowsheets, setFlowsheets] = useState<FlowsheetInfo[] | null>(null);
 
   const substrate = route.query.get('substrate') ?? 'glucose';
   const modelId = route.query.get('model') ?? '';
@@ -97,6 +99,8 @@ export default function GeneOSModel() {
     geneosModels(ctrl.signal).then(setShelf, (e: unknown) => {
       if (!ctrl.signal.aborted) setDown(e instanceof GeneosDown ? `${e.message} ${e.remedy}` : String(e));
     });
+    // A shelf that cannot be read leaves a typed yield with no unit, which the service refuses in words.
+    proformaShelf(ctrl.signal).then(setFlowsheets, () => !ctrl.signal.aborted && setFlowsheets([]));
     return () => ctrl.abort();
   }, []);
 
@@ -163,14 +167,16 @@ export default function GeneOSModel() {
             host: null,
             fits: proformaFits[s.id] ?? {},
             overrides: (parameterOverrides[proformaScope(s.id)] ?? []).filter((o) => o.key === 'yield'),
+            // The yield is sent in its input's unit, as the shelf states it for the scenario's flowsheet.
+            specs: (flowsheets ?? []).find((f) => f.id === (s.flowsheetId ?? s.modelId))?.inputs ?? [],
           },
         })),
-    [scenarios, createdScenarioIds, proformaFits, parameterOverrides],
+    [scenarios, createdScenarioIds, proformaFits, parameterOverrides, flowsheets],
   );
   const asksKey = JSON.stringify(scenarioAsks.map((x) => x.ask));
   useEffect(() => {
     setAboveCeiling([]);
-    if (!loaded || !chosen) return;
+    if (!loaded || !chosen || flowsheets === null) return;
     const ctrl = new AbortController();
     Promise.allSettled(scenarioAsks.map(({ scenario, ask }) => ceilingCheck(ask, ctrl.signal).then((check) => ({ scenario, check })))).then(
       (results) => {
@@ -188,7 +194,7 @@ export default function GeneOSModel() {
     );
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, chosen?.id, substrate, product, asksKey]);
+  }, [loaded, chosen?.id, substrate, product, asksKey, flowsheets === null]);
 
   // Only the yields of this product measured on this sugar are held against its ceilings.
   const { on: yields, elsewhere } = useMemo(

@@ -87,9 +87,13 @@ export const listEngines = (signal?: AbortSignal) => call<EngineInfo[]>('/api/en
 /** One run of an engine's thing at the engine's own defaults, in a configuration it names (null: the thing's own). */
 export const runEngine = (engine: string, thing: string, configuration: string | null, by: string) =>
   call<RunReport>(`/api/engines/${id(engine)}/run`, post({ thing, configuration, inputs: [], by }));
-/** One engine run of a plant on its package's own values, in a configuration it built in (null: the plant's own). */
+/**
+ * One engine run of a plant on its package's own values, in a configuration it built in (null: the plant's default,
+ * as the biosteam engine names it). It sets no value of its own: `inputs` is the typed values a run sets (alpha 2.2
+ * D2), and a run with values is a scenario's (`makeScenario`, then `runScenario`).
+ */
 export const runPlant = (plant: string, configuration: string | null, by: string) =>
-  call<RunReport>(`/api/library/${id(plant)}/run`, post({ configuration, overrides: [], by }));
+  call<RunReport>(`/api/library/${id(plant)}/run`, post({ configuration, inputs: [], by }));
 export const makeScenario = (asked: ScenarioCreate) => call<StudyScenario>('/api/studies/scenarios', post(asked));
 
 export const listFlowsheets = (signal?: AbortSignal) => call<SFFFlowsheet[]>('/api/flowsheets', { signal });

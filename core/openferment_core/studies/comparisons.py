@@ -6,8 +6,12 @@ first run's; and every value any of the runs set for itself, with each run's
 value and its origin: a person's assumption, a model's estimate, or the
 library's own default where a library run set none. A library run's outputs
 are its price block (BioSTEAM's TEA) and a flowsheet's own outputs, read as
-they have always been read; a run of any other engine's are its
-outputs.values (engine/runs.py `values_of`), so runs of any engine compare.
+they have always been read; a run of any other engine's, a Proforma
+scenario's run among them, are its outputs.values (engine/runs.py
+`values_of`), so runs of any engine compare. A value named as a library run
+names its own (`price.<key>`, `outputs.<key>`: a Proforma run's solved
+price, `price.solvedPrice`) shares that output's row, so a library run's
+price and a Proforma run's meet on one row with its change.
 
 A comparison is computed as one `study.comparison` artifact whose inputs
 are the runs' artifacts, so its provenance is the weakest of theirs
@@ -84,16 +88,36 @@ def _typed(a: Artifact) -> dict[str, dict[str, Any]]:
     return {} if a.tool == library.LIBRARY_RUN else {v["name"]: v["quantity"] for v in runs.values_of(a)}
 
 
+# The blocks a library run's outputs.values name its numbers by
+# (engine/runs.py `values_of`): another run's value of such a name shares the
+# library run's row.
+SHARED = ("price", "outputs")
+
+
+def _row_of(name: str) -> tuple[str, str]:
+    """The row a run's typed value stands in: a library block's row for a
+    name a library run's outputs.values gives (`price.<key>`,
+    `outputs.<key>`), else `values.<name>`."""
+    block, _, key = name.partition(".")
+    return (block, key) if block in SHARED and key else ("values", name)
+
+
+def _typed_in(a: Artifact, block: str, key: str) -> dict[str, Any] | None:
+    """A run's typed value standing in the row (block, key), or None."""
+    return _typed(a).get(key if block == "values" else f"{block}.{key}")
+
+
 def _rows(arts: list[Artifact]) -> list[dict[str, Any]]:
     """Each output any run answers, in the order the first run gives them:
     a library run's `price.<key>` and `outputs.<key>`, and any other run's
-    `values.<name>`."""
+    `values.<name>`, a value named as a library run names its own sharing
+    that row (`_row_of`)."""
     keys: list[tuple[str, str]] = []
     for a in arts:
         price, outputs = _block(a, "price"), _block(a, "outputs")
         keys += [("price", k) for k in price if k not in SKIP and ("price", k) not in keys]
         keys += [("outputs", k) for k in outputs if ("outputs", k) not in keys]
-        keys += [("values", k) for k in _typed(a) if ("values", k) not in keys]
+        keys += [_row_of(k) for k in _typed(a) if _row_of(k) not in keys]
     out = []
     for block, key in keys:
         if block == "values":
@@ -101,9 +125,12 @@ def _rows(arts: list[Artifact]) -> list[dict[str, Any]]:
             values = [q["value"] if q is not None else None for q in held]
             units = [q["unit"] if q is not None else None for q in held]
         else:
-            values = [_block(a, block).get(key) for a in arts]
-            units = [(_block(a, "price").get("units") or {}).get(key) if block == "price"
-                     else _block(a, "outputUnits").get(key) for a in arts]
+            # A library run's block, or another run's value of the same name.
+            held = [None if a.tool == library.LIBRARY_RUN else _typed_in(a, block, key) for a in arts]
+            values = [q["value"] if q is not None else _block(a, block).get(key) for a, q in zip(arts, held)]
+            units = [q["unit"] if q is not None else
+                     (_block(a, "price").get("units") or {}).get(key) if block == "price"
+                     else _block(a, "outputUnits").get(key) for a, q in zip(arts, held)]
         unit = next((u for u in units if u is not None), None)
         out.append({"key": f"{block}.{key}", "unit": unit, "values": values,
                     "change": [_change(v, values[0]) for v in values]})
@@ -155,9 +182,10 @@ def _set_values(arts: list[Artifact]) -> list[dict[str, Any]]:
 
 def _ran(a: Artifact) -> Any:
     """What a run ran, as its basis names it: a library run's `plant`, a
-    contract engine's run's `thing`."""
+    contract engine's run's `thing`, a Proforma scenario's run's
+    `flowsheet`."""
     named = {i.name: i.value for i in a.inputs}
-    return named.get("plant", named.get("thing"))
+    return named.get("plant", named.get("thing", named.get("flowsheet")))
 
 
 def _compared(inputs: Sequence[BasisInput]) -> list[Artifact]:

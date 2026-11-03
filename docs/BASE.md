@@ -37,14 +37,16 @@ A module adds capability through a contract and edits nothing in the base:
   `openferment.engines`, runs its heavy computation in a worker process of its own, takes typed
   quantities and gives back one run of the shape every run has (`docs/api/engines.md`). The
   engines in this repository register the same way, from `core/pyproject.toml`: `biosteam`
-  (library plants and openFerment's composed flowsheet), `kinetics` (fermOS's model families,
-  its forecasts of a kept fit and its vessel designs, computing in the service's process with no
-  worker of its own, a vessel design in the Proforma worker) and `train` (pureOS's trains, each a
-  project's own, built and run in the Proforma worker). `python -m
-  openferment_core.engine.conform <name>` makes the contract's eight checks on an engine
-  (`kinetics` with `--inputs <file>`, the values its families wait for; `train` with `--project
-  <id>`, a project that holds a train, which the checks read and check in a copy of their own),
-  and `pnpm prove` makes them on every engine registered (step 10).
+  (library plants, openFerment's composed flowsheet and the shelf's scenario flowsheets, each run
+  as a Proforma scenario of it), `kinetics` (fermOS's model families, its forecasts of a kept fit
+  and its vessel designs, computing in the service's process with no worker of its own, a vessel
+  design in the Proforma worker) and `train` (pureOS's trains, each a project's own, built and run
+  in the Proforma worker). `python -m openferment_core.engine.conform <name>` makes the
+  contract's eight checks on an engine (`biosteam --thing <a scenario flowsheet> --inputs <file>`,
+  the values a scenario flowsheet waits for; `kinetics` with `--inputs <file>`, the values its
+  families wait for; `train` with `--project <id>`, a project that holds a train, which the
+  checks read and check in a copy of their own), and `pnpm prove` makes them on every engine
+  registered (step 10).
 - **An agent**: a program that acts in a project through the REST API or the MCP server, under
   a name of its own, every write audited under that name (`docs/TOOLS.md`).
 - **The literature layer**: Sci RAG Kit, used as a library, with its REST under `/rag` and an

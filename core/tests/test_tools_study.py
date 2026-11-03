@@ -200,7 +200,11 @@ def test_the_shelf_and_a_plants_parameters(worker):
     shelf = tools.run("engine_plants", {"words": "", "limit": 40}, as_model())
     ids = [p["plant"] for p in shelf.summary["plants"]]
     assert "sugarcane" in ids and "cellulosic_ethanol_v0" in ids
-    assert all(p["kind"] in ("plant", "flowsheet") for p in shelf.summary["plants"])
+    # The library's plants and flowsheets, then the shelf's flowsheets a Proforma scenario runs (alpha 2.2 D6).
+    kinds = [p["kind"] for p in shelf.summary["plants"]]
+    assert set(kinds) <= {"plant", "flowsheet", "scenario"} and "scenario" in kinds
+    assert kinds == sorted(kinds, key=lambda k: k == "scenario"), "the library's own rows first"
+    assert {p["plant"] for p in shelf.summary["plants"] if p["kind"] == "scenario"} >= {"ethanol_glucose_v0"}
     narrowed = tools.run("engine_plants", {"words": "sugarcane"}, as_model()).summary["plants"]
     assert [p["plant"] for p in narrowed] == ["sugarcane"]
     params = tools.run("engine_parameters", {"plant": "sugarcane", "words": "price"}, as_model())

@@ -104,11 +104,22 @@ def study() -> dict[str, Any]:
         "flowsheets": {rep.run.id: rep.flowsheet.model_dump(mode="json", exclude={"graph"})
                        for rep in reports if rep.flowsheet is not None},
         "scenarios": [s.model_dump(mode="json") for s in reversed(scenarios.listed())],
+        # The Proforma scenarios a run belongs to, by name: a Proforma scenario's run is BioSTEAM's (alpha 2.2 D6).
+        "proformaScenarios": _proforma_scenarios({rep.run.scenarioId for rep in reports if rep.run.scenarioId}),
         "comparisons": [rep.comparison.model_dump(mode="json") for rep in compared],
         # As kept: the lock's digest reads a prediction's absent field and a null one differently.
         "runbooks": [b.model_dump(mode="json", exclude_unset=True) for b in reversed(runbooks.listed())],
         "artifacts": artifacts,
     }
+
+
+def _proforma_scenarios(named: set[str]) -> list[dict[str, Any]]:
+    """Each Proforma scenario of the project a run names, its id and its
+    name, oldest first, as the project keeps it."""
+    from .. import project_state
+
+    return [{"id": row["id"], "name": row.get("name") or ""} for row in project_state.kept("scenarios")
+            if isinstance(row, dict) and row.get("id") in named]
 
 
 def versions(held: dict[str, Any]) -> dict[str, Any]:
@@ -220,7 +231,8 @@ def _run_section(run: dict[str, Any], art: dict[str, Any] | None, scenario_title
 
 def markdown(held: dict[str, Any], vers: dict[str, Any]) -> str:
     arts = held["artifacts"]
-    titles = {s["id"]: s["title"] for s in held["scenarios"]}
+    titles = {**{s["id"]: s["name"] for s in held.get("proformaScenarios") or []},
+              **{s["id"]: s["title"] for s in held["scenarios"]}}
     out = [f"# {_cell(held['project']['name'])}: studies", "",
            f"Exported from openFerment {vers['openferment']}, project `{held['project']['id']}`. `study.json` holds "
            "every number below with its unit and its origin, and the artifacts that computed them; `sff/` holds each "

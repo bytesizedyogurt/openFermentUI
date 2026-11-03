@@ -24,6 +24,7 @@ from openferment_core import artifacts, basis, intake, proforma, units
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
 from openferment_core.models import BasisInput, BasisSource, ComputedBasis, InputAssumption, ProformaRunRequest
+from standins import assumed_inputs
 
 CORE = Path(__file__).resolve().parent.parent
 MODULE = CORE / "openferment_core" / "flowsheets" / "ethanol_glucose_v0.py"
@@ -89,6 +90,11 @@ def _assigned(name: str):
 
 
 ASSUMED = [assume("plant_scale", 100000.0), assume("glucose_price", 0.4, 0.3, 0.5)]
+
+
+def typed(assumptions) -> list[dict]:
+    """A person's values as a run request's JSON `inputs` (alpha 2.2 D2)."""
+    return [i.model_dump(mode="json", exclude_none=True) for i in assumed_inputs(assumptions)]
 
 
 # ── the flowsheet and its shelf entry (D4) ─────────────────────────────
@@ -205,14 +211,14 @@ def test_the_bind_endpoint_binds_a_flowsheet_and_refuses_in_words(client, held):
 
 
 def test_a_scenario_made_here_runs_its_flowsheet_bound_as_bind_binds_it(standin, held):
-    r = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, samples=20),
-                     pool=standin)
+    r = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED),
+                                        samples=20), pool=standin)
     assert r.scenarioId == MADE_HERE and r.flowsheet == ETHANOL and r.provenance == "assumed" and r.samples == 20
     assert [i.binding for i in r.inputs] == [i.binding for i in proforma.bind_inputs(ETHANOL, standin.records, None, ASSUMED)]
     assert r.priceBasis == shelf.ETHANOL_PRICE_BASIS and r.leavesOut == shelf.ETHANOL_LEAVES_OUT
     assert r.tea is not None and sum(line.perUnit for line in r.tea.lines) == pytest.approx(r.basePrice, rel=1e-12)
     assert len(r.grid.msp) == 125 and r.evidence.unit == shelf.ETHANOL_PRICE_BASIS and MADE_HERE in r.evidence.label
-    kept = proforma.run(ProformaRunRequest(scenarioId=HELD, assumptions=ASSUMED, samples=20), pool=standin)
+    kept = proforma.run(ProformaRunRequest(scenarioId=HELD, inputs=assumed_inputs(ASSUMED), samples=20), pool=standin)
     assert kept.artifactId != r.artifactId and kept.quantiles == r.quantiles  # the same case, two scenarios' runs
 
 
@@ -234,7 +240,7 @@ def test_every_other_run_is_refused_in_words(standin, client, held):
         assert r.status_code == 422 and words in r.json()["detail"], (body, r.json())
     # A held scenario may name its own flowsheet.
     ok = client.post("/api/proforma/run", json={"scenarioId": HELD, "flowsheet": ETHANOL, "samples": 8,
-                                                "assumptions": [a.model_dump() for a in ASSUMED]})
+                                                "inputs": typed(ASSUMED)})
     assert ok.status_code == 200 and ok.json()["scenarioId"] == HELD
 
 
@@ -242,8 +248,8 @@ def test_every_other_run_is_refused_in_words(standin, client, held):
 
 
 def test_every_run_names_its_scenario_in_the_basis_as_a_convention(standin, held):
-    for sid, req in ((HELD, {"assumptions": ASSUMED}),
-                     (MADE_HERE, {"flowsheet": ETHANOL, "assumptions": ASSUMED})):
+    for sid, req in ((HELD, {"inputs": assumed_inputs(ASSUMED)}),
+                     (MADE_HERE, {"flowsheet": ETHANOL, "inputs": assumed_inputs(ASSUMED)})):
         art = artifacts.get(proforma.run(ProformaRunRequest(scenarioId=sid, samples=8, **req), pool=standin).artifactId)
         named = [i for i in art.inputs if i.name == "scenario"]
         assert len(named) == 1 and named[0].value == sid and named[0].source.kind == "convention"
@@ -272,7 +278,7 @@ def test_the_basis_names_the_packages_and_the_conventions():
 
 
 def test_the_latest_run_and_its_evidence_follow_the_scenario(standin, held):
-    kept = proforma.run(ProformaRunRequest(scenarioId=HELD, assumptions=ASSUMED, samples=8), pool=standin)
+    kept = proforma.run(ProformaRunRequest(scenarioId=HELD, inputs=assumed_inputs(ASSUMED), samples=8), pool=standin)
     assert proforma.latest_run("sc-nowhere") is None and proforma.latest_run(MADE_HERE) is None
     assert proforma.latest_run(HELD).id == kept.artifactId
     ev = proforma.evidence_of(artifacts.get(kept.artifactId))
@@ -300,20 +306,26 @@ def test_every_run_names_the_utility_prices_and_cost_index_it_priced_on():
 def test_a_run_with_no_sample_the_flowsheet_holds_says_why_and_names_its_run(standin, client):
     # §2.R, review 3: every case asks a yield above the theoretical, so no
     # sample runs; the 422 says why and names the run it kept, which was
-    # stored before the refusal and was found nowhere on the screen.
+    # stored before the refusal and was found nowhere on the screen. From
+    # alpha 2.2 (D3) the run is kept as a row of the biosteam engine like any
+    # other, done, its price block empty.
+    from openferment_core.engine import runs
+
     above = standins.STANDIN_THEORETICAL * 1.2
     every = [assume("feed_glucose_conc", 100.0), assume("titre", 45.0), assume("yield", above),
              assume("productivity", 2.0), *ASSUMED]
     host = "nobody"  # no record binds: every input is a named person's assumption
     with pytest.raises(proforma.ScenarioRefused) as e:
-        proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, host=host, assumptions=every, samples=4),
-                     pool=standin)
+        proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, host=host, inputs=assumed_inputs(every),
+                                        samples=4), pool=standin)
     said = str(e.value)
     [kept] = [a for a in artifacts.all_artifacts() if a.tool == proforma.RUN]
     assert "no sample the flowsheet could hold" in said and kept.id in said
     assert "yield: 4 of 4" in said and "the base case" in said and "yield" in kept.output["baseInfeasible"]
+    row = runs.get(kept.id)
+    assert (row.status, row.engine, row.artifactId, row.outputs["values"]) == ("done", "biosteam", kept.id, [])
     r = client.post("/api/proforma/run", json={"scenarioId": MADE_HERE, "flowsheet": ETHANOL, "host": host, "samples": 4,
-                                               "assumptions": [a.model_dump() for a in every]})
+                                               "inputs": typed(every)})
     assert r.status_code == 422 and kept.id in r.json()["detail"] and "yield: 4 of 4" in r.json()["detail"]
 
 
@@ -321,10 +333,10 @@ def test_a_number_that_is_not_finite_and_a_negative_seed_are_refused_in_words(st
     # §2.R, review 5: both were a 500 (the infinite assumption reached the
     # artifact's canonical JSON; the negative seed reached the sampler).
     for field in ("value", "low", "high"):
-        a = {"key": "plant_scale", "value": 100000.0, "low": 100000.0, "high": 100000.0, "by": BY, "at": "2026-10-20"}
-        a[field] = "INF"
-        body = (f'{{"scenarioId": "{MADE_HERE}", "flowsheet": "{ETHANOL}", "samples": 4, "assumptions": ['
-                + ", ".join(__import__("json").dumps(x) for x in (a, ASSUMED[1].model_dump()))
+        (a,) = typed([assume("plant_scale", 100000.0)])
+        a["quantity"][field] = "INF"
+        body = (f'{{"scenarioId": "{MADE_HERE}", "flowsheet": "{ETHANOL}", "samples": 4, "inputs": ['
+                + ", ".join(__import__("json").dumps(x) for x in (a, *typed(ASSUMED[1:])))
                 + "]}").replace('"INF"', "Infinity")
         r = client.post("/api/proforma/run", content=body, headers={"Content-Type": "application/json"})
         assert r.status_code == 422 and "plant_scale" in r.json()["detail"] and "finite" in r.json()["detail"], (field, r.text)
@@ -333,7 +345,7 @@ def test_a_number_that_is_not_finite_and_a_negative_seed_are_refused_in_words(st
     proforma.call = lambda op, args: called.append(op) or real(op, args)
     try:
         r = client.post("/api/proforma/run", json={"scenarioId": MADE_HERE, "flowsheet": ETHANOL, "seed": -1, "samples": 4,
-                                                   "assumptions": [a.model_dump() for a in ASSUMED]})
+                                                   "inputs": typed(ASSUMED)})
     finally:
         proforma.call = real
     assert r.status_code == 422 and "seed" in r.json()["detail"] and called == []

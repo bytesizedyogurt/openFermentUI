@@ -26,9 +26,10 @@
 //
 // AN OVERRIDE BECOMES AN INPUT HERE ALONE (alpha 2.2 D2). The browser keeps a
 // person's change as an `Override`; every request that carries changes (the
-// resolve here, fermOS's bind, simulation, vessel and forecast) sends them as
-// typed inputs through `inputsOf`, each in the unit its parameter is in, and
-// the service converts each back into that Override at its door.
+// resolve here, fermOS's bind, simulation, vessel and forecast, pureOS's train
+// run, Proforma's run) sends them as typed inputs through `inputsOf`, each in
+// the unit its parameter is in, and the service converts each back into that
+// Override at its door.
 import type { EngineInput, Override, ParameterSpec, ParamResolveRequest, ParamResolveResult, ParamScope, TrainSpec } from '@/data/types';
 import { ServiceDown, ServiceRefused, call } from './http';
 
@@ -98,7 +99,7 @@ export const paramScope = (scope: string, ask: ParamAsk = {}, signal?: AbortSign
  * input (core/tests/standins.py's `as_inputs` mirrors it); a key the specs do
  * not name goes with no unit, and the service says why it cannot stand.
  */
-export function inputsOf(overrides: Override[], specs: ParameterSpec[]): EngineInput[] {
+export function inputsOf(overrides: Override[], specs: Pick<ParameterSpec, 'key' | 'unit'>[]): EngineInput[] {
   const unit = new Map(specs.map((s) => [s.key, s.unit]));
   return overrides.map((o) => ({
     name: o.key,

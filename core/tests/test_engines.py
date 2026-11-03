@@ -880,7 +880,7 @@ def test_check_7_fails_when_the_same_request_reaches_the_worker_again(engines, m
 
 def test_check_7_holds_an_engine_without_compute_to_a_refusal_in_words_that_keeps_nothing(engines):
     ok, words = conform._refused_unknown(registry.get("biosteam"), "conformance test")
-    assert ok and "the shelf has no conform-no-such-thing" in words and "0 run kept" in words
+    assert ok and "the biosteam engine runs no thing 'conform-no-such-thing'" in words and "0 run kept" in words
 
 
 def test_a_thing_that_must_name_a_configuration_is_checked_in_its_first_and_refused_with_none(engines, monkeypatch):
@@ -2323,3 +2323,287 @@ def test_sigterm_ends_the_command_with_its_code_and_drops_the_checks_database(te
         if left:
             migrate.drop(name, test_database.server)
     assert not left, f"{name} was left on the server"
+
+
+# ── biosteam's scenario flowsheets (alpha 2.2 stage C, D6) ─────────────
+
+from types import SimpleNamespace  # noqa: E402
+
+import standins  # noqa: E402
+from openferment_core.models import InputAssumption  # noqa: E402
+from standins import assumed_inputs  # noqa: E402
+
+SCENARIO_FLOWSHEET = "ethanol_glucose_v0"
+# test_proforma_runs' typed values: the plant scale and the glucose price, the two inputs no record binds.
+SCENARIO_ASSUMED = [InputAssumption(key="plant_scale", value=100000.0, low=100000.0, high=100000.0, by="Ada Moreno",
+                                    at=DAY, note="a STAND-IN for a test"),
+                    InputAssumption(key="glucose_price", value=0.4, low=0.3, high=0.5, by="Ada Moreno", at=DAY,
+                                    note="a STAND-IN for a test")]
+
+
+@pytest.fixture
+def scenario_worker(monkeypatch, tmp_path):
+    """The closed-form STAND-IN evaluator in place of the Proforma worker, over the stand-in records, as
+    test_proforma_runs' `standin` holds them; the engines' registry with BioSTEAM in it."""
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
+    rs = standins._standin_yeast_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: pool)
+    return pool
+
+
+def test_biosteam_lists_the_shelfs_scenario_flowsheets_beside_its_library_plants(engines, scenario_worker):
+    from openferment_core.flowsheets import shelf
+
+    biosteam = registry.get("biosteam")
+    things = {t.id: t for t in biosteam.things()}
+    library_ids = [p.id for p in library.shelf().plants if p.id in things]
+    assert list(things)[: len(library_ids)] == library_ids, "the library's own things first, as the shelf lists them"
+    flowsheet = things[SCENARIO_FLOWSHEET]
+    assert (flowsheet.kind, flowsheet.title, flowsheet.configurations, flowsheet.defaultConfiguration) == (
+        "scenario", shelf.SHELF[SCENARIO_FLOWSHEET].title, [], None)
+    assert (flowsheet.precision.rtol, flowsheet.precision.atol) == (0.0, 0.0), "a Proforma run replays identically"
+    # A reference biorefinery is no scenario's flowsheet, and the composite waits for a scenario that names its parts.
+    assert not {f for f, info in shelf.SHELF.items() if info.reference} & set(things)
+    assert shelf.COMPOSITE not in things
+    listed = {e["name"]: e for e in TestClient(api.app).get("/api/engines").json()}
+    assert SCENARIO_FLOWSHEET in [t["id"] for t in listed["biosteam"]["things"]]
+
+
+def test_a_scenario_flowsheets_parameters_are_what_a_scenario_of_it_binds(engines, scenario_worker):
+    biosteam = registry.get("biosteam")
+    params = {p.key: p for p in biosteam.parameters(SCENARIO_FLOWSHEET, None)}
+    bound = {i.key: i for i in proforma.bind_flowsheet(SCENARIO_FLOWSHEET, pool=scenario_worker).inputs}
+    assert set(params) == {i.key for i in shelf_inputs(SCENARIO_FLOWSHEET)}
+    for key, i in bound.items():
+        p = params[key]
+        if i.binding == "records":
+            assert (p.value, p.origin.kind, p.origin.ref) == (i.value, "record", ", ".join(i.recordIds)), key
+        else:
+            assert (p.value, p.origin) == (None, None) and "assumption" in p.sourceRule, key
+    assert params["ethanol_purity"].origin.kind == "convention" and params["ethanol_purity"].origin.note
+    # The engine's route reads the same, and a configuration the flowsheet takes none of is refused in words.
+    client = TestClient(api.app)
+    served = client.get("/api/engines/biosteam/parameters", params={"thing": SCENARIO_FLOWSHEET}).json()
+    assert [p["key"] for p in served] == list(params)
+    refused = client.get("/api/engines/biosteam/parameters", params={"thing": SCENARIO_FLOWSHEET, "configuration": "x"})
+    assert refused.status_code == 422 and "takes no configuration" in refused.json()["detail"]
+    held, said = conform._origins(biosteam, [t for t in biosteam.things() if t.id == SCENARIO_FLOWSHEET])
+    assert held, said
+
+
+def shelf_inputs(flowsheet):
+    from openferment_core.flowsheets import shelf
+
+    return shelf.SHELF[flowsheet].inputs
+
+
+def test_a_scenario_flowsheets_run_through_the_engine_is_one_proforma_row_with_its_file(engines, scenario_worker):
+    client = TestClient(api.app)
+    inputs = [i.model_dump(mode="json", exclude_none=True) for i in assumed_inputs(SCENARIO_ASSUMED)]
+    waits = client.post("/api/engines/biosteam/run", json={"thing": SCENARIO_FLOWSHEET, "by": "Ada Moreno"})
+    assert waits.status_code == 422 and "wait for a source" in waits.json()["detail"] and runs.listed() == []
+    first = client.post("/api/engines/biosteam/run", json={"thing": SCENARIO_FLOWSHEET, "inputs": inputs,
+                                                           "by": "Ada Moreno"})
+    assert first.status_code == 200, first.json()
+    run = first.json()["run"]
+    assert (run["engine"], run["tool"], run["plant"], run["configuration"], run["scenarioId"], run["by"]) == (
+        "biosteam", proforma.RUN, SCENARIO_FLOWSHEET, None, SCENARIO_FLOWSHEET, "Ada Moreno")
+    assert run["status"] == "done" and run["provenance"] == "assumed" and run["sff"]["recordId"] == f"run-{run['id']}"
+    assert {v["name"] for v in run["outputs"]["values"]} >= {"price.solvedPrice", "quantiles.p50"}
+    # The same request again, at the engine or at Proforma's own route as an unsaved scenario named by the
+    # flowsheet's id, is the one row.
+    again = client.post("/api/engines/biosteam/run", json={"thing": SCENARIO_FLOWSHEET, "inputs": inputs,
+                                                           "by": "Grace Hopper"}).json()["run"]
+    routed = client.post("/api/proforma/run", json={"scenarioId": SCENARIO_FLOWSHEET, "flowsheet": SCENARIO_FLOWSHEET,
+                                                    "inputs": inputs, "by": "Grace Hopper"})
+    assert again == run and routed.status_code == 200 and routed.json()["artifactId"] == run["id"]
+    assert [r.id for r in runs.listed("biosteam")] == [run["id"]]
+    # A value its input cannot take is refused before anything runs, and keeps nothing.
+    wrong = [{**inputs[0], "quantity": {**inputs[0]["quantity"], "unit": "placeholder-unit"}}, inputs[1]]
+    refused = client.post("/api/engines/biosteam/run", json={"thing": SCENARIO_FLOWSHEET, "inputs": wrong})
+    assert refused.status_code == 422 and "plant_scale is set in 'placeholder-unit'" in refused.json()["detail"]
+    assert len(runs.listed("biosteam")) == 1
+
+
+def test_conformance_holds_on_a_scenario_flowsheet(engines, scenario_worker):
+    """The eight checks on one of biosteam's scenario flowsheets, its values set as `--inputs` sets them, on the
+    stand-in evaluator (test_engines_sim.py makes them on the real worker, beside a library plant)."""
+    biosteam = registry.get("biosteam")
+    found = conform.checks(biosteam, by="conformance test", things=[SCENARIO_FLOWSHEET], entry=BIOSTEAM_ENTRY,
+                           inputs=assumed_inputs(SCENARIO_ASSUMED))
+    assert [c.number for c in found] == list(range(1, 9))
+    assert all(c.ok for c in found), [(c.number, c.said) for c in found if not c.ok]
+    model = next(c for c in found if c.number == 8).said
+    assert "conformance-model" in model and "its estimate" in model, model
+
+
+def test_the_two_library_doors_are_one_path(engines, plant_worker):
+    """POST /api/library/{plant}/run takes typed inputs and runs through the
+    biosteam engine's own path (engine/biosteam.py `run_plant`): a value's
+    unit is checked before the plant is built at both doors, in one set of
+    words, and a plant that takes configurations, asked with none, runs in
+    its default at both, and at the tools' door, as one row."""
+    biosteam = registry.get("biosteam")
+    client = TestClient(api.app)
+    typed = given("stream.sugarcane.price", 2.0, unit="placeholder-unit").model_dump(mode="json", exclude_none=True)
+    doors = [client.post("/api/library/sugarcane/run", json={"inputs": [typed], "by": "Ada Moreno"}),
+             client.post("/api/engines/biosteam/run", json={"thing": "sugarcane", "inputs": [typed], "by": "Ada Moreno"})]
+    assert [d.status_code for d in doors] == [422, 422]
+    assert doors[0].json()["detail"] == doors[1].json()["detail"] and "the parameter's unit is 'USD/kg'" in doors[0].text
+    assert "library_run" not in plant_worker.calls and runs.listed() == [], "a value refused keeps nothing"
+    (cane,) = [t for t in biosteam.things() if t.id == "cane"]
+    assert cane.configurations and cane.defaultConfiguration == cane.configurations[0]
+    routed = client.post("/api/library/cane/run", json={"by": "Ada Moreno"})
+    assert routed.status_code == 200, routed.json()
+    run = routed.json()["run"]
+    assert run["configuration"] == cane.defaultConfiguration
+    engine = client.post("/api/engines/biosteam/run", json={"thing": "cane", "by": "Ada Moreno"}).json()["run"]
+    tool = tools.run("engine_run", {"plant": "cane"}, tools.ToolContext(person="Ada Moreno"))
+    assert engine["id"] == run["id"] == tool.summary["runId"] and biosteam.run("cane", None, [], "Ada Moreno").id == run["id"]
+    assert [r.id for r in runs.listed("biosteam")] == [run["id"]]
+
+
+# The things the biosteam engine lists of kind `scenario`, in a process of its own: before and after Proforma is
+# imported, with the engine imported first or second, and once conformance reads the engine as the service holds it.
+PROVIDED = """
+import json, sys
+order = sys.argv[1]
+listed = []
+def scenario_things(engine):
+    return [t.id for t in engine.things() if t.kind == "scenario"]
+if order == "engine first":
+    from openferment_core.engine import biosteam
+    listed.append(scenario_things(biosteam.ENGINE))
+    from openferment_core import proforma
+elif order == "proforma first":
+    from openferment_core import proforma
+    from openferment_core.engine import biosteam
+else:
+    from openferment_core.engine import biosteam, conform
+    listed.append(scenario_things(biosteam.ENGINE))
+    conform.as_served()
+listed.append(scenario_things(biosteam.ENGINE))
+print(json.dumps({"listed": listed, "providers": list(biosteam._PROVIDERS)}))
+"""
+
+
+@pytest.mark.parametrize("order", ["engine first", "proforma first", "as served"])
+def test_the_engine_package_reaches_proforma_through_the_provider_proforma_registers(order):
+    """The plan's D6 amendment at C.4: engine/ imports no module above it, so
+    Proforma gives the biosteam engine its scenario flowsheets through the
+    provider it registers as it is imported (engine/biosteam.py `provide`),
+    whichever of the two is imported first; the engine alone lists none, and
+    conformance reads the engine as the service's app holds it, Proforma
+    imported (conform.as_served)."""
+    done = subprocess.run([sys.executable, "-c", PROVIDED, order], cwd=ROOT / "core", capture_output=True, text=True,
+                          timeout=300)
+    assert done.returncode == 0, done.stderr[-2000:]
+    got = json.loads(done.stdout.strip().splitlines()[-1])
+    assert got["providers"] == ["proforma"] and "ethanol_glucose_v0" in got["listed"][-1]
+    if order != "proforma first":
+        assert got["listed"][0] == [], "the engine alone lists no scenario flowsheet"
+
+
+def test_a_plant_that_takes_configurations_is_read_in_its_default_at_every_parameters_door(engines, plant_worker):
+    """The plan's D6 amendment at C.4: a plant that takes configurations,
+    asked with none, is read in its default at every door that reads its
+    parameters, as every door runs it: the engine's route, the library's
+    route, the engine_parameters tool, and engine_plants' row says so."""
+    biosteam = registry.get("biosteam")
+    (cane,) = [t for t in biosteam.things() if t.id == "cane"]
+    default = cane.defaultConfiguration
+    assert default is not None and cane.configurations
+    client = TestClient(api.app)
+    served = client.get("/api/engines/biosteam/parameters", params={"thing": "cane"})
+    assert served.status_code == 200, served.json()
+    named = client.get("/api/engines/biosteam/parameters", params={"thing": "cane", "configuration": default}).json()
+    assert served.json() == named
+    library_door = client.get("/api/library/cane/parameters")
+    assert library_door.status_code == 200 and library_door.json()["configuration"] == default
+    tool = tools.run("engine_parameters", {"plant": "cane"}, tools.ToolContext(person="Ada Moreno"))
+    assert tool.error is None and tool.summary["configuration"] == default, tool.error
+    asked_for = {args.get("configuration") for op, args in plant_worker.library.calls if op == "library_parameters"}
+    assert asked_for == {default}
+    rows = {r["plant"]: r for r in tools.run("engine_plants", {"words": "cane"}, tools.ToolContext()).summary["plants"]}
+    assert (rows["cane"]["defaultConfiguration"], rows["cane"]["requiresConfiguration"]) == (default, False)
+    assert rows["cane"]["configurations"] == cane.configurations
+
+
+def test_an_unknown_thing_at_biosteams_door_is_refused_naming_the_engines_own_things(engines, scenario_worker):
+    """A thing neither on the library's shelf nor provided is refused in
+    words naming what the engine runs, the shelf's scenario flowsheets among
+    them, at the run route, the parameters route, the tools and check 7, and
+    keeps nothing; a subsystem the shelf holds is the library's to refuse."""
+    biosteam = registry.get("biosteam")
+    ids = [t.id for t in biosteam.things()]
+    words = f"the biosteam engine runs no thing 'ethanol_glucose'; it runs {', '.join(ids)}"
+    client = TestClient(api.app)
+    ran = client.post("/api/engines/biosteam/run", json={"thing": "ethanol_glucose", "by": "Ada Moreno"})
+    read = client.get("/api/engines/biosteam/parameters", params={"thing": "ethanol_glucose"})
+    assert [(r.status_code, r.json()["detail"]) for r in (ran, read)] == [(422, words), (422, words)]
+    assert SCENARIO_FLOWSHEET in words and "tea" not in ids
+    tool = tools.run("engine_parameters", {"plant": "ethanol_glucose"}, tools.ToolContext(person="Ada Moreno"))
+    assert tool.error == f"engine_parameters refused: {words} (engine_plants lists them)"
+    tool = tools.run("engine_run", {"plant": "ethanol_glucose"}, tools.ToolContext(person="Ada Moreno"))
+    assert tool.error == f"engine_run refused: {words}"
+    ok, said = conform._refused_unknown(biosteam, "conformance test")
+    assert ok and f"the biosteam engine runs no thing '{conform.NO_SUCH_THING}'" in said and "0 run kept" in said
+    assert runs.listed() == []
+
+
+def test_a_scenario_flowsheets_refusal_keeps_its_words_whole_at_each_door(engines, scenario_worker):
+    """A refusal the scenario flowsheet's values meet at Proforma's door is
+    said whole at the engine's door, its closing quote kept, as Proforma's
+    own route says it."""
+    inputs = [i.model_dump(mode="json", exclude_none=True) for i in assumed_inputs(SCENARIO_ASSUMED)]
+    wrong = [{**inputs[0], "quantity": {**inputs[0]["quantity"], "unit": "placeholder-unit"}}, inputs[1]]
+    words = "plant_scale is set in 'placeholder-unit', and the parameter's unit is 't yr-1'"
+    client = TestClient(api.app)
+    engine = client.post("/api/engines/biosteam/run", json={"thing": SCENARIO_FLOWSHEET, "inputs": wrong})
+    routed = client.post("/api/proforma/run", json={"scenarioId": SCENARIO_FLOWSHEET, "flowsheet": SCENARIO_FLOWSHEET,
+                                                    "inputs": wrong})
+    assert [(r.status_code, r.json()["detail"]) for r in (engine, routed)] == [(422, words), (422, words)]
+    with pytest.raises(EngineRefused) as refused:
+        registry.get("biosteam").run(SCENARIO_FLOWSHEET, None, [EngineInput.model_validate(w) for w in wrong], "A. N.")
+    assert str(refused.value) == words and runs.listed() == []
+
+
+def test_a_scenario_flowsheet_whose_values_wait_is_refused_before_conformance_runs(engines, scenario_worker, capsys):
+    """A scenario flowsheet whose inputs wait for values (its parameters give
+    them no default) cannot run as it stands: biosteam's `unready` says so,
+    and the checks' command refuses it in words before anything is made, so
+    no failing verdict stands in for biosteam's; with its values set it is
+    ready, and a library plant always is."""
+    biosteam = registry.get("biosteam")
+    said = biosteam.unready(SCENARIO_FLOWSHEET, [])
+    assert said == f"{SCENARIO_FLOWSHEET} waits for 2 values its parameters give no default, which a run sets: " \
+                   "glucose_price, plant_scale"
+    assert biosteam.unready(SCENARIO_FLOWSHEET, assumed_inputs(SCENARIO_ASSUMED)) is None
+    assert biosteam.unready("cane", []) is None
+    kept = conform.latest("biosteam")
+    assert conform._inside("biosteam", "conformance test", ["--thing", SCENARIO_FLOWSHEET]) == 2
+    err = capsys.readouterr().err
+    assert f"{SCENARIO_FLOWSHEET} cannot be checked as it stands: {said}; set its values with --inputs <file>" in err
+    assert runs.listed() == [] and conform.latest("biosteam") == kept
+
+
+def test_check_3_says_a_run_that_answers_no_output(engines, scenario_worker):
+    """A scenario flowsheet's run whose every case asks a yield above the
+    stand-in's theoretical is kept done with no price (test_proforma_ethanol's
+    case): the engine's route answers 200 with that row, its outputs.values
+    empty, and check 3 says the run answers no output."""
+    biosteam = registry.get("biosteam")
+    above = standins.STANDIN_THEORETICAL * 1.2
+    values = [InputAssumption(key=k, value=v, low=v, high=v, by="Ada Moreno", at=DAY, note="a STAND-IN for a test")
+              for k, v in (("feed_glucose_conc", 100.0), ("titre", 45.0), ("yield", above), ("productivity", 2.0))]
+    inputs = assumed_inputs([*values, *SCENARIO_ASSUMED])
+    answer = TestClient(api.app).post("/api/engines/biosteam/run", json={
+        "thing": SCENARIO_FLOWSHEET, "by": "Ada Moreno",
+        "inputs": [i.model_dump(mode="json", exclude_none=True) for i in inputs]})
+    assert answer.status_code == 200, answer.json()
+    assert answer.json()["run"]["status"] == "done" and answer.json()["run"]["outputs"]["values"] == []
+    (thing,) = [t for t in biosteam.things() if t.id == SCENARIO_FLOWSHEET]
+    ok, said, run = conform._run_twice(biosteam, thing, inputs, "conformance test")
+    assert ok and run is not None and said.endswith("; it answers no output: its outputs.values are empty"), said

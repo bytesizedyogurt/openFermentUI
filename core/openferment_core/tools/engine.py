@@ -2,7 +2,9 @@
 stage 6; execution prompt §4.6, §9.1 step 6; ADR-004, ADR-006).
 
 `engine_plants` lists what the shelf runs: the `biorefineries` plants with an
-entry point and openFerment's own flowsheets, each with its configurations.
+entry point and openFerment's own flowsheets, each with its configurations,
+then the shelf's flowsheets a Proforma scenario runs (the biosteam engine's
+things of kind `scenario`, alpha 2.2 D6).
 `engine_parameters` gives one plant's parameters as the package builds it
 (the Proforma worker reads them): each key with its unit and the library's
 default, the values a scenario sets are set against. `engine_run` runs a plant
@@ -13,8 +15,9 @@ caller's; `engine_report` reads a kept run back.
 A RUN'S EVIDENCE. Each number its price block and its flowsheet's own outputs
 hold, in its unit, and each line of its TEA breakdown, per unit of the price's
 basis and per year, is one Evidence whose id is `<artifact id>:<block>.<key>`;
-each output of a contract engine's run and of a kinetics run (its
-outputs.values) is one whose id is `<artifact id>:values.<name>`. Each one's
+each output of a contract engine's run, of a kinetics run, of a train run
+and of a Proforma scenario's run (its outputs.values) is one whose id is
+`<artifact id>:values.<name>`. Each one's
 basis is the run's artifact, its provenance the artifact's
 (`assumed` when a value the run set is a person's assumption or a model's
 estimate). `engine_report` also gives, by words, the parameters the run read
@@ -79,11 +82,11 @@ def run_evidence(report: RunReport) -> list[Evidence]:
         if isinstance(v, dict) and isinstance(v.get("name"), str) and (_number(v.get("value")) or isinstance(v.get("value"), str)):
             out.append(Evidence(id=f"{art.id}:values.{v['name']}", label=f"{name}: {v['name']}", value=v["value"],
                                 unit=str(v.get("unit") or ""), provenance=art.provenance, basis=basis))
-    # The kinetics engine's (fermos_engine.py) and the train engine's (pureos/engine.py): each of the run's
-    # outputs.values, read from its artifact (engine/runs.py `values_of`).
+    # The kinetics engine's (fermos_engine.py), the train engine's (pureos/engine.py) and a Proforma scenario's
+    # (proforma.py): each of the run's outputs.values, read from its artifact (engine/runs.py `values_of`).
     from ..engine import runs
 
-    if art.tool in (runs.SIMULATION_TOOL, runs.FORECAST_TOOL, runs.VESSEL_TOOL, runs.TRAIN_TOOL):
+    if art.tool in (runs.SIMULATION_TOOL, runs.FORECAST_TOOL, runs.VESSEL_TOOL, runs.TRAIN_TOOL, runs.PROFORMA_TOOL):
         for v in runs.values_of(art):
             q = v["quantity"]
             out.append(Evidence(id=f"{art.id}:values.{v['name']}", label=f"{name}: {v['name']}", value=q["value"],
@@ -176,8 +179,8 @@ def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
 
 class EnginePlantsInput(BaseModel):
     engine: str = Field(default="biosteam", max_length=40, description=(
-        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and "
-        "openFerment's flowsheet, or any other registered here."))
+        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants, "
+        "openFerment's flowsheet and the shelf's scenario flowsheets, or any other registered here."))
     words: str = Field(default="", max_length=200,
                        description="Words to narrow the shelf by: a product, a feedstock, a plant's name; empty for all.")
     limit: int = Field(default=20, ge=1, le=MAX_ROWS, description="How many rows at most.")
@@ -212,16 +215,28 @@ def _plants(inp: EnginePlantsInput, ctx: ToolContext) -> ToolResult:
                 if not words or all(w in f"{th.id} {th.title} {th.kind or ''}".lower() for w in words)]
         return ToolResult(summary={"engine": engine.name, "matched": len(rows), "plants": rows[: inp.limit]})
     shelf = library.shelf()
+    # Each plant as the engine runs it (engine/biosteam.py): the
+    # configurations it built in here, and the one a run takes when none is
+    # named, at every door.
+    things = {th.id: th for th in engine.things()}
     rows = []
     for p in shelf.plants:
-        if p.kind not in ("plant", "flowsheet") or p.error:
+        th = things.get(p.id)
+        if th is None:
             continue
         said = " ".join(x for x in (p.id, p.title or "", p.module, p.composedFrom or "", p.readme or "") if x).lower()
         if words and not all(w in said for w in words):
             continue
-        rows.append({"plant": p.id, "kind": p.kind, "title": p.title, "configurations": p.configurations,
-                     "defaultConfiguration": p.defaultConfiguration, "requiresConfiguration": p.requiresConfiguration,
+        rows.append({"plant": p.id, "kind": p.kind, "title": p.title, "configurations": th.configurations,
+                     "defaultConfiguration": th.defaultConfiguration,
+                     "requiresConfiguration": bool(th.configurations) and th.defaultConfiguration is None,
                      "composedFrom": p.composedFrom})
+    # The things the engine's providers give it (alpha 2.2 D6): the shelf's
+    # flowsheets a Proforma scenario runs, a run of one a scenario's run.
+    held = {p.id for p in shelf.plants}
+    rows += [{"plant": th.id, "kind": th.kind, "title": th.title, "configurations": th.configurations,
+              "defaultConfiguration": th.defaultConfiguration} for th in things.values()
+             if th.id not in held and (not words or all(w in f"{th.id} {th.title}".lower() for w in words))]
     return ToolResult(summary={"engine": "biosteam", "simulator": shelf.simulator, "package": shelf.package,
                                "matched": len(rows), "plants": rows[: inp.limit]})
 
@@ -231,8 +246,8 @@ def _plants(inp: EnginePlantsInput, ctx: ToolContext) -> ToolResult:
 
 class EngineParametersInput(BaseModel):
     engine: str = Field(default="biosteam", max_length=40, description=(
-        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and "
-        "openFerment's flowsheet, or any other registered here."))
+        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants, "
+        "openFerment's flowsheet and the shelf's scenario flowsheets, or any other registered here."))
     plant: str = Field(max_length=80, description="A plant's id, as engine_plants gives it.")
     configuration: str = Field(default="", max_length=CONFIGURATION_MAX,
                                description="One of the plant's configurations; empty for its own.")
@@ -241,13 +256,13 @@ class EngineParametersInput(BaseModel):
 
 
 def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
-    from ..engine import library, runs
+    from ..engine import biosteam, library, runs
     from ..engine import EngineBroken, EngineRefused
 
     engine, refused = _registered("engine_parameters", inp.engine)
     if refused is not None:
         return refused
-    if engine.name != "biosteam":
+    if engine.name != "biosteam" or biosteam.provided(inp.plant) is not None:
         # The thing and its configuration resolved as a run of it resolves
         # them (runs.thing_of), so the worker is asked in the configuration
         # a run would use.
@@ -267,8 +282,13 @@ def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
                                    "note": "A run sets a value in the parameter's own unit, as a typed quantity; "
                                            "a parameter whose default is null has none, and a run sets it or the "
                                            "engine binds it from what the project holds."})
+    said = biosteam.unknown(inp.plant)
+    if said:
+        return ToolResult(error=f"engine_parameters refused: {said} (engine_plants lists them)")
     try:
-        found = library.parameters(inp.plant.strip(), inp.configuration.strip() or None)
+        # Read in the configuration a run of the plant runs in: the one
+        # named, else its default (engine/biosteam.py `default_configuration`).
+        found = library.parameters(inp.plant.strip(), biosteam.default_configuration(inp.plant, inp.configuration))
     except (library.LibraryRefused, library.PlantNotFound) as e:
         return ToolResult(error=f"engine_parameters refused: {str(e).strip(chr(39))}")
     defaults = {v.key: v for v in found.values}
@@ -291,8 +311,9 @@ def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
 
 class EngineRunInput(BaseModel):
     engine: str = Field(default="biosteam", max_length=40, description=(
-        "The engine to run (GET /api/engines names them): biosteam, whose things are the library plants and "
-        "openFerment's flowsheet, or any other registered here, whose thing this tool runs at its own defaults."))
+        "The engine to run (GET /api/engines names them): biosteam, whose things are the library plants, "
+        "openFerment's flowsheet and the shelf's scenario flowsheets, or any other registered here, whose thing this "
+        "tool runs at its own defaults."))
     plant: str = Field(default="", max_length=80,
                        description="A plant's id, run at the library's defaults; empty when a scenario is named.")
     configuration: str = Field(default="", max_length=CONFIGURATION_MAX,

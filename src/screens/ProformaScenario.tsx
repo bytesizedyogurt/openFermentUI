@@ -31,6 +31,7 @@ import {
   questionsText,
   scenarioRunOverrides,
   runProformaScenario,
+  runSpecs,
   runViewOfArtifact,
   runViewOfResult,
   stamp,
@@ -553,6 +554,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   const clearFit = useStore((s) => s.clearProformaFit);
   const togglePin = useStore((s) => s.togglePin);
   const recordScenarioRun = useStore((s) => s.recordScenarioRun);
+  // The person asking for a run: its row is created by them (alpha 2.2 D3).
+  const reviewer = useStore((s) => s.reviewer).trim();
   const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
   // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
   const parts = partsOf(scenario);
@@ -643,20 +646,36 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   // The ceiling check (OF-BLD-019 §5.2, D11): the yield as this page binds
   // it (host, fits, and the yield's override when a person typed one),
   // read by the service against the newest stored geneOS ceilings.
+  // The yield's change goes as a typed input in the yield's unit, as a run sends it (alpha 2.2 D2).
   const yieldTyped = JSON.stringify(overrides.filter((o) => o.key === 'yield'));
+  const yieldUnit =
+    panel?.specs.find((sp) => sp.key === 'yield')?.unit ??
+    info?.inputs.find((i) => i.key === 'yield')?.unit ??
+    shelf?.find((f) => f.id === flowsheetId)?.inputs.find((i) => i.key === 'yield')?.unit ??
+    null;
   useEffect(() => {
     const ctrl = new AbortController();
     setCeiling(null);
     setCeilingProblem(null);
     const fits = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
+    const typedYield = JSON.parse(yieldTyped) as typeof overrides;
+    // A typed yield waits for its unit, which the panel, the binding or the shelf names.
+    if (typedYield.length > 0 && yieldUnit === null) return () => ctrl.abort();
     ceilingCheck(
-      { scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, host, fits, overrides: JSON.parse(yieldTyped) as typeof overrides },
+      {
+        scenarioId: scenario.id,
+        flowsheet: madeHere ? flowsheetId : null,
+        host,
+        fits,
+        overrides: typedYield,
+        specs: yieldUnit === null ? [] : [{ key: 'yield', unit: yieldUnit }],
+      },
       ctrl.signal,
     )
       .then(setCeiling)
       .catch((e: unknown) => !ctrl.signal.aborted && setCeilingProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [madeHere, flowsheetId, scenario.id, host, fitsKey, yieldTyped]);
+  }, [madeHere, flowsheetId, scenario.id, host, fitsKey, yieldTyped, yieldUnit]);
 
 
   // The newest run: the service's, which holds every run any browser, the
@@ -754,6 +773,10 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     [overrides],
   );
 
+  // A composite's Finance values go in the units its panel names (OF-BLD-020 §6.1): its run waits for the panel
+  // while one of its scope's changes names no input, and a panel that failed leaves the service to refuse them.
+  const financeWaits =
+    !!parts && panel === null && panelProblem === null && overrides.some((o) => !(info?.inputs ?? []).some((i) => i.key === o.key));
   const priceBasis = bound?.priceBasis || flowsheet?.priceBasis || 'on the basis its flowsheet states';
   const labels = inputLabels(bound?.inputs ?? null, flowsheet);
   const unitLabels = inputLabels(bound?.inputs ?? null, flowsheet, true);
@@ -768,6 +791,11 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     // run carries every override of its scope, whether or not the panel has
     // answered, so a Finance value is never dropped while the scope loads or
     // after it failed (§6.R, main-15/26); the service splits and checks them.
+    // Each goes as a typed input in its parameter's unit (alpha 2.2 D2): the
+    // panel's specs name the unit, or the inputs as bound and the shelf's
+    // while it has not answered; a composite's run waits for its panel, which
+    // names its Finance group's units, and the service refuses in words a
+    // change it cannot place.
     const finance = (panel?.specs ?? []).filter((sp) => sp.group === 'Finance').map((sp) => sp.key);
     const sent = scenarioRunOverrides(overrides, { inputs: bound.inputs.map((i) => i.key), finance, composite: !!parts });
     const fits = Object.fromEntries(Object.entries(chosenFits).filter(([k]) => bound.inputs.find((i) => i.key === k)?.binding === 'artifact'));
@@ -775,6 +803,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
       scenarioId: scenario.id,
       flowsheet: madeHere ? flowsheetId : null,
       overrides: sent,
+      specs: runSpecs(panel, flowsheet, bound),
+      by: reviewer,
       host,
       fits,
       ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun } : {}),
@@ -975,7 +1005,11 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
             )}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button variant="primary" onClick={go} disabled={running || starting || !bound || bound.waiting.length > 0 || refused !== null}>
+            <Button
+              variant="primary"
+              onClick={go}
+              disabled={running || starting || !bound || bound.waiting.length > 0 || refused !== null || !reviewer || financeWaits}
+            >
               <Play size={14} /> {running ? 'Simulating…' : view ? 'Run the scenario again' : 'Run the scenario'}
             </Button>
             <StatusLine status={status} problem={statusProblem} running={running} elapsed={elapsed} />
@@ -985,6 +1019,16 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
               </span>
             )}
           </div>
+          {!reviewer && (
+            <p className="text-caption text-ink-soft mt-2" data-testid="run-needs-name">
+              A run is asked for in a person&rsquo;s name: set yours in Settings first.
+            </p>
+          )}
+          {financeWaits && (
+            <p className="text-caption text-ink-soft mt-2" data-testid="run-waits-panel">
+              Run waits for the parameter panel, which names the unit of each Finance value this scenario sets.
+            </p>
+          )}
           {refused !== null && (
             <p className="text-caption text-signal-warn mt-2" data-testid="run-held">
               Run waits until the service takes these values, since a run of them would be refused in the same words: {refused}

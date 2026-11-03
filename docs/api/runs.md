@@ -4,7 +4,8 @@ A run is one computation of one engine in a project (execution prompt §7.4; ADR
 ADR-006, ADR-015). Every run the service keeps has the shape below, whichever engine made it, and
 one function keeps it (`keep_run`, below): `docs/api/engines.md` is the contract an engine is built
 to. The code is `core/openferment_core/engine/runs.py`; BioSTEAM's computation is
-`engine/library.py` (`library.run` artifacts) and its file `engine/sff.py`.
+`engine/library.py` (`library.run` artifacts) for a library plant and `proforma.py`
+(`proforma.run` artifacts) for a Proforma scenario, and its file `engine/sff.py`.
 
 ## The record
 
@@ -14,22 +15,23 @@ to. The code is `core/openferment_core/engine/runs.py`; BioSTEAM's computation i
 |---|---|
 | `id` | The artifact id of the run's basis (`artifacts.artifact_id`): the first 16 hex characters of the sha256 of the UTF-8 canonical JSON (keys sorted, no spaces, every character outside ASCII kept as itself) of `{"tool", "toolVersion", "inputs"}`, with `"seed"` beside them when the computation takes one, each input `{"name", "value", "unit", "source"}`; `docs/api/engines.md` gives a contract engine's inputs in full. The same run asked twice is one row |
 | `engine` | The engine that ran it, as it registered (`GET /api/engines`); the `runs.engine` column. A row kept before engines registered is `biosteam`'s |
-| `plant`, `configuration` | What the engine ran and the configuration it ran in: for `biosteam` the plant on the shelf (`/api/library`), a flowsheet's default named; for `kinetics` a family, `forecast` with the kept fit it drew from, or `vessel` with the kept simulation, fit or forecast it was designed for; for `train` the train's id, with no configuration; for another engine one of its things |
+| `plant`, `configuration` | What the engine ran and the configuration it ran in: for `biosteam` the plant on the shelf (`/api/library`), a flowsheet's default named, or a Proforma scenario's flowsheet (A Proforma run, below); for `kinetics` a family, `forecast` with the kept fit it drew from, or `vessel` with the kept simulation, fit or forecast it was designed for; for `train` the train's id, with no configuration; for another engine one of its things |
 | `status` | `done`, or `refused` with the engine's own words in `refused` (a receipt: BioSTEAM's InfeasibleRegion naming its unit, a gate the values failed) |
-| `tool`, `toolVersion` | The artifact tool its computation is kept and replayed as, and the tool's version: `library.run` and its version for a BioSTEAM run; `fermos.simulation`, `growth_forecast` or `fermos.vessel` at the artifact's own version for a kinetics run; `pureos.train_run` at its own version for a train run |
+| `tool`, `toolVersion` | The artifact tool its computation is kept and replayed as, and the tool's version: `library.run` and its version for a library plant's run, `proforma.run` and its own for a Proforma scenario's, both BioSTEAM's; `fermos.simulation`, `growth_forecast` or `fermos.vessel` at the artifact's own version for a kinetics run; `pureos.train_run` at its own version for a train run |
 | `inputs` | Every input of the basis as `{name, quantity}`, the quantity carrying its origin (ADR-006): `library-default` (the plant, the simulator, the settings, all read from the package), `person-assumption` (a value a named person set), `model-estimate` (a value a named model estimated), `convention` (a change the plant needs to build here, the precision kept) |
-| `provenance`, `artifactId` | The artifact the run's own tool kept (`library.run` for a BioSTEAM run, `engine.<name>` for a contract engine's, fermOS's for a kinetics run, pureOS's for a train run) and the provenance computed on its basis: `assumed` when any input is a person's assumption or a model's estimate. A row held done follows its artifact's provenance when a record the basis rests on is reviewed or demoted since (Keeping a run, below). None for a refused run |
+| `provenance`, `artifactId` | The artifact the run's own tool kept (`library.run` for a library plant's run and `proforma.run` for a Proforma scenario's, both BioSTEAM's, `engine.<name>` for a contract engine's, fermOS's for a kinetics run, pureOS's for a train run) and the provenance computed on its basis: `assumed` when any input is a person's assumption or a model's estimate. A row held done follows its artifact's provenance when a record the basis rests on is reviewed or demoted since (Keeping a run, below). None for a refused run |
 | `outputs` | `values`: each output as `{name, quantity}`, the quantity in the unit the run's artifact states, its origin the artifact (Outputs, below); a library run also keeps its price block, a flowsheet's own outputs (its MESP and yields) and, for a run with no value of its own, how many of the package test's values it holds. A receipt computed nothing, and its `outputs` is `{}` |
 | `versions` | The distributions it ran on: biosteam, thermosteam and biorefineries as a library run's basis names them; for a kinetics run, what its thing ran on (A kinetics run, below); for a train run, the versions its basis names, the worker's (A train run, below); for a basis that names no simulator, the engine's own `version()` |
 | `sff` | The SFF file the run wrote: its flowsheet record (`run-<id>`, `docs/api/sff.md`), whether it validates, its completeness score and the tags it earns. `sffRefused` holds the words when no file could be written; the run stands |
 | `by`, `at`, `durationMs` | Who asked for the run first, when it was first kept, how long its computation took |
-| `scenarioId` | The study scenario that asked for it first (`docs/api/studies.md`); null for a run asked for directly |
+| `scenarioId` | The study scenario that asked for it first (`docs/api/studies.md`), or the Proforma scenario a Proforma run belongs to (A Proforma run, below); null for a run asked for directly |
 
 Where a row above names BioSTEAM, a contract engine's run fills it as the next section says. The
 tables and the read-back stay in the artifact; a report reads the run, its artifact and its SFF
-record together. A request refused before any plant is built (an unknown key, a range, a scope the
-plant does not have, a value a person did not name) keeps nothing. A run refused by its plant is
-answered from its receipt when asked again, without building the plant.
+record together. A request refused before any plant is built (an unknown key, a scope the plant
+does not have, a value a person did not name, and for a library plant a range, which is a
+study's to sample) keeps nothing. A run refused by its plant is answered from its receipt when
+asked again, without building the plant.
 
 ## A contract engine's run
 
@@ -94,13 +96,54 @@ value its parameter cannot take, the validation's refusals, a value that waits n
 bind it, a unit's needs) keeps nothing. A train run kept before its runs were rows has none of its
 own; the same request asked again keeps its row.
 
+## A Proforma run
+
+A Proforma scenario's run (`proforma.py`; alpha 2.2 D6) is a run of the `biosteam` engine, kept
+as a row of the same `EngineRun` whichever door asked for it: `POST /api/proforma/run`, the tools
+`run_flowsheet` and `proforma_write`, MCP, or `POST /api/engines/biosteam/run` on one of the
+shelf's scenario flowsheets (`docs/api/engines.md`, The core's `biosteam`). `proforma.keep_run`
+keeps it, through `compute_kept`:
+
+| Field | What it is |
+|---|---|
+| `engine`, `plant`, `configuration` | `biosteam`; the scenario's flowsheet; no configuration, or for a flowsheet built from a vessel and a train (`custom_train_v1`) the two it was built from, `vessel <id>, train run <id>` |
+| `id`, `artifactId` | The `proforma.run` artifact's id, over its basis and its seed: the same request at any door is one row |
+| `tool`, `toolVersion` | `proforma.run` at `shelf run 2 · biosteam <version> · biorefineries <version>` |
+| `inputs` | The artifact's basis as quantities with their origins: the flowsheet, the scenario, the packages the flowsheet borrows, the samples and whether the diagram is drawn, each record a binding rests on, each fit's value and band, and each value a request set with its low and high (`inputs`, converted at Proforma's door into the Override of `proforma:<scenario id>`), a composite's parts and its Finance group beside them |
+| `outputs` | `values`: the run's price block (Outputs, below), its solved price named as a library run names its own (`price.solvedPrice`) |
+| `versions` | The biosteam engine's `version()`: biosteam, thermosteam and biorefineries as installed, the distributions the Proforma worker ran on (the basis names no simulator) |
+| `sff`, `sffRefused` | The base case's file, written by the Proforma worker as the run is kept, from the run's basis alone (`proforma.plant_of`, `docs/api/sff.md`), and kept as `run-<id>`; or the words for why it has none (a base case that could not run has no plant to write) |
+| `status`, `refused` | `done`, or `refused` with the Proforma worker's words for a run it refused, a receipt the same request is answered from |
+| `scenarioId` | The scenario the run belongs to: a kept scenario's id, an unsaved one's, or, at the engine's door, the scenario flowsheet's own id |
+| `by` | The person the route's request names (`ProformaRunRequest.by`), or the caller the tool names (`tools/writes._actor`); `this browser` for a request naming no one |
+
+A request with many cases, a grid over the flowsheet's grid inputs and a Monte Carlo sample of the
+inputs' ranges, is one run: one row, whose artifact carries every case; the row holds the price
+block. A run whose samples hold no price is kept done, its `values` empty where nothing priced:
+`POST /api/proforma/run` answers 422 in words naming it, the engine's route 200 with the row, and
+the Runs screen says the run holds no price. A request Proforma refuses before anything runs (an
+input that waits for a source, a value its input cannot take, a part of a composite that cannot
+stand) keeps nothing.
+
+A run that sets a value writes one convention more in its basis, `assumptions read from:
+overrides`, in the words the parameter panel's overrides wrote before a run took typed inputs:
+an artifact's id hashes its basis, so a run a person makes through the panel keeps the artifact
+id its overrides gave it (alpha 2.2 D6, the amendment at C.4), a Finance value of a composite's
+among its values. A Proforma run kept before its runs were rows has none of its own; the same
+request asked again finds its artifact and keeps its row. Two kinds of run kept before C.4 are
+kept afresh when asked again, under a new id, each earlier artifact standing and replaying as it
+was: a run sent through the older `assumptions` field, which retired at C.4 and whose basis
+carried no such line, and a run a model's estimate set a value of, which based the estimate as a
+person's assumption naming the model and now bases it as the model's estimate (ADR-006), its
+output moving with it where the sensitivity reads the estimate's kind.
+
 ## Keeping a run
 
 `keep_run(engine, thing, configuration, *, tool, version, basis, by, art | refused, flowsheet |
 sff_refused, scenario_id, seed, versions)` keeps one run of any engine's computation as its row,
 the one public way a row is kept: the library path (`runs.run`), every contract engine's run
-(`run_engine`), the kinetics engine's computations and the train engine's runs (`compute_kept`,
-below) keep theirs through it.
+(`run_engine`), the kinetics engine's computations, the train engine's runs and Proforma's
+scenario runs (`compute_kept`, below) keep theirs through it.
 
 | Argument | What it is |
 |---|---|
@@ -116,7 +159,7 @@ below) keep theirs through it.
 `compute_kept(engine, thing, configuration, *, tool, basis, refusal, sff_refused | write_sff, by,
 seed, records_by_id, scenario_id, versions)` is the library path's shape for an engine that
 computes in the service's process (the kinetics engine) or through a worker of the core's own (the
-train engine): a receipt the project holds for the basis is
+train engine, Proforma's runs): a receipt the project holds for the basis is
 answered without computing, raising `refusal` in the receipt's words; a row held done answers
 its artifact, whose provenance `artifacts.compute` brings up to date when a record the basis rests
 on was reviewed or demoted since, and the row's provenance follows it, with nothing else written
@@ -155,6 +198,7 @@ no row.
 | `fermos.simulation` | `end.<state>` for each state of the end state in the unit `units` states for it, and `end.t`, the last hour, in hours; then `harvestH` and, where the sugar runs out, `sugarRunsOutH`, in hours | nothing |
 | `growth_forecast` | `finals.<role>` for each final of the band (biomass, product, substrate): its median as the value, its 5th and 95th percentiles as `low` and `high`, in the series' unit | nothing |
 | `fermos.vessel` | `design.<label>` for each row of the design table holding a number or words, in BioSTEAM's unit for it; a label two rows share carries its unit too (`design.<label> (<unit>)`) | nothing |
+| `proforma.run` | The price block: `price.solvedPrice`, the base case's price solved at its TEA's IRR, named as a library run names its own, then `quantiles.p5`, `quantiles.p25`, `quantiles.p50`, `quantiles.p75` and `quantiles.p95`, the price over the samples that held one, each in the unit the artifact states for a price (`tableUnits.price`) and on the basis its TEA states (`tea.basis`, what one unit of the price is of) as the quantity's `basis`; none where the base case or the samples held no price | nothing: the grid, the samples, the sensitivity and the tables stay in the artifact |
 | `pureos.train_run` | pureOS's reading of the run's tables, by pass (`pureos.train_of`), registered with the tool (`artifacts.register`'s `values_of`), since the engine package reads no pureOS module: `recovery.<unit id>` for each unit whose recovery is read and `overallRecovery`, each a share with no unit; `productOut`, the product the train delivers, in the stream table's unit of mass flow; then for each stream `massFlow.<stream id>` in that unit, and `purity.<stream id>`, its product share by mass, for each stream that carries product (a share above zero) | nothing |
 | any other tool | an empty list, or what the module that registered the tool reads (`values_of`) | nothing |
 
@@ -171,7 +215,9 @@ package test's absolute tolerance (1e-8). A train run keeps every digit BioSTEAM
 no precision, so the same rule holds it exactly: its tool registers no tolerance, a replay of it is
 `identical` or names its differences, and the train engine's things state rtol 0, atol 0
 (`train_spec.replay_precision`). A contract engine's run is held to the precision its thing states
-(`precision.rtol` and `precision.atol` in its basis). `ReplayResult.identical` says
+(`precision.rtol` and `precision.atol` in its basis). A Proforma run registers no tolerance either:
+its replay is `identical` or names its differences, and the biosteam engine's scenario flowsheets
+state rtol 0, atol 0. `ReplayResult.identical` says
 whether the output hashes the same; `withinTolerance` whether every difference is a number within
 that tolerance; `tolerance` says what was held. A replay computes with the tool registered now:
 when its version differs from the one the run was kept at, the first of `differences` is
@@ -182,7 +228,9 @@ Lists are compared in order.
 
 | Route | What it does |
 |---|---|
-| `POST /api/library/{plant}/run` | `{configuration?, overrides?, by?}`: one engine run, kept; answers the run's report. Values the plant refuses: 422 in its words, the receipt kept |
+| `POST /api/library/{plant}/run` | `{configuration?, inputs?, by?}`, its fields alone: one engine run of a library plant, kept, on the biosteam engine's own path (`engine/biosteam.py` `run_plant`: a plant that takes a configuration, asked with none, runs in its default; each value checked against the plant's parameters before the plant is built); answers the run's report. A value refused before anything runs: 422 in words, nothing kept. Values the plant refuses: 422 in its words, the receipt kept |
+| `POST /api/proforma/run` | `{scenarioId, inputs?, by?, flowsheet?, host?, fits?, samples?, seed?, vessel?, trainRun?}`, its fields alone: one Proforma scenario's run, kept as a row of the biosteam engine (A Proforma run, above); answers the run (`ProformaRunResult`) |
+| `GET /api/proforma/bind`, `GET /api/proforma/ceiling-check` | Two reads that bind a scenario's inputs as its run binds them, keeping nothing: `?inputs=` carries the values a person sets as a run's request carries them, converted at Proforma's door (the binding on the flowsheet's own scope, `proforma:<flowsheet id>`); the retired `?overrides=`, and `?assumptions=` at the ceiling check, are refused in words naming `?inputs=` |
 | `POST /api/engines/{name}/run` | `{thing, configuration?, inputs?, by?}`: one run of any registered engine's thing, kept; answers the run's report (`docs/api/engines.md`) |
 | `POST /api/pureos/train/run` | `{train, inputs?, by?}`: one run of a train, kept as a row of the engine `train`; answers the train run (`TrainRun`) |
 | `GET /api/runs` | The project's runs, newest first; `?engine=<name>` the runs one engine made |

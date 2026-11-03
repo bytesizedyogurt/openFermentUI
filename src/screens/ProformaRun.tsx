@@ -25,10 +25,14 @@
 //                   the run set first, all of them on asking;
 //   its test        the package's own test beside what this run measured, when
 //                   the run set no value of its own (`output.checks`);
-//   its sections    the sections a scenario run shows (RunReport), over the
-//                   run's `library.run` artifact read as one case
-//                   (`runViewOfRun`): the result, the cost breakdown, the
+//   its sections    the sections a scenario run shows (RunReport): over a
+//                   library run's `library.run` artifact read as one case
+//                   (`runViewOfRun`), the result, the cost breakdown, the
 //                   streams, the equipment, the utilities and the read-back;
+//                   over a Proforma scenario's `proforma.run` artifact, a run
+//                   of the biosteam engine since alpha 2.2 (D6), those and
+//                   its sensitivity and price distribution over its samples,
+//                   as the scenario's own page shows them (`runViewOfArtifact`);
 //   its SFF file    the record the run wrote, as the toolkit checked and scored
 //                   it, and the file itself to download.
 //
@@ -42,17 +46,17 @@
 import { SffGraph } from '@/components/SffGraph';
 import { useEffect, useState } from 'react';
 import { BookOpen, Download, ListChecks, Play } from 'lucide-react';
-import type { ParamScope, Quantity, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
+import type { FlowsheetInfo, ParamScope, Quantity, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';
-import { runViewOfRun, stamp } from '@/lib/proforma';
+import { RUN_TOOL, baseCaseRefusal, proformaShelf, runViewOfArtifact, runViewOfRun, stamp } from '@/lib/proforma';
 import { trainOfRun } from '@/lib/pureos';
 import { StudiesDown, downloadFlowsheet, makeRunbook, makeScenario, predictable, runReport, runScenario } from '@/lib/studies';
 import { Button, Callout, Card, LinkButton, PageHeader, cx } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
-import { RunReport } from '@/screens/ProformaBiosteam';
+import { RunReport, inputLabels } from '@/screens/ProformaBiosteam';
 import { regressionTable } from '@/screens/ProformaReference';
 import { fmt } from '@/engine/units';
 
@@ -114,9 +118,12 @@ const took = (ms: number) => (ms < 100 ? `${Math.round(ms)} ms` : `${(ms / 1000)
 /** Words a sentence follows on: a full stop added when they end with none. */
 const ended = (words: string) => (/[.!?]$/.test(words.trim()) ? words.trim() : `${words.trim()}.`);
 
-/** The outputs a contract engine's run kept. A library run keeps its `outputs.values` too, and its page shows them in its artifact's own sections. */
+/**
+ * The outputs a contract engine's run kept. A library run and a Proforma scenario's run keep their `outputs.values`
+ * too, and the page shows them in their artifacts' own sections.
+ */
 function runOutputs(run: EngineRunReport['run']): RunOutput[] {
-  if (run.tool === 'library.run') return [];
+  if (run.tool === 'library.run' || run.tool === RUN_TOOL) return [];
   const values = run.outputs.values;
   if (!Array.isArray(values)) return [];
   return values.filter(
@@ -250,7 +257,11 @@ function Inputs({ report }: { report: EngineRunReport }) {
             {rows.map((r, i) => (
               <tr key={r[0]} className="border-b border-line/50 align-top" data-testid="run-input" data-origin={report.run.inputs[i]?.quantity.origin?.kind}>
                 {r.map((c, j) => (
-                  <td key={j} className={cx('py-1 pr-2', j < 3 && 'font-num')} title={j === 1 && !(train && r[0] === 'train') ? c : undefined}>
+                  <td
+                    key={j}
+                    className={cx('py-1 pr-2', j < 3 && 'font-num', j === 2 && 'whitespace-nowrap')}
+                    title={j === 1 && !(train && r[0] === 'train') ? c : undefined}
+                  >
                     {j === 1 && train && r[0] === 'train' ? (
                       <TrainInput value={report.run.inputs[i]?.quantity.value} train={train} />
                     ) : j === 1 ? (
@@ -629,9 +640,30 @@ export default function ProformaRun({ runId }: { runId: string }) {
   }, [runId]);
 
   const run = report?.run ?? null;
-  const view = report?.artifact ? runViewOfRun(report.artifact) : null;
-  const price = (report?.artifact?.output?.price ?? {}) as Record<string, unknown>;
+  const art = report?.artifact ?? null;
+  // A Proforma scenario's run names its inputs as the shelf's flowsheet does, and its scenario by name.
+  const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
+  const isScenarioRun = art?.tool === RUN_TOOL;
+  useEffect(() => {
+    if (!isScenarioRun) return;
+    const ctrl = new AbortController();
+    proformaShelf(ctrl.signal).then(setShelf, () => !ctrl.signal.aborted && setShelf([]));
+    return () => ctrl.abort();
+  }, [isScenarioRun]);
+  const proformaScenarios = useStore((s) => s.scenarios);
+  const ownScenario = run?.scenarioId ? (proformaScenarios.find((s) => s.id === run.scenarioId) ?? null) : null;
+  const flowsheetInfo = isScenarioRun ? (shelf?.find((f) => f.id === run?.plant) ?? null) : null;
+  // A library run reads as one case; a Proforma scenario's run as the scenario's page reads it, with its samples.
+  const view = art ? (runViewOfRun(art) ?? runViewOfArtifact(art)) : null;
+  const scenarioRun = art?.tool === RUN_TOOL;
+  const price = (art?.output?.price ?? {}) as Record<string, unknown>;
   const product = typeof price.product === 'string' ? price.product : 'the product';
+  // A Proforma run's price is per unit of the basis its TEA states (the run's outputs.values say the same).
+  const priceBasis = scenarioRun
+    ? view?.tables.tea?.basis
+      ? `USD per ${view.tables.tea.basis}`
+      : 'USD per unit of the basis its flowsheet states'
+    : `USD per kg of ${product}`;
   const train = run ? trainOfRun(run) : null;
   const where = run ? (train ? `${train.name} (${run.plant})` : run.plant + (run.configuration ? ` (${run.configuration})` : '')) : runId;
 
@@ -647,7 +679,16 @@ export default function ProformaRun({ runId }: { runId: string }) {
               <span>
                 {run.status === 'done' ? 'Run' : 'Refused'} for {run.by}, {stamp(run.at)}
                 {run.durationMs != null && <>, in {took(run.durationMs)}</>}
-                {run.scenarioId && (
+                {run.scenarioId && ownScenario && (
+                  <>
+                    {' '}
+                    · asked for by scenario{' '}
+                    <a className="underline underline-offset-2 hover:text-accent" href={href(`/proforma/scenario/${encodeURIComponent(ownScenario.id)}`)}>
+                      {ownScenario.name || ownScenario.id}
+                    </a>
+                  </>
+                )}
+                {run.scenarioId && !ownScenario && (
                   <>
                     {' '}
                     · asked for by scenario <span className="font-num">{run.scenarioId}</span>
@@ -686,6 +727,17 @@ export default function ProformaRun({ runId }: { runId: string }) {
               <span data-testid="run-refused">{ended(run.refused ?? '')}</span> The receipt is kept with the run, and no artifact or SFF file was written.
             </Callout>
           )}
+          {scenarioRun && run.status === 'done' && !(Array.isArray(run.outputs.values) && run.outputs.values.length > 0) && (
+            <Callout kind="warn" title="This run holds no price">
+              <span data-testid="run-holds-no-price">
+                No sample the flowsheet could hold priced it
+                {typeof art?.output?.baseInfeasible === 'string' && art.output.baseInfeasible
+                  ? `; its base case could not run: ${baseCaseRefusal(art.output.baseInfeasible)}`
+                  : ''}
+                . The run is kept with its basis, so the same values asked again answer from it.
+              </span>
+            </Callout>
+          )}
           {report.parameters && <Parameters runId={run.id} data={report.parameters} />}
           <Outputs report={report} />
           <Inputs report={report} />
@@ -693,12 +745,12 @@ export default function ProformaRun({ runId }: { runId: string }) {
           {view && (
             <RunReport
               view={view}
-              priceBasis={`USD per kg of ${product}`}
-              labels={{}}
-              unitLabels={{}}
+              priceBasis={priceBasis}
+              labels={inputLabels(null, flowsheetInfo)}
+              unitLabels={inputLabels(null, flowsheetInfo, true)}
               scenarioId={run.scenarioId ?? ''}
               csvName={`run-${run.id}`}
-              oneCase
+              oneCase={!scenarioRun}
             />
           )}
           <FlowsheetCard report={report} />

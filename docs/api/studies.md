@@ -19,16 +19,24 @@ Proforma screens' rows in the same table are kind `proforma`):
 | `by`, `at` | Who made it, when |
 
 A scenario is checked against the plant's parameters when it is made: a key the plant does not
-read back, a unit it does not use, a parameter it reads back in words, or a key set twice is
-refused in words. Running it makes an engine run whose basis names each value's author; the run
-is `assumed` and names the scenario (`scenarioId`).
+read back, a unit it does not use, a parameter it reads back in words, a quantity carrying a
+basis, or a key set twice is refused in words. Running it makes an engine run on the biosteam
+engine's one path for a library plant (`engine/biosteam.py` `run_plant`, the path `POST
+/api/library/{plant}/run` takes): each value is the typed input it was made with, checked against
+the plant's parameters again and converted by `basis.override_of` into the plant's `Override`, so
+the run's basis names each value's author; the run is `assumed` and names the scenario
+(`scenarioId`). A plant that takes a configuration, made with none, is checked against its
+default's parameters (`engine/biosteam.py` `default_configuration`) and runs in its default, its
+`configuration` kept as made. A kept value its plant's parameters refuse when it is run (a key
+the plant no longer reads, a unit it no longer uses) is refused before anything runs, a 422 in
+words at the route and the tool's refusal in words, and keeps nothing.
 
 | Route | What it does |
 |---|---|
 | `GET /api/studies/scenarios` | The project's scenarios, newest first |
 | `POST /api/studies/scenarios` | `{title, plant, configuration?, values, note?, by}`: checked and kept |
 | `GET /api/studies/scenarios/{id}` | One scenario; 404 for one the project does not hold |
-| `POST /api/studies/scenarios/{id}/run` | `{by}`: the engine run's report (`{run, artifact, flowsheet}`); a plant's refusal 422 in its words, the receipt kept with the scenario |
+| `POST /api/studies/scenarios/{id}/run` | `{by}`: the engine run's report (`{run, artifact, flowsheet}`); a plant's refusal 422 in its words, the receipt kept with the scenario; a kept value the plant's parameters refuse 422 in words, nothing kept |
 
 ## Comparisons
 
@@ -38,13 +46,17 @@ weakest of theirs (`assumed` when any run rests on an assumption or an estimate)
 from them; the same runs in the same order are one comparison. Runs of any engine compare, one
 engine's beside another's. Its version says what it read: `study comparison 1` for library runs
 alone, read as they have been read since stage 5, and `study comparison 2` for a comparison that
-holds a run of another engine (alpha 2.2 D3). A comparison kept at version 1 over such a run
-replays at version 2, and its first difference names the two versions. The artifact's output:
+holds a run of another engine (alpha 2.2 D3), a Proforma scenario's run among them, whose price
+block it reads from its outputs.values. A value another engine's run names as a library run names
+its own (`price.<key>`, `outputs.<key>`) shares that output's row: a Proforma run's solved price
+(`price.solvedPrice`) and a library run's meet on one row with its change. A comparison kept at
+version 1 over such a run replays at version 2, and its first difference names the two versions.
+The artifact's output:
 
 | Key | What it is |
 |---|---|
-| `runs` | Each run's artifact id, plant (a contract engine's run names its thing), configuration and provenance |
-| `rows` | `[{key, unit, values, change}]`: every output any run answers, each run's value (null for a run with no output of that key), and its relative change from the first run's. A library run's are every number of its price block (`price.<key>`, in BioSTEAM's TEA units) and of a flowsheet's outputs (`outputs.<key>`), read from its artifact as they have always been read; a run of any other engine's are its outputs.values (`values.<name>`, each in its unit; `docs/api/runs.md`, Outputs) |
+| `runs` | Each run's artifact id, plant (a contract engine's run names its thing, a Proforma run its flowsheet), configuration and provenance |
+| `rows` | `[{key, unit, values, change}]`: every output any run answers, each run's value (null for a run with no output of that key), and its relative change from the first run's. A library run's are every number of its price block (`price.<key>`, in BioSTEAM's TEA units) and of a flowsheet's outputs (`outputs.<key>`), read from its artifact as they have always been read; a run of any other engine's are its outputs.values (`values.<name>`, each in its unit; `docs/api/runs.md`, Outputs), a value named `price.<key>` or `outputs.<key>` in the library's row of that key |
 | `values` | `[{key, values: [{value, unit, origin, by}]}]`: every value any run set for itself (a contract engine's run's by its basis name, `value <key>`), each run's value with its origin. At version 1, a run that set none has the library's own default (`library-default`, `by` the package module). At version 2, a library run that set none has that default where its plant declares the value, and every other cell of a value its run holds none of has `value`, `unit`, `origin` and `by` null: a contract engine's artifact keeps no default |
 
 A run its plant refused has no artifact and is refused here in words; so are one run alone, a run
@@ -120,6 +132,6 @@ The browser reads every list and report above and computes nothing of its own (`
 | Path | Screen | What it shows |
 |---|---|---|
 | `#/proforma/studies` | `ProformaStudies.tsx` | The project's runs (two or more compared from here), scenarios (each run again from here), comparisons and study runbooks; the export package to download |
-| `#/proforma/runs/{id}` | `ProformaRun.tsx` | One run: its parameters in the parameter panel, read-only (the values the run set first, all of them on asking), its basis with each origin, the package's own test, the `RunReport` sections over its artifact as one case, a contract engine's run's outputs, its SFF file, and a runbook made from its numbers (a library run's `price.<key>` and `outputs.<key>`, any other run's `values.<name>`) |
+| `#/proforma/runs/{id}` | `ProformaRun.tsx` | One run: its parameters in the parameter panel, read-only (the values the run set first, all of them on asking), its basis with each origin, the package's own test, the `RunReport` sections over its artifact (a library run's as one case, a Proforma scenario's with its sensitivity and price distribution over its samples), a contract engine's run's outputs, its SFF file, and a runbook made from its numbers (a library run's `price.<key>` and `outputs.<key>`, any other run's `values.<name>`) |
 | `#/proforma/comparisons/{id}` | `ProformaComparison.tsx` | The runs in order, each output's change from the first as a `Tornado` in the figure grammar's `FigureFrame` (the comparison's provenance on every bar), every number run by run, and the values the runs set with their origins |
 | `#/runbooks/{id}` | `RunbookDetail.tsx` | A study's runbook beside a person's: each prediction links to the run it came from, and the page locks it under the same digest the service writes |

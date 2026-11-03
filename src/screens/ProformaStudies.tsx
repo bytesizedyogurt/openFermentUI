@@ -3,9 +3,11 @@
 // What the project asked of its plants and kept of the answers, each list as
 // the service holds it (studies/):
 //
-//   engine runs   every run of a library plant or a flowsheet, newest first,
-//                 each a link to its page; two or more chosen are set side by
-//                 side as a comparison (POST /api/studies/comparisons);
+//   engine runs   every run of every engine, newest first, each a link to
+//                 its page: a library plant's or a flowsheet's, a Proforma
+//                 scenario's (BioSTEAM's since alpha 2.2 D6, its scenario
+//                 named), a kinetics run, a train run; two or more chosen are
+//                 set side by side as a comparison (POST /api/studies/comparisons);
 //   scenarios     a plant, its configuration and the values it sets, each a
 //                 person's assumption or a model's estimate with its author,
 //                 and the runs made of it; Run makes one more
@@ -369,6 +371,22 @@ function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void
   );
 }
 
+/** biosteam's scenario flowsheets (alpha 2.2 D6): a run of one is a Proforma scenario's, made on Proforma. */
+function ScenarioThings({ engine }: { engine: EngineInfo | null }) {
+  const things = (engine?.things ?? []).filter((t) => t.kind === 'scenario');
+  if (things.length === 0) return null;
+  return (
+    <p className="text-caption text-ink-soft mt-2" data-testid="run-plant-scenario-things">
+      BioSTEAM also runs the shelf&rsquo;s scenario flowsheets ({things.map((t) => t.title || t.id).join(', ')}): a run of one is a
+      Proforma scenario&rsquo;s, with the values a person sets on it. Make one with{' '}
+      <a className="text-accent hover:underline" href={href('/proforma')}>
+        Proforma → New scenario
+      </a>
+      ; its runs are listed with the project&rsquo;s runs below.
+    </p>
+  );
+}
+
 /** Run a thing of any engine registered here (GET /api/engines); BioSTEAM's plants first. */
 function RunAPlant({ onRan }: { onRan: () => void }) {
   const [engines, setEngines] = useState<EngineInfo[] | null>(null);
@@ -401,6 +419,7 @@ function RunAPlant({ onRan }: { onRan: () => void }) {
         </label>
       )}
       {other ? <EngineThings key={other.name} engine={other} onRan={onRan} /> : <BiosteamPlants onRan={onRan} />}
+      {!other && <ScenarioThings engine={usable.find((e) => e.name === 'biosteam') ?? null} />}
       {unusable.length > 0 && (
         <p className="text-caption text-ink-soft mt-2" data-testid="run-plant-unusable">
           Registered and not usable here:{' '}
@@ -417,6 +436,10 @@ function RunAPlant({ onRan }: { onRan: () => void }) {
   );
 }
 
+/** A Proforma scenario's run kept done whose samples held no price: its outputs.values hold none (docs/api/runs.md). */
+const holdsNoPrice = (r: EngineRun) =>
+  r.tool === 'proforma.run' && r.status === 'done' && !(Array.isArray(r.outputs?.values) && r.outputs.values.length > 0);
+
 function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario[] }) {
   const reviewer = useStore((s) => s.reviewer).trim();
   const [chosen, setChosen] = useState<string[]>([]);
@@ -424,11 +447,15 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [engine, setEngine] = useState('');
-  const titles = new Map(scenarios.map((s) => [s.id, s.title]));
+  // A run's scenario by its title: a study's, or a Proforma scenario's name (its run is BioSTEAM's since alpha 2.2 D6).
+  const proformaScenarios = useStore((s) => s.scenarios);
+  const titles = new Map<string, string>([...proformaScenarios.map((s) => [s.id, s.name] as const), ...scenarios.map((s) => [s.id, s.title] as const)]);
   // The engines the project's runs name (docs/api/engines.md); the filter shows one engine's runs.
   const engines = [...new Set(runs.map((r) => r.engine))].sort();
   const shown = engine ? runs.filter((r) => r.engine === engine) : runs;
-  const done = shown.filter((r) => r.status === 'done');
+  // A run kept done that holds no price (a Proforma run whose samples all failed) has nothing to compare.
+  const comparable = (r: EngineRun) => r.status === 'done' && !holdsNoPrice(r);
+  const done = shown.filter(comparable);
   const compare = () => {
     setBusy(true);
     setProblem(null);
@@ -482,7 +509,7 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
                 {shown.map((r) => (
                   <tr key={r.id} className="border-b border-line/50 align-top" data-testid="studies-run" data-status={r.status} data-engine={r.engine}>
                     <td className="py-1 pr-2">
-                      {r.status === 'done' && (
+                      {comparable(r) && (
                         <input
                           type="checkbox"
                           aria-label={`Compare run ${r.id}`}
@@ -499,7 +526,9 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
                     </td>
                     <td className="py-1 pr-2 font-num">{r.engine}</td>
                     <td className="py-1 pr-2">{ranWhat(r)}</td>
-                    <td className="py-1 pr-2">{r.status === 'done' ? 'done' : `refused: ${r.refused ?? ''}`}</td>
+                    <td className="py-1 pr-2" data-testid="studies-run-status">
+                      {r.status !== 'done' ? `refused: ${r.refused ?? ''}` : holdsNoPrice(r) ? 'done, and it holds no price: its page says why' : 'done'}
+                    </td>
                     <td className="py-1 pr-2">{r.provenance ? <ProvenanceBadge p={r.provenance} compact /> : '—'}</td>
                     <td className="py-1 pr-2">{r.scenarioId ? (titles.get(r.scenarioId) ?? r.scenarioId) : '—'}</td>
                     <td className="py-1 pr-2">{r.by}</td>

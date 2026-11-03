@@ -64,7 +64,22 @@ From C.2 every fermOS request here takes its values as typed inputs (alpha
 its door, so every other pin holds as captured. From C.3 the train run's
 request does the same, each input named by its place
 (`standins.train_inputs`), converted at pureOS's door
-(`train_spec.overrides_of`).
+(`train_spec.overrides_of`). From C.4 the Proforma run's request does the
+same (`standins.assumed_inputs`), converted at Proforma's door
+(`proforma.overrides_of`). The library's door takes typed inputs too,
+through the biosteam engine's own path (engine/biosteam.py `run_plant`),
+and the library pins hold whichever door sends the values.
+
+D1's amendment at C.4 (the Proforma run): the pin was captured through the
+older `assumptions` field, whose basis carried no line saying where its
+values came from, while every run a person made through the parameter
+panel sent overrides and carried `assumptions read from: overrides`. At C.4
+the older field retired, and a run's values sent as inputs base as the
+panel's overrides based them, that line included, so a run a person makes
+through the panel keeps its id (alpha 2.2 D6, the amendment at C.4). The
+pin's values therefore gained the line and the id the panel's overrides
+gave them at b6a85d0, and its output hash held; the pin names both ids and
+that decision, and the basis the older field built still gives ed33c02's id.
 
 One pin was captured at C.1 itself: a comparison of two runs of the sample
 engine. From C.1 on, a comparison that holds a run of an engine beside
@@ -90,13 +105,15 @@ import numpy as np
 import pytest
 
 import standins
-from openferment_core import artifacts, evidence_pool, fermos, intake, proforma, pureos, vessel
-from openferment_core.engine import library, runs, simulator
+from fastapi.testclient import TestClient
+
+from openferment_core import api, artifacts, evidence_pool, fermos, intake, proforma, pureos, vessel
+from openferment_core.engine import biosteam, library, runs, simulator
 from openferment_core.engine.sample import SAMPLE
 from openferment_core.models import ComparisonCreate, Override, ProformaRunRequest, SimulationRequest, VesselRequest
 from openferment_core.pureos import catalogue, train_spec
 from openferment_core.studies import comparisons
-from standins import as_inputs, train_inputs
+from standins import as_inputs, assumed_inputs, train_inputs
 from test_comparisons import PricedStandIn
 from test_engines import given
 from test_fermos import CHEMO, SD, STANDIN_CHEMOSTAT_TYPED, STANDIN_TYPED, T, batch, forecast_inputs, inputs_for
@@ -152,8 +169,13 @@ PINS: dict[str, tuple[str, str]] = {
         "748146b8afbc21a1", "892d4c0bcbb7cf5d4d855fce3d1b3ff07f75ec0cd1745ccd64e0ae0c1e6fd35a"),
     "pureos.train_run": (
         "d8f5d3f56d34aff9", "9053c28f6bc8695044bc100184e800fcae3dbade808427232fbae4e50364f095"),
+    # D1's amendment at C.4 (the Proforma run): its values, sent as inputs,
+    # base as the panel's overrides based them, with the line saying so, so
+    # the id moved from ed33c02's 7fd5c088e90f6689, captured through the
+    # retired older field, to the one the panel's overrides gave the same
+    # values at b6a85d0; the output hash is ed33c02's.
     "proforma.run": (
-        "7fd5c088e90f6689", "865d88ab811e3553dfff6549983fca62a2cf1cf01410b20fa5599493646f0fcf"),
+        "87a47693d171d91d", "865d88ab811e3553dfff6549983fca62a2cf1cf01410b20fa5599493646f0fcf"),
     "library.run": (
         "dfb8df271dc2f58d", "16534ffcf199ba8a7532b52c8fd28961fb997ee9bd7f0e5173950bb9ecafee10"),
     "library.run on its own defaults": (
@@ -174,6 +196,8 @@ PINS: dict[str, tuple[str, str]] = {
 }
 # The same comparison's id at ed33c02, on its basis at `study comparison 1`.
 ED33C02_SAMPLE_COMPARISON = "b939060b54056cec"
+# The Proforma run's id at ed33c02, on the basis the older `assumptions` field built.
+ED33C02_PROFORMA = "7fd5c088e90f6689"
 
 
 def under_fixed_dispatch() -> bool:
@@ -313,9 +337,33 @@ def evaluator(monkeypatch):
 
 
 def test_a_proforma_run_on_the_stand_in_evaluator_holds_its_pin(evaluator):
-    r = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, samples=8),
+    """From C.4 a Proforma run's request takes typed inputs (alpha 2.2 D2):
+    test_proforma_runs' ASSUMED, sent as inputs, converted at Proforma's door
+    into the Overrides of the scenario's scope, give the pin's artifact; the
+    same request's Overrides, laid on by the binding and based as the panel's
+    overrides were, the line saying so written out here word for word, give
+    its basis; and that basis less the line, the older field's, gives
+    ed33c02's id (D1's amendment at C.4). The run is kept as one row of the
+    biosteam engine."""
+    from openferment_core.models import BasisInput, BasisSource
+
+    inputs = assumed_inputs(ASSUMED)
+    r = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=inputs, samples=8),
                      pool=evaluator)
     pinned("proforma.run", artifacts.get(r.artifactId))
+    overrides = proforma.overrides_of(MADE_HERE, ETHANOL, inputs)
+    assert as_inputs(overrides, {i.name: i.quantity.unit for i in inputs}) == inputs
+    bound = proforma.bind_inputs(ETHANOL, evaluator.records, None, proforma.named_values(MADE_HERE, overrides))
+    older = proforma.basis_inputs(bound, ETHANOL, 8, scenario_id=MADE_HERE, fitted=[])
+    panel = older + [BasisInput(name="assumptions read from", value="overrides", unit="", source=BasisSource(
+        kind="convention", note="where the named persons' values in this basis came from: the parameter panel's "
+                                "overrides, and any the older assumptions field gave, which the service reads as "
+                                "overrides for one release; a basis without this input read the older field alone"))]
+    version = artifacts.registered(proforma.RUN).version_for(panel)
+    assert artifacts.artifact_id(proforma.RUN, version, panel, 0) == r.artifactId
+    assert artifacts.artifact_id(proforma.RUN, version, older, 0) == ED33C02_PROFORMA
+    row = runs.get(r.artifactId)
+    assert (row.engine, row.tool, row.plant, row.scenarioId) == ("biosteam", proforma.RUN, ETHANOL, MADE_HERE)
 
 
 # ── the library, its comparisons, and the contract's sample engine ────
@@ -348,8 +396,20 @@ def _two_runs_compared() -> tuple:
 
 
 def test_a_library_run_on_the_stand_in_worker_holds_its_pin(plant_worker):
-    rep = runs.run("sugarcane", None, [over("stream.sugarcane.price", 0.05, by="Ada Moreno")], by="Ada Moreno")
-    assert rep.run.id == rep.artifact.id
+    """From C.4 the library's door takes typed inputs (alpha 2.2 D2) through
+    the biosteam engine's own path (engine/biosteam.py `run_plant`): the
+    request sent as inputs, at the route and at the engine, and the same
+    request's Override are one artifact, the pin's."""
+    typed = over("stream.sugarcane.price", 0.05, by="Ada Moreno")
+    units = {p.key: p.unit for p in biosteam.ENGINE.parameters("sugarcane", None)}
+    (sent,) = as_inputs([typed], units)
+    answer = TestClient(api.app).post("/api/library/sugarcane/run", json={
+        "inputs": [sent.model_dump(mode="json", exclude_none=True)], "by": "Ada Moreno"})
+    assert answer.status_code == 200, answer.json()
+    rep = runs.run("sugarcane", None, [typed], by="Ada Moreno")
+    assert rep.run.id == rep.artifact.id == answer.json()["run"]["id"]
+    assert biosteam.run_plant("sugarcane", None, [sent], by="Ada Moreno").run.id == rep.run.id
+    assert biosteam.ENGINE.run("sugarcane", None, [sent], "Ada Moreno").id == rep.run.id
     pinned("library.run", rep.artifact)
 
 

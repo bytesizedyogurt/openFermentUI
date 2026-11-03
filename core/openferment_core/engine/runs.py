@@ -32,17 +32,20 @@ A request refused before anything computes (an unknown key, a range, a scope
 the plant does not have) keeps nothing. `keep_run` keeps the row of any
 engine's computation: BioSTEAM's library run (`run`), the run of every
 engine built on `contract.WorkerEngine` (`run_engine`), the kinetics
-engine's computations in the service's own process and the train engine's
-runs in the Proforma worker (`compute_kept`, fermos_engine.py and
-pureos/engine.py) are kept through it. The tables and the read-back stay in
-the artifact; `report` reads the run, its artifact and its SFF record
-together.
+engine's computations in the service's own process, the train engine's
+runs in the Proforma worker and a Proforma scenario's run, a run of
+BioSTEAM's (`compute_kept`, fermos_engine.py, pureos/engine.py and
+proforma.py's `keep_run`) are kept through it. The tables and the read-back
+stay in the artifact; `report` reads the run, its artifact and its SFF
+record together.
 
     GET  /api/runs                 the project's runs, newest first (?engine= one engine's)
     GET  /api/runs/{id}            one run's report: the run, its artifact, its SFF record,
                                    its parameters as the parameter panel reads them
-    POST /api/library/{plant}/run  a library plant or a flowsheet run and kept (api.py)
+    POST /api/library/{plant}/run  a library plant or a flowsheet run and kept (api.py,
+                                   engine/biosteam.py `run_plant`)
     POST /api/engines/{name}/run   any registered engine's thing run and kept (api.py)
+    POST /api/proforma/run         a Proforma scenario run and kept as BioSTEAM's (proforma.py)
 
 BioSTEAM's run is computed by `run`; an engine built on
 `contract.WorkerEngine` computes in its own worker, and `run_engine` keys,
@@ -87,6 +90,9 @@ VESSEL_TOOL = "fermos.vessel"
 # the engine package imports no pureOS module either. Its outputs are read by
 # pureOS, registered with the tool (`values_of`).
 TRAIN_TOOL = "pureos.train_run"
+# A Proforma scenario's run (proforma.py), a run of this engine's BioSTEAM
+# (alpha 2.2 D6), read here by its tool's name as fermOS's are.
+PROFORMA_TOOL = "proforma.run"
 
 
 class RunNotFound(KeyError):
@@ -176,17 +182,25 @@ def values_of(art: Artifact) -> list[dict[str, Any]]:
     forecast's finals, each its median with its 5th and 95th percentiles as
     the quantity's low and high (`finals.<role>`); and a vessel design's
     rows in BioSTEAM's units (`design.<label>`, the unit beside a label two
-    rows share). A tool whose module registers how its outputs read
-    (artifacts.register's `values_of`) is read by that module: a pureOS
-    train run's each unit's recovery, the overall recovery and the product
-    delivered, and each stream's mass flow and product share (the train
-    engine, pureos/engine.py). Any other tool's artifact answers an empty
-    list."""
+    rows share). A Proforma scenario's run's are its price block: the base
+    case's price, solved at its TEA's IRR as a library run's is and named as
+    a library run names its own (`price.solvedPrice`), and each quantile of
+    the price over its samples (`quantiles.p<n>`), each in the unit the
+    artifact states for a price (`tableUnits.price`), reckoned on the basis
+    its TEA states (`tea.basis`, what one unit of the price is of); a run
+    whose base case or samples held no price has none of those. A tool whose module registers
+    how its outputs read (artifacts.register's `values_of`) is read by that
+    module: a pureOS train run's each unit's recovery, the overall recovery
+    and the product delivered, and each stream's mass flow and product share
+    (the train engine, pureos/engine.py). Any other tool's artifact answers
+    an empty list."""
     origin = Origin(kind="artifact", ref=art.id)
 
-    def typed(name: str, value: Any, unit: str, low: Any = None, high: Any = None) -> dict[str, Any]:
+    def typed(name: str, value: Any, unit: str, low: Any = None, high: Any = None,
+              basis: Any = None) -> dict[str, Any]:
         return {"name": name, "quantity": Quantity(
-            value=value, unit=unit, low=low if _number(low) else None, high=high if _number(high) else None,
+            value=value, unit=unit, basis=basis if isinstance(basis, str) and basis else None,
+            low=low if _number(low) else None, high=high if _number(high) else None,
             origin=origin).model_dump(mode="json", exclude_none=True)}
 
     o = art.output
@@ -217,6 +231,15 @@ def values_of(art: Artifact) -> list[dict[str, Any]]:
         shared = {lb for lb in (r["label"] for r in rows) if sum(r["label"] == lb for r in rows) > 1}
         return [typed(f"design.{r['label']}" + (f" ({r['unit']})" if r["label"] in shared and r["unit"] else ""),
                       r["value"], r["unit"]) for r in rows]
+    if art.tool == PROFORMA_TOOL:
+        unit = (o.get("tableUnits") or {}).get("price")
+        if not isinstance(unit, str) or not unit:
+            return []
+        tea = o.get("tea")
+        on = tea.get("basis") if isinstance(tea, dict) else None
+        out = [typed("price.solvedPrice", o["basePrice"], unit, basis=on)] if _number(o.get("basePrice")) else []
+        quantiles = o.get("quantiles") or {}
+        return out + [typed(f"quantiles.{k}", v, unit, basis=on) for k, v in quantiles.items() if _number(v)]
     # A tool whose module reads its own outputs, registered with the tool
     # (artifacts.register's `values_of`): a pureOS train run's, read by pureOS.
     try:
@@ -232,7 +255,9 @@ def values_of(art: Artifact) -> list[dict[str, Any]]:
 def _outputs(art: Artifact) -> dict[str, Any]:
     """What a run answers, small enough for a listing: `values`, its outputs
     as typed quantities (`values_of`), and for a library run its price, a
-    flowsheet's own outputs and how the package's test held it as well."""
+    flowsheet's own outputs and how the package's test held it as well. A
+    Proforma run's grid and samples stay in its artifact: the row holds its
+    price block alone."""
     values = values_of(art)
     if art.tool != library.LIBRARY_RUN:
         return {"values": values}

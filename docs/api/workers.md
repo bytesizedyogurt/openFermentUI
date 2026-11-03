@@ -267,7 +267,9 @@ Request:
 
 A reference biorefinery (a flowsheet module with `load`) is built afresh inside
 `package_defaults()`; any other is the worker's warm plant set to `base` and simulated, its
-solved price on the product while the file is written; a library plant is built afresh and
+solved price on the product while the file is written (a Proforma scenario's run asks it as the
+run is kept, from the run's basis alone, `proforma.plant_of`; the service asks it of no run whose
+base case could not run, which keeps its words as `sffRefused`); a library plant is built afresh and
 set as its run set it; a train is rebuilt from `train` and simulated whole as `train_run`
 simulates it, inside `package_defaults()`, then written with no TEA, once the toolkit's schema
 leaves the TEA year to the file (below). The toolkit's JSON writer is

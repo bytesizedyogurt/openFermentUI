@@ -215,3 +215,31 @@ def test_the_route_and_the_command_line_hand_over_the_same_package(worker, tmp_p
     assert exports.main([]) == 2
     with projects.using("no-such-project"):
         assert exports.main([str(out)]) == 2
+
+
+def test_a_proforma_runs_scenario_is_named_in_the_package(monkeypatch, tmp_path):
+    """A Proforma scenario's run is a run of BioSTEAM's (alpha 2.2 D6): the
+    package names the scenario it belongs to by its name, as the project
+    keeps it, in study.json and study.md."""
+    from types import SimpleNamespace
+
+    import standins
+    from openferment_core import intake, proforma, project_state
+    from openferment_core.models import ProformaRunRequest
+    from standins import assumed_inputs
+    from test_proforma_runs import ASSUMED, ETHANOL
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
+    rs = standins._standin_yeast_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+    sid = "sc-export-1"
+    project_state.put("scenarios", sid, {"id": sid, "kind": "biosteam", "modelId": ETHANOL,
+                                         "name": "A STAND-IN scenario"}, by="Ada Moreno")
+    ran = proforma.run(ProformaRunRequest(scenarioId=sid, inputs=assumed_inputs(ASSUMED), samples=8, by="Ada Moreno"),
+                       pool=pool)
+    files = exports.files()
+    held = json.loads(files["study.json"])
+    assert [r["id"] for r in held["runs"]] == [ran.artifactId]
+    assert held["proformaScenarios"] == [{"id": sid, "name": "A STAND-IN scenario"}]
+    assert f"Asked for by scenario `{sid}` (A STAND-IN scenario)." in files["study.md"].decode("utf-8")

@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -688,27 +688,11 @@ def _train_param(raw: str | None) -> TrainSpec | None:
         raise HTTPException(status_code=422, detail=f"train is a pureOS train as JSON (a TrainSpec): {first}") from None
 
 
-def _assumptions_param(raw: str | None) -> list:
-    """`?assumptions=` on GET /api/proforma/ceiling-check: a JSON list of
-    named persons' assumptions, as ProformaRunRequest.assumptions carries
-    them."""
-    from pydantic import TypeAdapter, ValidationError
-
-    from .models import InputAssumption
-
-    if not raw:
-        return []
-    try:
-        return TypeAdapter(list[InputAssumption]).validate_json(raw)
-    except (ValidationError, RecursionError):
-        raise HTTPException(status_code=422, detail="assumptions is a JSON list of assumptions, each with key, value, "
-                                                    "low, high, by and at, as a run takes them") from None
-
-
 def _inputs_param(raw: str | None) -> list:
-    """`?inputs=` on GET /api/fermos/bind: a JSON list of the values a person
-    sets, each a parameter's key and a typed quantity with its origin, as
-    SimulationRequest.inputs carries them (alpha 2.2 D2)."""
+    """`?inputs=` on GET /api/fermos/bind, GET /api/proforma/bind and the
+    ceiling check: a JSON list of the values a person sets, each a
+    parameter's key and a typed quantity with its origin, as a run's request
+    carries them (alpha 2.2 D2)."""
     from pydantic import TypeAdapter, ValidationError
 
     from .models import EngineInput
@@ -724,21 +708,14 @@ def _inputs_param(raw: str | None) -> list:
                                                     "run takes them" + (f": {first}" if first else "")) from None
 
 
-def _overrides_param(raw: str | None) -> list:
-    """`?overrides=` on GET /api/proforma/bind and the ceiling check: a JSON
-    list of a person's overrides from the parameter panel (OF-BLD-020 D3),
-    as ProformaRunRequest.overrides carries them."""
-    from pydantic import TypeAdapter, ValidationError
-
-    from .models import Override
-
-    if not raw:
-        return []
-    try:
-        return TypeAdapter(list[Override]).validate_json(raw)
-    except (ValidationError, RecursionError):
-        raise HTTPException(status_code=422, detail="overrides is a JSON list of overrides, each with scope, key, value, "
-                                                    "by and at, as a run takes them") from None
+def _retired(name: str, raw: str | None) -> None:
+    """A query field Proforma's reads retired at alpha 2.2's C.4 (`?overrides=`,
+    and the older `?assumptions=`), refused in words naming the one they read,
+    as the run's request refuses a field it does not name."""
+    if raw is not None:
+        raise HTTPException(status_code=422, detail=(
+            f"{name} is retired: this read takes the values a person sets as ?inputs=, a JSON list of values, each a "
+            "parameter's key (name) and a quantity in its unit with its origin (kind, by, at), as a run takes them"))
 
 
 @app.get("/api/proforma/status")
@@ -1030,10 +1007,15 @@ def _library_plant(plant: str) -> None:
 @app.get("/api/library/{plant}/parameters", response_model=LibraryParameters)
 def library_parameters(plant: str, configuration: str | None = None) -> LibraryParameters:
     """A plant's parameters as the package builds it, each read back from a
-    fresh build in the worker with origin `library-default`."""
+    fresh build in the worker with origin `library-default`, in the
+    configuration a run of it runs in: the one named, else, for a plant that
+    takes configurations, its default (engine/biosteam.py
+    `default_configuration`), which the answer names."""
+    from .engine import biosteam as _biosteam
+
     _library_plant(plant)
     try:
-        return _library.parameters(plant, configuration)
+        return _library.parameters(plant, _biosteam.default_configuration(plant, configuration))
     except _library.LibraryRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
@@ -1048,18 +1030,28 @@ def library_regression(plant: str, configuration: str | None = None) -> PackageR
     return _library.regression(plant, configuration)
 
 
-@app.post("/api/library/{plant}/run", response_model=RunReport)
+@app.post("/api/library/{plant}/run", response_model=RunReport, responses={
+    404: {"model": Refusal, "description": "The library's shelf holds no plant of that id: in words, naming what it holds."},
+    422: {"model": Refusal, "description": "A value refused before anything runs, nothing kept; or values the plant "
+                                           "refused, in its words, the receipt kept."},
+    503: {"model": Refusal, "description": "The Proforma simulator could not run the plant: in words, with no run kept."}})
 def library_run(plant: str, request: LibraryRunRequest) -> RunReport:
     """One engine run of a library plant or an openFerment flowsheet, built
     afresh with the values set for it, priced, read back and written as an
     SFF file, kept in the project's runs (engine/runs.py): the run, its
-    `library.run` artifact and its SFF record. A basis already run answers
-    from its row; values the plant refuses are kept as a receipt and
+    `library.run` artifact and its SFF record. The run takes the biosteam
+    engine's own path (engine/biosteam.py `run_plant`): a plant that takes a
+    configuration, asked with none, runs in its default, and each value is
+    checked against the plant's parameters before the plant is built, a
+    value refused keeping nothing (422 in words). A basis already run
+    answers from its row; values the plant refuses are kept as a receipt and
     answered 422 in the plant's words."""
+    from .engine import biosteam as _biosteam
+
     _library_plant(plant)
     try:
-        return _runs.run(plant, request.configuration, request.overrides, by=request.by)
-    except _library.LibraryRefused as e:
+        return _biosteam.run_plant(plant, request.configuration, request.inputs, by=request.by)
+    except (_library.LibraryRefused, EngineRefused) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {plant}: {e}") from e
@@ -1196,12 +1188,15 @@ def study_scenario(scenario_id: str) -> StudyScenario:
 @app.post("/api/studies/scenarios/{scenario_id}/run")
 def study_scenario_run(scenario_id: str, asked: StudyRequest) -> RunReport:
     """The scenario run as an engine run (its report); values the plant
-    refuses are kept as a receipt with the scenario and answered 422."""
+    refuses are kept as a receipt with the scenario and answered 422. A kept
+    value its plant's parameters refuse before anything runs (a key the
+    plant no longer reads, a unit it no longer uses) is a 422 in words, and
+    keeps nothing."""
     try:
         return _scenarios.run(scenario_id, by=asked.by)
     except _scenarios.ScenarioNotFound as e:
         raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
-    except _library.LibraryRefused as e:
+    except (_library.LibraryRefused, _scenarios.ScenarioRefused) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {scenario_id}: {e}") from e
@@ -1301,31 +1296,36 @@ def proforma_scenarios(host: str | None = None) -> list[dict]:  # noqa: N803 (th
 
 @app.get("/api/proforma/bind")
 def proforma_bind(flowsheet: str, host: str | None = None,  # noqa: N803
-                  fits: str | None = None, overrides: str | None = None, vessel: str | None = None,
-                  trainRun: str | None = None) -> dict:  # noqa: N803 (the wire name)
+                  fits: str | None = None, inputs: str | None = None, vessel: str | None = None,
+                  trainRun: str | None = None,  # noqa: N803 (the wire name)
+                  overrides: str | None = Query(default=None, include_in_schema=False)) -> dict:
     """A shelf flowsheet's inputs bound, as a scenario not yet saved to the
     project shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
     lays on the fermOS fits a person chose (§5.1), a JSON object of input
-    key to artifact id, and `?overrides=` a person's overrides of one
-    scenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet
-    built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1) names its
-    vessel design and its train run (`?vessel=`, `?trainRun=`). A reference
-    biorefinery, the toy, an unknown id, a fit that cannot feed its input,
-    an override that cannot stand, or a composite's part that cannot
+    key to artifact id, and `?inputs=` the values a person sets over both
+    (OF-BLD-020 D3; alpha 2.2 D2), a JSON list of typed quantities, each
+    converted at Proforma's door into the Override of the flowsheet's own
+    scope, `proforma:<flowsheet id>`, as a run converts its values. A
+    flowsheet built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1)
+    names its vessel design and its train run (`?vessel=`, `?trainRun=`). A
+    reference biorefinery, the toy, an unknown id, a fit that cannot feed
+    its input, a value that cannot stand, or a composite's part that cannot
     (missing, another tool's, damaged, of another chemical set) is a 422 in
-    words. A read:
-    it starts no simulator."""
+    words, and so is the retired `?overrides=`. A read: it starts no
+    simulator."""
     from . import composite, proforma
 
+    _retired("overrides", overrides)
     chosen = _fits_param(fits)
-    typed = _overrides_param(overrides)
+    given = _inputs_param(inputs)
     try:
         # A composite's Finance group is its own (the run lays it on, the
         # panel resolves it); every other flowsheet takes no finance key, and
         # one sent is refused as the run refuses it (OF-BLD-020 §6.R, main-30).
         built = bool(proforma.runnable(flowsheet).builtFrom)
-        inputs, _finance = composite.split_overrides(typed) if built else (typed, [])
-        values, _ = proforma.named_values(None, inputs)
+        typed = proforma.overrides_of(flowsheet, flowsheet, given)
+        of_inputs, _finance = composite.split_overrides(typed) if built else (typed, [])
+        values = proforma.named_values(None, of_inputs)
         if values:
             proforma._check_keys(proforma.runnable(flowsheet), values)
         return proforma.bind_flowsheet(flowsheet, host=host,
@@ -1337,34 +1337,49 @@ def proforma_bind(flowsheet: str, host: str | None = None,  # noqa: N803
 
 @app.get("/api/proforma/ceiling-check")
 def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: str | None = None,  # noqa: N803
-                           fits: str | None = None,  # noqa: N803
-                           assumptions: str | None = None, overrides: str | None = None) -> dict:
+                           fits: str | None = None, inputs: str | None = None,
+                           overrides: str | None = Query(default=None, include_in_schema=False),
+                           assumptions: str | None = Query(default=None, include_in_schema=False)) -> dict:  # noqa: N803
     """A scenario's fermenter yield read against the newest stored geneOS
     ceiling of each shelf model of its organism, on its flowsheet's sugar
     (OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by
     its id, one not yet saved by the flowsheet it names; `?fits=` and
-    `?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,
-    and `?assumptions=`, the older field, is read as overrides for one
-    release. A yield above a ceiling is flagged, never clamped. A read: it
-    keeps nothing, starts no worker and changes no binding or run. Refused
-    in words (422) as the binding is."""
+    `?inputs=` (JSON; OF-BLD-020 D3, alpha 2.2 D2: the values a person sets,
+    each a typed quantity converted at Proforma's door into the Override of
+    the scenario's scope) bind its yield as its page binds it. A yield above
+    a ceiling is flagged and kept as bound. A read: it keeps nothing, starts
+    no worker and changes no binding or run. Refused in words (422) as the
+    binding is, and so are the retired `?overrides=` and `?assumptions=`."""
     from . import proforma
 
+    _retired("overrides", overrides)
+    _retired("assumptions", assumptions)
     chosen = _fits_param(fits)
-    typed = _assumptions_param(assumptions)
-    over = _overrides_param(overrides)
+    given = _inputs_param(inputs)
     try:
-        return proforma.ceiling_check(scenarioId, flowsheet, host=host,
-                                      assumptions=typed, fits=chosen, overrides=over).model_dump(mode="json")
+        over = proforma.overrides_of(scenarioId, proforma.flowsheet_of(scenarioId, flowsheet), given)
+        return proforma.ceiling_check(scenarioId, flowsheet, host=host, fits=chosen,
+                                      overrides=over).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-@app.post("/api/proforma/run")
+@app.post("/api/proforma/run", responses={
+    422: {"description": "The scenario cannot run as asked, in words (a list of field errors when the request's own "
+                         "fields are refused): an input that waits for a source, a value its input cannot take, or a "
+                         "refusal inside the run, its receipt kept.",
+          "content": {"application/json": {"schema": {"anyOf": [
+              {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}},
+    503: {"model": Refusal, "description": "The Proforma simulator could not run the scenario: in words, with no run "
+                                           "kept."}})
 def proforma_run(req: ProformaRunRequest) -> dict:
     """Run a scenario the project keeps by its id, or one not yet saved by
-    the shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any
-    other case, and listing every input waiting for a source."""
+    the shelf flowsheet it names (OF-BLD-019 §2.3, d), with the values a
+    person or a model sets as typed inputs, and keep it as one run of the
+    biosteam engine (GET /api/runs/{id}, its id the artifact's) with its SFF
+    file: 422 in words for any other case, listing every input waiting for a
+    source; a refusal inside the run is kept as its receipt and 422 in the
+    worker's words."""
     from . import proforma
     from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 

@@ -18,6 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, basis, fermos, intake, proforma
+from standins import assumed_inputs
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from test_fermos import forecast_inputs
 from openferment_core.models import (
@@ -183,7 +184,7 @@ def test_a_chosen_fit_binds_titre_yield_and_productivity_and_the_run_names_it(st
         assert by[k].records == [] and by[k].sampling == "triangular" and by[k].source.note
     assert "productivity" not in info.waiting and by["titre"].flags == ["chosen in place of the 3 records it bound"]
 
-    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, fits=fits), pool=standin)
+    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED), fits=fits), pool=standin)
     art = artifacts.get(run.artifactId)
     named = {i.name: i for i in art.inputs}
     for k in proforma.FIT_KEYS:
@@ -227,7 +228,7 @@ def test_a_fits_productivity_feeds_the_fermenter_only_beside_its_own_titre(stand
         assert f"productivity from growth_forecast {fc.artifactId}" in words and said in words, words
         assert f"choose {fc.artifactId} for titre as well, or stop using it for productivity" in words, words
         with pytest.raises(proforma.ScenarioRefused, match="only beside titre from"):
-            proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, fits=fits), pool=standin)
+            proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED), fits=fits), pool=standin)
     # No stand-in record is of S288C, so there titre takes a person's assumption.
     with pytest.raises(proforma.ScenarioRefused, match="titre is a named person's assumption"):
         proforma.bind_flowsheet(ETHANOL, pool=standin, host="s-cerevisiae-s288c", fits={"productivity": fc.artifactId},
@@ -260,7 +261,7 @@ def test_an_unidentified_mu_refuses_naming_mu(standin):
     with pytest.raises(proforma.ScenarioRefused, match=r"cannot feed titre: μ \(mu\) is not identified"):
         proforma.bind_flowsheet(ETHANOL, pool=standin, fits={"titre": fit.kineticArtifactId})
     with pytest.raises(proforma.ScenarioRefused, match=r"μ \(mu\) is not identified"):
-        proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED,
+        proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED),
                                         fits={"yield": fit.kineticArtifactId}), pool=standin)
 
 
@@ -380,5 +381,5 @@ def test_the_fits_endpoint_and_the_bind_endpoint_with_fits(client):
     assert refused.status_code == 422 and "does not run out" in refused.json()["detail"]
 
     ran = client.post("/api/proforma/run", json={"scenarioId": MADE_HERE, "flowsheet": ETHANOL, "fits": fits,
-                                                  "assumptions": [a.model_dump() for a in ASSUMED]})
+                                                  "inputs": [i.model_dump(mode="json", exclude_none=True) for i in assumed_inputs(ASSUMED)]})
     assert ran.status_code == 200 and {i["key"]: i["binding"] for i in ran.json()["inputs"]}["yield"] == "artifact"

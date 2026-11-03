@@ -423,14 +423,18 @@ RUN_WAITS = ("A named person types each waiting input in Proforma, on the scenar
 
 def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note: str, ctx: ToolContext, *,
                engine: Any = None) -> ToolResult:
-    """Run a library plant at the library's defaults, or a study scenario
-    with its values, as an engine run, keep it and mark it as the caller's
-    (alpha 2.0 stage 6). A plant's refusal is kept as the run's receipt
-    (engine/runs.py) and comes back in the plant's words. `engine`, when it
-    names a registered engine beside BioSTEAM (docs/api/engines.md), runs one
-    of its things at its defaults, kept the same way."""
+    """Run a thing of BioSTEAM's at its defaults (a library plant, a
+    composed flowsheet or a scenario's flowsheet, through the biosteam
+    engine's own run: a plant that takes a configuration, asked with none,
+    runs in its default), or a study scenario with its values, as an engine
+    run, keep it and mark it as the caller's (alpha 2.0 stage 6). A plant's
+    refusal is kept as the run's receipt (engine/runs.py) and comes back in
+    the plant's words. `engine`, when it names a registered engine beside
+    BioSTEAM (docs/api/engines.md), runs one of its things at its defaults,
+    kept the same way."""
     from ..engine import library, runs
     from ..engine import EngineBroken, EngineRefused
+    from ..engine.biosteam import ENGINE as BIOSTEAM
     from ..studies import scenarios
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
     from .engine import run_result
@@ -463,7 +467,8 @@ def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note
         return ToolResult(error=f"{tool} refused: name a plant to run at the library's defaults, or a scenario to "
                                 "run with its values; one of the two")
     try:
-        report = scenarios.run(sid, by=who) if sid else runs.run(pid, configuration.strip() or None, [], by=who)
+        report = (scenarios.run(sid, by=who) if sid else
+                  runs.run_with(BIOSTEAM, pid, configuration.strip() or None, [], by=who))
     except scenarios.ScenarioNotFound as e:
         return ToolResult(error=f"{tool} refused: {str(e).strip(chr(39))} (study_read lists them)")
     except runs.RunRefused as e:
@@ -471,8 +476,10 @@ def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note
                                                                          "note": note})
         return ToolResult(error=f"{tool}: the plant refused these values, in its words: {e}. The refusal is kept as "
                                 f"run {e.run_id}'s receipt.")
-    except library.LibraryRefused as e:
+    except (library.LibraryRefused, EngineRefused, scenarios.ScenarioRefused) as e:
         return ToolResult(error=f"{tool} refused: {e}")
+    except library.PlantNotFound as e:
+        return ToolResult(error=f"{tool} refused: {str(e).strip(chr(39))} (engine_plants lists them)")
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         return ToolResult(error=f"{tool} could not run the plant: {e}")
     run = report.run
@@ -580,14 +587,17 @@ def make_comparison(tool: str, title: str, run_ids: list[str], ctx: ToolContext)
 
 def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> ToolResult:
     """Run one of the project's BioSTEAM scenarios as its page runs it, keep
-    the run and mark it as the model's (OF-BLD-019 §6.1): the overrides a
+    the run and mark it as the caller's (OF-BLD-019 §6.1): the overrides a
     person set on its page and the fits chosen for it are read from the
-    project's rows (`project_state.run_request`), and the model adds no value. An
-    input nothing binds waits, and the refusal is proforma.run's own words
-    (what `POST /api/proforma/run` answers with a 422)."""
+    project's rows (`project_state.run_request`), and the model adds no
+    value. The run is kept as one row of the biosteam engine, created by the
+    caller (`_actor`). An input nothing binds waits, and the refusal is
+    proforma.run's own words (what `POST /api/proforma/run` answers with a
+    422)."""
     from .. import proforma, project_state, pureos
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 
+    _, who = _actor(ctx)
     sid = (scenario_id or "").strip()
     if not sid:
         return ToolResult(error=f"{tool} refused: name the scenario to run by its id (proforma_read lists them)")
@@ -597,7 +607,7 @@ def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> To
         return ToolResult(error=f"{tool} refused: {sid} is not a BioSTEAM scenario this project keeps; its BioSTEAM "
                                 f"scenarios are {kept}, and a person makes one with New scenario in Proforma")
     try:
-        r = proforma.run(project_state.run_request(held[sid]), pool=ctx.pool)
+        r = proforma.run(project_state.run_request(held[sid], by=who), pool=ctx.pool)
     except proforma.ScenarioRefused as e:
         waits = f" {RUN_WAITS}" if "wait for a source" in str(e) else ""
         return ToolResult(error=f"{tool} refused: {e}.{waits}")

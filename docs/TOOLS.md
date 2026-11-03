@@ -192,7 +192,7 @@ List what the library shelf runs: the biorefineries plants with an entry point a
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `engine` | string | no | The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and openFerment's flowsheet, or any other registered here. |
+| `engine` | string | no | The engine to read (GET /api/engines names them): biosteam, whose things are the library plants, openFerment's flowsheet and the shelf's scenario flowsheets, or any other registered here. |
 | `words` | string | no | Words to narrow the shelf by: a product, a feedstock, a plant's name; empty for all. |
 | `limit` | integer | no | How many rows at most. A count. |
 
@@ -204,7 +204,7 @@ A plant's parameters as the package builds it: each key with its label, its unit
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `engine` | string | no | The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and openFerment's flowsheet, or any other registered here. |
+| `engine` | string | no | The engine to read (GET /api/engines names them): biosteam, whose things are the library plants, openFerment's flowsheet and the shelf's scenario flowsheets, or any other registered here. |
 | `plant` | string | yes | A plant's id, as engine_plants gives it. |
 | `configuration` | string | no | One of the plant's configurations; empty for its own. |
 | `words` | string | no | Words to narrow the parameters by; empty for all. |
@@ -218,7 +218,7 @@ Run a plant from the library shelf at the library's defaults, or a study scenari
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `engine` | string | no | The engine to run (GET /api/engines names them): biosteam, whose things are the library plants and openFerment's flowsheet, or any other registered here, whose thing this tool runs at its own defaults. |
+| `engine` | string | no | The engine to run (GET /api/engines names them): biosteam, whose things are the library plants, openFerment's flowsheet and the shelf's scenario flowsheets, or any other registered here, whose thing this tool runs at its own defaults. |
 | `plant` | string | no | A plant's id, run at the library's defaults; empty when a scenario is named. |
 | `configuration` | string | no | One of the plant's configurations; empty for its own. |
 | `scenario` | string | no | A study scenario's id (study_scenario returns it), run on its plant with its values. |

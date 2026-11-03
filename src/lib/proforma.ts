@@ -15,6 +15,7 @@ import type {
   Override,
   InputSensitivity,
   PackageRegression,
+  ParameterSpec,
   ProformaGrid,
   ProformaRunRequest,
   ProformaRunResult,
@@ -34,6 +35,7 @@ import type {
 } from '@/data/types';
 import { useStore } from '@/store';
 import { ServiceDown, ServiceRefused, call } from './http';
+import { inputsOf } from './params';
 
 export { ServiceDown as ProformaDown, ServiceRefused as ProformaRefused };
 
@@ -376,9 +378,18 @@ export interface RunAsk {
   /**
    * A person's changes in the parameter panel (OF-BLD-020 D3): the scope
    * `proforma:<scenarioId>`'s overrides, each a named assumption that wins
-   * over the records and any fit for its input (`runOverrides`).
+   * over the records and any fit for its input (`runOverrides`), sent as typed
+   * inputs (`runBody`).
    */
   overrides: Override[];
+  /**
+   * The scope's parameters, each with the unit a change to it is sent in
+   * (`runSpecs`): the panel's specs when it has answered, else the
+   * flowsheet's inputs as the shelf states them.
+   */
+  specs: Pick<ParameterSpec, 'key' | 'unit'>[];
+  /** The person asking: the run's row is created by them. */
+  by: string;
   host: string | null;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1). */
   fits?: Record<string, string>;
@@ -412,17 +423,32 @@ export function scenarioRunOverrides(
   return ask.composite ? [...scoped] : runOverrides(scoped, [...ask.inputs, ...ask.finance]);
 }
 
+/**
+ * The parameters a scenario's changes are sent in the units of: the panel's specs when it has answered (a
+ * composite's Finance group among them), else the scenario's inputs as the service bound them, and the
+ * flowsheet's inputs as the shelf states them for a key the binding lacks (`inputsOf` reads the last spec of a
+ * key, so the bound inputs come last). A change to a key none of them names goes with no unit, and the service
+ * refuses it in words; a composite's run waits for its panel, which names its Finance group's units.
+ */
+export function runSpecs(
+  panel: { specs: Pick<ParameterSpec, 'key' | 'unit'>[] } | null,
+  flowsheet: Pick<FlowsheetInfo, 'inputs'> | null,
+  bound: { inputs: { key: string; unit: string }[] } | null = null,
+): Pick<ParameterSpec, 'key' | 'unit'>[] {
+  return panel?.specs ?? [...(flowsheet?.inputs ?? []), ...(bound?.inputs ?? [])];
+}
+
 /** The body `runProformaScenario` posts, as the service reads it (`ProformaRunRequest`). */
 export function runBody(ask: RunAsk): ProformaRunRequest {
-  // `flowsheet` joins ProformaRunRequest in the service with OF-BLD-019 §2.3;
-  // a service that predates it ignores the field and refuses a scenario it
-  // does not hold, in words. It is sent only for a scenario made here, and
-  // `fits` only when a person chose one (§5.1). A person's values go as
-  // `overrides` (OF-BLD-020 §2.2); the older `assumptions` field, which the
-  // service still reads for one release, is no longer sent.
+  // `flowsheet` is sent only for a scenario made here, and `fits` only when a
+  // person chose one (OF-BLD-019 §2.3, §5.1). A person's values go as typed
+  // inputs (alpha 2.2 D2), each turned from its Override by params.ts's one
+  // function, in its parameter's unit; the service converts each back into
+  // that Override at its door and refuses any field the request does not name.
   return {
     scenarioId: ask.scenarioId,
-    overrides: ask.overrides,
+    inputs: inputsOf(ask.overrides, ask.specs),
+    by: ask.by,
     host: ask.host,
     seed: 0,
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
@@ -490,15 +516,23 @@ export interface CeilingAsk {
   fits?: Record<string, string>;
   /** The yield's override, when a person typed one (OF-BLD-020 D3); the rest do not bear on the check. */
   overrides?: Override[];
+  /** The parameters the yield's change is sent in the unit of (`runSpecs`); a key they lack goes with no unit. */
+  specs?: Pick<ParameterSpec, 'key' | 'unit'>[];
 }
 
-/** `GET /api/proforma/ceiling-check`: a service that predates it says so in words. */
-export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promise<CeilingCheck> {
+/** The query `ceilingCheck` sends: the yield's change as a typed input in its unit (alpha 2.2 D2), as a run sends it. */
+export function ceilingQuery(ask: CeilingAsk): URLSearchParams {
   const q = new URLSearchParams({ scenarioId: ask.scenarioId });
   if (ask.flowsheet) q.set('flowsheet', ask.flowsheet);
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
-  if (ask.overrides && ask.overrides.length > 0) q.set('overrides', JSON.stringify(ask.overrides));
+  if (ask.overrides && ask.overrides.length > 0) q.set('inputs', JSON.stringify(inputsOf(ask.overrides, ask.specs ?? [])));
+  return q;
+}
+
+/** `GET /api/proforma/ceiling-check`: a service that predates it says so in words. */
+export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promise<CeilingCheck> {
+  const q = ceilingQuery(ask);
   try {
     return await call<CeilingCheck>(`/api/proforma/ceiling-check?${q.toString()}`, { signal });
   } catch (e) {

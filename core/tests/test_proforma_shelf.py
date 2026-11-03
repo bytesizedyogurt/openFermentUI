@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from openferment_core import artifacts, intake, proforma
 from openferment_core.flowsheets import KNOWN, shelf
 from openferment_core.models import Artifact, BasisInput, BasisSource, InputAssumption, ProformaRunRequest
+from standins import assumed_inputs
 
 CORE = Path(__file__).resolve().parent.parent
 FIXTURE_BY = "openFerment test fixture"
@@ -114,7 +115,7 @@ def test_the_stand_in_run_carries_every_table_and_says_it_is_the_stand_in(store,
     rs = standins._standin_yeast_records()
     a = [InputAssumption(key=k, value=v, low=lo, high=hi, by=FIXTURE_BY, at="2026-10-20")
          for k, v, lo, hi in (("plant_scale", 100000.0, 100000.0, 100000.0), ("glucose_price", 0.4, 0.3, 0.5))]
-    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=a, samples=50),
+    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(a), samples=50),
                        pool=SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
     assert run.samples == 50 and run.flowsheet == ETHANOL and run.tablesSource == standins.PROFORMA_STANDIN
     assert [u.id for u in run.units] == run.unitOrder == ["R1", "D302", "U301"] and len(run.streams) == 7

@@ -33,6 +33,7 @@ def test_the_benchmark_cites_the_package_it_ran(store):
 from types import SimpleNamespace  # noqa: E402
 
 from openferment_core.models import InputAssumption, ProformaRunRequest  # noqa: E402
+from standins import assumed_inputs
 
 
 ETHANOL = proforma.ETHANOL
@@ -72,7 +73,7 @@ def test_a_run_with_inputs_waiting_is_refused_listing_every_one(store):
     pool = SimpleNamespace(records=[rec("t", "ethanol_titre", 10.0, "g/L")], records_by_id={})
     with pytest.raises(proforma.ScenarioRefused) as e:
         proforma.run(ProformaRunRequest(scenarioId="sc-k3x9q-1", flowsheet=ETHANOL,
-                                        assumptions=[assume("plant_scale", 1000, 1000, 1000)]), pool=pool)
+                                        inputs=assumed_inputs([assume("plant_scale", 1000, 1000, 1000)])), pool=pool)
     for key in ("feed_glucose_conc", "yield", "productivity", "glucose_price"):
         assert key in str(e.value)
     assert "titre" not in str(e.value).split(":")[1] and "plant_scale" not in str(e.value)
@@ -268,10 +269,13 @@ ETHANOL_STANDIN = {"feed_glucose_conc": 100.0, "titre": 45.0, "yield": 0.45, "pr
 
 
 def replays_to_the_last_digits(artifact_id: str, rel: float = 1e-9) -> None:
-    """A run of the ethanol flowsheet replays, identically or with every
-    difference a number within `rel`: BioSTEAM's solvers carry noise in the
-    last digits between cases (measured 2026-10-20: one ulp of the price in
-    some cases), and the replay names it rather than hiding it."""
+    """A run of the ethanol flowsheet replays identically, as the biosteam
+    engine's scenario flowsheets state (rtol 0, atol 0; proforma.thing_list):
+    measured 2026-11-03 over five replays, with a sampled range and other runs
+    between them. The helper names any difference it meets, each a number
+    within `rel`, as it held one ulp of the price in some cases on
+    2026-10-20, so a host whose solvers carry noise in the last digits says
+    so in the difference's words."""
     from openferment_core import artifacts
 
     r = artifacts.replay(artifact_id)

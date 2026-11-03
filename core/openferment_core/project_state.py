@@ -201,18 +201,30 @@ def overrides_of(scope: str) -> list[dict[str, Any]]:
     return db.run(_scope_overrides(projects.current(), scope))
 
 
-def run_request(scenario: dict[str, Any]) -> Any:
-    """A run of a Proforma scenario the project keeps, as its page sends it:
-    the flowsheet and the parts a composite is built from, the overrides a
-    person set on its page, and the fermOS fits chosen for its inputs, each
-    read from the project's rows. No value is typed here."""
+def run_request(scenario: dict[str, Any], by: str = "") -> Any:
+    """A run of a Proforma scenario the project keeps, as its page sends it,
+    asked for by `by`: the flowsheet and the parts a composite is built
+    from, the values a person set on its page (the overrides the project
+    keeps for its scope, each sent as the typed input its parameter's unit
+    names, proforma.inputs_of), and the fermOS fits chosen for its inputs,
+    each read from the project's rows. No value is typed here. A kept
+    override that cannot be sent as an input (one that says no day, or
+    names no one) is refused in words (proforma.ScenarioRefused)."""
+    from pydantic import ValidationError
+
+    from . import proforma
     from .models import Override, ProformaRunRequest
 
     sid = scenario["id"]
     overrides = [Override.model_validate(o) for o in overrides_of(f"proforma:{sid}")]
+    try:
+        inputs = proforma.inputs_of(scenario["modelId"], overrides)
+    except ValidationError as e:
+        said = "; ".join(str(err.get("msg", "")).removeprefix("Value error, ") for err in e.errors())
+        raise proforma.ScenarioRefused(f"a value kept for {sid} cannot be sent with its run: {said}") from None
     fits = next((dict(f.get("byInput") or {}) for f in kept("fits") if f.get("id") == sid), {})
-    return ProformaRunRequest(scenarioId=sid, flowsheet=scenario["modelId"], overrides=overrides, fits=fits,
-                              vessel=scenario.get("vessel"), trainRun=scenario.get("trainRun"))
+    return ProformaRunRequest(scenarioId=sid, flowsheet=scenario["modelId"], inputs=inputs, fits=fits,
+                              vessel=scenario.get("vessel"), trainRun=scenario.get("trainRun"), by=by)
 
 
 # ── writes ─────────────────────────────────────────────────────────────

@@ -331,7 +331,7 @@ def test_an_override_of_a_proforma_input_is_an_assumption_in_the_basis(standin):
     values = {v.key: v for v in r.values}
     assert values["glucose_price"].origin == "assumption" and values["glucose_price"].overriddenBy == BY
     assert r.waiting == ["plant_scale"] and r.warnings == []
-    # What a run adds for it (§2.R): the value, its low and high, and the line saying the run read overrides.
+    # What a run adds for it (§2.R): the value, its low and high, and the line saying the run set values.
     assert [i.name for i in r.basisInputs] == ["glucose_price", "glucose_price low", "glucose_price high",
                                                proforma.ASSUMPTIONS_READ]
     assert all(i.unit == "USD kg-1" and i.source.kind == "assumption" and i.source.by == BY for i in r.basisInputs[:3])

@@ -9,10 +9,13 @@ against the plant's parameters when it is made, so a key the plant does not
 read back, a unit it does not use or a value of the wrong kind is refused
 before anything runs.
 
-Running a scenario is an engine run (engine/runs.py): each value becomes an
-`Override` of the plant's scope with its origin, the run's basis names each
-value's author, and a run resting on any of them is `assumed`. The scenario
-keeps the ids of its runs, oldest first.
+Running a scenario is an engine run on the biosteam engine's one path for a
+library plant (engine/biosteam.py `run_plant`, the one POST
+/api/library/{plant}/run takes): each value is the typed input it was made
+with, checked against the plant's parameters and converted by
+basis.override_of into the `Override` of the plant's scope with its origin,
+the run's basis names each value's author, and a run resting on any of them
+is `assumed`. The scenario keeps the ids of its runs, oldest first.
 
 A scenario is a row of `scenarios` with kind `engine`; its id is `ssc-` and
 the first twelve hex of the sha256 of its plant, configuration and values,
@@ -32,8 +35,8 @@ from datetime import datetime, timezone
 from .. import db, projects
 from ..db import models as t
 from ..db import rows
-from ..engine import library, runs
-from ..models import Override, RunReport, ScenarioCreate, StudyScenario
+from ..engine import EngineRefused, biosteam, library, runs
+from ..models import EngineInput, RunReport, ScenarioCreate, StudyScenario
 
 KIND = "engine"
 PREFIX = "ssc-"
@@ -62,9 +65,11 @@ def scenario_id(plant: str, configuration: str | None, values: list) -> str:
 
 def _checked(asked: ScenarioCreate) -> None:
     """The plant, the configuration and each value against what the plant
-    reads back: its key, its unit and its kind."""
+    reads back, in the configuration its run runs in (the one named, else
+    its default: engine/biosteam.py `default_configuration`): its key, its
+    unit and its kind."""
     try:
-        params = library.parameters(asked.plant, asked.configuration)
+        params = library.parameters(asked.plant, biosteam.default_configuration(asked.plant, asked.configuration))
     except library.PlantNotFound as e:
         raise ScenarioRefused(str(e).strip("'\"")) from None
     except library.LibraryRefused as e:
@@ -82,6 +87,9 @@ def _checked(asked: ScenarioCreate) -> None:
             raise ScenarioRefused(f"{v.key} is read back in words and never set")
         if v.quantity.unit != spec.unit:
             raise ScenarioRefused(f"{v.key} is in {spec.unit or 'no unit'}; the scenario gives {v.quantity.unit or 'none'}")
+        if v.quantity.basis is not None:
+            raise ScenarioRefused(f"{v.key}: a library plant's parameter is set in its own unit, which says what it "
+                                  f"is reckoned on; the scenario's value also carries the basis {v.quantity.basis!r}")
 
 
 async def _put(project_id: str, scenario: StudyScenario, by: str) -> None:
@@ -133,26 +141,29 @@ def listed() -> list[StudyScenario]:
     return db.run(_listed(projects.current()))
 
 
-def overrides(scenario: StudyScenario) -> list[Override]:
-    """The scenario's values as Overrides of its plant's scope, each with its
-    origin, its author, the moment it was set and what it rests on."""
-    scope = library.scope(scenario.plant, scenario.configuration)
-    return [Override(scope=scope, key=v.key, value=float(v.quantity.value), by=v.quantity.origin.by,
-                     at=v.quantity.origin.at, note=v.quantity.origin.note, origin=v.quantity.origin.kind)
-            for v in scenario.values]
+def inputs(scenario: StudyScenario) -> list[EngineInput]:
+    """The scenario's values as the typed inputs a run of its plant takes,
+    each a parameter's key and its quantity with its origin, its author, the
+    moment it was set and what it rests on."""
+    return [EngineInput(name=v.key, quantity=v.quantity) for v in scenario.values]
 
 
 def run(sid: str, *, by: str = "") -> RunReport:
-    """The scenario run as an engine run, and the run's id kept with it. A
-    plant's refusal is the run's receipt (engine/runs.py) and refused here
-    in the plant's words."""
+    """The scenario run as an engine run on the biosteam engine's one path
+    for a library plant (engine/biosteam.py `run_plant`), and the run's id
+    kept with it. A plant's refusal is the run's receipt (engine/runs.py)
+    and refused here in the plant's words; a value its plant's parameters
+    refuse before anything runs keeps nothing and is refused in words."""
     scenario = get(sid)
     who = (by or "").strip() or "this browser"
     try:
-        report = runs.run(scenario.plant, scenario.configuration, overrides(scenario), by=who, scenario_id=scenario.id)
+        report = biosteam.run_plant(scenario.plant, scenario.configuration, inputs(scenario), by=who,
+                                    scenario_id=scenario.id)
     except runs.RunRefused as e:
         _kept(scenario, e.run_id, who)
         raise
+    except EngineRefused as e:
+        raise ScenarioRefused(str(e)) from None
     _kept(scenario, report.run.id, who)
     return report
 

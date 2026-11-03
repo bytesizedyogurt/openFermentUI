@@ -11,8 +11,11 @@ Offline (stand-in workers, as test_custom_train's):
   that run held it) is refused as a composite's train in words: the
   composite sets its beer from the plant scale, and the side flow is not
   scaled with it.
-- main-28: a finance override of another scenario's scope is refused in the
-  run's words, as an input's is.
+- main-28: a finance override of another scenario's scope was refused in the
+  run's words, as an input's was. From alpha 2.2 (D2) a run's values are
+  typed inputs, which name no scope: each is laid on the scope of the
+  scenario the request names, a Finance value as an input's, and a value that
+  carries a scope of its own is refused as a field the input does not name.
 - main-29: a depreciation schedule longer than the plant's life (BioSTEAM's
   own table, read from its file) is refused by the panel's resolve and the
   run in words naming the life, before the worker runs.
@@ -36,7 +39,7 @@ import pytest
 from openferment_core import artifacts, composite, proforma, pureos, vessel
 from openferment_core.flowsheets import shelf
 from openferment_core.models import Override
-from standins import resolve_json, vessel_request
+from standins import inputs_json, resolve_json, vessel_request
 from test_custom_train import (  # noqa: F401 (the fixtures, by name)
     AT,
     BY,
@@ -140,13 +143,20 @@ def test_a_train_run_with_a_side_inlet_fed_is_refused_as_a_composites_train_in_w
 # ── main-28: an override names the scope it changes ────────────────────
 
 
-def test_a_finance_override_of_another_scenarios_scope_is_refused_as_an_inputs_is(parts, worker):
-    stray = over("IRR", 0.1, scope="proforma:sc-B")
-    with pytest.raises(proforma.ScenarioRefused, match="an override names the scope it changes, and these were sent "
-                                                       f"for {SCOPE}: proforma:sc-B"):
-        proforma.run(request(parts, overrides=[*inputs_typed(), stray]), pool=POOL)
-    assert not runs(worker)
-    # Its own scope's finance override still prices.
+def test_a_finance_value_is_laid_on_the_scope_of_the_scenario_the_run_names(parts, worker, client):
+    from pydantic import ValidationError
+
+    from openferment_core.models import ProformaRunRequest
+
+    # A run's value names no scope of its own to stray to: one that carries a scope is refused, nothing run.
+    body = request(parts).model_dump(mode="json", exclude_none=True)
+    (finance,) = [i.model_dump(mode="json", exclude_none=True) for i in request(
+        parts, overrides=[over("IRR", 0.1)]).inputs]
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ProformaRunRequest.model_validate({**body, "inputs": [*body["inputs"], {**finance, "scope": "proforma:sc-B"}]})
+    stray = client.post("/api/proforma/run", json={**body, "inputs": [*body["inputs"], {**finance, "scope": "proforma:sc-B"}]})
+    assert stray.status_code == 422 and not runs(worker)
+    # A Finance value laid on the scenario's own scope prices.
     proforma.run(request(parts, overrides=[*inputs_typed(), over("IRR", 0.1)]), pool=POOL)
     assert runs(worker)[-1][1]["structure"]["finance"] == {"IRR": 0.1}
 
@@ -188,8 +198,8 @@ def test_bind_on_a_flowsheet_with_no_finance_refuses_a_finance_key_as_the_run_do
     import json
 
     for key, value in (("IRR", 0.2), ("income_tax", 5.0), ("depreciation", 3.0)):
-        typed_ = json.dumps([over(key, value).model_dump(mode="json")])
-        r = client.get("/api/proforma/bind", params={"flowsheet": "ethanol_glucose_v0", "overrides": typed_})
+        typed_ = json.dumps(inputs_json([over(key, value)], {}))
+        r = client.get("/api/proforma/bind", params={"flowsheet": "ethanol_glucose_v0", "inputs": typed_})
         assert r.status_code == 422 and f"ethanol_glucose_v0 takes no input {key}" in r.json()["detail"], r.text
 
 

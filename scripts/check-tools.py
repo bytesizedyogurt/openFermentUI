@@ -161,11 +161,12 @@ ALLOWED_WRITES = (
     "proposals.propose",
     "audit.append",
     # engine_run, study_scenario and study_compare (alpha 2.0 stage 6), each
-    # through its one function in writes.py: an engine run of a plant or of a
-    # scenario, a scenario kept, a comparison kept.
-    "engine.runs.run",
-    # engine_run on any registered engine (alpha 2.2 stage B; docs/api/engines.md):
-    # an engine built on WorkerEngine is kept through run_with's run_engine.
+    # through its one function in writes.py: an engine run of a thing or of a
+    # scenario, a scenario kept, a comparison kept. engine_run on any
+    # registered engine goes through run_with (alpha 2.2 stage B;
+    # docs/api/engines.md): BioSTEAM's things through the biosteam engine's
+    # own run, the library's one path (alpha 2.2 stage C), and an engine built
+    # on WorkerEngine through run_with's run_engine.
     "engine.runs.run_with",
     "studies.scenarios.run",
     "studies.scenarios.make",

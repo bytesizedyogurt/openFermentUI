@@ -47,10 +47,10 @@ example = "openferment_engine_example.engine:ENGINE"
 - Installing an engine trusts its code with whatever the service's user can read, `core/.env`
   included: its entry module runs in the service's process, and its worker runs as the same user.
 - The engines in the repository register the same way, from `core/pyproject.toml`: `biosteam`
-  (the library plants and openFerment's composed flowsheet), `kinetics` (fermOS's model
-  families, its forecasts of a kept fit and its vessel designs) and `train` (pureOS's trains,
-  each a project's own). The sections The core's `kinetics` and The core's `train`, below,
-  describe those engines' runs.
+  (the library plants, openFerment's composed flowsheet and the shelf's scenario flowsheets),
+  `kinetics` (fermOS's model families, its forecasts of a kept fit and its vessel designs) and
+  `train` (pureOS's trains, each a project's own). The sections The core's `biosteam`, The core's
+  `kinetics` and The core's `train`, below, describe those engines' runs.
 
 ## What it declares
 
@@ -96,7 +96,8 @@ object, which runs in the service's process.
   naming none is refused in words; so is a configuration the thing does not name, and any
   configuration for a thing that takes none. The rule holds at every door: the run route, the
   parameters route and the engine tools, so the worker's `parameters` op receives the
-  configuration a run would use.
+  configuration a run would use. BioSTEAM's library plants follow it at their own doors too
+  (The core's `biosteam`, below).
 - `precision`: how near a replay's numbers must come to the run's: within
   `atol + rtol·|stored|` for every output. It enters each run's basis as `precision.rtol` and
   `precision.atol`.
@@ -175,13 +176,17 @@ origin:
 - A value a contract engine's run sets is its `value` and `unit` with its `origin`: a quantity
   that also carries `low`, `high` or `basis` is refused in words, since the worker receives the
   value and unit alone.
-- BioSTEAM checks the key, the unit and the kind the same way (`runs.check_inputs`); a library
-  plant's bounds are flagged by the library on the run's parameters (`ParameterValue.outOfBounds`),
-  the value kept as set, never clamped. Its door passes `low` and `high` to the plant as the
-  `Override`'s, which the library takes equal to the value (a range is a study's to sample), and
-  refuses a `basis` in words. The kinetics engine checks its values the same way, and keeps a
-  range in the run's basis as `<key> low` and `<key> high` beside the value, which the run
-  integrates at (The core's `kinetics`, below).
+- BioSTEAM checks a library plant's key, unit and kind the same way (`runs.check_inputs`), on
+  one path from every door (The core's `biosteam`, below); a library plant's bounds are flagged
+  by the library on the run's parameters (`ParameterValue.outOfBounds`), the value kept as set
+  and flagged. Its door passes `low` and `high` to the plant as the `Override`'s, which the
+  library takes equal to the value (a range is a study's to sample), and refuses a `basis` in
+  words. A scenario flowsheet's values are checked and converted at Proforma's own door, and
+  their `low` and `high` are the range the run's samples draw over; its `min` and `max` are the
+  flowsheet's to hold inside the run, so a value past them reaches the worker, whose refusal of
+  it is kept as the run's receipt (The core's `biosteam`, below). The kinetics engine checks
+  its values the same way, and keeps a range in the run's basis as `<key> low` and `<key> high`
+  beside the value, which the run integrates at (The core's `kinetics`, below).
 - A number is accepted only inside a `quantity`. A bare JSON number anywhere in a request, a
   field the request or a quantity does not name, and a `value`, `low` or `high` that is `true` or
   `false` are each refused in words before the engine's worker is reached.
@@ -343,6 +348,86 @@ computation from that artifact and asks `sff_export` for the file again.
   endpoint (`POST /api/tools/{name}`) a tool that writes, `engine_run` among them, names its
   caller with `?by=`, who is then the write's author; a call that names nobody is a 422 in words.
 - **`pnpm ready`** prints one row per engine: its version, its worker and its conformance verdict.
+
+## The core's `biosteam`
+
+`openferment_core.engine.biosteam:ENGINE`, registered by `core/pyproject.toml`, is BioSTEAM behind
+the contract: its worker is the Proforma worker, and `heavy` names what that worker computes with
+(`biosteam`, `thermosteam`, `biorefineries`, `pisces_sff`). Its things are of two kinds, the
+library's own and the shelf's flowsheets a Proforma scenario runs (`flowsheets/shelf.py`, the
+ones `proforma.runnable` takes: no reference biorefinery and no toy), each read afresh in the
+request's project on every listing. The engine package imports no Proforma module
+(`core/tests/test_boundaries.py`): Proforma gives the engine its scenario flowsheets through a
+provider it registers as it is imported (`engine/biosteam.py` `provide`, `Provider`), which lists
+them, reads their parameters and runs them. The service's app imports Proforma through its
+tools, and conformance reads an engine as the app holds it (`conform.as_served`), so every door
+lists the same things.
+
+| Thing | Configurations | A run of it |
+|---|---|---|
+| Each plant and composed flowsheet the library shelf found buildable here (`GET /api/library`), kind `plant` or `flowsheet` | those it built in here; its default the shelf's own, else the first it built in | `engine/biosteam.py` `run_plant`, then `runs.run`; the tool `library.run` |
+| Each shelf flowsheet a scenario runs with no part named (`ethanol_glucose_v0`), kind `scenario` | none | the run of an unsaved scenario of it, named by the flowsheet's own id (`proforma.run_thing`); the tool `proforma.run` |
+| `custom_train_v1`, kind `scenario`, built from a kept vessel design and a kept train run; listed while the project keeps a scenario of it whose parts stand (`composite.parts_of`) | `vessel <id>, train run <id>`, one for each pair the project's scenarios of it name, and no default | the same, built from the two its configuration names |
+
+- A library thing's precision is ten significant digits (`rtol` 1e-9) within the package test's
+  absolute tolerance (`atol` 1e-8): a library run keeps those digits (`library.DIGITS`). A
+  scenario flowsheet's is `rtol` 0, `atol` 0: `proforma.run` registers no tolerance, so its
+  replay holds every output identically.
+- `parameters(thing, configuration)` for a library thing is what the package builds it with,
+  each default read back from a fresh build (`library-default`, its `ref` naming the package and
+  version). For a scenario flowsheet it is the inputs a scenario of it binds, as `GET
+  /api/proforma/bind` binds one with no scenario (the `proforma:<flowsheet id>` scope resolved
+  with nothing set): each default with its origin, the records of the evidence pool that bound it
+  (`record`, its `ref` naming them), a fermOS fit or the vessel design (`artifact`), the stated
+  convention (`convention`, its note), a composite's Finance group at the package's own defaults
+  (`library-default`, its `ref` naming biorefineries); an input nothing binds has no default, and
+  a run sets it.
+- A library plant's run takes one path from every door (`run_plant`): this engine's run route,
+  `POST /api/library/{plant}/run`, a study scenario's run and the tools. A plant that takes a
+  configuration, asked with none, runs in its default (`default_configuration`: the shelf's own,
+  else the first it built in here), and every door that reads its parameters reads them there:
+  `GET /api/engines/biosteam/parameters`, `GET /api/library/{plant}/parameters` (whose answer
+  names the configuration), `engine_parameters`, and `POST /api/studies/scenarios`, which checks
+  a scenario naming no configuration against the default's parameters. `engine_plants` gives
+  each plant's row the configuration a run takes when none is named. A quantity carrying a
+  `basis` is refused before the plant's parameters are read; each value is then checked against
+  them (`runs.check_inputs`, a value outside its bounds kept and flagged) and converted by
+  `basis.override_of` into the plant's `Override`, before the plant is built.
+- A thing neither on the library's shelf nor provided is refused in words naming every thing
+  the engine runs, scenario flowsheets among them (`unknown`, as `runs.thing_of` words it for a
+  contract engine): a 422 at the run and parameters routes, the tools' refusal in words, and
+  check 7's. A plant on the library's shelf that runs nothing (a subsystem) is refused in the
+  library's own words.
+- A scenario flowsheet's run is the run of an unsaved scenario of it, its scenario id the
+  flowsheet's own, so the same request is one row; it runs at a scenario run's own settings (its
+  samples, its seed). Its values are checked and converted at Proforma's door
+  (`proforma.overrides_of`): a key the flowsheet takes no value for, a convention, a value in
+  another unit, words for a number and a value naming no one are refused in words, each said
+  whole at every door, and keep nothing; so does a run whose inputs wait for a source. A value
+  past a parameter's `min` or `max` reaches the worker: the flowsheet holds its bounds inside the
+  run, and a refusal the Proforma worker gives there is kept as a receipt. The row is the one
+  `POST /api/proforma/run` keeps for a scenario (`docs/api/runs.md`, A Proforma run): engine
+  `biosteam`, tool `proforma.run`, its SFF file written as it is kept. A run whose samples held
+  no price is kept done, its `outputs.values` empty: the engine's route answers 200 with that
+  row, and `POST /api/proforma/run` answers 422 naming it.
+- `version()` names biosteam, thermosteam and biorefineries as their installed metadata records
+  them. A library run's row names the versions its basis names; a Proforma run's, whose basis
+  names no simulator, the engine's `version()`.
+- Conformance (below) on `biosteam` reads every thing's parameters in check 2, and runs its first
+  thing (a library plant) in checks 3, 4, 5 and 8; the proof's step 10 makes them so. A scenario
+  flowsheet's inputs wait in a project that holds no record, so a check that names one sets its
+  values with `--inputs`, a JSON list of `EngineInput`s, each a person's assumption in its
+  parameter's unit:
+
+  ```json
+  [{"name": "<a parameter's key>", "quantity": {"value": 1, "unit": "<that parameter's unit>",
+    "origin": {"kind": "person-assumption", "by": "<a person's name>", "at": "<the day it was set>"}}}]
+  ```
+
+  `python -m openferment_core.engine.conform biosteam --thing ethanol_glucose_v0 --inputs <file>`.
+  Named with a value it waits for left unset, the thing cannot run as it stands (the engine's
+  `unready`), and the command refuses it in words before anything is made, keeping no verdict.
+  Check 3 says so when a run it makes answers no output (a run whose samples priced nothing).
 
 ## The core's `kinetics`
 

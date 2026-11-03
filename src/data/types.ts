@@ -2570,6 +2570,8 @@ export interface InputAssumption {
   by: string;
   at: string;
   note: string | null;
+  /** A person's assumption, or a model's estimate (`by` the model's id); the service reads a person's when it is left out. */
+  origin?: 'person-assumption' | 'model-estimate';
 }
 
 export interface ProformaScenarioInfo {
@@ -2588,18 +2590,15 @@ export interface ProformaScenarioInfo {
 export interface ProformaRunRequest {
   scenarioId: string;
   /**
-   * The older field (OF-BLD-014 §8.4): a named person's values by input key.
-   * The service reads it as overrides for one release (OF-BLD-020 §2.2); this
-   * browser sends `overrides` instead.
+   * A person's changes in the parameter panel (OF-BLD-020 D3; alpha 2.2 D2),
+   * each the scope `proforma:<scenarioId>`'s Override sent as a typed input in
+   * its parameter's unit (src/lib/params.ts `inputsOf`): a named assumption
+   * that wins over the records and any fermOS fit for its input, named in the
+   * run's basis, its low and high the range the samples draw over.
    */
-  assumptions?: InputAssumption[];
-  /**
-   * A person's changes in the parameter panel (OF-BLD-020 D3), each an
-   * Override of scope `proforma:<scenarioId>`: a named assumption that wins
-   * over the records and any fermOS fit for its input, named in the run's
-   * basis. The service keeps none.
-   */
-  overrides?: Override[];
+  inputs?: EngineInput[];
+  /** The person or the model asking: the run's row is created by them. */
+  by?: string;
   host: string | null;
   seed: number;
   /** Latin hypercube samples to draw (OF-BLD-019 D7); the service defaults it and caps it. */

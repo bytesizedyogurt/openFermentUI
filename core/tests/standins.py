@@ -122,6 +122,8 @@ def _bridge_fits() -> tuple[str, str]:
 # corpus holds, and BioSTEAM is replaced by a closed-form STAND-IN evaluator,
 # so test:core needs no simulator. Not a price of anything.
 PROFORMA_STANDIN = "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+# A STAND-IN of the toolkit's verdict on a Proforma run's SFF file: one that validates.
+STANDIN_SFF_VALID = {"valid": True, "schemaVersion": "0.2.4", "summary": {"error": {"pass": 1}}, "findings": []}
 
 
 def _standin_call(op: str, args: dict[str, Any]) -> Any:
@@ -129,6 +131,14 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
 
     from scipy.stats import qmc
 
+    if op == "sff_export":
+        # A run's SFF file (alpha 2.2 D6, written as the run is kept):
+        # test_sff's small plant, with the metadata block it was given, and a
+        # STAND-IN verdict that validates, as test_train's TrainWorker gives
+        # one. No flowsheet is built.
+        from test_sff import StandInToolkit
+
+        return {**StandInToolkit()(op, args), "validation": STANDIN_SFF_VALID}
     # OF-BLD-019 §2.3: every call names its flowsheet. The glucose-to-ethanol
     # flowsheet has a closed form; a vessel and a train, priced (OF-BLD-020
     # §6.1), answers as it does under its own output names (the stand-in
@@ -476,6 +486,39 @@ def train_inputs(spec: Any, overrides: Any) -> list[Any]:
         i = as_input(o, unit_for(o.key, units))
         out.append(EngineInput(name=f"{place}.{i.name}", quantity=i.quantity))
     return out
+
+
+def proforma_units(flowsheet: str) -> dict[str, str]:
+    """Each parameter's unit a Proforma scenario on `flowsheet` takes, as its
+    scope serves its specs: the flowsheet's inputs and, for a flowsheet built
+    from a vessel and a train, its Finance group."""
+    from openferment_core import composite, params
+    from openferment_core.flowsheets import shelf
+
+    info = shelf.info(flowsheet, allow_toy=True)
+    return params.units_of(params.flowsheet_specs(info) + (composite.finance_specs() if info.builtFrom else []))
+
+
+def proforma_inputs(overrides: Any, flowsheet: str = "ethanol_glucose_v0") -> list[Any]:
+    """A person's overrides of a Proforma scenario's scope as the inputs a
+    run request sends (alpha 2.2 D2), as the browser sends them
+    (src/lib/proforma.ts `runBody`, in the units `runSpecs` names, through
+    params.ts `inputsOf`): each in the unit of the input or the Finance
+    parameter its key names."""
+    return as_inputs(overrides, proforma_units(flowsheet))
+
+
+def assumed_inputs(assumptions: Any, flowsheet: str = "ethanol_glucose_v0") -> list[Any]:
+    """A person's values for a Proforma scenario's inputs, typed in a test as
+    InputAssumptions (a key, a value with its low and high, who and when), as
+    the inputs a run request sends: each its key and a quantity in its
+    input's unit, the person's assumption, the day and the note its origin."""
+    from openferment_core.models import EngineInput, Origin, Quantity
+
+    units = proforma_units(flowsheet)
+    return [EngineInput(name=a.key, quantity=Quantity(
+        value=a.value, unit=unit_for(a.key, units), low=a.low, high=a.high,
+        origin=Origin(kind="person-assumption", by=a.by, at=a.at, note=a.note))) for a in assumptions]
 
 
 def family_units(family: str) -> dict[str, str]:

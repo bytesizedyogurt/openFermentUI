@@ -224,3 +224,44 @@ def test_a_comparison_of_library_runs_keeps_version_1_and_one_kept_there_over_an
     assert not replayed.identical
     assert replayed.differences[0] == ReplayDifference(path="toolVersion", stored=comparisons.VERSION,
                                                        replayed=comparisons.VERSION_ENGINES)
+
+
+def test_a_proforma_run_and_a_library_run_compare_side_by_side(worker, monkeypatch, tmp_path):
+    """A Proforma scenario's run is a run of the biosteam engine (alpha 2.2 D6):
+    beside a library run it compares at `study comparison 2` by its
+    outputs.values, its price block in the unit its artifact states, each of
+    its typed values with its person, and it replays from them. Its solved
+    price is named as a library run names its own (`price.solvedPrice`), so
+    the two prices meet on one row with the second's change from the first."""
+    from types import SimpleNamespace
+
+    import standins
+    from openferment_core import intake, proforma
+    from openferment_core.models import ProformaRunRequest
+    from standins import assumed_inputs
+    from test_proforma_runs import ASSUMED, ETHANOL, MADE_HERE
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
+    records = standins._standin_yeast_records()
+    pool = SimpleNamespace(records=records, records_by_id={r["id"]: r for r in records})
+    cane = runs.run("sugarcane", by="Ada Moreno").run
+    made = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED),
+                                           samples=8, by="Ada Moreno"), pool=pool)
+    rep = comparisons.make(ComparisonCreate(title="A plant beside a scenario", runIds=[cane.id, made.artifactId],
+                                            by="Ada Moreno"))
+    art = rep.artifact
+    assert art.toolVersion == comparisons.VERSION_ENGINES and rep.comparison.provenance == "assumed"
+    assert [r["plant"] for r in art.output["runs"]] == ["sugarcane", ETHANOL]
+    rows = {r["key"]: r for r in art.output["rows"]}
+    unit = artifacts.get(made.artifactId).output["tableUnits"]["price"]
+    library_price = artifacts.get(cane.artifactId).output["price"]["solvedPrice"]
+    shared = rows["price.solvedPrice"]
+    assert shared["values"] == [library_price, made.basePrice] and shared["unit"] == "USD/kg" == unit
+    assert shared["change"][1] == pytest.approx((made.basePrice - library_price) / abs(library_price))
+    assert "values.price.solvedPrice" not in rows and "values.basePrice" not in rows, "one row for the one price"
+    assert rows["values.quantiles.p50"]["values"] == [None, made.quantiles["p50"]]
+    values = {v["key"]: v["values"] for v in art.output["values"]}
+    assert values["glucose_price"][1]["origin"] == "person-assumption" and values["glucose_price"][1]["by"] == ASSUMED[1].by
+    assert values["glucose_price"][0] == comparisons.NO_VALUE, "the plant declares no such value"
+    assert artifacts.replay(art.id).identical

@@ -1316,7 +1316,10 @@ export interface paths {
         /**
          * Library Parameters
          * @description A plant's parameters as the package builds it, each read back from a
-         *     fresh build in the worker with origin `library-default`.
+         *     fresh build in the worker with origin `library-default`, in the
+         *     configuration a run of it runs in: the one named, else, for a plant that
+         *     takes configurations, its default (engine/biosteam.py
+         *     `default_configuration`), which the answer names.
          */
         get: operations["library_parameters_api_library__plant__parameters_get"];
         put?: never;
@@ -1362,8 +1365,12 @@ export interface paths {
          * @description One engine run of a library plant or an openFerment flowsheet, built
          *     afresh with the values set for it, priced, read back and written as an
          *     SFF file, kept in the project's runs (engine/runs.py): the run, its
-         *     `library.run` artifact and its SFF record. A basis already run answers
-         *     from its row; values the plant refuses are kept as a receipt and
+         *     `library.run` artifact and its SFF record. The run takes the biosteam
+         *     engine's own path (engine/biosteam.py `run_plant`): a plant that takes a
+         *     configuration, asked with none, runs in its default, and each value is
+         *     checked against the plant's parameters before the plant is built, a
+         *     value refused keeping nothing (422 in words). A basis already run
+         *     answers from its row; values the plant refuses are kept as a receipt and
          *     answered 422 in the plant's words.
          */
         post: operations["library_run_api_library__plant__run_post"];
@@ -1646,15 +1653,17 @@ export interface paths {
          * @description A shelf flowsheet's inputs bound, as a scenario not yet saved to the
          *     project shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
          *     lays on the fermOS fits a person chose (§5.1), a JSON object of input
-         *     key to artifact id, and `?overrides=` a person's overrides of one
-         *     scenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet
-         *     built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1) names its
-         *     vessel design and its train run (`?vessel=`, `?trainRun=`). A reference
-         *     biorefinery, the toy, an unknown id, a fit that cannot feed its input,
-         *     an override that cannot stand, or a composite's part that cannot
+         *     key to artifact id, and `?inputs=` the values a person sets over both
+         *     (OF-BLD-020 D3; alpha 2.2 D2), a JSON list of typed quantities, each
+         *     converted at Proforma's door into the Override of the flowsheet's own
+         *     scope, `proforma:<flowsheet id>`, as a run converts its values. A
+         *     flowsheet built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1)
+         *     names its vessel design and its train run (`?vessel=`, `?trainRun=`). A
+         *     reference biorefinery, the toy, an unknown id, a fit that cannot feed
+         *     its input, a value that cannot stand, or a composite's part that cannot
          *     (missing, another tool's, damaged, of another chemical set) is a 422 in
-         *     words. A read:
-         *     it starts no simulator.
+         *     words, and so is the retired `?overrides=`. A read: it starts no
+         *     simulator.
          */
         get: operations["proforma_bind_api_proforma_bind_get"];
         put?: never;
@@ -1678,11 +1687,12 @@ export interface paths {
          *     ceiling of each shelf model of its organism, on its flowsheet's sugar
          *     (OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by
          *     its id, one not yet saved by the flowsheet it names; `?fits=` and
-         *     `?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,
-         *     and `?assumptions=`, the older field, is read as overrides for one
-         *     release. A yield above a ceiling is flagged, never clamped. A read: it
-         *     keeps nothing, starts no worker and changes no binding or run. Refused
-         *     in words (422) as the binding is.
+         *     `?inputs=` (JSON; OF-BLD-020 D3, alpha 2.2 D2: the values a person sets,
+         *     each a typed quantity converted at Proforma's door into the Override of
+         *     the scenario's scope) bind its yield as its page binds it. A yield above
+         *     a ceiling is flagged and kept as bound. A read: it keeps nothing, starts
+         *     no worker and changes no binding or run. Refused in words (422) as the
+         *     binding is, and so are the retired `?overrides=` and `?assumptions=`.
          */
         get: operations["proforma_ceiling_check_api_proforma_ceiling_check_get"];
         put?: never;
@@ -1734,8 +1744,12 @@ export interface paths {
         /**
          * Proforma Run
          * @description Run a scenario the project keeps by its id, or one not yet saved by
-         *     the shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any
-         *     other case, and listing every input waiting for a source.
+         *     the shelf flowsheet it names (OF-BLD-019 §2.3, d), with the values a
+         *     person or a model sets as typed inputs, and keep it as one run of the
+         *     biosteam engine (GET /api/runs/{id}, its id the artifact's) with its SFF
+         *     file: 422 in words for any other case, listing every input waiting for a
+         *     source; a refusal inside the run is kept as its receipt and 422 in the
+         *     worker's words.
          */
         post: operations["proforma_run_api_proforma_run_post"];
         delete?: never;
@@ -2502,7 +2516,10 @@ export interface paths {
         /**
          * Study Scenario Run
          * @description The scenario run as an engine run (its report); values the plant
-         *     refuses are kept as a receipt with the scenario and answered 422.
+         *     refuses are kept as a receipt with the scenario and answered 422. A kept
+         *     value its plant's parameters refuse before anything runs (a key the
+         *     plant no longer reads, a unit it no longer uses) is a 422 in words, and
+         *     keeps nothing.
          */
         post: operations["study_scenario_run_api_studies_scenarios__scenario_id__run_post"];
         delete?: never;
@@ -4198,23 +4215,6 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** InputAssumption */
-        InputAssumption: {
-            /** At */
-            at: string;
-            /** By */
-            by: string;
-            /** High */
-            high: number;
-            /** Key */
-            key: string;
-            /** Low */
-            low: number;
-            /** Note */
-            note?: string | null;
-            /** Value */
-            value: number;
-        };
         /** Interval */
         Interval: {
             /** High */
@@ -4394,8 +4394,9 @@ export interface components {
         /**
          * LibraryRunRequest
          * @description POST /api/library/{plant}/run: the configuration (None: the plant's
-         *     own), the values set for the run, each an Override of the plant's scope
-         *     (a person's assumption or a model's estimate), and who asks for the run.
+         *     default, as the biosteam engine names it), the values set for the run,
+         *     and who asks for the run. It holds these fields alone: a field it does
+         *     not name is refused.
          */
         LibraryRunRequest: {
             /**
@@ -4405,8 +4406,8 @@ export interface components {
             by: string;
             /** Configuration */
             configuration?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
         };
         /**
          * LibraryScenarioField
@@ -4725,36 +4726,6 @@ export interface components {
             url?: string | null;
             /** Year */
             year?: number | null;
-        };
-        /**
-         * Override
-         * @description A change to one parameter of one scope for a run (D3): a named
-         *     person's assumption, or a model's estimate (ADR-006), `by` naming the
-         *     person or the model.
-         */
-        Override: {
-            /** At */
-            at: string;
-            /** By */
-            by: string;
-            /** High */
-            high?: number | null;
-            /** Key */
-            key: string;
-            /** Low */
-            low?: number | null;
-            /** Note */
-            note?: string | null;
-            /**
-             * Origin
-             * @default person-assumption
-             * @enum {string}
-             */
-            origin: "person-assumption" | "model-estimate";
-            /** Scope */
-            scope: string;
-            /** Value */
-            value: number | string;
         };
         /**
          * PackageRegression
@@ -5263,10 +5234,17 @@ export interface components {
             /** Product */
             product: string;
         };
-        /** ProformaRunRequest */
+        /**
+         * ProformaRunRequest
+         * @description POST /api/proforma/run. It holds these fields alone: a field it does
+         *     not name is refused.
+         */
         ProformaRunRequest: {
-            /** Assumptions */
-            assumptions?: components["schemas"]["InputAssumption"][];
+            /**
+             * By
+             * @default
+             */
+            by: string;
             /** Fits */
             fits?: {
                 [key: string]: string;
@@ -5275,8 +5253,8 @@ export interface components {
             flowsheet?: string | null;
             /** Host */
             host?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /**
              * Samples
              * @default 500
@@ -8912,13 +8890,31 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
-            /** @description Validation Error */
+            /** @description The library's shelf holds no plant of that id: in words, naming what it holds. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A value refused before anything runs, nothing kept; or values the plant refused, in its words, the receipt kept. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The Proforma simulator could not run the plant: in words, with no run kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -9321,7 +9317,7 @@ export interface operations {
                 flowsheet: string;
                 host?: string | null;
                 fits?: string | null;
-                overrides?: string | null;
+                inputs?: string | null;
                 vessel?: string | null;
                 trainRun?: string | null;
             };
@@ -9363,8 +9359,7 @@ export interface operations {
                 flowsheet?: string | null;
                 host?: string | null;
                 fits?: string | null;
-                assumptions?: string | null;
-                overrides?: string | null;
+                inputs?: string | null;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9496,13 +9491,22 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description The scenario cannot run as asked, in words (a list of field errors when the request's own fields are refused): an input that waits for a source, a value its input cannot take, or a refusal inside the run, its receipt kept. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The Proforma simulator could not run the scenario: in words, with no run kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };

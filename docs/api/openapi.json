@@ -3843,55 +3843,6 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
-      "InputAssumption": {
-        "properties": {
-          "at": {
-            "title": "At",
-            "type": "string"
-          },
-          "by": {
-            "title": "By",
-            "type": "string"
-          },
-          "high": {
-            "title": "High",
-            "type": "number"
-          },
-          "key": {
-            "title": "Key",
-            "type": "string"
-          },
-          "low": {
-            "title": "Low",
-            "type": "number"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          },
-          "value": {
-            "title": "Value",
-            "type": "number"
-          }
-        },
-        "required": [
-          "key",
-          "value",
-          "low",
-          "high",
-          "by",
-          "at"
-        ],
-        "title": "InputAssumption",
-        "type": "object"
-      },
       "Interval": {
         "properties": {
           "high": {
@@ -4347,7 +4298,8 @@
         "type": "object"
       },
       "LibraryRunRequest": {
-        "description": "POST /api/library/{plant}/run: the configuration (None: the plant's\nown), the values set for the run, each an Override of the plant's scope\n(a person's assumption or a model's estimate), and who asks for the run.",
+        "additionalProperties": false,
+        "description": "POST /api/library/{plant}/run: the configuration (None: the plant's\ndefault, as the biosteam engine names it), the values set for the run,\nand who asks for the run. It holds these fields alone: a field it does\nnot name is refused.",
         "properties": {
           "by": {
             "default": "",
@@ -4367,11 +4319,11 @@
             ],
             "title": "Configuration"
           },
-          "overrides": {
+          "inputs": {
             "items": {
-              "$ref": "#/components/schemas/Override"
+              "$ref": "#/components/schemas/EngineInput"
             },
-            "title": "Overrides",
+            "title": "Inputs",
             "type": "array"
           }
         },
@@ -5212,89 +5164,6 @@
           "textSource"
         ],
         "title": "OverlayPaper",
-        "type": "object"
-      },
-      "Override": {
-        "description": "A change to one parameter of one scope for a run (D3): a named\nperson's assumption, or a model's estimate (ADR-006), `by` naming the\nperson or the model.",
-        "properties": {
-          "at": {
-            "title": "At",
-            "type": "string"
-          },
-          "by": {
-            "title": "By",
-            "type": "string"
-          },
-          "high": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "High"
-          },
-          "key": {
-            "title": "Key",
-            "type": "string"
-          },
-          "low": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Low"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          },
-          "origin": {
-            "default": "person-assumption",
-            "enum": [
-              "person-assumption",
-              "model-estimate"
-            ],
-            "title": "Origin",
-            "type": "string"
-          },
-          "scope": {
-            "title": "Scope",
-            "type": "string"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Value"
-          }
-        },
-        "required": [
-          "scope",
-          "key",
-          "value",
-          "by",
-          "at"
-        ],
-        "title": "Override",
         "type": "object"
       },
       "PackageRegression": {
@@ -6768,13 +6637,14 @@
         "type": "object"
       },
       "ProformaRunRequest": {
+        "additionalProperties": false,
+        "description": "POST /api/proforma/run. It holds these fields alone: a field it does\nnot name is refused.",
         "properties": {
-          "assumptions": {
-            "items": {
-              "$ref": "#/components/schemas/InputAssumption"
-            },
-            "title": "Assumptions",
-            "type": "array"
+          "by": {
+            "default": "",
+            "maxLength": 200,
+            "title": "By",
+            "type": "string"
           },
           "fits": {
             "additionalProperties": {
@@ -6805,11 +6675,11 @@
             ],
             "title": "Host"
           },
-          "overrides": {
+          "inputs": {
             "items": {
-              "$ref": "#/components/schemas/Override"
+              "$ref": "#/components/schemas/EngineInput"
             },
-            "title": "Overrides",
+            "title": "Inputs",
             "type": "array"
           },
           "samples": {
@@ -13627,7 +13497,7 @@
     },
     "/api/library/{plant}/parameters": {
       "get": {
-        "description": "A plant's parameters as the package builds it, each read back from a\nfresh build in the worker with origin `library-default`.",
+        "description": "A plant's parameters as the package builds it, each read back from a\nfresh build in the worker with origin `library-default`, in the\nconfiguration a run of it runs in: the one named, else, for a plant that\ntakes configurations, its default (engine/biosteam.py\n`default_configuration`), which the answer names.",
         "operationId": "library_parameters_api_library__plant__parameters_get",
         "parameters": [
           {
@@ -13767,7 +13637,7 @@
     },
     "/api/library/{plant}/run": {
       "post": {
-        "description": "One engine run of a library plant or an openFerment flowsheet, built\nafresh with the values set for it, priced, read back and written as an\nSFF file, kept in the project's runs (engine/runs.py): the run, its\n`library.run` artifact and its SFF record. A basis already run answers\nfrom its row; values the plant refuses are kept as a receipt and\nanswered 422 in the plant's words.",
+        "description": "One engine run of a library plant or an openFerment flowsheet, built\nafresh with the values set for it, priced, read back and written as an\nSFF file, kept in the project's runs (engine/runs.py): the run, its\n`library.run` artifact and its SFF record. The run takes the biosteam\nengine's own path (engine/biosteam.py `run_plant`): a plant that takes a\nconfiguration, asked with none, runs in its default, and each value is\nchecked against the plant's parameters before the plant is built, a\nvalue refused keeping nothing (422 in words). A basis already run\nanswers from its row; values the plant refuses are kept as a receipt and\nanswered 422 in the plant's words.",
         "operationId": "library_run_api_library__plant__run_post",
         "parameters": [
           {
@@ -13810,15 +13680,35 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The library's shelf holds no plant of that id: in words, naming what it holds."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refusal"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "A value refused before anything runs, nothing kept; or values the plant refused, in its words, the receipt kept."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The Proforma simulator could not run the plant: in words, with no run kept."
           }
         },
         "summary": "Library Run",
@@ -14599,7 +14489,7 @@
     },
     "/api/proforma/bind": {
       "get": {
-        "description": "A shelf flowsheet's inputs bound, as a scenario not yet saved to the\nproject shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`\nlays on the fermOS fits a person chose (§5.1), a JSON object of input\nkey to artifact id, and `?overrides=` a person's overrides of one\nscenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet\nbuilt from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1) names its\nvessel design and its train run (`?vessel=`, `?trainRun=`). A reference\nbiorefinery, the toy, an unknown id, a fit that cannot feed its input,\nan override that cannot stand, or a composite's part that cannot\n(missing, another tool's, damaged, of another chemical set) is a 422 in\nwords. A read:\nit starts no simulator.",
+        "description": "A shelf flowsheet's inputs bound, as a scenario not yet saved to the\nproject shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`\nlays on the fermOS fits a person chose (§5.1), a JSON object of input\nkey to artifact id, and `?inputs=` the values a person sets over both\n(OF-BLD-020 D3; alpha 2.2 D2), a JSON list of typed quantities, each\nconverted at Proforma's door into the Override of the flowsheet's own\nscope, `proforma:<flowsheet id>`, as a run converts its values. A\nflowsheet built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1)\nnames its vessel design and its train run (`?vessel=`, `?trainRun=`). A\nreference biorefinery, the toy, an unknown id, a fit that cannot feed\nits input, a value that cannot stand, or a composite's part that cannot\n(missing, another tool's, damaged, of another chemical set) is a 422 in\nwords, and so is the retired `?overrides=`. A read: it starts no\nsimulator.",
         "operationId": "proforma_bind_api_proforma_bind_get",
         "parameters": [
           {
@@ -14645,7 +14535,7 @@
           },
           {
             "in": "query",
-            "name": "overrides",
+            "name": "inputs",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14656,7 +14546,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Overrides"
+              "title": "Inputs"
             }
           },
           {
@@ -14731,7 +14621,7 @@
     },
     "/api/proforma/ceiling-check": {
       "get": {
-        "description": "A scenario's fermenter yield read against the newest stored geneOS\nceiling of each shelf model of its organism, on its flowsheet's sugar\n(OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by\nits id, one not yet saved by the flowsheet it names; `?fits=` and\n`?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,\nand `?assumptions=`, the older field, is read as overrides for one\nrelease. A yield above a ceiling is flagged, never clamped. A read: it\nkeeps nothing, starts no worker and changes no binding or run. Refused\nin words (422) as the binding is.",
+        "description": "A scenario's fermenter yield read against the newest stored geneOS\nceiling of each shelf model of its organism, on its flowsheet's sugar\n(OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by\nits id, one not yet saved by the flowsheet it names; `?fits=` and\n`?inputs=` (JSON; OF-BLD-020 D3, alpha 2.2 D2: the values a person sets,\neach a typed quantity converted at Proforma's door into the Override of\nthe scenario's scope) bind its yield as its page binds it. A yield above\na ceiling is flagged and kept as bound. A read: it keeps nothing, starts\nno worker and changes no binding or run. Refused in words (422) as the\nbinding is, and so are the retired `?overrides=` and `?assumptions=`.",
         "operationId": "proforma_ceiling_check_api_proforma_ceiling_check_get",
         "parameters": [
           {
@@ -14793,7 +14683,7 @@
           },
           {
             "in": "query",
-            "name": "assumptions",
+            "name": "inputs",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14804,23 +14694,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Assumptions"
-            }
-          },
-          {
-            "in": "query",
-            "name": "overrides",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Overrides"
+              "title": "Inputs"
             }
           },
           {
@@ -14965,7 +14839,7 @@
     },
     "/api/proforma/run": {
       "post": {
-        "description": "Run a scenario the project keeps by its id, or one not yet saved by\nthe shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any\nother case, and listing every input waiting for a source.",
+        "description": "Run a scenario the project keeps by its id, or one not yet saved by\nthe shelf flowsheet it names (OF-BLD-019 §2.3, d), with the values a\nperson or a model sets as typed inputs, and keep it as one run of the\nbiosteam engine (GET /api/runs/{id}, its id the artifact's) with its SFF\nfile: 422 in words for any other case, listing every input waiting for a\nsource; a refusal inside the run is kept as its receipt and 422 in the\nworker's words.",
         "operationId": "proforma_run_api_proforma_run_post",
         "parameters": [
           {
@@ -15005,11 +14879,28 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The scenario cannot run as asked, in words (a list of field errors when the request's own fields are refused): an input that waits for a source, a value its input cannot take, or a refusal inside the run, its receipt kept."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The Proforma simulator could not run the scenario: in words, with no run kept."
           }
         },
         "summary": "Proforma Run",
@@ -16894,7 +16785,7 @@
     },
     "/api/studies/scenarios/{scenario_id}/run": {
       "post": {
-        "description": "The scenario run as an engine run (its report); values the plant\nrefuses are kept as a receipt with the scenario and answered 422.",
+        "description": "The scenario run as an engine run (its report); values the plant\nrefuses are kept as a receipt with the scenario and answered 422. A kept\nvalue its plant's parameters refuse before anything runs (a key the\nplant no longer reads, a unit it no longer uses) is a 422 in words, and\nkeeps nothing.",
         "operationId": "study_scenario_run_api_studies_scenarios__scenario_id__run_post",
         "parameters": [
           {

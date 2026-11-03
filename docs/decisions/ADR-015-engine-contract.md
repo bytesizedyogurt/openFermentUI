@@ -67,7 +67,42 @@ Option 2.
   ADR-013's package-test values stand as they were. `engine/biosteam.py` puts it behind the
   protocol, registered by `core/pyproject.toml` as
   `biosteam = "openferment_core.engine.biosteam:ENGINE"`. ADR-004's revisit condition, a second
-  engine, is met here; its adapter is the `biosteam` engine.
+  engine, is met here; its adapter is the `biosteam` engine. A library plant's run takes one path
+  from every door (`biosteam.run_plant`: the engine's route, `POST /api/library/{plant}/run`, a
+  study scenario's run, the tools): `LibraryRunRequest` takes `inputs` (`EngineInput`s) and
+  refuses a field it does not name, each value checked against the plant's parameters and
+  converted by `basis.override_of`, and a plant that takes a configuration, asked with none, runs
+  in its default at every door; the library's artifact ids stand as pinned
+  (`core/tests/test_engine_pins.py`).
+- **Proforma's runs are BioSTEAM's** (stage C of alpha 2.2, D6). `proforma.run` keeps each run as
+  one row of the `biosteam` engine (`proforma.keep_run`, through `runs.compute_kept`): tool
+  `proforma.run`, thing the scenario's flowsheet, the scenario's id on the row, created by the
+  request's `by` or the tool's caller, its SFF file written as it is kept from the run's basis
+  (`proforma.plant_of`), `outputs.values` its price block in the units its artifact states, its
+  solved price named as a library run names its own (`price.solvedPrice`), so a comparison sets
+  the two prices on one row. A request with many cases is one row whose artifact carries the
+  cases; a refusal inside the run is a receipt, and a run whose inputs wait keeps nothing.
+  `ProformaRunRequest` takes `inputs` converted at Proforma's door (`proforma.overrides_of`) and
+  `by`, and refuses a field it does not name; the binding and the ceiling check take `?inputs=`
+  the same way. A run that sets a value writes the line the parameter panel's overrides wrote
+  (`assumptions read from: overrides`), word for word, so a run a person makes through the panel
+  keeps the artifact id it had; the older `assumptions` field retired, and the run it made, the
+  Proforma pin's among them, gains that line and the panel's id (D1's amendment at C.4, both ids
+  named in `core/tests/test_engine_pins.py`, the output hash held). A model's estimate bases as
+  an estimate (ADR-006), where it based as a person's assumption naming the model, so a run a
+  model set a value of is kept afresh under a new id. Every kept artifact replays as it was.
+  The engine's things gain the shelf's flowsheets a scenario runs, kind `scenario`: their
+  parameters the inputs a scenario of each binds, as `GET /api/proforma/bind` binds one with no
+  scenario, and a run the run of an unsaved scenario named by the flowsheet's own id;
+  `custom_train_v1`, built from a kept vessel design and a kept train run, runs in a
+  configuration naming the two, one for each pair the project's scenarios of it name, and is
+  listed while the project keeps one. `proforma.run` registers no replay tolerance, so a scenario
+  flowsheet's precision is identical (rtol 0, atol 0). The engine package imports no Proforma
+  module: Proforma gives the engine those things through a provider it registers as it is
+  imported (`engine/biosteam.py` `provide`), and conformance reads the engine as the service's
+  app holds it (`conform.as_served`). A library plant taking configurations, asked with none, is
+  read and run in its default at every door, the parameters doors and a study scenario's among
+  them.
 - **fermOS** is registered as the engine `kinetics` through the same group, by
   `core/pyproject.toml` (`kinetics = "openferment_core.fermos_engine:ENGINE"`; stage C of alpha
   2.2). It wraps fermOS as fermOS computes: its things are the model families that simulate
@@ -139,7 +174,9 @@ Option 2.
 - The four engine tools (`engine_plants`, `engine_parameters`, `engine_run`, `engine_report`)
   take `engine`, `biosteam` by default; the tool registry keeps its 48 names.
 - The package map (`core/tests/test_boundaries.py`) holds two exceptions for the conformance
-  check: `engine → api` and `engine → tools`, the two doors a bare number is sent through.
+  check: `engine → api` and `engine → tools`, the two doors a bare number is sent through. The
+  biosteam engine reaches the shelf's scenario flowsheets through the provider Proforma
+  registers with it (`engine/biosteam.py` `provide`), with no exception of its own.
 - An engine's code runs in the service's process when its entry point loads, and its worker runs
   as the service's user: installing an engine trusts its code with whatever that user can read,
   `core/.env` included. The worker's environment carries no variable `workers.withheld` names
@@ -190,6 +227,24 @@ importer (ADR-003).
 - `core/tests/test_boundaries.py`: `from X import y` read as the module `X.y` where y is one, so
   the engine's row refuses a worker module imported from its package.
 - `python -m openferment_core.engine.conform biosteam`: the eight checks on BioSTEAM.
+- `core/tests/test_engines.py`, `core/tests/test_proforma_runs.py` and
+  `core/tests/test_engines_sim.py` (stage C, C.4): `biosteam` lists the shelf's scenario
+  flowsheets beside its library plants, `custom_train_v1` once the project keeps a scenario of
+  it; a scenario flowsheet's parameters are what its scenario binds, each default with its
+  origin; a run of one through the engine is one row of `proforma.run` with its SFF file, the
+  same request twice that row; a Proforma run at its own route is a row of the engine too, its
+  outputs its price block, a refusal inside it a receipt, a run that waits keeping nothing; the
+  library route takes inputs on the engine's own path, a plant that takes a configuration running
+  in its default there; `conform biosteam` holds all eight checks with `--thing` on a library
+  plant and on a scenario flowsheet, with the `sim` marker on the real worker.
+  `core/tests/test_engine_pins.py` holds the library artifact ids through the inputs, and the
+  Proforma pin's two ids, the older field's and the panel's (D1's amendment at C.4);
+  `core/tests/test_proforma_overrides.py` and `core/tests/test_custom_train.py` hold a panel run's
+  ids as b6a85d0 kept them, a Finance value's among them, and a model's estimate based as one;
+  `core/tests/test_engines.py` holds the provider whichever module is imported first, the
+  parameters doors in a plant's default, an unknown thing named in the engine's words, a scenario
+  flowsheet that cannot run as it stands refused before conformance runs, and check 3's words for
+  a run that answers no output.
 - `core/tests/test_engines.py` (stage C): `GET /api/engines` lists `kinetics` with no worker, and
   its forecast and vessel once the project keeps what they take; a run of each of its things is
   one row at every door, the same request twice that row, its versions what its thing ran on; a

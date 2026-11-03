@@ -119,8 +119,9 @@ def _no_run(sid: str, row: dict, ctx: ToolContext) -> str:
     name = row.get("name") or sid
     try:
         req = project_state.run_request(row)
-        typed, _ = proforma.named_values(sid, req.overrides)
-        bound = proforma.bound(req.flowsheet or row["modelId"], scenario_id=sid, name=name, pool=ctx.pool,
+        flowsheet = req.flowsheet or row["modelId"]
+        typed = proforma.named_values(sid, proforma.overrides_of(sid, flowsheet, req.inputs))
+        bound = proforma.bound(flowsheet, scenario_id=sid, name=name, pool=ctx.pool,
                                assumptions=typed, fits=req.fits, vessel=req.vessel, train_run=req.trainRun)
     except proforma.ScenarioRefused as e:
         return f"{NAME} refused: no run of {sid} is on file here, and its inputs could not be bound: {e}"

@@ -338,12 +338,21 @@ def _in_place_of(inp, bound: list) -> None:
 
 
 def _assume(inp, a) -> None:
-    from .basis import assumption_source
+    """An input bound to a named value: a person's assumption, its source
+    naming the person (basis.assumption_source), or a model's estimate, its
+    source naming the model (basis.estimate_source, ADR-006); either makes
+    the run `assumed`."""
+    from .basis import assumption_source, estimate_source
     from .biorepo import reviewer_refusal
 
-    why = reviewer_refusal(a.by)
-    if why:
-        raise ScenarioRefused(f"the assumption for {inp.key} needs a person's name: {why}")
+    if a.origin == "model-estimate":
+        name = (a.by or "").strip()
+        if not name or any(not ch.isprintable() for ch in name):
+            raise ScenarioRefused(f"the estimate of {inp.key} names the model that made it, on one line")
+    else:
+        why = reviewer_refusal(a.by)
+        if why:
+            raise ScenarioRefused(f"the assumption for {inp.key} needs a person's name: {why}")
     if not all(math.isfinite(v) for v in (a.value, a.low, a.high)):
         # §2.R: an infinite value passed the range check and broke the artifact's JSON.
         raise ScenarioRefused(f"the assumption for {inp.key} must be a finite number, with a finite low and high")
@@ -352,32 +361,49 @@ def _assume(inp, a) -> None:
     inp.binding = "assumption"
     inp.value, inp.low, inp.high = a.value, a.low, a.high
     inp.sampling = "fixed" if a.low == a.high else "uniform"
-    inp.source = assumption_source(a.by, a.at, a.note)
+    inp.source = (estimate_source(a.by, a.at, a.note) if a.origin == "model-estimate"
+                  else assumption_source(a.by, a.at, a.note))
 
 
-# ── A person's overrides (OF-BLD-020 §2.2, D3) ─────────────────────────
+# ── A person's values (OF-BLD-020 §2.2, D3; alpha 2.2 D2) ───────────────
 #
 # The parameter panel keeps a person's change to a scenario's input as an
-# Override of scope `proforma:<scenario id>`, one of the project's rows, and
-# a run, a binding or a ceiling check carries it. Each is laid on as the
-# named assumption it is: it wins over the records and over a fermOS fit
-# for its input, the input says how many records it stands in place of, and
-# the basis names the person (basis.assumption_source), so the run is
-# `assumed`. The older `assumptions` field is read the same way for one
-# release, and so wins over the records too: before the panel an older-field
-# value of an input that bound records was ignored, so such a run now binds,
-# bases and is kept differently (§2.R, finding 4; a test holds it). The basis
-# says which field it read: a run that read overrides carries `assumptions
-# read from`; one that read the older field alone adds no such line, so a
-# run whose older-field values name only inputs no record binds keeps the
-# basis, and the artifact id, it had before the panel. The service keeps
-# none.
+# Override of scope `proforma:<scenario id>`, one of the project's rows. A
+# run, a binding and a ceiling check carry it as a typed input
+# (ProformaRunRequest.inputs; `?inputs=` on the two reads), which
+# `overrides_of` converts at Proforma's door into that Override
+# (basis.override_of, in the unit of the input or the Finance parameter it
+# names). Each is laid on as the named value it is: it wins over the records
+# and over a fermOS fit for its input, the input says how many records it
+# stands in place of, and the basis names the person
+# (basis.assumption_source) or the model (basis.estimate_source, ADR-006),
+# so the run is `assumed`. A run that sets a value writes one line more
+# (`values_read`), in the words the panel's overrides wrote before a run
+# took typed inputs: an artifact's id hashes its basis, so a run a person
+# makes through the panel keeps the artifact id it had (alpha 2.2 D6, the
+# amendment at C.4).
 
+# That line, its name, its value and its note word for word as the panel's
+# overrides wrote it; the older `assumptions` field its note names retired
+# at C.4.
 ASSUMPTIONS_READ = "assumptions read from"
-READ_WORDS = {
-    (True, False): "overrides",
-    (True, True): "overrides, and assumptions, the older field, read as overrides for one release",
-}
+VALUES_READ = "overrides"
+VALUES_READ_NOTE = ("where the named persons' values in this basis came from: the parameter panel's overrides, and any "
+                    "the older assumptions field gave, which the service reads as overrides for one release; a basis "
+                    "without this input read the older field alone")
+
+
+def values_read(sets: bool) -> list:
+    """The basis input a run writes when it sets a value, an input's or a
+    composite's Finance value (`ASSUMPTIONS_READ`, a convention); none for a
+    run that sets nothing. The parameter panel's resolve says what a run
+    adds through this same function (OF-BLD-020 §2.R)."""
+    from .models import BasisInput, BasisSource
+
+    if not sets:
+        return []
+    return [BasisInput(name=ASSUMPTIONS_READ, value=VALUES_READ, unit="",
+                       source=BasisSource(kind="convention", note=VALUES_READ_NOTE))]
 
 
 def proforma_scope(scenario_id: str) -> str:
@@ -395,19 +421,16 @@ def held_to_scope(scenario_id: str, overrides: list) -> None:
                               f"{proforma_scope(scenario_id)}: {', '.join(stray)}")
 
 
-def named_values(scenario_id: str | None, overrides: list | None = None,
-                 assumptions: list | None = None) -> tuple[list, str | None]:
-    """A person's values for a scenario's inputs, as the binding lays them on:
-    each Override of the scenario's scope, and the older `assumptions` field,
-    as `InputAssumption`s; and the words the basis says it read (None when
-    it read no override: the older field alone, or nothing, is what every
-    run before the panel read). With no scenario id (GET /api/proforma/bind) every
-    override names one proforma scope. Refused in words: an override of
-    another scope, a value in words, and an input named twice."""
+def named_values(scenario_id: str | None, overrides: list | None = None) -> list:
+    """A person's or a model's values for a scenario's inputs, as the binding
+    lays them on: each Override of the scenario's scope as an
+    `InputAssumption`, its origin the Override's. With no
+    scenario id (GET /api/proforma/bind) every override names one proforma
+    scope. Refused in words: an override of another scope, a value in words,
+    and an input named twice."""
     from .models import InputAssumption
 
     over = list(overrides or [])
-    old = list(assumptions or [])
     scopes = sorted({o.scope for o in over})
     if scenario_id is not None:
         held_to_scope(scenario_id, over)
@@ -419,9 +442,9 @@ def named_values(scenario_id: str | None, overrides: list | None = None,
     out: dict[str, InputAssumption] = {}
     for o in over:
         if isinstance(o.value, bool) or not isinstance(o.value, (int, float)):
-            raise ScenarioRefused(f"the override of {o.key} takes a number, not words")
+            raise ScenarioRefused(f"{o.key} takes a number, and its value was sent as {o.value!r}")
         if o.key in out:
-            raise ScenarioRefused(f"two overrides of {o.key}: one person's value an input")
+            raise ScenarioRefused(f"{o.key} is set twice: a run sets each input once")
         when = params.unstamped(o)
         if when:  # §2.R, finding 5: the resolve refused it, and the run kept a basis naming no day
             raise ScenarioRefused(when)
@@ -430,15 +453,56 @@ def named_values(scenario_id: str | None, overrides: list | None = None,
         # resolve reads it); neither, the value is held fixed at itself.
         low, high = params.held(value, o.low, o.high)
         out[o.key] = InputAssumption(key=o.key, value=value, low=value if low is None else low,
-                                     high=value if high is None else high, by=o.by, at=o.at, note=o.note)
-    from_overrides = set(out)
-    for a in old:
-        if a.key in from_overrides:
-            raise ScenarioRefused(f"{a.key} is named in both overrides and assumptions, the older field: send it once, "
-                                  "as an override")
-        out[a.key] = a  # as before the panel, the last of the older field's values for a key stands
-    words = READ_WORDS.get((bool(over), bool(old)))
-    return list(out.values()), words
+                                     high=value if high is None else high, by=o.by, at=o.at, note=o.note,
+                                     origin=o.origin)
+    return list(out.values())
+
+
+def overrides_of(scenario_id: str, flowsheet: str, inputs: list | None) -> list:
+    """The values a run request sets (ProformaRunRequest.inputs), each a
+    typed quantity with its origin, as the Overrides of the scenario's scope
+    `proforma:<scenario id>` its binding takes (basis.override_of), each in
+    the unit of the parameter its name keys: an input of the flowsheet, or a
+    parameter of the Finance group of a flowsheet built from a vessel and a
+    train (params.flowsheet_specs, composite.finance_specs). Proforma's door,
+    where every value set is converted once. A name the flowsheet takes no
+    value for is refused in the words `_check_keys` says it in; a value in
+    another unit than its parameter's, one carrying a basis and one that says
+    no day are refused in basis.override_of's words (ScenarioRefused)."""
+    from . import composite, params
+    from .basis import InputRefused, override_of
+
+    info = _shelf.info(flowsheet, allow_toy=True)
+    specs = params.flowsheet_specs(info) + (composite.finance_specs() if info.builtFrom else [])
+    units = params.units_of(specs)
+    given = list(inputs or [])
+    unknown = sorted({i.name for i in given if i.name not in units})
+    if unknown:
+        raise ScenarioRefused(f"{info.id} takes no input {', '.join(unknown)}")
+    out = []
+    for i in given:
+        try:
+            out.append(override_of(proforma_scope(scenario_id), i, units[i.name]))
+        except InputRefused as e:
+            raise ScenarioRefused(str(e)) from None
+    return out
+
+
+def inputs_of(flowsheet: str, overrides: list) -> list:
+    """A scenario's Overrides (the rows the project keeps for its scope) as the
+    inputs a run request carries, each in the unit of the parameter its key
+    names: the inverse of `overrides_of`, the service's mirror of the
+    browser's own (src/lib/params.ts `inputsOf`). A key the flowsheet takes no
+    value for goes with no unit, as the browser sends it, and the run refuses
+    it in words."""
+    from . import composite, params
+    from .models import EngineInput, Origin, Quantity
+
+    info = _shelf.info(flowsheet, allow_toy=True)
+    units = params.units_of(params.flowsheet_specs(info) + (composite.finance_specs() if info.builtFrom else []))
+    return [EngineInput(name=o.key, quantity=Quantity(value=o.value, unit=units.get(o.key, ""), low=o.low, high=o.high,
+                                                      origin=Origin(kind=o.origin, by=o.by, at=o.at, note=o.note)))
+            for o in overrides]
 
 
 def fits_beside(fits: dict[str, str] | None, typed: list) -> dict[str, str]:
@@ -461,22 +525,6 @@ def _check_keys(info, typed: list) -> None:
     unknown = sorted({a.key for a in typed} - takes)
     if unknown:
         raise ScenarioRefused(f"{info.id} takes no input {', '.join(unknown)}")
-
-
-def assumptions_read(words: str | None) -> list:
-    """The basis input that says a run's named values were read from the
-    panel's overrides (OF-BLD-020 §2.2): none for a run that carries no
-    override. A run with none whose older-field values name only inputs no
-    record binds keeps the basis, and the artifact id, it had before the
-    panel; an older-field value over records now wins over them (§2.R)."""
-    from .models import BasisInput, BasisSource
-
-    if not words:
-        return []
-    return [BasisInput(name=ASSUMPTIONS_READ, value=words, unit="", source=BasisSource(
-        kind="convention", note="where the named persons' values in this basis came from: the parameter panel's "
-                                "overrides, and any the older assumptions field gave, which the service reads as overrides "
-                                "for one release; a basis without this input read the older field alone"))]
 
 
 def basis_inputs(inputs: list, flowsheet: str, samples: int = SAMPLES, scenario_id: str | None = None,
@@ -822,12 +870,48 @@ def _no_sample_held(art) -> str:
             + f". The run is kept as artifact {art.id}.")
 
 
-def run(req, pool=None):
-    """Bind, refuse what waits for a source, and run once per basis. The run
-    is one `proforma.run` artifact holding the price, the sensitivity and the
-    base case's tables (D1); this reads them back from it."""
-    from . import artifacts, evidence_pool
-    from .models import ProformaGrid, ProformaRunResult
+def keep_run(flowsheet: str, basis: list, *, by: str = "", seed: int = 0, records_by_id: Any = None,
+             scenario_id: str | None = None, configuration: str | None = None):
+    """A run's `proforma.run` artifact computed and kept as a run of the
+    biosteam engine (engine/runs.compute_kept; alpha 2.2 D3, D6): one runs
+    row, its thing the flowsheet, its configuration none (or, for a
+    flowsheet built from a vessel and a train, the two it was built from,
+    `parts_configuration`), the scenario's id on the row, created by `by`.
+    Its SFF file is written at keep time by the Proforma worker from the
+    run's base case (`write_file`) and kept as the record `run-<id>`, or the
+    words for why it has none kept as `sffRefused`. A refusal the worker
+    gives inside the computation is kept as a receipt and raised as
+    ScenarioRefused with the receipt's id as `run_id`; the same request
+    again is answered from its row, the computation one artifact whatever
+    its cases (a grid, a sample)."""
+    from .engine import runs
+
+    return runs.compute_kept(runs.LIBRARY_ENGINE, flowsheet, configuration, tool=RUN, basis=basis,
+                             refusal=ScenarioRefused, by=by, seed=seed, records_by_id=records_by_id,
+                             scenario_id=scenario_id, write_sff=write_file)
+
+
+def write_file(art, project_id: str, by: str):
+    """A run's SFF file, written by the Proforma worker from the run's base
+    case, rebuilt from its basis alone (`plant_of`, engine/sff.py `export`,
+    through `call`), and kept as the record `run-<id>`. A run whose base case
+    could not run has no plant to write: the worker is asked nothing, and
+    the run keeps the words (sff.SFFRefused)."""
+    from .engine import sff
+
+    failed = art.output.get("baseInfeasible")
+    if failed:
+        raise sff.SFFRefused(f"the run's base case could not run ({failed}), so it has no plant to write as an SFF file")
+    return sff.export(plant_of(art), project_id=project_id, run_artifact_id=art.id, by=by, call=call)
+
+
+def computed(req, pool=None):
+    """A scenario's run as `run` makes it, short of reading its price: bound,
+    refused where an input waits for a source, and kept once per basis as one
+    `proforma.run` artifact and its row (`keep_run`). Answers the artifact,
+    the inputs as bound and the flowsheet's shelf entry. A run whose samples
+    hold no price is kept like any other: the price is `run`'s to refuse."""
+    from . import evidence_pool
 
     # OF-BLD-019 §2.3 (d): a scenario the project keeps by its id, or one a
     # page has not yet saved by the shelf flowsheet it names; anything else is
@@ -836,17 +920,20 @@ def run(req, pool=None):
     info = _shelf.info(flowsheet)
     _check_samples(req.samples)
     _check_seed(req.seed)
+    # Alpha 2.2 D2: the values set, each a typed quantity, converted at the
+    # door into the Overrides of the scenario's scope.
+    overrides = overrides_of(req.scenarioId, flowsheet, req.inputs)
     # OF-BLD-020 §6.1 (D11): a composite names its vessel design and its
     # train run, each held to the rules (composite.parts_of); the finance
     # group's overrides are its own, apart from the inputs'.
-    parts, finance, overrides = _composite(flowsheet, req.vessel, req.trainRun, req.overrides,
-                                           scenario_id=req.scenarioId)
-    # OF-BLD-020 §2.2 (D3): a person's overrides, and the older assumptions
-    # field read the same way for one release, each a named assumption that
+    parts, finance, rest = _composite(flowsheet, req.vessel, req.trainRun, overrides, scenario_id=req.scenarioId)
+    # OF-BLD-020 §2.2 (D3): a person's values, each a named assumption that
     # wins over the records and any fit for its input.
-    typed, read = named_values(req.scenarioId, overrides, req.assumptions)
-    if finance is not None and not read and any(v.overriddenBy for v in finance):
-        read = READ_WORDS[(True, bool(req.assumptions))]
+    typed = named_values(req.scenarioId, rest)
+    # A run that sets a value, an input's or a Finance value, says so in its
+    # basis in the panel's words (`values_read`), so its artifact id is the
+    # one the panel's overrides gave it.
+    sets = bool(rest) or (finance is not None and any(v.overriddenBy for v in finance))
     _check_keys(info, typed)
     pool = pool or evidence_pool.load()
     inputs = bind_inputs(flowsheet, pool.records, req.host, typed)
@@ -861,9 +948,22 @@ def run(req, pool=None):
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
         raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
-    art = artifacts.compute(RUN, basis_inputs(inputs, flowsheet, req.samples, scenario_id=req.scenarioId,
-                                              fitted=fitted, parts=parts, finance=finance) + assumptions_read(read),
-                            records_by_id=pool.records_by_id, seed=req.seed)
+    art = keep_run(flowsheet, basis_inputs(inputs, flowsheet, req.samples, scenario_id=req.scenarioId, fitted=fitted,
+                                           parts=parts, finance=finance) + values_read(sets),
+                   by=req.by, seed=req.seed, records_by_id=pool.records_by_id, scenario_id=req.scenarioId,
+                   configuration=parts_configuration(parts.vessel.id, parts.train.id) if parts is not None else None)
+    return art, inputs, info
+
+
+def run(req, pool=None):
+    """Bind, refuse what waits for a source, and run once per basis, the run
+    kept as one row of the biosteam engine (`computed`, `keep_run`). The run
+    is one `proforma.run` artifact holding the price, the sensitivity and the
+    base case's tables (D1); this reads them back from it, and refuses in
+    words a run whose samples hold no price, the run kept."""
+    from .models import ProformaGrid, ProformaRunResult
+
+    art, inputs, info = computed(req, pool)
     o = art.output
     q = o["quantiles"]
     if not q:
@@ -881,9 +981,11 @@ def run(req, pool=None):
 def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, seed: int = 0,
                   allow_toy: bool = False, scenario_id: str | None = None):
     """Run a flowsheet whose every input is a named person's assumption, and
-    return its one `proforma.run` artifact. The toy is refused unless the
-    caller is a test or a fixture and says `allow_toy`; a reference
-    biorefinery runs whole through its own reference run, not here; a
+    return its one `proforma.run` artifact, keeping no runs row: no route,
+    tool or engine reaches it, and a test or a fixture makes a run's artifact
+    with it (`run` keeps the row of every run a door asks for). The toy is
+    refused unless the caller is a test or a fixture and says `allow_toy`; a
+    reference biorefinery runs whole through its own reference run; a
     flowsheet built from kept artifacts (OF-BLD-020 §6.1) runs as a scenario
     that names them."""
     from . import artifacts
@@ -1228,6 +1330,216 @@ def _composite(flowsheet: str, vessel: str | None, train_run: str | None,
     except params.ParamRefused as e:
         raise ScenarioRefused(str(e)) from None
     return parts, finance, rest
+
+
+# ── A scenario's flowsheet as a thing of the biosteam engine (alpha 2.2 D6) ──
+#
+# The biosteam engine (engine/biosteam.py) lists the shelf's flowsheets a
+# scenario runs beside the library's plants, and runs each as Proforma runs a
+# scenario of it, through the provider this module registers with it as it
+# is imported (`_provide`). Its parameters are the inputs a scenario of it binds, as
+# GET /api/proforma/bind binds one with no scenario: the records of the
+# evidence pool, the stated conventions, and for a flowsheet built from a
+# vessel and a train its Finance group at the package's own defaults and
+# the plant scale its vessel design gives; an input nothing binds has no
+# default and waits for a run's value. A run is the run of an unsaved
+# scenario of it, named by the flowsheet's own id, so the same request is
+# the same row. A flowsheet built from a kept vessel design and a kept train
+# run (custom_train_v1) runs in a configuration naming the two, one for each
+# pair the project's kept scenarios of it name whose parts stand, and is
+# listed while the project keeps one: its parts are a scenario's to name.
+
+# What the biosteam engine says a scenario's flowsheet is (EngineThing.kind).
+THING_KIND = "scenario"
+# A configuration of a flowsheet built from a vessel and a train: the two
+# artifacts' ids, as a scenario of it names them (`parts_configuration`).
+_PARTS = re.compile(r"vessel (\S+), train run (\S+)")
+
+
+def runs_as_thing(flowsheet: str) -> bool:
+    """Whether a flowsheet is one a scenario runs, and so a thing of the
+    biosteam engine whatever the project keeps: on the shelf, and no
+    reference biorefinery."""
+    info = _shelf.SHELF.get(flowsheet)
+    return info is not None and not info.reference
+
+
+def parts_configuration(vessel: str, train_run: str) -> str:
+    """The configuration of a flowsheet built from a vessel and a train that
+    names the vessel design and the train run a scenario of it is built from."""
+    return f"vessel {vessel}, train run {train_run}"
+
+
+def _kept_parts(flowsheet: str) -> list[str]:
+    """The configurations of a flowsheet built from a vessel and a train: each
+    pair of parts a scenario of it the project keeps names, once, in the
+    order the project keeps them, whose parts stand (composite.parts_of: a
+    pair that cannot stand is said on its scenario's page). Nothing while no
+    project is named."""
+    from . import composite, project_state, projects
+    from .models import CONFIGURATION_MAX
+
+    if projects.current_or_none() is None:
+        return []
+    out: list[str] = []
+    for row in project_state.kept("scenarios"):
+        if not isinstance(row, dict) or row.get("kind") != "biosteam" or row.get("modelId") != flowsheet:
+            continue
+        vessel, train_run = row.get("vessel"), row.get("trainRun")
+        if not (isinstance(vessel, str) and vessel and isinstance(train_run, str) and train_run):
+            continue
+        name = parts_configuration(vessel, train_run)
+        if name in out or len(name) > CONFIGURATION_MAX:
+            continue
+        try:
+            composite.parts_of(vessel, train_run)
+        except ScenarioRefused:
+            continue
+        out.append(name)
+    return out
+
+
+def thing_flowsheets() -> list[tuple[Any, list[str]]]:
+    """The shelf's flowsheets a scenario runs (`runnable`: no reference
+    biorefinery, no toy), in the shelf's order, each with the configurations
+    it runs in as a thing of the biosteam engine: none for a flowsheet built
+    from nothing a scenario names; for one built from a kept vessel design
+    and a kept train run, each pair of parts the project's scenarios of it
+    name (`_kept_parts`), the flowsheet listed while there is one."""
+    out = []
+    for info in _shelf.SHELF.values():
+        if info.reference:
+            continue
+        configurations = _kept_parts(info.id) if info.builtFrom else []
+        if info.builtFrom and not configurations:
+            continue
+        out.append((info, configurations))
+    return out
+
+
+def _thing_parts(flowsheet: str, configuration: str | None) -> tuple[str | None, str | None]:
+    """The vessel design and the train run a thing's configuration names, or
+    the refusal in words: a flowsheet built from nothing a scenario names
+    takes no configuration, and one built from a vessel and a train takes one
+    of those its kept scenarios name."""
+    info = runnable(flowsheet)
+    cfg = (configuration or "").strip() or None
+    if not info.builtFrom:
+        if cfg is not None:
+            raise ScenarioRefused(f"{flowsheet} takes no configuration, and {cfg!r} was named")
+        return None, None
+    held = _kept_parts(flowsheet)
+    if cfg is None or cfg not in held:
+        said = f"{cfg!r} is none of them" if cfg is not None else "none was named"
+        raise ScenarioRefused(f"{flowsheet} runs in a configuration naming the vessel design and the train run a "
+                              f"scenario of it the project keeps is built from: "
+                              f"{'; '.join(held) or 'the project keeps no such scenario'}; {said}")
+    vessel, train_run = _PARTS.fullmatch(cfg).groups()
+    return vessel, train_run
+
+
+def _engine_parameter(spec: Any, v: Any) -> Any:
+    """One parameter of a scenario's flowsheet as the engine contract states
+    it, from its value as the scenario's scope binds it with nothing set: the
+    records that bound it (a `record` naming them), a fermOS fit, a kept
+    simulation or the vessel design (an `artifact` naming it), the stated
+    convention with its note, the package's own default (a `library-default`
+    naming the package); else no default, which a run sets."""
+    from .basis import origin_of
+    from .models import EngineParameter, Origin
+
+    origin = None
+    if v is not None and v.value is not None and v.origin != "waiting":
+        ref = v.source.id if v.source is not None and v.source.id else None
+        if v.origin == "record":
+            ids = ", ".join(v.recordIds) or ref
+            origin = Origin(kind="record", ref=ids, note=v.detail) if ids else None
+        elif v.origin in ("fit", "simulation", "artifact"):
+            origin = Origin(kind="artifact", ref=ref, note=v.detail) if ref else None
+        elif v.origin == "convention":
+            note = (v.detail or spec.note or "").strip() or f"{spec.key}'s stated convention"
+            origin = Origin(kind="convention", note=note)
+        elif v.origin == "library-default":
+            origin = Origin(kind="library-default", ref=ref, note=v.detail) if ref else None
+        elif v.origin == "assumption" and v.source is not None:
+            origin = origin_of(v.source)
+    return EngineParameter(**spec.model_dump(), value=v.value if origin is not None else None, origin=origin)
+
+
+def thing_parameters(flowsheet: str, configuration: str | None) -> list:
+    """What a run of a scenario's flowsheet takes, as the biosteam engine
+    states it: each input, and a composite's Finance parameters, as a
+    scenario of it binds them with nothing set (the `proforma:` scope of the
+    flowsheet's own id, which binds as GET /api/proforma/bind binds a
+    scenario not yet saved), each default with its origin
+    (`_engine_parameter`). Reads the project's records and kept artifacts;
+    starts no worker and keeps nothing."""
+    from . import params
+    from .models import ParamResolveRequest
+
+    vessel, train_run = _thing_parts(flowsheet, configuration)
+    try:
+        scope = params.scope(proforma_scope(flowsheet),
+                             ParamResolveRequest(flowsheet=flowsheet, vessel=vessel, trainRun=train_run))
+    except (params.ParamRefused, params.ScopeUnknown) as e:
+        raise ScenarioRefused(str(e).strip("'\"")) from None
+    values = {v.key: v for v in scope.values}
+    return [_engine_parameter(s, values.get(s.key)) for s in scope.specs]
+
+
+def run_thing(flowsheet: str, configuration: str | None, inputs: list, by: str):
+    """One run of a scenario's flowsheet as the biosteam engine runs it: the
+    run of an unsaved scenario of the flowsheet, its id the flowsheet's own,
+    bound as GET /api/proforma/bind binds one, with the values set (`inputs`,
+    converted at Proforma's door) and the parts its configuration names,
+    every other setting a scenario run's own default (its samples, its
+    seed); kept as one row by `computed`, the artifact answered. A run whose
+    samples hold no price is kept and answered as the run it is."""
+    from .models import ProformaRunRequest
+
+    vessel, train_run = _thing_parts(flowsheet, configuration)
+    art, _, _ = computed(ProformaRunRequest(scenarioId=flowsheet, flowsheet=flowsheet, inputs=list(inputs), by=by,
+                                            vessel=vessel, trainRun=train_run))
+    return art
+
+
+def thing_list() -> list:
+    """The shelf's scenario flowsheets as the biosteam engine lists them,
+    each in the configurations it runs in (`thing_flowsheets`), kind
+    `scenario`. proforma.run registers no replay tolerance, so each replays
+    identically: its precision is rtol 0, atol 0."""
+    from .models import EnginePrecision, EngineThing
+
+    exact = EnginePrecision(rtol=0.0, atol=0.0)
+    return [EngineThing(id=info.id, title=info.title, kind=THING_KIND, configurations=configurations,
+                        precision=exact) for info, configurations in thing_flowsheets()]
+
+
+def _run_as_thing(flowsheet: str, configuration: str | None, inputs: list, by: str) -> str:
+    """`run_thing` as the biosteam engine's provider answers it: the id of
+    the run kept. A request its fields cannot hold (a `by` longer than a
+    request takes) is refused in the request's words."""
+    from pydantic import ValidationError
+
+    try:
+        return run_thing(flowsheet, configuration, inputs, by).id
+    except ValidationError as e:
+        said = e.errors()[0]["msg"] if e.errors() else str(e)
+        raise ScenarioRefused(f"the biosteam engine cannot take this request: {said}") from None
+
+
+def _provide() -> None:
+    """The shelf's scenario flowsheets given to the biosteam engine as things
+    of its own (engine/biosteam.py `provide`), as this module is imported:
+    the engine package imports no Proforma module, and the service's app
+    imports this one through its tools."""
+    from .engine import biosteam
+
+    biosteam.provide(biosteam.Provider(name="proforma", things=thing_list, holds=runs_as_thing,
+                                       parameters=thing_parameters, run=_run_as_thing, refusal=ScenarioRefused))
+
+
+_provide()
 
 
 # ── A fermOS fit feeds the fermenter (OF-BLD-019 §5.1, D10) ─────────────
@@ -1722,15 +2034,14 @@ def _row_words(flag: str, binding: str, value_above: bool) -> str:
             "run keep the yield as bound.")
 
 
-def ceiling_check(scenario_id: str, flowsheet: str | None = None,
-                  host: str | None = None, assumptions: list | None = None, fits: dict[str, str] | None = None,
-                  pool=None, overrides: list | None = None):
+def ceiling_check(scenario_id: str, flowsheet: str | None = None, host: str | None = None,
+                  fits: dict[str, str] | None = None, pool=None, overrides: list | None = None):
     """GET /api/proforma/ceiling-check: a scenario's fermenter yield beside
     the newest stored geneOS ceiling of each shelf model of its organism, on
     its flowsheet's sugar (D11). The scenario is one the service holds by its
-    id, or one made here by the flowsheet it names (flowsheet_of); its yield is bound as
-    its page binds it, with the person's overrides (and the older
-    assumptions field, read the same way) and the fermOS fits chosen. Refused in words as the binding is. A read: it keeps
+    id, or one made here by the flowsheet it names (flowsheet_of); its yield
+    is bound as its page binds it, with the person's overrides and the
+    fermOS fits chosen. Refused in words as the binding is. A read: it keeps
     nothing, starts no worker, and changes no binding or run."""
     from . import artifacts, evidence_pool, geneos, geneos_models, module_stores, units
     from .models import CeilingCheck, CeilingRow
@@ -1741,7 +2052,7 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None,
     product = PRODUCTS.get(fid, fid)
     if sugar is None or product not in geneos_models.PRODUCTS:
         raise ScenarioRefused(f"{fid} names no product and sugar a geneOS ceiling is computed for")
-    typed, _ = named_values(scenario_id, overrides, assumptions)
+    typed = named_values(scenario_id, overrides)
     _check_keys(info, typed)
     pool = pool or evidence_pool.load()
     # The yield as the scenario binds it, each record read as it is (D11).

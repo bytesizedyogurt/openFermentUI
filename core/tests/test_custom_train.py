@@ -38,7 +38,7 @@ import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
 from openferment_core.models import Override, ProformaRunRequest
 from openferment_core.pureos import catalogue, train_spec
-from standins import resolve_json, vessel_request
+from standins import proforma_inputs, resolve_json, vessel_request
 from test_train import TrainWorker, spec_of
 from test_vessel import ANAEROBIC_ID, StandInWorker as VesselWorker, keep, standin_simulation
 
@@ -123,9 +123,14 @@ def client():
 POOL = SimpleNamespace(records=[], records_by_id={})
 
 
-def request(parts, **kw) -> ProformaRunRequest:
+def request(parts, overrides=None, **kw) -> ProformaRunRequest:
+    """A run of the composite as the browser sends one: the scope's overrides,
+    the inputs' and the Finance group's, as typed inputs in each parameter's
+    unit (alpha 2.2 D2)."""
+    typed = inputs_typed() if overrides is None else overrides
     return ProformaRunRequest(**{"scenarioId": SCENARIO, "flowsheet": FLOWSHEET, "vessel": parts.vessel,
-                                 "trainRun": parts.train, "overrides": inputs_typed(), "samples": 3, **kw})
+                                 "trainRun": parts.train, "inputs": proforma_inputs(typed, FLOWSHEET), "samples": 3,
+                                 **kw})
 
 
 # ── the shelf (offline) ────────────────────────────────────────────────
@@ -223,7 +228,7 @@ def test_the_vessel_design_binds_the_plant_scale_it_was_designed_at_and_a_person
     assert scale.binding == "artifact" and scale.value == PLANT_STANDIN and scale.source.id == parts.vessel
     assert f"the plant scale vessel design {parts.vessel} was designed at, typed by {BY}" == scale.source.note
     assert got.product == "ethanol" and "plant_scale" not in got.waiting
-    typed = proforma.named_values(None, [over("plant_scale", 7.0)])[0]
+    typed = proforma.named_values(None, [over("plant_scale", 7.0)])
     mine = proforma.bind_flowsheet(FLOWSHEET, pool=POOL, vessel=parts.vessel, train_run=parts.train, assumptions=typed)
     assert next(i for i in mine.inputs if i.key == "plant_scale").binding == "assumption"
 
@@ -476,3 +481,58 @@ def test_a_yield_the_vessels_reaction_cannot_reach_is_a_case_it_cannot_hold(real
     with pytest.raises(proforma.ScenarioRefused, match="yield: 2 of 2.*this yield is above what the vessel's reaction "
                                                        "makes of the glucose"):
         proforma.run(request(p, overrides=inputs_typed(**{"yield": 0.5}), samples=2), pool=POOL)
+
+
+# Each composite run's artifact id through the panel's overrides at b6a85d0,
+# measured there on these stand-ins, three samples, no host drawing the diagram.
+PANEL_IDS = {"inputs": "5787b339a1c448e9", "inputs and a Finance value": "f32cbb91635cb3d5"}
+
+
+def test_a_composite_run_sent_as_inputs_keeps_the_artifact_id_its_overrides_gave(parts, worker, monkeypatch):
+    """Alpha 2.2 D6, the amendment at C.4: a composite run a person makes
+    through the panel keeps the artifact id it had, a Finance value among its
+    values: sent as inputs, its values base as the panel's overrides based
+    them, the line saying so included (proforma.values_read)."""
+    monkeypatch.setattr(proforma, "drawn_here", lambda: False)
+    for name, typed in (("inputs", inputs_typed()), ("inputs and a Finance value", [*inputs_typed(), over("IRR", 0.1)])):
+        r = proforma.run(request(parts, overrides=typed), pool=POOL)
+        assert r.artifactId == PANEL_IDS[name], name
+        got = {i.name: i for i in artifacts.get(r.artifactId).inputs}
+        assert got[proforma.ASSUMPTIONS_READ].value == "overrides", name
+
+
+# ── the composite as a thing of the biosteam engine (alpha 2.2 D6) ─────
+
+
+def test_the_biosteam_engine_runs_the_composite_in_each_pair_its_kept_scenarios_name(parts, worker):
+    """custom_train_v1 is built from a vessel design and a train run a
+    scenario names, so the biosteam engine lists it while the project keeps a
+    scenario of it, one configuration for each pair of parts those name;
+    its parameters are what the scenario binds with those parts, and a run
+    in one is one row of proforma.run, its configuration the parts'."""
+    from openferment_core import project_state
+    from openferment_core.engine import EngineRefused, registry, runs
+
+    registry.reset()
+    biosteam = registry.get("biosteam")
+    assert FLOWSHEET not in {t.id for t in biosteam.things()}, "listed while the project keeps a scenario of it"
+    project_state.put("scenarios", SCENARIO, {"id": SCENARIO, "kind": "biosteam", "modelId": FLOWSHEET,
+                                              "name": "A STAND-IN composite", "vessel": parts.vessel,
+                                              "trainRun": parts.train}, by=BY)
+    configuration = proforma.parts_configuration(parts.vessel, parts.train)
+    (thing,) = [t for t in biosteam.things() if t.id == FLOWSHEET]
+    assert (thing.kind, thing.configurations, thing.defaultConfiguration) == ("scenario", [configuration], None)
+    params = {p.key: p for p in biosteam.parameters(FLOWSHEET, configuration)}
+    assert (params["plant_scale"].origin.kind, params["plant_scale"].origin.ref) == ("artifact", parts.vessel)
+    assert params["IRR"].origin.kind == "library-default" and params["IRR"].value == shelf.package_tea_defaults()["IRR"]
+    for named, said in ((None, "none was named"), ("vessel 0, train run 0", "is none of them")):
+        with pytest.raises(EngineRefused, match=said):
+            biosteam.run(FLOWSHEET, named, [], BY)
+    asked = proforma_inputs(inputs_typed(), FLOWSHEET)
+    run = biosteam.run(FLOWSHEET, configuration, asked, BY)
+    assert (run.engine, run.tool, run.plant, run.configuration, run.scenarioId, run.by) == (
+        "biosteam", proforma.RUN, FLOWSHEET, configuration, FLOWSHEET, BY)
+    assert run.status == "done" and run.sff is not None
+    assert biosteam.run(FLOWSHEET, configuration, asked, "Another STAND-IN person").id == run.id
+    assert [r.id for r in runs.listed("biosteam")] == [run.id]
+    registry.reset()

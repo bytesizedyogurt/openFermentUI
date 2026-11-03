@@ -62,7 +62,16 @@ export function Distribution(props: DistributionProps) {
       csvName={props.csvName ?? 'distribution'}
       basis={props.basis}
       notes={notes}
-      empty={bins.length ? null : { what: 'no sample of this scenario ran.', where: 'Run the scenario in Proforma once every input has a source.' }}
+      empty={
+        bins.length
+          ? null
+          : props.infeasible.some((i) => i.count > 0)
+            ? {
+                what: `each of its ${props.samples} samples failed to price.`,
+                where: `The flowsheet could not hold them: ${props.infeasible.map((i) => `${i.count} ${i.reason}`).join(', ')}.`,
+              }
+            : { what: 'no sample of this scenario ran.', where: 'Run the scenario in Proforma once every input has a source.' }
+      }
     >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={props.title} data-testid="distribution">
         <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="currentColor" strokeOpacity={0.4} />

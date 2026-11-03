@@ -170,7 +170,7 @@ class Provided(NamedTuple):
     says why nothing bound. `basis`, when a provider gives it, is what a run
     of the scope adds to its basis for the request's overrides, built by the
     function the run builds them with (OF-BLD-020 §2.R: Proforma's run writes
-    every override's low and high and the line saying it read overrides);
+    every override's value, low and high and the line saying it set values);
     without it the resolve takes `basis_inputs` over the overridden values,
     which is how the vessel builds its own."""
 
@@ -685,9 +685,9 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         given = checked(specs + finance, overrides_of(scope_name("proforma", scenario_id), req.inputs,
                                                       units_of(specs + finance)))
         mine = {sp.key for sp in finance}
-        typed, read = proforma.named_values(scenario_id, [o for k, o in given.items() if k not in mine])
-        if finance and not read and any(k in mine for k in given):
-            read = proforma.READ_WORDS[(True, False)]
+        typed = proforma.named_values(scenario_id, [o for k, o in given.items() if k not in mine])
+        # A run that sets a value writes the panel's line in its basis (proforma.values_read).
+        sets = bool(typed) or (bool(finance) and any(k in mine for k in given))
         proforma._check_keys(info, typed)
         pool = evidence_pool.load()
         bound = proforma.bound(flowsheet, scenario_id=scenario_id, name=held.get(scenario_id, {}).get("name") or "",
@@ -699,8 +699,9 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
     sources = {inp.key: _input_sources(inp, pool, feed) for inp in bound.inputs}
     sources.update(composite.finance_sources() if finance else {})
     # What a run adds to its basis for these overrides, by the run's own
-    # functions: each overridden input's value, low and high, then the line
-    # saying the run read overrides (§2.R, findings 3 and 19).
+    # functions: each overridden input's value, low and high, each Finance
+    # value a person set, then the line saying the run set values
+    # (§2.R, findings 3 and 19).
     added = [b for inp in bound.inputs if inp.binding == "assumption" for b in proforma.assumption_inputs(inp)]
     if finance:
         fin = resolve(finance, composite.finance_sources(), [o for k, o in given.items() if k in mine])
@@ -721,7 +722,7 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
                      "fermenter's beer is. Finance is the dry-grind corn plant's TEA: each parameter the package's own "
                      "default until a person sets one, held at its value across the run's samples.")
     return Provided(title=title, specs=specs + finance, sources=sources, notes=notes,
-                    basis=added + proforma.assumptions_read(read),
+                    basis=added + proforma.values_read(sets),
                     refuses=(composite.finance_refusal if finance else None))
 
 

@@ -163,7 +163,8 @@ def test_a_whole_yeast_run_through_the_worker(store, monkeypatch):
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-20")
          for k, v, lo, hi in standins.YEAST_STANDIN_ASSUMED]
-    out = proforma.run(ProformaRunRequest(scenarioId="sc-held-ethanol", assumptions=a, seed=3), pool=pool)
+    out = proforma.run(ProformaRunRequest(scenarioId="sc-held-ethanol", inputs=standins.assumed_inputs(a), seed=3),
+                       pool=pool)
     assert out.samples == 500 and out.feasible + sum(out.infeasible.values()) == 500 and out.baseInfeasible is None
     assert set(out.infeasible) <= {"yield", "concentration", "convergence"}
     assert out.provenance == "assumed" and out.flowsheet == "ethanol_glucose_v0" and out.tea.teaClass == "ConventionalEthanolTEA"

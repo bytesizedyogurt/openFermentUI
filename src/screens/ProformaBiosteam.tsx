@@ -160,9 +160,18 @@ export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; pri
       </p>
       <p className="text-caption text-ink-soft mt-2">
         Run{' '}
-        <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${view.artifactId}`)}>
+        <a
+          className="font-num hover:text-accent underline underline-offset-2"
+          href={href(`/proforma/runs/${view.artifactId}`)}
+          data-testid="scenario-run-page"
+        >
           {view.artifactId}
+        </a>{' '}
+        (its page, with its SFF file;{' '}
+        <a className="hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${view.artifactId}`)}>
+          its artifact
         </a>
+        )
         {view.createdAt && (
           <>
             , computed <span className="font-num">{stamp(view.createdAt)}</span>
@@ -320,7 +329,7 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
       <p className="text-caption text-ink-soft mb-3">
         Interpolated between the {g.msp.length} grid cases the service simulated; the other inputs stay at their base value. The cost lines
         are split as the flowsheet splits its grid, the fermentation section apart from the downstream units, not as the breakdown above.
-        {g.infeasible > 0 && ` ${g.infeasible} cases could not run, and a point near one shows no price.`}
+        {g.infeasible > 0 && ` ${g.infeasible} case${g.infeasible === 1 ? '' : 's'} could not run, and a point near one shows no price.`}
       </p>
       <div className="space-y-3">
         {g.dims

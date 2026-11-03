@@ -141,6 +141,15 @@ def _spied(engine: Any, wrappers: dict[str, Callable[[Callable[..., Any]], Calla
                 delattr(engine, m)
 
 
+def as_served() -> None:
+    """The engine as the service's process holds it: the service's app,
+    which check 1 sends its numbers to, imported before anything is read, so
+    every module that gives an engine things of its own as it is imported
+    has given them (Proforma's scenario flowsheets, engine/biosteam.py
+    `provide`). The checks call it first."""
+    from .. import api  # noqa: F401
+
+
 # ── the eight checks ────────────────────────────────────────────────────
 
 
@@ -406,7 +415,10 @@ def _run_twice(engine: Any, thing: Any, inputs: list[EngineInput], by: str) -> t
                 + f", asked twice, is {rows} row{'s' if rows != 1 else ''}; engine {a.engine}, status {a.status}; "
                 + ("its id the artifact id of its basis" if keyed else "its id is no artifact id of its basis")
                 + (f"; the second answered {b.id}" if a.id != b.id else "")
-                + (f"; refused: {a.refused}" if a.refused else ""))
+                + (f"; refused: {a.refused}" if a.refused else "")
+                # A run kept done that answers no output (a Proforma run whose samples priced nothing) says so.
+                + ("; it answers no output: its outputs.values are empty" if a.status == "done"
+                   and not (a.outputs or {}).get("values") else ""))
         return ok, said, a if a.status == "done" else None
     except Exception as e:  # a check that cannot be made fails in words
         return False, f"{thing.id} could not be run: {type(e).__name__}: {_words(e)}", None
@@ -466,7 +478,9 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
     of the project: `in_project`). `entry` is the entry point's `module:attr`
     for check 6; `inputs` are the values the checked run sets, for a thing
     that waits for values its parameters give no default. A thing runs in its
-    default configuration, or in the first it names."""
+    default configuration, or in the first it names. The engine is read as
+    the service's process holds it (`as_served`)."""
+    as_served()
     inputs = list(inputs or [])
 
     out: list[EngineCheck] = []
@@ -935,6 +949,18 @@ def _inside(name: str, by: str, argv: list[str]) -> int:
     things, inputs, _ = _options(argv)
     engine = registry.get(name)
     entry = registry.found()[name].entry
+    # A thing the checks would run that cannot run as it stands (the engine's
+    # `unready`: biosteam's scenario flowsheet with its values unset) is
+    # refused in words before anything is made, so no failing verdict stands
+    # in for the engine's.
+    as_served()
+    values = _read_inputs(inputs) if inputs else []
+    ask = getattr(engine, "unready", None)
+    first = (things or [t.id for t in engine.things()])[:1]
+    said = ask(first[0], values) if callable(ask) and first else None
+    if said:
+        print(f"{first[0]} cannot be checked as it stands: {said}; set its values with --inputs <file>", file=sys.stderr)
+        return 2
     made = projects.create(ProjectCreate(name=f"Conformance of {name}", by=by))
     with projects.using(made.id):
         found = checks(engine, by=by, entry=entry, things=things or None,

@@ -159,6 +159,10 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
             rows={moved}
             provenance={c.provenance}
             csvName={`comparison-${c.id}-changes`}
+            empty={{
+              what: 'each output here is a number in some of these runs alone.',
+              where: 'A bar is drawn for an output every run answers with a number; the table below holds every number, run by run.',
+            }}
             notes={[
               'Every change is the comparison artifact’s own, relative to the first run’s value; the browser divides nothing.',
               ...(still.length ? [`${still.length} of these outputs did not move: ${still.map((r) => r.label).join(', ')}.`] : []),
