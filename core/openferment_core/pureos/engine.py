@@ -53,9 +53,20 @@ row names the distributions its own basis names, the versions the worker
 ran.
 
 Every thing is a project's own, so `things_are` says what they are, and
-conformance runs in a project that holds one (`python -m
-openferment_core.engine.conform train --project <id>`, a project of a
-development database: the checks refuse the production one).
+conformance checks a copy of a project that holds one (`python -m
+openferment_core.engine.conform train --project <id>`, on any database, the
+production one among them), with two declarations of its own:
+
+    rests_on    the rows of the current project its trains rest on, by table,
+                which conformance reads and copies into a database of its own:
+                every train, each artifact a train's inlet reads with its
+                run's row, the scenarios a run-stream inlet names, the
+                evidence pool and the project's strains
+    unready     why a train cannot be checked as it stands, in words saying
+                what it is (a saved draft, a train whose values wait for a
+                source, a train whose run is refused before it computes), or
+                None for one whose run would compute; runs nothing and keeps
+                nothing
 """
 from __future__ import annotations
 
@@ -82,6 +93,17 @@ THINGS_ARE = "a project's trains, each saved in pureOS's Builder or built by a m
 # The words a parameter's note gains when the train fills it itself as a run
 # leaves it unset, the resolution's reason beside them.
 FILLS_ITSELF = "A run may leave it unset, and the train then fills it itself"
+# What a train conformance leaves out is, in words (`unready`): one its
+# validation refuses, one each of whose run's refusals is a value or a unit's
+# need that waits, and one whose run is refused for another reason before it
+# computes.
+DRAFT = "a saved draft, which cannot be built as it stands"
+WAITS = "a train whose values wait for a source"
+REFUSED = "a train whose run is refused before it computes"
+# How pureOS says a value that waits for its source (train_spec's
+# `_waiting_words`: `<key> waits (<what would bind it>)`) and a unit's need
+# that waits for one (catalogue.unmet: `<unit> waits for <options>`).
+WAITING = re.compile(r"\bwaits (\(|for\b)")
 
 
 def precision() -> EnginePrecision:
@@ -229,6 +251,75 @@ class TrainEngine:
     def export_sff(self, run: EngineRun) -> SFFFlowsheet | str:
         """The SFF file the run wrote when it was kept, as its flowsheet record, or its words for why none was."""
         return sff_of(run)
+
+    def rests_on(self) -> dict[str, dict[str, list[str]] | None]:
+        """What the current project's trains rest on, as the rows of the
+        openferment schema each train's resolution reads, by table: None for
+        every row of the project in the table, or the values of the columns
+        that pick the rows (engine/conform.py `--project`, which copies them).
+        Read from the store, writing nothing.
+
+            trains      every train the project holds, saved and built
+            artifacts   each artifact a train's inlet reads, by id: a
+                        simulation and its vessel design, a run's artifact, a
+                        scenario's newest run (`proforma.latest_run`)
+            runs        each of those artifacts' runs, a run's row keyed by its
+                        artifact's id (conformance copies no run of this engine)
+            scenarios   each scenario a run-stream inlet names
+            candidates  the evidence pool whole: the extractor's candidates
+            decisions   and the reviewers' decisions, since a value binds the
+                        records of its field that the pool holds, and its words
+                        count each record the value leaves out
+            catalogue   every strain the project keeps: a simulation names its
+                        strain, and pureOS reads that strain's species, and the
+                        one species of its chemical set, from all of them
+                        (vessel._organism_read, proforma._strain_labels)
+
+        The pool reads the titles of the project's documents too, for its
+        search alone; no train's value or words read them, so the copy
+        leaves them out."""
+        from .. import proforma
+
+        held: set[str] = set()
+        scenarios: set[str] = set()
+        for _, spec, _ in _trains():
+            inlet = spec.inlet
+            named = [inlet.ref, inlet.vessel] if inlet.kind == "simulation" else [inlet.ref] if (
+                inlet.kind == "run-stream") else []
+            for ref in filter(None, named):
+                if train_spec.ARTIFACT_ID.fullmatch(ref):
+                    held.add(ref)
+                elif inlet.kind == "run-stream":
+                    scenarios.add(ref)
+                    newest = proforma.latest_run(ref)
+                    if newest is not None:
+                        held.add(newest.id)
+        ids = sorted(held)
+        return {"trains": None, "artifacts": {"id": ids}, "runs": {"id": ids}, "scenarios": {"id": sorted(scenarios)},
+                "candidates": None, "decisions": None, "catalogue": {"kind": ["strain"]}}
+
+    def unready(self, thing: str, inputs: list[EngineInput]) -> str | None:
+        """Why a train cannot be checked as it stands, in words that say what
+        it is, or None when its run with `inputs` would compute: a saved draft,
+        which the train's validation refuses (a train with no unit, an outlet
+        routed nowhere), in the validation's words; a train whose values wait
+        for a source, each of its run's refusals a value or a unit's need that
+        waits; or a train whose run is refused for another reason before it
+        computes (an input naming a place the train lacks among them), in the
+        run's words. Runs nothing and keeps nothing: the worker is asked only
+        what the scopes read, as `POST /api/pureos/train/check` asks it."""
+        spec = self._train(thing, None)
+        drafted = train_spec.validate(spec)
+        if drafted:
+            return f"{DRAFT}: {'; '.join(drafted)}"
+        try:
+            checked = train_spec.check_train(spec, list(inputs), None)
+        except REFUSALS as e:
+            return f"{REFUSED}: {_refused(e)}"
+        if checked.ok:
+            return None
+        label = WAITS if all(WAITING.search(w) for w in checked.refusals) else REFUSED
+        return f"{label}: {'; '.join(checked.refusals)}"
 
 
 ENGINE = TrainEngine()

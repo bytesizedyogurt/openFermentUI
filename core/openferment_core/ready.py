@@ -305,46 +305,31 @@ def things_are(name: str) -> str | None:
     return str(said) if said else None
 
 
-def on_production() -> bool:
-    """Whether the configured database is the production one, which the
-    checks of an engine whose things are a project's own refuse
-    (engine/conform.py `in_project`), as `pnpm db:reset` refuses it."""
-    from .db.engine import PRODUCTION_NAME, database_url
-
-    try:
-        return (database_url().database or "") == PRODUCTION_NAME
-    except db.DatabaseUnavailable:
-        return False
-
-
 def conform_command(name: str) -> str:
     """The command that checks an engine here, in words: with `--inputs
     <file>` and the builder that writes the file, for an engine whose things
     wait for values (CONFORM_INPUTS); with `--project <id>` for an engine
-    whose things are a project's own (`things_are`), in a project of this
-    database that holds one of them."""
+    whose things are a project's own (`things_are`), naming a project of this
+    database that holds one of them. The checks read that project and run on
+    a copy of it in a database of their own (engine/conform.py `in_project`),
+    so the command runs on any database, the production one among them."""
     command = f"python -m openferment_core.engine.conform {name}"
     if name in CONFORM_INPUTS:
         return f"{command} --inputs <file>, the file {CONFORM_INPUTS[name]} writes"
     held = things_are(name)
     if held:
-        return f"{command} --project <id>, in a project of this database that holds one of its things ({held})"
+        return (f"{command} --project <id>, naming a project of this database that holds one of its things ({held}); "
+                "the checks run on a copy of it")
     return command
-
-
-def unchecked_on_production(name: str) -> str:
-    """Where an engine whose things are a project's own is checked, in
-    words, when the configured database is the production one: in a project
-    of a development database, and by `pnpm prove` in the proof's own."""
-    return (f"checked in a project of a development database that holds one of its things ({things_are(name)}): "
-            f"python -m openferment_core.engine.conform {name} --project <id> there, and pnpm prove makes the checks "
-            "in the proof's own project (step 10); the checks make runs in the project they check")
 
 
 def check_engines() -> list[Check]:
     """One row per engine registered here (docs/api/engines.md): its version,
-    its worker, and its last conformance verdict at that version. An engine
-    that fails to load is a warning: the service runs on without it."""
+    its worker, and its last conformance verdict at that version, with the
+    command that checks it again (`conform_command`), or, for an engine whose
+    things are a project's own and that names nothing they rest on, the words
+    saying why no command checks it (`conform.unrested`). An engine that
+    fails to load is a warning: the service runs on without it."""
     from .engine import conform, contract, registry
 
     rows: list[Check] = []
@@ -364,15 +349,16 @@ def check_engines() -> list[Check]:
                                                                        if name in CALLS_WORKER else ""))
         verdict = conform.latest(name)
         again = conform_command(name)
-        if verdict is None and things_are(name) and on_production():
-            mark, said = "skip", unchecked_on_production(name)
+        unchecked = conform.unrested(e)
+        if unchecked:
+            mark, said = "warn", unchecked
         elif verdict is None:
             mark, said = "warn", f"never checked here: {again}"
         elif verdict.version != version:
             mark, said = "warn", f"checked at {verdict.version}; check it again: {again}"
         elif not verdict.ok:
             failed = ", ".join(str(c.number) for c in verdict.checks if not c.ok)
-            mark, said = "warn", f"checks {failed} failed at {verdict.at}; {again} says why"
+            mark, said = "warn", f"checks {failed} failed at {verdict.at}; to see why, run {again}"
         else:
             mark, said = "ok", f"every conformance check held at {verdict.at}"
         rows.append(Check(f"engine {name}", mark, f"{version}; {worker}; {said}"))

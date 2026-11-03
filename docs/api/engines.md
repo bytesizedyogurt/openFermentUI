@@ -58,7 +58,9 @@ An engine from outside the core is built on `openferment_core.engine.WorkerEngin
 implements every method over four worker ops: the package declares the engine's name, its worker,
 its distributions and the heavy modules its worker computes with (`heavy`, which conformance
 check 6 holds), and writes the worker. The table lists what the service asks of every engine, the
-core's own `biosteam`, `kinetics` and `train` among them.
+core's own `biosteam`, `kinetics` and `train` among them. A package whose things are a project's
+own declares `things_are`, `rests_on` and `unready` as attributes and methods of the engine
+object, which runs in the service's process.
 
 | Name | Type | What it is |
 |---|---|---|
@@ -67,7 +69,9 @@ core's own `biosteam`, `kinetics` and `train` among them.
 | `heavy` | `tuple[str, ...]` | The modules the worker computes with, which the service keeps out of its process (conformance check 6); each name covers its module and every module below it (`a.b` covers `a.b` and `a.b.c`). `()` for an engine that computes with nothing heavy. The service keeps `biosteam`, `thermosteam`, `biorefineries`, `pisces_sff` and `cobra` out for every engine, whatever it declares |
 | `version()` | `dict[str, str]` | The distributions the engine runs on, each with the version its installed metadata records: `{"openferment-engine-example": "0.1.0"}`; a distribution that is not installed reads `"not installed"`, and enters the version string so. It is the run's `versions`, and it enters every run's id. It changes whenever the engine's computation changes: an editable install keeps its version across edits of its code, so a new version goes with every change to what a run computes (installed again, as above), and the service then computes the request afresh |
 | `things()` | `list[EngineThing]` | What the engine can run, each with its configurations and its precision. The service asks it afresh on every listing and every run, in the request's project, so an engine may list what the project holds: the kinetics engine lists its forecast while the project keeps a fit, and the train engine lists each train the project holds. A `WorkerEngine` keeps its worker's first answer for the life of the process (below) |
-| `things_are` | `str`, optional | Words saying what the engine's things are, declared by an engine every one of whose things is a project's own: the train engine's are `a project's trains, each saved in pureOS's Builder or built by a model`. `GET /api/engines` lists them as `thingsAre`, so a project that holds none of the things says what one would be. A database made for the checks holds none of them, so such an engine is checked in a project named (`--project`, Conformance, below), and `pnpm ready` names that command (on the production database it says where the checks run). An engine that declares none is checked on a database of its own |
+| `things_are` | `str`, optional | Words saying what the engine's things are, declared by an engine every one of whose things is a project's own: the train engine's are `a project's trains, each saved in pureOS's Builder or built by a model`. `GET /api/engines` lists them as `thingsAre`, so a project that holds none of the things says what one would be. A database made for the checks holds none of them, so such an engine is checked in a copy of a project the command names (`--project`, Conformance, below), and `pnpm ready` names that command on every database, the production one among them. An engine that declares none is checked on a database of its own |
+| `rests_on()` | `dict[str, dict[str, list[str]] \| None]`, required beside `things_are` | What the current project's things rest on, as rows by table. Each key is a table of the `openferment` schema that holds a project's rows, one with a `project_id` column (`core/openferment_core/db/models.py`); its value is `None` for every row of the project in the table, or the columns that pick the rows, each with the values it holds (`{"id": [...]}`). Conformance copies those rows into a database of its own, the project's own row always among them (Conformance, below). It reads the store and writes nothing. An engine that declares `things_are` with no `rests_on` loads and runs; conformance refuses it in words, and `pnpm ready` says those words in its row |
+| `unready(thing, inputs)` | `str` or `None`, optional, beside `things_are` | Why a thing cannot be checked as it stands, in words saying what it is, or `None` when a run of it with `inputs` would compute; it runs nothing and keeps nothing. Conformance leaves out each thing it gives words for, and lists the thing with them; with no `unready`, every thing is checked. The train engine says `a saved draft, which cannot be built as it stands`, with its validation's words; `a train whose values wait for a source`, with the words of its run's check; or `a train whose run is refused before it computes`, with the run's words |
 | `parameters(thing, configuration)` | `list[EngineParameter]` | What one thing takes: each parameter a `ParameterSpec` with its default and the default's origin, or with none for a parameter a run sets |
 | `run(thing, configuration, inputs, by)` | `EngineRun` | One run, kept as one `runs` row. `inputs` is a list of `EngineInput`, each a named `Quantity`; `by` names the person or the model asking |
 | `replay(run)` | `ReplayResult` | The run computed again from its basis alone, each output held within the stated precision |
@@ -397,7 +401,8 @@ the simulator starts; a vessel's route that worker cannot answer is a 503 naming
 `openferment_core.pureos.engine:ENGINE`, registered by `core/pyproject.toml`, puts pureOS's
 trains behind the contract as pureOS runs them. `worker` and `heavy` are the biosteam engine's: a
 train is built and run in the Proforma worker, and importing the module imports neither. Every
-thing is a project's own, so the engine declares `things_are`.
+thing is a project's own, so the engine declares `things_are`, `rests_on` (the rows a train's
+resolution reads, Conformance, below) and `unready`.
 
 | Thing | Configurations | A run of it |
 |---|---|---|
@@ -465,7 +470,9 @@ registered.
 
 - `--thing <id>`, as often as needed, narrows the checks to those things, in the order named;
   the first named is the one run, and an id the engine runs none of is refused in words. With
-  none, every thing's parameters are read and the engine's first thing is run.
+  none, every thing's parameters are read and the engine's first thing is run. With `--project`
+  (below), each thing named is run. An option given with no value is refused in words naming
+  what it takes (`--project needs a project's id`).
 - `--inputs <file>` names a JSON list of `EngineInput`s the checked run sets, for a thing whose
   parameters leave a value to the run. With none, the run is made at the thing's own defaults.
   Every kinetics family waits for values no default gives:
@@ -478,27 +485,65 @@ registered.
   engine lists only while the project holds what it takes is left out of them: the kinetics
   engine's `forecast` and `vessel`, whose parameters and runs `core/tests/test_engines.py`
   holds.
-- `--project <id>` makes the checks in that existing project of the configured database
-  (`core/.env`), for an engine whose things are a project's own (`things_are`): the train
-  engine's things are a project's trains, so `conform train --project <id>` runs a train that
-  project holds. The checks run one thing there: the first `--thing` names, else the first the
-  project holds that runs. A thing passed over before it (one whose parameters cannot be read, a
-  saved draft with no unit among them, or one whose run is refused in words with nothing kept, a
-  value that waits) is said in check 3's words. They run it on a basis of their own: with no
-  `--inputs`, check 3's run sets one parameter at its own default, the first with a default
-  whose source rule takes a run's value, as the checks' assumption (`by` `conformance check of
-  train`, dated the day they run), so check 8's model sets that value as its estimate on the same
-  thing. The checks' runs and the runs a person of the project asks for keep rows of their own,
-  in either order. The runs the checks make stay in the project, each in the name of the checks or
-  of check 8's model.
-- The production database (`openferment`) is refused in words, as `pnpm db:reset` refuses it,
-  and so is a project the database does not hold; either refusal exits 2. On the production
-  database a project's things are checked elsewhere: in a project of a development database, and
-  by `pnpm prove` step 10, which makes a train in its own project on its own database and checks
-  the train engine there; `pnpm ready` says so in the engine's row there (`·`, checked in a
-  project of a development database). An engine that declares `things_are`, checked with no
+- `--project <id>` checks the things that project of the configured database (`core/.env`)
+  holds, for an engine whose things are a project's own (`things_are`): the train engine's things
+  are a project's trains, so `conform train --project <id>` checks the trains that project holds.
+  The checks read the project and run on a copy of it:
+  - **What is read.** The project's own row, and the rows the engine's `rests_on()` names, each
+    whole, read from the configured database, where the checks write their verdict alone. The
+    train engine names every train the project holds; each artifact a train's inlet reads, by its
+    id, with its run's row where the project keeps one (a simulation and its vessel design, a
+    run's artifact, a scenario's newest run); the scenarios a run-stream inlet names; the evidence
+    pool whole, every candidate and every decision, since a value binds the records of its field
+    that the pool holds and its words count each record the value leaves out; and every strain the
+    project keeps, since a simulation names its strain, and pureOS reads that strain's species, and
+    the one species of its chemical set, from all of them. The pool also reads the titles of the
+    project's documents for its search; the copy leaves them out, and every value and every word of
+    a train reads the same in the copy as in the project.
+  - **Where the checks run.** A database of the checks' own, made on the configured server and
+    migrated, holds those rows under the same ids in a project of the same id; every session of
+    the checks is a savepoint of one transaction there. The database is dropped when the checks
+    end, however they end: a check that raises, Ctrl-C, `SIGTERM` or `SIGHUP`. A process killed
+    outright (`SIGKILL`, a machine that stops) leaves it on the server, named
+    `openferment_conform_<engine>_<eight hex digits>` and holding the migrated schema and no row,
+    since every row the checks write stays in a transaction they never commit; `cd core && uv run
+    python -m openferment_core.migrations drop <name>` drops it, and `pnpm prove` asks a run that
+    outlives its time to end (`SIGTERM`) before it kills it. A runs row of the engine being
+    checked is left out of the copy, so every runs row of a thing there is one the checks made, in
+    their name or check 8's model's: a person's earlier run of a train changes nothing, and the
+    checks' run of a train at the values a person's run set keeps that run's id, its row the
+    checks' own. An artifact is copied as its id is named: a train run that another train's inlet
+    reads is copied as its artifact, so the checks' run of the first train at that run's values is
+    answered from that artifact, and check 4's replay computes it again.
+  - **What is checked.** Each thing `--thing` names, in order, as named; else each thing the
+    copy holds that can run. The values `--inputs` names are set on every thing checked. A thing
+    the engine says cannot run as it stands (`unready`: a saved draft, a train whose values wait
+    for a source, a train whose run is refused before it computes) is left out, and listed with
+    its words: a train that lacks a place a value names is refused that way, so `--thing` narrows
+    the file's values to the trains they fit. Checks 3, 4, 5 and 8 run on every thing checked,
+    each holding when it holds on every one, its words each thing's in turn; check 2 reads the
+    parameters of every thing checked; checks 1, 6 and 7 run once for the engine, check 1 on the
+    first thing. Check 3's words end with where the checks ran and how many rows were copied, then
+    the things left out, each numbered, with its words.
+  - **What is written.** The verdict alone, one row of the configured database's `engine_checks`,
+    replacing the engine's last; `GET /api/engines` and `pnpm ready` read it there. The row is the
+    machine's, no project's, so the verdict it keeps gives counts in each check's words (the things
+    checked and the things left out), naming no project, thing or run; the command's own table
+    gives each thing's words. Each command keeps one verdict for the engine, so a project whose
+    trains wait for different values is held by its last command's verdict.
+- The production database (`openferment`) is read as any other: the live host checks its own
+  projects' trains with the same command, and `pnpm ready` names it there. A project the database
+  does not hold is refused in words, and so is a project that holds no thing that can run: one
+  that holds none of the engine's things is told what they are, and one whose every thing is left
+  out is given the list, each with its words, and the ways on (make a thing that runs, set the
+  values a waiting thing needs with `--inputs <file>`, or name one with `--thing <id>` to check
+  it as it stands). Either refusal exits 2, keeps nothing, and leaves the engine's last verdict
+  standing. An engine that declares `things_are` with no `rests_on` is refused the same way, with
+  or without `--project`, and an engine that declares no `things_are`, asked with `--project`, is
+  told it is checked with none. An engine that declares `things_are`, checked with no
   `--project`, is refused in words saying what its things are and naming the command, and exits
-  2.
+  2. `pnpm prove` step 10 makes a train in the proof's own project and checks the train engine
+  with `--project` there.
 - Each thing is checked in its default configuration, or in the first it names when it has no
   default.
 - Check 2 holds every default to an origin naming what it rests on (a library-default, a record
@@ -515,11 +560,11 @@ registered.
   asked again is answered from the receipt with the worker's `run` op never asked; a hand-written
   engine (`biosteam`) refuses the unknown thing in words, keeping nothing. Check 8 asks a second
   run in a model's name, on a basis of its own: with no values set, through the `engine_run` tool
-  on another thing checked, or else another configuration of the first; with values set, or with
-  no second basis, through the run itself, the checked run's values as the model's estimates,
-  or, with none set, one parameter at its own default: the first whose source rule takes a run's
-  value (`assumption`), else the first with a default. Each estimate is dated the day the check
-  runs.
+  on another thing checked, or else another configuration of the first; with values set, with
+  no second basis, or with every thing checked (`--project`: check 3 has run each thing already),
+  through the run itself, the checked run's values as the model's estimates, or, with none set,
+  one parameter at its own default: the first whose source rule takes a run's value
+  (`assumption`), else the first with a default. Each estimate is dated the day the check runs.
 
 | # | Check |
 |---|---|

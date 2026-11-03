@@ -100,10 +100,19 @@ Option 2.
   2.2). Its things are the project's own trains, each pureOS's Builder saved and each a model
   built, read afresh on every ask, none taking a configuration. A database made for the checks
   holds none, so the engine declares what its things are (`things_are`, listed by `GET
-  /api/engines` as `thingsAre`) and conformance runs it in a project that holds a train
-  (`conform train --project <id>`): one train, the first named or the first that runs, on a basis
-  of the checks' own, so their rows and a person's keep apart. The production database is
-  refused in words, and there `pnpm ready` says where the checks run. The proof makes a train from
+  /api/engines` as `thingsAre`), what they rest on (`rests_on`: every train, the artifacts each
+  inlet reads with their runs' rows, the scenarios an inlet names, the evidence pool, the
+  project's strains) and which it cannot check as it stands (`unready`: a saved draft, a train
+  whose values wait for a source, a train whose run is refused before it computes). Conformance
+  checks a copy of a person's project: `conform train --project <id>` reads those rows from the
+  configured database, copies them under the same ids into a project of a database of its own,
+  checks every train there that can run (each left out listed with its words), and drops that
+  database however the checks end (a check that raises, Ctrl-C, `SIGTERM`, `SIGHUP`). Its one
+  write where it read is its verdict in `engine_checks`, the machine's row, whose words give
+  counts and name no project, train or run. A runs row of the engine being checked is left out of
+  the copy, so every runs row of a train there is one the checks made, and a person's earlier run
+  of a train changes nothing. The command runs on the live host's production database as on any
+  other, where `pnpm ready` names it. The proof makes a train from
   step 4's corn stover run through pureOS's from-run and checks it there in step 10: the tail of
   the read train after its last unit whose values wait (at these pins the four units from T701
   on, none of them a separation, which a debt in `docs/PROGRESS.md` holds). Its parameters are
@@ -197,10 +206,17 @@ importer (ADR-003).
   by place together, with the train's own refusals, in one set of words at both doors; a row keeps
   its outputs and its file's words, a worker's failure keeping no row; a train run replays
   identically; a train stands on a library run; `conform train --project` holds all eight checks
-  in a project with a train, beside a person's run of it and past a draft and a train that waits,
-  and with no project names the command in words; `pnpm ready` on the production database says
-  where the checks run. With the `sim` marker, a real train's row, its outputs, the worker's words
-  and its identical replay, and the worker's file step building nothing while the toolkit's
-  schema requires a TEA year. `core/tests/test_engine_pins.py` holds the train's artifact id
-  through the inputs. `pnpm prove` step 10 makes the eight checks on `train` in the proof's
-  project.
+  on each train of a copy of the project, every row of the project the same byte for byte after
+  them and the verdict the one row written, a person's earlier run of a train changing nothing, a
+  draft and a train that waits listed as such and left out, a project with no train that can run
+  refused in words, and the command run with the configured address naming the production
+  database (`openferment`), its every engine held off a database of that name and its verdict the
+  one row written, where `pnpm ready` names the command; the verdict kept names no project, train
+  or run; the copy holds every table and every row a train's resolution reads, and resolves each
+  train as the project does (a copy that leaves one out fails); the checks' database is dropped
+  when SIGTERM ends the command and when a rollback cannot close; with no project the command
+  names `--project` in words. With the `sim` marker, a real train's row, its outputs, the
+  worker's words and its identical replay, and the worker's file step building nothing while the
+  toolkit's schema requires a TEA year. `core/tests/test_engine_pins.py` holds the train's
+  artifact id through the inputs. `pnpm prove` step 10 makes the eight checks on `train` in the
+  proof's project.

@@ -28,9 +28,21 @@ placeholders conformance builds, in the test's database and on a scratch one.
 Stage C (D5): the train engine registered by the core's own entry point, its
 things the project's trains read afresh, its parameters each with the origin
 its resolution names, a run one row at every door, a value that waits keeping
-nothing and the worker's refusal a receipt, the eight checks holding on it in
-a project with a train (`--project`), and the command without one refused in
-words naming it.
+nothing and the worker's refusal a receipt, the eight checks holding on each
+train of a copy of a project (`--project`), and the command without one
+refused in words naming it. Stage C.3b (D5's amendment): the checks read a
+project and check a copy of it on a database of their own, so the project
+holds the same rows, byte for byte, after them, beside the verdict, and a
+person's earlier run of a train changes nothing; a draft and a train that
+waits are listed as such and left out, numbered, a project with no train that
+can run is refused in words saying the ways on, and the command runs with the
+configured address naming the production database, every engine held off a
+database of that name, its verdict the one row written; the verdict kept
+gives counts and names no project, train or run; the copy holds every row a
+train's resolution reads; the checks' database is dropped when SIGTERM ends
+the command and when a rollback cannot close; and `pnpm ready` says why a
+failed engine fails and why no command checks an engine that names nothing
+its things rest on.
 """
 from __future__ import annotations
 
@@ -479,8 +491,15 @@ def test_the_checks_run_with_the_values_they_are_given(engines):
 def test_the_command_takes_things_inputs_and_a_project_and_refuses_anything_else(tmp_path):
     assert conform._options(["--thing", "a", "--thing", "b", "--inputs", "x.json"]) == (["a", "b"], "x.json", None)
     assert conform._options(["--project", "a-project"]) == ([], None, "a-project")
-    with pytest.raises(conform.ConformRefused, match="no option here"):
+    with pytest.raises(conform.ConformRefused, match="unknown option --things: the options are --thing <id>"):
         conform._options(["--things", "a"])
+    # An option with no value says what it takes, whether it ends the line or another option follows it.
+    for argv, says in ((["--project"], "--project needs a project's id"), (["--thing", "--project", "p"],
+                                                                         "--thing needs a thing's id"),
+                       (["--inputs"], "--inputs needs a file")):
+        with pytest.raises(conform.ConformRefused) as refused:
+            conform._options(argv)
+        assert conform._words(refused.value) == says
     path = tmp_path / "inputs.json"
     path.write_text(json.dumps([{"name": "a-parameter", "quantity": person(2.0)}]))
     assert [i.name for i in conform._read_inputs(str(path))] == ["a-parameter"]
@@ -1592,16 +1611,19 @@ def test_the_conform_command_holds_all_eight_on_kinetics_on_a_scratch_database(k
 # TrainWorker with no record pool, as test_train runs it; a record a value
 # binds from is test_pureos_build_tool's STAND-IN.
 
+from openferment_core import db  # noqa: E402
 from openferment_core.pureos import engine as train_engine  # noqa: E402
 from openferment_core.pureos import kept as kept_trains  # noqa: E402
 from openferment_core.pureos import train_spec  # noqa: E402
 from test_train import AT as TRAIN_AT  # noqa: E402
 from test_train import BY as TRAIN_BY  # noqa: E402
 from test_train import VERSIONS as TRAIN_VERSIONS  # noqa: E402
-from test_train import TrainWorker, spec_of  # noqa: E402
+from test_train import TrainWorker, spec_of, typed  # noqa: E402
 
 TRAIN_ENTRY = "openferment_core.pureos.engine:ENGINE"
 TRAIN = train_engine.ENGINE
+# The project's evidence pool as pureOS reads it, before `train_engines` hands in none.
+PROJECT_POOL = train_spec._pool
 
 
 @pytest.fixture
@@ -1639,33 +1661,56 @@ def test_the_service_registers_train_through_its_own_entry_point():
         biosteam = registry.get("biosteam")
         assert (TRAIN.worker, TRAIN.heavy) == (biosteam.worker, biosteam.heavy)
         assert TRAIN.version() == {**biosteam.version(), "train run": train_spec.VERSION_WORDS.rsplit(" ", 1)[1]}
-        assert ready.conform_command("train") == ("python -m openferment_core.engine.conform train --project <id>, in "
-                                                  "a project of this database that holds one of its things "
-                                                  f"({TRAIN.things_are})")
+        assert ready.conform_command("train") == ("python -m openferment_core.engine.conform train --project <id>, "
+                                                  "naming a project of this database that holds one of its things "
+                                                  f"({TRAIN.things_are}); the checks run on a copy of it")
         assert ready.things_are("biosteam") is None and ready.conform_command("biosteam") == (
             "python -m openferment_core.engine.conform biosteam")
     finally:
         registry.reset()
 
 
-def test_ready_says_where_the_train_engine_is_checked_when_the_database_is_the_production_one(train_engines,
+def test_the_conform_command_reads_the_production_database_and_writes_there_its_verdict_alone(train_engines,
                                                                                                 test_database,
-                                                                                                monkeypatch):
-    """The checks of an engine whose things are a project's own never run on
-    the production database (conform.in_project), so `pnpm ready` there says
-    where they run."""
+                                                                                                monkeypatch, capsys):
+    """The live host's database is the production one (`openferment`). With
+    the configured address naming the production database, `pnpm ready`
+    names the command as it names it on any database; the command reads the
+    project and checks a copy of it on a database of its own, and the one row
+    it writes where it read is its verdict. Every session here reaches the
+    test's own database through its binding, and every engine the command
+    makes is held off a database named `openferment`, so a path that made an
+    engine of its own from the configured address fails here before it
+    reaches a server's real database of that name."""
+    import importlib
+
+    # The module that makes every engine (db.make_engine), which `openferment_core.db.engine` names as a function.
+    db_engine = importlib.import_module("openferment_core.db.engine")
+    made, reached = db_engine.create_async_engine, []
+
+    def held_off(url, *args, **kwargs):
+        if getattr(url, "database", None) == db.PRODUCTION_NAME:
+            reached.append(url.render_as_string(hide_password=True))
+            raise AssertionError(f"an engine was made for the production database: {reached[-1]}")
+        return made(url, *args, **kwargs)
+
+    _saved(spec_of())
     server = test_database.server.render_as_string(hide_password=False)
+    monkeypatch.setattr(db_engine, "create_async_engine", held_off)
+    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", server.rsplit("/", 1)[0] + "/" + db.PRODUCTION_NAME)
     rows = {c.name: c for c in ready.check_engines()}
-    assert rows["engine train"].mark == "warn" and "never checked here: python -m" in rows["engine train"].detail
-    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", server.rsplit("/", 1)[0] + "/openferment")
-    assert ready.on_production()
+    assert rows["engine train"].mark == "warn" and rows["engine train"].detail.endswith(
+        f"never checked here: {ready.conform_command('train')}")
+    before = _every_row()
+    assert conform.main(["train", "--project", TEST_PROJECT]) == 0, capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert printed.count("✓") == 8 and "every check holds" in printed
+    after = _every_row()
+    assert _changed(before, after) == ["openferment.engine_checks"]
+    assert len(after["openferment.engine_checks"]) == 1 and conform.latest("train").ok
     rows = {c.name: c for c in ready.check_engines()}
-    said = rows["engine train"]
-    assert said.mark == "skip" and said.detail.endswith(
-        "checked in a project of a development database that holds one of its things "
-        f"({TRAIN.things_are}): python -m openferment_core.engine.conform train --project <id> there, and pnpm prove "
-        "makes the checks in the proof's own project (step 10); the checks make runs in the project they check")
-    assert rows["engine biosteam"].mark == "warn" and "never checked here" in rows["engine biosteam"].detail
+    assert rows["engine train"].mark == "ok" and "every conformance check held" in rows["engine train"].detail
+    assert reached == []
 
 
 def test_get_api_engines_lists_train_with_the_projects_trains_read_afresh(train_engines):
@@ -1806,11 +1851,11 @@ def test_the_conform_command_checks_train_in_a_named_project_and_refuses_without
     assert held.ok and held.version == contract.version_string(TRAIN)
     assert conform.main(["train", "--project", "no-such-project"]) == 2
     assert "holds no project 'no-such-project'" in capsys.readouterr().out
-    # The production database is refused, as pnpm db:reset refuses it, before anything runs.
-    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", server.rsplit("/", 1)[0] + "/openferment")
-    assert conform.main(["train", "--project", TEST_PROJECT]) == 2
-    assert "database 'openferment' is the production one, and the checks make runs in the project they check" in (
-        capsys.readouterr().out)
+    # An engine that declares no things_are is checked on a database of its own, with no --project.
+    assert conform.main(["biosteam", "--project", TEST_PROJECT]) == 2
+    assert ("the biosteam engine declares no things_are, so its things are checked in a project made for the checks "
+            "on a database of their own: python -m openferment_core.engine.conform biosteam, with no --project"
+            in capsys.readouterr().out)
 
 
 def test_both_doors_refuse_a_trains_bad_inputs_together_by_place_in_one_set_of_words(train_engines):
@@ -1838,59 +1883,443 @@ def _conform_here(test_database, monkeypatch) -> None:
     monkeypatch.setenv("OPENFERMENT_DATABASE_URL", test_database.server.render_as_string(hide_password=False))
 
 
-def test_conform_in_a_project_runs_on_a_basis_of_its_own_beside_a_persons_run_of_the_train(train_engines,
-                                                                                           test_database,
-                                                                                           monkeypatch):
-    """A person of the project ran the train at its own values before the
-    checks, and asks for it again after them: the checks run on a basis of
-    their own (one parameter at its own default as their assumption), so
-    check 8 holds, the person's row stays theirs, and the person's later
-    request is answered from their own row."""
-    _saved(spec_of())
-    client = TestClient(api.app)
-    body = {"train": spec_of().model_dump(mode="json"), "by": "A. Stranger"}
-    mine = client.post("/api/pureos/train/run", json=body).json()["artifactId"]
-    _conform_here(test_database, monkeypatch)
-    v = conform.in_project("train", TEST_PROJECT, by="conformance check of train")
-    assert v.ok, [(c.number, c.said) for c in v.checks if not c.ok]
-    assert "of t1 with 1 value set" in v.checks[2].said
-    held = {r.id: r.by for r in runs.listed("train")}
-    assert held[mine] == "A. Stranger" == conform._created_by(mine)
-    assert sorted(held.values()) == sorted(["A. Stranger", "conformance check of train", conform.MODEL])
-    assert client.post("/api/pureos/train/run", json={**body, "by": "Ada Moreno"}).json()["artifactId"] == mine
-    checked = next(r for r in runs.listed("train") if r.by == "conformance check of train")
-    own = [i for i in checked.inputs if i.quantity.origin is not None and i.quantity.origin.by == checked.by]
-    assert [i.name for i in own] == ["inlet.broth_flow"] and conform.OWN_BASIS_NOTE in (own[0].quantity.origin.note or "")
+def _every_row() -> dict[str, list[str]]:
+    """Every row of every table of the openferment and sci_rag schemas, each
+    as PostgreSQL writes the row out as text, by table: what "the same rows,
+    byte for byte" is held to."""
+    from sqlalchemy import text
+
+    async def read() -> dict[str, list[str]]:
+        async with db.session() as s:
+            names = (await s.execute(text(
+                "SELECT table_schema || '.' || table_name FROM information_schema.tables WHERE table_schema IN "
+                "('openferment', 'sci_rag') AND table_type = 'BASE TABLE' ORDER BY 1"))).scalars().all()
+            out = {}
+            for name in names:
+                schema, table = name.split(".", 1)
+                out[name] = sorted((await s.execute(text(f'SELECT x::text FROM "{schema}"."{table}" x'))).scalars())
+        return out
+
+    return db.run(read())
 
 
-def test_conform_in_a_project_passes_over_a_draft_and_a_train_that_waits_and_checks_the_first_that_runs(
+def _changed(before: dict[str, list[str]], after: dict[str, list[str]]) -> list[str]:
+    """The tables whose rows differ between two reads of `_every_row`."""
+    return sorted(n for n in {*before, *after} if before.get(n) != after.get(n))
+
+
+CHECKS_BY = "conformance check of train"
+# test_train's STAND-IN flash, alone: a train of it stands on a stream that carries no cells.
+FLASH = [{"id": "F1", "type": "flash", "params": {"P": typed(101325.0), "V": typed(0.1)},
+          "outlets": {"vapour": "waste", "liquid": "onward"}}]
+
+
+def test_conform_in_a_project_checks_each_train_in_a_copy_and_a_persons_earlier_run_changes_nothing(
         train_engines, test_database, monkeypatch):
-    """The checks run one thing in a named project: the first that runs. A
-    saved draft with no unit and a train whose value waits come first here;
-    each is passed over with its words and nothing kept, and every check
-    holds on t1, check 8's model on t1 too."""
+    """The checks read the project and run on a copy of it in a database of
+    their own: each train the project holds is checked, all eight hold, and
+    the project holds the same rows, byte for byte, after them, beside the
+    verdict. A person of the project ran a train before the checks: its run
+    made afresh in the copy is the person's run's id, created by the checks,
+    and the person's row is as it was. The verdict kept gives counts and
+    names no project, train or run. With a value set (`--inputs`), the train
+    that lacks the value's place is left out, refused, and the train it fits
+    is checked with it."""
+    _saved(spec_of())
+    _saved(spec_of(id="t2", name="Another test train", units=FLASH))
+    client = TestClient(api.app)
+    mine = client.post("/api/pureos/train/run", json={"train": spec_of().model_dump(mode="json"),
+                                                      "by": "A. Stranger"}).json()["artifactId"]
+    _conform_here(test_database, monkeypatch)
+    before = _every_row()
+    v = conform.in_project("train", TEST_PROJECT, by=CHECKS_BY)
+    assert v.ok, [(c.number, c.said) for c in v.checks if not c.ok]
+    assert "parameters of 2 things (t1, t2)" in v.checks[1].said
+    three = v.checks[2].said
+    assert three.startswith(f"t1: run {mine} of t1, asked twice, is 1 row; engine train, status done") and (
+        "; t2: run " in three)
+    assert f"made in a copy of project {TEST_PROJECT} on a database of the checks' own" in three
+    assert "copied, and the verdict alone written to the database they were read from" in three
+    assert "left out" not in three
+    # A train replays with no tolerance, and its words say identical once.
+    assert v.checks[3].said == "t1: identical; 0 differences; t2: identical; 0 differences"
+    eight = v.checks[7].said
+    assert eight.startswith(f"t1: the checks' run: created_by {CHECKS_BY!r}") and (
+        f"; t2: the checks' run: created_by {CHECKS_BY!r}" in eight)
+    assert eight.count("1 value its estimate") == 2
+    assert _changed(before, _every_row()) == ["openferment.engine_checks"]
+    assert [(r.id, r.by) for r in runs.listed("train")] == [(mine, "A. Stranger")]
+    # The verdict kept is the machine's row: its words give counts and name no project, train or run.
+    kept = conform.latest("train")
+    assert kept == conform._counted(v, 2, 0) and [(c.number, c.ok) for c in kept.checks] == [
+        (c.number, c.ok) for c in v.checks]
+    words = json.dumps(kept.model_dump(mode="json"))
+    assert not [w for w in (TEST_PROJECT, "t1", "t2", mine) if w in words], words
+    assert kept.checks[2].said == ("held on each of the 2 things of a project, checked in a copy of it; the command's "
+                                   "own table gives the words")
+    assert kept.checks[0].said.startswith("held for the engine") and "over the parameters of the 2 things" in (
+        kept.checks[1].said)
+    # The values --inputs names are set on every train checked: one that lacks a value's place is left out, refused.
+    unit = {p.key: p.unit for p in TRAIN.parameters("t1", None)}["C1.split.Yeast"]
+    asked = [EngineInput(name="C1.split.Yeast", quantity=Quantity(value=0.9, unit=unit, origin={
+        "kind": "person-assumption", "by": "Ada Moreno", "at": DAY}))]
+    narrowed = conform.in_project("train", TEST_PROJECT, by=CHECKS_BY, inputs=asked)
+    assert narrowed.ok, [(c.number, c.said) for c in narrowed.checks if not c.ok]
+    three = narrowed.checks[2].said
+    assert " of t1 with 1 value set, asked twice, is 1 row" in three and "of t2" not in three
+    assert (f"; left out, 1 thing, each with its words: (1) t2, {train_engine.REFUSED}: C1.split.Yeast names 'C1', "
+            "which is no unit of train t2 and not its inlet") in three
+    assert conform.latest("train") == conform._counted(narrowed, 1, 1)
+    assert conform.latest("train").checks[2].said.startswith("held on the 1 thing of a project, checked in a copy of "
+                                                             "it, 1 more left out")
+
+
+def test_conform_in_a_project_lists_a_draft_and_a_train_that_waits_as_such_and_leaves_them_out(
+        train_engines, test_database, monkeypatch):
+    """A saved draft with no unit and a train whose values wait for what no
+    source gives are listed in check 3's words, each as what it is with its
+    own words, and left out; every check holds on the train that runs. A
+    thing named is checked as named, and a train that waits then fails check
+    3 in its words. The project holds the same rows after either."""
     _saved(spec_of(id="a0", name="A train that waits", units=[{"id": "D1", "type": "distillation"}]))
     _saved(spec_of(id="b0", name="A draft", units=[]))
     _saved(spec_of())
     _conform_here(test_database, monkeypatch)
-    v = conform.in_project("train", TEST_PROJECT, by="conformance check of train")
+    before = _every_row()
+    v = conform.in_project("train", TEST_PROJECT, by=CHECKS_BY)
     assert v.ok, [(c.number, c.said) for c in v.checks if not c.ok]
     three = v.checks[2].said
-    assert " of t1 with 1 value set" in three and "passed over before t1, each refused in words with nothing kept: " in three
-    assert "a0: unit D1 (distillation): light_key waits" in three and "b0: a train holds at least one unit" in three
+    assert three.startswith("run ") and " of t1, asked twice, is 1 row" in three
+    # The copy's words come first, then each thing left out, numbered, with its words.
+    copied = three.index("copied, and the verdict alone written to the database they were read from")
+    listed = three.index(f"; left out, 2 things, each with its words: (1) a0, {train_engine.WAITS}: unit D1 "
+                         "(distillation): light_key waits")
+    assert copied < listed and three.endswith(f"; (2) b0, {train_engine.DRAFT}: a train holds at least one unit")
     assert "(t1)" in v.checks[1].said and "a0" not in v.checks[1].said
-    assert {r.plant for r in runs.listed("train")} == {"t1"}
-    # Named, a thing is checked as named: a train that waits fails check 3 in its words.
-    named = conform.in_project("train", TEST_PROJECT, by="conformance check of train", things=["a0"])
-    assert not named.ok and "light_key waits" in named.checks[2].said
-    assert {r.plant for r in runs.listed("train")} == {"t1"}
+    named = conform.in_project("train", TEST_PROJECT, by=CHECKS_BY, things=["a0"])
+    assert not named.ok and "light_key waits" in named.checks[2].said and "left out" not in named.checks[2].said
+    assert _changed(before, _every_row()) == ["openferment.engine_checks"]
+    assert runs.listed("train") == []
 
 
-def test_conform_in_a_project_that_holds_no_train_that_runs_is_refused_in_words(train_engines, test_database,
-                                                                                 monkeypatch):
+def test_conform_in_a_project_that_holds_no_train_that_can_run_is_refused_in_words(train_engines, test_database,
+                                                                                    monkeypatch):
     _saved(spec_of(id="b0", name="A draft", units=[]))
     _conform_here(test_database, monkeypatch)
-    with pytest.raises(conform.ConformRefused, match="the project holds no thing of the train engine that runs "
-                                                     r"\(b0: a train holds at least one unit\): name one with --thing"):
-        conform.in_project("train", TEST_PROJECT, by="conformance check of train")
-    assert runs.listed("train") == []
+    before = _every_row()
+    with pytest.raises(conform.ConformRefused, match=re.escape(
+            "the project holds no thing of the train engine that can run as it stands; left out, 1 thing, each with "
+            f"its words: (1) b0, {train_engine.DRAFT}: a train holds at least one unit. Make one that runs; set the "
+            "values a waiting thing needs with --inputs <file>; or name one with --thing <id> to check it as it "
+            "stands")):
+        conform.in_project("train", TEST_PROJECT, by=CHECKS_BY)
+    assert _changed(before, _every_row()) == [] and conform.latest("train") is None
+
+
+def test_conform_in_a_project_that_holds_none_of_the_engines_things_says_what_they_are(train_engines, test_database,
+                                                                                       monkeypatch, capsys):
+    _conform_here(test_database, monkeypatch)
+    before = _every_row()
+    assert conform.main(["train", "--project", TEST_PROJECT]) == 2
+    assert capsys.readouterr().out.strip() == (f"✗ the project holds none of the train engine's things, which are "
+                                               f"{TRAIN.things_are}: make one there, then run the checks again")
+    assert _changed(before, _every_row()) == [] and conform.latest("train") is None
+
+
+def test_a_trains_rest_on_what_its_inlet_reads_the_pool_and_the_strains_and_unready_says_what_it_is(train_engines):
+    """What the copy takes of a project, as the train engine names it: every
+    train; each artifact a train's inlet reads, by id, with its run's row (a
+    simulation and its vessel design, a run, a scenario's newest run); the
+    scenarios an inlet names; the evidence pool whole; the strains. And what
+    each train the checks leave out is, in its words."""
+    from test_builder import RUN_ID, _keep
+
+    _keep()  # test_builder's STAND-IN run of scenario sc-k3x9q-1, its basis naming the scenario
+    simulation, design = "a0a0a0a0a0a0a0a1", "a0a0a0a0a0a0a0a5"
+    _saved(spec_of(id="s1", name="On a simulation", inlet={"kind": "simulation", "ref": simulation, "vessel": design}))
+    _saved(spec_of(id="r1", name="On a run", inlet={"kind": "run-stream", "ref": RUN_ID, "streamId": "s1"},
+                   units=FLASH))
+    _saved(spec_of(id="c1", name="On a scenario", inlet={"kind": "run-stream", "ref": "sc-k3x9q-1"}, units=FLASH))
+    _saved(spec_of(id="b0", name="A draft", units=[]))
+    _saved(spec_of(id="a0", name="A train that waits", units=[{"id": "D1", "type": "distillation"}]))
+    ids = sorted({simulation, design, RUN_ID})
+    assert TRAIN.rests_on() == {"trains": None, "artifacts": {"id": ids}, "runs": {"id": ids},
+                                "scenarios": {"id": ["sc-k3x9q-1"]}, "candidates": None, "decisions": None,
+                                "catalogue": {"kind": ["strain"]}}
+    said = {th.id: TRAIN.unready(th.id, []) for th in TRAIN.things()}
+    assert said["r1"] is None and said["c1"] is None
+    assert said["b0"] == f"{train_engine.DRAFT}: a train holds at least one unit"
+    assert said["a0"].startswith(f"{train_engine.WAITS}: unit D1 (distillation): light_key waits (")
+    assert said["s1"].startswith(f"{train_engine.REFUSED}: there is no kept artifact {simulation} here")
+    assert runs.listed("train") == [] and not [c for c in train_engines.calls if c[0] == "train_run"]
+
+
+def test_the_copy_holds_every_row_a_trains_resolution_reads_and_resolves_each_train_as_the_project_does(
+        train_engines, test_database, monkeypatch):
+    """A project whose trains rest on every kind of row a train's resolution
+    reads: records bound from the evidence pool (an extraction, a reviewer's
+    rejection of one of its candidates that moves what binds), a simulation
+    naming a strain of the catalogue, a person's earlier run of a train that
+    another train stands on, and a scenario whose newest run belongs to it
+    through the scenario's own row. Every table the resolution reads in the
+    project is one the copy takes, and the copy resolves each train as the
+    project does: its parameters, and the artifact a run of it computes (its
+    id, its output and its provenance). A copy that leaves out a table, or
+    the rows of one that a train reads, fails here. Every check then holds on
+    each train, the train a second one stands on among them."""
+    from sqlalchemy import event
+
+    from openferment_core import biorepo, catalogues, extract, project_state, projects
+    from openferment_core.models import ExtractResponse, Usage
+    from standins import plant_artifact
+    from test_builder import _keep
+    from test_catalogues import STRAIN
+    from test_evidence_pool import cand, decision
+    from test_vessel import keep, standin_simulation
+
+    monkeypatch.setattr(train_spec, "_pool", PROJECT_POOL)
+    # test_train's STAND-IN step records, as an extraction the project keeps; a reviewer accepted the first and
+    # rejected the second, so the first alone binds the centrifuge's split.
+    found = [cand("cl1-Q1-00000001", "Q1", "step_recovery", 90.0, "%", "after centrifugation the broth kept"),
+             cand("cl1-Q1-00000002", "Q1", "step_recovery", 80.0, "%", "after centrifugation the broth kept"),
+             cand("cl1-Q1-00000003", "Q1", "step_recovery", 50.0, "%", "after the chromatography column")]
+    extract._persist(ExtractResponse(paperId="Q1", extractedAt=f"{DAY}T00:00:00Z", candidates=found, audit=[],
+                                     usage=Usage(), calls=0))
+    db.run(biorepo._keep(projects.current(), decision("cl1-Q1-00000001", "verified"), found[0], undo=False))
+    db.run(biorepo._keep(projects.current(), decision("cl1-Q1-00000002", "rejected", rejectReason="a STAND-IN"),
+                         found[1], undo=False))
+    catalogues.keep(STRAIN, by="Ada Moreno")
+    simulation = "a0a0a0a0a0a0a0a2"
+    keep(simulation, {**standin_simulation(False), "strain": STRAIN.id})
+    # test_builder's STAND-IN runs of the scenario's flowsheet: one whose basis names the scenario, and a newer one
+    # kept before a basis named its scenario, which belongs to it through the scenario's row.
+    _keep()
+    newest = _keep("bbbbbbbbbbbbbbb3", scenario=None)
+    plant_artifact(newest.model_copy(update={"createdAt": "2026-10-22T10:00:00Z"}))
+    project_state.put("scenarios", "sc-k3x9q-1", {"id": "sc-k3x9q-1", "kind": "biosteam", "modelId": "ethanol_glucose_v0",
+                                                  "name": "A test scenario"}, by="Ada Moreno")
+    _saved(spec_of())
+    mine = TestClient(api.app).post("/api/pureos/train/run", json={"train": spec_of().model_dump(mode="json"),
+                                                                   "by": "A. Stranger"}).json()["artifactId"]
+    _saved(spec_of(id="s1", name="On a simulation", inlet={"kind": "simulation", "ref": simulation,
+                                                           "params": {"broth_flow": typed(1.0)}}))
+    _saved(spec_of(id="r1", name="On a person's run", inlet={"kind": "run-stream", "ref": mine, "streamId": "C1_liquid"}))
+    _saved(spec_of(id="c1", name="On a scenario", inlet={"kind": "run-stream", "ref": "sc-k3x9q-1"}, units=FLASH))
+
+    def resolved() -> dict[str, object]:
+        out = {}
+        for th in TRAIN.things():
+            assert TRAIN.unready(th.id, []) is None, th.id
+            got = train_spec._prepared(TRAIN._train(th.id, None), [], None)
+            art = artifacts.compute(train_spec.TRAIN_RUN, got.basis, records_by_id=got.pool.records_by_id, keep=False)
+            out[th.id] = ([p.model_dump(mode="json") for p in TRAIN.parameters(th.id, None)],
+                          (art.id, art.outputHash, art.provenance))
+        return out
+
+    read: list[str] = []
+
+    def heard(conn, cursor, statement, *_):
+        read.extend(re.findall(r"(?:FROM|JOIN)\s+openferment\.(\w+)", statement))
+
+    event.listen(test_database.engine.sync_engine, "before_cursor_execute", heard)
+    try:
+        here = resolved()
+    finally:
+        event.remove(test_database.engine.sync_engine, "before_cursor_execute", heard)
+    assert here["t1"][1][0] == mine
+    bound = next(p for p in here["t1"][0] if p["key"] == "C1.split.Ethanol")
+    assert (bound["origin"]["kind"], bound["origin"]["ref"]) == ("record", "cl1-Q1-00000001")
+    assert any(i.value == newest.id for i in train_spec._prepared(TRAIN._train("c1", None), [], None).basis
+               if i.name == "inlet")
+    # The pool reads its documents' titles for its search alone, which no train's value or words read.
+    assert set(read) - {"documents_link"} <= set(TRAIN.rests_on()) | {"projects"}, sorted(set(read))
+    assert {"trains", "artifacts", "candidates", "decisions", "catalogue", "scenarios"} <= set(read)
+    _conform_here(test_database, monkeypatch)
+    with conform.copy_of(TRAIN, TEST_PROJECT) as copied:
+        there = resolved()
+    assert there == here
+    assert copied == {"projects": 1, "trains": 4, "artifacts": 3, "runs": 0, "scenarios": 1, "candidates": 1,
+                      "decisions": 2, "catalogue": 1}
+    before = _every_row()
+    v = conform.in_project("train", TEST_PROJECT, by=CHECKS_BY)
+    assert v.ok, [(c.number, c.said) for c in v.checks if not c.ok]
+    assert v.checks[2].said.startswith(f"t1: run {mine} of t1, asked twice, is 1 row")
+    assert all(f"{t}: run " in v.checks[2].said for t in ("s1", "r1", "c1"))
+    assert _changed(before, _every_row()) == ["openferment.engine_checks"]
+
+
+def test_ready_names_the_checks_that_failed_and_the_command_that_says_why(train_engines):
+    """A failed verdict's row reads to its end as one sentence: the checks
+    that failed, when, and the command to run to see why."""
+    from openferment_core.models import EngineCheck
+
+    found = [EngineCheck(number=n, check=conform.CHECKS[n], ok=n not in (3, 8), said="placeholder words")
+             for n in range(1, 9)]
+    failed = conform.verdict(TRAIN, found, "conformance test")
+    conform.keep(failed)
+    row = {c.name: c for c in ready.check_engines()}["engine train"]
+    assert row.mark == "warn" and row.detail.endswith(
+        f"checks 3, 8 failed at {failed.at}; to see why, run {ready.conform_command('train')}")
+    assert row.detail.endswith("; the checks run on a copy of it") and "says why" not in row.detail
+
+
+class _Unrested:
+    """An engine whose things are a project's own (`things_are`) and that
+    names nothing they rest on: it loads and runs, and no command checks it."""
+
+    name, worker, heavy = "unrested", None, ()
+    things_are = "a project's placeholders"
+
+    def version(self):
+        return {"openferment-core": "0.1.0"}
+
+    def things(self):
+        return []
+
+    def parameters(self, thing, configuration):
+        return []
+
+    def run(self, thing, configuration, inputs, by):
+        raise EngineRefused("the unrested engine runs nothing")
+
+    def replay(self, run):
+        raise EngineRefused("nothing to replay")
+
+    def export_sff(self, run):
+        return "it has no plant"
+
+
+UNRESTED = _Unrested()
+
+
+def test_an_engine_whose_things_rest_on_nothing_named_loads_and_ready_says_why_no_command_checks_it(monkeypatch,
+                                                                                                     capsys):
+    monkeypatch.setattr(registry, "entry_points", lambda: _points(("unrested", "tests.test_engines:UNRESTED")))
+    registry.reset()
+    try:
+        assert registry.found()["unrested"].error is None
+        said = conform.unrested(UNRESTED)
+        assert said.startswith(f"the unrested engine's things are {UNRESTED.things_are}, and it declares no "
+                               "rests_on() naming the rows they rest on")
+        assert conform.unrested(TRAIN) is None and conform.unrested(SAMPLE) is None
+        row = {c.name: c for c in ready.check_engines()}["engine unrested"]
+        assert row.mark == "warn" and row.detail.endswith(said) and "python -m" not in row.detail
+        # The command refuses it in the same words, with --project and without.
+        for argv in (["unrested"], ["unrested", "--project", TEST_PROJECT]):
+            assert conform.main(argv) == 2
+            assert capsys.readouterr().out.strip() == f"✗ {said}"
+    finally:
+        registry.reset()
+
+
+def test_a_table_an_engine_names_is_one_of_a_projects_rows_and_any_other_is_refused_in_whole_words():
+    assert conform._table("trains") is not None
+    for name in ("no_such_table", "engine_checks"):
+        with pytest.raises(conform.ConformRefused) as refused:
+            conform._table(name)
+        assert conform._words(refused.value) == (f"the name {name!r} is no table of a project's rows in the "
+                                                 "openferment schema")
+
+
+def test_words_too_long_for_a_check_are_cut_at_a_word_with_an_ellipsis():
+    said = "a train carries no TEA, and the schema the toolkit ships requires every file's year"
+    assert conform._cut(said, 200) == said
+    cut = conform._cut(said, 40)
+    assert cut == "a train carries no TEA, and the schema…" and len(cut) <= 41
+    assert conform._cut("a" * 50, 40) == "a" * 40 + "…"
+
+
+def _on_server(test_database, name: str) -> bool:
+    """Whether the test server holds database `name`."""
+    import asyncio
+
+    from openferment_core.db import migrate
+
+    found = asyncio.run(migrate._scalar(test_database.server.set(database="postgres"),
+                                        f"SELECT count(*) FROM pg_database WHERE datname = '{name}'"))
+    return bool(found)
+
+
+class _Interrupted(BaseException):
+    """What an interrupt raises as it ends a block, standing in for Ctrl-C's KeyboardInterrupt."""
+
+
+def test_a_copy_whose_rollback_cannot_close_lets_what_ended_it_through_and_drops_its_database(train_engines,
+                                                                                            test_database,
+                                                                                            monkeypatch):
+    """A connection still busy with a query an interrupt cut short refuses its
+    rollback (asyncpg: another operation is in progress). The interrupt is
+    what the caller meets, the pool is disposed of, and the checks' database
+    is dropped."""
+    from openferment_core.db import migrate
+
+    _saved(spec_of())
+    _conform_here(test_database, monkeypatch)
+    made: list[str] = []
+    create = migrate.create
+    monkeypatch.setattr(migrate, "create", lambda name, url=None: made.append(name) or create(name, url))
+
+    class Busy(db.Binding):
+        async def close(self):
+            await super().close()
+            raise RuntimeError("cannot perform operation: another operation is in progress (a STAND-IN)")
+
+    monkeypatch.setattr(db, "Binding", Busy)
+    with pytest.raises(_Interrupted):
+        with conform.copy_of(TRAIN, TEST_PROJECT):
+            assert [th.id for th in TRAIN.things()] == ["t1"] and _on_server(test_database, made[0])
+            raise _Interrupted
+    assert len(made) == 1 and not _on_server(test_database, made[0])
+    assert [th.id for th in TRAIN.things()] == ["t1"], "the sessions bind as they did before the copy"
+
+
+def test_sighup_and_sigterm_end_the_block_while_the_checks_database_stands_and_their_handlers_return_after():
+    import signal as signals
+
+    before = {s: signals.getsignal(s) for s in conform.ENDING}
+    assert {signals.SIGTERM, signals.SIGHUP} <= set(conform.ENDING)
+    with conform._signals_end_the_block():
+        for s in conform.ENDING:
+            handler = signals.getsignal(s)
+            assert handler is not before[s] and callable(handler)
+            with pytest.raises(SystemExit) as ended:
+                handler(s, None)
+            assert ended.value.code == 128 + s
+    assert {s: signals.getsignal(s) for s in conform.ENDING} == before
+
+
+# A process that makes the checks' own database, says its name and waits to be ended.
+SCRATCH_THEN_WAIT = """
+import time
+from openferment_core.engine import conform
+with conform._scratch("signal-test") as url:
+    print(url.database, flush=True)
+    time.sleep(120)
+"""
+
+
+def test_sigterm_ends_the_command_with_its_code_and_drops_the_checks_database(test_database):
+    import os
+    import signal as signals
+
+    from openferment_core.db import migrate
+
+    env = {**os.environ, "OPENFERMENT_DATABASE_URL": test_database.server.render_as_string(hide_password=False)}
+    ran = subprocess.Popen([sys.executable, "-c", SCRATCH_THEN_WAIT], cwd=ROOT / "core", env=env, text=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    name, left = "", False
+    try:
+        name = ran.stdout.readline().strip()
+        assert name.startswith("openferment_conform_signal_test_"), ran.stderr.read()
+        assert _on_server(test_database, name)
+        ran.send_signal(signals.SIGTERM)
+        assert ran.wait(timeout=60) == 128 + signals.SIGTERM, ran.stderr.read()
+    finally:
+        if ran.poll() is None:
+            ran.kill()
+            ran.wait()
+        # A database the process left is the test's to drop, so a failing run leaves none behind.
+        left = bool(name) and _on_server(test_database, name)
+        if left:
+            migrate.drop(name, test_database.server)
+    assert not left, f"{name} was left on the server"

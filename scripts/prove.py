@@ -55,12 +55,13 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
        version and worker, none with an error; the eight conformance checks of docs/api/engines.md
        made on each (`python -m openferment_core.engine.conform <name>`, on a scratch database of
        its own; the kinetics engine's with `--inputs`, the placeholders its builder writes as the
-       proof's person's assumptions; the train engine's with `--project`, in the proof's own
-       project on its own database, on a train made there first as a person makes one in pureOS's
-       Builder: step 4's cornstover run read into a train (`POST /api/pureos/train/from-run`), the
-       units whose values wait taken out with every unit before them, the inlet the run's stream
-       entering the first unit kept, checked and saved as the project's row), and each verdict
-       kept and listed
+       proof's person's assumptions; the train engine's with `--project`, naming the proof's own
+       project, which the checks read and copy into a database of their own and check there, on a
+       train made in the project first as a person makes one in pureOS's Builder: step 4's
+       cornstover run read into a train (`POST /api/pureos/train/from-run`), the units whose values
+       wait taken out with every unit before them, the inlet the run's stream entering the first
+       unit kept, checked and saved as the project's row), and each verdict kept in the proof's
+       database and listed
 """
 from __future__ import annotations
 
@@ -133,14 +134,17 @@ TITLES = {
     10: "the engines: each registered one listed, the eight conformance checks made on it, its verdict kept; a train "
         "made on step 4's run for the train engine's",
 }
-# How long the conformance checks of one engine may take (BioSTEAM's: a cold import and nine plants' parameters).
+# How long the conformance checks of one engine may take (BioSTEAM's: a cold import and nine plants' parameters),
+# and how long a run past it is given to end once asked to (SIGTERM), dropping its own database as it ends,
+# before it is killed.
 CONFORM_TIMEOUT_S = 1800.0
+CONFORM_END_S = 60.0
 # The engines whose things wait for values no default gives, each with the module and the function that
 # write the file `conform --inputs` reads (docs/api/engines.md, Conformance): the core's kinetics engine.
 PLACEHOLDERS = {"kinetics": ("openferment_core.fermos_engine", "write_placeholder_inputs")}
-# The engines whose things are a project's own (each declares `things_are`), checked in the proof's own project
-# (`conform --project`), on what the proof made there for each: the core's train engine, on the train `make_train`
-# makes on step 4's reference run.
+# The engines whose things are a project's own (each declares `things_are`), checked in a copy of the proof's own
+# project (`conform --project`), on what the proof made there for each: the core's train engine, on the train
+# `make_train` makes on step 4's reference run.
 IN_PROJECT = ("train",)
 WRITE_PLACEHOLDERS = "import importlib, sys; getattr(importlib.import_module(sys.argv[1]), sys.argv[2])(sys.argv[3], by=sys.argv[4])"
 RUN_TIMEOUT_S = 1800.0
@@ -216,6 +220,25 @@ class Stop(Exception):
 def on_server(address: str, name: str) -> str:
     parts = urlsplit(address)
     return urlunsplit(parts._replace(path=f"/{name}"))
+
+
+def conformed(command: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
+    """`conform` run to its end, as `subprocess.run` runs it; a run past CONFORM_TIMEOUT_S is asked to end
+    (SIGTERM), which drops the checks' own database as it ends (engine/conform.py `_scratch`), and is killed
+    CONFORM_END_S later if it has not. A run that outlived its time ends with words saying so."""
+    with subprocess.Popen(command, cwd=CORE, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          env=env) as p:
+        try:
+            out, err = p.communicate(timeout=CONFORM_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            p.terminate()
+            try:
+                out, err = p.communicate(timeout=CONFORM_END_S)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                out, err = p.communicate()
+            err = f"{err or ''}\nthe checks ran past {CONFORM_TIMEOUT_S:.0f} s and were asked to end"
+    return subprocess.CompletedProcess(command, p.returncode, out, err)
 
 
 def migrations(*args: str) -> subprocess.CompletedProcess:
@@ -775,7 +798,7 @@ def step_10(proof: Proof) -> None:
             command += ["--inputs", str(path)]
         if e["name"] in IN_PROJECT:
             command += ["--project", proof.project]
-        done = subprocess.run(command, cwd=CORE, text=True, capture_output=True, env=env, timeout=CONFORM_TIMEOUT_S)
+        done = conformed(command, env)
         rows = [line for line in done.stdout.splitlines() if line.startswith(("✓", "✗"))]
         failed = [line for line in rows if line.startswith("✗")]
         said = (done.stdout.strip().splitlines() or [done.stderr.strip()[-300:]])[0]
