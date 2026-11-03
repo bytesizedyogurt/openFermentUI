@@ -76,9 +76,17 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
 }
 
 
+def _is_module(root: Path, dotted: str) -> bool:
+    """Whether `dotted` names a module file or a package standing under `root`."""
+    where = root.joinpath(*dotted.split("."))
+    return where.with_suffix(".py").is_file() or (where / "__init__.py").is_file()
+
+
 def _imports(path: Path, root: Path = PACKAGE.parent) -> list[tuple[int, str]]:
     """Every module a file imports, as an absolute dotted name, with its line;
-    `root` is the directory its top-level package stands in."""
+    `root` is the directory its top-level package stands in. `from X import y`
+    names X, and X.y as well when y is a module file or a package under X, as
+    Python imports it."""
     parts = path.relative_to(root).with_suffix("").parts
     here = list(parts[:-1]) if path.name != "__init__.py" else list(parts[:-1])
     out = []
@@ -89,11 +97,15 @@ def _imports(path: Path, root: Path = PACKAGE.parent) -> list[tuple[int, str]]:
             if node.level:
                 base = here[: len(here) - (node.level - 1)] if node.level > 1 else here
                 if node.module:
-                    out.append((node.lineno, ".".join([*base, node.module])))
+                    module = ".".join([*base, node.module])
+                    out.append((node.lineno, module))
+                    out += [(node.lineno, f"{module}.{a.name}") for a in node.names if _is_module(root, f"{module}.{a.name}")]
                 else:
                     out += [(node.lineno, ".".join([*base, a.name])) for a in node.names]
             elif node.module:
                 out.append((node.lineno, node.module))
+                out += [(node.lineno, f"{node.module}.{a.name}") for a in node.names
+                        if _is_module(root, f"{node.module}.{a.name}")]
     return out
 
 
@@ -106,6 +118,25 @@ def test_the_reader_resolves_relative_imports_as_python_does():
     found = dict((name, line) for line, name in _imports(PACKAGE / "engine" / "runs.py"))
     assert "openferment_core.basis" in found and "openferment_core.engine.library" in found
     assert "openferment_core.workers" in found and "sqlalchemy" not in found
+    # `from ..db import models as t` imports the module db/models.py; `from ..workers import WorkerError` a name.
+    assert "openferment_core.db.models" in found and "openferment_core.workers.WorkerError" not in found
+
+
+def test_the_reader_names_a_worker_module_imported_from_its_package(tmp_path):
+    """`from ..workers import proforma_worker` imports the worker's own module,
+    which the engine's row forbids (WORKER_SIDE), relative or absolute."""
+    engine = tmp_path / "openferment_core" / "engine"
+    workers = tmp_path / "openferment_core" / "workers"
+    for d in (engine, workers):
+        d.mkdir(parents=True)
+        (d / "__init__.py").write_text("")
+    (workers / "proforma_worker.py").write_text("")
+    (engine / "relative.py").write_text("from ..workers import proforma_worker, WorkerError\n")
+    (engine / "absolute.py").write_text("from openferment_core.workers import proforma_worker\n")
+    for name in ("relative", "absolute"):
+        found = [n for _, n in _imports(engine / f"{name}.py", tmp_path)]
+        assert "openferment_core.workers.proforma_worker" in found and "openferment_core.workers.WorkerError" not in found
+        assert any(".".join(n.split(".")[1:3]) in WORKER_SIDE for n in found), name
 
 
 @pytest.mark.parametrize("package", sorted(MAY))
@@ -145,7 +176,8 @@ def test_every_exception_names_a_package_with_a_row_and_is_still_needed():
 
 def heavy_outside_the_worker(root: Path, package: str, worker: str | None, heavy: set[str]) -> list[str]:
     """Each module of `package` (standing in `root`), beside its worker module
-    and the modules below it, that imports the worker or a heavy module."""
+    and the modules below it, that imports the worker or a heavy module (a
+    heavy name covering the module and every module below it)."""
     base = root / package
     files = sorted(base.rglob("*.py")) if base.is_dir() else [root / f"{package}.py"]
     inside = (lambda m: bool(worker) and (m == worker or m.startswith(worker + ".")))
@@ -155,7 +187,7 @@ def heavy_outside_the_worker(root: Path, package: str, worker: str | None, heavy
         if inside(module):
             continue
         for line, name in _imports(path, root):
-            if inside(name) or name.split(".")[0] in heavy:
+            if inside(name) or any(name == h or name.startswith(h + ".") for h in heavy):
                 wrong.append(f"{path.relative_to(root)}:{line} imports {name}")
     return wrong
 
@@ -169,6 +201,7 @@ def test_every_registered_engine_imports_what_it_computes_with_in_its_worker_alo
     import importlib.util
 
     from openferment_core.engine import registry
+    from openferment_core.workers import WORKER_LIBRARIES
 
     registry.reset()
     try:
@@ -180,12 +213,13 @@ def test_every_registered_engine_imports_what_it_computes_with_in_its_worker_alo
             worker = f.engine.worker
             if top == "openferment_core":
                 assert worker is None or worker.removeprefix("openferment_core.") in WORKER_SIDE, (name, worker)
-                assert set(f.engine.heavy) <= SIMULATION | {"cobra"}, (name, f.engine.heavy)
+                assert set(f.engine.heavy) <= set(WORKER_LIBRARIES), (name, f.engine.heavy)
             else:
                 spec = importlib.util.find_spec(top)
                 where = spec.submodule_search_locations
                 root = Path(list(where)[0]).parent if where else Path(spec.origin).parent
-                assert heavy_outside_the_worker(root, top, worker, set(f.engine.heavy)) == [], name
+                kept_out = set(f.engine.heavy) | set(WORKER_LIBRARIES)
+                assert heavy_outside_the_worker(root, top, worker, kept_out) == [], name
             held.append(name)
         assert "biosteam" in held
     finally:
@@ -203,3 +237,7 @@ def test_the_grep_finds_a_heavy_import_outside_an_engines_worker(tmp_path):
     (pkg / "engine.py").write_text("from . import worker\nENGINE = None\n")
     assert heavy_outside_the_worker(tmp_path, "an_engine", "an_engine.worker", set()) == [
         "an_engine/engine.py:1 imports an_engine.worker"]
+    # A dotted heavy name covers its module and every module below it.
+    (pkg / "engine.py").write_text("import a_heavy_library.core.solve\nimport a_heavy_library\nENGINE = None\n")
+    assert heavy_outside_the_worker(tmp_path, "an_engine", "an_engine.worker", {"a_heavy_library.core"}) == [
+        "an_engine/engine.py:1 imports a_heavy_library.core.solve"]

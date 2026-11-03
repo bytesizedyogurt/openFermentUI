@@ -1,10 +1,14 @@
 // An engine run's page (execution prompt §7.4, §9.1 step 5): /proforma/runs/:id.
 //
-// One run of a library plant or an openFerment flowsheet, as the service kept
-// it (GET /api/runs/{id}, engine/runs.py). What it reads:
+// One run of a library plant, an openFerment flowsheet or another engine's
+// thing, as the service kept it (GET /api/runs/{id}, engine/runs.py). What it
+// reads:
 //
 //   the run         its plant and configuration, its status and provenance,
 //                   who asked and when, the study scenario that asked for it;
+//   its outputs     a contract engine's run (docs/api/engines.md): each output
+//                   its name, value and unit, its origin the run's artifact;
+//                   a BioSTEAM run's numbers are in its sections below;
 //   its parameters  every value the run was bound with, in the parameter panel,
 //                   read-only: a person's assumption or a model's estimate where
 //                   the run set one, the library's own default elsewhere, each
@@ -31,7 +35,7 @@
 import { SffGraph } from '@/components/SffGraph';
 import { useEffect, useState } from 'react';
 import { BookOpen, Download, ListChecks, Play } from 'lucide-react';
-import type { ParamScope, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
+import type { ParamScope, Quantity, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';
@@ -79,6 +83,76 @@ function Parameters({ runId, data }: { runId: string; data: ParamScope }) {
           : `It set ${set.size} of its ${data.specs.length} parameters; the rest are the library’s defaults.`}
       </p>
       {shown.specs.length > 0 && <ParameterPanel scope={`run:${runId}`} data={shown} readOnly />}
+    </Card>
+  );
+}
+
+/** One output a contract engine's run kept (`outputs.values`): its name and the quantity, in its unit, with its origin. */
+interface RunOutput {
+  name: string;
+  quantity: Quantity;
+}
+
+/** The outputs a contract engine's run kept; none for a BioSTEAM run, whose numbers are its artifact's sections. */
+function runOutputs(outputs: Record<string, unknown>): RunOutput[] {
+  const values = outputs.values;
+  if (!Array.isArray(values)) return [];
+  return values.filter(
+    (v): v is RunOutput =>
+      typeof v === 'object' && v !== null && typeof (v as RunOutput).name === 'string' && typeof (v as RunOutput).quantity === 'object' && (v as RunOutput).quantity !== null,
+  );
+}
+
+/** A contract engine's run (docs/api/engines.md): each output with its value, its unit and its origin, the run's artifact. */
+function Outputs({ report }: { report: EngineRunReport }) {
+  const values = runOutputs(report.run.outputs);
+  if (!values.length) return null;
+  const headers = ['Output', 'Value', 'Unit', 'Origin'];
+  const originOf = (q: Quantity) => (q.origin?.kind === 'artifact' ? `the run's artifact ${q.origin.ref ?? ''}`.trim() : (ORIGIN_WORDS[q.origin?.kind ?? ''] ?? q.origin?.kind ?? '—'));
+  const rows = values.map((v) => [v.name, String(v.quantity.value), v.quantity.unit || '—', originOf(v.quantity)]);
+  return (
+    <Card className="p-4" data-testid="run-outputs" data-engine={report.run.engine}>
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
+        <h2 className="font-serif text-section-title font-semibold">What it computed</h2>
+        <button className="chip" onClick={() => exportCSV(`run-${report.run.id}-outputs.csv`, headers, rows)}>
+          <Download size={12} aria-hidden /> CSV
+        </button>
+      </div>
+      <p className="text-caption text-ink-soft mb-2">
+        Each output the {report.run.engine} engine computed, in its unit, its origin the run&rsquo;s artifact: a replay computes it again from the
+        basis below.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-caption">
+          <thead>
+            <tr className="border-b border-line text-ink-soft">
+              {headers.map((h) => (
+                <th key={h} className="text-left py-1 pr-2 font-medium">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {values.map((v, i) => (
+              <tr key={v.name} className="border-b border-line/50 align-top" data-testid="run-output" data-origin={v.quantity.origin?.kind}>
+                <td className="py-1 pr-2 font-num">{rows[i][0]}</td>
+                <td className="py-1 pr-2 font-num">{rows[i][1]}</td>
+                <td className="py-1 pr-2 font-num">{rows[i][2]}</td>
+                <td className="py-1 pr-2">
+                  {v.quantity.origin?.kind === 'artifact' && v.quantity.origin.ref ? (
+                    <a className="text-accent hover:underline" href={href(`/biorepo/artifacts/${v.quantity.origin.ref}`)}>
+                      {rows[i][3]}
+                    </a>
+                  ) : (
+                    rows[i][3]
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }
@@ -542,6 +616,7 @@ export default function ProformaRun({ runId }: { runId: string }) {
             </Callout>
           )}
           {report.parameters && <Parameters runId={run.id} data={report.parameters} />}
+          <Outputs report={report} />
           <Inputs report={report} />
           <PackageTest report={report} />
           {view && (

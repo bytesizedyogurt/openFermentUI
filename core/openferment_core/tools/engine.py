@@ -26,7 +26,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..models import ComputedBasis, Evidence, RunReport, ToolResult
+from ..models import CONFIGURATION_MAX, ComputedBasis, Evidence, RunReport, ToolResult
 from . import Tool, ToolContext, register
 
 MAX_ROWS = 40
@@ -190,8 +190,14 @@ def _plants(inp: EnginePlantsInput, ctx: ToolContext) -> ToolResult:
         return refused
     words = [w for w in inp.words.lower().split() if w]
     if engine.name != "biosteam":
+        from ..engine import EngineBroken
+
+        try:
+            things = engine.things()
+        except EngineBroken as e:
+            return ToolResult(error=f"engine_plants refused: the {engine.name} engine broke its contract: {e}")
         rows = [{"plant": th.id, "kind": th.kind, "title": th.title, "configurations": th.configurations,
-                 "defaultConfiguration": th.defaultConfiguration} for th in engine.things()
+                 "defaultConfiguration": th.defaultConfiguration} for th in things
                 if not words or all(w in f"{th.id} {th.title} {th.kind or ''}".lower() for w in words)]
         return ToolResult(summary={"engine": engine.name, "matched": len(rows), "plants": rows[: inp.limit]})
     shelf = library.shelf()
@@ -217,30 +223,35 @@ class EngineParametersInput(BaseModel):
         "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and "
         "openFerment's flowsheet, or any other registered here."))
     plant: str = Field(max_length=80, description="A plant's id, as engine_plants gives it.")
-    configuration: str = Field(default="", max_length=40, description="One of the plant's configurations; empty for its own.")
+    configuration: str = Field(default="", max_length=CONFIGURATION_MAX,
+                               description="One of the plant's configurations; empty for its own.")
     words: str = Field(default="", max_length=200, description="Words to narrow the parameters by; empty for all.")
     limit: int = Field(default=20, ge=1, le=MAX_ROWS, description="How many rows at most.")
 
 
 def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
-    from ..engine import library
-    from ..engine import EngineRefused
+    from ..engine import library, runs
+    from ..engine import EngineBroken, EngineRefused
 
     engine, refused = _registered("engine_parameters", inp.engine)
     if refused is not None:
         return refused
     if engine.name != "biosteam":
+        # The thing and its configuration resolved as a run of it resolves
+        # them (runs.thing_of), so the worker is asked in the configuration
+        # a run would use.
         try:
-            found_params = engine.parameters(inp.plant.strip(), inp.configuration.strip() or None)
+            cfg, found_params = runs.parameters_with(engine, inp.plant, inp.configuration)
         except EngineRefused as e:
             return ToolResult(error=f"engine_parameters refused: {e}")
+        except EngineBroken as e:
+            return ToolResult(error=f"engine_parameters refused: the {engine.name} engine broke its contract: {e}")
         words = [w for w in inp.words.lower().split() if w]
         rows = [{"key": p.key, "label": p.label, "unit": p.unit, "default": p.value, "origin": p.origin.kind,
                  "min": p.min, "max": p.max} for p in found_params
                 if not words or all(w in f"{p.key} {p.label}".lower() for w in words)]
-        return ToolResult(summary={"engine": engine.name, "plant": inp.plant.strip(),
-                                   "configuration": inp.configuration.strip() or None, "matched": len(rows),
-                                   "parameters": rows[: inp.limit],
+        return ToolResult(summary={"engine": engine.name, "plant": inp.plant.strip(), "configuration": cfg,
+                                   "matched": len(rows), "parameters": rows[: inp.limit],
                                    "note": "A run sets a value in the parameter's own unit, as a typed quantity."})
     try:
         found = library.parameters(inp.plant.strip(), inp.configuration.strip() or None)
@@ -266,11 +277,12 @@ def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
 
 class EngineRunInput(BaseModel):
     engine: str = Field(default="biosteam", max_length=40, description=(
-        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and "
-        "openFerment's flowsheet, or any other registered here."))
+        "The engine to run (GET /api/engines names them): biosteam, whose things are the library plants and "
+        "openFerment's flowsheet, or any other registered here, whose thing this tool runs at its own defaults."))
     plant: str = Field(default="", max_length=80,
                        description="A plant's id, run at the library's defaults; empty when a scenario is named.")
-    configuration: str = Field(default="", max_length=40, description="One of the plant's configurations; empty for its own.")
+    configuration: str = Field(default="", max_length=CONFIGURATION_MAX,
+                               description="One of the plant's configurations; empty for its own.")
     scenario: str = Field(default="", max_length=80,
                           description="A study scenario's id (study_scenario returns it), run on its plant with its values.")
     note: str = Field(default="", max_length=600, description="Why the run is asked for, in words.")

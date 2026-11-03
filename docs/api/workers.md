@@ -22,8 +22,11 @@ out  {"id": 1, "ok": false, "error": "Refused: there is no flowsheet x; there ar
 - An unknown op, a handler that raises, or a result JSON cannot hold (NaN, infinity) is an error
   response, `"<ExceptionType>: <words>"`, and the worker answers the next request. A request the
   worker refuses in words raises `Refused`, so its error begins `Refused: `.
-- Only responses reach stdout: descriptor 1 is pointed at stderr while the worker serves, so a
-  library that prints cannot corrupt the stream.
+- Only responses reach stdout. `SimWorker` starts every worker through a launcher
+  (`workers.LAUNCH`) that keeps a duplicate of descriptor 1 for the responses, points descriptor 1
+  at stderr, and then runs the module as `python -m <module>` would; so a library that prints,
+  from Python or from C, as the module is imported or while it serves, writes to stderr. A module
+  started by hand with `python -m` moves descriptor 1 when `serve` starts.
 - A request that takes longer than the call's timeout kills the process; the next call starts a
   new one. A crash reports the tail of the worker's stderr. No worker stops in a debugger
   (`PYTHONBREAKPOINT=0`).
@@ -43,28 +46,43 @@ Each module's docstring describes its ops; this page gives every op's request an
 ## Engine ops (an engine's worker; ADR-015, `docs/api/engines.md`)
 
 A worker an engine names answers four ops, which `WorkerEngine` (`engine/contract.py`) calls; its
-process starts with an environment less every key, token, password and database address
-(`workers.withheld`). The shapes of `EngineThing` and `EngineParameter` are those of
+process starts with `core/` as its working directory and an environment less every variable
+`workers.withheld` names: each whose name begins `ANTHROPIC_` or `SCI_RAG_`, and each whose name
+holds `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `DATABASE_URL` or `CREDENTIAL` anywhere, in
+any case (`docs/api/engines.md`, The worker). Each handler takes the request's `args` as one dict
+and returns the result object. The shapes of `EngineThing` and `EngineParameter` are those of
 `docs/api/openapi.json`.
+
+Every op that names a thing refuses one it does not run, by raising `Refused`. An answer outside
+the shapes below (a result key missing, outputs that are no list of names, values and units, a
+number that is NaN or infinite, two outputs of one name, a flowsheet that is no JSON object)
+breaks the contract: the service raises `EngineBroken`, keeps no runs row and answers 503 in
+words. A break in `run` keeps nothing; a break in `sff_export` comes after the run's artifact is
+kept, and the next ask answers the computation from it and asks `sff_export` again.
 
 ### `things`
 
 `{}` → `{"things": [EngineThing, …]}`: what the engine runs, each with its configurations, the
-configuration a run takes when it names none, and the precision a replay is held to.
+configuration a run takes when it names none, and the precision a replay is held to. The service
+asks it once per process and keeps the answer.
 
 ### `parameters`
 
 `{"thing", "configuration"}` → `{"parameters": [EngineParameter, …]}`: what the thing takes, each a
 `ParameterSpec` with its default `value` and the default's `origin` (`library-default` with `ref`,
-or `convention` with `note`). An unknown thing is refused in words.
+or `convention` with `note`). The service sends the configuration a run of the thing would use:
+the one named, else the thing's default, and `null` for a thing that takes none. An unknown thing
+is refused in words.
 
 ### `run`
 
 `{"thing", "configuration", "inputs": [{"name", "value", "unit"}, …]}` → `{"outputs": [{"name",
 "value", "unit"}, …]}`. The inputs are the values the run sets, already checked by the service
-against the thing's parameters; each output is a number or a string in a unit. A run the engine
-cannot make is refused in words (`Refused: …`), and the service keeps the refusal as the run's
-receipt.
+against the thing's parameters; each output is a finite number or a string in a unit, each name
+its own and at most 200 characters, and every output a function of the request alone, in the same
+order on every run of it, since a replay compares the outputs in order. A run the engine cannot
+make, an unknown thing among them, is refused in words (`Refused: …`), and the service keeps the
+refusal as the run's receipt.
 
 ### `sff_export`
 

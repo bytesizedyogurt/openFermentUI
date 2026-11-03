@@ -58,6 +58,27 @@ def test_a_library_printing_to_stdout_does_not_corrupt_the_stream(worker):
     assert worker.call("echo", {"x": "y"}) == {"x": "y"}
 
 
+def test_a_worker_module_that_prints_as_it_is_imported_keeps_the_stream_whole(tmp_path, monkeypatch):
+    """Descriptor 1 is pointed at stderr before the worker module is
+    imported (workers.LAUNCH), so a library that prints at its import, from
+    Python or from C, writes to stderr and every response arrives whole."""
+    (tmp_path / "a_chatty_worker.py").write_text(
+        "import os\n"
+        "print(\"a placeholder library's banner, printed as it is imported\")\n"
+        "os.write(1, b\"a placeholder solver's banner, written to fd 1 as it is imported\\n\")\n"
+        "from openferment_core.workers import serve\n"
+        "if __name__ == '__main__':\n"
+        "    serve({'echo': lambda a: a}, name='chatty')\n")
+    monkeypatch.setenv("PYTHONPATH", str(tmp_path))
+    w = SimWorker("a_chatty_worker", timeout_s=10)
+    try:
+        assert w.call("echo", {"a": "b"}) == {"a": "b"} and w.ping()["worker"] == "chatty"
+        tail = w._tail()
+        assert "printed as it is imported" in tail and "written to fd 1 as it is imported" in tail
+    finally:
+        w.close()
+
+
 def test_a_module_that_does_not_exist_crashes_with_its_reason():
     w = SimWorker("openferment_core.workers.nonesuch", timeout_s=10)
     try:

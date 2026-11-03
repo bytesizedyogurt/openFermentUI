@@ -97,6 +97,7 @@ from .models import (
     EngineParameter,
     EngineRun,
     EngineRunRequest,
+    Refusal,
     ScenarioCreate,
     StudyRequest,
     StudyScenario,
@@ -120,7 +121,7 @@ from . import llm
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
 from .engine import runs as _runs
 from .engine import registry as _engines
-from .engine import EngineRefused
+from .engine import EngineBroken, EngineRefused
 from .studies import comparisons as _comparisons  # noqa: F401  (registers study.comparison for compute and replay)
 from .studies import exports as _exports
 from .studies import runbooks as _runbooks
@@ -136,11 +137,20 @@ load_dotenv(Path(__file__).parent.parent / ".env", override=False)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("openferment.api")
 
-# Discovery at startup (docs/api/engines.md, What the service does with an
-# engine): every engine of the entry-point group is loaded once, so a run any
-# of them kept replays on a service just started. A package that fails to load
-# is listed with its words, and the service starts all the same.
-_engines.found()
+
+def _discover_engines() -> None:
+    """Discovery at startup (docs/api/engines.md, What the service does with
+    an engine): every engine of the entry-point group is loaded once, so a run
+    any of them kept replays on a service just started. A package that fails
+    to load is listed with its words; a group that cannot be read at all is
+    said in the log, and the service starts all the same."""
+    try:
+        _engines.found()
+    except Exception as e:  # the group itself could not be read
+        log.warning("the engines of %s could not be read at startup: %s: %s", _engines.GROUP, type(e).__name__, e)
+
+
+_discover_engines()
 
 app = FastAPI(title="openferment-core", version="0.1.0")
 
@@ -1037,24 +1047,48 @@ def engines_list() -> list[EngineInfo]:
     return _engines.infos()
 
 
-@app.get("/api/engines/{name}/parameters")
+def _refusals(refused: str) -> dict[int | str, dict[str, Any]]:
+    """What an engine's route answers beside its result, each in words
+    (`detail`); `refused` says what its 422 refuses."""
+    return {
+        404: {"model": Refusal, "description": "No engine of that name is registered here, or BioSTEAM's shelf holds "
+                                               "no plant of that id: in words, naming what is here."},
+        422: {"description": f"{refused} (a list of field errors when the request's own fields are refused).",
+              "content": {"application/json": {"schema": {"anyOf": [
+                  {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}},
+        503: {"model": Refusal, "description": "The engine cannot be used (it failed to load or to declare what it "
+                                               "must), its worker could not answer, or it answered outside the "
+                                               "protocol: in words, with no run kept."},
+    }
+
+
+@app.get("/api/engines/{name}/parameters", responses=_refusals(
+    "The thing refused in words: one the engine does not run, or a configuration it does not take"))
 def engine_parameters(name: str, thing: str, configuration: str | None = None) -> list[EngineParameter]:
-    """What one of an engine's things takes, each default with its origin."""
+    """What one of an engine's things takes, each default with its origin.
+    A contract engine's thing and configuration are resolved as a run of it
+    resolves them (`runs.thing_of`): no configuration named reads the
+    thing's default."""
     engine = _engine(name)
     try:
-        return engine.parameters(thing.strip(), (configuration or "").strip() or None)
+        return _runs.parameters_with(engine, thing, configuration)[1]
     except _library.PlantNotFound as e:
         raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
     except (EngineRefused, _library.LibraryRefused) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except EngineBroken as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the {name} engine's worker could not answer: {e}") from e
 
 
-@app.post("/api/engines/{name}/run")
+@app.post("/api/engines/{name}/run", responses=_refusals(
+    "The request refused in words: a field it does not hold, a bare number, a thing or a configuration the "
+    "engine does not run, a value its parameters refuse, or a run the engine refused, kept as a receipt"))
 def engine_run(name: str, req: EngineRunRequest) -> RunReport:
     """One of an engine's things run with the values a person or a model sets,
-    kept as a runs row; a refused run is kept as a receipt and 422 in words."""
+    kept as a runs row; a refused run is kept as a receipt and 422 in words.
+    An engine that answers outside its contract keeps no run and is 503."""
     engine = _engine(name)
     try:
         return _runs.run_with(engine, req.thing, req.configuration, req.inputs, by=req.by)
@@ -1062,6 +1096,8 @@ def engine_run(name: str, req: EngineRunRequest) -> RunReport:
         raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
     except (EngineRefused, _library.LibraryRefused) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except EngineBroken as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the {name} engine's worker could not run it: {e}") from e
 
@@ -1072,7 +1108,8 @@ def runs_list(engine: str | None = None) -> list[EngineRun]:
     return _runs.listed((engine or "").strip() or None)
 
 
-@app.get("/api/runs/{run_id}")
+@app.get("/api/runs/{run_id}", responses={404: {"model": Refusal, "description": "The project holds no run of that "
+                                                                               "id, in words."}})
 def runs_report(run_id: str) -> RunReport:
     """One engine run with its artifact and its SFF record."""
     try:
@@ -2052,7 +2089,10 @@ def artifacts_read(artifact_id: str) -> Artifact:
         raise HTTPException(status_code=409, detail=str(e)) from None
 
 
-@app.post("/api/biorepo/artifacts/{artifact_id}/replay", response_model=ReplayResult)
+@app.post("/api/biorepo/artifacts/{artifact_id}/replay", response_model=ReplayResult, responses={
+    404: {"model": Refusal, "description": "The project holds no artifact of that id, in words."},
+    409: {"model": Refusal, "description": "The tool that made it is not registered in this service, or the stored "
+                                           "artifact is damaged, in words."}})
 def artifacts_replay(artifact_id: str) -> ReplayResult:
     """Recompute and compare. 404 for an unknown id; 409 when the tool that
     made it is not registered in this service, which cannot replay it. The
@@ -2376,16 +2416,31 @@ def audit_read(limit: int = 200) -> list[AuditEntry]:
     return audit.read(max(1, min(limit, audit.MAX_READ)))
 
 
-@app.post("/api/tools/{name}", response_model=ToolResult)
+@app.post("/api/tools/{name}", response_model=ToolResult, responses={
+    404: {"model": Refusal, "description": "No tool of that name is registered here, in words."},
+    422: {"description": "A tool that writes, called with no ?by= naming the person calling, in words (a list of "
+                         "field errors when the body is no JSON object).",
+          "content": {"application/json": {"schema": {"anyOf": [
+              {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}}})
 def tools_run(name: str, body: dict[str, Any], by: str = "") -> ToolResult:  # noqa: N803 (the wire name)
     """Run one tool through the registry, the same path Postdoc's loop and
     the MCP server take, in the request's project. A refusal is a result
     with `error` set; an unknown tool is a 404. The body is the tool's
     input; `?by=` names the person calling, who is the author of any
-    quantity the input types (ADR-006) and of any study write it makes."""
+    quantity the input types (ADR-006) and of any write it makes: the audit
+    row, a proposal and what the write keeps are marked as that person's,
+    and a store that holds a model's work alone (pureOS's kept trains)
+    refuses the write in its words. A tool that writes (`writes` in
+    docs/TOOLS.md) is run only for a person named so: a call that names
+    nobody is a 422 in words, and nothing runs."""
     if name not in tools.REGISTRY:
         raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
-    return tools.run(name, body, tools.ToolContext(person=by.strip()[:200]))
+    person = by.strip()[:200]
+    if tools.REGISTRY[name].writes and not person:
+        raise HTTPException(status_code=422, detail=(
+            f"{name} keeps something in the project in its caller's name, and this call names nobody: name the "
+            "person calling with ?by=<their name>"))
+    return tools.run(name, body, tools.ToolContext(person=person))
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

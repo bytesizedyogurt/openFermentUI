@@ -109,17 +109,21 @@ def propose(
     note: str = "",
     ask_id: str | None = None,
     effort: str | None = None,
+    agent: str = "model",
 ) -> Proposal:
+    """A proposal kept for a person to carry out, by `by`: the model that
+    proposed it, or the person a tool's HTTP door names (`agent` "person"),
+    as its audit row says."""
     _held_to_rule_one(title=title, why=why, note=note, target=target, fields=fields or {})
     made = Proposal(
         id=f"pr-{uuid.uuid4().hex[:12]}", at=_now(), module=module, action=action, gate=gate.id,  # type: ignore[arg-type]
         title=title, why=why, how=gate.how, route=gate.route, server=gate.server,
         target=target or None, fields=fields or {}, note=note, by=by, askId=ask_id or None,
     )
-    return db.run(_keep(projects.current(), made, effort))
+    return db.run(_keep(projects.current(), made, effort, agent))
 
 
-async def _keep(pid: str, made: Proposal, effort: str | None) -> Proposal:
+async def _keep(pid: str, made: Proposal, effort: str | None, agent: str = "model") -> Proposal:
     """The proposal and its audit row, written together, unless one of its
     kind already waits in this ask."""
     async with db.session() as s:
@@ -133,7 +137,7 @@ async def _keep(pid: str, made: Proposal, effort: str | None) -> Proposal:
             raise ProposalRefused(f"{made.module} {made.action}{on} is already proposed in this ask ({twin.id}) and "
                                   "waits for a person")
         await _put(s, pid, made)
-        await audit.add(pid, agent="model", who=made.by, module=made.module, action=made.action, state="proposed",
+        await audit.add(pid, agent=agent, who=made.by, module=made.module, action=made.action, state="proposed",
                         target=made.target, ask_id=made.askId, effort=effort,
                         detail={"proposalId": made.id, "gate": made.gate})
     return made

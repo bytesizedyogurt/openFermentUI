@@ -1,21 +1,24 @@
 """The `biosteam` engine behind the contract (docs/api/engines.md; ADR-015),
 on the real Proforma worker: registered by core/pyproject.toml's own entry
 point, its run the adapter's own row, a value set as a quantity the adapter's
-override, its SFF file answered as the flowsheet record, and the eight
-conformance checks holding on a plant.
+override on the day its origin names, a value typed in another unit refused
+before the plant is run, its SFF file answered as the flowsheet record, and
+the eight conformance checks holding on a plant.
 """
 from __future__ import annotations
 
 import pytest
 
 from openferment_core import proforma
-from openferment_core.engine import conform, registry, runs
+from openferment_core.engine import EngineRefused, conform, registry, runs
 from openferment_core.models import EngineInput, Origin, Quantity, SFFFlowsheet
 
 pytestmark = pytest.mark.sim
 
 BY = "Ada Moreno"
 ENTRY = "openferment_core.engine.biosteam:ENGINE"
+# The day a person set a value, as the request says it: a placeholder day.
+DAY = "2026-10-30"
 
 
 @pytest.fixture(scope="module")
@@ -47,12 +50,17 @@ def test_a_value_set_as_a_quantity_is_the_adapters_override_and_makes_the_run_as
     p = {x.key: x for x in biosteam.parameters("cornstover", None)}["stream.cornstover.price"]
     assert p.origin.kind == "library-default" and p.origin.ref and p.boundsReason.strip()
     q = Quantity(value=p.value * 1.5, unit=p.unit,
-                 origin=Origin(kind="person-assumption", by=BY, note="half again the package's own"))
+                 origin=Origin(kind="person-assumption", by=BY, at=DAY, note="half again the package's own"))
+    held = len(runs.listed("biosteam"))
+    other_unit = q.model_copy(update={"unit": "placeholder-unit"})
+    with pytest.raises(EngineRefused, match=f"the parameter's unit is '{p.unit}'"):
+        biosteam.run("cornstover", None, [EngineInput(name=p.key, quantity=other_unit)], BY)
+    assert len(runs.listed("biosteam")) == held, "a value typed in another unit keeps nothing"
     run = biosteam.run("cornstover", None, [EngineInput(name=p.key, quantity=q)], BY)
     assert run.provenance == "assumed"
     (given,) = [i for i in run.inputs if i.name == p.key]
     assert given.quantity.value == pytest.approx(p.value * 1.5) and given.quantity.origin.kind == "person-assumption"
-    assert given.quantity.origin.by == BY
+    assert (given.quantity.origin.by, given.quantity.origin.at) == (BY, DAY)
     at_default = biosteam.run("cornstover", None, [], BY)
     assert run.outputs["price"]["solvedPrice"] > at_default.outputs["price"]["solvedPrice"]
 

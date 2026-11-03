@@ -8,9 +8,10 @@ Engines register through the entry-point group `openferment.engines`
 (docs/api/engines.md), and every run the service keeps is one `runs` row of
 one shape whatever engine made it. The row gains an `engine` column, its
 lookup key for `GET /api/runs?engine=`. Every row kept before this revision
-was a BioSTEAM run, so the column's default names it for them; a row's body
-is left as it was stored, and `EngineRun.engine` reads `biosteam` where the
-body has no key.
+was a BioSTEAM run, so the column's default names it for them; a row whose
+body names its engine (one kept at this revision, then downgraded and
+upgraded again) takes the body's name. A row's body is left as it was
+stored, and `EngineRun.engine` reads `biosteam` where the body has no key.
 """
 from __future__ import annotations
 
@@ -28,6 +29,8 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column('runs', sa.Column('engine', sa.Text(), server_default='biosteam', nullable=False),
                   schema='openferment')
+    op.execute("UPDATE openferment.runs SET engine = body->>'engine' "
+               "WHERE body->>'engine' IS NOT NULL AND body->>'engine' <> engine")
     op.create_index(op.f('ix_runs_project_id_engine'), 'runs', ['project_id', 'engine'], unique=False,
                     schema='openferment')
 

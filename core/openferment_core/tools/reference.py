@@ -57,7 +57,12 @@ the registry holds, it holds for each of them.
 - **Scope**: every tool acts in one project (ADR-005): the request's, the question's, or the one the
   MCP server was started in.
 - **Writes**: a tool marked *writes* keeps something new in the project, audited as its caller's,
-  through `tools/writes.py`; a read keeps nothing but the computations it caches.
+  through `tools/writes.py`; a read keeps nothing but the computations it caches. At the HTTP
+  endpoint a write names the person calling with `?by=`, and a call that names nobody is a 422 in
+  words, with nothing run. The person named is the write's author: its audit row (agent `person`),
+  a proposal it makes (which waits for a person to carry it out, as every proposal does) and what
+  it keeps; pureOS's kept trains hold a model's work alone, and a person's call to keep one is
+  refused in the store's words.
 
 {count} tools.
 """

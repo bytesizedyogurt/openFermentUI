@@ -172,6 +172,8 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-03 01:24 | Alpha 2.2 stage B gate on `e375ede`: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2328 passed, 1 skipped, 171 deselected; `test:sim` 135 passed (132 and the three of `test_engines_sim.py`); `test:lit` 10 passed; `smoke` 12 of 12 screens | 13 min 56 s | `e375ede` |
 | 2026-11-03 01:28 | `pnpm prove`, offline, steps 1 to 10 | 69 of 69 checks hold: step 10 lists `biosteam`, `conform biosteam` holds all eight, its verdict listed; no call in the proof's spend table | 3 min 35 s | `e375ede` |
 | 2026-11-03 01:50 | `pnpm test:core` on B.5 (the contract's defects the design measured) | 2343 passed, 1 skipped, 172 deselected | 5 min 22 s | B.5 |
+| 2026-11-03 04:12 | `pnpm test:core` on B.6 (the critic's defects and the review's) | 2397 passed, 1 skipped, 172 deselected | 5 min 8 s | B.6 |
+| 2026-11-03 04:24 | B.6: `pnpm test:sim`; verify's fast stages (`check:secrets`, `typecheck`, both `--check`s, `check:plan`, `check:licences`, `check:tools`, `check:guild`, `check:state`, `check:figures`, `test:reconcile`); `build`; `smoke` | 136 passed; every stage green; 12 of 12 screens open | 5 min 14 s (`test:sim`) | B.6 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -221,6 +223,7 @@ prompt's §4).
 | Where | Departure | Why |
 |---|---|---|
 | alpha 2.2 §6.1, B.2 | `run(thing, configuration, inputs, by)` takes `inputs` as a list of `EngineInput`, each a parameter's key and a `Quantity` (the shape a run's inputs have, `RunInput`), where §6.1 writes `inputs: list[Quantity]` | A `Quantity` carries no name, so the parameter each value sets is named beside it |
+| alpha 2.2 §6.1, B.2 and B.6 | An engine declares `heavy` beside `worker`: the modules its worker alone imports. The registry and conformance check 6 keep the worker module, each module `heavy` names (with every module below it) and `workers.WORKER_LIBRARIES` (BioSTEAM, thermosteam, biorefineries, the SFF toolkit, cobra) out of the service's process for every engine; `worker` may be `None` only with `heavy` empty | §6.1's `worker` names one module, and its name alone cannot say which of the libraries it imports are heavy; check 6 needs the list to hold them out |
 | alpha 2.2 §6.1, B.2 | `engine → api` and `engine → tools` join the package map's exceptions (`test_boundaries.py`) | Conformance check 1 sends a bare number through the service's own route and its tool, the two doors a number enters by, and §6.1 names the command `openferment_core.engine.conform` |
 | A4, stage 8 | `test_no_seed.py` holds what A4 names (each deleted module absent, no `.ts` under `src/data/` exporting content, the shipped stores empty), and an `rg` over `core/tests/` still finds test values: `standins.py` (stand-in records on real strain ids, a closed-form ethanol evaluator with the theoretical yield on glucose; 27 test files use it) and `test_proforma_slow.py` (the benchmark price this build once measured). `src/` and the service's code hold none | The stand-ins carry rule tests (binding, overrides, ceilings, run contracts) that stage 4's library fixtures were to replace; that work did not fit stages 4 to 8 (a debt below) |
 | §5.5, A3, stage 7.1 | The Durable snapshot keeps the writes the service has not acknowledged (review decisions, Guild entries, project rows), beside the preferences; a record the service holds is never kept there (ADR-014) | Without the queue, a reviewer's decision made while the service is away is lost on the next reload |
@@ -1114,3 +1117,46 @@ holds the numbers, the tables and the judgements).
   client keeps says it came over MCP, where it said Postdoc. `docs/TOOLS.md` had no section for
   the catalogue and flowsheet tools (their families were missing from `tools/reference.py`); it
   has both, and the page refuses to render with a family it places nowhere.
+- B.6. The sixteen defects the stage's critic found in the contract after B.5, each fixed with a
+  test (`test_engines.py` holds 82):
+  - BioSTEAM checks a value's unit before its plant is built, through the one checker every
+    engine's values pass (`runs.check_inputs`); a plant's bounds stay the library's, flagged on the
+    run's parameters as `outOfBounds`.
+  - A value set on a contract engine's run carries the day it was set (`origin.at`, required), and
+    the service stamps no day of its own.
+  - Discovery runs on past an entry module that exits as it is imported, whose declaration
+    raises, which asks the registry while it is imported, or which brings its worker module, a
+    heavy module it declares or one of `workers.WORKER_LIBRARIES` into the service's process; each
+    is listed with its words, and the service starts when the group itself cannot be read.
+  - A worker that answers outside the protocol (a key missing, a name repeated, blank or too long,
+    a number NaN or infinite, a `things` or `parameters` answer of the wrong shape) raises
+    `EngineBroken`: nothing is kept, the routes answer 503 in words and the job says it failed.
+  - Check 7 holds a refusal to one call of the worker's `run` op and its receipt; check 8 makes
+    its model's run through the tool door.
+  - A thing that must name a configuration is checked in its first and refused with none, and
+    every door resolves a thing's configuration as a run does (`runs.thing_of`).
+  - Every contract engine's tool version begins with `engine run 1` (`contract.CONTRACT_RUN`).
+  - A `WorkerEngine`'s things are asked once, a cold worker given 30 s on the listing.
+  - The nightly holds a replay within its stated precision and says so.
+  - A run whose SFF step fails says its job failed and keeps no row.
+  - Migration 0008 takes a body's engine name on an upgrade after a downgrade.
+  - The engine routes declare their 404, 422 and 503 answers in the OpenAPI document.
+  - Proforma's run page shows a run's `outputs.values`.
+- B.6, the review round. Three reviewers read the fixes: one built a stranger's engine from the
+  four contract pages alone, one looked for regressions, one for boundaries. They found 29 more,
+  all confirmed and fixed. Four change behaviour beyond the engine package:
+  - Every worker process starts through `workers.LAUNCH` (`python -c LAUNCH <module>`), which
+    points descriptor 1 at stderr before the worker module is imported, so a library that prints
+    as it is imported, from Python or from C, leaves every response whole (`test_workers.py`).
+  - A tool that writes, called at `POST /api/tools/{name}`, runs only for the person `?by=` names
+    (a 422 in words with none), and its audit row, its proposal and what it keeps are marked as
+    that person's, where they were marked as the chain's first model. pureOS's kept trains hold a
+    model's work alone and refuse a person's write in their own words, as they do at every door.
+    No screen calls this endpoint.
+  - A replay whose tool version moved names it as its first difference, an identical output
+    included, and BioRepo's artifact page says which version kept it and which replayed it.
+  - `Quantity`, `ScenarioValue` and `ReviewDecision` are each one schema in `openapi.json`: their
+    serializer's return annotation had made empty `-Output` twins.
+  - `docs/api/engines.md` states the run id's recipe (recomputed from the page alone), the limits
+    on names (an engine's 40 characters, a configuration's 80), the reinstall and restart a new
+    version needs, and the launcher.

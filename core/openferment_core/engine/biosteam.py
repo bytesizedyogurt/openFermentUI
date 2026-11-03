@@ -7,12 +7,13 @@ parameters what the package builds each with (`library.parameters`, every
 default a `library-default` naming the package it was read from), and a run is
 `runs.run`, the Proforma worker building the plant fresh, every number and test
 as before (the A→B→A gate, the replay precision, the package-test values of
-ADR-013). A value a run sets reaches the plant as the `Override` the adapter
-has always taken, its origin the person or the model that set it.
+ADR-013). A value a run sets is checked against the plant's parameters (its
+key, unit and kind, `runs.check_inputs`) and reaches the plant as the
+`Override` the adapter has always taken, its origin the person or the model
+that set it and the day its origin names. A value outside a plant's bounds is
+kept as set and flagged on the run's parameters (`runs.parameters_of`).
 """
 from __future__ import annotations
-
-from datetime import datetime, timezone
 
 from .. import artifacts
 from ..models import (EngineInput, EngineParameter, EnginePrecision, EngineRun, EngineThing, Origin, Override,
@@ -82,21 +83,32 @@ class BiosteamEngine:
     def run(self, thing: str, configuration: str | None, inputs: list[EngineInput], by: str) -> EngineRun:
         """One run, kept as a `runs` row by the adapter's own path. A plant
         that takes a configuration, asked with none, runs in the one its thing
-        names as its default (the first it built in here)."""
+        names as its default (the first it built in here). Each value is
+        checked against the plant's parameters before any is set (its key,
+        once, in the parameter's unit, a number for a number): a value
+        refused keeps nothing. A quantity's `low` and `high` reach the plant
+        as the Override's, and the library takes them only equal to the value
+        (a range is a study's to sample); a quantity carrying a `basis` is
+        refused in words."""
         if configuration is None:
             named = next((t for t in self.things() if t.id == thing), None)
             if named is not None and named.configurations:
                 configuration = named.defaultConfiguration
-        scope = library.scope(thing, configuration)
-        today = datetime.now(timezone.utc).date().isoformat()
-        overrides = []
         for i in inputs:
             o = i.quantity.origin
             if o is None or o.kind not in ("person-assumption", "model-estimate"):
                 raise EngineRefused(f"{i.name}: a value a run sets is a person's assumption or a model's estimate")
-            overrides.append(Override(scope=scope, key=i.name, value=i.quantity.value, low=i.quantity.low,
-                                      high=i.quantity.high, by=o.by or "", at=o.at or today, note=o.note,
-                                      origin=o.kind))
+            if not (o.at or "").strip():
+                raise EngineRefused(f"{i.name}: a value a run sets says when it was set (quantity.origin.at)")
+            if i.quantity.basis is not None:
+                raise EngineRefused(f"{i.name}: a library plant's parameter is set in its own unit, which says "
+                                    f"what it is reckoned on; this quantity also carries the basis {i.quantity.basis!r}")
+        if inputs:
+            runs.check_inputs(thing, self.parameters(thing, configuration), inputs, bounds=False)
+        scope = library.scope(thing, configuration)
+        overrides = [Override(scope=scope, key=i.name, value=i.quantity.value, low=i.quantity.low, high=i.quantity.high,
+                              by=i.quantity.origin.by or "", at=i.quantity.origin.at, note=i.quantity.origin.note,
+                              origin=i.quantity.origin.kind) for i in inputs]
         return runs.run(thing, configuration, overrides, by=by).run
 
     def replay(self, run: EngineRun) -> ReplayResult:

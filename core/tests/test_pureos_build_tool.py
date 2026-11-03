@@ -154,6 +154,16 @@ def test_new_keeps_a_train_for_the_product_from_a_runs_stream_marked_as_the_mode
     assert proposals.read().proposals == []
 
 
+def test_a_person_named_at_the_http_door_is_refused_a_kept_train_in_the_stores_words(store, inlet):
+    """A kept train holds a model's work alone; a person's trains are the
+    project's rows from the Builder. A call naming a person (the HTTP door's
+    ?by=) keeps nothing and audits nothing."""
+    c = tools.ToolContext(pool_factory=lambda: stand_in_pool(), person="Ada Lovelace")
+    r = tools.run("pureos_build", {"action": "new", "product": "ethanol", "inletRef": inlet}, c)
+    assert r.error.startswith("pureos_build refused: a kept train is a model's")
+    assert kept.read().trains == [] and audit.read() == []
+
+
 def test_units_are_added_in_order_named_by_type_and_taken_out(store, inlet):
     tid = built(inlet, "centrifugation", "tank")
     after = b(action="add_unit", trainId=tid, unitType="tank", afterUnitId="C1")

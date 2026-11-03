@@ -843,7 +843,7 @@
             "type": "string"
           },
           "si": {
-            "$ref": "#/components/schemas/Quantity-Output"
+            "$ref": "#/components/schemas/Quantity"
           },
           "status": {
             "default": "unverified",
@@ -1459,7 +1459,7 @@
             "type": "string"
           },
           "quantity": {
-            "$ref": "#/components/schemas/Quantity-Output"
+            "$ref": "#/components/schemas/Quantity"
           },
           "source": {
             "anyOf": [
@@ -2009,7 +2009,7 @@
       },
       "EngineInput": {
         "additionalProperties": false,
-        "description": "A value a run sets: a parameter's key and a typed quantity in that\nparameter's unit (the shape a run's inputs have), carrying the person or\nthe model that set it. It holds those fields alone, and a value, low or\nhigh that is true or false is refused, as an Override refuses one.",
+        "description": "A value a run sets: a parameter's key and a typed quantity in that\nparameter's unit (the shape a run's inputs have), carrying the person or\nthe model that set it and the day it was set (`origin.at`), as an\nOverride and a scenario's value carry theirs. It holds those fields\nalone, and a value, low or high that is true or false is refused, as an\nOverride refuses one.",
         "properties": {
           "name": {
             "maxLength": 200,
@@ -2018,7 +2018,7 @@
             "type": "string"
           },
           "quantity": {
-            "$ref": "#/components/schemas/Quantity-Input"
+            "$ref": "#/components/schemas/Quantity"
           }
         },
         "required": [
@@ -2387,6 +2387,7 @@
           "configuration": {
             "anyOf": [
               {
+                "maxLength": 80,
                 "type": "string"
               },
               {
@@ -2420,6 +2421,8 @@
         "properties": {
           "configurations": {
             "items": {
+              "maxLength": 80,
+              "minLength": 1,
               "type": "string"
             },
             "title": "Configurations",
@@ -2717,7 +2720,7 @@
         "description": "A candidate a reviewer rejected — the only way one gets here (§6.2).",
         "properties": {
           "extracted": {
-            "$ref": "#/components/schemas/Quantity-Output"
+            "$ref": "#/components/schemas/Quantity"
           },
           "field": {
             "title": "Field",
@@ -2752,7 +2755,7 @@
           "extracted": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Quantity-Output"
+                "$ref": "#/components/schemas/Quantity"
               },
               {
                 "type": "null"
@@ -5022,7 +5025,7 @@
           },
           "records": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/ReviewDecision-Output"
+              "$ref": "#/components/schemas/ReviewDecision"
             },
             "title": "Records",
             "type": "object"
@@ -7147,7 +7150,7 @@
         "title": "ProposeRequest",
         "type": "object"
       },
-      "Quantity-Input": {
+      "Quantity": {
         "description": "A value and its unit; a categorical field carries a string value. A\nnumber a model, a person or a library supplies carries its origin\n(ADR-006); a value code derives from another (the SI form of a record's\nvalue) carries none, the thing it was derived from being its source.",
         "properties": {
           "basis": {
@@ -7216,7 +7219,6 @@
         "title": "Quantity",
         "type": "object"
       },
-      "Quantity-Output": {},
       "Range": {
         "properties": {
           "high": {
@@ -7233,6 +7235,20 @@
           "high"
         ],
         "title": "Range",
+        "type": "object"
+      },
+      "Refusal": {
+        "description": "The body of a refusal the service answers in words: a 404 for what is\nnot here, a 422 for what cannot be run, a 503 for an engine or a worker\nthat cannot answer (the engine routes declare each).",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "Refusal",
         "type": "object"
       },
       "RegressionValue": {
@@ -7368,7 +7384,7 @@
         "title": "ReplayTolerance",
         "type": "object"
       },
-      "ReviewDecision-Input": {
+      "ReviewDecision": {
         "description": "What a reviewer decided about one record (§7.1).\n\nThe first six fields are exactly the browser's DurableReviewDecision — the\nshape the Durable tier already persists — so a decision made offline and a\ndecision posted to the service are the same object. The rest say which\nrecord, when, and, for a decision that re-anchors the record to another\nsentence of the paper, the replacement span.",
         "properties": {
           "at": {
@@ -7378,7 +7394,7 @@
           "corrected": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Quantity-Input"
+                "$ref": "#/components/schemas/Quantity"
               },
               {
                 "type": "null"
@@ -7388,116 +7404,7 @@
           "gold": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Quantity-Input"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "provenance": {
-            "enum": [
-              "measured",
-              "gold",
-              "verified",
-              "curated",
-              "computed",
-              "unverified",
-              "user",
-              "industry-estimate",
-              "assumed"
-            ],
-            "title": "Provenance",
-            "type": "string"
-          },
-          "quote": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Quote"
-          },
-          "recordId": {
-            "title": "Recordid",
-            "type": "string"
-          },
-          "rejectReason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rejectreason"
-          },
-          "reviewer": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reviewer"
-          },
-          "sectionId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sectionid"
-          },
-          "status": {
-            "enum": [
-              "unverified",
-              "verified",
-              "rejected"
-            ],
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "status",
-          "provenance",
-          "recordId",
-          "at"
-        ],
-        "title": "ReviewDecision",
-        "type": "object"
-      },
-      "ReviewDecision-Output": {
-        "description": "What a reviewer decided about one record (§7.1).\n\nThe first six fields are exactly the browser's DurableReviewDecision — the\nshape the Durable tier already persists — so a decision made offline and a\ndecision posted to the service are the same object. The rest say which\nrecord, when, and, for a decision that re-anchors the record to another\nsentence of the paper, the replacement span.",
-        "properties": {
-          "at": {
-            "title": "At",
-            "type": "string"
-          },
-          "corrected": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Quantity-Output"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "gold": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Quantity-Output"
+                "$ref": "#/components/schemas/Quantity"
               },
               {
                 "type": "null"
@@ -7594,7 +7501,7 @@
             "type": "string"
           },
           "quantity": {
-            "$ref": "#/components/schemas/Quantity-Output"
+            "$ref": "#/components/schemas/Quantity"
           }
         },
         "required": [
@@ -8659,7 +8566,7 @@
           },
           "values": {
             "items": {
-              "$ref": "#/components/schemas/ScenarioValue-Input"
+              "$ref": "#/components/schemas/ScenarioValue"
             },
             "title": "Values",
             "type": "array"
@@ -8672,7 +8579,7 @@
         "title": "ScenarioCreate",
         "type": "object"
       },
-      "ScenarioValue-Input": {
+      "ScenarioValue": {
         "description": "One value a scenario sets on its plant: the parameter's key, and the\nvalue as a quantity whose origin is a named person's assumption or a\nmodel's estimate (ADR-006).",
         "properties": {
           "key": {
@@ -8680,25 +8587,7 @@
             "type": "string"
           },
           "quantity": {
-            "$ref": "#/components/schemas/Quantity-Input"
-          }
-        },
-        "required": [
-          "key",
-          "quantity"
-        ],
-        "title": "ScenarioValue",
-        "type": "object"
-      },
-      "ScenarioValue-Output": {
-        "description": "One value a scenario sets on its plant: the parameter's key, and the\nvalue as a quantity whose origin is a named person's assumption or a\nmodel's estimate (ADR-006).",
-        "properties": {
-          "key": {
-            "title": "Key",
-            "type": "string"
-          },
-          "quantity": {
-            "$ref": "#/components/schemas/Quantity-Output"
+            "$ref": "#/components/schemas/Quantity"
           }
         },
         "required": [
@@ -9143,7 +9032,7 @@
           },
           "values": {
             "items": {
-              "$ref": "#/components/schemas/ScenarioValue-Output"
+              "$ref": "#/components/schemas/ScenarioValue"
             },
             "title": "Values",
             "type": "array"
@@ -10775,6 +10664,26 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project holds no artifact of that id, in words."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The tool that made it is not registered in this service, or the stored artifact is damaged, in words."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -10809,7 +10718,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReviewDecision-Input"
+                "$ref": "#/components/schemas/ReviewDecision"
               }
             }
           },
@@ -10860,7 +10769,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReviewDecision-Input"
+                "$ref": "#/components/schemas/ReviewDecision"
               }
             }
           },
@@ -10871,7 +10780,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReviewDecision-Output"
+                  "$ref": "#/components/schemas/ReviewDecision"
                 }
               }
             },
@@ -11282,7 +11191,7 @@
     },
     "/api/engines/{name}/parameters": {
       "get": {
-        "description": "What one of an engine's things takes, each default with its origin.",
+        "description": "What one of an engine's things takes, each default with its origin.\nA contract engine's thing and configuration are resolved as a run of it\nresolves them (`runs.thing_of`): no configuration named reads the\nthing's default.",
         "operationId": "engine_parameters_api_engines__name__parameters_get",
         "parameters": [
           {
@@ -11344,15 +11253,42 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The thing refused in words: one the engine does not run, or a configuration it does not take (a list of field errors when the request's own fields are refused)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The engine cannot be used (it failed to load or to declare what it must), its worker could not answer, or it answered outside the protocol: in words, with no run kept."
           }
         },
         "summary": "Engine Parameters",
@@ -11361,7 +11297,7 @@
     },
     "/api/engines/{name}/run": {
       "post": {
-        "description": "One of an engine's things run with the values a person or a model sets,\nkept as a runs row; a refused run is kept as a receipt and 422 in words.",
+        "description": "One of an engine's things run with the values a person or a model sets,\nkept as a runs row; a refused run is kept as a receipt and 422 in words.\nAn engine that answers outside its contract keeps no run and is 503.",
         "operationId": "engine_run_api_engines__name__run_post",
         "parameters": [
           {
@@ -11404,15 +11340,42 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request refused in words: a field it does not hold, a bare number, a thing or a configuration the engine does not run, a value its parameters refuse, or a run the engine refused, kept as a receipt (a list of field errors when the request's own fields are refused)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The engine cannot be used (it failed to load or to declare what it must), its worker could not answer, or it answered outside the protocol: in words, with no run kept."
           }
         },
         "summary": "Engine Run",
@@ -16260,6 +16223,16 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project holds no run of that id, in words."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -17304,7 +17277,7 @@
     },
     "/api/tools/{name}": {
       "post": {
-        "description": "Run one tool through the registry, the same path Postdoc's loop and\nthe MCP server take, in the request's project. A refusal is a result\nwith `error` set; an unknown tool is a 404. The body is the tool's\ninput; `?by=` names the person calling, who is the author of any\nquantity the input types (ADR-006) and of any study write it makes.",
+        "description": "Run one tool through the registry, the same path Postdoc's loop and\nthe MCP server take, in the request's project. A refusal is a result\nwith `error` set; an unknown tool is a 404. The body is the tool's\ninput; `?by=` names the person calling, who is the author of any\nquantity the input types (ADR-006) and of any write it makes: the audit\nrow, a proposal and what the write keeps are marked as that person's,\nand a store that holds a model's work alone (pureOS's kept trains)\nrefuses the write in its words. A tool that writes (`writes` in\ndocs/TOOLS.md) is run only for a person named so: a call that names\nnobody is a 422 in words, and nothing runs.",
         "operationId": "tools_run_api_tools__name__post",
         "parameters": [
           {
@@ -17359,15 +17332,32 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "No tool of that name is registered here, in words."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "A tool that writes, called with no ?by= naming the person calling, in words (a list of field errors when the body is no JSON object)."
           }
         },
         "summary": "Tools Run",

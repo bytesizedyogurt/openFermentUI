@@ -192,8 +192,8 @@ def test_a_person_the_endpoint_names_types_an_assumption(worker):
     made = client.post("/api/tools/study_scenario", params={"by": "Ada Moreno"}, json=dearer_cane()).json()
     assert made["error"] is None and made["summary"]["values"][0]["origin"] == "person-assumption"
     assert made["summary"]["values"][0]["by"] == "Ada Moreno"
-    refused = client.post("/api/tools/study_scenario", json=dearer_cane()).json()
-    assert "names who typed it" in refused["error"]
+    refused = client.post("/api/tools/study_scenario", json=dearer_cane())
+    assert refused.status_code == 422 and "this call names nobody" in refused.json()["detail"]
 
 
 def test_the_shelf_and_a_plants_parameters(worker):

@@ -378,9 +378,24 @@ def test_the_routes_list_carry_out_and_dismiss(pool, store, client):  # noqa: F8
 
 
 def test_the_endpoint_runs_a_write_tool_like_the_loop(pool, store, client):  # noqa: F811
-    r = client.post("/api/tools/runbooks_write", json={"action": "lock", "target": "rb-1", "fields": {}, "note": "n"})
+    asked = {"action": "lock", "target": "rb-1", "fields": {}, "note": "n"}
+    nobody = client.post("/api/tools/runbooks_write", json=asked)
+    assert nobody.status_code == 422 and "this call names nobody" in nobody.json()["detail"]
+    assert proposals.open_ones() == [], "a write that names nobody runs nothing"
+    r = client.post("/api/tools/runbooks_write", params={"by": "Ada Lovelace"}, json=asked)
     assert r.status_code == 200 and r.json()["summary"]["state"] == "proposed"
     assert [p.askId for p in proposals.open_ones()] == [None]
+    # The person ?by= names is the write's author: the proposal and its audit
+    # row are hers, with no effort, and it waits for a person as every proposal does.
+    (made,) = proposals.open_ones()
+    assert made.by == "Ada Lovelace" and made.state == "proposed"
+    (line,) = audit.read()
+    assert (line.agent, line.who, line.action, line.state, line.effort) == ("person", "Ada Lovelace", "lock",
+                                                                            "proposed", None)
+    note = client.post("/api/tools/home_write", params={"by": "Ada Lovelace"},
+                       json={"action": "note", "target": "", "fields": {}, "note": "a placeholder note"})
+    assert note.status_code == 200 and note.json()["error"] is None
+    assert [(a.agent, a.who) for a in audit.read()][-1] == ("person", "Ada Lovelace")
 
 
 def test_the_log_reads_its_newest_rows_newest_last(store):

@@ -344,6 +344,9 @@ export interface paths {
         /**
          * Engine Parameters
          * @description What one of an engine's things takes, each default with its origin.
+         *     A contract engine's thing and configuration are resolved as a run of it
+         *     resolves them (`runs.thing_of`): no configuration named reads the
+         *     thing's default.
          */
         get: operations["engine_parameters_api_engines__name__parameters_get"];
         put?: never;
@@ -367,6 +370,7 @@ export interface paths {
          * Engine Run
          * @description One of an engine's things run with the values a person or a model sets,
          *     kept as a runs row; a refused run is kept as a receipt and 422 in words.
+         *     An engine that answers outside its contract keeps no run and is 503.
          */
         post: operations["engine_run_api_engines__name__run_post"];
         delete?: never;
@@ -2582,7 +2586,12 @@ export interface paths {
          *     the MCP server take, in the request's project. A refusal is a result
          *     with `error` set; an unknown tool is a 404. The body is the tool's
          *     input; `?by=` names the person calling, who is the author of any
-         *     quantity the input types (ADR-006) and of any study write it makes.
+         *     quantity the input types (ADR-006) and of any write it makes: the audit
+         *     row, a proposal and what the write keeps are marked as that person's,
+         *     and a store that holds a model's work alone (pureOS's kept trains)
+         *     refuses the write in its words. A tool that writes (`writes` in
+         *     docs/TOOLS.md) is run only for a person named so: a call that names
+         *     nobody is a 422 in words, and nothing runs.
          */
         post: operations["tools_run_api_tools__name__post"];
         delete?: never;
@@ -2918,7 +2927,7 @@ export interface components {
             rejectReason?: string | null;
             /** Sectionid */
             sectionId: string;
-            si: components["schemas"]["Quantity-Output"];
+            si: components["schemas"]["Quantity"];
             /**
              * Status
              * @default unverified
@@ -3173,7 +3182,7 @@ export interface components {
         ClaimValue: {
             /** Label */
             label: string;
-            quantity: components["schemas"]["Quantity-Output"];
+            quantity: components["schemas"]["Quantity"];
             /** Source */
             source?: string | null;
         };
@@ -3432,13 +3441,15 @@ export interface components {
          * EngineInput
          * @description A value a run sets: a parameter's key and a typed quantity in that
          *     parameter's unit (the shape a run's inputs have), carrying the person or
-         *     the model that set it. It holds those fields alone, and a value, low or
-         *     high that is true or false is refused, as an Override refuses one.
+         *     the model that set it and the day it was set (`origin.at`), as an
+         *     Override and a scenario's value carry theirs. It holds those fields
+         *     alone, and a value, low or high that is true or false is refused, as an
+         *     Override refuses one.
          */
         EngineInput: {
             /** Name */
             name: string;
-            quantity: components["schemas"]["Quantity-Input"];
+            quantity: components["schemas"]["Quantity"];
         };
         /**
          * EngineParameter
@@ -3717,7 +3728,7 @@ export interface components {
          * @description A candidate a reviewer rejected — the only way one gets here (§6.2).
          */
         ExtractRunFalsePositive: {
-            extracted: components["schemas"]["Quantity-Output"];
+            extracted: components["schemas"]["Quantity"];
             /** Field */
             field: string;
             /** Id */
@@ -3732,7 +3743,7 @@ export interface components {
          * @description One reference, a value a reviewer typed, scored against a run (§6.2).
          */
         ExtractRunResult: {
-            extracted?: components["schemas"]["Quantity-Output"] | null;
+            extracted?: components["schemas"]["Quantity"] | null;
             /** Goldrecordid */
             goldRecordId: string;
             /**
@@ -4613,7 +4624,7 @@ export interface components {
             };
             /** Records */
             records?: {
-                [key: string]: components["schemas"]["ReviewDecision-Output"];
+                [key: string]: components["schemas"]["ReviewDecision"];
             };
             /** Runs */
             runs?: components["schemas"]["ExtractRun"][] | null;
@@ -5364,7 +5375,7 @@ export interface components {
          *     (ADR-006); a value code derives from another (the SI form of a record's
          *     value) carries none, the thing it was derived from being its source.
          */
-        "Quantity-Input": {
+        Quantity: {
             /** Basis */
             basis?: string | null;
             /** High */
@@ -5377,13 +5388,22 @@ export interface components {
             /** Value */
             value: number | string;
         };
-        "Quantity-Output": unknown;
         /** Range */
         Range: {
             /** High */
             high: number;
             /** Low */
             low: number;
+        };
+        /**
+         * Refusal
+         * @description The body of a refusal the service answers in words: a 404 for what is
+         *     not here, a 422 for what cannot be run, a 503 for an engine or a worker
+         *     that cannot answer (the engine routes declare each).
+         */
+        Refusal: {
+            /** Detail */
+            detail: string;
         };
         /**
          * RegressionValue
@@ -5458,47 +5478,11 @@ export interface components {
          *     record, when, and, for a decision that re-anchors the record to another
          *     sentence of the paper, the replacement span.
          */
-        "ReviewDecision-Input": {
+        ReviewDecision: {
             /** At */
             at: string;
-            corrected?: components["schemas"]["Quantity-Input"] | null;
-            gold?: components["schemas"]["Quantity-Input"] | null;
-            /**
-             * Provenance
-             * @enum {string}
-             */
-            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
-            /** Quote */
-            quote?: string | null;
-            /** Recordid */
-            recordId: string;
-            /** Rejectreason */
-            rejectReason?: string | null;
-            /** Reviewer */
-            reviewer?: string | null;
-            /** Sectionid */
-            sectionId?: string | null;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "unverified" | "verified" | "rejected";
-        };
-        /**
-         * ReviewDecision
-         * @description What a reviewer decided about one record (§7.1).
-         *
-         *     The first six fields are exactly the browser's DurableReviewDecision — the
-         *     shape the Durable tier already persists — so a decision made offline and a
-         *     decision posted to the service are the same object. The rest say which
-         *     record, when, and, for a decision that re-anchors the record to another
-         *     sentence of the paper, the replacement span.
-         */
-        "ReviewDecision-Output": {
-            /** At */
-            at: string;
-            corrected?: components["schemas"]["Quantity-Output"] | null;
-            gold?: components["schemas"]["Quantity-Output"] | null;
+            corrected?: components["schemas"]["Quantity"] | null;
+            gold?: components["schemas"]["Quantity"] | null;
             /**
              * Provenance
              * @enum {string}
@@ -5528,7 +5512,7 @@ export interface components {
         RunInput: {
             /** Name */
             name: string;
-            quantity: components["schemas"]["Quantity-Output"];
+            quantity: components["schemas"]["Quantity"];
         };
         /**
          * RunReport
@@ -5961,7 +5945,7 @@ export interface components {
             /** Title */
             title: string;
             /** Values */
-            values?: components["schemas"]["ScenarioValue-Input"][];
+            values?: components["schemas"]["ScenarioValue"][];
         };
         /**
          * ScenarioValue
@@ -5969,21 +5953,10 @@ export interface components {
          *     value as a quantity whose origin is a named person's assumption or a
          *     model's estimate (ADR-006).
          */
-        "ScenarioValue-Input": {
+        ScenarioValue: {
             /** Key */
             key: string;
-            quantity: components["schemas"]["Quantity-Input"];
-        };
-        /**
-         * ScenarioValue
-         * @description One value a scenario sets on its plant: the parameter's key, and the
-         *     value as a quantity whose origin is a named person's assumption or a
-         *     model's estimate (ADR-006).
-         */
-        "ScenarioValue-Output": {
-            /** Key */
-            key: string;
-            quantity: components["schemas"]["Quantity-Output"];
+            quantity: components["schemas"]["Quantity"];
         };
         /**
          * SearchHit
@@ -6171,7 +6144,7 @@ export interface components {
             /** Title */
             title: string;
             /** Values */
-            values: components["schemas"]["ScenarioValue-Output"][];
+            values: components["schemas"]["ScenarioValue"][];
         };
         /**
          * ThermoPropsRequest
@@ -6845,6 +6818,24 @@ export interface operations {
                     "application/json": components["schemas"]["ReplayResult"];
                 };
             };
+            /** @description The project holds no artifact of that id, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The tool that made it is not registered in this service, or the stored artifact is damaged, in words. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6868,7 +6859,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReviewDecision-Input"];
+                "application/json": components["schemas"]["ReviewDecision"];
             };
         };
         responses: {
@@ -6904,7 +6895,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReviewDecision-Input"];
+                "application/json": components["schemas"]["ReviewDecision"];
             };
         };
         responses: {
@@ -6914,7 +6905,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReviewDecision-Output"];
+                    "application/json": components["schemas"]["ReviewDecision"];
                 };
             };
             /** @description Validation Error */
@@ -7205,13 +7196,31 @@ export interface operations {
                     "application/json": components["schemas"]["EngineParameter"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The thing refused in words: one the engine does not run, or a configuration it does not take (a list of field errors when the request's own fields are refused). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The engine cannot be used (it failed to load or to declare what it must), its worker could not answer, or it answered outside the protocol: in words, with no run kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -7243,13 +7252,31 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
-            /** @description Validation Error */
+            /** @description No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The request refused in words: a field it does not hold, a bare number, a thing or a configuration the engine does not run, a value its parameters refuse, or a run the engine refused, kept as a receipt (a list of field errors when the request's own fields are refused). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The engine cannot be used (it failed to load or to declare what it must), its worker could not answer, or it answered outside the protocol: in words, with no run kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -10232,6 +10259,15 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
+            /** @description The project holds no run of that id, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10936,13 +10972,22 @@ export interface operations {
                     "application/json": components["schemas"]["ToolResult"];
                 };
             };
-            /** @description Validation Error */
+            /** @description No tool of that name is registered here, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A tool that writes, called with no ?by= naming the person calling, in words (a list of field errors when the body is no JSON object). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };

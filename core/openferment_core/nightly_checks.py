@@ -1,10 +1,17 @@
 """What the nightly job checks after intake (OF-BLD-014 §10.2): every
 fetched model file against its pinned hash, and the ten newest artifacts of
-each project replayed against what was kept. It reports and rewrites
-nothing; the exit code is non-zero when a file does not match or a replay
-differs, so the night's log says so.
+each project replayed against what was kept. A replay holds when it is
+identical, or when every number lies within the precision its basis states
+(a BioSTEAM run's last kept digit); the log says which. It reports and
+rewrites nothing; the exit code is non-zero when a file does not match or a
+replay lies outside its precision, so the night's log says so.
 
     python -m openferment_core.nightly_checks
+
+Its registrars are every artifact tool the service registers, BioSTEAM's
+library runs and every engine's among them, so replaying a BioSTEAM run
+starts the Proforma worker, where BioSTEAM runs (a cold import of about
+thirty seconds), and builds that run's plant afresh.
 
 A nightly command acts in the project OPENFERMENT_PROJECT names, or in every
 project the database holds (`each_project`); the checks queue's commands
@@ -54,9 +61,11 @@ def load_registrars() -> None:
 
 
 def replay_newest(n: int = REPLAY_NEWEST) -> list[str]:
-    """Problems: a replay that differs at the tool's current version. An
-    artifact an earlier version made is reported as stale, and is no
-    problem: what it holds is what that version computed."""
+    """Problems: a replay at the tool's current version that lies outside
+    the precision its basis states. One identical, or within that precision,
+    holds, and the log says which. An artifact an earlier version made is
+    reported as stale, and is no problem: what it holds is what that version
+    computed."""
     from . import artifacts
 
     load_registrars()
@@ -78,6 +87,10 @@ def replay_newest(n: int = REPLAY_NEWEST) -> list[str]:
             continue
         if r.identical:
             print(f"artifact {a.id} ({a.tool}): replays identically")
+        elif r.withinTolerance:
+            held = f"rtol {r.tolerance.rtol:g}, atol {r.tolerance.atol:g}" if r.tolerance else "its stated precision"
+            print(f"artifact {a.id} ({a.tool}): replays within its precision ({held}), "
+                  f"{len(r.differences)} difference{'s' if len(r.differences) != 1 else ''} inside it")
         else:
             problems.append(f"artifact {a.id} ({a.tool}) replays differently: {len(r.differences)} differences, "
                             f"first at {r.differences[0].path if r.differences else '?'}")

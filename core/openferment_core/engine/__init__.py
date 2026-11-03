@@ -53,12 +53,24 @@ class EngineRefused(ValueError):
     """A request the engine cannot run, in its words (a receipt, never a traceback)."""
 
 
+class EngineBroken(RuntimeError):
+    """An engine that broke its contract: its worker answered outside the
+    protocol (a result key missing, outputs that are no list of names, values
+    and units, two outputs of one name, a number that is NaN or infinite, a
+    flowsheet that is no JSON object), or its own `run` kept no row. Said in
+    the service's words, with no runs row kept; the routes answer it 503. A
+    break in the `run` op keeps nothing, so the next ask after the engine is
+    mended computes afresh; a break in `sff_export` comes after the run's
+    artifact is kept, so the next ask answers the computation from that
+    artifact and asks for the file again."""
+
+
 def __getattr__(name: str) -> object:
-    """`WorkerEngine` and `version_string`, the contract's own implementation
-    (engine/contract.py), imported on first use: `from openferment_core.engine
-    import WorkerEngine` works, and importing this package still imports none
-    of its modules."""
-    if name in ("WorkerEngine", "version_string"):
+    """`WorkerEngine`, `version_string` and `CONTRACT_RUN`, the contract's own
+    implementation (engine/contract.py), imported on first use: `from
+    openferment_core.engine import WorkerEngine` works, and importing this
+    package still imports none of its modules."""
+    if name in ("WorkerEngine", "version_string", "CONTRACT_RUN"):
         from . import contract
 
         return getattr(contract, name)
@@ -71,8 +83,9 @@ class Engine(Protocol):
 
     `name` matches the entry point that registers it; `worker` is the module
     its heavy computation runs in, or None for an engine that computes in
-    the service's process with nothing heavy; `heavy` names the modules the
-    service process must never import (conformance check 6)."""
+    the service's process with nothing heavy; `heavy` names the modules its
+    worker computes with, each with every module below it, which the service
+    keeps out of its process (conformance check 6)."""
 
     name: str
     worker: str | None

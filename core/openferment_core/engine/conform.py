@@ -2,7 +2,9 @@
 Conformance; ADR-015).
 
     python -m openferment_core.engine.conform <name>     the eight checks, one row each
-        [--thing <id>]...      narrow the checks to these things (the first one is run)
+        [--thing <id>]...      narrow the checks to these things, in the order named
+                               (the first named is run); an id the engine runs none of
+                               is refused in words
         [--inputs <file>]      a JSON list of EngineInputs the run is made with, for an
                                engine whose thing waits for values no default gives
 
@@ -17,18 +19,20 @@ current: a test's, or the proof's (scripts/prove.py).
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import secrets
 import subprocess
 import sys
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from .. import db, projects
 from ..db import models as t
-from ..models import EngineCheck, EngineConformance, EngineInput, EngineRun, Origin, Quantity
+from ..models import EngineCheck, EngineConformance, EngineInput, EnginePrecision, EngineRun, EngineThing, Origin, Quantity
 from . import EngineRefused
 from .contract import version_string
 
@@ -39,7 +43,7 @@ CHECKS: dict[int, str] = {
     4: "a replay holds every output within the precision the thing states",
     5: "the run's SFF file validates and scores, or sffRefused holds words",
     6: "importing the module the entry point names imports neither the worker module nor what the engine computes with",
-    7: "a request the engine cannot run is refused with a receipt in words, with no traceback",
+    7: "a request the engine refuses is kept as a receipt in its words, with no traceback",
     8: "created_by on every run is the person or the model that asked for it",
 }
 CORE = Path(__file__).resolve().parent.parent.parent
@@ -60,6 +64,32 @@ def _traceless(said: str) -> bool:
     return bool(said.strip()) and "Traceback" not in said and 'File "' not in said
 
 
+def _configuration_of(thing: Any) -> str | None:
+    """The configuration a check runs a thing in: its default, or the first
+    it names, since a thing with configurations and no default is run with
+    one named."""
+    return thing.defaultConfiguration or (thing.configurations[0] if thing.configurations else None)
+
+
+@contextlib.contextmanager
+def _spied(engine: Any, wrappers: dict[str, Callable[[Callable[..., Any]], Callable[..., Any]]]) -> Iterator[None]:
+    """Each named method of the engine stood in by its wrapper for the block,
+    and put back after as it was: an attribute of the object's own restored,
+    one its class gives deleted."""
+    saved = {m: getattr(engine, m) for m in wrappers if callable(getattr(engine, m, None))}
+    own = {m for m in saved if m in getattr(engine, "__dict__", {})}
+    try:
+        for m, fn in saved.items():
+            setattr(engine, m, wrappers[m](fn))
+        yield
+    finally:
+        for m in saved:
+            if m in own:
+                setattr(engine, m, saved[m])
+            else:
+                delattr(engine, m)
+
+
 # ── the eight checks ────────────────────────────────────────────────────
 
 
@@ -70,34 +100,28 @@ def _bare_number(engine: Any, thing: str, by: str) -> tuple[bool, str]:
     from ..engine import runs
 
     calls: list[str] = []
-    saved = {m: getattr(engine, m) for m in ("run", "compute") if callable(getattr(engine, m, None))}
-    own = {m for m in saved if m in getattr(engine, "__dict__", {})}
 
-    def spy(name: str, fn: Callable[..., Any]) -> Callable[..., Any]:
-        def called(*a: Any, **k: Any) -> Any:
-            calls.append(name)
-            return fn(*a, **k)
-        return called
+    def spy(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        def wrap(fn: Callable[..., Any]) -> Callable[..., Any]:
+            def called(*a: Any, **k: Any) -> Any:
+                calls.append(name)
+                return fn(*a, **k)
+            return called
+        return wrap
 
     held = {r.id for r in runs.listed(engine.name)}
     client = TestClient(api.app, base_url="http://127.0.0.1")
     try:
-        for m, fn in saved.items():
-            setattr(engine, m, spy(m, fn))
-        headers = {projects.HEADER: projects.current()}
-        # A number in place of a quantity, then a stray number beside the
-        # request's own fields: both refused at the route.
-        http = [client.post(f"/api/engines/{engine.name}/run", headers=headers, json=body) for body in (
-            {"thing": thing, "inputs": [{"name": "a-parameter", "quantity": 1.5}], "by": by},
-            {"thing": thing, "inputs": [], "by": by, "n": 3})]
-        tool = tools.run("engine_run", {"engine": engine.name, "plant": thing, "configuration": 7},
-                         tools.ToolContext(model=by))
+        with _spied(engine, {"run": spy("run"), "compute": spy("compute")}):
+            headers = {projects.HEADER: projects.current()}
+            # A number in place of a quantity, then a stray number beside the
+            # request's own fields: both refused at the route.
+            http = [client.post(f"/api/engines/{engine.name}/run", headers=headers, json=body) for body in (
+                {"thing": thing, "inputs": [{"name": "a-parameter", "quantity": 1.5}], "by": by},
+                {"thing": thing, "inputs": [], "by": by, "n": 3})]
+            tool = tools.run("engine_run", {"engine": engine.name, "plant": thing, "configuration": 7},
+                             tools.ToolContext(model=by))
     finally:
-        for m in saved:
-            if m in own:
-                setattr(engine, m, saved[m])
-            else:
-                delattr(engine, m)
         client.close()
     kept = {r.id for r in runs.listed(engine.name)} - held
     codes = [h.status_code for h in http]
@@ -113,7 +137,7 @@ def _bare_number(engine: Any, thing: str, by: str) -> tuple[bool, str]:
 def _origins(engine: Any, things: list[Any]) -> tuple[bool, str]:
     count, wrong = 0, []
     for th in things:
-        for p in engine.parameters(th.id, th.defaultConfiguration):
+        for p in engine.parameters(th.id, _configuration_of(th)):
             count += 1
             o = p.origin
             if not ((o.kind == "library-default" and (o.ref or "").strip())
@@ -122,7 +146,8 @@ def _origins(engine: Any, things: list[Any]) -> tuple[bool, str]:
     names = ", ".join(th.id for th in things)
     if wrong:
         return False, f"{len(wrong)} of {count} parameters lack an origin with what it names: {', '.join(wrong[:6])}"
-    return True, f"{count} parameters of {len(things)} things ({names}), each in its default configuration"
+    return True, (f"{count} parameters of {len(things)} things ({names}), each in its default configuration or "
+                  "its first")
 
 
 def _row_count(run_id: str) -> int:
@@ -148,28 +173,142 @@ def _created_by(run_id: str) -> str | None:
     return db.run(read())
 
 
+def _today() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
 def _model_inputs(engine: Any, thing: Any, inputs: list[EngineInput]) -> list[EngineInput] | None:
     """Check 8's model path on a basis of its own: the checked run's values set
     as the model's estimates, or, with none, the thing's first parameter set to
-    its own default as the model's estimate; None when the thing takes none."""
+    its own default as the model's estimate; None when the thing takes none.
+    Each estimate is dated the day the check runs (its origin's `at`), so the
+    model's run is a basis of that day."""
+    at = _today()
     if inputs:
         return [EngineInput(name=i.name, quantity=i.quantity.model_copy(update={"origin": Origin(
-            kind="model-estimate", by=MODEL, note="conformance check 8: the checked run's value")}))
+            kind="model-estimate", by=MODEL, at=at, note="conformance check 8: the checked run's value")}))
             for i in inputs]
-    for p in engine.parameters(thing.id, thing.defaultConfiguration):
+    for p in engine.parameters(thing.id, _configuration_of(thing)):
         if p.value is not None:
             return [EngineInput(name=p.key, quantity=Quantity(value=p.value, unit=p.unit, origin=Origin(
-                kind="model-estimate", by=MODEL, note="conformance check 8: the parameter's own default")))]
+                kind="model-estimate", by=MODEL, at=at, note="conformance check 8: the parameter's own default")))]
     return None
+
+
+def _second_basis(chosen: list[Any], first: Any) -> tuple[str, str | None] | None:
+    """A basis the checked run did not make, for check 8's model to ask through
+    the tool door: another thing checked, in its configuration, else another
+    configuration of the first; None when there is neither."""
+    for th in chosen:
+        if th.id != first.id:
+            return th.id, _configuration_of(th)
+    ran = _configuration_of(first)
+    other = next((c for c in first.configurations if c != ran), None)
+    return (first.id, other) if other is not None else None
+
+
+def _refused_unknown(engine: Any, by: str) -> tuple[bool, str]:
+    """Check 7. An engine built on WorkerEngine is offered the thing
+    NO_SUCH_THING as though it were one of its own, taking no parameters: the
+    first ask reaches its worker's `run` op once, the worker's `Refused` is
+    kept as a receipt in the worker's words, and the same request asked again
+    is answered from the receipt with the worker's `run` op never asked. Any
+    other engine refuses the unknown thing in words, keeping nothing."""
+    from ..engine import runs
+
+    held = {r.id for r in runs.listed(engine.name)}
+    if not callable(getattr(engine, "compute", None)):
+        try:
+            runs.run_with(engine, NO_SUCH_THING, None, [], by=by)
+            return False, f"a run of {NO_SUCH_THING!r} was kept where it should have been refused"
+        except (EngineRefused, LookupError, ValueError) as e:
+            said = _words(e)
+            kept = {r.id for r in runs.listed(engine.name)} - held
+            return _traceless(said) and not kept, (f"refused in words, {len(kept)} run kept: {said[:200]}")
+
+    computed: list[str] = []
+    offered = EngineThing(id=NO_SUCH_THING, title="a thing the conformance check offers the worker as one of its own",
+                          precision=EnginePrecision(rtol=0, atol=0))
+
+    def things(fn: Callable[..., Any]) -> Callable[..., Any]:
+        return lambda *a, **k: [*fn(*a, **k), offered]
+
+    def parameters(fn: Callable[..., Any]) -> Callable[..., Any]:
+        return lambda thing, configuration, *a, **k: [] if thing == NO_SUCH_THING else fn(thing, configuration, *a, **k)
+
+    def compute(fn: Callable[..., Any]) -> Callable[..., Any]:
+        def called(*a: Any, **k: Any) -> Any:
+            computed.append("compute")
+            return fn(*a, **k)
+        return called
+
+    asked: list[Any] = []
+    with _spied(engine, {"things": things, "parameters": parameters, "compute": compute}):
+        for _ in range(2):
+            before = len(computed)
+            try:
+                runs.run_with(engine, NO_SUCH_THING, None, [], by=by)
+                return False, f"its worker computed {NO_SUCH_THING!r} where it should have refused it, and a run was kept"
+            except runs.RunRefused as e:
+                asked.append((e, len(computed) - before))
+            except Exception as e:  # a refusal that is no receipt, or a failure: said as it came
+                return False, f"refused with no receipt: {type(e).__name__}: {_words(e)[:160]}"
+    (once, first), (twice, again) = asked
+    receipt = runs.get(once.run_id)
+    said = (receipt.refused or "").strip()
+    reached = first == 1
+    from_receipt = twice.run_id == once.run_id and again == 0
+    ok = receipt.status == "refused" and receipt.artifactId is None and _traceless(said) and reached and from_receipt
+    return ok, ((f"its worker refused {NO_SUCH_THING!r}, kept as receipt {once.run_id} in its words: {said[:160]}; "
+                 if reached else
+                 f"the first ask reached its worker's run op {first} time{'s' if first != 1 else ''}, and the check "
+                 f"holds when it reaches it once; it answered as receipt {once.run_id}: {said[:160]}; ")
+                + ("asked again, answered from the receipt with the worker's run op never asked" if from_receipt else
+                   f"asked again, answered as {twice.run_id} with the worker's run op asked {again} more "
+                   f"time{'s' if again != 1 else ''}"))
+
+
+def _model_path(engine: Any, chosen: list[Any], first: Any, inputs: list[EngineInput], run: EngineRun) -> tuple[bool, str]:
+    """Check 8's second run, in a model's name, on a basis the checked run did
+    not make. With no values set, through the tool door (`engine_run`, the
+    model in the tool's context) on another thing or configuration; with
+    values, or with no second basis, through `runs.run_with` with the values
+    as the model's estimates. Either way its created_by column is read."""
+    from .. import tools
+    from ..engine import runs
+
+    other = None if inputs else _second_basis(chosen, first)
+    if other is not None:
+        thing, configuration = other
+        where = thing + (f" ({configuration})" if configuration else "")
+        done = tools.run("engine_run", {"engine": engine.name, "plant": thing, "configuration": configuration or ""},
+                         tools.ToolContext(model=MODEL))
+        if done.error:
+            return False, f"the model's run of {where} through the engine_run tool was refused: {done.error[:200]}"
+        run_id = str(done.summary.get("runId") or "")
+        who = _created_by(run_id)
+        return (who == MODEL and done.summary.get("by") == MODEL and run_id != run.id), (
+            f"a model's run of {where} through the engine_run tool ({run_id}): created_by {who!r}, asked by {MODEL!r}")
+    asked = _model_inputs(engine, first, inputs)
+    if asked is None:
+        return True, f"the model's path needs a value to set or a second thing, and {first.id} takes none"
+    m = runs.run_with(engine, first.id, _configuration_of(first), asked, by=MODEL).run
+    who = _created_by(m.id)
+    return (who == MODEL and m.by == MODEL and m.id != run.id), (
+        f"a model's run ({m.id}, {len(asked)} value{'s' if len(asked) != 1 else ''} its estimate): created_by {who!r}, "
+        f"asked by {MODEL!r}")
 
 
 def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str | None = None,
            inputs: list[EngineInput] | None = None) -> list[EngineCheck]:
     """The eight checks of docs/api/engines.md on `engine`, in the current
-    database and project. `things` narrows checks 2 to those things (the
-    first one runs checks 3, 4, 5, 7 and 8); `entry` is the entry point's
+    database and project. `things` narrows the checks to those things, in the
+    order named, an id the engine runs none of refused in words: check 2
+    reads the parameters of each, checks 3, 4, 5 and 8 run the first named,
+    and check 8's model asks for the next; `entry` is the entry point's
     `module:attr` for check 6; `inputs` are the values the checked run sets,
-    for a thing that waits for values its parameters give no default."""
+    for a thing that waits for values its parameters give no default. A
+    thing runs in its default configuration, or in the first it names."""
     from .. import artifacts
     from ..engine import runs
 
@@ -181,10 +320,14 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
         out.append(EngineCheck(number=n, check=CHECKS[n], ok=ok, said=said))
 
     every = engine.things()
-    chosen = [th for th in every if things is None or th.id in things]
-    if not chosen:
-        raise ConformRefused(f"the {engine.name} engine runs none of {things}; it runs "
+    by_id = {th.id: th for th in every}
+    unknown = [t for t in things or [] if t not in by_id]
+    if unknown:
+        raise ConformRefused(f"the {engine.name} engine runs no {', '.join(map(repr, unknown))}; it runs "
                              f"{', '.join(th.id for th in every) or 'nothing'}")
+    chosen = [by_id[t] for t in dict.fromkeys(things)] if things else list(every)
+    if not chosen:
+        raise ConformRefused(f"the {engine.name} engine runs nothing to check")
     first = chosen[0]
     try:
         add(1, *_bare_number(engine, first.id, by))
@@ -197,8 +340,8 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
 
     run: EngineRun | None = None
     try:
-        a = runs.run_with(engine, first.id, first.defaultConfiguration, inputs, by=by).run
-        b = runs.run_with(engine, first.id, first.defaultConfiguration, inputs, by=by).run
+        a = runs.run_with(engine, first.id, _configuration_of(first), inputs, by=by).run
+        b = runs.run_with(engine, first.id, _configuration_of(first), inputs, by=by).run
         rows = _row_count(a.id)
         keyed = False
         if a.artifactId is not None:
@@ -244,24 +387,9 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
         add(6, False, "no entry point was given to import")
 
     try:
-        runs.run_with(engine, NO_SUCH_THING, None, [], by=by)
-        add(7, False, f"a run of {NO_SUCH_THING!r} was kept where it should have been refused")
-    except (EngineRefused, LookupError, ValueError) as e:
-        said = _words(e)
-        ok, words = _traceless(said), f"refused: {said[:200]}"
-        if ok and callable(getattr(engine, "compute", None)):
-            # The worker's own discipline: what it cannot compute it refuses
-            # with `Refused`, which reaches the service as the engine's words.
-            try:
-                engine.compute(NO_SUCH_THING, None, [])
-                ok, words = False, words + f"; its worker computed {NO_SUCH_THING!r} where it should have refused it"
-            except EngineRefused as w:
-                words += f"; its worker refused it too: {_words(w)[:160]}"
-            except Exception as w:
-                ok, words = False, words + f"; its worker failed with no Refused: {type(w).__name__}: {_words(w)[:160]}"
-        add(7, ok, words)
+        add(7, *_refused_unknown(engine, by))
     except Exception as e:
-        add(7, False, f"refused with no words of the engine's: {type(e).__name__}: {_words(e)[:160]}")
+        add(7, False, f"the check could not be made: {type(e).__name__}: {_words(e)[:160]}")
 
     if run is None:
         add(8, False, "no run to read created_by from (check 3)")
@@ -270,15 +398,8 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
         ok = who == by and run.by == by
         words = f"a person's run: created_by {who!r}, its by {run.by!r}, asked by {by!r}"
         try:
-            asked = _model_inputs(engine, first, inputs)
-            if asked is None:
-                words += f"; the model's path needs a value to set, and {first.id} takes none"
-            else:
-                m = runs.run_with(engine, first.id, first.defaultConfiguration, asked, by=MODEL).run
-                mwho = _created_by(m.id)
-                ok = ok and mwho == MODEL and m.by == MODEL and m.id != run.id
-                words += (f"; a model's run ({m.id}, {len(asked)} value{'s' if len(asked) != 1 else ''} its estimate): "
-                          f"created_by {mwho!r}, asked by {MODEL!r}")
+            held, said = _model_path(engine, chosen, first, inputs, run)
+            ok, words = ok and held, f"{words}; {said}"
         except Exception as e:
             ok, words = False, words + f"; the model's run could not be made: {type(e).__name__}: {_words(e)[:160]}"
         add(8, ok, words)
@@ -287,14 +408,19 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
 
 def _imports_alone(module: str, engine: Any) -> tuple[bool, str]:
     """Check 6, in a process of its own: what importing the entry point's
-    module brings in, beside the worker module and the engine's heavy ones."""
-    worker = engine.worker or ""
-    heavy = list(engine.heavy)
+    module brings in of what the service keeps out for the engine
+    (`registry.kept_out`: the worker module, the heavy modules it declares and
+    `workers.WORKER_LIBRARIES`, each with every module below it)."""
+    from .registry import kept_out
+
+    worker, kept = kept_out(engine)
+    heavy = sorted(kept)
     probe = ("import importlib, json, sys\n"
              f"importlib.import_module({module!r})\n"
-             f"w, heavy = {worker!r}, {heavy!r}\n"
-             "seen = sorted(m for m in sys.modules if (w and (m == w or m.startswith(w + '.'))) "
-             "or m.split('.')[0] in heavy)\n"
+             "loaded = list(sys.modules)\n"
+             "from openferment_core.engine.registry import in_worker\n"
+             f"w, heavy = {worker!r}, set({heavy!r})\n"
+             "seen = sorted(m for m in loaded if in_worker(m, w, heavy))\n"
              "print(json.dumps(seen))\n")
     env = {**os.environ, "PYTHONPATH": os.pathsep.join(p for p in (str(CORE), os.environ.get("PYTHONPATH", "")) if p)}
     done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, timeout=120, cwd=str(CORE),

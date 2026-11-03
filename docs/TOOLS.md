@@ -20,7 +20,12 @@ the registry holds, it holds for each of them.
 - **Scope**: every tool acts in one project (ADR-005): the request's, the question's, or the one the
   MCP server was started in.
 - **Writes**: a tool marked *writes* keeps something new in the project, audited as its caller's,
-  through `tools/writes.py`; a read keeps nothing but the computations it caches.
+  through `tools/writes.py`; a read keeps nothing but the computations it caches. At the HTTP
+  endpoint a write names the person calling with `?by=`, and a call that names nobody is a 422 in
+  words, with nothing run. The person named is the write's author: its audit row (agent `person`),
+  a proposal it makes (which waits for a person to carry it out, as every proposal does) and what
+  it keeps; pureOS's kept trains hold a model's work alone, and a person's call to keep one is
+  refused in the store's words.
 
 48 tools.
 
@@ -213,7 +218,7 @@ Run a plant from the library shelf at the library's defaults, or a study scenari
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `engine` | string | no | The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and openFerment's flowsheet, or any other registered here. |
+| `engine` | string | no | The engine to run (GET /api/engines names them): biosteam, whose things are the library plants and openFerment's flowsheet, or any other registered here, whose thing this tool runs at its own defaults. |
 | `plant` | string | no | A plant's id, run at the library's defaults; empty when a scenario is named. |
 | `configuration` | string | no | One of the plant's configurations; empty for its own. |
 | `scenario` | string | no | A study scenario's id (study_scenario returns it), run on its plant with its values. |
@@ -639,7 +644,7 @@ Read Home: what waits for a person: candidates awaiting review and open checks. 
 
 *writes · scope: project · loose*
 
-Write to Runbooks, through the module's own write function. Actions — draft: draft a runbook: use the draft_runbook tool, which writes the numbers from the evidence; lock: lock a runbook's predictions before a run (gated) [gated: lock a prediction a person will test; becomes a proposal a person carries out on Home]; deposit: start a deposition of a protocol on the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; run: send a runbook's protocol to the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; publish: publish a runbook and its ledger to the commons (gated) [gated: publish to the commons; becomes a proposal a person carries out on Home]; revise_protocol: draft a protocol revision (fields: protocolId, change). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to Runbooks, through the module's own write function. Actions — draft: draft a runbook: use the draft_runbook tool, which writes the numbers from the evidence; lock: lock a runbook's predictions before a run (gated) [gated: lock a prediction a person will test; becomes a proposal a person carries out on Home]; deposit: start a deposition of a protocol on the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; run: send a runbook's protocol to the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; publish: publish a runbook and its ledger to the commons (gated) [gated: publish to the commons; becomes a proposal a person carries out on Home]; revise_protocol: draft a protocol revision (fields: protocolId, change). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -652,7 +657,7 @@ Write to Runbooks, through the module's own write function. Actions — draft: d
 
 *writes · scope: project · loose*
 
-Write to geneOS, through the module's own write function. Actions — ceiling: compute and keep the yield ceiling of a model on a sugar (fields: modelId, product, substrate); frontier: compute and keep the growth–product frontier of a model on a sugar (fields: modelId, product, substrate); mix: compute and keep the ceiling across a mix of two sugars (fields: modelId, product, substrate, substrateB). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to geneOS, through the module's own write function. Actions — ceiling: compute and keep the yield ceiling of a model on a sugar (fields: modelId, product, substrate); frontier: compute and keep the growth–product frontier of a model on a sugar (fields: modelId, product, substrate); mix: compute and keep the ceiling across a mix of two sugars (fields: modelId, product, substrate, substrateB). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -665,7 +670,7 @@ Write to geneOS, through the module's own write function. Actions — ceiling: c
 
 *writes · scope: project · loose*
 
-Write to fermOS, through the module's own write function. Actions — forecast: forecast a run from a kept kinetic fit and keep it (fields: fitArtifactId); fit: fit a deposited run's series (fields: depositionId); simulate: simulate the model family named in target (batch_v1 and the rest) and keep the simulation, as fermos_simulate does: each parameter binds from a fit, the records, a kept simulation or a stated convention, and the call refuses naming each parameter nothing binds; records.<parameter key> names the record ids, comma-separated, that bind that parameter (fields: strain, product, sugar, fitArtifact, startFrom, durationPreset, records.<key>); design_vessel: design on BioSTEAM the vessel a kept simulation (or, anaerobic, a kept kinetic fit) needs and keep it, as fermos_vessel does; refused in words while its plant scale waits for a person (fields: simulationArtifact, fitArtifact, vesselType, klaMethod). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to fermOS, through the module's own write function. Actions — forecast: forecast a run from a kept kinetic fit and keep it (fields: fitArtifactId); fit: fit a deposited run's series (fields: depositionId); simulate: simulate the model family named in target (batch_v1 and the rest) and keep the simulation, as fermos_simulate does: each parameter binds from a fit, the records, a kept simulation or a stated convention, and the call refuses naming each parameter nothing binds; records.<parameter key> names the record ids, comma-separated, that bind that parameter (fields: strain, product, sugar, fitArtifact, startFrom, durationPreset, records.<key>); design_vessel: design on BioSTEAM the vessel a kept simulation (or, anaerobic, a kept kinetic fit) needs and keep it, as fermos_vessel does; refused in words while its plant scale waits for a person (fields: simulationArtifact, fitArtifact, vesselType, klaMethod). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -678,7 +683,7 @@ Write to fermOS, through the module's own write function. Actions — forecast: 
 
 *writes · scope: project · loose*
 
-Write to pureOS, through the module's own write function. Actions — new_train: start a train for a product (its id) from the inlet a kept artifact gives (inletRef: a kept simulation's artifact id, a kept vessel design's, or a kept run's stream as <artifact id>/<stream id>), kept on the service as the model's, as pureos_build's new does (fields: product, inletRef); add_unit: add a unit of a catalogue type to the train named in target, after the unit named (inlet for the first place; empty for the end) (fields: unitType, afterUnitId); remove_unit: take a unit out of the train named in target (fields: unitId); set_from_record: bind a unit's parameter to exactly the records named for it (records.<parameter key>, their ids separated by commas or spaces), each held to the parameter's field, the aggregate gate and its unit; refused naming a record that cannot bind and why (fields: unitId, records.<key>); run_train: run the train named in target in the Proforma worker as the service binds it and keep the run; refused naming each value that waits for a person's. pureOS's unit operations and its unit catalogue are curated (schema/vocabulary.yaml, core/openferment_core/pureos/catalogue.py); the service has no write function for them: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to pureOS, through the module's own write function. Actions — new_train: start a train for a product (its id) from the inlet a kept artifact gives (inletRef: a kept simulation's artifact id, a kept vessel design's, or a kept run's stream as <artifact id>/<stream id>), kept on the service as the model's, as pureos_build's new does (fields: product, inletRef); add_unit: add a unit of a catalogue type to the train named in target, after the unit named (inlet for the first place; empty for the end) (fields: unitType, afterUnitId); remove_unit: take a unit out of the train named in target (fields: unitId); set_from_record: bind a unit's parameter to exactly the records named for it (records.<parameter key>, their ids separated by commas or spaces), each held to the parameter's field, the aggregate gate and its unit; refused naming a record that cannot bind and why (fields: unitId, records.<key>); run_train: run the train named in target in the Proforma worker as the service binds it and keep the run; refused naming each value that waits for a person's. pureOS's unit operations and its unit catalogue are curated (schema/vocabulary.yaml, core/openferment_core/pureos/catalogue.py); the service has no write function for them: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -691,7 +696,7 @@ Write to pureOS, through the module's own write function. Actions — new_train:
 
 *writes · scope: project · loose*
 
-Write to Proforma, through the module's own write function. Actions — run: run the BioSTEAM scenario named in target as the service binds it and keep the run, as run_flowsheet does; refused naming the inputs that wait for a person's assumption; bind: bind an assumption to a scenario input (fields: key, value, basis). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to Proforma, through the module's own write function. Actions — run: run the BioSTEAM scenario named in target as the service binds it and keep the run, as run_flowsheet does; refused naming the inputs that wait for a person's assumption; bind: bind an assumption to a scenario input (fields: key, value, basis). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -704,7 +709,7 @@ Write to Proforma, through the module's own write function. Actions — run: run
 
 *writes · scope: project · loose*
 
-Write to BioRepo, through the module's own write function. Actions — candidate: create an extraction candidate anchored to a sentence of a fetched paper (fields: paperId, sectionId, field, value, unit, quote, organism, carbonSource, method); decide: accept, reject or correct a record (fields: recordId); publish: publish records to the commons (gated) [gated: publish to the commons; becomes a proposal a person carries out on Home]. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to BioRepo, through the module's own write function. Actions — candidate: create an extraction candidate anchored to a sentence of a fetched paper (fields: paperId, sectionId, field, value, unit, quote, organism, carbonSource, method); decide: accept, reject or correct a record (fields: recordId); publish: publish records to the commons (gated) [gated: publish to the commons; becomes a proposal a person carries out on Home]. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -717,7 +722,7 @@ Write to BioRepo, through the module's own write function. Actions — candidate
 
 *writes · scope: project · loose*
 
-Write to Guild, through the module's own write function. Actions — propose_check: propose a competence check on a person's skills (gated: a person asks for it) (fields: personId, skillIds) [gated: mark a personnel check; becomes a proposal a person carries out on Home]; record_check: mark a check's outcome (refused: an assessor runs a check at the bench) (fields: checkId); evidence: record evidence on the ledger (gated: a person signs it) (fields: personId, skillId, kind) [gated: sign a Guild entry; becomes a proposal a person carries out on Home]; person: add or change a person on the ledger (gated) (fields: personId, name) [gated: sign a Guild entry; becomes a proposal a person carries out on Home]; policy: change the lead's Guild policy (gated) (fields: criticality, mode) [gated: sign a Guild entry; becomes a proposal a person carries out on Home]. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to Guild, through the module's own write function. Actions — propose_check: propose a competence check on a person's skills (gated: a person asks for it) (fields: personId, skillIds) [gated: mark a personnel check; becomes a proposal a person carries out on Home]; record_check: mark a check's outcome (refused: an assessor runs a check at the bench) (fields: checkId); evidence: record evidence on the ledger (gated: a person signs it) (fields: personId, skillId, kind) [gated: sign a Guild entry; becomes a proposal a person carries out on Home]; person: add or change a person on the ledger (gated) (fields: personId, name) [gated: sign a Guild entry; becomes a proposal a person carries out on Home]; policy: change the lead's Guild policy (gated) (fields: criticality, mode) [gated: sign a Guild entry; becomes a proposal a person carries out on Home]. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -730,7 +735,7 @@ Write to Guild, through the module's own write function. Actions — propose_che
 
 *writes · scope: project · loose*
 
-Write to Primer, through the module's own write function. Actions — lesson: write or change a lesson (fields: lessonId). Primer holds no lessons yet, and the service has no write function for them: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to Primer, through the module's own write function. Actions — lesson: write or change a lesson (fields: lessonId). Primer holds no lessons yet, and the service has no write function for them: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -743,7 +748,7 @@ Write to Primer, through the module's own write function. Actions — lesson: wr
 
 *writes · scope: project · loose*
 
-Write to Intake, through the module's own write function. Actions — fetch: collect the document target names (a PMCID, a DOI, PMID:..., OSTI:..., an osti.gov or yeastgenome.org address) into the project's literature; extract: extract candidates from the project's document whose documentId is target (spends on the model) [at the budget, gated: becomes a spend proposal a person carries out on Home]; add: add a new source to the corpus (fields: doi). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to Intake, through the module's own write function. Actions — fetch: collect the document target names (a PMCID, a DOI, PMID:..., OSTI:..., an osti.gov or yeastgenome.org address) into the project's literature; extract: extract candidates from the project's document whose documentId is target (spends on the model) [at the budget, gated: becomes a spend proposal a person carries out on Home]; add: add a new source to the corpus (fields: doi). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -756,7 +761,7 @@ Write to Intake, through the module's own write function. Actions — fetch: col
 
 *writes · scope: project · loose*
 
-Write to Home, through the module's own write function. Actions — note: propose a notebook note a person accepts under their name (gated) [gated: write a note under a person's name; becomes a proposal a person carries out on Home]. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to Home, through the module's own write function. Actions — note: propose a notebook note a person accepts under their name (gated) [gated: write a note under a person's name; becomes a proposal a person carries out on Home]. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|

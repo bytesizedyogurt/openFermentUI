@@ -372,7 +372,9 @@ def _within(stored: Any, replayed: Any, tol: ReplayTolerance) -> bool:
 def replay(aid: str) -> ReplayResult:
     """Recompute a stored artifact with the tool registered now, and compare:
     identical, or within the precision its basis states when the tool reads
-    one (`tolerance_of`). A replay changes nothing stored."""
+    one (`tolerance_of`). A replay changes nothing stored. It computes with
+    the tool registered now, and when that tool's version differs from the
+    one the artifact was kept at, its first difference is `toolVersion`."""
     artifact = get(aid)
     reg = registered(artifact.tool)
     try:
@@ -397,11 +399,12 @@ def replay(aid: str) -> ReplayResult:
         if len(differences) > MAX_DIFFERENCES:
             differences = differences[:MAX_DIFFERENCES]
             differences.append(ReplayDifference(path="…", stored="more differences not listed", replayed=None))
-        now = reg.version_for(artifact.inputs)
-        if now != artifact.toolVersion:
-            differences.insert(
-                0, ReplayDifference(path="toolVersion", stored=artifact.toolVersion, replayed=now)
-            )
+    # A replay computes with the tool installed now. When its version moved
+    # since the artifact was kept, the first difference names the version it
+    # was kept at and the version it ran at, an identical output included.
+    now = reg.version_for(artifact.inputs)
+    if now != artifact.toolVersion:
+        differences.insert(0, ReplayDifference(path="toolVersion", stored=artifact.toolVersion, replayed=now))
     identical = replayed == artifact.outputHash
     return ReplayResult(
         artifactId=aid,

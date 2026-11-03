@@ -9,9 +9,11 @@ stdin and writes one JSON response per line on stdout:
 
 `SimWorker` is the service's side: it starts the process on first use, keeps
 it warm, sends one request at a time under a lock, kills and restarts it on a
-timeout, and reports the tail of its stderr when it crashes. `serve` is the
-worker's side: a loop over stdin that answers `ping` itself and dispatches
-every other op to the module's handlers.
+timeout, and reports the tail of its stderr when it crashes. It starts the
+worker module through `LAUNCH`, which points descriptor 1 at stderr before
+the module is imported, so a library that prints as it is imported writes to
+stderr too. `serve` is the worker's side: a loop over stdin that answers
+`ping` itself and dispatches every other op to the module's handlers.
 
 `cobra` is imported in the geneOS worker module alone, and `biosteam` in the
 Proforma worker and `flowsheets/` alone (Part G, rule 8); `test_workers`
@@ -72,6 +74,32 @@ def withheld(name: str) -> bool:
     return upper.startswith(_SECRET_PREFIXES) or any(w in upper for w in _SECRET_WORDS)
 
 
+# The libraries that run in a worker's process alone (CLAUDE.md, Verified
+# constraints): the registry and conformance check 6 keep each out of the
+# service's process for every engine, whatever the engine declares in `heavy`.
+WORKER_LIBRARIES = ("biosteam", "thermosteam", "biorefineries", "pisces_sff", "cobra")
+
+
+def covers(declared: str, module: str) -> bool:
+    """Whether a declared module name covers `module`: the module itself and
+    every module below it (`a.b` covers `a.b` and `a.b.c`)."""
+    return module == declared or module.startswith(declared + ".")
+
+
+# The program a worker's process starts with: it keeps a duplicate of
+# descriptor 1 for the responses (`RESPONSES_FD`, which `serve` writes to),
+# points descriptor 1 at stderr, then runs the worker module as `python -m`
+# would. A library that prints, from Python or from C, as the module is
+# imported or while it serves, writes to stderr.
+LAUNCH = ("import os, runpy, sys\n"
+          "from openferment_core import workers\n"
+          "workers.RESPONSES_FD = os.dup(1)\n"
+          "os.dup2(2, 1)\n"
+          "runpy.run_module(sys.argv.pop(1), run_name='__main__', alter_sys=True)\n")
+# The descriptor `serve` writes its responses to, when LAUNCH started the process.
+RESPONSES_FD: int | None = None
+
+
 class SimWorker:
     def __init__(self, module: str, *, timeout_s: float = DEFAULT_TIMEOUT_S, python: str | None = None,
                  withhold_secrets: bool = False) -> None:
@@ -106,7 +134,7 @@ class SimWorker:
         self._out = queue.Queue()
         self._err = collections.deque(maxlen=STDERR_LINES)
         self._proc = subprocess.Popen(
-            [self.python, "-m", self.module],
+            [self.python, "-c", LAUNCH, self.module],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -212,12 +240,17 @@ def serve(handlers: dict[str, Handler], *, name: str = "worker", stdin=None, std
     Only responses reach the stream. Run as a process (`stdout` not given),
     the responses go out on a duplicate of file descriptor 1, and descriptor
     1 itself is pointed at stderr, so a library that prints, from Python or
-    from C (a solver's banner), writes to stderr (§3.R)."""
+    from C (a solver's banner), writes to stderr (§3.R). A process LAUNCH
+    started made the duplicate before the worker module was imported
+    (`RESPONSES_FD`); a module started by hand with `python -m` makes it here."""
     stdin = stdin or sys.stdin
     if stdout is None:
         sys.stdout.flush()
-        out = os.fdopen(os.dup(1), "w", encoding="utf-8", buffering=1)
-        os.dup2(2, 1)
+        if RESPONSES_FD is not None:
+            out = os.fdopen(RESPONSES_FD, "w", encoding="utf-8", buffering=1)
+        else:
+            out = os.fdopen(os.dup(1), "w", encoding="utf-8", buffering=1)
+            os.dup2(2, 1)
         sys.stdout = sys.stderr
     else:
         out = stdout

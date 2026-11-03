@@ -217,7 +217,7 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `migrations.py` | `python -m openferment_core.migrations` — both schemas' migrations, and the database commands (execution prompt §8.1, §8.2). |
 | `models.py` | AnswerPlan (OF-BLD-007 §3). |
 | `module_stores.py` | Every module's store, read the same way (OF-BLD-015 §7.1, §7.2). |
-| `nightly_checks.py` | What the nightly job checks after intake (OF-BLD-014 §10.2): every fetched model file against its pinned hash, and the ten newest artifacts of each project replayed against what was kept. It reports and rewrites nothing; the exit code is non-zero when a file does not match or a replay differs, so the night's log says so. |
+| `nightly_checks.py` | What the nightly job checks after intake (OF-BLD-014 §10.2): every fetched model file against its pinned hash, and the ten newest artifacts of each project replayed against what was kept. A replay holds when it is identical, or when every number lies within the precision its basis states (a BioSTEAM run's last kept digit); the log says which. It reports and rewrites nothing; the exit code is non-zero when a file does not match or a replay lies outside its precision, so the night's log says so. |
 | `params.py` | One parameter panel, declared in Python (OF-BLD-020 Phase 2, D2–D4). |
 | `postdoc_agent.py` | Postdoc as an agent: a bounded loop of tools, answered with a checked plan (OF-BLD-014 §5.2). |
 | `practice.py` | Practice — scenarios drafted from the bench, and a tutor that questions the trainee's reasoning (OF-BLD-013 §4.1, §4.2). |

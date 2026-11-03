@@ -187,20 +187,26 @@ class ModuleWriteInput(BaseModel):
 
 
 def _who(ctx: ToolContext | None = None) -> tuple[str, str]:
-    """The model this write is marked with: the one answering the run when a
-    loop owns it (§7.R finding 7), else the chain's first name."""
+    """The model a write is marked with when no person calls: the one
+    answering the run when a loop owns it (§7.R finding 7), else the chain's
+    first name."""
     model = getattr(ctx, "model", "") or llm.chain("answer")[0]
     return model, llm.effort()
 
 
 def _actor(ctx: ToolContext) -> tuple[str, str]:
-    """Who a study write is marked with: the model answering, the person the
-    HTTP endpoint names, else the chain's first model."""
+    """Who every write is marked with: the model answering, the person the
+    HTTP endpoint names (`?by=`), else the chain's first model."""
     if ctx.model.strip():
         return "model", ctx.model.strip()
     if ctx.person.strip():
         return "person", ctx.person.strip()
     return "model", _who(ctx)[0]
+
+
+def _effort(agent: str) -> str | None:
+    """The effort a model's write ran at; a person's carries none."""
+    return llm.effort() if agent == "model" else None
 
 
 def _audit_as(ctx: ToolContext, module: str, action: str, state: str, target: str | None,
@@ -209,28 +215,25 @@ def _audit_as(ctx: ToolContext, module: str, action: str, state: str, target: st
 
     agent, who = _actor(ctx)
     audit.append(agent=agent, who=who, module=module, action=action, state=state, target=target,
-                 ask_id=getattr(ctx, "ask_id", None) or None, effort=llm.effort() if agent == "model" else None,
-                 detail=detail)
+                 ask_id=getattr(ctx, "ask_id", None) or None, effort=_effort(agent), detail=detail)
 
 
 def _audit(ctx: ToolContext, module: str, action: str, state: str, target: str | None, detail: dict[str, Any]) -> None:
-    from .. import audit
-
-    model, effort = _who(ctx)
-    audit.append(agent="model", who=model, module=module, action=action, state=state, target=target,
-                 ask_id=getattr(ctx, "ask_id", None), effort=effort, detail=detail)
+    """A module write's audit row, marked as its caller's (`_actor`)."""
+    _audit_as(ctx, module, action, state, target, detail)
 
 
 def _propose(ctx: ToolContext, module: str, action: str, gate: gates.Gate, inp: ModuleWriteInput, title: str, why: str) -> ToolResult:
     from .. import proposals
 
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
         # The store holds a proposal's words to Rule 1 and refuses an open
-        # twin in the same ask (OF-BLD-016 §1.R findings 2, 5 and 8).
-        made = proposals.propose(module=module, action=action, gate=gate, title=title, why=why, by=model,
+        # twin in the same ask (OF-BLD-016 §1.R findings 2, 5 and 8). The
+        # proposal waits for a person to carry it out, whoever proposed it.
+        made = proposals.propose(module=module, action=action, gate=gate, title=title, why=why, by=who, agent=agent,
                                  target=inp.target or None, fields=inp.fields, note=inp.note,
-                                 ask_id=getattr(ctx, "ask_id", None), effort=effort)
+                                 ask_id=getattr(ctx, "ask_id", None), effort=_effort(agent))
     except proposals.ProposalRefused as e:
         return ToolResult(error=f"{module}_write refused {action}: {e}. Nothing was proposed. Say so in gaps.")
     return ToolResult(summary={
@@ -281,7 +284,7 @@ def _geneos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     _audit(ctx, "geneos", action, "open", f["modelId"], {"artifactId": r.artifactId, "evidenceId": ev.id, "note": inp.note})
     return ToolResult(
         summary={"state": "open", "artifactId": r.artifactId, "evidenceId": ev.id, "what": ev.label, "provenance": ev.provenance,
-                 "meaning": "kept as an artifact in the open lane, marked as the model's in the audit log; cite the evidence id"},
+                 "meaning": "kept as an artifact in the open lane, marked as its caller's in the audit log; cite the evidence id"},
         evidence=[ev],
     )
 
@@ -300,7 +303,7 @@ def _fermos_forecast(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
                                                                             "note": inp.note})
     return ToolResult(summary={"state": "open", "artifactId": r.artifactId, "evidenceId": r.evidence.id,
                                "provenance": r.evidence.provenance,
-                               "meaning": "kept as an artifact in the open lane, marked as the model's; cite the evidence id"},
+                               "meaning": "kept as an artifact in the open lane, marked as its caller's; cite the evidence id"},
                       evidence=[r.evidence])
 
 
@@ -345,7 +348,7 @@ def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_me
                                                                    "tool": tool, "note": note})
     return ToolResult(summary={"state": "open", **_vessel_summary(d), "evidenceId": ev.id,
                                "meaning": "the vessel is designed on BioSTEAM and kept as one artifact in the open lane, "
-                                          "marked as the model's in the audit log; cite its numbers by the evidence id, "
+                                          "marked as its caller's in the audit log; cite its numbers by the evidence id, "
                                           "which is its artifact id; never state them yourself"},
                       evidence=[ev])
 
@@ -404,7 +407,7 @@ def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note
     names a registered engine beside BioSTEAM (docs/api/engines.md), runs one
     of its things at its defaults, kept the same way."""
     from ..engine import library, runs
-    from ..engine import EngineRefused
+    from ..engine import EngineBroken, EngineRefused
     from ..studies import scenarios
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
     from .engine import run_result
@@ -424,6 +427,9 @@ def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note
                                     f"kept as run {e.run_id}'s receipt.")
         except EngineRefused as e:
             return ToolResult(error=f"{tool} refused: {e}")
+        except EngineBroken as e:
+            return ToolResult(error=f"{tool} refused: the {engine.name} engine broke its contract, and no run was "
+                                    f"kept: {e}")
         except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
             return ToolResult(error=f"{tool} could not run it on the {engine.name} engine: {e}")
         run = report.run
@@ -600,7 +606,7 @@ def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> To
             "units": len(r.units),
             "leavesOut": r.leavesOut,
             "meaning": "the scenario ran as the service binds it and is kept as one run artifact in the open lane, "
-                       "marked as the model's in the audit log; cite its price, a cost line or a recovery by the "
+                       "marked as its caller's in the audit log; cite its price, a cost line or a recovery by the "
                        "evidence id; stream_table reads its streams and pureos_read its train",
         },
         evidence=[ev],
@@ -747,7 +753,7 @@ def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResu
             "massBalanceCloses": r.massBalance.ok,
             "flags": _summary_flags(r),
             "meaning": "the family ran as the service binds it and is kept as one simulation artifact in the open lane, "
-                       "marked as the model's in the audit log; each parameter says what bound it, and its value is in "
+                       "marked as its caller's in the audit log; each parameter says what bound it, and its value is in "
                        "the artifact. Its numbers are read from the artifact, never stated: cite the simulation by the "
                        "evidence id, which is its artifact id; fermos_read reads it again as kind simulation",
         },
@@ -822,9 +828,10 @@ def new_train(tool: str, product: str, inlet_ref: str, note: str, ctx: ToolConte
         spec, said = build.new_spec(product, inlet_ref)
     except build.BuildRefused as e:
         return _train_refused(tool, e)
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
-        k = kept.keep_train(None, lambda _: spec, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(None, lambda _: spec, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
+                            effort=_effort(agent))
     except kept.KeptTrainRefused as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "new_train", k, note, ctx, {"read": said})
@@ -842,10 +849,11 @@ def add_unit(tool: str, train_id: str, unit_type: str, after: str, note: str, ct
         made.append(uid)
         return spec
 
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
         build.kept_or_refuse(train_id)
-        k = kept.keep_train(train_id.strip(), change, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(train_id.strip(), change, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
+                            effort=_effort(agent))
     except (build.BuildRefused, kept.KeptTrainRefused) as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "add_unit", k, note, ctx, {"added": made[-1]})
@@ -856,11 +864,11 @@ def remove_unit(tool: str, train_id: str, unit_id: str, note: str, ctx: ToolCont
     pureos_write remove_unit)."""
     from ..pureos import build, kept
 
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
         build.kept_or_refuse(train_id)
-        k = kept.keep_train(train_id.strip(), lambda cur: build.without_unit(cur, unit_id), model,
-                            ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(train_id.strip(), lambda cur: build.without_unit(cur, unit_id), who, agent,
+                            ask_id=getattr(ctx, "ask_id", None) or None, effort=_effort(agent))
     except (build.BuildRefused, kept.KeptTrainRefused) as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "remove_unit", k, note, ctx, {"removed": unit_id.strip()})
@@ -890,9 +898,10 @@ def set_from_record(tool: str, train_id: str, unit_id: str, records_by_param: di
             raise build.BuildRefused(f"train {base.id} changed while its records were checked; ask again")
         return spec
 
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
-        k = kept.keep_train(base.id, change, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(base.id, change, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
+                            effort=_effort(agent))
     except (build.BuildRefused, kept.KeptTrainRefused) as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "set_from_record", k, note, ctx, {"unit": unit_id.strip(), "bound": bound})
@@ -929,7 +938,7 @@ def run_train(tool: str, train_id: str, note: str, ctx: ToolContext) -> ToolResu
     return ToolResult(
         summary={"state": "open", **build.run_summary(r), "evidenceId": ev.id,
                  "meaning": "the train ran as the service binds it in the Proforma worker, where BioSTEAM builds it, and "
-                            "the run is kept as one artifact in the open lane, marked as the model's in the audit log; "
+                            "the run is kept as one artifact in the open lane, marked as its caller's in the audit log; "
                             "its numbers are read from the artifact, never stated: cite a recovery or a purity by the "
                             "evidence id, which is its artifact id; pureos_read reads it again as kind train-run"},
         evidence=[ev], data=r.model_dump(mode="json"))
@@ -979,9 +988,10 @@ def propose_train(tool: str, product: str, host: str, inlet_ref: str, note: str,
     except (ValueError, LookupError) as e:
         return _train_refused(tool, e)
     spec = spec.model_copy(update={"id": build.new_id()})
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
-        k = kept.keep_train(None, lambda _: spec, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(None, lambda _: spec, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
+                            effort=_effort(agent))
     except kept.KeptTrainRefused as e:
         return _train_refused(tool, e)
     words = [r.model_dump(mode="json") if hasattr(r, "model_dump") else r for r in reasons]
@@ -1038,19 +1048,19 @@ def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
             if word not in ("true", "false"):
                 return ToolResult(error=f"biorepo_write refused: {flag} is the word true or false, or left out")
             raw[flag] = word == "true"
-    model, _ = _who(ctx)
+    _, who = _actor(ctx)
     try:
-        made, rule, detail = extract.add_candidate(inp.fields["paperId"], raw, who=model)
+        made, rule, detail = extract.add_candidate(inp.fields["paperId"], raw, who=who)
     except extract.ExtractUnavailable as e:
         return ToolResult(error=f"biorepo_write refused: {e}")
     if made is None:
         return ToolResult(error=f"biorepo_write refused on rule {rule}: {detail}")
     row = module_stores.Row("biorepo", "candidate", made.id, made.field, "proposed", "unverified", provenance="unverified",
-                            detail={"paperId": made.paperId, "field": made.field, "by": model})
+                            detail={"paperId": made.paperId, "field": made.field, "by": who})
     _audit(ctx, "biorepo", "candidate", "proposed", made.id, {"paperId": made.paperId, "field": made.field, "note": inp.note})
     return ToolResult(
         summary={"state": "proposed", "ref": row.ref, "candidateId": made.id, "field": made.field, "provenance": "unverified",
-                 "meaning": "an unverified candidate in the review queue, anchored to the sentence, marked as the model's; "
+                 "meaning": "an unverified candidate in the review queue, anchored to the sentence, marked as its caller's; "
                             "a person accepts or rejects it on Guild; cite its ref in moduleRefs"},
         rows=[row.model()],
     )
@@ -1059,15 +1069,15 @@ def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
 def _intake_fetch(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     from .. import intake, projects
 
-    model, _ = _who(ctx)
-    r = intake.collect(inp.target, project_id=projects.current(), by=model, reason=inp.note or "")
+    _, who = _actor(ctx)
+    r = intake.collect(inp.target, project_id=projects.current(), by=who, reason=inp.note or "")
     if r.status == "failed":
         return ToolResult(error=f"intake_write could not collect {inp.target}: {r.reason}")
     _audit(ctx, "intake", "fetch", module_stores.intake_state(r.status), inp.target,
            {"status": r.status, "documentId": r.documentId, "note": inp.note})
     return ToolResult(summary={"state": module_stores.intake_state(r.status), "documentId": r.documentId,
                                "status": r.status, "passages": r.chunks, "licenceClass": r.licenceClass,
-                               "meaning": "the document is in the project's literature, collected under the model's "
+                               "meaning": "the document is in the project's literature, collected under its caller's "
                                           "name; extract it next, by its documentId"})
 
 
@@ -1088,7 +1098,7 @@ def _intake_extract(inp: ModuleWriteInput, ctx: ToolContext, gate: gates.Gate) -
                                                               "costUsd": r.usage.costUsd, "note": inp.note})
     return ToolResult(summary={"state": "proposed", "paperId": inp.target, "candidates": len(r.candidates), "rejected": r.rejected,
                                "costUsd": r.usage.costUsd,
-                               "meaning": "candidates anchored and queued for review, unverified, marked as the model's run"},
+                               "meaning": "candidates anchored and queued for review, unverified, marked as its caller's run"},
                       usage=r.usage)
 
 
@@ -1155,7 +1165,7 @@ def _description(module: str) -> str:
             f" {CURATED_NOTE[module]}: every other call is refused in words." if module in CURATED_NOTE else "")
     return (f"Write to {label}, through the module's own write function. Actions — " + "; ".join(lines) + f".{seed} "
             "Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane "
-            "marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.")
+            "marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.")
 
 
 TOOLS = {

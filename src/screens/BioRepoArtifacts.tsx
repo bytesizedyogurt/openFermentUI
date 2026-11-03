@@ -191,6 +191,11 @@ function ArtifactPage({ id }: { id: string }) {
   );
 }
 
+/** The replay's differences in the output itself, the tool's version left out. */
+function outputDifferences(r: ReplayResult): number {
+  return r.differences.filter((d) => d.path !== 'toolVersion').length;
+}
+
 function ArtifactBody({
   a,
   replay,
@@ -274,13 +279,22 @@ function ArtifactBody({
           Output
         </SectionTitle>
         {replay.result && (
-          <div className="mb-3" data-testid="replay-result">
+          <div className="mb-3 space-y-2" data-testid="replay-result">
+            {/* A replay computes with the tool installed now; when its version
+                moved since the artifact was kept, the first difference says so. */}
+            {replay.result.differences
+              .filter((d) => d.path === 'toolVersion')
+              .map((d) => (
+                <Callout key="version" kind="info">
+                  Kept at {String(d.stored)}; replayed with {String(d.replayed)}, the tool installed now.
+                </Callout>
+              ))}
             {replay.result.identical ? (
               <Callout kind="info">Replayed identically: the tool computed the same output from the same inputs.</Callout>
             ) : replay.result.withinTolerance && replay.result.tolerance ? (
               <Callout kind="info">
                 Replayed within the precision its basis states ({replay.result.tolerance.why}):{' '}
-                {replay.result.differences.length} number{replay.result.differences.length === 1 ? '' : 's'} moved in
+                {outputDifferences(replay.result)} number{outputDifferences(replay.result) === 1 ? '' : 's'} moved in
                 their last kept digit, and nothing else changed.
               </Callout>
             ) : (

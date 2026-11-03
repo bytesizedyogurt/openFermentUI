@@ -14,7 +14,7 @@ structurally incapable of originating a quantity (§5).
 from __future__ import annotations
 
 import math
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
@@ -707,10 +707,12 @@ class Quantity(BaseModel):
     origin: Origin | None = None
 
     @model_serializer(mode="wrap")
-    def _as_before_when_bare(self, handler: Any) -> Any:
+    def _as_before_when_bare(self, handler: Any):
         # A quantity with no basis, range or origin is written as it was
         # before they existed, so a stored output's hash and a stored
-        # record's row read the same (ADR-006).
+        # record's row read the same (ADR-006). Left without a return
+        # annotation, its JSON schema is its fields', the shape it writes
+        # with the unset ones left out.
         out = handler(self)
         if isinstance(out, dict):
             for k in ("basis", "low", "high", "origin"):
@@ -4086,7 +4088,12 @@ class RunReport(BaseModel):
 # Quantity, with its origin (ADR-006).
 
 ENGINE_NAME = r"^[a-z][a-z0-9-]{0,39}$"
+ENGINE_NAME_MAX = 40
 THING_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+# The longest name a thing's configuration may have, at every door: the
+# route, the tools and the thing's own list.
+CONFIGURATION_MAX = 80
+ConfigurationName = Annotated[str, Field(min_length=1, max_length=CONFIGURATION_MAX)]
 
 
 class EnginePrecision(BaseModel):
@@ -4103,8 +4110,9 @@ class EngineThing(BaseModel):
     id: str = Field(pattern=THING_ID)
     title: str
     kind: str | None = None
-    # [] when the thing takes no configuration.
-    configurations: list[str] = Field(default_factory=list)
+    # [] when the thing takes no configuration; each name at most
+    # CONFIGURATION_MAX characters.
+    configurations: list[ConfigurationName] = Field(default_factory=list)
     defaultConfiguration: str | None = None
     precision: EnginePrecision
 
@@ -4161,8 +4169,10 @@ ORIGIN_FIELDS = frozenset({"kind", "ref", "by", "at", "note"})
 class EngineInput(RunInput):
     """A value a run sets: a parameter's key and a typed quantity in that
     parameter's unit (the shape a run's inputs have), carrying the person or
-    the model that set it. It holds those fields alone, and a value, low or
-    high that is true or false is refused, as an Override refuses one."""
+    the model that set it and the day it was set (`origin.at`), as an
+    Override and a scenario's value carry theirs. It holds those fields
+    alone, and a value, low or high that is true or false is refused, as an
+    Override refuses one."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -4191,6 +4201,9 @@ class EngineInput(RunInput):
         if origin is None or origin.kind not in ("person-assumption", "model-estimate"):
             raise ValueError(f"{self.name}: a value a run sets is a person's assumption or a model's estimate, its "
                              "origin naming who set it (person-assumption or model-estimate, with by)")
+        if not (origin.at or "").strip():
+            raise ValueError(f"{self.name}: a value a run sets says when it was set (quantity.origin.at), and the "
+                             "day enters the run's basis")
         return self
 
 
@@ -4202,7 +4215,7 @@ class EngineRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     thing: str = Field(min_length=1, max_length=80)
-    configuration: str | None = None
+    configuration: str | None = Field(default=None, max_length=CONFIGURATION_MAX)
     inputs: list[EngineInput] = Field(default_factory=list)
     by: str = ""
 
@@ -4225,6 +4238,14 @@ class EngineConformance(BaseModel):
     checks: list[EngineCheck]
     by: str
     at: str
+
+
+class Refusal(BaseModel):
+    """The body of a refusal the service answers in words: a 404 for what is
+    not here, a 422 for what cannot be run, a 503 for an engine or a worker
+    that cannot answer (the engine routes declare each)."""
+
+    detail: str
 
 
 class EngineInfo(BaseModel):

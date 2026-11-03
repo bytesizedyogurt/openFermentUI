@@ -39,6 +39,7 @@ keeps, files and reports its run here, the same for every such engine.
 """
 from __future__ import annotations
 
+import difflib
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -50,10 +51,11 @@ from .. import artifacts, db, events, projects
 from ..basis import ASSUMED_KINDS, assumption_source, estimate_source, origin_of
 from ..db import models as t
 from ..db import rows
-from ..models import (Artifact, BasisInput, BasisSource, EngineInput, EngineRun, Origin, Override, ParameterValue,
-                      ParamScope, Quantity, ReplayTolerance, RunInput, RunReport, RunSFF)
+from ..models import (Artifact, BasisInput, BasisSource, EngineInput, EngineParameter, EngineRun, EngineThing, Origin,
+                      Override, ParameterValue, ParamScope, Quantity, ReplayTolerance, RunInput, RunReport, RunSFF)
+from ..params import bounds_check
 from ..workers import WorkerError
-from . import Engine, EngineRefused, contract, library, sff
+from . import Engine, EngineBroken, EngineRefused, contract, library, sff
 
 # The words a version is read from in a run's basis: "biosteam 2.54.0" and
 # "thermosteam 0.54.2" as values, "<module>@2.35.1" as the plant's source.
@@ -157,19 +159,22 @@ def parameters_of(run: EngineRun, art: Artifact) -> ParamScope | None:
     own = BasisSource(kind="model", id=plant.source.id if plant else None,
                       note="read back from the plant as the package builds it")
     set_here = {i.name: i for i in art.inputs if i.source.kind in ASSUMED_KINDS}
+    specs = [library._spec(p) for p in read]
     values = []
-    for p in read:
+    for p, spec in zip(read, specs):
         i = set_here.get(p["key"])
         if i is None:
             values.append(ParameterValue(key=p["key"], value=p["value"], source=own, origin="library-default",
                                          libraryDefault=defaults.get(p["key"], p["value"]), detail=p["note"]))
             continue
+        # A value the run set outside the plant's bounds is kept as set, and flagged (D4).
         values.append(ParameterValue(key=p["key"], value=i.value, source=i.source,
                                      origin="model-estimate" if i.source.kind == "model-estimate" else "assumption",
-                                     overriddenBy=i.source.by, libraryDefault=defaults.get(p["key"]), detail=i.source.note))
+                                     overriddenBy=i.source.by, libraryDefault=defaults.get(p["key"]), detail=i.source.note,
+                                     outOfBounds=bounds_check(spec, i.value)))
     where = run.plant + (f" ({run.configuration})" if run.configuration else "")
     return ParamScope(scope=library.scope(run.plant, run.configuration), kind="library",
-                      title=f"{where}: the values this run was bound with", specs=[library._spec(p) for p in read],
+                      title=f"{where}: the values this run was bound with", specs=specs,
                       values=values, waiting=[], notes=[
                           "Each value is the run's own: a person's assumption or a model's estimate where the run set "
                           "one, the library's default elsewhere. A different value is a new scenario, and a new run."])
@@ -229,10 +234,15 @@ def run(plant_id: str, configuration: str | None = None, overrides: list[Overrid
         flowsheet = sff.export(library.plant_of(art), project_id=project_id, run_artifact_id=art.id, by=who)
     except sff.SFFRefused as e:
         refused = str(e)
-    except WorkerError as e:
-        if not str(e).startswith("Refused: "):
+    except Exception as e:
+        # The worker's words for the file are kept with the run; any other
+        # failure is said on the event stream and raised, with no row kept.
+        if isinstance(e, WorkerError) and str(e).startswith("Refused: "):
+            refused = str(e).removeprefix("Refused: ")
+        else:
+            events.publish("job.failed", {**job, "status": "failed", "words": f"{type(e).__name__}: {e}"},
+                           project=project_id)
             raise
-        refused = str(e).removeprefix("Refused: ")
     kept = EngineRun(**base, status="done", provenance=art.provenance, artifactId=art.id, outputs=_outputs(art),
                      durationMs=art.durationMs, sffRefused=refused,
                      sff=RunSFF(recordId=flowsheet.id, valid=flowsheet.validation.valid,
@@ -282,34 +292,53 @@ def register_engine_tool(engine: Any) -> None:
                        version_of=lambda inputs: contract.version_string(engine), tolerance_of=_precision_of)
 
 
-def _today() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
-
-
-def _value_source(origin: Origin) -> BasisSource:
+def _value_source(name: str, origin: Origin) -> BasisSource:
     """A value's source in the basis, as its origin names it: a person's
     assumption or a model's estimate, written as a library run's override is
-    (basis.override_source), the day it was set stamped: the origin's `at`, or
-    the day the request arrives when it names none."""
-    at = (origin.at or "").strip() or _today()
+    (basis.override_source), with the day its origin says it was set. The
+    service stamps no day of its own, so the same request is the same run on
+    any day."""
+    at = (origin.at or "").strip()
+    if not at:
+        raise EngineRefused(f"{name}: a value a run sets says when it was set (quantity.origin.at)")
     if origin.kind == "model-estimate":
         return estimate_source(origin.by or "", at, origin.note)
     return assumption_source(origin.by or "", at, origin.note)
 
 
-def _checked_values(engine: Any, thing: str, configuration: str | None,
-                    inputs: Sequence[EngineInput]) -> list[BasisInput]:
-    """The values a run sets, each checked against the thing's parameters:
-    a key it declares, set once, in the parameter's unit and kind, inside
-    its bounds. A value the parameters refuse keeps nothing."""
-    params = {p.key: p for p in engine.parameters(thing, configuration)}
-    out: list[BasisInput] = []
+# How many of a thing's keys a refusal of an unknown key names, nearest first.
+NEAREST_KEYS = 3
+
+
+def _unknown_key(thing: str, key: str, params: dict[str, EngineParameter]) -> str:
+    """A key the thing does not declare, in words: how many parameters the
+    thing has and the few keys nearest to the one asked for."""
+    if not params:
+        return f"{thing} has no parameter {key!r}; it takes no parameters"
+    near = difflib.get_close_matches(key, sorted(params), n=NEAREST_KEYS, cutoff=0.0)
+    n = len(params)
+    return (f"{thing} has no parameter {key!r}; of its {n} parameter{'s' if n != 1 else ''}, the nearest "
+            f"{'is' if len(near) == 1 else 'are'} {', '.join(near)}")
+
+
+def check_inputs(thing: str, parameters: Sequence[EngineParameter], inputs: Sequence[EngineInput], *,
+                 bounds: bool) -> None:
+    """The values a run sets, each checked against the thing's parameters
+    before anything runs: a key the thing declares, set once, in the
+    parameter's unit, a number for a number and one of its choices for words,
+    and, with `bounds`, inside its bounds. `run_engine` checks a contract
+    engine's values with their bounds; BioSTEAM's engine checks its values
+    with `bounds` False, and the library flags a value outside a plant's
+    bounds on the run's parameters, kept as set (`parameters_of`). A value
+    refused raises EngineRefused in words, and nothing is kept. A key the
+    thing lacks is named with the few keys nearest to it, the same for every
+    engine."""
+    params = {p.key: p for p in parameters}
     seen: set[str] = set()
     for i in inputs:
         p = params.get(i.name)
         if p is None:
-            raise EngineRefused(f"{thing} has no parameter {i.name!r}; its parameters are "
-                                         f"{', '.join(sorted(params)) or 'none'}")
+            raise EngineRefused(_unknown_key(thing, i.name, params))
         if i.name in seen:
             raise EngineRefused(f"{i.name} is set twice")
         seen.add(i.name)
@@ -320,16 +349,75 @@ def _checked_values(engine: Any, thing: str, configuration: str | None,
         if numeric != isinstance(q.value, (int, float)):
             raise EngineRefused(f"{i.name} takes {'a number' if numeric else 'words'}")
         if p.choices is not None and q.value not in p.choices:
-            raise EngineRefused(f"{i.name} takes one of {', '.join(map(str, p.choices))}; "
-                                         f"{q.value!r} is none of them")
-        if numeric:
+            raise EngineRefused(f"{i.name} takes one of {', '.join(map(str, p.choices))}; {q.value!r} is none of them")
+        if bounds and numeric:
             v = float(q.value)
             if (p.min is not None and v < p.min) or (p.max is not None and v > p.max):
-                raise EngineRefused(f"{i.name} = {q.value} {q.unit} lies outside its bounds "
-                                             f"[{p.min}, {p.max}] {p.unit}")
+                raise EngineRefused(f"{i.name} = {q.value} {q.unit} lies outside its bounds [{p.min}, {p.max}] {p.unit}")
+
+
+def _checked_values(engine: Any, thing: str, configuration: str | None,
+                    inputs: Sequence[EngineInput]) -> list[BasisInput]:
+    """The values a run sets, checked against the thing's parameters with
+    their bounds (`check_inputs`), each as its basis input with its source.
+    A contract engine's run sets one value per parameter, its value and unit
+    with its origin: a quantity that also carries `low`, `high` or `basis` is
+    refused in words, since its worker receives the value and unit alone."""
+    for i in inputs:
+        carried = [k for k in ("low", "high", "basis") if getattr(i.quantity, k) is not None]
+        if carried:
+            raise EngineRefused(f"{i.name}: a run of the {engine.name} engine sets one value in the parameter's "
+                                f"unit, with its origin; this quantity also carries {' and '.join(carried)}")
+    check_inputs(thing, engine.parameters(thing, configuration), inputs, bounds=True)
+    out: list[BasisInput] = []
+    for i in inputs:
+        q = i.quantity
         assert q.origin is not None  # EngineInput holds a person's or a model's
-        out.append(BasisInput(name=f"value {i.name}", value=q.value, unit=q.unit, source=_value_source(q.origin)))
+        out.append(BasisInput(name=f"value {i.name}", value=q.value, unit=q.unit, source=_value_source(i.name, q.origin)))
     return sorted(out, key=lambda b: b.name)
+
+
+def is_contract(engine: Any) -> bool:
+    """Whether the engine is built on WorkerEngine: the service keys, keeps
+    and files its runs (`run_engine`) over its worker's ops."""
+    return callable(getattr(engine, "compute", None)) and callable(getattr(engine, "sff_document", None))
+
+
+def thing_of(engine: Any, thing: str, configuration: str | None) -> tuple[EngineThing, str | None]:
+    """The thing a request names and the configuration it runs in, one rule
+    at every door of a contract engine (its run, its parameters, its tools):
+    a request naming no configuration runs in the thing's default; a thing
+    with configurations and no default is run with one named; a configuration
+    the thing does not name, or any configuration for a thing that takes
+    none, is refused in words."""
+    thing_id = (thing or "").strip()
+    things = {x.id: x for x in engine.things()}
+    if thing_id not in things:
+        raise EngineRefused(f"the {engine.name} engine runs no thing {thing_id!r}; it runs "
+                            f"{', '.join(sorted(things)) or 'nothing'}")
+    found = things[thing_id]
+    cfg = (configuration or "").strip() or found.defaultConfiguration
+    if found.configurations and cfg is None:
+        raise EngineRefused(f"{thing_id} is run in one of its configurations, named in the request: "
+                            f"{', '.join(found.configurations)}")
+    if found.configurations and cfg not in found.configurations:
+        raise EngineRefused(f"{thing_id} runs in {', '.join(found.configurations)}; {cfg!r} is none of them")
+    if not found.configurations and cfg is not None:
+        raise EngineRefused(f"{thing_id} takes no configuration, and {cfg!r} was named")
+    return found, cfg
+
+
+def parameters_with(engine: Any, thing: str, configuration: str | None) -> tuple[str | None, list[EngineParameter]]:
+    """A thing's parameters as a run of it reads them, with the configuration
+    they are read in. A contract engine's thing and configuration are
+    resolved by `thing_of` first, so its worker's `parameters` op receives
+    the configuration a run would use; any other engine answers its own
+    `parameters` for the configuration named."""
+    if is_contract(engine):
+        found, cfg = thing_of(engine, thing, configuration)
+        return cfg, engine.parameters(found.id, cfg)
+    cfg = (configuration or "").strip() or None
+    return cfg, engine.parameters((thing or "").strip(), cfg)
 
 
 def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Sequence[EngineInput] = (), *,
@@ -338,22 +426,19 @@ def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Seque
     `runs` row of the shape every run has. Its id is the artifact id of its
     basis: the engine, the thing, the configuration, the precision the thing
     states and every value set, with its source. The same request twice is
-    that one row; a run the engine refuses is kept as a receipt and answered
-    from it. After the run the engine is asked once for its SFF file, kept
-    as `run-<id>`, or its words kept as `sffRefused`."""
+    that one row, answered as it was first kept (its `by` the first asker's);
+    a run the engine refuses is kept as a receipt and answered from it. Every
+    ask, a repeat included, first checks its values against the worker's
+    `parameters` op, so a row or a receipt is answered while the worker
+    answers. After the run the engine is asked once for its SFF file, kept as
+    `run-<id>`, or its words kept as `sffRefused`. A worker that fails, or
+    answers outside the protocol (EngineBroken), keeps no row: its job is
+    said failed on the event stream and the error raised. A failure of the
+    SFF step leaves the run's artifact kept, and the next ask answers the
+    computation from it and asks for the file again."""
     who = (by or "").strip() or "this browser"
-    thing_id = (thing or "").strip()
-    things = {x.id: x for x in engine.things()}
-    if thing_id not in things:
-        raise EngineRefused(f"the {engine.name} engine runs no thing {thing_id!r}; it runs "
-                                     f"{', '.join(sorted(things)) or 'nothing'}")
-    found = things[thing_id]
-    cfg = (configuration or "").strip() or found.defaultConfiguration
-    if found.configurations and cfg not in found.configurations:
-        raise EngineRefused(f"{thing_id} runs in {', '.join(found.configurations)}; "
-                                     f"{cfg!r} is none of them")
-    if not found.configurations and cfg is not None:
-        raise EngineRefused(f"{thing_id} takes no configuration, and {cfg!r} was named")
+    found, cfg = thing_of(engine, thing, configuration)
+    thing_id = found.id
     values = _checked_values(engine, thing_id, cfg, list(inputs))
 
     def convention(note: str) -> BasisSource:
@@ -405,12 +490,17 @@ def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Seque
                                       title=found.title, by=who)
     except (EngineRefused, sff.SFFRefused) as e:
         refused = str(e)
-    except WorkerError as e:
-        # The Proforma worker refused the file in words; any other failure of a
-        # worker is raised, as a library run's is, and the next ask tries again.
-        if not str(e).startswith("Refused: "):
+    except Exception as e:
+        # The Proforma worker refused the file in words; any other failure (a
+        # worker that crashed or timed out, an engine that broke the protocol)
+        # is said on the event stream and raised, as a library run's is, with
+        # no row kept, and the next ask tries again.
+        if isinstance(e, WorkerError) and str(e).startswith("Refused: "):
+            refused = str(e).removeprefix("Refused: ")
+        else:
+            events.publish("job.failed", {**job, "status": "failed", "words": f"{type(e).__name__}: {e}"},
+                           project=project_id)
             raise
-        refused = str(e).removeprefix("Refused: ")
     values_out = [{"name": o["name"], "quantity": Quantity(value=o["value"], unit=o["unit"],
                                                             origin=Origin(kind="artifact", ref=art.id)).model_dump(
                       mode="json", exclude_none=True)}
@@ -430,8 +520,12 @@ def run_with(engine: Any, thing: str, configuration: str | None, inputs: Sequenc
              by: str = "", scenario_id: str | None = None) -> RunReport:
     """One run of any registered engine, answered as its report: an engine
     built on WorkerEngine through `run_engine`, any other through its own
-    `run`, which keeps its row."""
-    if callable(getattr(engine, "compute", None)) and callable(getattr(engine, "sff_document", None)):
+    `run`, which keeps its row; an engine whose `run` kept none is broken
+    (EngineBroken)."""
+    if is_contract(engine):
         return run_engine(engine, thing, configuration, inputs, by=by, scenario_id=scenario_id)
     kept = engine.run(thing, configuration, list(inputs), by)
-    return report(kept.id)
+    try:
+        return report(str(getattr(kept, "id", "") or ""))
+    except RunNotFound:
+        raise EngineBroken(f"the {engine.name} engine kept no row for its run") from None

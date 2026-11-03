@@ -44,12 +44,16 @@ Option 2.
   said in words; `GET /api/engines` lists the engine with that error, and the service runs on.
 - `engine/runs.py` keeps every contract engine's run as one row of `runs`, of the shape a library
   run has. Its id is the artifact id over the tool `engine.<name>`, the engine's version string
-  and the basis: the engine, the thing, the configuration, the precision the thing states, and
-  every value set with its origin. The same request twice is that row; a refusal is kept as a
-  receipt; the SFF file the engine writes is validated and scored in the Proforma worker, or the
-  engine's words for why none exists are kept as `sffRefused`.
-- An engine's worker starts with the service's interpreter and an environment less every key,
-  token, password and database address (`workers.withheld`).
+  (the contract's stem, the engine's name and every distribution with its version:
+  `engine run 1 · <name> · <distribution> <version> …`) and the basis: the engine, the thing, the
+  configuration, the precision the thing states, and every value set with its origin and the day
+  it was set. The same request twice is that row; a refusal is kept as a receipt; the SFF file
+  the engine writes is validated and scored in the Proforma worker, or the engine's words for why
+  none exists are kept as `sffRefused`. A worker that answers outside the protocol raises
+  `EngineBroken`: nothing is kept, and the routes answer 503 in words.
+- An engine's worker starts with the service's interpreter, `core/` as its working directory,
+  and an environment less every variable named as a key, token, password or database address
+  (`workers.withheld`).
 - `python -m openferment_core.engine.conform <name>` makes the eight checks of
   `docs/api/engines.md` on a scratch database and keeps the verdict in `engine_checks`, where
   `GET /api/engines` and `pnpm ready` read it. `pnpm prove` runs the checks for every registered
@@ -74,11 +78,29 @@ Option 2.
   take `engine`, `biosteam` by default; the tool registry keeps its 48 names.
 - The package map (`core/tests/test_boundaries.py`) holds two exceptions for the conformance
   check: `engine → api` and `engine → tools`, the two doors a bare number is sent through.
-- An engine's code runs in the service's process when its entry point loads. Installing a package
-  into the environment is the host owner's act; the registry adds no network exposure, and the
-  loopback bind and `guard.py` are as they were.
-- `uv sync` is exact, so it removes a package installed beside the lock with `uv pip install -e`.
-  The proof installs the stranger's engine into its own environment each time it runs.
+- An engine's code runs in the service's process when its entry point loads, and its worker runs
+  as the service's user: installing an engine trusts its code with whatever that user can read,
+  `core/.env` included. The worker's environment carries no variable `workers.withheld` names
+  (those beginning `ANTHROPIC_` or `SCI_RAG_`, and those whose name holds `KEY`, `TOKEN`, `SECRET`,
+  `PASSWORD`, `PASSWD`, `DATABASE_URL` or `CREDENTIAL`). The registry and conformance check 6 keep
+  the worker module, every module its `heavy` covers, and `workers.WORKER_LIBRARIES` out of the
+  service's process for every engine. Installing a package into the environment is the host owner's
+  act; the registry adds no network exposure, and the loopback bind and `guard.py` are as they
+  were.
+- An engine from outside the core is installed into core's environment with
+  `cd core && uv pip install -e <path>`, and an exact `uv sync` (`scripts/session-start.sh`,
+  `scripts/host/deploy.sh`) removes it; the service reads the group once, so an install is
+  followed by a restart, and a new version of the package takes effect once it is installed again.
+  The proof's install step for such a package, and the licence check of it
+  (`pnpm check:licences` reads the packages `core/uv.lock` names), arrive with the handoff, stage D
+  of alpha 2.2.
+- Every contract engine's tool version begins with the contract's stem, `engine run 1`
+  (`contract.CONTRACT_RUN`): a change to how `runs.run_engine` keys a run or shapes its outputs
+  moves the stem, so a run kept before it keeps its own id, its replay names the version it was
+  kept at (a `toolVersion` difference), and the nightly checks report it as stale.
+- An engine's version changes whenever its computation changes: an editable install keeps its
+  version across edits of its code, and a run's id holds the version, so a new version is what
+  makes the service compute a request afresh.
 
 ## Revisit condition
 
@@ -88,7 +110,21 @@ importer (ADR-003).
 ## Evidence
 
 - `core/tests/test_engines.py`: the registry, `GET /api/engines`, a run kept as one row, a value
-  set with its origin, a bare number refused before the worker, values the parameters refuse, a
-  receipt, a replay, the worker's environment, the four tools, and the eight checks on the
-  contract's own sample engine (`engine/sample.py`).
+  set with its origin and its own day, a bare number refused before the worker, values the
+  parameters refuse, a receipt, a replay, the worker's environment, the four tools, and the eight
+  checks on the contract's own sample engine (`engine/sample.py`); discovery that keeps running
+  past an engine whose import exits, whose declaration raises, which asks the registry as it is
+  imported, or which brings its worker or a heavy module into the service; a worker answering
+  outside the protocol (`EngineBroken`, nothing kept, 503); the listing's short wait on a cold
+  worker and its things kept once answered; BioSTEAM checking a value's unit before the plant
+  runs; a write at the HTTP tool door naming its caller. After the review of B.6: every door
+  resolving a thing's configuration as a run does, a configuration name of up to 80 characters at
+  each of them, a value carrying a range or a basis refused, a dotted heavy name, an undeclared
+  worker library and one heavy module two engines share each setting an engine aside, a thread an
+  entry module starts answered, a replay naming the version a run was kept at, and check 7
+  holding its first ask to one call of the worker's `run` op.
+- `core/tests/test_workers.py`: a worker module that prints as it is imported, from Python and
+  from C, leaves every response whole (`workers.LAUNCH`).
+- `core/tests/test_boundaries.py`: `from X import y` read as the module `X.y` where y is one, so
+  the engine's row refuses a worker module imported from its package.
 - `python -m openferment_core.engine.conform biosteam`: the eight checks on BioSTEAM.

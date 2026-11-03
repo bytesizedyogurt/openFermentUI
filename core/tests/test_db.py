@@ -256,9 +256,11 @@ def test_migration_0005_keeps_each_turn_of_a_conversation_kept_whole_as_a_row_an
 
 
 def test_migration_0008_names_every_run_kept_before_it_a_biosteam_run_and_back(test_database):
-    """A database at 0007 holding a run kept before engines were registered. At 0008 its
-    `engine` column reads `biosteam`, its body is as it was stored, and the column's filter
-    finds it; at 0007 again the column is gone and the row is whole."""
+    """A database at 0007 holding a run kept before engines were registered, and one whose
+    body names its engine (a row kept at 0008, then downgraded). At 0008 the first's
+    `engine` column reads `biosteam` and the second's the engine its body names, each body
+    as it was stored, and the column's filter finds each; at 0007 again the column is gone
+    and each row is whole; at 0008 once more each column reads its body's engine again."""
     import sqlalchemy as sa
     from alembic import command
 
@@ -268,36 +270,41 @@ def test_migration_0008_names_every_run_kept_before_it_a_biosteam_run_and_back(t
     engine = make_engine(url)
     body = {"id": "r-1", "plant": "a-plant", "status": "done", "tool": "library.run", "toolVersion": "v",
             "inputs": [], "by": "Ada Moreno", "at": "2026-11-02T08:00:00Z"}
+    named = {**body, "id": "r-2", "engine": "an-engine", "plant": "a-thing", "tool": "engine.an-engine"}
 
     async def seed() -> None:
         async with engine.begin() as c:
             await c.execute(insert(t.projects).values(id="p", name="p", created_by="test"))
-            await c.execute(sa.text("insert into openferment.runs (project_id, id, body, created_by, status) "
-                                    "values ('p', 'r-1', cast(:body as json), 'Ada Moreno', 'done')"),
-                            {"body": json.dumps(body)})
+            for row in (body, named):
+                await c.execute(sa.text("insert into openferment.runs (project_id, id, body, created_by, status) "
+                                        "values ('p', :id, cast(:body as json), 'Ada Moreno', 'done')"),
+                                {"id": row["id"], "body": json.dumps(row)})
 
-    async def held() -> tuple[set[str], list[dict], list[str]]:
+    async def held() -> tuple[set[str], dict[str, dict], dict[str, str]]:
         async with engine.connect() as c:
             columns = set((await c.execute(sa.text(
                 "select column_name from information_schema.columns "
                 "where table_schema = 'openferment' and table_name = 'runs'"))).scalars())
             # Named columns: a statement whose result keeps one shape across the change.
-            found = [dict(r) for r in (await c.execute(sa.text("select id, body from openferment.runs"))).mappings()]
-            biosteam = []
+            found = {r["id"]: r["body"] for r in (await c.execute(sa.text("select id, body from openferment.runs"))).mappings()}
+            engines = {}
             if "engine" in columns:
-                biosteam = list((await c.execute(sa.text(
-                    "select id from openferment.runs where project_id = 'p' and engine = 'biosteam'"))).scalars())
-            return columns, found, biosteam
+                engines = {r.id: r.engine for r in (await c.execute(sa.text(
+                    "select id, engine from openferment.runs where project_id = 'p'"))).all()}
+            return columns, found, engines
 
     try:
         migrate.upgrade(url, "0007")
         db.run(seed())
         migrate.upgrade(url, "0008")
-        columns, found, biosteam = db.run(held())
-        assert "engine" in columns and found[0]["body"] == body and biosteam == ["r-1"]
+        columns, found, engines = db.run(held())
+        assert "engine" in columns and found == {"r-1": body, "r-2": named}
+        assert engines == {"r-1": "biosteam", "r-2": "an-engine"}
         command.downgrade(migrate.config(url), "0007")
         columns, found, _ = db.run(held())
-        assert "engine" not in columns and found[0]["body"] == body
+        assert "engine" not in columns and found == {"r-1": body, "r-2": named}
+        migrate.upgrade(url, "0008")
+        assert db.run(held())[2] == {"r-1": "biosteam", "r-2": "an-engine"}
     finally:
         db.run(engine.dispose())
         migrate.drop(name, test_database.server)

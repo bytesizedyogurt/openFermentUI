@@ -110,6 +110,16 @@ def test_replay_names_a_changed_version():
     assert (r.differences[0].stored, r.differences[0].replayed) == ("v1", "v2")
 
 
+def test_replay_names_a_changed_version_when_the_output_is_the_same():
+    """A run kept at an earlier version replays with the tool installed now,
+    and says so: its first difference names both versions."""
+    a = artifacts.compute("t_count", [_in("x")])
+    artifacts.register("t_count", "v2", _count)
+    r = artifacts.replay(a.id)
+    assert r.identical and r.withinTolerance
+    assert [(d.path, d.stored, d.replayed) for d in r.differences] == [("toolVersion", "v1", "v2")]
+
+
 def test_replay_of_an_unregistered_tool_is_refused():
     a = artifacts.compute("t_count", [_in("x")])
     artifacts._REGISTRY.pop("t_count")
