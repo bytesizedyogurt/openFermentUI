@@ -15,6 +15,8 @@
 //
 // And the person's own starts (alpha 2.1 stage B):
 //
+//   GET  /api/engines                           the engines registered here, each with its things
+//   POST /api/engines/{name}/run                one run of an engine's thing, in a person's name
 //   GET  /api/library                           the installed plants and the configurations each built in
 //   POST /api/library/{plant}/run               one engine run of a plant in a configuration, in a person's name
 //   POST /api/studies/scenarios                 a scenario whose values are a person's assumptions
@@ -43,6 +45,9 @@ import type {
 
 /** One of the toolkit's reference SFF files at the pinned commit. */
 export type SFFLibraryEntry = components['schemas']['SFFLibraryEntry'];
+/** An engine registered here, with its things, its worker and its last conformance verdict (GET /api/engines). */
+export type EngineInfo = components['schemas']['EngineInfo'];
+export type EngineThing = components['schemas']['EngineThing'];
 import { downloadBlob } from './csv';
 import { ServiceDown, ServiceRefused, call } from './http';
 import { apiFetch } from './project';
@@ -77,6 +82,11 @@ export const getFlowsheet = (recordId: string, signal?: AbortSignal) =>
 export const makeRunbook = (asked: RunbookCreate) => call<Runbook>('/api/studies/runbooks', post(asked));
 
 export const libraryShelf = (signal?: AbortSignal) => call<LibraryShelf>('/api/library', { signal });
+/** The engines of the entry-point group openferment.engines, each listed with its error when it cannot be used. */
+export const listEngines = (signal?: AbortSignal) => call<EngineInfo[]>('/api/engines', { signal });
+/** One run of an engine's thing at the engine's own defaults, in a configuration it names (null: the thing's own). */
+export const runEngine = (engine: string, thing: string, configuration: string | null, by: string) =>
+  call<RunReport>(`/api/engines/${id(engine)}/run`, post({ thing, configuration, inputs: [], by }));
 /** One engine run of a plant on its package's own values, in a configuration it built in (null: the plant's own). */
 export const runPlant = (plant: string, configuration: string | null, by: string) =>
   call<RunReport>(`/api/library/${id(plant)}/run`, post({ configuration, overrides: [], by }));

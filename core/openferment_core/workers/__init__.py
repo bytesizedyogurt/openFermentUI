@@ -58,11 +58,30 @@ class WorkerTimeout(RuntimeError):
     new one."""
 
 
+# What a worker started with `withhold_secrets` never receives: the model key
+# (Anthropic's names and openFerment's), the database addresses, the kit's
+# settings (they carry both), and anything named as a key, token, secret or
+# password (docs/api/engines.md, The worker).
+_SECRET_PREFIXES = ("ANTHROPIC_", "SCI_RAG_")
+_SECRET_WORDS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "DATABASE_URL", "CREDENTIAL")
+
+
+def withheld(name: str) -> bool:
+    """Whether a variable of this name stays out of an engine worker's environment."""
+    upper = name.upper()
+    return upper.startswith(_SECRET_PREFIXES) or any(w in upper for w in _SECRET_WORDS)
+
+
 class SimWorker:
-    def __init__(self, module: str, *, timeout_s: float = DEFAULT_TIMEOUT_S, python: str | None = None) -> None:
+    def __init__(self, module: str, *, timeout_s: float = DEFAULT_TIMEOUT_S, python: str | None = None,
+                 withhold_secrets: bool = False) -> None:
         self.module = module
         self.timeout_s = timeout_s
         self.python = python or sys.executable
+        # An engine's worker (engine/contract.py) starts with no key and no
+        # database address in its environment; the service's own workers keep
+        # the environment they have always had.
+        self.withhold_secrets = withhold_secrets
         self._proc: subprocess.Popen[str] | None = None
         self._out: queue.Queue[str | None] = queue.Queue()
         self._err: collections.deque[str] = collections.deque(maxlen=STDERR_LINES)
@@ -77,7 +96,7 @@ class SimWorker:
         return self._proc is not None and self._proc.poll() is None
 
     def _start(self) -> None:
-        env = dict(os.environ)
+        env = {k: v for k, v in os.environ.items() if not (self.withhold_secrets and withheld(k))}
         env["PYTHONPATH"] = os.pathsep.join(p for p in (str(_CORE), env.get("PYTHONPATH", "")) if p)
         env["PYTHONUNBUFFERED"] = "1"
         # No worker stops in a debugger on its JSON channel (OF-BLD-020 §4.1):

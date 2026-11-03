@@ -1,6 +1,6 @@
 """The proof (execution prompt §9.1): an end-to-end path with nothing seeded.
 
-    pnpm prove                    every step: 1 to 9
+    pnpm prove                    every step: 1 to 10
     pnpm prove --steps 5,8        the steps named, after the steps they stand on
     pnpm prove --keep             leave the service running at the end, and say where
     pnpm prove --live             with the key in core/.env and the network: step 3 collects the
@@ -51,6 +51,10 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
        live trace, a document pasted in and searched, the flowsheet run's report and its SFF
        graph, a scenario begun from that run, the plants Studies offers to run, the project's
        SFF flowsheets, the conversation of step 6 with its estimate marked, the runbook of step 5
+   10  every engine of the entry-point group `openferment.engines` listed by the service with its
+       version and worker, none with an error; the eight conformance checks of docs/api/engines.md
+       made on each (`python -m openferment_core.engine.conform <name>`, on a scratch database of
+       its own), and each verdict kept and listed
 """
 from __future__ import annotations
 
@@ -106,7 +110,8 @@ DEPARTURES = {
 }
 DIGITS = 10
 # A step, and the steps it stands on.
-STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 3: (2,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,), 9: (5, 6)}
+STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 3: (2,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,), 9: (5, 6),
+                                     10: (2,)}
 TITLES = {
     1: "a fresh database, migrated; ready green",
     2: "a project made through the API",
@@ -119,7 +124,10 @@ TITLES = {
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
     9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a conversation, a runbook",
+    10: "the engines: each registered one listed, the eight conformance checks made on it, its verdict kept",
 }
+# How long the conformance checks of one engine may take (BioSTEAM's: a cold import and nine plants' parameters).
+CONFORM_TIMEOUT_S = 1800.0
 RUN_TIMEOUT_S = 1800.0
 
 # Opens the export package with the standard library alone (run with -I -S, from a directory of its own).
@@ -686,6 +694,36 @@ def step_9(proof: Proof) -> None:
                 f"the walk exited {walked.returncode}: {(walked.stderr or '').strip()[-300:]}")
 
 
+def step_10(proof: Proof) -> None:
+    listed = api(proof, "GET", "/api/engines")
+    usable = [e for e in listed if not e["error"]]
+    broken = [e for e in listed if e["error"]]
+    proof.check(any(e["name"] == "biosteam" for e in usable) and not broken,
+                f"the service lists {len(listed)} engine{'s' if len(listed) != 1 else ''} of the group "
+                "openferment.engines: " + "; ".join(
+                    f"{e['name']} from {e['entryPoint']} ("
+                    + ", ".join(f"{k} {v}" for k, v in sorted(e["version"].items())) + ")" for e in usable)
+                + ("; with errors: " + "; ".join(f"{e['name']}: {e['error']}" for e in broken) if broken else ""))
+    env = environment(proof, int(proof.origin.rsplit(":", 1)[1]))
+    for e in usable:
+        done = subprocess.run([sys.executable, "-m", "openferment_core.engine.conform", e["name"]], cwd=CORE,
+                              text=True, capture_output=True, env=env, timeout=CONFORM_TIMEOUT_S)
+        rows = [line for line in done.stdout.splitlines() if line.startswith(("✓", "✗"))]
+        failed = [line for line in rows if line.startswith("✗")]
+        said = (done.stdout.strip().splitlines() or [done.stderr.strip()[-300:]])[0]
+        proof.check(done.returncode == 0 and len(rows) == 8 and not failed,
+                    f"conform {e['name']}: {len(rows) - len(failed)} of {len(rows)} checks hold"
+                    + (f" ({said})" if not failed and rows else "")
+                    + (": " + "; ".join(failed) if failed else "")
+                    + ("" if rows else f": {done.stderr.strip()[-300:] or said}"))
+    again = {e["name"]: e for e in api(proof, "GET", "/api/engines")}
+    kept = {n: (again[n].get("conformance") or {}) for n in (e["name"] for e in usable)}
+    proof.check(bool(kept) and all(v.get("ok") for v in kept.values()),
+                "each verdict kept and listed by GET /api/engines: " + "; ".join(
+                    f"{n} {'holds' if v.get('ok') else 'fails' if v else 'never checked'}"
+                    + (f" at {v['version']}" if v.get("version") else "") for n, v in kept.items()))
+
+
 def step_7(proof: Proof) -> None:
     listed = api(proof, "GET", "/api/flowsheets/library")
     entry = next((f for f in listed if f["id"] == REFERENCE_FILE), None)
@@ -748,7 +786,7 @@ def step_8(proof: Proof) -> None:
 
 
 RUNNERS: dict[int, Callable[[Proof], None]] = {1: step_1, 2: step_2, 3: step_3, 4: step_4, 5: step_5, 6: step_6,
-                                               7: step_7, 8: step_8, 9: step_9}
+                                               7: step_7, 8: step_8, 9: step_9, 10: step_10}
 
 
 def spent(proof: Proof) -> None:

@@ -198,9 +198,16 @@ determinism after `empty_recycles()` and `tea._sales = 0`.
   3.6e-5 and the installed cost 2e-9 (measured), and every number it moves is outside; the TEA's
   sales guess kept alone moves nothing.
 
+### Alpha 2.2 (2026-11-03): the adapter is the `biosteam` engine
+
+- The revisit condition below, a second engine, is met by alpha 2.2, and ADR-015 records the
+  contract every engine keeps. `engine/biosteam.py` puts this adapter behind the `Engine` protocol,
+  registered by `core/pyproject.toml`'s entry point of the group `openferment.engines`; the
+  library runner, the composed flowsheet and every number and gate above stand as they are.
+
 ## Revisit condition
 
-A second engine; NSKinetics once a kinetic model exists.
+A second engine (met in alpha 2.2: ADR-015); NSKinetics once a kinetic model exists.
 
 ## Evidence
 

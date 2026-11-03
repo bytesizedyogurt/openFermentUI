@@ -286,6 +286,43 @@ def check_models() -> Check:
     return Check("models", worst, "; ".join(said))
 
 
+def check_engines() -> list[Check]:
+    """One row per engine registered here (docs/api/engines.md): its version,
+    its worker, and its last conformance verdict at that version. An engine
+    that fails to load is a warning: the service runs on without it."""
+    from .engine import conform, contract, registry
+
+    rows: list[Check] = []
+    for name in registry.names():
+        f = registry.found()[name]
+        if f.engine is None:
+            rows.append(Check(f"engine {name}", "warn", f"{f.error}; the service runs on without it"))
+            continue
+        e = f.engine
+        try:
+            version = contract.version_string(e)
+        except Exception as ex:  # a version that cannot be read is said, and the row stands
+            rows.append(Check(f"engine {name}", "warn", f"its version could not be read: {type(ex).__name__}: {ex}"))
+            continue
+        worker = f"worker {e.worker} ({registry.status_of(e)})" if e.worker else "no worker: it computes in the service's process"
+        verdict = conform.latest(name)
+        again = f"python -m openferment_core.engine.conform {name}"
+        if verdict is None:
+            mark, said = "warn", f"never checked here: {again}"
+        elif verdict.version != version:
+            mark, said = "warn", f"checked at {verdict.version}; check it again: {again}"
+        elif not verdict.ok:
+            failed = ", ".join(str(c.number) for c in verdict.checks if not c.ok)
+            mark, said = "warn", f"checks {failed} failed at {verdict.at}; {again} says why"
+        else:
+            mark, said = "ok", f"every conformance check held at {verdict.at}"
+        rows.append(Check(f"engine {name}", mark, f"{version}; {worker}; {said}"))
+    if not rows:
+        rows.append(Check("engines", "fail", "no engine is registered: install the service again (cd core && uv sync "
+                                              "--all-extras), whose pyproject.toml registers biosteam"))
+    return rows
+
+
 def check_graphviz() -> Check:
     """Whether Graphviz's `dot` is on the path (OF-BLD-019 D8). Optional, so
     a warning at most: without it Proforma lists a flowsheet's units in run
@@ -561,6 +598,10 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True,
             checks.append(row())
         except Exception as e:  # any failure is the row's answer, in words
             checks.append(Check(name, "warn", f"could not be checked: {type(e).__name__}: {e}"))
+    try:
+        checks += check_engines()
+    except Exception as e:  # the registry itself could not be read: said, and the rest still run
+        checks.append(Check("engines", "warn", f"could not be checked: {type(e).__name__}: {e}"))
     if no_network:
         checks += [Check(n, "skip", "--no-network") for n in ("model", "roles", "europepmc", "huggingface")]
     else:

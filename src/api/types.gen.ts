@@ -312,6 +312,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/engines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engines List
+         * @description Every engine registered here (docs/api/engines.md): its version, worker,
+         *     things and last conformance verdict, or the error that keeps it from use.
+         */
+        get: operations["engines_list_api_engines_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/engines/{name}/parameters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engine Parameters
+         * @description What one of an engine's things takes, each default with its origin.
+         */
+        get: operations["engine_parameters_api_engines__name__parameters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/engines/{name}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Engine Run
+         * @description One of an engine's things run with the values a person or a model sets,
+         *     kept as a runs row; a refused run is kept as a receipt and 422 in words.
+         */
+        post: operations["engine_run_api_engines__name__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -3306,6 +3368,149 @@ export interface components {
             value?: number | string | null;
         };
         /**
+         * EngineCheck
+         * @description One conformance check (docs/api/engines.md, Conformance).
+         */
+        EngineCheck: {
+            /** Check */
+            check: string;
+            /** Number */
+            number: number;
+            /** Ok */
+            ok: boolean;
+            /** Said */
+            said: string;
+        };
+        /**
+         * EngineConformance
+         * @description An engine's last conformance verdict, at the version it was checked.
+         */
+        EngineConformance: {
+            /** At */
+            at: string;
+            /** By */
+            by: string;
+            /** Checks */
+            checks: components["schemas"]["EngineCheck"][];
+            /** Engine */
+            engine: string;
+            /** Ok */
+            ok: boolean;
+            /** Version */
+            version: string;
+        };
+        /**
+         * EngineInfo
+         * @description GET /api/engines: one engine as the service found it.
+         */
+        EngineInfo: {
+            conformance?: components["schemas"]["EngineConformance"] | null;
+            /** Entrypoint */
+            entryPoint: string;
+            /** Error */
+            error?: string | null;
+            /** Heavy */
+            heavy?: string[];
+            /** Name */
+            name: string;
+            /** Things */
+            things?: components["schemas"]["EngineThing"][];
+            /** Version */
+            version?: {
+                [key: string]: string;
+            };
+            /** Worker */
+            worker?: string | null;
+            /**
+             * Workerstatus
+             * @default cold
+             */
+            workerStatus: string;
+        };
+        /**
+         * EngineInput
+         * @description A value a run sets: a parameter's key and a typed quantity in that
+         *     parameter's unit (the shape a run's inputs have), carrying the person or
+         *     the model that set it.
+         */
+        EngineInput: {
+            /** Name */
+            name: string;
+            quantity: components["schemas"]["Quantity-Input"];
+        };
+        /**
+         * EngineParameter
+         * @description One parameter a thing takes: a `ParameterSpec` (the panel's shape,
+         *     its bounds with their written reason) with its default value and where
+         *     the default comes from, `library-default` naming the package it was read
+         *     from or a `convention` saying what the setting is. The panel's fields an
+         *     engine may leave unset default here; `sourceRule` is the origin's kind.
+         */
+        EngineParameter: {
+            /** Boundsreason */
+            boundsReason: string;
+            /** Choices */
+            choices?: string[] | null;
+            /** Convention */
+            convention?: number | string | null;
+            /**
+             * Dimension
+             * @default
+             */
+            dimension: string;
+            /**
+             * Gloss
+             * @default
+             */
+            gloss: string;
+            /**
+             * Group
+             * @default parameters
+             */
+            group: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Max */
+            max?: number | null;
+            /** Min */
+            min?: number | null;
+            /** Note */
+            note?: string | null;
+            origin: components["schemas"]["Origin"];
+            /**
+             * Scale
+             * @default linear
+             * @enum {string}
+             */
+            scale: "linear" | "log";
+            /** Sourcerule */
+            sourceRule?: string[];
+            /** Step */
+            step?: number | null;
+            /**
+             * Symbol
+             * @default
+             */
+            symbol: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number | string;
+        };
+        /**
+         * EnginePrecision
+         * @description How near a replayed output must come to the run's: within
+         *     `atol + rtol·|stored|`.
+         */
+        EnginePrecision: {
+            /** Atol */
+            atol: number;
+            /** Rtol */
+            rtol: number;
+        };
+        /**
          * EngineRun
          * @description One engine run in a project: a row of `runs` (GET /api/runs).
          */
@@ -3357,6 +3562,41 @@ export interface components {
             versions?: {
                 [key: string]: string;
             };
+        };
+        /**
+         * EngineRunRequest
+         * @description POST /api/engines/{name}/run: one thing, in one configuration, with
+         *     the values a person or a model sets.
+         */
+        EngineRunRequest: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            /** Configuration */
+            configuration?: string | null;
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
+            /** Thing */
+            thing: string;
+        };
+        /**
+         * EngineThing
+         * @description One thing an engine can run, with the configurations it runs in.
+         */
+        EngineThing: {
+            /** Configurations */
+            configurations?: string[];
+            /** Defaultconfiguration */
+            defaultConfiguration?: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind?: string | null;
+            precision: components["schemas"]["EnginePrecision"];
+            /** Title */
+            title: string;
         };
         /**
          * Evidence
@@ -6900,6 +7140,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolCallRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    engines_list_api_engines_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EngineInfo"][];
+                };
+            };
+        };
+    };
+    engine_parameters_api_engines__name__parameters_get: {
+        parameters: {
+            query: {
+                thing: string;
+                configuration?: string | null;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EngineParameter"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    engine_run_api_engines__name__run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EngineRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunReport"];
                 };
             };
             /** @description Validation Error */

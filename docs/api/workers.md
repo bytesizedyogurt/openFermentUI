@@ -2,7 +2,8 @@
 
 BioSTEAM, thermosteam, biorefineries, the vendored SFF toolkit and cobra run in worker processes
 (execution prompt §7.1, §7.3): a cold BioSTEAM import takes about thirty seconds, and the
-service stays light. The service's side is `SimWorker` (`core/openferment_core/workers/__init__.py`);
+service stays light. An engine registered through the contract (`docs/api/engines.md`) runs in a
+worker of its own, which speaks this protocol too. The service's side is `SimWorker` (`core/openferment_core/workers/__init__.py`);
 the worker's side is `serve`. The Proforma worker is reached through
 `core/openferment_core/engine/simulator.py`, which starts it on first use (or with the service
 when `OPENFERMENT_WARM_PROFORMA=1`) and reports `cold`, `starting`, `ready` or `failed`.
@@ -34,8 +35,42 @@ out  {"id": 1, "ok": false, "error": "Refused: there is no flowsheet x; there ar
 | `proforma` | `workers/proforma_worker.py` (with `flowsheets/`, `workers/library_plants.py`, `workers/sff_toolkit.py`, `vendor/pisces_sff`) | biosteam, thermosteam, biorefineries, the SFF toolkit | `benchmark`, `evaluate`, `grid`, `montecarlo`, `run`, `reference`, `thermo_props`, `volatility`, `vessel_specs`, `vessel_design`, `catalogue_specs`, `catalogue_unit_check`, `train_specs`, `flowsheet_unit_values`, `train_run`, `sff_export`, `sff_validate`, `sff_score`, `library_discover`, `library_parameters`, `library_run`, `library_cases` |
 | `geneos` | `workers/geneos_worker.py` | cobra | `describe`, `ceiling`, `frontier`, `mix` |
 | `echo` | `workers/echo_worker.py` | nothing heavy | the protocol's own tests |
+| `sample` | `workers/sample_worker.py` | nothing heavy | `things`, `parameters`, `run`, `sff_export`, `environment`: the engine contract's own tests (`engine/sample.py`, which no entry point registers) |
+| an engine's | the module its `worker` names | what the engine declares in `heavy` | `things`, `parameters`, `run`, `sff_export` (below) |
 
 Each module's docstring describes its ops; this page gives every op's request and result.
+
+## Engine ops (an engine's worker; ADR-015, `docs/api/engines.md`)
+
+A worker an engine names answers four ops, which `WorkerEngine` (`engine/contract.py`) calls; its
+process starts with an environment less every key, token, password and database address
+(`workers.withheld`). The shapes of `EngineThing` and `EngineParameter` are those of
+`docs/api/openapi.json`.
+
+### `things`
+
+`{}` → `{"things": [EngineThing, …]}`: what the engine runs, each with its configurations, the
+configuration a run takes when it names none, and the precision a replay is held to.
+
+### `parameters`
+
+`{"thing", "configuration"}` → `{"parameters": [EngineParameter, …]}`: what the thing takes, each a
+`ParameterSpec` with its default `value` and the default's `origin` (`library-default` with `ref`,
+or `convention` with `note`). An unknown thing is refused in words.
+
+### `run`
+
+`{"thing", "configuration", "inputs": [{"name", "value", "unit"}, …]}` → `{"outputs": [{"name",
+"value", "unit"}, …]}`. The inputs are the values the run sets, already checked by the service
+against the thing's parameters; each output is a number or a string in a unit. A run the engine
+cannot make is refused in words (`Refused: …`), and the service keeps the refusal as the run's
+receipt.
+
+### `sff_export`
+
+The same request as `run` → `{"flowsheet": <an SFF document>}`, which the service validates and
+scores in the Proforma worker and keeps as the run's flowsheet record; or `Refused: <words>` when
+the engine has no plant, which the service keeps as the run's `sffRefused`.
 
 ## Proforma's flowsheet ops (Proforma worker; OF-BLD-014 §8, OF-BLD-019 §2, `proforma.py`)
 

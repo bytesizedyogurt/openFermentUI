@@ -150,6 +150,7 @@ List what the library shelf runs: the biorefineries plants with an entry point a
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
+| `engine` | string | no | The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and openFerment's flowsheet, or any other registered here. |
 | `words` | string | no | Words to narrow the shelf by: a product, a feedstock, a plant's name; empty for all. |
 | `limit` | integer | no | How many rows at most. A count. |
 
@@ -161,6 +162,7 @@ A plant's parameters as the package builds it: each key with its label, its unit
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
+| `engine` | string | no | The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and openFerment's flowsheet, or any other registered here. |
 | `plant` | string | yes | A plant's id, as engine_plants gives it. |
 | `configuration` | string | no | One of the plant's configurations; empty for its own. |
 | `words` | string | no | Words to narrow the parameters by; empty for all. |
@@ -174,6 +176,7 @@ Run a plant from the library shelf at the library's defaults, or a study scenari
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
+| `engine` | string | no | The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and openFerment's flowsheet, or any other registered here. |
 | `plant` | string | no | A plant's id, run at the library's defaults; empty when a scenario is named. |
 | `configuration` | string | no | One of the plant's configurations; empty for its own. |
 | `scenario` | string | no | A study scenario's id (study_scenario returns it), run on its plant with its values. |
@@ -187,6 +190,7 @@ Read a kept engine run by its id: what ran, the values it set with their origins
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
+| `engine` | string | no | The engine that ran it, when you know it: a run of another engine is then refused; empty for the run's own. |
 | `run` | string | yes | A kept run's id, as engine_run or study_read gives it. |
 | `parameters` | string | no | Words to read the parameters the run read back from the plant by (its feed, a unit, a price, a finance term): each one matched comes back as an evidence id with its value, its unit and its origin. Empty for none. |
 | `limit` | integer | no | How many parameters at most. A count. |

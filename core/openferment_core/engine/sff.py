@@ -574,6 +574,22 @@ def export(plant: dict[str, Any], *, project_id: str, run_artifact_id: str, by: 
     return db.run(_put(project_id, record, text))
 
 
+
+def keep_run_file(data: bytes, *, project_id: str, run_artifact_id: str, source: str, title: str,
+                  by: str) -> SFFFlowsheet:
+    """An SFF file an engine wrote for one of its runs (docs/api/engines.md,
+    The SFF file): checked by the toolkit in the worker (validated and
+    scored; a file that fails validation is kept with its findings), drawn,
+    and kept as the record `run-<id>` with origin `run`."""
+    text, doc = parsed(data, f"the file run {run_artifact_id} wrote")
+    with tempfile.TemporaryDirectory(prefix="openferment-sff-") as tmp:
+        path = Path(tmp) / f"{run_artifact_id}.sff.json"
+        path.write_bytes(data)
+        checked = _checked(path)
+    record = _record(doc, data, checked, record_id=f"run-{run_artifact_id}", origin="run", source=source,
+                     fallback_title=title, by=by, run_artifact_id=run_artifact_id)
+    return db.run(_put(project_id, record, text))
+
 # ── the command line ────────────────────────────────────────────────────
 
 

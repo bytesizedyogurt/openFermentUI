@@ -395,18 +395,41 @@ RUN_WAITS = ("A named person types each waiting input in Proforma, on the scenar
              "name; a model never supplies one. Say in gaps which inputs wait.")
 
 
-def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note: str, ctx: ToolContext) -> ToolResult:
+def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note: str, ctx: ToolContext, *,
+               engine: Any = None) -> ToolResult:
     """Run a library plant at the library's defaults, or a study scenario
     with its values, as an engine run, keep it and mark it as the caller's
     (alpha 2.0 stage 6). A plant's refusal is kept as the run's receipt
-    (engine/runs.py) and comes back in the plant's words."""
+    (engine/runs.py) and comes back in the plant's words. `engine`, when it
+    names a registered engine beside BioSTEAM (docs/api/engines.md), runs one
+    of its things at its defaults, kept the same way."""
     from ..engine import library, runs
+    from ..engine import EngineRefused
     from ..studies import scenarios
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
     from .engine import run_result
 
     _, who = _actor(ctx)
     sid, pid = scenario_id.strip(), plant.strip()
+    if engine is not None:
+        if sid or not pid:
+            return ToolResult(error=f"{tool} refused: on the {engine.name} engine, name one of its things to run "
+                                    "at its defaults (engine_plants lists them); a study scenario runs on BioSTEAM")
+        try:
+            report = runs.run_with(engine, pid, configuration.strip() or None, [], by=who)
+        except runs.RunRefused as e:
+            _audit_as(ctx, "proforma", "engine_run", "refused", e.run_id, {"tool": tool, "engine": engine.name,
+                                                                             "note": note})
+            return ToolResult(error=f"{tool}: the {engine.name} engine refused, in its words: {e}. The refusal is "
+                                    f"kept as run {e.run_id}'s receipt.")
+        except EngineRefused as e:
+            return ToolResult(error=f"{tool} refused: {e}")
+        except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+            return ToolResult(error=f"{tool} could not run it on the {engine.name} engine: {e}")
+        run = report.run
+        _audit_as(ctx, "proforma", "engine_run", "open", run.id, {"tool": tool, "engine": engine.name,
+                                                                  "artifactId": run.artifactId, "note": note})
+        return run_result(report)
     if bool(sid) == bool(pid):
         return ToolResult(error=f"{tool} refused: name a plant to run at the library's defaults, or a scenario to "
                                 "run with its values; one of the two")

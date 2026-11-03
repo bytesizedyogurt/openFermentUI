@@ -54,9 +54,9 @@ def test_the_session_database_is_at_the_newest_revision_of_both_schemas(test_dat
     from openferment_core import migrations
 
     test_database.open()
-    assert migrate.head() == "0008"
+    assert migrate.head() == "0009"
     assert migrations.kit_head() == "0006"
-    assert migrations.at_head(test_database.url) == {"openferment": ("0008", "0008"), "sci_rag": ("0006", "0006")}
+    assert migrations.at_head(test_database.url) == {"openferment": ("0009", "0009"), "sci_rag": ("0006", "0006")}
 
 
 def test_rollback_1_a_row_a_test_writes_is_there_for_the_rest_of_that_test():

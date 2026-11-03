@@ -161,6 +161,9 @@ ALLOWED_WRITES = (
     # through its one function in writes.py: an engine run of a plant or of a
     # scenario, a scenario kept, a comparison kept.
     "engine.runs.run",
+    # engine_run on any registered engine (alpha 2.2 stage B; docs/api/engines.md):
+    # an engine built on WorkerEngine is kept through run_with's run_engine.
+    "engine.runs.run_with",
     "studies.scenarios.run",
     "studies.scenarios.make",
     "studies.comparisons.make",

@@ -93,7 +93,10 @@ from .models import (
     LibraryParameters,
     LibraryRunRequest,
     RunReport,
+    EngineInfo,
+    EngineParameter,
     EngineRun,
+    EngineRunRequest,
     ScenarioCreate,
     StudyRequest,
     StudyScenario,
@@ -116,6 +119,8 @@ from .models import (
 from . import llm
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
 from .engine import runs as _runs
+from .engine import registry as _engines
+from .engine import EngineRefused
 from .studies import comparisons as _comparisons  # noqa: F401  (registers study.comparison for compute and replay)
 from .studies import exports as _exports
 from .studies import runbooks as _runbooks
@@ -1007,6 +1012,52 @@ def library_run(plant: str, request: LibraryRunRequest) -> RunReport:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {plant}: {e}") from e
+
+
+def _engine(name: str):
+    """The registered engine named, or the HTTP answer that says why it cannot be used."""
+    try:
+        return _engines.get(name)
+    except _engines.EngineNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+    except _engines.EngineUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.get("/api/engines")
+def engines_list() -> list[EngineInfo]:
+    """Every engine registered here (docs/api/engines.md): its version, worker,
+    things and last conformance verdict, or the error that keeps it from use."""
+    return _engines.infos()
+
+
+@app.get("/api/engines/{name}/parameters")
+def engine_parameters(name: str, thing: str, configuration: str | None = None) -> list[EngineParameter]:
+    """What one of an engine's things takes, each default with its origin."""
+    engine = _engine(name)
+    try:
+        return engine.parameters(thing.strip(), (configuration or "").strip() or None)
+    except _library.PlantNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+    except (EngineRefused, _library.LibraryRefused) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the {name} engine's worker could not answer: {e}") from e
+
+
+@app.post("/api/engines/{name}/run")
+def engine_run(name: str, req: EngineRunRequest) -> RunReport:
+    """One of an engine's things run with the values a person or a model sets,
+    kept as a runs row; a refused run is kept as a receipt and 422 in words."""
+    engine = _engine(name)
+    try:
+        return _runs.run_with(engine, req.thing, req.configuration, req.inputs, by=req.by)
+    except _library.PlantNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+    except (EngineRefused, _library.LibraryRefused) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the {name} engine's worker could not run it: {e}") from e
 
 
 @app.get("/api/runs")

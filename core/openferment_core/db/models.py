@@ -356,3 +356,17 @@ spend = Table(
     _when(),
     Column("expires_at", TIMESTAMP(timezone=True)),
 )
+
+# Each engine's last conformance verdict (engine/conform.py; docs/api/engines.md,
+# Conformance): the machine's, as the engines installed here are, so it belongs
+# to no project. One row per engine, replaced by its next check.
+engine_checks = Table(
+    "engine_checks",
+    metadata,
+    Column("engine", Text, primary_key=True),
+    Column("version", Text, nullable=False),
+    Column("ok", Boolean, nullable=False),
+    Column("body", JSON, nullable=False),
+    Column("created_by", Text, nullable=False),
+    _when(),
+)

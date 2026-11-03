@@ -26,16 +26,25 @@ session continues from this file and `git log` alone.
      OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage B, the engine contract**: `docs/api/engines.md` first, then ADR-015,
-   `engine/registry.py` on the entry-point group `openferment.engines`, migration 0008 (the
-   `engine` column) and the `biosteam` engine registered through `core/pyproject.toml`. Then
-   stages C, D and E in the prompt's order. `pnpm ready --probe` found the account answering at
+4. **Next step: stage C, every run one shape**: the `kinetics` engine over fermOS's families and
+   the `train` engine over pureOS, each registered through `core/pyproject.toml` beside `biosteam`;
+   Proforma's shelf flowsheets as things of `biosteam`; every run a `runs` row; the `measurement`
+   origin; import from a URL; the hand-written shelf entries and Proforma's split retired. Stage B
+   (the engine contract) is done: `docs/api/engines.md`, ADR-015, `engine/registry.py`,
+   `python -m openferment_core.engine.conform <name>`, proof step 10. Then stages D and E in the
+   prompt's order. `pnpm ready --probe` found the account answering at
    23:50 UTC on 2 November, so stage F, the live work, follows E. Alpha 2.1's Ethanol project is
    in this container's `openferment_dev`; a fresh container makes it again on Home from
    `docs/corpus/ethanol-sources.txt` through Intake (about twenty minutes), then extracts.
 5. Files in flight: none.
 
 ## Current stage
+
+Alpha 2.2, stage B (2026-11-03): the engine contract. `docs/api/engines.md` is the page a stranger
+builds an engine from, ADR-015 records the registry on the entry-point group `openferment.engines`,
+and `biosteam` is registered through `core/pyproject.toml`'s own entry point with every number and
+test as it was. `conform biosteam` holds all eight checks; `pnpm prove` runs them for every
+registered engine (step 10).
 
 Alpha 2.2, stage A (2026-11-02): #16 merged into `main` as `112eb8b` and `claude/alpha-2-2-base`
 cut from it; the tag pushes refused again (Blockers); `pnpm verify` green on all sixteen stages and
@@ -181,6 +190,7 @@ prompt's §4).
 | Stage | Calls | USD | What |
 |---|---|---|---|
 | A | 1 | 0.000004 | `pnpm ready --probe`: one call on the index route (`claude-haiku-5-5`, 18 tokens in, 4 out) |
+| B | 0 | 0 | none: the contract, the registry and the conformance checks make no model call |
 
 ## Decisions
 
@@ -201,11 +211,14 @@ prompt's §4).
 | [012](decisions/ADR-012-licence-undecided.md) | Licence undecided | open (owner) |
 | [013](decisions/ADR-013-cornstover-package-test.md) | The corn stover plant's two values its package's own test fails, held to the package's measurement | accepted, stage 5 |
 | [014](decisions/ADR-014-durable-write-queue.md) | The Durable snapshot keeps the writes the service has not acknowledged | accepted, stage 7 (a departure) |
+| [015](decisions/ADR-015-engine-contract.md) | Engines register through Python entry points, behind one contract | accepted, alpha 2.2 stage B |
 
 ## Departures from the execution prompt
 
 | Where | Departure | Why |
 |---|---|---|
+| alpha 2.2 §6.1, B.2 | `run(thing, configuration, inputs, by)` takes `inputs` as a list of `EngineInput`, each a parameter's key and a `Quantity` (the shape a run's inputs have, `RunInput`), where §6.1 writes `inputs: list[Quantity]` | A `Quantity` carries no name, so the parameter each value sets is named beside it |
+| alpha 2.2 §6.1, B.2 | `engine → api` and `engine → tools` join the package map's exceptions (`test_boundaries.py`) | Conformance check 1 sends a bare number through the service's own route and its tool, the two doors a number enters by, and §6.1 names the command `openferment_core.engine.conform` |
 | A4, stage 8 | `test_no_seed.py` holds what A4 names (each deleted module absent, no `.ts` under `src/data/` exporting content, the shipped stores empty), and an `rg` over `core/tests/` still finds test values: `standins.py` (stand-in records on real strain ids, a closed-form ethanol evaluator with the theoretical yield on glucose; 27 test files use it) and `test_proforma_slow.py` (the benchmark price this build once measured). `src/` and the service's code hold none | The stand-ins carry rule tests (binding, overrides, ceilings, run contracts) that stage 4's library fixtures were to replace; that work did not fit stages 4 to 8 (a debt below) |
 | §5.5, A3, stage 7.1 | The Durable snapshot keeps the writes the service has not acknowledged (review decisions, Guild entries, project rows), beside the preferences; a record the service holds is never kept there (ADR-014) | Without the queue, a reviewer's decision made while the service is away is lost on the next reload |
 | §4.8, §11.1, stage 6.3 | The per-request key override and a route's non-Anthropic model are not built; each would change how a key is read, which the owner decides (owner question 10; ADR-008, Implementation 6.3) | §11.1 asks the owner before a change to how keys are stored or read |
@@ -1035,3 +1048,43 @@ holds the numbers, the tables and the judgements).
   Models API the model row asks. A refused probe names the API's date and sets the lane to `none`
   (`test_ready.py`). Run once at 23:50 UTC: `claude-haiku-5-5` answered, 18 tokens in and 4 out,
   0.000004 USD. The plan keeps every stage, F after E.
+
+
+### Alpha 2.2 — Stage B — 2026-11-03
+
+- B.1. `docs/api/engines.md`, the contract a stranger builds from: what an engine is (one object
+  registered under the entry-point group `openferment.engines`), what it declares (`name`,
+  `worker`, `heavy`, `version()`, `things()`, `parameters()`, `run()`, `replay()`, `export_sff()`),
+  the shapes `EngineThing` (the fields `GET /api/library` answers for a plant, with a precision),
+  `EngineParameter` (a `ParameterSpec` with its default and the default's origin) and
+  `EngineInput`, the worker (started with no key, token, password or database address in its
+  environment; `serve`; `Refused`), `WorkerEngine` over four ops, what the service does with an
+  engine, the eight conformance checks and what is deliberately absent. Every example value is a
+  placeholder in a placeholder unit. `docs/api/workers.md` gains the engine ops and the sample
+  worker.
+- B.2. ADR-015 (entry points, over a class hierarchy in the core or a configuration file). The
+  `Engine` protocol in `engine/__init__.py`; `engine/contract.py` (`WorkerEngine`, the version
+  string every run is keyed by); `engine/registry.py` (each entry point loaded once; a load error,
+  a name that differs from its entry point's, a missing method, heavy modules with no worker, or
+  two packages claiming one name, each said in words while the service runs on); `GET
+  /api/engines`, `GET /api/engines/{name}/parameters`, `POST /api/engines/{name}/run`; migration
+  0008 (`runs.engine`, stored rows read `biosteam`; 61aaeda) and 0009 (`engine_checks`, each
+  engine's last verdict); `GET /api/runs?engine=`; the Runs screen's engine column and filter, and
+  Studies' run card offering every usable engine's things; the four engine tools take `engine`
+  (48 tools still); `pnpm ready` a row per engine; `engine/runs.py` `run_engine` keeps a contract
+  engine's run as one row (a value set checked against its parameter's key, unit, kind, choices
+  and bounds; a refusal a receipt; the SFF file validated in the Proforma worker or the engine's
+  words kept); `engine/conform.py`, the eight checks on a scratch database with the verdict kept.
+  The contract's own sample engine (`engine/sample.py` over `workers/sample_worker.py`, which no
+  entry point registers) carries `test_engines.py` (22 tests). An engine's worker starts with
+  every key, token, password and database address withheld (`workers.withheld`); the four kit
+  settings the package writes on import are its own constants (`literature.KIT_SETTINGS`).
+- B.3. `biosteam` registered by `core/pyproject.toml`'s entry point (`engine/biosteam.py` over
+  `library.py` and `runs.run`), every number and test as before. `python -m
+  openferment_core.engine.conform biosteam` holds all eight in 46 s: 1833 parameters of nine
+  things, each with its origin; a run of `cane` asked twice is one row, identical on replay, its
+  SFF file valid and scored 0.803; a bare number refused before the worker; a thing it lacks
+  refused in words; `created_by` the asker. `test_engines_sim.py` (3 tests) runs it on the real
+  worker. Proof step 10 lists every registered engine, makes the eight checks on each and reads
+  the verdict back: 9 of 9 checks in 94 s with steps 1 and 2.
+- B.4. `docs/BASE.md`'s first draft (6e13f55), brought to the contract.

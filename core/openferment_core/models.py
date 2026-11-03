@@ -4080,6 +4080,143 @@ class RunReport(BaseModel):
     parameters: ParamScope | None = None
 
 
+# ── engines (alpha 2.2 stage B; docs/api/engines.md, ADR-015) ──────────
+# The shapes an engine's things, parameters and run values have, and what the
+# service says of each engine it found. A number travels only inside a
+# Quantity, with its origin (ADR-006).
+
+ENGINE_NAME = r"^[a-z][a-z0-9-]{0,39}$"
+THING_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+
+
+class EnginePrecision(BaseModel):
+    """How near a replayed output must come to the run's: within
+    `atol + rtol·|stored|`."""
+
+    rtol: float = Field(ge=0)
+    atol: float = Field(ge=0)
+
+
+class EngineThing(BaseModel):
+    """One thing an engine can run, with the configurations it runs in."""
+
+    id: str = Field(pattern=THING_ID)
+    title: str
+    kind: str | None = None
+    # [] when the thing takes no configuration.
+    configurations: list[str] = Field(default_factory=list)
+    defaultConfiguration: str | None = None
+    precision: EnginePrecision
+
+    @model_validator(mode="after")
+    def _default_is_one_of_them(self) -> "EngineThing":
+        if self.defaultConfiguration is not None and self.defaultConfiguration not in self.configurations:
+            raise ValueError(f"{self.id}'s default configuration {self.defaultConfiguration!r} is not one of its own")
+        return self
+
+
+class EngineParameter(ParameterSpec):
+    """One parameter a thing takes: a `ParameterSpec` (the panel's shape,
+    its bounds with their written reason) with its default value and where
+    the default comes from, `library-default` naming the package it was read
+    from or a `convention` saying what the setting is. The panel's fields an
+    engine may leave unset default here; `sourceRule` is the origin's kind."""
+
+    key: str = Field(min_length=1, max_length=200)
+    symbol: str = ""
+    gloss: str = ""
+    dimension: str = ""
+    group: str = "parameters"
+    sourceRule: list[str] = Field(default_factory=list)
+    value: float | str
+    origin: Origin
+
+    @model_validator(mode="before")
+    @classmethod
+    def _rule_from_origin(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            origin = data.get("origin")
+            kind = origin.get("kind") if isinstance(origin, dict) else getattr(origin, "kind", None)
+            if kind is not None and kind not in ("library-default", "convention"):
+                raise ValueError(f"{data.get('key')}'s default is a library-default or a convention, never {kind}")
+            if kind and not data.get("sourceRule"):
+                data = {**data, "sourceRule": [kind]}
+        return data
+
+    @model_validator(mode="after")
+    def _default_has_its_origin(self) -> "EngineParameter":
+        if self.origin.kind == "convention" and not (self.origin.note or "").strip():
+            raise ValueError(f"{self.key}'s convention says what it is (note)")
+        if self.choices is not None and self.value not in self.choices:
+            raise ValueError(f"{self.key}'s default {self.value!r} is none of its choices")
+        return self
+
+
+class EngineInput(RunInput):
+    """A value a run sets: a parameter's key and a typed quantity in that
+    parameter's unit (the shape a run's inputs have), carrying the person or
+    the model that set it."""
+
+    name: str = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def _names_who_set_it(self) -> "EngineInput":
+        origin = self.quantity.origin
+        if origin is None or origin.kind not in ("person-assumption", "model-estimate"):
+            raise ValueError(f"{self.name}: a value a run sets is a person's assumption or a model's estimate, its "
+                             "origin naming who set it (person-assumption or model-estimate, with by)")
+        return self
+
+
+class EngineRunRequest(BaseModel):
+    """POST /api/engines/{name}/run: one thing, in one configuration, with
+    the values a person or a model sets."""
+
+    thing: str = Field(min_length=1, max_length=80)
+    configuration: str | None = None
+    inputs: list[EngineInput] = Field(default_factory=list)
+    by: str = ""
+
+
+class EngineCheck(BaseModel):
+    """One conformance check (docs/api/engines.md, Conformance)."""
+
+    number: int
+    check: str
+    ok: bool
+    said: str
+
+
+class EngineConformance(BaseModel):
+    """An engine's last conformance verdict, at the version it was checked."""
+
+    engine: str
+    version: str
+    ok: bool
+    checks: list[EngineCheck]
+    by: str
+    at: str
+
+
+class EngineInfo(BaseModel):
+    """GET /api/engines: one engine as the service found it."""
+
+    name: str
+    # The entry point the object was loaded from, `package.module:ENGINE`.
+    entryPoint: str
+    version: dict[str, str] = Field(default_factory=dict)
+    # The worker's dotted module, or None for an engine computing in the
+    # service's process (kinetics), and the worker's state.
+    worker: str | None = None
+    workerStatus: str = "cold"
+    heavy: list[str] = Field(default_factory=list)
+    things: list[EngineThing] = Field(default_factory=list)
+    conformance: EngineConformance | None = None
+    # Why the engine cannot be used, in words: it failed to load, or a
+    # declared method failed. The service runs on without it.
+    error: str | None = None
+
+
 # ── studies (execution prompt §7.2, §9.1 step 5; studies/) ──────────────
 
 

@@ -61,6 +61,10 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
                               "the regression check reads the package's own test by ast)",
     ("engine", "projects"): "a run and a flowsheet record belong to the current project (ADR-005)",
     ("engine", "events"): "a run is a job the project's event stream says as it happens (§7.3 item 2)",
+    ("engine", "api"): "conformance check 1 (engine/conform.py) sends a bare number to the service's own run route "
+                       "and sees it refused before the engine is reached (docs/api/engines.md)",
+    ("engine", "tools"): "conformance check 1 sends a bare number through the engine_run tool as well, the second "
+                         "door a number enters by (docs/api/engines.md)",
     ("studies", "projects"): "a scenario, a comparison and a runbook belong to the current project (ADR-005)",
     ("studies", "artifacts"): "a comparison is computed as an artifact over the runs' artifacts, replayable (§7.4)",
     ("studies", "basis"): "a value's origin and a comparison's provenance are the basis rules' (ADR-006)",

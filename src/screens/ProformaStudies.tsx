@@ -16,12 +16,16 @@
 //   the package   the export: study.json, study.md, each run's SFF file and the
 //                 versions, one zip that opens without the service.
 //
-// RUN A PLANT (alpha 2.1 stage B). A person runs any plant the installed
-// package holds, or openFerment's composed flowsheet, in a configuration it
-// built in when discovery built it (GET /api/library), on the package's own
-// values (POST /api/library/{plant}/run, in the person's name); the run lands
-// in the list and its page is a link away. Configurations that did not build
-// here are named with the package's words.
+// RUN A PLANT (alpha 2.1 stage B; every engine, alpha 2.2). A person runs any
+// plant the installed package holds, or openFerment's composed flowsheet, in a
+// configuration it built in when discovery built it (GET /api/library), on the
+// package's own values (POST /api/library/{plant}/run, in the person's name);
+// the run lands in the list and its page is a link away. Configurations that
+// did not build here are named with the package's words. With another engine
+// registered (GET /api/engines; docs/api/engines.md), the card offers its
+// things too, each run on the engine's own defaults
+// (POST /api/engines/{name}/run); an engine that cannot be used is named with
+// its error.
 //
 // Nothing here is typed as a number: a scenario's values are set on a run's
 // page, each a person's assumption, or by Postdoc, each a labelled estimate.
@@ -40,9 +44,13 @@ import {
   listComparisons,
   listRuns,
   listScenarios,
+  listEngines,
   listStudyRunbooks,
+  runEngine,
   runPlant,
   runScenario,
+  type EngineInfo,
+  type EngineThing,
 } from '@/lib/studies';
 import { runnable, type LibraryPlant } from '@/lib/library';
 import { Button, Callout, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui';
@@ -63,7 +71,38 @@ const where = (plant: string, configuration: string | null) => plant + (configur
 /** A configuration as a person reads it: the plant's own when it names none. */
 const configurationWords = (c: string | null) => c ?? 'its own';
 
-function RunAPlant({ onRan }: { onRan: () => void }) {
+/** What a run answered, a link to its page and to its SFF file, or the engine's words. */
+function Ran({ ran }: { ran: RunReport }) {
+  return (
+    <p className="text-body mt-2" data-testid="run-plant-ran" data-run={ran.run.id} data-status={ran.run.status} data-engine={ran.run.engine}>
+      {ran.run.status === 'done' ? 'Ran' : 'Refused'} {where(ran.run.plant, ran.run.configuration)}
+      {ran.run.engine !== 'biosteam' && <> on {ran.run.engine}</>}
+      {ran.run.refused && <>: {ran.run.refused}</>}.{' '}
+      <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/proforma/runs/${ran.run.id}`)}>
+        Run {ran.run.id}
+      </a>
+      {ran.run.provenance && (
+        <>
+          {' '}
+          <ProvenanceBadge p={ran.run.provenance} compact />
+        </>
+      )}
+      {ran.run.sff && (
+        <>
+          {' '}
+          · its SFF file{' '}
+          <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/flowsheets/${ran.run.sff.recordId}`)}>
+            {ran.run.sff.recordId}
+          </a>
+        </>
+      )}
+      {ran.run.sffRefused && <span className="text-caption text-ink-soft"> · no SFF file: {ran.run.sffRefused}</span>}
+    </p>
+  );
+}
+
+/** BioSTEAM's things: the installed package's plants and openFerment's flowsheet, each in a configuration it built in here. */
+function BiosteamPlants({ onRan }: { onRan: () => void }) {
   const reviewer = useStore((s) => s.reviewer).trim();
   const [plants, setPlants] = useState<LibraryPlant[] | null>(null);
   const [plantId, setPlantId] = useState('');
@@ -113,8 +152,7 @@ function RunAPlant({ onRan }: { onRan: () => void }) {
   };
 
   return (
-    <Card className="p-4" data-testid="studies-run-plant">
-      <h2 className="font-serif text-section-title font-semibold mb-1">Run a plant</h2>
+    <>
       <p className="text-caption text-ink-soft mb-2">
         Any plant the installed package holds, or openFerment&rsquo;s composed flowsheet, run whole by BioSTEAM on the package&rsquo;s own values in a
         configuration it built in here, and kept with its basis, its artifact and its SFF file.
@@ -172,25 +210,143 @@ function RunAPlant({ onRan }: { onRan: () => void }) {
         <p className="text-caption text-ink-soft mt-2">A run is asked for in a person&rsquo;s name: set yours in Settings first.</p>
       )}
       {busy && <p className="text-caption text-ink-soft mt-2">A first run starts the simulator and takes a minute or two; it stays warm after.</p>}
-      {ran && (
-        <p className="text-body mt-2" data-testid="run-plant-ran" data-run={ran.run.id} data-status={ran.run.status}>
-          {ran.run.status === 'done' ? 'Ran' : 'Refused'} {where(ran.run.plant, ran.run.configuration)}
-          {ran.run.refused && <>: {ran.run.refused}</>}.{' '}
-          <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/proforma/runs/${ran.run.id}`)}>
-            Run {ran.run.id}
-          </a>
-          {ran.run.sff && (
-            <>
-              {' '}
-              · its SFF file{' '}
-              <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/flowsheets/${ran.run.sff.recordId}`)}>
-                {ran.run.sff.recordId}
-              </a>
-            </>
-          )}
+      {ran && <Ran ran={ran} />}
+      {problem && <p className="text-caption text-signal-warn mt-2" data-testid="run-plant-problem">{problem}</p>}
+    </>
+  );
+}
+
+/** Another engine's things (docs/api/engines.md), each run on the engine's own defaults in a configuration it names. */
+function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void }) {
+  const reviewer = useStore((s) => s.reviewer).trim();
+  const things = engine.things ?? [];
+  const [thingId, setThingId] = useState(things[0]?.id ?? '');
+  const thing = things.find((t) => t.id === thingId) ?? null;
+  const configurationsOf = (t: EngineThing | null): (string | null)[] => {
+    if (!t || !(t.configurations ?? []).length) return [null];
+    const own = t.defaultConfiguration ?? null;
+    return [own, ...(t.configurations ?? []).filter((c) => c !== own)].filter((c): c is string => c !== null);
+  };
+  const [configuration, setConfiguration] = useState<string | null>(configurationsOf(thing)[0] ?? null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [ran, setRan] = useState<RunReport | null>(null);
+  const configurations = configurationsOf(thing);
+  const choose = (id: string) => {
+    setThingId(id);
+    setConfiguration(configurationsOf(things.find((t) => t.id === id) ?? null)[0] ?? null);
+    setRan(null);
+    setProblem(null);
+  };
+  const run = () => {
+    if (!thing) return;
+    setBusy(true);
+    setProblem(null);
+    setRan(null);
+    runEngine(engine.name, thing.id, configuration, reviewer)
+      .then((report) => {
+        setRan(report);
+        onRan();
+      })
+      .catch((e: unknown) => setProblem(e instanceof StudiesRefused ? `${thing.id} refused: ${e.message}` : problemOf(e)))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <>
+      <p className="text-caption text-ink-soft mb-2">
+        What the {engine.name} engine runs ({Object.entries(engine.version ?? {}).map(([d, v]) => `${d} ${v}`).join(', ') || 'no distribution named'}),
+        each on the engine&rsquo;s own defaults, kept with its basis, its artifact and its SFF file or the engine&rsquo;s words for why it has none.
+      </p>
+      {things.length === 0 ? (
+        <p className="text-body text-ink-soft">The {engine.name} engine names nothing it runs.</p>
+      ) : (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-caption text-ink-soft">
+            Thing
+            <select className="input text-body block mt-0.5" aria-label="Thing" value={thingId} onChange={(e) => choose(e.target.value)} data-testid="run-engine-thing">
+              {things.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.id}
+                  {t.title ? ` (${t.title})` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-caption text-ink-soft">
+            Configuration
+            <select
+              className="input text-body block mt-0.5"
+              aria-label="Configuration"
+              value={configuration ?? ''}
+              onChange={(e) => setConfiguration(e.target.value === '' ? null : e.target.value)}
+              disabled={configurations.length <= 1}
+              data-testid="run-engine-configuration"
+            >
+              {configurations.map((c) => (
+                <option key={c ?? ''} value={c ?? ''}>
+                  {configurationWords(c)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button variant="primary" disabled={busy || !reviewer || !thing} onClick={run} data-testid="run-engine-go">
+            <Play size={14} /> {busy ? 'Running…' : 'Run it'}
+          </Button>
+        </div>
+      )}
+      {!reviewer && things.length > 0 && (
+        <p className="text-caption text-ink-soft mt-2">A run is asked for in a person&rsquo;s name: set yours in Settings first.</p>
+      )}
+      {ran && <Ran ran={ran} />}
+      {problem && <p className="text-caption text-signal-warn mt-2" data-testid="run-plant-problem">{problem}</p>}
+    </>
+  );
+}
+
+/** Run a thing of any engine registered here (GET /api/engines); BioSTEAM's plants first. */
+function RunAPlant({ onRan }: { onRan: () => void }) {
+  const [engines, setEngines] = useState<EngineInfo[] | null>(null);
+  const [engine, setEngine] = useState('biosteam');
+  useEffect(() => {
+    const ctrl = new AbortController();
+    // With no engine list (a service that cannot read it), BioSTEAM's plants are still offered.
+    listEngines(ctrl.signal)
+      .then(setEngines)
+      .catch(() => !ctrl.signal.aborted && setEngines([]));
+    return () => ctrl.abort();
+  }, []);
+  const usable = (engines ?? []).filter((e) => !e.error);
+  const unusable = (engines ?? []).filter((e) => e.error);
+  const other = usable.find((e) => e.name === engine && e.name !== 'biosteam') ?? null;
+  return (
+    <Card className="p-4" data-testid="studies-run-plant">
+      <h2 className="font-serif text-section-title font-semibold mb-1">Run a plant</h2>
+      {usable.length > 1 && (
+        <label className="text-caption text-ink-soft block mb-2">
+          Engine
+          <select className="input text-body block mt-0.5" aria-label="Engine" value={engine} onChange={(e) => setEngine(e.target.value)} data-testid="run-plant-engine">
+            {usable.map((e) => (
+              <option key={e.name} value={e.name}>
+                {e.name}
+                {e.conformance ? (e.conformance.ok ? ' (every conformance check holds)' : ' (a conformance check fails)') : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {other ? <EngineThings key={other.name} engine={other} onRan={onRan} /> : <BiosteamPlants onRan={onRan} />}
+      {unusable.length > 0 && (
+        <p className="text-caption text-ink-soft mt-2" data-testid="run-plant-unusable">
+          Registered and not usable here:{' '}
+          {unusable.map((e, i) => (
+            <span key={e.name}>
+              {i > 0 && '; '}
+              {e.name}: {e.error}
+            </span>
+          ))}
+          .
         </p>
       )}
-      {problem && <p className="text-caption text-signal-warn mt-2" data-testid="run-plant-problem">{problem}</p>}
     </Card>
   );
 }

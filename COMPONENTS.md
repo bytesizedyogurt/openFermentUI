@@ -36,6 +36,8 @@ Documented exceptions, each with its reason:
 | `engine/` | `flowsheets` | the package-test reader in flowsheets/shelf.py, which imports no BioSTEAM (§8.4: the regression check reads the package's own test by ast) |
 | `engine/` | `projects` | a run and a flowsheet record belong to the current project (ADR-005) |
 | `engine/` | `events` | a run is a job the project's event stream says as it happens (§7.3 item 2) |
+| `engine/` | `api` | conformance check 1 (engine/conform.py) sends a bare number to the service's own run route and sees it refused before the engine is reached (docs/api/engines.md) |
+| `engine/` | `tools` | conformance check 1 sends a bare number through the engine_run tool as well, the second door a number enters by (docs/api/engines.md) |
 | `studies/` | `projects` | a scenario, a comparison and a runbook belong to the current project (ADR-005) |
 | `studies/` | `artifacts` | a comparison is computed as an artifact over the runs' artifacts, replayable (§7.4) |
 | `studies/` | `basis` | a value's origin and a comparison's provenance are the basis rules' (ADR-006) |
@@ -60,12 +62,17 @@ PostgreSQL: the one store (ADR-001). `db` imports `models` and nothing else of t
 
 ### `engine/`
 
-The engine (execution prompt §7.2; ADR-003, ADR-004): BioSTEAM through one adapter, and SFF as the flowsheet record.
+The engine (execution prompt §7.2; ADR-003, ADR-004, ADR-015): every engine behind one contract, BioSTEAM the first, and SFF as the flowsheet record.
 
 | Module | What it says it is |
 |---|---|
+| `biosteam.py` | BioSTEAM as an engine (docs/api/engines.md; ADR-004, ADR-015). |
+| `conform.py` | Conformance: an installed engine held to its contract (docs/api/engines.md, Conformance; ADR-015). |
+| `contract.py` | The engine contract (docs/api/engines.md; ADR-015). |
 | `library.py` | The library plant runner (ADR-004; execution prompt §4.4, §8.4). |
+| `registry.py` | The engines this service found (docs/api/engines.md, What the service does with an engine; ADR-015). |
 | `runs.py` | Engine runs (execution prompt §7.4; ADR-004, ADR-003, ADR-006). |
+| `sample.py` | The engine contract's own sample engine (docs/api/engines.md; ADR-015). |
 | `sff.py` | SFF flowsheet records (ADR-003; execution prompt §8.3). |
 | `simulator.py` | The engine's simulator: the Proforma worker, BioSTEAM in a process of its own (OF-BLD-014 §8.1; execution prompt §7.2). |
 
@@ -174,6 +181,7 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `geneos_worker.py` | The geneOS worker: flux balance analysis, in a process of its own (OF-BLD-014 §6.2, Appendix 2). |
 | `library_plants.py` | The `biorefineries` package's plants, found by inspection and run whole (ADR-004; execution prompt §4.4, §8.4). |
 | `proforma_worker.py` | The Proforma worker: BioSTEAM in a process of its own, kept warm (OF-BLD-014 §8.1). |
+| `sample_worker.py` | A worker for the engine contract's own tests (docs/api/engines.md; ADR-015). |
 | `sff_toolkit.py` | The PISCES SFF toolkit, called in the Proforma worker (ADR-003; execution prompt §8.3). |
 
 ## Modules at the top of `openferment_core`

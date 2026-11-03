@@ -72,6 +72,11 @@ def run_evidence(report: RunReport) -> list[Evidence]:
         if _number(value) or isinstance(value, str):
             out.append(Evidence(id=f"{art.id}:outputs.{key}", label=f"{name}: {key}", value=value,
                                 unit=units.get(key) or "", provenance=art.provenance, basis=basis))
+    # A contract engine's outputs (docs/api/engines.md): each a name, a value and a unit.
+    for v in art.output.get("values") or []:
+        if isinstance(v, dict) and isinstance(v.get("name"), str) and (_number(v.get("value")) or isinstance(v.get("value"), str)):
+            out.append(Evidence(id=f"{art.id}:values.{v['name']}", label=f"{name}: {v['name']}", value=v["value"],
+                                unit=str(v.get("unit") or ""), provenance=art.provenance, basis=basis))
     # The TEA's breakdown, line by line as the worker read it from BioSTEAM's TEA object.
     tea = art.output.get("tea") or {}
     per_unit = f"USD per {tea['basis']}" if tea.get("basis") else "USD per unit of the price's basis"
@@ -159,16 +164,37 @@ def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
 
 
 class EnginePlantsInput(BaseModel):
+    engine: str = Field(default="biosteam", max_length=40, description=(
+        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and "
+        "openFerment's flowsheet, or any other registered here."))
     words: str = Field(default="", max_length=200,
                        description="Words to narrow the shelf by: a product, a feedstock, a plant's name; empty for all.")
     limit: int = Field(default=20, ge=1, le=MAX_ROWS, description="How many rows at most.")
 
 
+def _registered(tool: str, name: str) -> tuple[Any, ToolResult | None]:
+    """The registered engine named, or the tool's refusal in words."""
+    from ..engine import registry
+
+    try:
+        return registry.get(name.strip() or "biosteam"), None
+    except (registry.EngineNotFound, registry.EngineUnavailable) as e:
+        return None, ToolResult(error=f"{tool} refused: {str(e).strip(chr(39))}")
+
+
 def _plants(inp: EnginePlantsInput, ctx: ToolContext) -> ToolResult:
     from ..engine import library
 
-    shelf = library.shelf()
+    engine, refused = _registered("engine_plants", inp.engine)
+    if refused is not None:
+        return refused
     words = [w for w in inp.words.lower().split() if w]
+    if engine.name != "biosteam":
+        rows = [{"plant": th.id, "kind": th.kind, "title": th.title, "configurations": th.configurations,
+                 "defaultConfiguration": th.defaultConfiguration} for th in engine.things()
+                if not words or all(w in f"{th.id} {th.title} {th.kind or ''}".lower() for w in words)]
+        return ToolResult(summary={"engine": engine.name, "matched": len(rows), "plants": rows[: inp.limit]})
+    shelf = library.shelf()
     rows = []
     for p in shelf.plants:
         if p.kind not in ("plant", "flowsheet") or p.error:
@@ -179,14 +205,17 @@ def _plants(inp: EnginePlantsInput, ctx: ToolContext) -> ToolResult:
         rows.append({"plant": p.id, "kind": p.kind, "title": p.title, "configurations": p.configurations,
                      "defaultConfiguration": p.defaultConfiguration, "requiresConfiguration": p.requiresConfiguration,
                      "composedFrom": p.composedFrom})
-    return ToolResult(summary={"simulator": shelf.simulator, "package": shelf.package, "matched": len(rows),
-                               "plants": rows[: inp.limit]})
+    return ToolResult(summary={"engine": "biosteam", "simulator": shelf.simulator, "package": shelf.package,
+                               "matched": len(rows), "plants": rows[: inp.limit]})
 
 
 # ── engine_parameters ───────────────────────────────────────────────────
 
 
 class EngineParametersInput(BaseModel):
+    engine: str = Field(default="biosteam", max_length=40, description=(
+        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and "
+        "openFerment's flowsheet, or any other registered here."))
     plant: str = Field(max_length=80, description="A plant's id, as engine_plants gives it.")
     configuration: str = Field(default="", max_length=40, description="One of the plant's configurations; empty for its own.")
     words: str = Field(default="", max_length=200, description="Words to narrow the parameters by; empty for all.")
@@ -195,7 +224,24 @@ class EngineParametersInput(BaseModel):
 
 def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
     from ..engine import library
+    from ..engine import EngineRefused
 
+    engine, refused = _registered("engine_parameters", inp.engine)
+    if refused is not None:
+        return refused
+    if engine.name != "biosteam":
+        try:
+            found_params = engine.parameters(inp.plant.strip(), inp.configuration.strip() or None)
+        except EngineRefused as e:
+            return ToolResult(error=f"engine_parameters refused: {e}")
+        words = [w for w in inp.words.lower().split() if w]
+        rows = [{"key": p.key, "label": p.label, "unit": p.unit, "default": p.value, "origin": p.origin.kind,
+                 "min": p.min, "max": p.max} for p in found_params
+                if not words or all(w in f"{p.key} {p.label}".lower() for w in words)]
+        return ToolResult(summary={"engine": engine.name, "plant": inp.plant.strip(),
+                                   "configuration": inp.configuration.strip() or None, "matched": len(rows),
+                                   "parameters": rows[: inp.limit],
+                                   "note": "A run sets a value in the parameter's own unit, as a typed quantity."})
     try:
         found = library.parameters(inp.plant.strip(), inp.configuration.strip() or None)
     except (library.LibraryRefused, library.PlantNotFound) as e:
@@ -219,6 +265,9 @@ def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
 
 
 class EngineRunInput(BaseModel):
+    engine: str = Field(default="biosteam", max_length=40, description=(
+        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants and "
+        "openFerment's flowsheet, or any other registered here."))
     plant: str = Field(default="", max_length=80,
                        description="A plant's id, run at the library's defaults; empty when a scenario is named.")
     configuration: str = Field(default="", max_length=40, description="One of the plant's configurations; empty for its own.")
@@ -230,13 +279,19 @@ class EngineRunInput(BaseModel):
 def _run(inp: EngineRunInput, ctx: ToolContext) -> ToolResult:
     from .writes import run_engine
 
-    return run_engine("engine_run", inp.plant, inp.configuration, inp.scenario, inp.note, ctx)
+    engine, refused = _registered("engine_run", inp.engine)
+    if refused is not None:
+        return refused
+    return run_engine("engine_run", inp.plant, inp.configuration, inp.scenario, inp.note, ctx,
+                      engine=None if engine.name == "biosteam" else engine)
 
 
 # ── engine_report ───────────────────────────────────────────────────────
 
 
 class EngineReportInput(BaseModel):
+    engine: str = Field(default="", max_length=40, description=(
+        "The engine that ran it, when you know it: a run of another engine is then refused; empty for the run's own."))
     run: str = Field(max_length=80, description="A kept run's id, as engine_run or study_read gives it.")
     parameters: str = Field(default="", max_length=200, description=(
         "Words to read the parameters the run read back from the plant by (its feed, a unit, a price, a finance term): "
@@ -251,6 +306,9 @@ def _report(inp: EngineReportInput, ctx: ToolContext) -> ToolResult:
         report = runs.report(inp.run.strip())
     except runs.RunNotFound as e:
         return ToolResult(error=f"engine_report refused: {str(e).strip(chr(39))}")
+    if inp.engine.strip() and inp.engine.strip() != report.run.engine:
+        return ToolResult(error=f"engine_report refused: run {report.run.id} was made by the {report.run.engine} "
+                                f"engine, and {inp.engine.strip()!r} was named")
     result = run_result(report, state="open")
     if inp.parameters.strip() and result.error is None:
         # The parameters asked for, in the summary's room: the run's own numbers

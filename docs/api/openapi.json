@@ -1859,6 +1859,350 @@
         "title": "DroppedCandidate",
         "type": "object"
       },
+      "EngineCheck": {
+        "description": "One conformance check (docs/api/engines.md, Conformance).",
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "said": {
+            "title": "Said",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "check",
+          "ok",
+          "said"
+        ],
+        "title": "EngineCheck",
+        "type": "object"
+      },
+      "EngineConformance": {
+        "description": "An engine's last conformance verdict, at the version it was checked.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/EngineCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "engine",
+          "version",
+          "ok",
+          "checks",
+          "by",
+          "at"
+        ],
+        "title": "EngineConformance",
+        "type": "object"
+      },
+      "EngineInfo": {
+        "description": "GET /api/engines: one engine as the service found it.",
+        "properties": {
+          "conformance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EngineConformance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entryPoint": {
+            "title": "Entrypoint",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "heavy": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Heavy",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "things": {
+            "items": {
+              "$ref": "#/components/schemas/EngineThing"
+            },
+            "title": "Things",
+            "type": "array"
+          },
+          "version": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Version",
+            "type": "object"
+          },
+          "worker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker"
+          },
+          "workerStatus": {
+            "default": "cold",
+            "title": "Workerstatus",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "entryPoint"
+        ],
+        "title": "EngineInfo",
+        "type": "object"
+      },
+      "EngineInput": {
+        "description": "A value a run sets: a parameter's key and a typed quantity in that\nparameter's unit (the shape a run's inputs have), carrying the person or\nthe model that set it.",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "$ref": "#/components/schemas/Quantity-Input"
+          }
+        },
+        "required": [
+          "name",
+          "quantity"
+        ],
+        "title": "EngineInput",
+        "type": "object"
+      },
+      "EngineParameter": {
+        "description": "One parameter a thing takes: a `ParameterSpec` (the panel's shape,\nits bounds with their written reason) with its default value and where\nthe default comes from, `library-default` naming the package it was read\nfrom or a `convention` saying what the setting is. The panel's fields an\nengine may leave unset default here; `sourceRule` is the origin's kind.",
+        "properties": {
+          "boundsReason": {
+            "title": "Boundsreason",
+            "type": "string"
+          },
+          "choices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choices"
+          },
+          "convention": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Convention"
+          },
+          "dimension": {
+            "default": "",
+            "title": "Dimension",
+            "type": "string"
+          },
+          "gloss": {
+            "default": "",
+            "title": "Gloss",
+            "type": "string"
+          },
+          "group": {
+            "default": "parameters",
+            "title": "Group",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Origin"
+          },
+          "scale": {
+            "default": "linear",
+            "enum": [
+              "linear",
+              "log"
+            ],
+            "title": "Scale",
+            "type": "string"
+          },
+          "sourceRule": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sourcerule",
+            "type": "array"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "symbol": {
+            "default": "",
+            "title": "Symbol",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "unit",
+          "boundsReason",
+          "value",
+          "origin"
+        ],
+        "title": "EngineParameter",
+        "type": "object"
+      },
+      "EnginePrecision": {
+        "description": "How near a replayed output must come to the run's: within\n`atol + rtol·|stored|`.",
+        "properties": {
+          "atol": {
+            "minimum": 0.0,
+            "title": "Atol",
+            "type": "number"
+          },
+          "rtol": {
+            "minimum": 0.0,
+            "title": "Rtol",
+            "type": "number"
+          }
+        },
+        "required": [
+          "rtol",
+          "atol"
+        ],
+        "title": "EnginePrecision",
+        "type": "object"
+      },
       "EngineRun": {
         "description": "One engine run in a project: a row of `runs` (GET /api/runs).",
         "properties": {
@@ -2028,6 +2372,98 @@
           "at"
         ],
         "title": "EngineRun",
+        "type": "object"
+      },
+      "EngineRunRequest": {
+        "description": "POST /api/engines/{name}/run: one thing, in one configuration, with\nthe values a person or a model sets.",
+        "properties": {
+          "by": {
+            "default": "",
+            "title": "By",
+            "type": "string"
+          },
+          "configuration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/EngineInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "thing": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Thing",
+            "type": "string"
+          }
+        },
+        "required": [
+          "thing"
+        ],
+        "title": "EngineRunRequest",
+        "type": "object"
+      },
+      "EngineThing": {
+        "description": "One thing an engine can run, with the configurations it runs in.",
+        "properties": {
+          "configurations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Configurations",
+            "type": "array"
+          },
+          "defaultConfiguration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defaultconfiguration"
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "precision": {
+            "$ref": "#/components/schemas/EnginePrecision"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "precision"
+        ],
+        "title": "EngineThing",
         "type": "object"
       },
       "Evidence": {
@@ -10804,6 +11240,180 @@
           }
         },
         "summary": "Conversation Calls",
+        "x-openferment-scope": "project"
+      }
+    },
+    "/api/engines": {
+      "get": {
+        "description": "Every engine registered here (docs/api/engines.md): its version, worker,\nthings and last conformance verdict, or the error that keeps it from use.",
+        "operationId": "engines_list_api_engines_get",
+        "parameters": [
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EngineInfo"
+                  },
+                  "title": "Response Engines List Api Engines Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Engines List",
+        "x-openferment-scope": "project"
+      }
+    },
+    "/api/engines/{name}/parameters": {
+      "get": {
+        "description": "What one of an engine's things takes, each default with its origin.",
+        "operationId": "engine_parameters_api_engines__name__parameters_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "thing",
+            "required": true,
+            "schema": {
+              "title": "Thing",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "configuration",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Configuration"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EngineParameter"
+                  },
+                  "title": "Response Engine Parameters Api Engines  Name  Parameters Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Engine Parameters",
+        "x-openferment-scope": "project"
+      }
+    },
+    "/api/engines/{name}/run": {
+      "post": {
+        "description": "One of an engine's things run with the values a person or a model sets,\nkept as a runs row; a refused run is kept as a receipt and 422 in words.",
+        "operationId": "engine_run_api_engines__name__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EngineRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Engine Run",
         "x-openferment-scope": "project"
       }
     },

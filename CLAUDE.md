@@ -7,7 +7,7 @@
 
 - R: openFerment is an open platform in which a person directs Postdoc, an AI research coordinator, through bioprocess engineering work, and every claim, number and result stays inspectable back to its source, its calculation and its assumptions (execution prompt of 29 October 2026, §1).
 - R: The first domain is cellulosic ethanol from characterized biomass, served by BioSTEAM's `biorefineries` library plants (§1).
-- R: Four components carry it: PostgreSQL is the one store, Sci RAG Kit the literature layer, BioSTEAM the engine through one adapter, and SFF the flowsheet record (§1; ADR-001 to ADR-004).
+- R: Four components carry it: PostgreSQL is the one store, Sci RAG Kit the literature layer, BioSTEAM the first engine behind one engine contract, and SFF the flowsheet record (§1; ADR-001 to ADR-004; alpha 2.2 prompt §1, ADR-015).
 - R: The repository holds software alone: no composition, yield, price, titre, strain fact or paper's finding is typed in code or seed, and science arrives at run time through Intake and the library plants (§1 item 7; `core/tests/test_no_seed.py`, acceptance A4).
 - R: Versions, ports, tolerances, unit-conversion factors, file hashes and the library's own regression values read at run time count as software (§1 item 7).
 - R: Out of scope for alpha 2.0: accounts and multi-user access (a membership stub only), kinetic response models, optimization, bench execution, a public licence, engines beyond BioSTEAM, specialist or fine-tuned agents, a visual redesign (§1).
@@ -23,7 +23,7 @@
 - C: `pnpm test:sim` (marker `sim`) starts the real BioSTEAM worker: a cold BioSTEAM import takes about 31 s and a reference plant builds in about 17 s; the suite takes about seven minutes.
 - C: `pnpm test:lit` (marker `lit`) runs Sci RAG Kit with FastEmbed's model over the kit's demo corpus; the model file comes from Hugging Face once and stays cached in `.cache/fastembed`.
 - C: `pnpm test:slow` (marker `slow`) and `pnpm test:live` (marker `live`: a real network call, most needing the key and spending) run by hand, outside verify.
-- C: `pnpm prove` runs the proof (`scripts/prove.py`, steps 1 to 9) on a database of its own, with no key and the network refused; run `pnpm build` first, since step 9 walks the built app in Chromium; `--steps 3,8` proves the steps named with what they stand on.
+- C: `pnpm prove` runs the proof (`scripts/prove.py`, steps 1 to 10) on a database of its own, with no key and the network refused; run `pnpm build` first, since step 9 walks the built app in Chromium; `--steps 3,8` proves the steps named with what they stand on.
 - C: `pnpm ready` (or `pnpm ready --offline`) says in rows whether the service can run: the database, both schemas, pgvector, the embedder, the model routes and the key; `pnpm ready --probe` adds one minimal call on the `index` route, the one row that sees the account's own usage limit, and it spends.
 - C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names; `--suite ethanol` is the owner's twelve, `--tag` names a route table, `--judge` and `pnpm eval judge` add the `judge` route's scores, and `pnpm eval summary` sets the tags side by side (`docs/api/postdoc.md`).
 - C: `pnpm gen:api`, `pnpm gen:tools` and `pnpm gen:components` write `docs/api/openapi.json` with `src/api/types.gen.ts`, `docs/TOOLS.md` and `COMPONENTS.md`; verify fails on drift, so regenerate a generated file and leave it unedited by hand.
@@ -74,6 +74,7 @@
 - C: The licence stays undecided, and no LICENSE file is added until the owner chooses (ADR-012).
 - C: The corn stover plant's two values its package's own test fails on these pins are held to the package's own measurement (ADR-013).
 - C: The browser's Durable snapshot keeps preferences and the writes the service has not acknowledged (ADR-014).
+- C: Engines register through the entry-point group `openferment.engines` behind one contract, BioSTEAM the first, every run one `runs` row with its `engine` (ADR-015).
 
 ## Communication contracts
 
@@ -82,6 +83,7 @@
 - C: Postdoc: conversations, turns, a claim's typed values, the routing table and the evaluation set (`docs/api/postdoc.md`).
 - C: A request may name its own Anthropic key in `X-OpenFerment-Key`: its calls, openFerment's and the kit's, run on it, never stored, logged or echoed, and the audit row says an override was used (owner question 10; ADR-008, Implementation 10; `core/tests/test_key_override.py`).
 - C: The worker protocol: JSON lines, every op with its request and result schema (`docs/api/workers.md`).
+- C: Engines: what a package declares and its worker answers, and the eight conformance checks (`docs/api/engines.md`; `python -m openferment_core.engine.conform <name>`).
 - C: Engine runs: a run's inputs with their origins, its outputs, tables, SFF file and versions (`docs/api/runs.md`).
 - C: SFF: the schema version, the record kept for a file, and what openFerment adds in `metadata` (`docs/api/sff.md`).
 - C: Studies: scenarios, comparisons, runbooks and the export package (`docs/api/studies.md`).
@@ -118,6 +120,7 @@
 - C: ADR-006: a task needs a formal decision rule or uncertainty method, justified and evaluated for that task. ADR-008: the evaluation that lets the simple system compete.
 - C: ADR-010: a deleted piece proves needed, restored from `alpha-1.0` with a decision record. ADR-011: a guard proves necessary again and returns with a negative test.
 - C: ADR-013: biosteam, thermosteam or biorefineries changes version, or the package's test values change upstream. ADR-014: the owner asks for the queue to go, or accounts give pending writes a home on the service.
+- C: ADR-015: a second scientific engine beyond the three in the tree, or the SFF toolkit ships an importer (ADR-003).
 
 ## Stop conditions (ask the owner first; execution prompt §11.1)
 
@@ -134,4 +137,4 @@
 - R: Tag `alpha-1.0` marks `d19224f`, the tree before this build, and a deleted piece returns from it (ADR-010); the tag's push waits on the owner (`docs/PROGRESS.md`, Blockers).
 - C: `docs/handoff/2026-10/` holds the owner's handoff documents (white paper, development plan, reference atlas), with extracted text in `txt/`.
 - C: A citation such as OF-BLD-012 §2.3, OF-DES or OF-COR-001 in code or tests names an alpha 1.0 document; those kept are in `docs/history/`, and none carries authority.
-- C: `docs/decisions/` holds ADR-000 to ADR-014; `docs/PROGRESS.md` holds the log of every stage, the departures, the debts and the blockers; `docs/reports/` holds measured reports.
+- C: `docs/decisions/` holds ADR-000 to ADR-015; `docs/PROGRESS.md` holds the log of every stage, the departures, the debts and the blockers; `docs/reports/` holds measured reports.
