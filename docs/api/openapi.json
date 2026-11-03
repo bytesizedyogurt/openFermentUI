@@ -1903,6 +1903,11 @@
             ],
             "title": "Durationms"
           },
+          "engine": {
+            "default": "biosteam",
+            "title": "Engine",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -15549,9 +15554,25 @@
     },
     "/api/runs": {
       "get": {
-        "description": "The project's engine runs, newest first.",
+        "description": "The project's engine runs, newest first; with `engine`, the runs that engine made.",
         "operationId": "runs_list_api_runs_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "engine",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Engine"
+            }
+          },
           {
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
@@ -15576,6 +15597,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Runs List",

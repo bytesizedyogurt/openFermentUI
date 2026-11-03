@@ -1,9 +1,10 @@
 # Engine runs
 
-An engine run is one run of a library plant or of an openFerment flowsheet in a project
-(execution prompt §7.4; ADR-004, ADR-003, ADR-006). The code is
-`core/openferment_core/engine/runs.py`; the computation is `engine/library.py` (`library.run`
-artifacts) and the file `engine/sff.py`.
+A run is one computation of one engine in a project (execution prompt §7.4; ADR-004, ADR-003,
+ADR-006, ADR-015). Every run the service keeps has the shape below, whichever engine made it:
+`docs/api/engines.md` is the contract an engine is built to. The code is
+`core/openferment_core/engine/runs.py`; BioSTEAM's computation is `engine/library.py`
+(`library.run` artifacts) and its file `engine/sff.py`.
 
 ## The record
 
@@ -12,7 +13,8 @@ artifacts) and the file `engine/sff.py`.
 | Field | What it is |
 |---|---|
 | `id` | The artifact id of the run's basis (sha256 over the tool, its version and the inputs). The same run asked twice is one row |
-| `plant`, `configuration` | The plant on the shelf (`/api/library`) and the configuration it ran; a flowsheet's default is named |
+| `engine` | The engine that ran it, as it registered (`GET /api/engines`); the `runs.engine` column. A row kept before engines registered is `biosteam`'s |
+| `plant`, `configuration` | What the engine ran and the configuration it ran in: for `biosteam` the plant on the shelf (`/api/library`), a flowsheet's default named; for another engine one of its things |
 | `status` | `done`, or `refused` with the plant's own words in `refused` (a receipt: BioSTEAM's InfeasibleRegion naming its unit, a gate the values failed) |
 | `inputs` | Every input of the basis as `{name, quantity}`, the quantity carrying its origin (ADR-006): `library-default` (the plant, the simulator, the settings, all read from the package), `person-assumption` (a value a named person set), `model-estimate` (a value a named model estimated), `convention` (a change the plant needs to build here, the precision kept) |
 | `provenance`, `artifactId` | The `library.run` artifact and the provenance computed on its basis: `assumed` when any input is a person's assumption or a model's estimate. None for a refused run |
@@ -40,5 +42,5 @@ the same; `withinTolerance` whether every difference is a number within that tol
 | Route | What it does |
 |---|---|
 | `POST /api/library/{plant}/run` | `{configuration?, overrides?, by?}`: one engine run, kept; answers the run's report. Values the plant refuses: 422 in its words, the receipt kept |
-| `GET /api/runs` | The project's runs, newest first |
+| `GET /api/runs` | The project's runs, newest first; `?engine=<name>` the runs one engine made |
 | `GET /api/runs/{id}` | `{run, artifact, flowsheet, parameters}`: one run's report; 404 for a run the project does not hold. `parameters` is the run's parameters as the parameter panel reads them (a `ParamScope` of kind `library`): each as its plant declares it, its value the run's, a person's assumption or a model's estimate where the run set one and the library's own default elsewhere, built from the run's artifact alone (`engine/runs.py` `parameters_of`); null for a refused run |

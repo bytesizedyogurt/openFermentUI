@@ -58,7 +58,9 @@ const post = (body: unknown, signal?: AbortSignal): RequestInit => ({
 
 const id = (s: string) => encodeURIComponent(s);
 
-export const listRuns = (signal?: AbortSignal) => call<EngineRun[]>('/api/runs', { signal });
+/** The project's runs, newest first; those of one engine when `engine` names it (`GET /api/runs?engine=`). */
+export const listRuns = (signal?: AbortSignal, engine?: string) =>
+  call<EngineRun[]>(engine ? `/api/runs?engine=${id(engine)}` : '/api/runs', { signal });
 export const runReport = (runId: string, signal?: AbortSignal) => call<RunReport>(`/api/runs/${id(runId)}`, { signal });
 
 export const listScenarios = (signal?: AbortSignal) => call<StudyScenario[]>('/api/studies/scenarios', { signal });

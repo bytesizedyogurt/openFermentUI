@@ -4189,6 +4189,9 @@ export interface RunSFF {
 export interface EngineRun {
   /** Its computation's id: the artifact id of its basis. */
   id: string;
+  /** The engine that ran it (docs/api/engines.md); a row kept before engines were registered reads `biosteam`. */
+  engine: string;
+  /** What the engine ran: a plant or flowsheet for BioSTEAM, one of the engine's things for any other. */
   plant: string;
   configuration: string | null;
   status: RunStatus;

@@ -181,6 +181,9 @@ def test_the_routes_run_list_report_and_refuse(worker):
     assert body["artifact"]["tool"] == "library.run" and body["flowsheet"]["origin"] == "run"
     listed = client.get("/api/runs").json()
     assert [r["id"] for r in listed] == [body["run"]["id"]]
+    assert body["run"]["engine"] == "biosteam"
+    assert [r["id"] for r in client.get("/api/runs", params={"engine": "biosteam"}).json()] == [body["run"]["id"]]
+    assert client.get("/api/runs", params={"engine": "an-engine-that-ran-nothing"}).json() == []
     report = client.get(f"/api/runs/{body['run']['id']}").json()
     assert report["run"] == body["run"] and report["flowsheet"]["id"] == f"run-{body['run']['id']}"
     assert report["parameters"]["kind"] == "library" and report["parameters"] == body["parameters"]

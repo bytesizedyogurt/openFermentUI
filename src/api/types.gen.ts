@@ -2160,7 +2160,7 @@ export interface paths {
         };
         /**
          * Runs List
-         * @description The project's engine runs, newest first.
+         * @description The project's engine runs, newest first; with `engine`, the runs that engine made.
          */
         get: operations["runs_list_api_runs_get"];
         put?: never;
@@ -3320,6 +3320,11 @@ export interface components {
             configuration?: string | null;
             /** Durationms */
             durationMs?: number | null;
+            /**
+             * Engine
+             * @default biosteam
+             */
+            engine: string;
             /** Id */
             id: string;
             /** Inputs */
@@ -9831,7 +9836,9 @@ export interface operations {
     };
     runs_list_api_runs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                engine?: string | null;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9848,6 +9855,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EngineRun"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -566,7 +566,13 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True,
     else:
         checks += [check_model(have_key), check_roles(have_key), check_europe_pmc(), check_huggingface()]
     if probe:
-        checks.append(Check("probe", "skip", "--probe needs the network") if no_network else check_probe(have_key))
+        if no_network:
+            checks.append(Check("probe", "skip", "--probe needs the network"))
+        else:
+            try:
+                checks.append(check_probe(have_key))
+            except Exception as e:  # a route table or a cap the call could not read: the row says so
+                checks.append(Check("probe", "fail", f"the probe could not be made: {type(e).__name__}: {e}"))
     checks.append(check_service(port, have_key, host))
     return checks
 

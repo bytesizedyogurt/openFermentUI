@@ -1010,9 +1010,9 @@ def library_run(plant: str, request: LibraryRunRequest) -> RunReport:
 
 
 @app.get("/api/runs")
-def runs_list() -> list[EngineRun]:
-    """The project's engine runs, newest first."""
-    return _runs.listed()
+def runs_list(engine: str | None = None) -> list[EngineRun]:
+    """The project's engine runs, newest first; with `engine`, the runs that engine made."""
+    return _runs.listed((engine or "").strip() or None)
 
 
 @app.get("/api/runs/{run_id}")

@@ -201,8 +201,12 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [engine, setEngine] = useState('');
   const titles = new Map(scenarios.map((s) => [s.id, s.title]));
-  const done = runs.filter((r) => r.status === 'done');
+  // The engines the project's runs name (docs/api/engines.md); the filter shows one engine's runs.
+  const engines = [...new Set(runs.map((r) => r.engine))].sort();
+  const shown = engine ? runs.filter((r) => r.engine === engine) : runs;
+  const done = shown.filter((r) => r.status === 'done');
   const compare = () => {
     setBusy(true);
     setProblem(null);
@@ -219,19 +223,33 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
           title="No engine run yet"
           body={
             <>
-              A run is one library plant or openFerment flowsheet run whole by BioSTEAM, kept with its basis, its artifact and its SFF file. Run a plant
-              above, or a scenario below; Postdoc runs the scenarios it proposes.
+              A run is one computation of a registered engine, kept with its basis, its artifact and, where the engine has a plant, its SFF file:
+              BioSTEAM runs a library plant or openFerment&rsquo;s flowsheet whole. Run a plant above, or a scenario below; Postdoc runs the
+              scenarios it proposes.
             </>
           }
         />
       ) : (
         <>
-          <p className="text-caption text-ink-soft mb-2">Newest first. Choose two or more in the order a comparison should read them: each change is reckoned from the first chosen.</p>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <p className="text-caption text-ink-soft">Newest first. Choose two or more in the order a comparison should read them: each change is reckoned from the first chosen.</p>
+            <label className="text-caption text-ink-soft flex items-center gap-1">
+              Engine
+              <select className="input text-caption" value={engine} onChange={(e) => setEngine(e.target.value)} data-testid="studies-runs-engine">
+                <option value="">every engine</option>
+                {engines.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-caption">
               <thead>
                 <tr className="border-b border-line text-ink-soft">
-                  {['', 'Run', 'Plant', 'Status', 'Provenance', 'Scenario', 'By', 'At'].map((h) => (
+                  {['', 'Run', 'Engine', 'What it ran', 'Status', 'Provenance', 'Scenario', 'By', 'At'].map((h) => (
                     <th key={h} className="text-left py-1 pr-2 font-medium">
                       {h}
                     </th>
@@ -239,8 +257,8 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
                 </tr>
               </thead>
               <tbody>
-                {runs.map((r) => (
-                  <tr key={r.id} className="border-b border-line/50 align-top" data-testid="studies-run" data-status={r.status}>
+                {shown.map((r) => (
+                  <tr key={r.id} className="border-b border-line/50 align-top" data-testid="studies-run" data-status={r.status} data-engine={r.engine}>
                     <td className="py-1 pr-2">
                       {r.status === 'done' && (
                         <input
@@ -257,6 +275,7 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
                         {r.id}
                       </a>
                     </td>
+                    <td className="py-1 pr-2 font-num">{r.engine}</td>
                     <td className="py-1 pr-2">{where(r.plant, r.configuration)}</td>
                     <td className="py-1 pr-2">{r.status === 'done' ? 'done' : `refused: ${r.refused ?? ''}`}</td>
                     <td className="py-1 pr-2">{r.provenance ? <ProvenanceBadge p={r.provenance} compact /> : '—'}</td>

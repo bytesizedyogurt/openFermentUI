@@ -106,7 +106,8 @@ async def _put(project_id: str, run: EngineRun, by: str) -> None:
     columns = {"scenario_id": run.scenarioId} if run.scenarioId else {}
     async with db.session() as s:
         await rows.put(s, t.runs, project_id, run.id, run.model_dump(mode="json"), by=by,
-                       flowsheet_id=run.sff.recordId if run.sff else None, status=run.status, **columns)
+                       flowsheet_id=run.sff.recordId if run.sff else None, status=run.status, engine=run.engine,
+                       **columns)
 
 
 async def _get(project_id: str, run_id: str) -> EngineRun | None:
@@ -115,9 +116,10 @@ async def _get(project_id: str, run_id: str) -> EngineRun | None:
     return EngineRun.model_validate(body) if body is not None else None
 
 
-async def _listed(project_id: str) -> list[EngineRun]:
+async def _listed(project_id: str, engine: str | None = None) -> list[EngineRun]:
+    where = (t.runs.c.engine == engine,) if engine else ()
     async with db.session() as s:
-        found = await rows.bodies(s, t.runs, project_id, order=(t.runs.c.created_at.desc(), t.runs.c.id))
+        found = await rows.bodies(s, t.runs, project_id, *where, order=(t.runs.c.created_at.desc(), t.runs.c.id))
     return [EngineRun.model_validate(b) for b in found]
 
 
@@ -128,9 +130,9 @@ def get(run_id: str) -> EngineRun:
     return found
 
 
-def listed() -> list[EngineRun]:
-    """The project's runs, newest first."""
-    return db.run(_listed(projects.current()))
+def listed(engine: str | None = None) -> list[EngineRun]:
+    """The project's runs, newest first; those of one engine when `engine` names it."""
+    return db.run(_listed(projects.current(), engine))
 
 
 def parameters_of(run: EngineRun, art: Artifact) -> ParamScope | None:

@@ -4040,6 +4040,11 @@ class EngineRun(BaseModel):
 
     # Its computation's id: the artifact id of its basis.
     id: str
+    # The engine that ran it (docs/api/engines.md), the `runs.engine` column's
+    # value; a row kept before engines were registered was BioSTEAM's.
+    engine: str = "biosteam"
+    # What the engine ran: a plant or flowsheet for BioSTEAM, one of the
+    # engine's things for any other.
     plant: str
     configuration: str | None = None
     status: RunStatus

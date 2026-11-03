@@ -197,7 +197,10 @@ runs = _scoped(
     Column("flowsheet_id", Text),
     Column("scenario_id", Text),
     Column("status", Text, nullable=False),
+    # The engine that ran it (migration 0008; docs/api/engines.md).
+    Column("engine", Text, nullable=False, server_default="biosteam"),
     Index(None, "project_id", "scenario_id"),
+    Index(None, "project_id", "engine"),
 )
 
 artifacts = _scoped(
