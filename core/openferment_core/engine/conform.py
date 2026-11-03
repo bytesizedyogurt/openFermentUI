@@ -2,6 +2,9 @@
 Conformance; ADR-015).
 
     python -m openferment_core.engine.conform <name>     the eight checks, one row each
+        [--thing <id>]...      narrow the checks to these things (the first one is run)
+        [--inputs <file>]      a JSON list of EngineInputs the run is made with, for an
+                               engine whose thing waits for values no default gives
 
 The checks run on a database of their own, made on the server that
 OPENFERMENT_DATABASE_URL names (core/.env) and dropped after, in a project made
@@ -25,7 +28,7 @@ from typing import Any, Callable
 
 from .. import db, projects
 from ..db import models as t
-from ..models import EngineCheck, EngineConformance, EngineRun
+from ..models import EngineCheck, EngineConformance, EngineInput, EngineRun, Origin, Quantity
 from . import EngineRefused
 from .contract import version_string
 
@@ -41,6 +44,8 @@ CHECKS: dict[int, str] = {
 }
 CORE = Path(__file__).resolve().parent.parent.parent
 NO_SUCH_THING = "conform-no-such-thing"
+# Who the model path of check 8 is asked by.
+MODEL = "conformance-model"
 
 
 class ConformRefused(RuntimeError):
@@ -79,8 +84,12 @@ def _bare_number(engine: Any, thing: str, by: str) -> tuple[bool, str]:
     try:
         for m, fn in saved.items():
             setattr(engine, m, spy(m, fn))
-        http = client.post(f"/api/engines/{engine.name}/run", headers={projects.HEADER: projects.current()},
-                           json={"thing": thing, "inputs": [{"name": "a-parameter", "quantity": 1.5}], "by": by})
+        headers = {projects.HEADER: projects.current()}
+        # A number in place of a quantity, then a stray number beside the
+        # request's own fields: both refused at the route.
+        http = [client.post(f"/api/engines/{engine.name}/run", headers=headers, json=body) for body in (
+            {"thing": thing, "inputs": [{"name": "a-parameter", "quantity": 1.5}], "by": by},
+            {"thing": thing, "inputs": [], "by": by, "n": 3})]
         tool = tools.run("engine_run", {"engine": engine.name, "plant": thing, "configuration": 7},
                          tools.ToolContext(model=by))
     finally:
@@ -91,11 +100,14 @@ def _bare_number(engine: Any, thing: str, by: str) -> tuple[bool, str]:
                 delattr(engine, m)
         client.close()
     kept = {r.id for r in runs.listed(engine.name)} - held
-    detail = http.json().get("detail") if http.headers.get("content-type", "").startswith("application/json") else None
-    ok = http.status_code == 422 and bool(tool.error) and not calls and not kept
-    return ok, (f"the route answered {http.status_code} and the tool {'refused' if tool.error else 'ran'}; the engine "
-                f"was {'reached' if calls else 'never reached'}; {len(kept)} run kept"
-                + ("" if ok else f" (route said {json.dumps(detail)[:160]}; tool said {tool.error!r})"))
+    codes = [h.status_code for h in http]
+    detail = [h.json().get("detail") if h.headers.get("content-type", "").startswith("application/json") else None
+              for h in http]
+    ok = codes == [422, 422] and bool(tool.error) and not calls and not kept
+    return ok, (f"the route answered {' and '.join(map(str, codes))} (a number for a quantity, a stray number) and the "
+                f"tool {'refused' if tool.error else 'ran'}; the engine was {'reached' if calls else 'never reached'}; "
+                f"{len(kept)} run kept"
+                + ("" if ok else f" (route said {json.dumps(detail)[:200]}; tool said {tool.error!r})"))
 
 
 def _origins(engine: Any, things: list[Any]) -> tuple[bool, str]:
@@ -136,12 +148,32 @@ def _created_by(run_id: str) -> str | None:
     return db.run(read())
 
 
-def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str | None = None) -> list[EngineCheck]:
+def _model_inputs(engine: Any, thing: Any, inputs: list[EngineInput]) -> list[EngineInput] | None:
+    """Check 8's model path on a basis of its own: the checked run's values set
+    as the model's estimates, or, with none, the thing's first parameter set to
+    its own default as the model's estimate; None when the thing takes none."""
+    if inputs:
+        return [EngineInput(name=i.name, quantity=i.quantity.model_copy(update={"origin": Origin(
+            kind="model-estimate", by=MODEL, note="conformance check 8: the checked run's value")}))
+            for i in inputs]
+    for p in engine.parameters(thing.id, thing.defaultConfiguration):
+        if p.value is not None:
+            return [EngineInput(name=p.key, quantity=Quantity(value=p.value, unit=p.unit, origin=Origin(
+                kind="model-estimate", by=MODEL, note="conformance check 8: the parameter's own default")))]
+    return None
+
+
+def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str | None = None,
+           inputs: list[EngineInput] | None = None) -> list[EngineCheck]:
     """The eight checks of docs/api/engines.md on `engine`, in the current
     database and project. `things` narrows checks 2 to those things (the
     first one runs checks 3, 4, 5, 7 and 8); `entry` is the entry point's
-    `module:attr` for check 6."""
+    `module:attr` for check 6; `inputs` are the values the checked run sets,
+    for a thing that waits for values its parameters give no default."""
+    from .. import artifacts
     from ..engine import runs
+
+    inputs = list(inputs or [])
 
     out: list[EngineCheck] = []
 
@@ -165,13 +197,21 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
 
     run: EngineRun | None = None
     try:
-        a = runs.run_with(engine, first.id, first.defaultConfiguration, [], by=by).run
-        b = runs.run_with(engine, first.id, first.defaultConfiguration, [], by=by).run
+        a = runs.run_with(engine, first.id, first.defaultConfiguration, inputs, by=by).run
+        b = runs.run_with(engine, first.id, first.defaultConfiguration, inputs, by=by).run
         rows = _row_count(a.id)
-        ok = a.id == b.id and rows == 1 and a.status == "done" and a.engine == engine.name
+        keyed = False
+        if a.artifactId is not None:
+            art = artifacts.get(a.artifactId)
+            keyed = artifacts.artifact_id(art.tool, art.toolVersion, art.inputs) == a.id
+        ok = a.id == b.id and rows == 1 and a.status == "done" and a.engine == engine.name and keyed
         run = a if a.status == "done" else None
-        add(3, ok, f"run {a.id} of {first.id}, asked twice, is {rows} row{'s' if rows != 1 else ''}; "
-                   f"engine {a.engine}, status {a.status}" + (f"; the second answered {b.id}" if a.id != b.id else ""))
+        add(3, ok, f"run {a.id} of {first.id}" + (f" with {len(inputs)} value{'s' if len(inputs) != 1 else ''} set"
+                                                     if inputs else "")
+                   + f", asked twice, is {rows} row{'s' if rows != 1 else ''}; engine {a.engine}, status {a.status}; "
+                   + ("its id the artifact id of its basis" if keyed else "its id is no artifact id of its basis")
+                   + (f"; the second answered {b.id}" if a.id != b.id else "")
+                   + (f"; refused: {a.refused}" if a.refused else ""))
     except Exception as e:
         add(3, False, f"{first.id} could not be run: {type(e).__name__}: {_words(e)}")
 
@@ -208,7 +248,18 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
         add(7, False, f"a run of {NO_SUCH_THING!r} was kept where it should have been refused")
     except (EngineRefused, LookupError, ValueError) as e:
         said = _words(e)
-        add(7, _traceless(said), f"refused: {said[:200]}")
+        ok, words = _traceless(said), f"refused: {said[:200]}"
+        if ok and callable(getattr(engine, "compute", None)):
+            # The worker's own discipline: what it cannot compute it refuses
+            # with `Refused`, which reaches the service as the engine's words.
+            try:
+                engine.compute(NO_SUCH_THING, None, [])
+                ok, words = False, words + f"; its worker computed {NO_SUCH_THING!r} where it should have refused it"
+            except EngineRefused as w:
+                words += f"; its worker refused it too: {_words(w)[:160]}"
+            except Exception as w:
+                ok, words = False, words + f"; its worker failed with no Refused: {type(w).__name__}: {_words(w)[:160]}"
+        add(7, ok, words)
     except Exception as e:
         add(7, False, f"refused with no words of the engine's: {type(e).__name__}: {_words(e)[:160]}")
 
@@ -216,7 +267,21 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
         add(8, False, "no run to read created_by from (check 3)")
     else:
         who = _created_by(run.id)
-        add(8, who == by and run.by == by, f"created_by {who!r}, the run's by {run.by!r}, asked by {by!r}")
+        ok = who == by and run.by == by
+        words = f"a person's run: created_by {who!r}, its by {run.by!r}, asked by {by!r}"
+        try:
+            asked = _model_inputs(engine, first, inputs)
+            if asked is None:
+                words += f"; the model's path needs a value to set, and {first.id} takes none"
+            else:
+                m = runs.run_with(engine, first.id, first.defaultConfiguration, asked, by=MODEL).run
+                mwho = _created_by(m.id)
+                ok = ok and mwho == MODEL and m.by == MODEL and m.id != run.id
+                words += (f"; a model's run ({m.id}, {len(asked)} value{'s' if len(asked) != 1 else ''} its estimate): "
+                          f"created_by {mwho!r}, asked by {MODEL!r}")
+        except Exception as e:
+            ok, words = False, words + f"; the model's run could not be made: {type(e).__name__}: {_words(e)[:160]}"
+        add(8, ok, words)
     return sorted(out, key=lambda c: c.number)
 
 
@@ -293,16 +358,43 @@ def table(v: EngineConformance) -> str:
     return "\n".join(lines)
 
 
-def _inside(name: str, by: str) -> int:
+def _read_inputs(path: str) -> list[EngineInput]:
+    """The values a checked run sets, from a JSON list of EngineInputs."""
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(raw, list):
+        raise ConformRefused(f"{path} holds no JSON list of inputs")
+    return [EngineInput.model_validate(i) for i in raw]
+
+
+def _options(argv: list[str]) -> tuple[list[str], str | None]:
+    """`--thing <id>`, as often as asked, and `--inputs <file>`."""
+    things: list[str] = []
+    inputs: str | None = None
+    rest = list(argv)
+    while rest:
+        flag = rest.pop(0)
+        if flag not in ("--thing", "--inputs") or not rest:
+            raise ConformRefused(f"{flag!r} is no option here: --thing <id> or --inputs <file>")
+        value = rest.pop(0)
+        if flag == "--thing":
+            things.append(value)
+        else:
+            inputs = value
+    return things, inputs
+
+
+def _inside(name: str, by: str, argv: list[str]) -> int:
     """In the scratch database: a project of its own, the checks, the verdict on stdout."""
     from . import registry
     from ..models import ProjectCreate
 
+    things, inputs = _options(argv)
     engine = registry.get(name)
     entry = registry.found()[name].entry
     made = projects.create(ProjectCreate(name=f"Conformance of {name}", by=by))
     with projects.using(made.id):
-        found = checks(engine, by=by, entry=entry)
+        found = checks(engine, by=by, entry=entry, things=things or None,
+                       inputs=_read_inputs(inputs) if inputs else None)
     print(json.dumps(verdict(engine, found, by).model_dump(mode="json")))
     return 0
 
@@ -314,12 +406,22 @@ def main(argv: list[str]) -> int:
     from ..db.engine import database_url
     from . import registry
 
-    if argv[:1] == ["--inside"] and len(argv) == 3:
-        return _inside(argv[1], argv[2])
-    if len(argv) != 1 or argv[0].startswith("-"):
-        print("usage: python -m openferment_core.engine.conform <engine name>")
+    if argv[:1] == ["--inside"] and len(argv) >= 3:
+        return _inside(argv[1], argv[2], argv[3:])
+    usage = "usage: python -m openferment_core.engine.conform <engine name> [--thing <id>]... [--inputs <file>]"
+    if not argv or argv[0].startswith("-"):
+        print(usage)
         return 2
-    name = argv[0]
+    name, options = argv[0], argv[1:]
+    try:
+        _, inputs = _options(options)
+        if inputs:
+            _read_inputs(inputs)
+            options = [*options[: options.index("--inputs") + 1], str(Path(inputs).resolve()),
+                       *options[options.index("--inputs") + 2:]]
+    except (ConformRefused, OSError, ValueError) as e:
+        print(f"✗ {_words(e)}\n{usage}")
+        return 2
     load_dotenv(CORE / ".env", override=False)
     try:
         engine = registry.get(name)
@@ -333,7 +435,7 @@ def main(argv: list[str]) -> int:
     try:
         migrate.upgrade(url)
         env = {**os.environ, "OPENFERMENT_DATABASE_URL": url.render_as_string(hide_password=False)}
-        done = subprocess.run([sys.executable, "-m", "openferment_core.engine.conform", "--inside", name, by],
+        done = subprocess.run([sys.executable, "-m", "openferment_core.engine.conform", "--inside", name, by, *options],
                               capture_output=True, text=True, cwd=str(CORE), env=env, timeout=1800)
     finally:
         migrate.drop(scratch, server)

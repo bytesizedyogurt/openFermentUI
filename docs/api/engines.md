@@ -23,7 +23,10 @@ example = "openferment_engine_example.engine:ENGINE"
 ```
 
 - The service never imports an engine by name. At startup it reads the group
-  (`importlib.metadata.entry_points(group="openferment.engines")`) and loads each object.
+  (`importlib.metadata.entry_points(group="openferment.engines")`) and loads each object once.
+- Two packages that register one name are both set aside, said in words; when one of them is
+  the service's own distribution (`openferment-core`), its engine keeps the name and the other is
+  set aside.
 - The package installs into the service's Python environment, beside the service:
   `cd core && uv pip install -e <path to the package>`. `uv sync` keeps only what `core/uv.lock`
   names, so after a sync install it again; `uv run`, which every `pnpm` command uses, keeps it.
@@ -109,8 +112,12 @@ origin:
 - A value set is checked against the thing's parameters before the worker sees it: a key the
   thing declares, set once, in the parameter's unit, a number for a number and one of `choices`
   for words, inside `min` and `max`. A value refused keeps nothing.
-- A number is accepted only inside a `quantity`. A bare JSON number anywhere in a request is
-  refused in words before the engine's worker is reached.
+- A number is accepted only inside a `quantity`. A bare JSON number anywhere in a request, a
+  field the request or a quantity does not name, and a `value`, `low` or `high` that is `true` or
+  `false` are each refused in words before the engine's worker is reached.
+- `at` is the day the value was set. When the origin names none, the service stamps the day the
+  request arrives, and the day enters the run's basis: the same request on another day is
+  another run.
 
 ## The worker
 
@@ -158,13 +165,16 @@ of the worker:
 The worker receives the values a run sets, already checked against the parameters: each
 `name` a key of the thing, each `unit` the parameter's, each number inside its bounds. A
 parameter a run leaves alone is the worker's default. The same request must give the same
-outputs, within the precision the thing states.
+outputs, within the precision the thing states: an output is what the thing computes from its
+inputs, so a time the computation took, which differs on every run, is no output (the service
+keeps each run's `durationMs` beside it).
 
 ## What the service does with an engine
 
 - **Discovery.** At startup `engine/registry.py` loads every object of the group. An engine
   that fails to load, or whose object lacks a declared name or method, is listed with its error
-  in words, and the service keeps running.
+  in words, and the service keeps running. Listing an engine asks it for its things, which
+  starts its worker the first time.
 - **`GET /api/engines`**: each engine's name, version, worker module and status, things, the
   error that keeps it from loading (when one does) and its last conformance verdict.
 - **`GET /api/engines/{name}/parameters?thing=&configuration=`**: the thing's parameters.
@@ -198,6 +208,14 @@ outputs, within the precision the thing states.
 and prints one row per check, on a database of its own that it drops after; it exits 1 when any
 check fails, and keeps its verdict for `GET /api/engines`. `pnpm prove` runs it for every engine
 registered.
+
+- `--thing <id>`, as often as needed, narrows the checks to those things; the first is the one
+  run. With none, every thing's parameters are read and the first thing is run.
+- `--inputs <file>` names a JSON list of `EngineInput`s the checked run sets, for a thing whose
+  parameters leave a value to the run. With none, the run is made at the thing's own defaults.
+- Check 3 holds the run's id to the artifact id of its basis. Check 8 asks a second run, on a
+  basis of its own, in a model's name: the checked run's values as the model's estimates, or
+  with none, the thing's first parameter at its own default as the model's estimate.
 
 | # | Check |
 |---|---|

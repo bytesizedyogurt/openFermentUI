@@ -494,7 +494,8 @@ def keep_catalogue(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
     agent, who = _actor(ctx)
     fields = {k: v for k, v in inp.model_dump().items() if k != "kind" and v not in ("", [], None)}
     try:
-        kept = catalogues.keep_fields(kind, fields, by=who, source=f"Postdoc ({who})" if agent == "model" else who)
+        source = f"{who}, over MCP" if ctx.via == "mcp" else f"Postdoc ({who})" if agent == "model" else who
+        kept = catalogues.keep_fields(kind, fields, by=who, source=source)
     except catalogues.CatalogueRefused as e:
         return ToolResult(error=f"{tool} refused: {e}")
     _audit_as(ctx, CATALOGUE_MODULES[kind], tool, "open", f"{kind}/{kept.id}", {"tool": tool, "kind": kind})

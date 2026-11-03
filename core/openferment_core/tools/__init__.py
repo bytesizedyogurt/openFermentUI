@@ -176,6 +176,9 @@ class ToolContext:
     # The project the call acts in; None acts in the current one (the
     # request's or the command's, projects.current).
     project: str | None = None
+    # The door the call came in by: "mcp" for the MCP server, whose `model` is
+    # the name its client declared; empty for Postdoc's loop and the endpoint.
+    via: str = ""
 
     def author(self) -> Origin | None:
         """The origin of a number this call types into a tool (ADR-006): the

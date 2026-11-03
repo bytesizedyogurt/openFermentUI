@@ -24,8 +24,11 @@ from the environment, or from core/.env when the environment lacks them;
 nothing else is read from that file here.
 
 A number an outside assistant types into a quantity is its estimate
-(ADR-006), and a write it makes is audited as its own: both are marked
-`AUTHOR`, since the protocol does not say which model the assistant runs.
+(ADR-006), and a write it makes is audited as its own: both are marked with
+the name its client declares when it connects (MCP's `clientInfo`), as
+`<name>/<version>` (`caller`), and with `AUTHOR` when it declares none or only
+the SDK's own default. The name is a label the client chooses: a write it
+marks stays in the model's open lane until a person promotes it.
 """
 from __future__ import annotations
 
@@ -37,7 +40,8 @@ from typing import Any
 
 from dotenv import dotenv_values
 
-from mcp.server.mcpserver import MCPServer
+from mcp.client.session import DEFAULT_CLIENT_INFO
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase
 from pydantic import ConfigDict
 
@@ -45,8 +49,11 @@ from . import db, projects, tools
 
 NAME = "openferment"
 EXTRA = ("ask_postdoc", "get_artifact")
-# Who an outside assistant's typed numbers and writes are marked as (ADR-006).
+# Who an outside assistant's typed numbers and writes are marked as when its
+# client declares no name of its own (ADR-006).
 AUTHOR = "an assistant over MCP"
+# The longest name a client's writes are marked with.
+MAX_CALLER = 200
 NO_PROJECT = ("This openFerment server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT "
               "(in the environment or core/.env) to the project's id.")
 
@@ -70,13 +77,31 @@ def named_project(argv: list[str] | None = None) -> str | None:
     return (os.environ.get(projects.ENV) or "").strip() or None
 
 
+def caller(ctx: Any) -> str:
+    """Who a call's writes and typed numbers are marked as: the name the
+    client declared when it connected, with its version as `<name>/<version>`;
+    AUTHOR for a client that declared none, or only the SDK's own default, and
+    for a call made in process with no client at all."""
+    try:
+        params = ctx.request_context.session.client_params
+    except Exception:  # no session behind the call: no name was declared
+        return AUTHOR
+    info = getattr(params, "client_info", None) or getattr(params, "clientInfo", None)
+    name = " ".join(str(getattr(info, "name", "") or "").split())
+    version = " ".join(str(getattr(info, "version", "") or "").split())
+    if not name or (name, version) == (DEFAULT_CLIENT_INFO.name, DEFAULT_CLIENT_INFO.version):
+        return AUTHOR
+    named = name if not version or name.endswith(f"/{version}") else f"{name}/{version}"
+    return named[:MAX_CALLER]
+
+
 def _register(server: MCPServer, name: str, project: str | None) -> None:
     tool = tools.REGISTRY[name]
 
-    def call(**arguments: Any) -> str:
+    def call(ctx: Context, **arguments: Any) -> str:
         if project is None:
             return json.dumps({"error": NO_PROJECT})
-        result = tools.run(name, arguments, tools.ToolContext(project=project, model=AUTHOR))
+        result = tools.run(name, arguments, tools.ToolContext(project=project, model=caller(ctx), via="mcp"))
         return result.model_dump_json(exclude_none=True)
 
     server.add_tool(call, name=name, description=tool.description, structured_output=False)

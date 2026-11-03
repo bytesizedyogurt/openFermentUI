@@ -80,7 +80,13 @@ class BiosteamEngine:
         return out
 
     def run(self, thing: str, configuration: str | None, inputs: list[EngineInput], by: str) -> EngineRun:
-        """One run, kept as a `runs` row by the adapter's own path."""
+        """One run, kept as a `runs` row by the adapter's own path. A plant
+        that takes a configuration, asked with none, runs in the one its thing
+        names as its default (the first it built in here)."""
+        if configuration is None:
+            named = next((t for t in self.things() if t.id == thing), None)
+            if named is not None and named.configurations:
+                configuration = named.defaultConfiguration
         scope = library.scope(thing, configuration)
         today = datetime.now(timezone.utc).date().isoformat()
         overrides = []

@@ -2008,7 +2008,8 @@
         "type": "object"
       },
       "EngineInput": {
-        "description": "A value a run sets: a parameter's key and a typed quantity in that\nparameter's unit (the shape a run's inputs have), carrying the person or\nthe model that set it.",
+        "additionalProperties": false,
+        "description": "A value a run sets: a parameter's key and a typed quantity in that\nparameter's unit (the shape a run's inputs have), carrying the person or\nthe model that set it. It holds those fields alone, and a value, low or\nhigh that is true or false is refused, as an Override refuses one.",
         "properties": {
           "name": {
             "maxLength": 200,
@@ -2375,7 +2376,8 @@
         "type": "object"
       },
       "EngineRunRequest": {
-        "description": "POST /api/engines/{name}/run: one thing, in one configuration, with\nthe values a person or a model sets.",
+        "additionalProperties": false,
+        "description": "POST /api/engines/{name}/run: one thing, in one configuration, with\nthe values a person or a model sets, and nothing beside: a field it does\nnot name, a stray number among them, is refused.",
         "properties": {
           "by": {
             "default": "",
@@ -10740,7 +10742,7 @@
     },
     "/api/biorepo/artifacts/{artifact_id}/replay": {
       "post": {
-        "description": "Recompute and compare. 404 for an unknown id; 409 when the tool that\nmade it is not registered in this service, which cannot replay it.",
+        "description": "Recompute and compare. 404 for an unknown id; 409 when the tool that\nmade it is not registered in this service, which cannot replay it. The\nengines are read first, so a run of any of them registers its tool.",
         "operationId": "artifacts_replay_api_biorepo_artifacts__artifact_id__replay_post",
         "parameters": [
           {

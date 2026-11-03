@@ -76,9 +76,10 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
 }
 
 
-def _imports(path: Path) -> list[tuple[int, str]]:
-    """Every module a file imports, as an absolute dotted name, with its line."""
-    parts = path.relative_to(PACKAGE.parent).with_suffix("").parts
+def _imports(path: Path, root: Path = PACKAGE.parent) -> list[tuple[int, str]]:
+    """Every module a file imports, as an absolute dotted name, with its line;
+    `root` is the directory its top-level package stands in."""
+    parts = path.relative_to(root).with_suffix("").parts
     here = list(parts[:-1]) if path.name != "__init__.py" else list(parts[:-1])
     out = []
     for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
@@ -137,3 +138,68 @@ def test_every_exception_names_a_package_with_a_row_and_is_still_needed():
     for (pkg, first), why in EXCEPTIONS.items():
         assert pkg in MAY and why.strip()
         assert (pkg, first) in used, f"the exception {pkg} → {first} is no longer used: remove it"
+
+
+# ── every registered engine (docs/api/engines.md, check 6, as a grep) ───
+
+
+def heavy_outside_the_worker(root: Path, package: str, worker: str | None, heavy: set[str]) -> list[str]:
+    """Each module of `package` (standing in `root`), beside its worker module
+    and the modules below it, that imports the worker or a heavy module."""
+    base = root / package
+    files = sorted(base.rglob("*.py")) if base.is_dir() else [root / f"{package}.py"]
+    inside = (lambda m: bool(worker) and (m == worker or m.startswith(worker + ".")))
+    wrong = []
+    for path in files:
+        module = ".".join(path.relative_to(root).with_suffix("").parts).removesuffix(".__init__")
+        if inside(module):
+            continue
+        for line, name in _imports(path, root):
+            if inside(name) or name.split(".")[0] in heavy:
+                wrong.append(f"{path.relative_to(root)}:{line} imports {name}")
+    return wrong
+
+
+def test_every_registered_engine_imports_what_it_computes_with_in_its_worker_alone():
+    """The core's own engines keep their worker on the worker's side this
+    package map and test_workers' grep hold; any other package registered here
+    is read whole, and no module of it but its worker imports the worker or a
+    heavy module it declares. Read inside the test, so the package map
+    (`pnpm gen:components`) never depends on what is installed."""
+    import importlib.util
+
+    from openferment_core.engine import registry
+
+    registry.reset()
+    try:
+        held = []
+        for name, f in sorted(registry.found().items()):
+            if f.engine is None:
+                continue
+            top = f.entry.split(":", 1)[0].split(".")[0]
+            worker = f.engine.worker
+            if top == "openferment_core":
+                assert worker is None or worker.removeprefix("openferment_core.") in WORKER_SIDE, (name, worker)
+                assert set(f.engine.heavy) <= SIMULATION | {"cobra"}, (name, f.engine.heavy)
+            else:
+                spec = importlib.util.find_spec(top)
+                where = spec.submodule_search_locations
+                root = Path(list(where)[0]).parent if where else Path(spec.origin).parent
+                assert heavy_outside_the_worker(root, top, worker, set(f.engine.heavy)) == [], name
+            held.append(name)
+        assert "biosteam" in held
+    finally:
+        registry.reset()
+
+
+def test_the_grep_finds_a_heavy_import_outside_an_engines_worker(tmp_path):
+    pkg = tmp_path / "an_engine"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("from .engine import ENGINE\n")
+    (pkg / "engine.py").write_text("import a_heavy_library\nENGINE = None\n")
+    (pkg / "worker.py").write_text("import a_heavy_library\nfrom another_heavy import x\n")
+    assert heavy_outside_the_worker(tmp_path, "an_engine", "an_engine.worker", {"a_heavy_library"}) == [
+        "an_engine/engine.py:1 imports a_heavy_library"]
+    (pkg / "engine.py").write_text("from . import worker\nENGINE = None\n")
+    assert heavy_outside_the_worker(tmp_path, "an_engine", "an_engine.worker", set()) == [
+        "an_engine/engine.py:1 imports an_engine.worker"]

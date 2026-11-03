@@ -211,3 +211,44 @@ def test_an_outside_assistants_numbers_are_its_estimates(monkeypatch):
     out = _text(asyncio.run(mcp_server.build().call_tool("study_scenario", dearer_cane())))
     (value,) = out["summary"]["values"]
     assert (value["origin"], value["by"]) == ("model-estimate", mcp_server.AUTHOR)
+
+
+def test_a_clients_writes_are_marked_with_the_name_it_declares(monkeypatch):
+    """Appendix B of the alpha 2.2 prompt: a client acts under its own name,
+    and the entry it keeps and the audit line name it."""
+    from mcp import Client
+    from mcp.types import Implementation
+
+    from openferment_core import audit, catalogues, projects
+
+    TEST_PROJECT = projects.current()
+    entry = {"kind": "strain", "id": "placeholder-strain", "name": "A placeholder strain", "note": "a placeholder"}
+
+    async def write(info):
+        async with Client(mcp_server.build(TEST_PROJECT), client_info=info) as client:
+            return _text(await client.call_tool("catalogue_write", entry))
+
+    kept = asyncio.run(write(Implementation(name="example-agent", version="0.1")))
+    assert kept["summary"]["by"] == "example-agent/0.1"
+    with projects.using(TEST_PROJECT):
+        (row,) = [e for e in catalogues.listed("strain") if e.id == "placeholder-strain"]
+        line = next(a for a in audit.read() if a.target == "strain/placeholder-strain")
+    assert row.by == "example-agent/0.1" and "over MCP" in (row.source or "")
+    assert (line.agent, line.who) == ("model", "example-agent/0.1")
+    assert asyncio.run(write(None))["summary"]["by"] == mcp_server.AUTHOR, "the SDK's default is no name"
+
+
+def test_a_declared_name_is_read_as_name_and_version():
+    class Info:
+        def __init__(self, name, version):
+            self.name, self.version = name, version
+
+    def ctx(info):
+        session = type("S", (), {"client_params": type("P", (), {"client_info": info})()})()
+        return type("C", (), {"request_context": type("R", (), {"session": session})()})()
+
+    assert mcp_server.caller(ctx(Info("example-agent", "0.1"))) == "example-agent/0.1"
+    assert mcp_server.caller(ctx(Info("example-agent/0.1", "0.1"))) == "example-agent/0.1"
+    assert mcp_server.caller(ctx(Info("  ", "0.1"))) == mcp_server.AUTHOR
+    assert mcp_server.caller(ctx(Info("mcp", "0.1.0"))) == mcp_server.AUTHOR
+    assert mcp_server.caller(object()) == mcp_server.AUTHOR

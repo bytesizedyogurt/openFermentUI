@@ -27,11 +27,13 @@ FAMILIES = {
     "runbook": "Runbooks",
     "engine": "Engine",
     "studies": "Studies",
+    "catalogues": "Catalogues",
+    "flowsheets": "Flowsheets",
     "modules": "Module reads",
     "writes": "Module writes",
 }
-ORDER = ("Records", "Literature", "Units", "Engine", "Studies", "Proforma", "fermOS", "pureOS", "geneOS",
-         "thermosteam", "Runbooks", "Module reads", "Module writes")
+ORDER = ("Records", "Catalogues", "Literature", "Units", "Engine", "Flowsheets", "Studies", "Proforma", "fermOS",
+         "pureOS", "geneOS", "thermosteam", "Runbooks", "Module reads", "Module writes")
 
 HEADER = """# The tools
 
@@ -134,8 +136,13 @@ def _mcp() -> list[str]:
             "above under its own name, description and input schema, and adds "
             + " and ".join(f"`{n}`" for n in mcp_server.EXTRA)
             + ": Postdoc's loop on a question, and a kept artifact by its id. It acts in one project, the one "
-              "`--project` names or else `OPENFERMENT_PROJECT`, and a number an outside assistant types into a "
-              f"quantity is marked as an estimate by `{mcp_server.AUTHOR}`.", ""]
+              "`--project` names or else `OPENFERMENT_PROJECT`.", "",
+            "A client is known by the name it declares when it connects: MCP's `clientInfo`, written "
+            "`<name>/<version>` (a client of the Python `mcp` package passes "
+            "`client_info=Implementation(name=..., version=...)`). A number it types into a quantity is that "
+            "name's estimate, and every write it makes is audited under that name: the entry or the run it keeps "
+            "names it as `by`, and the audit line (`GET /api/audit`) as `who`. A client that declares no name, or "
+            f"only the SDK's default, is marked `{mcp_server.AUTHOR}`.", ""]
 
 
 def render() -> str:
@@ -145,6 +152,11 @@ def render() -> str:
         tool = REGISTRY[name]
         lines.append(f"| `{name}` | {family(name)} | {'writes' if tool.writes else 'read'} | {tool.scope} |")
     lines.append("")
+    # Every tool stands in a section: a family the order does not name would
+    # leave its tools off the page a client reads.
+    unplaced = sorted({family(n) for n in WHITELIST} - set(ORDER))
+    if unplaced:
+        raise ValueError(f"docs/TOOLS.md has no section for the families {unplaced}: add each to ORDER")
     for fam in ORDER:
         names = [n for n in WHITELIST if family(n) == fam]
         if names:

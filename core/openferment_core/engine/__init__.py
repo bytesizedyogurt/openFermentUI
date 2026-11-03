@@ -53,6 +53,18 @@ class EngineRefused(ValueError):
     """A request the engine cannot run, in its words (a receipt, never a traceback)."""
 
 
+def __getattr__(name: str) -> object:
+    """`WorkerEngine` and `version_string`, the contract's own implementation
+    (engine/contract.py), imported on first use: `from openferment_core.engine
+    import WorkerEngine` works, and importing this package still imports none
+    of its modules."""
+    if name in ("WorkerEngine", "version_string"):
+        from . import contract
+
+        return getattr(contract, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 @runtime_checkable
 class Engine(Protocol):
     """What the service asks of an engine (docs/api/engines.md, What it declares).

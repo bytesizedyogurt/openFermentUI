@@ -55,3 +55,10 @@ def test_a_value_set_as_a_quantity_is_the_adapters_override_and_makes_the_run_as
     assert given.quantity.origin.by == BY
     at_default = biosteam.run("cornstover", None, [], BY)
     assert run.outputs["price"]["solvedPrice"] > at_default.outputs["price"]["solvedPrice"]
+
+
+def test_a_plant_that_takes_a_configuration_runs_in_its_default_when_asked_with_none(biosteam):
+    (cane,) = [t for t in biosteam.things() if t.id == "cane"]
+    assert cane.configurations and cane.defaultConfiguration in cane.configurations
+    run = biosteam.run("cane", None, [], BY)
+    assert run.status == "done" and run.configuration == cane.defaultConfiguration

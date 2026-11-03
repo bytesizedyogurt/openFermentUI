@@ -2,11 +2,14 @@
 with an engine; ADR-015).
 
 Every object registered under the entry-point group `openferment.engines` is
-loaded once, at the first ask, and checked for what the contract has it
-declare. One that fails to load, lacks a declaration, or shares its name with
-another package's is kept with its error in words, and the service runs on
-without it. The core imports no engine by name: its own register through
-core/pyproject.toml like any other package's.
+loaded once, when the service starts (api.py) or at the first ask, and checked
+for what the contract has it declare. One that fails to load, lacks a
+declaration, or shares its name with another package's is kept with its error
+in words, and the service runs on without it: two packages naming one engine
+are both set aside, except that the core's own engine (the distribution
+`openferment-core`) keeps its name and the other is set aside. The core
+imports no engine by name: its own register through core/pyproject.toml like
+any other package's.
 """
 from __future__ import annotations
 
@@ -20,6 +23,8 @@ from ..models import ENGINE_NAME, EngineInfo
 from . import METHODS, Engine
 
 GROUP = "openferment.engines"
+# The distribution whose engines keep their names against another package's.
+CORE_DISTRIBUTION = "openferment-core"
 
 
 class EngineNotFound(LookupError):
@@ -40,7 +45,14 @@ class Found:
 
 
 _FOUND: dict[str, Found] | None = None
+# Entry points set aside because the core's own engine holds their name.
+_ASIDE: list[Found] = []
 _LOCK = threading.Lock()
+
+
+def _distribution(ep: Any) -> str | None:
+    dist = getattr(ep, "dist", None)
+    return getattr(dist, "name", None) if dist is not None else None
 
 
 def entry_points() -> list[importlib.metadata.EntryPoint]:
@@ -71,16 +83,25 @@ def _why_not(name: str, entry: str, obj: Any) -> str | None:
     return None
 
 
-def _discover() -> dict[str, Found]:
+def _discover() -> tuple[dict[str, Found], list[Found]]:
     from . import runs
 
-    found: dict[str, Found] = {}
+    named: dict[str, list[Any]] = {}
     for ep in entry_points():
-        if ep.name in found:
-            first = found[ep.name].entry
-            found[ep.name] = Found(ep.name, first, None, f"two packages register an engine named {ep.name!r} "
-                                                         f"({first} and {ep.value}), so neither is used")
-            continue
+        named.setdefault(ep.name, []).append(ep)
+    found: dict[str, Found] = {}
+    aside: list[Found] = []
+    for name, eps in named.items():
+        if len(eps) > 1:
+            core = [ep for ep in eps if _distribution(ep) == CORE_DISTRIBUTION]
+            if len(core) != 1:
+                found[name] = Found(name, eps[0].value, None, f"{len(eps)} packages register an engine named "
+                                    f"{name!r} ({' and '.join(ep.value for ep in eps)}), so none is used")
+                continue
+            aside += [Found(name, ep.value, None, f"the core's own engine is named {name!r} ({core[0].value}), so "
+                                                  f"{ep.value} is set aside") for ep in eps if ep is not core[0]]
+            eps = core
+        ep = eps[0]
         try:
             obj = ep.load()
         except Exception as e:  # any failure to load is the engine's, said in words
@@ -90,23 +111,29 @@ def _discover() -> dict[str, Found]:
         found[ep.name] = Found(ep.name, ep.value, None if why else obj, why)
         if why is None and hasattr(obj, "compute"):
             runs.register_engine_tool(obj)
-    return found
+    return found, aside
 
 
 def found() -> dict[str, Found]:
     """Every engine registered here, loaded on the first ask."""
-    global _FOUND
+    global _FOUND, _ASIDE
     with _LOCK:
         if _FOUND is None:
-            _FOUND = _discover()
+            _FOUND, _ASIDE = _discover()
         return _FOUND
+
+
+def set_aside() -> list[Found]:
+    """The entry points that could not take their name, each with its words."""
+    found()
+    return list(_ASIDE)
 
 
 def reset() -> None:
     """Forget what was found, so the next ask reads the group again."""
-    global _FOUND
+    global _FOUND, _ASIDE
     with _LOCK:
-        _FOUND = None
+        _FOUND, _ASIDE = None, []
 
 
 def names() -> list[str]:
@@ -154,4 +181,6 @@ def info(name: str) -> EngineInfo:
 
 
 def infos() -> list[EngineInfo]:
-    return [info(n) for n in names()]
+    """Every engine, then every entry point set aside, each with its words."""
+    return [info(n) for n in names()] + [EngineInfo(name=f.name, entryPoint=f.entry, error=f.error)
+                                         for f in set_aside()]

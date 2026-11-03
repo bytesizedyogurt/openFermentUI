@@ -13,7 +13,10 @@ nothing), its verdict kept for `GET /api/engines` and `pnpm ready`.
 """
 from __future__ import annotations
 
+import json
+import re
 from importlib.metadata import EntryPoint
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -23,10 +26,11 @@ from openferment_core import api, artifacts, llm, ready, tools
 from openferment_core.engine import conform, contract, registry, runs
 from openferment_core.engine.sample import SAMPLE
 from openferment_core.literature import KIT_SETTINGS
-from openferment_core.models import EngineInput, EngineParameter, ParameterSpec, Quantity
+from openferment_core.models import EngineInput, EngineParameter, EngineThing, ParameterSpec, Quantity
 from openferment_core.workers import withheld
 
 SAMPLE_ENTRY = "openferment_core.engine.sample:SAMPLE"
+ROOT = Path(__file__).resolve().parents[2]
 BIOSTEAM_ENTRY = "openferment_core.engine.biosteam:ENGINE"
 
 
@@ -79,6 +83,80 @@ class _Heavy:
 
 
 HEAVY = _Heavy()
+
+
+class _Point:
+    """An entry point as a distribution installs it: its name, its value and its distribution's."""
+
+    def __init__(self, name, value, distribution):
+        self.name, self.value, self.group = name, value, registry.GROUP
+        self.dist = type("Dist", (), {"name": distribution})()
+
+    def load(self):
+        return EntryPoint(self.name, self.value, self.group).load()
+
+
+def test_the_cores_own_engine_keeps_its_name_and_another_package_claiming_it_is_set_aside(monkeypatch):
+    points = [_Point("sample", SAMPLE_ENTRY, "openferment-core"),
+              _Point("sample", "a_strangers_package.engine:ENGINE", "a-strangers-package")]
+    monkeypatch.setattr(registry, "entry_points", lambda: points)
+    registry.reset()
+    try:
+        assert registry.get("sample") is SAMPLE
+        (aside,) = registry.set_aside()
+        assert aside.entry == "a_strangers_package.engine:ENGINE" and "the core's own engine is named" in aside.error
+        listed = [(i.name, i.entryPoint, i.error is None) for i in registry.infos()]
+        assert ("sample", SAMPLE_ENTRY, True) in listed and ("sample", aside.entry, False) in listed
+    finally:
+        registry.reset()
+
+
+def test_two_packages_claiming_one_name_are_both_set_aside(monkeypatch):
+    points = [_Point("twin", SAMPLE_ENTRY, "one-package"), _Point("twin", SAMPLE_ENTRY, "another-package")]
+    monkeypatch.setattr(registry, "entry_points", lambda: points)
+    registry.reset()
+    try:
+        with pytest.raises(registry.EngineUnavailable, match="2 packages register an engine named 'twin'"):
+            registry.get("twin")
+    finally:
+        registry.reset()
+
+
+def test_the_contract_pages_imports_run_and_its_examples_validate():
+    page = (ROOT / "docs" / "api" / "engines.md").read_text(encoding="utf-8")
+    blocks = re.findall(r"```(\w+)\n(.*?)```", page, flags=re.S)
+    imports = [line for lang, body in blocks if lang == "python" for line in body.splitlines()
+               if line.startswith(("from openferment_core", "import openferment_core"))]
+    assert imports
+    for line in imports:
+        exec(line, {})  # noqa: S102  (the page's own import lines, as a stranger runs them)
+    shapes = {"EngineThing": EngineThing, "EngineParameter": EngineParameter, "EngineInput": EngineInput}
+    checked = 0
+    for heading, body in re.findall(r"### `(\w+)`\n\n((?:```json\n.*?```\s*)+)", page, flags=re.S):
+        for example in re.findall(r"```json\n(.*?)```", body, flags=re.S):
+            shapes[heading].model_validate(json.loads(example))
+            checked += 1
+    assert checked >= 4
+
+
+def test_importing_the_engine_package_imports_none_of_its_modules():
+    import subprocess
+    import sys
+
+    probe = ("import sys, openferment_core.engine as e; from openferment_core.engine import Engine, EngineRefused; "
+             "print(sorted(m for m in sys.modules if m.startswith('openferment_core.engine.')))")
+    done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, cwd=ROOT / "core")
+    assert done.returncode == 0 and done.stdout.strip() == "[]", done.stderr[-400:]
+
+
+def test_a_run_replays_on_a_service_that_has_just_started(engines, monkeypatch):
+    made = TestClient(api.app).post("/api/engines/sample/run", json={"thing": "placeholder"}).json()["run"]
+    # A service just started knows no engine tool until it reads the registry.
+    monkeypatch.delitem(artifacts._REGISTRY, "engine.sample")
+    registry.reset()
+    monkeypatch.setattr(registry, "entry_points", lambda: _points(("sample", SAMPLE_ENTRY)))
+    replayed = TestClient(api.app).post(f"/api/biorepo/artifacts/{made['artifactId']}/replay")
+    assert replayed.status_code == 200 and replayed.json()["identical"]
 
 
 def test_an_engine_that_computes_with_heavy_modules_names_the_worker_they_live_in(monkeypatch):
@@ -152,9 +230,26 @@ def test_a_value_set_is_kept_with_its_origin_and_makes_the_run_assumed(engines):
     run = TestClient(api.app).post("/api/engines/sample/run", json=asked).json()["run"]
     assert run["provenance"] == "assumed"
     (given,) = [i for i in run["inputs"] if i["name"] == "value a-parameter"]
-    assert said(given["quantity"]["origin"]) == {"kind": "person-assumption", "by": "Ada Moreno", "note": "a placeholder"}
+    # Written as a library run's override is: the day it was set, then its note.
+    assert said(given["quantity"]["origin"]) == {"kind": "person-assumption", "by": "Ada Moreno", "at": runs._today(),
+                                                 "note": f"typed on {runs._today()}: a placeholder"}
     assert [(v["name"], v["quantity"]["value"]) for v in run["outputs"]["values"]] == [("given a-parameter", 2.5),
                                                                                     ("count", 1.0)]
+
+
+@pytest.mark.parametrize(("body", "says"), [
+    ({"thing": "placeholder", "n": 3}, "Extra inputs are not permitted"),
+    ({"thing": "placeholder", "inputs": [{"name": "a-parameter", "quantity": person(2.5) | {"n": 3}}]},
+     "n is none of them"),
+    ({"thing": "placeholder", "inputs": [{"name": "a-parameter", "quantity": {
+        "value": 2.5, "unit": "placeholder-unit", "origin": {"kind": "person-assumption", "by": "Ada Moreno", "n": 3}}}]},
+     "origin.n is none of them"),
+    ({"thing": "placeholder", "inputs": [{"name": "a-parameter", "quantity": person(True)}]}, "never true or false"),
+])
+def test_a_request_holds_its_own_fields_and_numbers_alone(engines, body, says):
+    answer = TestClient(api.app).post("/api/engines/sample/run", json=body)
+    assert answer.status_code == 422 and says in answer.text
+    assert runs.listed("sample") == []
 
 
 def test_a_bare_number_is_refused_before_the_worker_is_reached(engines, monkeypatch):
@@ -249,7 +344,7 @@ def test_the_engine_tools_take_the_engine(engines):
     assert ran.error is None and ran.summary["provenance"] == "computed" and ran.summary["by"] == llm.DEFAULT_PRIMARY
     assert [e.id for e in ran.evidence] == [f"{ran.summary['artifactId']}:values.count"]
     report = tools.run("engine_report", {"run": ran.summary["runId"]}, ctx)
-    assert report.error is None and report.summary["runId"] == ran.summary["runId"]
+    assert report.error is None and report.summary["runId"] == ran.summary["runId"], "left out, the run's own"
     wrong = tools.run("engine_report", {"run": ran.summary["runId"], "engine": "biosteam"}, ctx)
     assert "was made by the sample engine" in wrong.error
     assert "the engines are" in tools.run("engine_plants", {"engine": "nosuch"}, ctx).error
@@ -270,6 +365,27 @@ def test_the_eight_checks_hold_for_the_sample_and_the_verdict_is_kept_for_the_sc
     assert {c.name: c for c in ready.check_engines()}["engine sample"].mark == "ok"
     listed = {e["name"]: e for e in TestClient(api.app).get("/api/engines").json()}
     assert listed["sample"]["conformance"]["ok"] is True
+
+
+def test_the_checks_run_with_the_values_they_are_given(engines):
+    given = [EngineInput(name="a-parameter", quantity=Quantity(value=3.0, unit="placeholder-unit", origin={
+        "kind": "person-assumption", "by": "conformance test", "note": "a placeholder"}))]
+    found = {c.number: c for c in conform.checks(SAMPLE, by="conformance test", entry=SAMPLE_ENTRY, inputs=given)}
+    assert all(c.ok for c in found.values()), [(n, c.said) for n, c in found.items() if not c.ok]
+    assert "with 1 value set" in found[3].said and "its id the artifact id of its basis" in found[3].said
+    assert "a model's run" in found[8].said and "its worker refused it too" in found[7].said
+
+
+def test_the_command_takes_things_and_inputs_and_refuses_anything_else(tmp_path):
+    assert conform._options(["--thing", "a", "--thing", "b", "--inputs", "x.json"]) == (["a", "b"], "x.json")
+    with pytest.raises(conform.ConformRefused, match="no option here"):
+        conform._options(["--things", "a"])
+    path = tmp_path / "inputs.json"
+    path.write_text(json.dumps([{"name": "a-parameter", "quantity": person(2.0)}]))
+    assert [i.name for i in conform._read_inputs(str(path))] == ["a-parameter"]
+    path.write_text(json.dumps({"name": "a-parameter"}))
+    with pytest.raises(conform.ConformRefused, match="no JSON list"):
+        conform._read_inputs(str(path))
 
 
 def test_a_check_that_fails_says_which_and_why(engines, monkeypatch):

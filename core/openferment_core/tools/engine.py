@@ -290,8 +290,8 @@ def _run(inp: EngineRunInput, ctx: ToolContext) -> ToolResult:
 
 
 class EngineReportInput(BaseModel):
-    engine: str = Field(default="", max_length=40, description=(
-        "The engine that ran it, when you know it: a run of another engine is then refused; empty for the run's own."))
+    engine: str = Field(default="biosteam", max_length=40, description=(
+        "The engine that ran it, when you know it: a run of another engine is then refused. Left out, the run's own."))
     run: str = Field(max_length=80, description="A kept run's id, as engine_run or study_read gives it.")
     parameters: str = Field(default="", max_length=200, description=(
         "Words to read the parameters the run read back from the plant by (its feed, a unit, a price, a finance term): "
@@ -306,7 +306,9 @@ def _report(inp: EngineReportInput, ctx: ToolContext) -> ToolResult:
         report = runs.report(inp.run.strip())
     except runs.RunNotFound as e:
         return ToolResult(error=f"engine_report refused: {str(e).strip(chr(39))}")
-    if inp.engine.strip() and inp.engine.strip() != report.run.engine:
+    # The engine is checked only when the caller names one: left out, its
+    # default stands for the run's own (docs/TOOLS.md, engine_report).
+    if "engine" in inp.model_fields_set and inp.engine.strip() and inp.engine.strip() != report.run.engine:
         return ToolResult(error=f"engine_report refused: run {report.run.id} was made by the {report.run.engine} "
                                 f"engine, and {inp.engine.strip()!r} was named")
     result = run_result(report, state="open")

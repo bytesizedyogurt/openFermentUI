@@ -47,12 +47,12 @@ import json
 from collections.abc import Sequence
 
 from .. import artifacts, db, events, projects
-from ..basis import ASSUMED_KINDS, origin_of
+from ..basis import ASSUMED_KINDS, assumption_source, estimate_source, origin_of
 from ..db import models as t
 from ..db import rows
 from ..models import (Artifact, BasisInput, BasisSource, EngineInput, EngineRun, Origin, Override, ParameterValue,
                       ParamScope, Quantity, ReplayTolerance, RunInput, RunReport, RunSFF)
-from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
+from ..workers import WorkerError
 from . import Engine, EngineRefused, contract, library, sff
 
 # The words a version is read from in a run's basis: "biosteam 2.54.0" and
@@ -288,15 +288,13 @@ def _today() -> str:
 
 def _value_source(origin: Origin) -> BasisSource:
     """A value's source in the basis, as its origin names it: a person's
-    assumption or a model's estimate, the day stamped as the library's are."""
+    assumption or a model's estimate, written as a library run's override is
+    (basis.override_source), the day it was set stamped: the origin's `at`, or
+    the day the request arrives when it names none."""
+    at = (origin.at or "").strip() or _today()
     if origin.kind == "model-estimate":
-        stamp = f"estimated on {origin.at}" if origin.at else None
-        kind = "model-estimate"
-    else:
-        stamp = f"typed on {origin.at}" if origin.at else None
-        kind = "assumption"
-    note = ": ".join(x for x in (stamp, origin.note) if x) or None
-    return BasisSource(kind=kind, by=(origin.by or "").strip(), note=note)
+        return estimate_source(origin.by or "", at, origin.note)
+    return assumption_source(origin.by or "", at, origin.note)
 
 
 def _checked_values(engine: Any, thing: str, configuration: str | None,
@@ -407,8 +405,12 @@ def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Seque
                                       title=found.title, by=who)
     except (EngineRefused, sff.SFFRefused) as e:
         refused = str(e)
-    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
-        refused = f"the SFF file could not be written or checked: {e}"
+    except WorkerError as e:
+        # The Proforma worker refused the file in words; any other failure of a
+        # worker is raised, as a library run's is, and the next ask tries again.
+        if not str(e).startswith("Refused: "):
+            raise
+        refused = str(e).removeprefix("Refused: ")
     values_out = [{"name": o["name"], "quantity": Quantity(value=o["value"], unit=o["unit"],
                                                             origin=Origin(kind="artifact", ref=art.id)).model_dump(
                       mode="json", exclude_none=True)}

@@ -71,11 +71,11 @@ the registry holds, it holds for each of them.
 | `study_read` | Studies | read | project |
 | `literature_sources` | Literature | read | project |
 | `literature_document` | Literature | read | project |
-| `flowsheet_library` | flowsheets | read | project |
-| `flowsheet_import` | flowsheets | writes | project |
-| `flowsheet_read` | flowsheets | read | project |
-| `catalogue_read` | catalogues | read | project |
-| `catalogue_write` | catalogues | writes | project |
+| `flowsheet_library` | Flowsheets | read | project |
+| `flowsheet_import` | Flowsheets | writes | project |
+| `flowsheet_read` | Flowsheets | read | project |
+| `catalogue_read` | Catalogues | read | project |
+| `catalogue_write` | Catalogues | writes | project |
 
 ## Records
 
@@ -91,6 +91,43 @@ Search the records Postdoc may cite: the candidates extracted from the project's
 | `field` | string or null | yes | An ontology field id to keep only records of that field, or null for any field. |
 | `organism` | string or null | yes | A strain id to keep only records on that strain, or null for any organism. |
 | `limit` | integer | yes | How many records to return, at most 10. A count. |
+
+## Catalogues
+
+### `catalogue_read`
+
+*read · scope: project · loose*
+
+Read one of the project's catalogues: its strains (each with its species, the chemical set its trains use and the other names papers give it), its products (each with its class and a protein's sequence), Guild's skills or Primer's lessons. Narrow by words. Returns the entries in words; a pureOS proposal's host is a strain read here.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `kind` | string | yes | Which catalogue: strain, product, skill or lesson. |
+| `words` | string | no | Words to narrow the entries by: an id, a name, an alias; empty for all. |
+| `limit` | integer | no | How many rows at most. A count. |
+
+### `catalogue_write`
+
+*writes · scope: project · loose*
+
+Keep one entry in the project's catalogue of strains, products, skills or lessons, marked as yours: a strain a document describes, with its species and the names papers give it; a product with its class; a skill or a lesson. Names and words only, never a measured value: a number a paper reports is a record. An entry already kept under the id is replaced; say in the note what the entry rests on.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `kind` | string | yes | Which catalogue: strain, product, skill or lesson. |
+| `id` | string | yes | The entry's id: letters, digits, '.', '_', ':' or '-'. |
+| `name` | string | yes | Its name as a person reads it. |
+| `species` | string | no | A strain's species. |
+| `program` | string | no | A strain's chemical set, as pureOS names it. |
+| `aliases` | list of string | no | A strain's other names, as papers give them. |
+| `category` | string | no | A product's class, as the proposer's rules read it. |
+| `sequence` | string | no | A protein product's sequence, one letter a residue. |
+| `sequenceSource` | string | no | Where the sequence was read, in words; a sequence needs it. |
+| `family` | string | no | A skill's family. |
+| `summary` | string | no | What a skill is. |
+| `mastery` | list of string | no | What mastery of a skill means, a criterion an item. |
+| `skills` | list of string | no | The skill ids a lesson counts toward. |
+| `note` | string | no | What the entry rests on, in words: the document or record it came from. |
 
 ## Literature
 
@@ -190,10 +227,46 @@ Read a kept engine run by its id: what ran, the values it set with their origins
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `engine` | string | no | The engine that ran it, when you know it: a run of another engine is then refused; empty for the run's own. |
+| `engine` | string | no | The engine that ran it, when you know it: a run of another engine is then refused. Left out, the run's own. |
 | `run` | string | yes | A kept run's id, as engine_run or study_read gives it. |
 | `parameters` | string | no | Words to read the parameters the run read back from the plant by (its feed, a unit, a price, a finance term): each one matched comes back as an evidence id with its value, its unit and its origin. Empty for none. |
 | `limit` | integer | no | How many parameters at most. A count. |
+
+## Flowsheets
+
+### `flowsheet_library`
+
+*read · scope: project · loose*
+
+List the SFF toolkit's reference flowsheet files at the pinned commit (their ids, titles, the schema version each declares, the simulator model each comes from) and which this machine holds. Narrow by words. Returns ids and words; flowsheet_import brings one into the project.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `words` | string | no | Words to narrow the reference files by: a plant, a product, a file's id; empty for all. |
+| `limit` | integer | no | How many rows at most. A count. |
+
+### `flowsheet_import`
+
+*writes · scope: project · loose*
+
+Import one of the toolkit's reference SFF files into the project by its id: fetched at the pinned commit, its hash checked, checked by the toolkit against the schema it ships, drawn, and kept as a record marked as yours. Returns the record's id, whether the file is valid and what the checks found, the unit types its graph holds, its feeds and its products by name, and what the graph counts as evidence ids to cite. A file already kept answers from its record.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `file` | string | yes | A reference file's id, as flowsheet_library gives it (e.g. SF_BST_15). |
+| `note` | string | no | Why it is imported, in words. |
+
+### `flowsheet_read`
+
+*read · scope: project · loose*
+
+Read an SFF flowsheet record the project holds by its id (an imported file, or the one an engine run writes): what the file is, whether it is valid, the unit types its graph holds, its feeds and its products, and what the graph counts as evidence ids to cite. With no id, list the project's records, narrowed by words.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `record` | string | no | A kept record's id (flowsheet_import or engine_run gives it); empty to list them. |
+| `words` | string | no | Words to narrow the list by, when no record is named. |
+| `limit` | integer | no | How many rows at most. A count. |
 
 ## Studies
 
@@ -708,4 +781,6 @@ A write tool whose module and action a gate names writes nothing: the call becom
 
 ## The MCP server
 
-`openferment` (`core/openferment_core/mcp_server.py`, started by `.mcp.json`) lists every tool above under its own name, description and input schema, and adds `ask_postdoc` and `get_artifact`: Postdoc's loop on a question, and a kept artifact by its id. It acts in one project, the one `--project` names or else `OPENFERMENT_PROJECT`, and a number an outside assistant types into a quantity is marked as an estimate by `an assistant over MCP`.
+`openferment` (`core/openferment_core/mcp_server.py`, started by `.mcp.json`) lists every tool above under its own name, description and input schema, and adds `ask_postdoc` and `get_artifact`: Postdoc's loop on a question, and a kept artifact by its id. It acts in one project, the one `--project` names or else `OPENFERMENT_PROJECT`.
+
+A client is known by the name it declares when it connects: MCP's `clientInfo`, written `<name>/<version>` (a client of the Python `mcp` package passes `client_info=Implementation(name=..., version=...)`). A number it types into a quantity is that name's estimate, and every write it makes is audited under that name: the entry or the run it keeps names it as `by`, and the audit line (`GET /api/audit`) as `who`. A client that declares no name, or only the SDK's default, is marked `an assistant over MCP`.

@@ -136,6 +136,12 @@ load_dotenv(Path(__file__).parent.parent / ".env", override=False)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("openferment.api")
 
+# Discovery at startup (docs/api/engines.md, What the service does with an
+# engine): every engine of the entry-point group is loaded once, so a run any
+# of them kept replays on a service just started. A package that fails to load
+# is listed with its words, and the service starts all the same.
+_engines.found()
+
 app = FastAPI(title="openferment-core", version="0.1.0")
 
 
@@ -2049,7 +2055,9 @@ def artifacts_read(artifact_id: str) -> Artifact:
 @app.post("/api/biorepo/artifacts/{artifact_id}/replay", response_model=ReplayResult)
 def artifacts_replay(artifact_id: str) -> ReplayResult:
     """Recompute and compare. 404 for an unknown id; 409 when the tool that
-    made it is not registered in this service, which cannot replay it."""
+    made it is not registered in this service, which cannot replay it. The
+    engines are read first, so a run of any of them registers its tool."""
+    _engines.found()
     try:
         return artifacts.replay(artifact_id)
     except artifacts.ArtifactNotFound:

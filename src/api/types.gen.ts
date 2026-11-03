@@ -127,7 +127,8 @@ export interface paths {
         /**
          * Artifacts Replay
          * @description Recompute and compare. 404 for an unknown id; 409 when the tool that
-         *     made it is not registered in this service, which cannot replay it.
+         *     made it is not registered in this service, which cannot replay it. The
+         *     engines are read first, so a run of any of them registers its tool.
          */
         post: operations["artifacts_replay_api_biorepo_artifacts__artifact_id__replay_post"];
         delete?: never;
@@ -3431,7 +3432,8 @@ export interface components {
          * EngineInput
          * @description A value a run sets: a parameter's key and a typed quantity in that
          *     parameter's unit (the shape a run's inputs have), carrying the person or
-         *     the model that set it.
+         *     the model that set it. It holds those fields alone, and a value, low or
+         *     high that is true or false is refused, as an Override refuses one.
          */
         EngineInput: {
             /** Name */
@@ -3566,7 +3568,8 @@ export interface components {
         /**
          * EngineRunRequest
          * @description POST /api/engines/{name}/run: one thing, in one configuration, with
-         *     the values a person or a model sets.
+         *     the values a person or a model sets, and nothing beside: a field it does
+         *     not name, a stray number among them, is refused.
          */
         EngineRunRequest: {
             /**

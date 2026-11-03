@@ -47,6 +47,10 @@ def load_registrars() -> None:
     its module is imported; the service imports them all, and a command
     run on its own must too, or nothing it kept can be replayed."""
     from . import fermos, geneos, proforma, tools  # noqa: F401
+    from .engine import library  # noqa: F401  (library.run)
+    from .engine import registry
+
+    registry.found()  # every engine's tool (docs/api/engines.md)
 
 
 def replay_newest(n: int = REPLAY_NEWEST) -> list[str]:

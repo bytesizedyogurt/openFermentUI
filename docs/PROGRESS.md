@@ -169,6 +169,9 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-02 22:07 | Alpha 2.1 F.3, every conversation held: `typecheck`, `check:state`, `gen:components --check`, `check:plan`, `build`, `pnpm test:core`, `pnpm smoke` | all passed; 2302 passed, 1 skipped, 168 deselected; 12 of 12 screens open | 4 min 13 s (`test:core`) | F.3 |
 | 2026-11-02 23:46 | Alpha 2.2 stage A on `112eb8b` (the merge of #16), `core/.env` as the prompt's §4 names: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2302 passed, 1 skipped, 168 deselected; `test:sim` 132 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 9 min | `112eb8b` |
 | 2026-11-02 23:49 | `pnpm build && pnpm prove`, offline, steps 1 to 9 | 66 of 66 checks hold; no call in the proof's spend table | 2 min 18 s (the proof 119 s) | `112eb8b` |
+| 2026-11-03 01:24 | Alpha 2.2 stage B gate on `e375ede`: `pnpm verify`, all sixteen stages | every stage green: `test:core` 2328 passed, 1 skipped, 171 deselected; `test:sim` 135 passed (132 and the three of `test_engines_sim.py`); `test:lit` 10 passed; `smoke` 12 of 12 screens | 13 min 56 s | `e375ede` |
+| 2026-11-03 01:28 | `pnpm prove`, offline, steps 1 to 10 | 69 of 69 checks hold: step 10 lists `biosteam`, `conform biosteam` holds all eight, its verdict listed; no call in the proof's spend table | 3 min 35 s | `e375ede` |
+| 2026-11-03 01:50 | `pnpm test:core` on B.5 (the contract's defects the design measured) | 2343 passed, 1 skipped, 172 deselected | 5 min 22 s | B.5 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -1088,3 +1091,26 @@ holds the numbers, the tables and the judgements).
   worker. Proof step 10 lists every registered engine, makes the eight checks on each and reads
   the verdict back: 9 of 9 checks in 94 s with steps 1 and 2.
 - B.4. `docs/BASE.md`'s first draft (6e13f55), brought to the contract.
+- B.5. The defects the stage's design reader measured in the contract as first written, each
+  fixed with a test: `from openferment_core.engine import WorkerEngine`, the page's own line,
+  failed (the package now exports it lazily, and a test runs every import line and validates every
+  example on the page); a stray number beside a run request's fields, a field a quantity or its
+  origin does not name, and a value of `true` were accepted (now 422s, and check 1 sends a stray
+  number too); a contract engine's run could not be replayed on a service just started (the
+  registry is read at startup and before every replay, and the nightly's registrars read it);
+  `biosteam` advertised a default configuration its run refused (a plant asked with none runs in
+  its default); a value set with no `at` was stamped by one path and left unstamped by the other
+  (both write it as a library override is, the day of the request); a crash of the worker
+  checking a run's SFF file was kept as a permanent `sffRefused` (raised, as a library run's is);
+  a package registering `biosteam` would have set the core's own engine aside (the core's keeps
+  its name); `engine_report`'s `engine` defaulted to empty where §6.1 has `biosteam` (checked only
+  when named). Check 3 now holds the run's id to its basis's artifact id, check 7 asks a
+  `WorkerEngine`'s worker to refuse too, check 8 makes a second run in a model's name, and the
+  command takes `--thing` and `--inputs`. `test_boundaries.py` reads every registered engine's own
+  package for a heavy import outside its worker.
+- B.5, for stage D. The MCP server marks a client's writes and typed numbers with the name it
+  declares when it connects (`clientInfo`, written `<name>/<version>`; `mcp_server.caller`), and
+  `an assistant over MCP` when it declares none or only the SDK's default; a catalogue entry a
+  client keeps says it came over MCP, where it said Postdoc. `docs/TOOLS.md` had no section for
+  the catalogue and flowsheet tools (their families were missing from `tools/reference.py`); it
+  has both, and the page refuses to render with a family it places nowhere.

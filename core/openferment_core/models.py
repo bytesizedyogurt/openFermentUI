@@ -4152,12 +4152,38 @@ class EngineParameter(ParameterSpec):
         return self
 
 
+# What a quantity and its origin hold, and nothing beside: a request that
+# carries any other field, a number among them, is refused (docs/api/engines.md).
+QUANTITY_FIELDS = frozenset({"value", "unit", "basis", "low", "high", "origin"})
+ORIGIN_FIELDS = frozenset({"kind", "ref", "by", "at", "note"})
+
+
 class EngineInput(RunInput):
     """A value a run sets: a parameter's key and a typed quantity in that
     parameter's unit (the shape a run's inputs have), carrying the person or
-    the model that set it."""
+    the model that set it. It holds those fields alone, and a value, low or
+    high that is true or false is refused, as an Override refuses one."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _a_quantity_holds_its_own_fields(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or not isinstance(data.get("quantity"), dict):
+            return data
+        name, q = data.get("name"), data["quantity"]
+        stray = sorted(set(q) - QUANTITY_FIELDS)
+        if isinstance(q.get("origin"), dict):
+            stray += [f"origin.{k}" for k in sorted(set(q["origin"]) - ORIGIN_FIELDS)]
+        if stray:
+            raise ValueError(f"{name}: a quantity holds {', '.join(sorted(QUANTITY_FIELDS))} and its origin "
+                             f"{', '.join(sorted(ORIGIN_FIELDS))}; {', '.join(stray)} is none of them")
+        for k in ("value", "low", "high"):
+            if isinstance(q.get(k), bool):
+                raise ValueError(f"{name}: a quantity's {k} is a number or words, never true or false")
+        return data
 
     @model_validator(mode="after")
     def _names_who_set_it(self) -> "EngineInput":
@@ -4170,7 +4196,10 @@ class EngineInput(RunInput):
 
 class EngineRunRequest(BaseModel):
     """POST /api/engines/{name}/run: one thing, in one configuration, with
-    the values a person or a model sets."""
+    the values a person or a model sets, and nothing beside: a field it does
+    not name, a stray number among them, is refused."""
+
+    model_config = ConfigDict(extra="forbid")
 
     thing: str = Field(min_length=1, max_length=80)
     configuration: str | None = None
