@@ -36,8 +36,9 @@ from fastapi.testclient import TestClient
 from openferment_core import artifacts, composite, intake, proforma, pureos, vessel
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
-from openferment_core.models import Override, ProformaRunRequest, VesselRequest
+from openferment_core.models import Override, ProformaRunRequest
 from openferment_core.pureos import catalogue, train_spec
+from standins import resolve_json, vessel_request
 from test_train import TrainWorker, spec_of
 from test_vessel import ANAEROBIC_ID, StandInWorker as VesselWorker, keep, standin_simulation
 
@@ -105,7 +106,7 @@ def parts(store, worker):
     """A stand-in vessel design (the NREL vessel, at a stand-in plant scale)
     and a stand-in train run, each made by the real code on the stand-in
     workers."""
-    d = vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=ANAEROBIC_ID, overrides=[Override(
         scope=f"fermos:vessel:{ANAEROBIC_ID}", key="plant_scale", value=PLANT_STANDIN, by=BY, at=AT, note=STANDIN)]))
     run = pureos.run_train(spec_of())
     return SimpleNamespace(vessel=d.artifactId, train=run.artifactId)
@@ -202,7 +203,7 @@ def test_a_train_run_of_another_chemical_set_is_refused(parts, monkeypatch):
 
 
 def test_a_train_unit_the_fermenter_takes_is_refused(store, worker):
-    d = vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=ANAEROBIC_ID, overrides=[Override(
         scope=f"fermos:vessel:{ANAEROBIC_ID}", key="plant_scale", value=PLANT_STANDIN, by=BY, at=AT, note=STANDIN)]))
     spec = spec_of(units=[{"id": "R1", "type": "centrifugation", "params": {"split.Yeast": {
         "value": 0.9, "by": BY, "at": AT, "note": STANDIN}}}])
@@ -228,7 +229,7 @@ def test_the_vessel_design_binds_the_plant_scale_it_was_designed_at_and_a_person
 
 def test_a_batch_volume_design_is_refused_as_the_composites_fermenter(store, worker, monkeypatch):
     # A design of one vessel's batch volume (its basis names no plant scale).
-    d = vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=ANAEROBIC_ID, overrides=[Override(
         scope=f"fermos:vessel:{ANAEROBIC_ID}", key="plant_scale", value=PLANT_STANDIN, by=BY, at=AT, note=STANDIN)]))
     art = artifacts.get(d.artifactId)
     art = art.model_copy(update={"inputs": [i.model_copy(update={"name": i.name.replace("plant_scale", "batch_volume")})
@@ -271,8 +272,8 @@ def test_the_panel_serves_finance_from_the_packages_own_file_and_a_persons_value
     dep = next(s for s in finance if s["key"] == "depreciation")
     assert defaults["depreciation"] in dep["choices"] and all(c.startswith("MACRS") for c in dep["choices"])
     # A person's value is their named assumption, and the resolve says what a run adds for it.
-    ask = {"flowsheet": FLOWSHEET, "vessel": parts.vessel, "trainRun": parts.train,
-           "overrides": [over("IRR", 0.1).model_dump(), over("depreciation", "MACRS10").model_dump()]}
+    fields = {"flowsheet": FLOWSHEET, "vessel": parts.vessel, "trainRun": parts.train}
+    ask = {**fields, "inputs": resolve_json(SCOPE, [over("IRR", 0.1), over("depreciation", "MACRS10")], **fields)}
     r = client.post(f"/api/params/{SCOPE}/resolve", json=ask)
     assert r.status_code == 200, r.text
     added = {b["name"]: b for b in r.json()["basisInputs"]}
@@ -280,11 +281,12 @@ def test_the_panel_serves_finance_from_the_packages_own_file_and_a_persons_value
     assert added["finance.depreciation"]["value"] == "MACRS10"
     assert added["assumptions read from"]["value"] == "overrides"
     # A schedule that does not sum to the whole is refused in the run's own words.
-    bad = {**ask, "overrides": [over("construction_schedule.1", 0.9).model_dump()]}
+    bad = {**ask, "inputs": resolve_json(SCOPE, [over("construction_schedule.1", 0.9)], **fields)}
     r = client.post(f"/api/params/{SCOPE}/resolve", json=bad)
     assert r.status_code == 422 and "the construction schedule's shares sum to" in r.json()["detail"]
     # A choice not offered, and a scope with no parts, are refused in words.
-    r = client.post(f"/api/params/{SCOPE}/resolve", json={**ask, "overrides": [over("depreciation", "MACRS8").model_dump()]})
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={**ask, "inputs": resolve_json(SCOPE, [over("depreciation", "MACRS8")],
+                                                                                     **fields)})
     assert r.status_code == 422 and "depreciation is one of" in r.json()["detail"]
     r = client.get(f"/api/params/{SCOPE}?flowsheet={FLOWSHEET}")
     assert r.status_code == 422 and "names no vessel design (vessel) and no train run (trainRun)" in r.json()["detail"]
@@ -405,7 +407,7 @@ def _sim_parts(aerobic: bool):
     from test_vessel import real_simulation
 
     sim = real_simulation(aerobic)
-    d = vessel.design(VesselRequest(simulation=sim.artifactId, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=sim.artifactId, overrides=[Override(
         scope=f"fermos:vessel:{sim.artifactId}", key="plant_scale", value=PLANT_STANDIN, by=BY, at=AT, note=STANDIN)]))
     run = pureos.run_train(three_units(kind="simulation", ref=sim.artifactId, vessel=d.artifactId))
     return SimpleNamespace(vessel=d.artifactId, train=run.artifactId, design=d, run=run)

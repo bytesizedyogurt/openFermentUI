@@ -68,10 +68,33 @@ Option 2.
   protocol, registered by `core/pyproject.toml` as
   `biosteam = "openferment_core.engine.biosteam:ENGINE"`. ADR-004's revisit condition, a second
   engine, is met here; its adapter is the `biosteam` engine.
-- **fermOS** registers its families as the engine `kinetics` through the same group (stage C of
-  alpha 2.2). Its integrators compute in the service process (`test_workers.py` allows SciPy in
-  `kinetics.py` and `fermos.py`), so its `worker` is `None`, which the contract allows for an
-  engine with nothing heavy to keep out of the service. Every trajectory stays bit for bit.
+- **fermOS** is registered as the engine `kinetics` through the same group, by
+  `core/pyproject.toml` (`kinetics = "openferment_core.fermos_engine:ENGINE"`; stage C of alpha
+  2.2). It wraps fermOS as fermOS computes: its things are the model families that simulate
+  (`batch_v1`, `fedbatch_v1`, `chemostat_v1`, the light_v1 socket left out), a forecast whose
+  configurations are the project's kept kinetic fits, and a vessel design whose configurations
+  are the project's kept batch simulations, fits and forecasts, the last two things listed while
+  the project holds one; its parameters are each thing's own scope, a convention's default and a
+  vessel class's own each with its origin, and every other parameter with none; its runs are
+  `fermos.simulate`, `fermos.forecast_run` and `vessel.design`, each of which keeps the run's row
+  (`runs.compute_kept`), so fermOS's routes, its tools, MCP and the engine make one row for one
+  request. Its integrators compute in the service process (`test_workers.py` allows SciPy in
+  `kinetics.py` and `fermos.py`) and a vessel design runs on BioSTEAM in the Proforma worker, so
+  its `worker` is `None` and its `heavy` `()`, which the contract allows for an engine with
+  nothing heavy to keep out of the service. Its rows replay identically (precision rtol 0, atol
+  0), and every trajectory stays bit for bit, with every artifact id but one
+  (`core/tests/test_engine_pins.py`): D1's amendment at C.2 moves the id of the forecast that
+  sets a start value, whose basis now names the day the value was set and the unit it is typed
+  in, and its output hash holds. A run's id is fermOS's own artifact id, keyed by fermOS's tool
+  version; `version()` names what the engine as a whole runs on (numpy, scipy, biosteam and
+  thermosteam), and each row's versions what its thing ran on. A parameter with no default has
+  `value` and `origin` null in the contract (`EngineParameter`), and a run that leaves one unset
+  is refused in words, keeping nothing; conformance runs `kinetics` with `--inputs`, the file
+  `fermos_engine.write_placeholder_inputs` writes, and the proof writes it in step 10.
+  Conformance runs in a fresh project, so the forecast and the vessel, listed only while the
+  project holds what they take, are held by `core/tests/test_engines.py`. fermOS's tools take ids
+  and words, as rule E.4‴ has them: a person sets a fermOS value on the screens' routes or at
+  the contract's run route.
 - **pureOS** registers `train` over `train_run` through `train_spec.py` (stage C), with the unit
   types and record ids it takes today.
 - The four engine tools (`engine_plants`, `engine_parameters`, `engine_run`, `engine_report`)
@@ -128,3 +151,11 @@ importer (ADR-003).
 - `core/tests/test_boundaries.py`: `from X import y` read as the module `X.y` where y is one, so
   the engine's row refuses a worker module imported from its package.
 - `python -m openferment_core.engine.conform biosteam`: the eight checks on BioSTEAM.
+- `core/tests/test_engines.py` (stage C): `GET /api/engines` lists `kinetics` with no worker, and
+  its forecast and vessel once the project keeps what they take; a run of each of its things is
+  one row at every door, the same request twice that row, its versions what its thing ran on; a
+  parameter that waits is refused with nothing kept; a refusal inside the integration is kept as
+  a receipt; a vessel's refusals name its own scope's keys; a worker its computation calls that
+  cannot answer is a 503 naming it; and `conform kinetics --inputs <file>` holds all eight checks
+  on a scratch database. `pnpm prove` step 10 makes the eight checks on `kinetics` with the
+  placeholders it writes.

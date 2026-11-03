@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from openferment_core import (artifacts, binding, evidence_pool, fermos, intake, kinetics, module_stores, proforma,
                               units, validate)
 from openferment_core.models import Override, SimulationRequest
+from standins import as_inputs, family_units, inputs_json
 
 BY = "openFerment test fixture"
 BATCH = "batch_v1"
@@ -53,6 +54,11 @@ TYPED = dict(alpha=2.0, p_max=90.0, x0=0.2, p0=0.0)
 def typed(**values):
     return [Override(scope=SCOPE, key=k, value=v, by=BY, at="2026-10-21", note="a STAND-IN for a test")
             for k, v in values.items()]
+
+
+def typed_in(**values):
+    """`typed`'s values as the typed inputs a simulation request takes, each in its parameter's unit (alpha 2.2 D2)."""
+    return as_inputs(typed(**values), family_units(BATCH))
 
 
 def by_key(values):
@@ -106,7 +112,7 @@ def test_records_bind_mu_max_and_ks_and_pmax_waits_naming_its_field(store):
     # A run refuses naming every parameter that waits and the field that would bind it.
     with pytest.raises(fermos.SimulationRefused, match="batch_v1 cannot run yet") as e:
         fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
-                                          overrides=typed(**{k: x for k, x in TYPED.items() if k != "p_max"})),
+                                          inputs=typed_in(**{k: x for k, x in TYPED.items() if k != "p_max"})),
                         by_pool=pool_of(*STANDIN))
     assert "p_max (maximum product concentration)" in str(e.value) and "ethanol_max_conc" in str(e.value)
     assert "mu_max" not in str(e.value)
@@ -153,11 +159,11 @@ def test_the_strain_filter_and_every_strain_each_bind_what_they_should(store, ca
     assert every["mu_max"].recordIds == ["mu-cenpk", "mu-alias", "mu-s288c", "mu-none", "mu-zymo"]
     # The basis says which choice bound the records.
     sim = fermos.simulate(SimulationRequest(family=BATCH, strain=CENPK, product="ethanol", sugar="glucose",
-                                            overrides=typed(ks=0.2, yxs=0.12, yps=0.45, **TYPED)), by_pool=pool)
+                                            inputs=typed_in(ks=0.2, yxs=0.12, yps=0.45, **TYPED)), by_pool=pool)
     named = {i.name: i for i in artifacts.get(sim.artifactId).inputs}
     assert named["records of"].value.startswith(f"{CENPK} by its aliases")
     every_sim = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
-                                                  overrides=typed(ks=0.2, yxs=0.12, yps=0.45, **TYPED)),
+                                                  inputs=typed_in(ks=0.2, yxs=0.12, yps=0.45, **TYPED)),
                                 by_pool=pool)
     named = {i.name: i for i in artifacts.get(every_sim.artifactId).inputs}
     assert named["records of"].value == "every strain on every paper the evidence pool holds"
@@ -230,7 +236,7 @@ def test_a_record_of_a_new_field_binds_maintenance_and_makes_the_culture_aerobic
     v, _ = bind(pool)
     assert v["maintenance"].origin == "record" and v["maintenance"].value == 0.02
     assert v["yxo"].origin == "record" and v["yxo"].value == 1.1
-    r = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", overrides=typed(**TYPED)),
+    r = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", inputs=typed_in(**TYPED)),
                         by_pool=pool)
     assert r.aerobic and r.our.peak > 0
 
@@ -243,7 +249,7 @@ def test_an_override_replaces_a_record_and_the_basis_names_the_person(store):
     v, _ = bind(pool, overrides=typed(mu_max=0.25))
     assert v["mu_max"].origin == "assumption" and v["mu_max"].overriddenBy == BY and not v["mu_max"].recordIds
     r = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
-                                          overrides=typed(mu_max=0.25, **TYPED)), by_pool=pool)
+                                          inputs=typed_in(mu_max=0.25, **TYPED)), by_pool=pool)
     art = artifacts.get(r.artifactId)
     named = {i.name: i for i in art.inputs}
     assert named["mu_max"].source.kind == "assumption" and named["mu_max"].source.by == BY
@@ -322,7 +328,7 @@ def test_an_unidentified_fitted_parameter_binds_flagged(store, monkeypatch):
     assert v["mu_max"].origin == "fit" and v["mu_max"].identified is False
     assert "did not identify it" in v["mu_max"].detail
     r = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", fitArtifact=fit_id,
-                                          overrides=typed(x0=0.2)), by_pool=pool)
+                                          inputs=typed_in(x0=0.2)), by_pool=pool)
     assert by_key(r.parameters)["mu_max"].identified is False
     assert any(f.startswith("mu_max is bound to fit") for f in r.flags)
 
@@ -341,7 +347,7 @@ def test_a_logistic_fit_gives_mu_its_coefficients_and_yps_through_its_forecast(s
 
 def test_a_kept_simulation_binds_where_no_fit_or_record_does(store):
     first = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
-                                              overrides=typed(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3, s0=50.0,
+                                              inputs=typed_in(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3, s0=50.0,
                                                               **TYPED)),
                             by_pool=pool_of())
     pool = pool_of(rec("mu1", "growth_rate_mu", 0.40, "h-1"))
@@ -383,7 +389,7 @@ def test_the_bind_endpoint_and_the_family_scope_bind_alike(client):
     scope = client.get(f"/api/params/{SCOPE}", params={k: v for k, v in q.items() if k != "family"}).json()
     assert {x["key"]: x["value"] for x in scope["values"]} == {k: x["value"] for k, x in got.items()}
     resolved = client.post(f"/api/params/{SCOPE}/resolve", json={
-        "product": "ethanol", "sugar": "glucose", "overrides": [o.model_dump() for o in typed(mu_max=0.25)]}).json()
+        "product": "ethanol", "sugar": "glucose", "inputs": inputs_json(typed(mu_max=0.25), family_units(BATCH))}).json()
     assert {x["key"]: x for x in resolved["values"]}["mu_max"]["overriddenBy"] == BY
     for params_, status, words in (
         ({"family": "nowhere_v1"}, 404, "there is no model family"),
@@ -438,7 +444,7 @@ def test_named_records_bind_ahead_of_a_fit_and_a_persons_override_still_wins(sto
 def test_a_simulation_on_named_records_names_them_in_its_basis_and_says_they_were_named(store):
     pool = pool_of(*STANDIN)
     rest = {k: x for k, x in dict(ks=0.2, yxs=0.12, yps=0.45, s0=50.0, **TYPED).items()}
-    r = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", overrides=typed(**rest),
+    r = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", inputs=typed_in(**rest),
                                           recordsByParam={"mu_max": ["mu1", "mu2"]}), by_pool=pool)
     art = artifacts.get(r.artifactId)
     named = {i.name: i for i in art.inputs}
@@ -452,7 +458,7 @@ def test_a_simulation_on_named_records_names_them_in_its_basis_and_says_they_wer
     assert artifacts.replay(r.artifactId).identical
     # A request naming no records keeps the id it had before §3.4: nothing is added to its basis.
     plain = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
-                                              overrides=typed(mu_max=0.3, **rest)), by_pool=pool)
+                                              inputs=typed_in(mu_max=0.3, **rest)), by_pool=pool)
     assert not [i for i in artifacts.get(plain.artifactId).inputs if i.name.endswith(" origin")]
 
 
@@ -478,7 +484,7 @@ def test_a_named_record_that_cannot_bind_refuses_the_request_naming_it(store, na
 
 def test_the_simulate_endpoint_takes_named_records_and_refuses_one_that_cannot_bind(client):
     body = {"family": BATCH, "product": "ethanol", "sugar": "glucose", "recordsByParam": {"mu_max": ["mu2"]},
-            "overrides": [o.model_dump() for o in typed(**TYPED)]}
+            "inputs": inputs_json(typed(**TYPED), family_units(BATCH))}
     ok = client.post("/api/fermos/simulate", json=body)
     assert ok.status_code == 200, ok.json()
     mu = {x["key"]: x for x in ok.json()["parameters"]}["mu_max"]

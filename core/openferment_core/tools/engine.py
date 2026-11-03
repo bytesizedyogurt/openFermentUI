@@ -12,8 +12,10 @@ caller's; `engine_report` reads a kept run back.
 
 A RUN'S EVIDENCE. Each number its price block and its flowsheet's own outputs
 hold, in its unit, and each line of its TEA breakdown, per unit of the price's
-basis and per year, is one Evidence whose id is `<artifact id>:<block>.<key>`
-and whose basis is the run's artifact, its provenance the artifact's
+basis and per year, is one Evidence whose id is `<artifact id>:<block>.<key>`;
+each output of a contract engine's run and of a kinetics run (its
+outputs.values) is one whose id is `<artifact id>:values.<name>`. Each one's
+basis is the run's artifact, its provenance the artifact's
 (`assumed` when a value the run set is a person's assumption or a model's
 estimate). `engine_report` also gives, by words, the parameters the run read
 back from the plant (`<artifact id>:parameters.<key>`), each with its origin:
@@ -77,6 +79,14 @@ def run_evidence(report: RunReport) -> list[Evidence]:
         if isinstance(v, dict) and isinstance(v.get("name"), str) and (_number(v.get("value")) or isinstance(v.get("value"), str)):
             out.append(Evidence(id=f"{art.id}:values.{v['name']}", label=f"{name}: {v['name']}", value=v["value"],
                                 unit=str(v.get("unit") or ""), provenance=art.provenance, basis=basis))
+    # The kinetics engine's (fermos_engine.py): each of the run's outputs.values, read from its artifact by name.
+    from ..engine import runs
+
+    if art.tool in (runs.SIMULATION_TOOL, runs.FORECAST_TOOL, runs.VESSEL_TOOL):
+        for v in runs.values_of(art):
+            q = v["quantity"]
+            out.append(Evidence(id=f"{art.id}:values.{v['name']}", label=f"{name}: {v['name']}", value=q["value"],
+                                unit=q["unit"], provenance=art.provenance, basis=basis))
     # The TEA's breakdown, line by line as the worker read it from BioSTEAM's TEA object.
     tea = art.output.get("tea") or {}
     per_unit = f"USD per {tea['basis']}" if tea.get("basis") else "USD per unit of the price's basis"
@@ -247,12 +257,15 @@ def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
         except EngineBroken as e:
             return ToolResult(error=f"engine_parameters refused: the {engine.name} engine broke its contract: {e}")
         words = [w for w in inp.words.lower().split() if w]
-        rows = [{"key": p.key, "label": p.label, "unit": p.unit, "default": p.value, "origin": p.origin.kind,
-                 "min": p.min, "max": p.max} for p in found_params
-                if not words or all(w in f"{p.key} {p.label}".lower() for w in words)]
+        # A parameter with no default (default and origin null) is one a run sets, or the engine binds.
+        rows = [{"key": p.key, "label": p.label, "unit": p.unit, "default": p.value,
+                 "origin": p.origin.kind if p.origin is not None else None, "min": p.min, "max": p.max}
+                for p in found_params if not words or all(w in f"{p.key} {p.label}".lower() for w in words)]
         return ToolResult(summary={"engine": engine.name, "plant": inp.plant.strip(), "configuration": cfg,
                                    "matched": len(rows), "parameters": rows[: inp.limit],
-                                   "note": "A run sets a value in the parameter's own unit, as a typed quantity."})
+                                   "note": "A run sets a value in the parameter's own unit, as a typed quantity; "
+                                           "a parameter whose default is null has none, and a run sets it or the "
+                                           "engine binds it from what the project holds."})
     try:
         found = library.parameters(inp.plant.strip(), inp.configuration.strip() or None)
     except (library.LibraryRefused, library.PlantNotFound) as e:

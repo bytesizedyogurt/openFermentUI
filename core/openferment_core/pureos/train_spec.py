@@ -103,6 +103,7 @@ from ..models import (
     Artifact,
     BasisInput,
     BasisSource,
+    EngineInput,
     Override,
     ParameterSpec,
     ParameterValue,
@@ -1280,16 +1281,44 @@ def provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
             catalogue.entry(unit.type)
         except catalogue.CatalogueUnknown as e:
             raise params.ParamRefused(str(e)) from None
-        chems = chemicals_of(spec, req.overrides)
-        # The request's overrides decide what expands with them (an
+        overrides = _unit_overrides(spec, unit, req.inputs)
+        chems = chemicals_of(spec, overrides)
+        # The values the request sets decide what expands with them (an
         # evaporator's effects) and what a record binds beside (passes); the
         # resolve lays them on.
-        got = unit_scope(spec, unit, chems, _pool(), req.overrides, _product_chemical(spec.product))
+        got = unit_scope(spec, unit, chems, _pool(), overrides, _product_chemical(spec.product))
         if got.refused:
             raise params.ParamRefused("; ".join(got.refused))
         return got.provided
     except (TrainRefused, TrainNotOnFile) as e:
         raise params.ParamRefused(str(e)) from None
+
+
+def _unit_overrides(spec: TrainSpec, unit: TrainUnitSpec, inputs: Iterable[EngineInput]) -> list[Override]:
+    """The values a resolve sets on a train's unit that the unit's scope
+    binds with, each a typed quantity with its origin, as the Overrides of
+    the unit's scope (params.overrides_of), each in its parameter's unit: a
+    catalogue key's own, a key expanded per chemical or per effect
+    (`<key>.<item>`) its template's, a side inlet's flow the side inlet's.
+    A name the unit has no such key for binds nothing here: the resolve
+    converts every input again against the scope's specs as expanded
+    (params.resolve_scope), and refuses it in words that list the unit's
+    parameters."""
+    inputs = list(inputs)
+    if not inputs:
+        return []
+    e = catalogue.entry(unit.type)
+    units = params.units_of(catalogue.provided(e.id).specs)
+    units.update(params.units_of(_side_specs(e, train_specs()["chemicals"])))
+    per = catalogue.template_keys(e)
+    named: dict[str, str] = {}
+    for i in inputs:
+        base = i.name.partition(catalogue.SEP)[0]
+        if i.name in units:
+            named[i.name] = units[i.name]
+        elif base in per and base in units:
+            named[i.name] = units[base]
+    return params.overrides_of(scope_of(spec.id, unit.id), [i for i in inputs if i.name in named], named)
 
 
 # ── the run ────────────────────────────────────────────────────────────

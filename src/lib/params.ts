@@ -5,7 +5,8 @@
 //   GET  /api/params/{scope}?flowsheet=&host=&fits=&vesselType=&strain=&…   a scope's specs and
 //        each value as the service binds it now, with its source
 //        (`ParamScope`);
-//   POST /api/params/{scope}/resolve   a person's overrides laid on, each an
+//   POST /api/params/{scope}/resolve   a person's overrides laid on, each sent
+//        as a typed quantity with its origin (`inputsOf`) and taken as an
 //        assumption by the person it names, bound as a run of the scope
 //        binds them (a refusal is the run's, in its words), with every value
 //        outside its bounds said in words and the basis inputs a run adds
@@ -22,7 +23,13 @@
 // service's words (ServiceRefused); nothing stands in for an answer (E.2). The
 // overrides themselves are the project's rows (`parameterOverrides`), and a
 // write the service has not acknowledged waits in the outbox.
-import type { Override, ParamResolveRequest, ParamResolveResult, ParamScope, TrainSpec } from '@/data/types';
+//
+// AN OVERRIDE BECOMES AN INPUT HERE ALONE (alpha 2.2 D2). The browser keeps a
+// person's change as an `Override`; every request that carries changes (the
+// resolve here, fermOS's bind, simulation, vessel and forecast) sends them as
+// typed inputs through `inputsOf`, each in the unit its parameter is in, and
+// the service converts each back into that Override at its door.
+import type { EngineInput, Override, ParameterSpec, ParamResolveRequest, ParamResolveResult, ParamScope, TrainSpec } from '@/data/types';
 import { ServiceDown, ServiceRefused, call } from './http';
 
 export { ServiceDown as ParamsDown, ServiceRefused as ParamsRefused };
@@ -82,10 +89,33 @@ const askQuery = (ask: ParamAsk) => {
 export const paramScope = (scope: string, ask: ParamAsk = {}, signal?: AbortSignal) =>
   call<ParamScope>(`${scopePath(scope)}${askQuery(ask)}`, { signal });
 
-/** The resolve request the panel posts: the scope's overrides, with what the caller binds by. */
-export function resolveRequest(overrides: Override[], ask: ParamAsk = {}): ParamResolveRequest {
+/**
+ * A person's changes as the inputs a request sends: each Override's key, and a
+ * quantity holding its value, low and high in the unit its parameter is in (the
+ * scope's `specs`: the key's own spec, or for a key expanded per item,
+ * `<key>.<item>`, its template's), with the person or the model that set it,
+ * the day and the note as its origin. The one place an Override becomes an
+ * input (core/tests/standins.py's `as_inputs` mirrors it); a key the specs do
+ * not name goes with no unit, and the service says why it cannot stand.
+ */
+export function inputsOf(overrides: Override[], specs: ParameterSpec[]): EngineInput[] {
+  const unit = new Map(specs.map((s) => [s.key, s.unit]));
+  return overrides.map((o) => ({
+    name: o.key,
+    quantity: {
+      value: o.value,
+      unit: unit.get(o.key) ?? unit.get(o.key.split('.')[0]) ?? '',
+      ...(o.low != null ? { low: o.low } : {}),
+      ...(o.high != null ? { high: o.high } : {}),
+      origin: { kind: o.origin ?? 'person-assumption', by: o.by, at: o.at, ...(o.note ? { note: o.note } : {}) },
+    },
+  }));
+}
+
+/** The resolve request the panel posts: the scope's overrides as inputs in its specs' units, with what the caller binds by. */
+export function resolveRequest(overrides: Override[], specs: ParameterSpec[], ask: ParamAsk = {}): ParamResolveRequest {
   return {
-    overrides,
+    inputs: inputsOf(overrides, specs),
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
     ...(ask.host ? { host: ask.host } : {}),
     ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
@@ -98,11 +128,11 @@ export function resolveRequest(overrides: Override[], ask: ParamAsk = {}): Param
   };
 }
 
-/** POST a person's overrides to their scope: the values with the overrides laid on, and every value outside its bounds, in words. */
-export const resolveParams = (scope: string, overrides: Override[], ask: ParamAsk = {}, signal?: AbortSignal) =>
+/** POST a person's overrides to their scope, each in the unit its spec names: the values with the overrides laid on, and every value outside its bounds, in words. */
+export const resolveParams = (scope: string, overrides: Override[], specs: ParameterSpec[], ask: ParamAsk = {}, signal?: AbortSignal) =>
   call<ParamResolveResult>(`${scopePath(scope)}/resolve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(resolveRequest(overrides, ask)),
+    body: JSON.stringify(resolveRequest(overrides, specs, ask)),
     signal,
   });

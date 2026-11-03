@@ -30,6 +30,31 @@ export class ServiceRefused extends Error {
   }
 }
 
+/**
+ * A refusal's detail in words. The service's own words stand as they are. A
+ * request whose fields the service refused answers a list of field errors
+ * (FastAPI's 422, each with the field's place and why), said here field by
+ * field; a field the service does not hold means this page was loaded before
+ * the service changed, and the words say to reload it.
+ */
+export function detailWords(detail: unknown): string {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const fields = detail.map((d) => {
+      const e = (d ?? {}) as { loc?: unknown; msg?: unknown };
+      const where = Array.isArray(e.loc) ? e.loc.filter((x) => x !== 'body').join('.') : '';
+      return `${where ? `${where}: ` : ''}${typeof e.msg === 'string' && e.msg ? e.msg : 'refused'}`;
+    });
+    const older = detail.some((d) => (d as { type?: unknown } | null)?.type === 'extra_forbidden');
+    return (
+      `The service refused the request's fields: ${fields.join('; ')}.` +
+      (older ? ' This page was loaded before the service changed what it takes: reload the page.' : '')
+    );
+  }
+  if (detail == null) return '';
+  return typeof detail === 'object' ? JSON.stringify(detail) : String(detail);
+}
+
 export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -44,7 +69,7 @@ export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   if ([404, 409, 413, 422, 502, 503].includes(response.status)) {
     let detail = '';
     try {
-      detail = String(((await response.json()) as { detail?: unknown }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }

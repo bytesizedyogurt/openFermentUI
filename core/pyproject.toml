@@ -51,6 +51,7 @@ sim = ["cobra==0.32.1", "scipy", "biosteam==2.54.0", "biorefineries==2.35.1", "j
 # its own engines the way it finds anyone else's (engine/registry.py).
 [project.entry-points."openferment.engines"]
 biosteam = "openferment_core.engine.biosteam:ENGINE"
+kinetics = "openferment_core.fermos_engine:ENGINE"
 
 [build-system]
 requires = ["hatchling"]

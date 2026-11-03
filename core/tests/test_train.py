@@ -42,12 +42,12 @@ from openferment_core.models import (
     InputAssumption,
     Override,
     ParamResolveRequest,
-    SimulationRequest,
     TrainParam,
     TrainSpec,
     TrainUnitSpec,
 )
 from openferment_core.pureos import catalogue, train_spec
+from standins import as_input, resolve_request, simulation_request, vessel_request
 from test_catalogue import StandInWorker
 
 CORE = Path(__file__).resolve().parent.parent
@@ -294,7 +294,7 @@ def real_simulation(**more):
     on STAND-IN overrides."""
     values = {**SIM_STANDIN, **more}
     scope = "fermos:family:batch_v1"
-    return fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose", overrides=[
+    return fermos.simulate(simulation_request(family="batch_v1", product="ethanol", sugar="glucose", overrides=[
         Override(scope=scope, key=k, value=v, by=BY, at=AT, note=STANDIN) for k, v in values.items()]))
 
 
@@ -449,8 +449,18 @@ def test_the_scope_names_its_train_its_unit_and_its_inlet(store, worker, no_pool
     # The panel's resolve refuses what the run refuses, in the unit's needs.
     flash = "pureos:unit:t1:F1"
     with pytest.raises(params.ParamRefused, match="Flash drum waits for"):
-        params.resolve_scope(flash, ParamResolveRequest(train=spec, overrides=[
+        params.resolve_scope(flash, resolve_request(flash, train=spec, overrides=[
             Override(scope=flash, key="P", value=101325.0, by=BY, at=AT)]))
+    # A key the unit lacks is refused naming the unit's parameters as its scope expands them, beside a key it has.
+    centrifuge = "pureos:unit:t1:C1"
+    keys = ", ".join(s.key for s in params.scope(centrifuge, ParamResolveRequest(train=spec)).specs)
+    stray = as_input(Override(scope=centrifuge, key="no_such_key", value=1.0, by=BY, at=AT), "placeholder-unit")
+    for given in ([stray], [stray, *resolve_request(centrifuge, train=spec, overrides=[
+            Override(scope=centrifuge, key="split.Water", value=0.5, by=BY, at=AT)]).inputs]):
+        with pytest.raises(params.ParamRefused) as refused:
+            params.resolve_scope(centrifuge, ParamResolveRequest(train=spec, inputs=given))
+        assert str(refused.value) == f"there is no parameter no_such_key here; the parameters are {keys}"
+    assert "split.Water" in keys and "moisture_content" in keys
 
 
 def test_the_get_scope_takes_the_train_as_json(client, store, worker, no_pool):
@@ -615,7 +625,7 @@ def _values_of(spec, unit_id, overrides=()):
     scope = f"pureos:unit:{spec.id}:{unit_id}"
     unit = next(u for u in spec.units if u.id == unit_id)
     typed_ = [Override(scope=scope, key=k, **p.model_dump()) for k, p in unit.params.items()]
-    got = params.resolve_scope(scope, ParamResolveRequest(train=spec, overrides=[*typed_, *overrides])).values
+    got = params.resolve_scope(scope, resolve_request(scope, train=spec, overrides=[*typed_, *overrides])).values
     return {x.key: x for x in got}
 
 
@@ -929,10 +939,9 @@ def test_a_unit_that_cannot_run_refuses_the_train_naming_it_and_biosteams_words(
 @pytest.mark.sim
 def test_a_simulations_harvest_takes_its_broth_flow_from_a_vessel_design(real):
     from openferment_core import vessel
-    from openferment_core.models import VesselRequest
 
     sim = real_simulation()
-    d = vessel.design(VesselRequest(simulation=sim.artifactId, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=sim.artifactId, overrides=[Override(
         scope=f"fermos:vessel:{sim.artifactId}", key="plant_scale", value=50000.0, by=BY, at=AT, note=STANDIN)]))
     rows = {r.label: r.value for r in d.design}
     spec = three_units(kind="simulation", ref=sim.artifactId, vessel=d.artifactId)

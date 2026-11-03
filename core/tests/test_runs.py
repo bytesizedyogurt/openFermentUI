@@ -15,7 +15,10 @@ any engine's computation, or its receipt, in the one shape, and says so on
 the event stream; it answers a run kept already as it was first kept, and
 refuses in words, keeping nothing, a call outside its rules or an engine
 name nothing registers; a run's parameters are a library run's alone. The
-real worker is test_runs_sim.py.
+kinetics engine's outputs.values are the end state, the hours, the finals and
+the design rows its artifacts state a unit for; `compute_kept` keeps an
+in-process computation as one run, answers a receipt without computing, and
+keeps nothing for a failure. The real worker is test_runs_sim.py.
 """
 from __future__ import annotations
 
@@ -28,7 +31,7 @@ from conftest import TEST_PROJECT
 from openferment_core import artifacts, events, llm
 from openferment_core.api import app
 from openferment_core.engine import library, runs, sff, simulator
-from openferment_core.models import BasisInput, BasisSource, ReplayTolerance
+from openferment_core.models import Artifact, BasisInput, BasisSource, ReplayTolerance
 
 from test_library import SUGARCANE_PARAMETERS, StandInWorker, over
 from test_sff import StandInToolkit
@@ -342,3 +345,143 @@ def test_keep_run_refuses_a_call_outside_its_rules_and_keeps_nothing(kept_tool):
     with pytest.raises(ValueError, match="no engine named 'placeholder-engine' is registered here"):
         runs.keep_run("placeholder-engine", "a-thing", None, **asked, art=art, sff_refused="words")
     assert runs.listed() == []
+
+
+# ── the kinetics engine's outputs and its keeper (alpha 2.2 D3, D4) ─────
+
+
+def _art(tool: str, output: dict) -> Artifact:
+    """An artifact of `tool` holding `output`, as values_of reads it: a placeholder of every number and unit."""
+    return Artifact(id="00000000000000aa", tool=tool, toolVersion="1", inputs=[], output=output,
+                    outputHash=artifacts.output_hash(output), provenance="computed", createdAt="2026-10-30T00:00:00Z",
+                    durationMs=0, seed=None)
+
+
+def test_the_kinetics_tools_are_named_here_as_fermos_names_them():
+    from openferment_core import fermos, vessel
+
+    assert (runs.SIMULATION_TOOL, runs.FORECAST_TOOL, runs.VESSEL_TOOL) == (fermos.SIMULATION, fermos.FORECAST,
+                                                                            vessel.TOOL)
+
+
+def test_a_kinetics_runs_outputs_values_are_what_its_artifact_states_a_unit_for():
+    origin = {"kind": "artifact", "ref": "00000000000000aa"}
+
+    def q(value, unit, **more):
+        return {"value": value, "unit": unit, **more, "origin": origin}
+
+    simulated = _art(runs.SIMULATION_TOOL, {
+        "units": {"t": "placeholder-hour", "X": "placeholder-unit"}, "end": {"X": 1.5, "S": 2.5, "t": 4.0},
+        "harvestH": 3.5, "sugarRunsOutH": None, "finalTitre": 9.0})
+    assert runs.values_of(simulated) == [
+        {"name": "end.X", "quantity": q(1.5, "placeholder-unit")}, {"name": "end.t", "quantity": q(4.0, "placeholder-hour")},
+        {"name": "harvestH", "quantity": q(3.5, "placeholder-hour")}], "a state with no unit, and an hour that never came, are left out"
+    forecast = _art(runs.FORECAST_TOOL, {"finals": [
+        {"role": "biomass", "unit": "placeholder-unit", "low": 1.0, "median": 1.5, "high": 2.0}]})
+    assert runs.values_of(forecast) == [{"name": "finals.biomass", "quantity": q(1.5, "placeholder-unit", low=1.0,
+                                                                                    high=2.0)}]
+    designed = _art(runs.VESSEL_TOOL, {"design": [
+        {"label": "a count", "value": 2.0, "unit": "", "readFrom": "a placeholder"},
+        {"label": "a flow", "value": 1.0, "unit": "placeholder-a", "readFrom": "a placeholder"},
+        {"label": "a flow", "value": 3.0, "unit": "placeholder-b", "readFrom": "a placeholder"},
+        {"label": "a word", "value": "placeholder", "unit": "", "readFrom": "a placeholder"},
+        {"label": "a switch", "value": True, "unit": "", "readFrom": "a placeholder"},
+        {"label": "unset", "value": None, "unit": "", "readFrom": "a placeholder"}]})
+    assert runs.values_of(designed) == [
+        {"name": "design.a count", "quantity": q(2.0, "")},
+        {"name": "design.a flow (placeholder-a)", "quantity": q(1.0, "placeholder-a")},
+        {"name": "design.a flow (placeholder-b)", "quantity": q(3.0, "placeholder-b")},
+        {"name": "design.a word", "quantity": q("placeholder", "")}]
+
+
+class Refused(ValueError):
+    """A placeholder engine's refusal of the values, in its words."""
+
+
+@pytest.fixture
+def in_process(monkeypatch):
+    """A tool of the test's own computing in the service's process, refusing a basis whose value is 2.0 and
+    failing on 3.0, each call counted; and an engine that names itself."""
+    calls: list[float] = []
+
+    def computed(inputs, seed):
+        value = inputs[0].value
+        calls.append(value)
+        if value == 2.0:
+            raise Refused("the placeholder engine refuses these values, in these words")
+        if value == 3.0:
+            raise RuntimeError("the placeholder engine failed")
+        return {"answer": 2.5}
+
+    monkeypatch.setitem(artifacts._REGISTRY, "test.in-process", artifacts.Registered("test.in-process", "1", computed))
+    engine = SimpleNamespace(name="placeholder-engine", version=lambda: {"placeholder-distribution": "0.0"})
+    return engine, calls
+
+
+def test_an_in_process_computation_is_kept_as_one_run_and_the_same_basis_again_is_that_row(in_process):
+    engine, calls = in_process
+    kept = dict(tool="test.in-process", basis=_kept_basis(1.0), refusal=Refused, sff_refused="no plant")
+    start = events.newest()
+    art = runs.compute_kept(engine, "a-thing", None, **kept, by="Ada Moreno")
+    run = runs.get(art.id)
+    assert (run.engine, run.plant, run.status, run.by, run.artifactId, run.sffRefused) == (
+        "placeholder-engine", "a-thing", "done", "Ada Moreno", art.id, "no plant")
+    assert [e.type for e in events.recent(TEST_PROJECT, start)] == ["job.queued", "job.running", "artifact.kept",
+                                                                    "job.done"]
+    start = events.newest()
+    again = runs.compute_kept(engine, "a-thing", None, **kept, by="Grace Hopper")
+    assert again.id == art.id and calls == [1.0] and runs.listed() == [run]
+    assert events.recent(TEST_PROJECT, start) == [], "a row held done is answered as kept, and nothing is said"
+
+
+def test_an_in_process_refusal_is_kept_as_a_receipt_answered_from_it_and_a_failure_keeps_nothing(in_process):
+    engine, calls = in_process
+    refused = dict(tool="test.in-process", basis=_kept_basis(2.0), refusal=Refused, sff_refused="no plant")
+    with pytest.raises(Refused, match="in these words") as first:
+        runs.compute_kept(engine, "a-thing", None, **refused, by="Ada Moreno")
+    receipt = runs.get(first.value.run_id)
+    assert (receipt.status, receipt.refused, receipt.artifactId, receipt.by) == (
+        "refused", "the placeholder engine refuses these values, in these words", None, "Ada Moreno")
+    with pytest.raises(Refused, match="in these words") as again:
+        runs.compute_kept(engine, "a-thing", None, **refused, by="Grace Hopper")
+    assert again.value.run_id == receipt.id and calls == [2.0], "the receipt answers, computing nothing"
+    start = events.newest()
+    with pytest.raises(RuntimeError, match="failed"):
+        runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(3.0), refusal=Refused,
+                          sff_refused="no plant")
+    failed = [e for e in events.recent(TEST_PROJECT, start) if e.type == "job.failed"]
+    assert [e.data["status"] for e in failed] == ["failed"] and runs.listed() == [receipt]
+
+
+def test_a_held_rows_provenance_follows_its_artifacts_when_a_record_it_rests_on_moves(in_process):
+    """A row held done answers its artifact, whose provenance artifacts.compute
+    brings up to date when a record its basis rests on was reviewed or
+    demoted since; the row's provenance follows, so the run's report and the
+    listing say what the artifact says. Nothing else of the row moves."""
+    engine, calls = in_process
+    basis = [BasisInput(name="a-value", value=1.0, unit="placeholder-unit",
+                        source=BasisSource(kind="record", id="r-placeholder", note="a placeholder record"))]
+    kept = dict(tool="test.in-process", basis=basis, refusal=Refused, sff_refused="no plant")
+    first = runs.compute_kept(engine, "a-thing", None, **kept, by="Ada Moreno",
+                              records_by_id={"r-placeholder": {"provenance": "gold"}})
+    held = runs.get(first.id)
+    assert first.provenance == held.provenance == "computed"
+    start = events.newest()
+    again = runs.compute_kept(engine, "a-thing", None, **kept, by="Grace Hopper",
+                              records_by_id={"r-placeholder": {"provenance": "unverified"}})
+    assert again.id == first.id and again.provenance == "unverified" and calls == [1.0], "answered, computing nothing"
+    moved = runs.get(first.id)
+    assert moved.provenance == "unverified" and runs.report(first.id).artifact.provenance == "unverified"
+    assert [r.provenance for r in runs.listed()] == ["unverified"]
+    assert moved.model_copy(update={"provenance": held.provenance}) == held, "only the provenance moved"
+    assert [e.type for e in events.recent(TEST_PROJECT, start)] == [], "nothing is said"
+
+
+def test_a_keeper_names_what_its_thing_ran_on_as_the_rows_versions(in_process):
+    engine, _ = in_process
+    art = runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(1.0), refusal=Refused,
+                            sff_refused="no plant", versions={"placeholder-library": "1.0"})
+    assert runs.get(art.id).versions == {"placeholder-library": "1.0"}
+    plain = runs.compute_kept(engine, "a-thing", None, tool="test.in-process", basis=_kept_basis(4.0),
+                              refusal=Refused, sff_refused="no plant")
+    assert runs.get(plain.id).versions == {"placeholder-distribution": "0.0"}, "the engine's own version() by default"

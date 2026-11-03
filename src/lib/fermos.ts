@@ -11,8 +11,9 @@
 // person's overrides laid on (`GET /api/fermos/bind`), the run
 // (`POST /api/fermos/simulate`, one kept `fermos.simulation` artifact) and
 // the kept ones (`GET /api/fermos/simulations`). The browser sends ids,
-// words and the scope's overrides, and draws what comes back; it computes
-// no value of a simulation.
+// words and the scope's overrides, each a typed input in its parameter's unit
+// (lib/params.ts, `inputsOf`), and draws what comes back; it computes no value
+// of a simulation.
 import type {
   Deposition,
   FamilyInfo,
@@ -23,16 +24,17 @@ import type {
   ForecastResult,
   KineticFit,
   Override,
+  ParameterSpec,
   Runbook,
   SimulationResult,
   SimulationSummary,
-  StartValues,
   VesselDesign,
   VesselRequest,
 } from '@/data/types';
 import { seriesOf } from '@/engine/series';
 import type { TimeCourseProps, TrajectorySeries } from '@/components/figures';
 import { ServiceDown, ServiceRefused, call } from './http';
+import { inputsOf } from './params';
 
 export { ServiceDown as FermosDown, ServiceRefused as FermosRefused };
 
@@ -88,18 +90,18 @@ export const paramAskOf = (ask: SimulateAsk) => ({
 /** Every model family. */
 export const fermosFamilies = (signal?: AbortSignal) => call<FamilyInfo[]>('/api/fermos/families', { signal });
 
-/** What binds and what waits, with the person's overrides laid on, as Simulate would bind it. */
-export function fermosBind(ask: SimulateAsk, overrides: Override[], signal?: AbortSignal): Promise<FermosBinding> {
+/** What binds and what waits, with the person's overrides laid on (as inputs in the family's units), as Simulate would bind it. */
+export function fermosBind(ask: SimulateAsk, overrides: Override[], specs: ParameterSpec[], signal?: AbortSignal): Promise<FermosBinding> {
   const q = new URLSearchParams({ family: ask.family, startFrom: ask.startFrom, durationPreset: ask.durationPreset });
   for (const k of ['strain', 'product', 'sugar'] as const) if (ask[k]) q.set(k, ask[k] as string);
   if (ask.fitArtifact) q.set('fit', ask.fitArtifact);
-  if (overrides.length > 0) q.set('overrides', JSON.stringify(overrides));
+  if (overrides.length > 0) q.set('inputs', JSON.stringify(inputsOf(overrides, specs)));
   return call<FermosBinding>(`/api/fermos/bind?${q.toString()}`, { signal });
 }
 
-/** Simulate: the scope's overrides go with the run, each an assumption by its person. */
-export const fermosSimulate = (ask: SimulateAsk, overrides: Override[], signal?: AbortSignal) =>
-  post<SimulationResult>('/api/fermos/simulate', { ...ask, overrides }, signal);
+/** Simulate: the scope's overrides go with the run as inputs in the family's units, each an assumption by its person; `by` is who asks. */
+export const fermosSimulate = (ask: SimulateAsk, overrides: Override[], specs: ParameterSpec[], by: string, signal?: AbortSignal) =>
+  post<SimulationResult>('/api/fermos/simulate', { ...ask, inputs: inputsOf(overrides, specs), by }, signal);
 
 /** The kept simulations, newest first (`GET /api/fermos/simulations`). Simulate and Vessel both read it. */
 export const fermosSimulations = (signal?: AbortSignal) => call<SimulationSummary[]>('/api/fermos/simulations', { signal });
@@ -172,42 +174,20 @@ export const simulateFromFitPath = (family: string, fitId: string) =>
   `/fermos/simulate?family=${encodeURIComponent(family)}&start=fit&fit=${encodeURIComponent(fitId)}`;
 
 /**
- * A forecast's start values and length from its scope's overrides
- * (`fermos:forecast:<fit id>`): renamed to the forecast request's fields,
- * never computed. Unset ones are the run's own; a changed start names the
- * person who typed it, and a changed length the person who typed that
- * (`durationBy`, OF-BLD-020 §3.R): the service keeps each an assumption by
- * name, and the forecast is assumed.
+ * A forecast (`POST /api/fermos/forecast`): its start values and length are
+ * its scope's overrides (`fermos:forecast:<fit id>`: x0, s0, p0 and t_end),
+ * sent as inputs in the units the scope's specs name, each as typed. Unset
+ * ones are the run's own; a changed one names the person who typed it, with
+ * the day it was typed (OF-BLD-020 §3.R): the service keeps each an
+ * assumption by name, and the forecast is assumed.
  */
-export function forecastAsk(overrides: Override[]): {
-  start: Partial<StartValues>;
-  changedBy: string | null;
-  durationH: number | null;
-  durationBy: string | null;
-} {
-  const num = (key: string) => {
-    const v = overrides.find((o) => o.key === key)?.value;
-    return typeof v === 'number' ? v : null;
-  };
-  const start = { X0: num('x0'), S0: num('s0'), P0: num('p0') };
-  const names = [...new Set(overrides.filter((o) => ['x0', 's0', 'p0'].includes(o.key)).map((o) => o.by.trim()))];
-  const length = overrides.find((o) => o.key === 't_end' && typeof o.value === 'number');
-  return {
-    start,
-    changedBy: names.length ? names.join(' and ') : null,
-    durationH: num('t_end'),
-    durationBy: length ? length.by.trim() : null,
-  };
-}
-
 export const fermosForecast = (
   req: {
     fitArtifactId?: string | null;
     fit?: KineticFit | null;
-    start?: Partial<StartValues>;
-    changedBy?: string | null;
-    durationH?: number | null;
-    durationBy?: string | null;
+    overrides?: Override[];
+    specs?: ParameterSpec[];
+    by?: string;
     sample?: boolean;
   },
   signal?: AbortSignal,
@@ -217,10 +197,8 @@ export const fermosForecast = (
     {
       fitArtifactId: req.fitArtifactId ?? null,
       fit: req.fit ?? null,
-      start: { X0: req.start?.X0 ?? null, P0: req.start?.P0 ?? null, S0: req.start?.S0 ?? null },
-      changedBy: req.changedBy ?? null,
-      durationH: req.durationH ?? null,
-      durationBy: req.durationBy ?? null,
+      inputs: inputsOf(req.overrides ?? [], req.specs ?? []),
+      by: req.by ?? '',
       sample: req.sample ?? false,
     },
     signal,
@@ -312,13 +290,19 @@ export function vesselTypeOf(overrides: Override[]): VesselType | null {
   return chosen && typeof chosen.value === 'string' ? VESSEL_TYPE_OF_DESIGN[chosen.value] ?? null : null;
 }
 
-/** The design request: the source, the vessel type the person chose, and every override of the scope as typed. */
-export function vesselRequest(source: { simulation?: string | null; fit?: string | null }, overrides: Override[]): VesselRequest {
+/** The design request: the source, the vessel type the person chose, every override of the scope as typed (an input in the unit its spec names), and who asks. */
+export function vesselRequest(
+  source: { simulation?: string | null; fit?: string | null },
+  overrides: Override[],
+  specs: ParameterSpec[],
+  by: string,
+): VesselRequest {
   return {
     simulation: source.simulation ?? null,
     fit: source.fit ?? null,
     vesselType: vesselTypeOf(overrides),
-    overrides,
+    inputs: inputsOf(overrides, specs),
+    by,
   };
 }
 

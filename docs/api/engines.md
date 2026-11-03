@@ -47,7 +47,9 @@ example = "openferment_engine_example.engine:ENGINE"
 - Installing an engine trusts its code with whatever the service's user can read, `core/.env`
   included: its entry module runs in the service's process, and its worker runs as the same user.
 - The engines in the repository register the same way, from `core/pyproject.toml`: `biosteam`
-  (the library plants and openFerment's composed flowsheet).
+  (the library plants and openFerment's composed flowsheet) and `kinetics` (fermOS's model
+  families, its forecasts of a kept fit and its vessel designs). The section The core's
+  `kinetics`, below, describes the kinetics engine's runs.
 
 ## What it declares
 
@@ -55,16 +57,16 @@ An engine from outside the core is built on `openferment_core.engine.WorkerEngin
 implements every method over four worker ops: the package declares the engine's name, its worker,
 its distributions and the heavy modules its worker computes with (`heavy`, which conformance
 check 6 holds), and writes the worker. The table lists what the service asks of every engine, the
-core's own `biosteam` among them.
+core's own `biosteam` and `kinetics` among them.
 
 | Name | Type | What it is |
 |---|---|---|
 | `name` | `str` | Lowercase letters, digits and `-`, starting with a letter, at most 40 characters; the entry point's name, the `engine` column of every run it makes, and the `?engine=` filter |
-| `worker` | `str` or `None` | The dotted module of the engine's worker: the service runs it as `python -m <worker>` would (The worker, below) and speaks the protocol of `docs/api/workers.md`. Heavy imports live here alone. `None` for an engine that computes in the service's own process with nothing heavy, whose `heavy` is then `()` |
+| `worker` | `str` or `None` | The dotted module of the engine's worker: the service runs it as `python -m <worker>` would (The worker, below) and speaks the protocol of `docs/api/workers.md`. Heavy imports live here alone. `None` for an engine that computes in the service's own process with nothing heavy, whose `heavy` is then `()`, as the core's `kinetics` is; `GET /api/engines` lists its worker's status as `none`. Such an engine's computation may call a worker of the core's own (the kinetics engine's vessel design runs in the Proforma worker), and a route that worker cannot answer is a 503 naming the worker its computation called |
 | `heavy` | `tuple[str, ...]` | The modules the worker computes with, which the service keeps out of its process (conformance check 6); each name covers its module and every module below it (`a.b` covers `a.b` and `a.b.c`). `()` for an engine that computes with nothing heavy. The service keeps `biosteam`, `thermosteam`, `biorefineries`, `pisces_sff` and `cobra` out for every engine, whatever it declares |
 | `version()` | `dict[str, str]` | The distributions the engine runs on, each with the version its installed metadata records: `{"openferment-engine-example": "0.1.0"}`; a distribution that is not installed reads `"not installed"`, and enters the version string so. It is the run's `versions`, and it enters every run's id. It changes whenever the engine's computation changes: an editable install keeps its version across edits of its code, so a new version goes with every change to what a run computes (installed again, as above), and the service then computes the request afresh |
-| `things()` | `list[EngineThing]` | What the engine can run, each with its configurations and its precision |
-| `parameters(thing, configuration)` | `list[EngineParameter]` | What one thing takes: each parameter a `ParameterSpec` with its default and the default's origin |
+| `things()` | `list[EngineThing]` | What the engine can run, each with its configurations and its precision. The service asks it afresh on every listing and every run, in the request's project, so an engine may list what the project holds: the kinetics engine lists its forecast while the project keeps a fit. A `WorkerEngine` keeps its worker's first answer for the life of the process (below) |
+| `parameters(thing, configuration)` | `list[EngineParameter]` | What one thing takes: each parameter a `ParameterSpec` with its default and the default's origin, or with none for a parameter a run sets |
 | `run(thing, configuration, inputs, by)` | `EngineRun` | One run, kept as one `runs` row. `inputs` is a list of `EngineInput`, each a named `Quantity`; `by` names the person or the model asking |
 | `replay(run)` | `ReplayResult` | The run computed again from its basis alone, each output held within the stated precision |
 | `export_sff(run)` | `SFFFlowsheet` or words | The run's SFF file as its flowsheet record (`GET /api/flowsheets/{id}`), validated and scored, or the words that say why there is none |
@@ -107,15 +109,27 @@ core's own `biosteam` among them.
  "origin": {"kind": "convention", "note": "what the setting is"}}
 ```
 
+```json
+{"key": "a-parameter-a-run-sets", "label": "A placeholder with no default", "unit": "placeholder-unit",
+ "value": null, "origin": null, "min": 0, "boundsReason": "why a run may set it only above this"}
+```
+
 A `ParameterSpec` (the shape every parameter panel reads) with its default and the default's
 origin:
 
 - `key`, `label` and `unit` name it; `unit` is `""` for a share, a pure number or a choice.
-- `value` is the default the engine uses when a run sets none: a number, or one of `choices` for
-  a parameter chosen from words.
+- `value` is the default the engine uses when a run sets none: a number, one of `choices` for a
+  parameter chosen from words, or a convention's words in a unit for a term the default leaves
+  off (the kinetics engine's `ki_substrate` is `off` in g L⁻¹), which a run replaces with a
+  number in that unit.
 - `origin` says where the default comes from: `library-default` with `ref` naming the package
   and version it was read from, or `convention` with a `note` for a software setting (a step
-  count, a tolerance). Every parameter carries one.
+  count, a tolerance). Every default carries one.
+- A parameter with no default has `value` and `origin` null, and its `sourceRule` names
+  `assumption` (given when the parameter names no rule): a run sets it, or the engine binds it
+  from what the project holds (the kinetics engine binds a family's parameter from the project's
+  records, or from the fit or the simulation a configuration names). A run that leaves it with
+  neither is refused in words and keeps nothing.
 - `min` and `max`, when given, bound what a run may set; `boundsReason` says why, in words, and
   every parameter carries one, a parameter with no bounds included.
 - The panel's other fields may be left out: `symbol`, `gloss`, `dimension`, `step`, `scale`
@@ -138,8 +152,11 @@ origin:
   request is one run whatever day it arrives.
 - A value set is checked against the thing's parameters before the worker sees it: a key the
   thing declares, set once, in the parameter's unit, a number for a number and one of `choices`
-  for words, inside `min` and `max`. A key the thing lacks is refused with the number of its
-  parameters and the few keys nearest to it. A value refused keeps nothing.
+  for words, inside `min` and `max`. A parameter takes words when it has `choices`, or when its
+  default is words in no unit; every other parameter takes a number, one with no default among
+  them, and one whose default is a convention's words in a unit (a term left off). A key the
+  thing lacks is refused with the number of its parameters and the few keys nearest to it. A
+  value refused keeps nothing, and so does a run that leaves a parameter with no default unset.
 - A value a contract engine's run sets is its `value` and `unit` with its `origin`: a quantity
   that also carries `low`, `high` or `basis` is refused in words, since the worker receives the
   value and unit alone.
@@ -147,7 +164,9 @@ origin:
   plant's bounds are flagged by the library on the run's parameters (`ParameterValue.outOfBounds`),
   the value kept as set, never clamped. Its door passes `low` and `high` to the plant as the
   `Override`'s, which the library takes equal to the value (a range is a study's to sample), and
-  refuses a `basis` in words.
+  refuses a `basis` in words. The kinetics engine checks its values the same way, and keeps a
+  range in the run's basis as `<key> low` and `<key> high` beside the value, which the run
+  integrates at (The core's `kinetics`, below).
 - A number is accepted only inside a `quantity`. A bare JSON number anywhere in a request, a
   field the request or a quantity does not name, and a `value`, `low` or `high` that is `true` or
   `false` are each refused in words before the engine's worker is reached.
@@ -250,9 +269,10 @@ computation from that artifact and asks `sff_export` for the file again.
   own thread, and after `registry.DISCOVERY_WAIT_S` (10 s) from a thread it starts and waits on.
   Discovery itself runs with no time limit.
 - **`GET /api/engines`**: each engine's name, version, worker module and status, things, the
-  error that keeps it from loading (when one does) and its last conformance verdict. The listing
-  gives a cold worker 30 s to answer `things` first; an engine whose things fail or time out is
-  listed with the words.
+  error that keeps it from loading (when one does) and its last conformance verdict. The things
+  are read in the request's project, afresh on each listing. The listing gives a cold worker
+  30 s to answer `things` first; an engine whose things fail or time out is listed with the
+  words.
 - **`GET /api/engines/{name}/parameters?thing=&configuration=`**: the thing's parameters, the
   configuration resolved as a run resolves it (`EngineThing` above).
 - **`POST /api/engines/{name}/run`**: `{thing, configuration?, inputs?, by?}` runs one thing and
@@ -302,10 +322,64 @@ computation from that artifact and asks `sff_export` for the file again.
   (default `biosteam`), so Postdoc and any MCP client list, read and report every engine's things
   and runs the same way. `engine_run` runs a contract engine's thing at its own defaults; values
   are set through `POST /api/engines/{name}/run`, and a study scenario (`engine_run`'s `scenario`)
-  runs on BioSTEAM. At the HTTP endpoint (`POST /api/tools/{name}`) a tool that writes,
-  `engine_run` among them, names its caller with `?by=`, who is then the write's author; a call
-  that names nobody is a 422 in words.
+  runs on BioSTEAM. A kinetics family runs with values no default gives, so `engine_run` on one
+  answers its refusal naming each parameter that waits; a person sets those values on fermOS's
+  screens or at `POST /api/engines/kinetics/run` (The core's `kinetics`, below). At the HTTP
+  endpoint (`POST /api/tools/{name}`) a tool that writes, `engine_run` among them, names its
+  caller with `?by=`, who is then the write's author; a call that names nobody is a 422 in words.
 - **`pnpm ready`** prints one row per engine: its version, its worker and its conformance verdict.
+
+## The core's `kinetics`
+
+`openferment_core.fermos_engine:ENGINE`, registered by `core/pyproject.toml`, puts fermOS behind
+the contract as fermOS computes: `worker` is `None` and `heavy` is `()`, since fermOS integrates
+with SciPy in the service's process and a vessel design runs on BioSTEAM in the Proforma worker
+the simulator starts; a vessel's route that worker cannot answer is a 503 naming it.
+
+| Thing | Configurations | A run of it |
+|---|---|---|
+| Each family that simulates: `batch_v1`, `fedbatch_v1`, `chemostat_v1` (the light_v1 socket stays out) | none | `fermos.simulate`, the family with the run's inputs and `by`; the tool `fermos.simulation` |
+| `forecast`, listed while the project keeps a kinetic fit a forecast draws from (logistic_v0) | those fits' artifact ids, newest first, and no default | `fermos.forecast_run` of the fit; the tool `growth_forecast` |
+| `vessel`, listed while the project keeps a batch_v1 simulation, a kinetic fit a forecast draws from, or a forecast | those artifacts' ids, newest first, and no default | `vessel.design` for the simulation, the fit or the forecast; the tool `fermos.vessel` |
+
+- Each thing's precision is `rtol` 0 and `atol` 0: fermOS replays a computation identically.
+- `parameters(thing, configuration)` is the thing's own parameter scope (`fermos:family:<id>`,
+  `fermos:forecast:<fit id>`, `fermos:vessel:<id>`) resolved with nothing set: a convention keeps
+  its default (origin `convention`, with its note), a vessel class's own default keeps it (origin
+  `library-default`, its `ref` naming BioSTEAM), and every other parameter has no default.
+- The things are read afresh in the request's project on every listing, from the artifact
+  store's tool column. A run names its thing and its configuration, and reads the one artifact the
+  configuration names; a configuration the thing cannot take is refused naming those it lists.
+- A run's values are checked before anything runs (`runs.check_inputs`; a value outside its
+  bounds is kept and flagged on the artifact, as fermOS has always flagged one). A design's
+  values are held by the vessel's own scope, whose keys are those of its kind (an anaerobic
+  design takes a plant scale and no batch volume) and whose choices follow the vessel type the
+  run chooses: a key the scope lacks is refused in words, naming the scope's own keys or saying
+  why its kind takes none (an anaerobic vessel's type). A range on a value is kept in the run's
+  basis as `<key> low` and `<key> high` beside it, and the run integrates at the value.
+- A run's id is its fermOS artifact's: the artifact's tool at fermOS's own tool version
+  (`kinetics <family> 2 · scipy <version>` for a simulation, `fermos-1` for a forecast,
+  `vessel 3 · biosteam <version> · thermosteam <version>` for a design) over fermOS's basis, so a
+  change to fermOS's computation moves the tool version and the id. A forecast's basis names a
+  start value it sets `start X0`, `start S0` or `start P0`, in the unit of the fitted run's
+  series, and a length it sets `duration`, in hours.
+- `version()` names what the engine as a whole runs on: numpy and scipy, and biosteam and
+  thermosteam, each as its installed metadata records it, the versions a vessel design's tool
+  version names. The conformance verdict's version is the contract's version string over it
+  (`engine run 1 · kinetics · …`); the stem's rules (The run's row, above) are the contract
+  engines' own. Each row's `versions` names what its thing ran on: numpy and scipy for a
+  family's simulation and a forecast; biosteam and thermosteam, as the design's tool version
+  names them, and biorefineries, the package its chemicals are read from, for a vessel design.
+- fermOS's own doors keep the same row: `POST /api/fermos/simulate`, `POST /api/fermos/forecast`
+  (a kept fit's forecast; the sample run's keeps nothing) and `POST /api/fermos/vessel`, and the
+  tools `fermos_simulate`, `growth_forecast`, `fermos_vessel` and `fermos_write`, each in the name
+  of the person the request names or the caller the tool names. The tools take ids and words
+  (`docs/TOOLS.md`): a person sets a value on fermOS's screens, through the routes above, or at
+  `POST /api/engines/kinetics/run`, each value carrying the day it was set (`at`). The row's id is
+  the artifact id, so the same request at any door is one row. A parameter that waits refuses
+  the run in words and keeps nothing; a refusal inside the computation (the integration, the
+  forecast's draws, BioSTEAM's refusal of a design) is kept as a receipt. A kinetics run writes no
+  SFF file, and `sffRefused` says why. `docs/api/runs.md` gives the outputs each tool keeps.
 
 ## Conformance
 
@@ -319,11 +393,24 @@ registered.
   none, every thing's parameters are read and the engine's first thing is run.
 - `--inputs <file>` names a JSON list of `EngineInput`s the checked run sets, for a thing whose
   parameters leave a value to the run. With none, the run is made at the thing's own defaults.
+  Every kinetics family waits for values no default gives:
+  `openferment_core.fermos_engine.write_placeholder_inputs(path, by=...)` writes the file for
+  the first family, each parameter with no default at 1 in its own unit, the product's start
+  value at 0 and a parameter chosen from words at its first choice, each a person's assumption
+  dated `at`, or the day the file is written; `conform kinetics --inputs <file>` makes the eight
+  checks with it, and `pnpm prove` writes the file for it in step 10.
+- The checks run in a project of their own, made fresh on their own database, so a thing an
+  engine lists only while the project holds what it takes is left out of them: the kinetics
+  engine's `forecast` and `vessel`, whose parameters and runs `core/tests/test_engines.py`
+  holds.
 - Each thing is checked in its default configuration, or in the first it names when it has no
   default.
-- Check 3 holds the run's id to the artifact id of its basis. Check 6 imports the entry
-  point's module in a process of its own and holds out of it the worker module, every module
-  `heavy` covers, and the five libraries the service keeps out for every engine. Check 7 offers a
+- Check 2 holds every default to its origin, and every parameter with no default to a source
+  rule naming `assumption`. Check 3 holds the run's id to the artifact id of its basis (its seed
+  joining it where the computation takes one). Check 6 imports the entry point's module in a
+  process of its own and holds out of it the worker module, every module `heavy` covers, and the
+  five libraries the service keeps out for every engine, an engine whose worker is `None` among
+  them. Check 7 offers a
   WorkerEngine's worker the thing `conform-no-such-thing` as one of its own: the first ask reaches
   the worker's `run` op once, its `Refused` is kept as a receipt in its words, and the same request
   asked again is answered from the receipt with the worker's `run` op never asked; a hand-written
@@ -336,7 +423,7 @@ registered.
 | # | Check |
 |---|---|
 | 1 | A JSON number outside a `quantity` is refused in words before the worker is reached |
-| 2 | Every parameter of every thing carries an origin: `library-default` with `ref`, or `convention` with `note` |
+| 2 | Every default carries an origin, `library-default` with `ref` or `convention` with `note`, and a parameter with none says a run sets it |
 | 3 | A run writes one `runs` row keyed by its basis, and the same request twice is that one row |
 | 4 | A replay holds every output within the precision the thing states |
 | 5 | The run's SFF file validates and scores, or `sffRefused` holds words |
@@ -346,7 +433,8 @@ registered.
 
 ## What is deliberately absent
 
-- No socket for kinetic models beyond what an engine computes in its own worker.
+- No kinetics socket: the kinetics engine runs the families fermOS builds, and the light_v1
+  socket fermOS declares stays out of its things.
 - No scenario fields beyond parameters: a study scenario is one of BioSTEAM's plants, a
   configuration and values for its parameters (`docs/api/studies.md`); a contract engine's
   values are set on its run.

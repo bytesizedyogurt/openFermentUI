@@ -1233,7 +1233,7 @@ def _provider(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided
     except CatalogueUnknown as e:
         raise params.ParamRefused(str(e)) from None
     per = template_keys(e)
-    bare = sorted({o.key for o in req.overrides if o.key in per})
+    bare = sorted({i.name for i in req.inputs if i.name in per})
     if bare:
         raise params.ParamRefused(
             f"{', '.join(bare)} is set per {' and per '.join(sorted({per[k] for k in bare}))}, as "

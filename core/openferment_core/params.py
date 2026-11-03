@@ -13,6 +13,12 @@ served; no screen writes a form for a parameter of its own.
                                 fermos:forecast:<kinetic fit artifact id>
                                 pureos:unit:<train id>:<unit id>
                                 proforma:<scenario id>
+    overrides_of(scope, inputs, units)
+                              the values a request sets, each a typed
+                              quantity with its origin (an EngineInput), as
+                              the Overrides of the scope a resolver takes
+                              (basis.override_of), each in its parameter's
+                              unit; refused in words where one cannot stand
     resolve(specs, sources, overrides, by=None)
                               each spec's value: an Override for its key wins
                               over everything (an `assumption` by the person)
@@ -40,7 +46,10 @@ served; no screen writes a form for a parameter of its own.
                               `check()`
     scope(name, req) / resolve_scope(name, req)
                               GET /api/params/{scope} and
-                              POST /api/params/{scope}/resolve: they integrate
+                              POST /api/params/{scope}/resolve, whose values
+                              arrive as typed quantities with their origins,
+                              each laid on as an Override of the scope the
+                              route names: they integrate
                               nothing and keep nothing. A `proforma:` scope
                               binds only and starts no worker; a
                               `fermos:vessel:` scope reads BioSTEAM's defaults
@@ -86,6 +95,7 @@ from typing import Any, Callable, Iterable, Mapping, NamedTuple
 from .models import (
     BasisInput,
     BasisSource,
+    EngineInput,
     FlowsheetInfo,
     FlowsheetInput,
     Override,
@@ -239,7 +249,7 @@ def _not_read(got: Provided, values: list[ParameterValue]) -> list[ParameterValu
 def scope(name: str, req: ParamResolveRequest | None = None) -> ParamScope:
     """GET /api/params/{scope}: the scope's specs and their values as the
     service binds them now, with no override (the service keeps none)."""
-    req = (req or ParamResolveRequest()).model_copy(update={"overrides": []})
+    req = (req or ParamResolveRequest()).model_copy(update={"inputs": []})
     kind, got = _provided(name, req)
     values = _not_read(got, resolve(got.specs, got.sources, []))
     return ParamScope(scope=name, kind=kind, title=got.title, specs=got.specs, values=values,
@@ -247,14 +257,16 @@ def scope(name: str, req: ParamResolveRequest | None = None) -> ParamScope:
 
 
 def resolve_scope(name: str, req: ParamResolveRequest) -> ParamResolveResult:
-    """POST /api/params/{scope}/resolve: the values with a person's overrides
-    laid on, what those overrides would add to a run's basis, and every
-    value outside its bounds, in words. Runs nothing and keeps nothing."""
-    stray = sorted({o.scope for o in req.overrides if o.scope != name})
-    if stray:
-        raise ParamRefused(f"an override names the scope it changes, and these were sent to {name}: {', '.join(stray)}")
+    """POST /api/params/{scope}/resolve: the values with the ones a person
+    or a model sets laid on, each the Override of this scope its typed
+    quantity converts to (`overrides_of`, in its parameter's unit), what
+    those would add to a run's basis, and every value outside its bounds,
+    in words. A provider that binds on the values set converts them at its
+    own door, with its own units, as a run of the scope does. Runs nothing
+    and keeps nothing."""
     _, got = _provided(name, req)
-    values = _not_read(got, resolve(got.specs, got.sources, req.overrides))
+    overrides = overrides_of(name, req.inputs, units_of(got.specs))
+    values = _not_read(got, resolve(got.specs, got.sources, overrides))
     why = got.refuses(values) if got.refuses is not None else None
     if why:
         raise ParamRefused(why)
@@ -265,6 +277,31 @@ def resolve_scope(name: str, req: ParamResolveRequest) -> ParamResolveResult:
 
 
 # ── resolution ─────────────────────────────────────────────────────────
+
+
+def units_of(specs: Iterable[ParameterSpec]) -> dict[str, str]:
+    """Each parameter's unit, by its key: what a value set for it is typed in."""
+    return {s.key: s.unit for s in specs}
+
+
+def overrides_of(scope: str, inputs: Iterable[EngineInput], units: Mapping[str, str]) -> list[Override]:
+    """The values a request sets, each the Override of `scope` its resolver
+    takes (basis.override_of), in the unit of the parameter its name keys
+    (`units`, key to unit). A name the scope has no parameter for, and a
+    value its parameter cannot take as an Override, are refused in words
+    (ParamRefused); `checked` holds what is left to every rule a person's
+    value meets."""
+    from .basis import InputRefused, override_of
+
+    out: list[Override] = []
+    for i in inputs:
+        if i.name not in units:
+            raise ParamRefused(f"there is no parameter {i.name} here; the parameters are {', '.join(units) or 'none'}")
+        try:
+            out.append(override_of(scope, i, units[i.name]))
+        except InputRefused as e:
+            raise ParamRefused(str(e)) from None
+    return out
 
 
 def _num(x: float) -> str:
@@ -643,8 +680,10 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         # laid on as the run lays them on (`proforma.named_values`): each wins
         # over the records and any fit for its input (`bound` takes no fit
         # there), and a fit's productivity beside a titre a person typed is
-        # refused in the run's own words.
-        given = checked(specs + finance, req.overrides)
+        # refused in the run's own words. The values set arrive typed, each
+        # converted into its parameter's unit as the run converts them.
+        given = checked(specs + finance, overrides_of(scope_name("proforma", scenario_id), req.inputs,
+                                                      units_of(specs + finance)))
         mine = {sp.key for sp in finance}
         typed, read = proforma.named_values(scenario_id, [o for k, o in given.items() if k not in mine])
         if finance and not read and any(k in mine for k in given):
@@ -719,8 +758,8 @@ register("fermos-family", _fermos_family, _fermos_family_static)
 #
 # OF-BLD-020 §3.3: a forecast of a logistic_v0 fit starts from the fitted
 # run's own start values and runs its own length; a person's other values are
-# this scope's overrides (fermos.forecast_provided), so FermOSForecast.tsx
-# renders no number box of its own (E.1‴).
+# the values set on this scope (fermos.forecast_provided), so
+# FermOSForecast.tsx renders no number box of its own (E.1‴).
 
 
 def _fermos_forecast(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:

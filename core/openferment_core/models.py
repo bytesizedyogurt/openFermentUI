@@ -721,6 +721,61 @@ class Quantity(BaseModel):
         return out
 
 
+class RunInput(BaseModel):
+    """One input of an engine run: its name, and its value as a quantity
+    with its origin (ADR-006)."""
+
+    name: str
+    quantity: Quantity
+
+
+# What a quantity and its origin hold, and nothing beside: a request that
+# carries any other field, a number among them, is refused (docs/api/engines.md).
+QUANTITY_FIELDS = frozenset({"value", "unit", "basis", "low", "high", "origin"})
+ORIGIN_FIELDS = frozenset({"kind", "ref", "by", "at", "note"})
+
+
+class EngineInput(RunInput):
+    """A value a run sets: a parameter's key and a typed quantity in that
+    parameter's unit (the shape a run's inputs have), carrying the person or
+    the model that set it and the day it was set (`origin.at`), as an
+    Override and a scenario's value carry theirs. It holds those fields
+    alone, and a value, low or high that is true or false is refused, as an
+    Override refuses one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _a_quantity_holds_its_own_fields(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or not isinstance(data.get("quantity"), dict):
+            return data
+        name, q = data.get("name"), data["quantity"]
+        stray = sorted(set(q) - QUANTITY_FIELDS)
+        if isinstance(q.get("origin"), dict):
+            stray += [f"origin.{k}" for k in sorted(set(q["origin"]) - ORIGIN_FIELDS)]
+        if stray:
+            raise ValueError(f"{name}: a quantity holds {', '.join(sorted(QUANTITY_FIELDS))} and its origin "
+                             f"{', '.join(sorted(ORIGIN_FIELDS))}; {', '.join(stray)} is none of them")
+        for k in ("value", "low", "high"):
+            if isinstance(q.get(k), bool):
+                raise ValueError(f"{name}: a quantity's {k} is a number or words, never true or false")
+        return data
+
+    @model_validator(mode="after")
+    def _names_who_set_it(self) -> "EngineInput":
+        origin = self.quantity.origin
+        if origin is None or origin.kind not in ("person-assumption", "model-estimate"):
+            raise ValueError(f"{self.name}: a value a run sets is a person's assumption or a model's estimate, its "
+                             "origin naming who set it (person-assumption or model-estimate, with by)")
+        if not (origin.at or "").strip():
+            raise ValueError(f"{self.name}: a value a run sets says when it was set (quantity.origin.at), and the "
+                             "day enters the run's basis")
+        return self
+
+
 class ClaimValue(BaseModel):
     """A number a claim states, apart from its words (ADR-006): what it is,
     and the quantity with its origin, which the validator computes from what
@@ -1600,17 +1655,23 @@ class StartValues(BaseModel):
 
 
 class ForecastRequest(BaseModel):
+    """POST /api/fermos/forecast: a band for the next run, drawn from a fit.
+    Its start values and length are the values of the forecast's scope
+    `fermos:forecast:<fit id>`, each keyed as the scope names it (x0, s0, p0
+    and t_end, fermos.FORECAST_KEYS) and typed as a quantity with its
+    origin, the person or the model that set it and the day it was set;
+    the ones left unset are the fitted run's own. It holds these fields and
+    no other: a field it does not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
+
     # A kept kinetic fit, or the fit itself inline for the sample run.
     fitArtifactId: str | None = None
     fit: KineticFit | None = None
-    start: StartValues = Field(default_factory=StartValues)
-    # Who changed a starting value; a changed one is that person's assumption.
-    changedBy: str | None = None
-    # Hours; unset is the fitted run's own length.
-    durationH: float | None = None
-    # Who set the length; a length a person set is that person's assumption
-    # (OF-BLD-020 §3.R). Unset: the one who changed a starting value, if any.
-    durationBy: str | None = None
+    # The start values and the length a person or a model sets (alpha 2.2 D2).
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking.
+    by: str = Field(default="", max_length=200)
     sample: bool = False
 
 
@@ -2714,9 +2775,15 @@ class ParamScope(BaseModel):
 
 
 class ParamResolveRequest(BaseModel):
-    """POST /api/params/{scope}/resolve. Runs nothing."""
+    """POST /api/params/{scope}/resolve. Runs nothing. It holds these
+    fields alone: a field it does not name is refused."""
 
-    overrides: list[Override] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+    # The values a person or a model sets, each a parameter's key and a typed
+    # quantity in its unit with its origin, laid on the scope the route names
+    # (alpha 2.2 D2).
+    inputs: list[EngineInput] = Field(default_factory=list)
     # The shelf flowsheet a Proforma scenario not yet saved runs, as
     # ProformaRunRequest.flowsheet names it; a scenario the project keeps
     # needs none.
@@ -2746,8 +2813,9 @@ class ParamResolveRequest(BaseModel):
     # pureOS's unit scope (§5.2): the whole train, as the project keeps it
     # (D9), so the unit's per-component keys expand over the train's
     # chemicals and its records bind from the evidence pool by field; the
-    # scope `pureos:unit:<train id>:inlet` is the train's inlet. Its units'
-    # typed values are not laid on here: a resolve's `overrides` are.
+    # scope `pureos:unit:<train id>:inlet` is the train's inlet. A resolve
+    # lays on its `inputs` alone, so a page sends a unit's typed values among
+    # them.
     train: TrainSpec | None = None
     # A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the kept
     # vessel design and train run it is built from, as ProformaRunRequest
@@ -2781,7 +2849,10 @@ class ParamResolveResult(BaseModel):
 
 
 class VesselRequest(BaseModel):
-    """POST /api/fermos/vessel. Exactly one of `simulation` and `fit`."""
+    """POST /api/fermos/vessel. Exactly one of `simulation` and `fit`. It
+    holds these fields alone: a field it does not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
 
     # A `fermos.simulation` artifact id.
     simulation: str | None = None
@@ -2796,9 +2867,12 @@ class VesselRequest(BaseModel):
     # one its class runs for the design; a convention of this request, as
     # fermos_vessel names it (OF-BLD-020 §4.2, D13). None is the class's own.
     klaMethod: str | None = None
-    # A person's changes, each a named assumption (D3), scope
-    # `fermos:vessel:<simulation or fit id>`.
-    overrides: list[Override] = Field(default_factory=list)
+    # The values a person or a model sets, each a design parameter's key and
+    # a typed quantity in its unit with its origin, laid on the scope
+    # `fermos:vessel:<simulation or fit id>` (alpha 2.2 D2).
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking.
+    by: str = Field(default="", max_length=200)
 
 
 class VesselDesignRow(BaseModel):
@@ -2983,14 +3057,21 @@ class FamilyInfo(BaseModel):
 
 
 class SimulationRequest(BaseModel):
-    """POST /api/fermos/simulate."""
+    """POST /api/fermos/simulate. It holds these fields alone: a field it
+    does not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
 
     family: str
     strain: str | None = None
     product: str | None = None
     sugar: str | None = None
-    # A person's changes, each an Override of scope fermos:family:<family>.
-    overrides: list[Override] = Field(default_factory=list)
+    # The values a person or a model sets, each a parameter's key and a typed
+    # quantity in its unit with its origin, laid on the scope
+    # `fermos:family:<family>` (alpha 2.2 D2).
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking.
+    by: str = Field(default="", max_length=200)
     fitArtifact: str | None = None
     # `records`, `fit`, or `simulation:<artifact id>`.
     startFrom: str = "records"
@@ -4018,14 +4099,6 @@ class LibraryRunRequest(BaseModel):
 RunStatus = Literal["done", "refused"]
 
 
-class RunInput(BaseModel):
-    """One input of an engine run: its name, and its value as a quantity
-    with its origin (ADR-006)."""
-
-    name: str
-    quantity: Quantity
-
-
 class RunSFF(BaseModel):
     """The SFF file a run wrote: its flowsheet record and what the toolkit
     said of it."""
@@ -4129,8 +4202,13 @@ class EngineParameter(ParameterSpec):
     """One parameter a thing takes: a `ParameterSpec` (the panel's shape,
     its bounds with their written reason) with its default value and where
     the default comes from, `library-default` naming the package it was read
-    from or a `convention` saying what the setting is. The panel's fields an
-    engine may leave unset default here; `sourceRule` is the origin's kind."""
+    from or a `convention` saying what the setting is. A parameter with no
+    default has `value` and `origin` null: a run sets it, or the engine binds
+    it from what the project holds (the kinetics engine binds a family's
+    parameter from the project's records), and a run that leaves it with
+    neither is refused in words, keeping nothing. The panel's fields an
+    engine may leave unset default here; `sourceRule` is the origin's kind,
+    and `assumption` (a run's value) for a parameter with no default."""
 
     key: str = Field(min_length=1, max_length=200)
     symbol: str = ""
@@ -4138,8 +4216,10 @@ class EngineParameter(ParameterSpec):
     dimension: str = ""
     group: str = "parameters"
     sourceRule: list[str] = Field(default_factory=list)
-    value: float | str
-    origin: Origin
+    # The default a run uses when it sets none; null for a parameter with no default.
+    value: float | str | None
+    # Where the default comes from; null exactly when there is no default.
+    origin: Origin | None
 
     @model_validator(mode="before")
     @classmethod
@@ -4149,63 +4229,19 @@ class EngineParameter(ParameterSpec):
             kind = origin.get("kind") if isinstance(origin, dict) else getattr(origin, "kind", None)
             if kind is not None and kind not in ("library-default", "convention"):
                 raise ValueError(f"{data.get('key')}'s default is a library-default or a convention, never {kind}")
-            if kind and not data.get("sourceRule"):
-                data = {**data, "sourceRule": [kind]}
+            if not data.get("sourceRule"):
+                data = {**data, "sourceRule": [kind] if kind else ["assumption"]}
         return data
 
     @model_validator(mode="after")
     def _default_has_its_origin(self) -> "EngineParameter":
-        if self.origin.kind == "convention" and not (self.origin.note or "").strip():
+        if (self.value is None) != (self.origin is None):
+            raise ValueError(f"{self.key}: a default carries its origin (library-default or convention), and a "
+                             "parameter with no default has value and origin null")
+        if self.origin is not None and self.origin.kind == "convention" and not (self.origin.note or "").strip():
             raise ValueError(f"{self.key}'s convention says what it is (note)")
-        if self.choices is not None and self.value not in self.choices:
+        if self.choices is not None and self.value is not None and self.value not in self.choices:
             raise ValueError(f"{self.key}'s default {self.value!r} is none of its choices")
-        return self
-
-
-# What a quantity and its origin hold, and nothing beside: a request that
-# carries any other field, a number among them, is refused (docs/api/engines.md).
-QUANTITY_FIELDS = frozenset({"value", "unit", "basis", "low", "high", "origin"})
-ORIGIN_FIELDS = frozenset({"kind", "ref", "by", "at", "note"})
-
-
-class EngineInput(RunInput):
-    """A value a run sets: a parameter's key and a typed quantity in that
-    parameter's unit (the shape a run's inputs have), carrying the person or
-    the model that set it and the day it was set (`origin.at`), as an
-    Override and a scenario's value carry theirs. It holds those fields
-    alone, and a value, low or high that is true or false is refused, as an
-    Override refuses one."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    name: str = Field(min_length=1, max_length=200)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _a_quantity_holds_its_own_fields(cls, data: Any) -> Any:
-        if not isinstance(data, dict) or not isinstance(data.get("quantity"), dict):
-            return data
-        name, q = data.get("name"), data["quantity"]
-        stray = sorted(set(q) - QUANTITY_FIELDS)
-        if isinstance(q.get("origin"), dict):
-            stray += [f"origin.{k}" for k in sorted(set(q["origin"]) - ORIGIN_FIELDS)]
-        if stray:
-            raise ValueError(f"{name}: a quantity holds {', '.join(sorted(QUANTITY_FIELDS))} and its origin "
-                             f"{', '.join(sorted(ORIGIN_FIELDS))}; {', '.join(stray)} is none of them")
-        for k in ("value", "low", "high"):
-            if isinstance(q.get(k), bool):
-                raise ValueError(f"{name}: a quantity's {k} is a number or words, never true or false")
-        return data
-
-    @model_validator(mode="after")
-    def _names_who_set_it(self) -> "EngineInput":
-        origin = self.quantity.origin
-        if origin is None or origin.kind not in ("person-assumption", "model-estimate"):
-            raise ValueError(f"{self.name}: a value a run sets is a person's assumption or a model's estimate, its "
-                             "origin naming who set it (person-assumption or model-estimate, with by)")
-        if not (origin.at or "").strip():
-            raise ValueError(f"{self.name}: a value a run sets says when it was set (quantity.origin.at), and the "
-                             "day enters the run's basis")
         return self
 
 

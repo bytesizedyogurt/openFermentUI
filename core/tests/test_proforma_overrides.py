@@ -22,10 +22,12 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from openferment_core import artifacts, basis, intake, params, proforma
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
-from openferment_core.models import InputAssumption, Override, ParamResolveRequest, ProformaRunRequest
+from openferment_core.models import InputAssumption, Override, ProformaRunRequest
+from standins import as_input, resolve_json, resolve_request, scope_units
 
 ETHANOL = "ethanol_glucose_v0"
 BY = "openFerment test fixture"
@@ -109,7 +111,7 @@ def test_an_override_replaces_the_records_for_its_input_and_reset_brings_them_ba
     bound = {i.key: i for i in proforma.bound(ETHANOL, assumptions=proforma.named_values(None, [over("titre", 50.0)])[0],
                                               pool=standin).inputs}
     assert bound["titre"].binding == "assumption" and bound["titre"].value == 50.0
-    resolved = {v.key: v for v in params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[over("titre", 50.0)])).values}
+    resolved = {v.key: v for v in params.resolve_scope(SCOPE, resolve_request(SCOPE, overrides=[over("titre", 50.0)])).values}
     assert resolved["titre"].origin == "assumption" and resolved["titre"].value == 50.0
 
 
@@ -209,8 +211,7 @@ def test_the_endpoints_carry_overrides(standin, client):
 def test_resolve_warns_outside_the_bounds_and_keeps_the_value(standin, client):
     # D4: a yield outside its bounds (a physical limit: no negative yield) is
     # kept, never clamped, and said.
-    o = over("yield", -0.1).model_dump()
-    r = client.post(f"/api/params/{SCOPE}/resolve", json={"overrides": [o]})
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={"inputs": resolve_json(SCOPE, [over("yield", -0.1)])})
     assert r.status_code == 200
     got = {v["key"]: v for v in r.json()["values"]}
     assert got["yield"]["value"] == -0.1 and got["yield"]["origin"] == "assumption" and got["yield"]["overriddenBy"] == BY
@@ -235,7 +236,7 @@ def test_the_panel_binds_as_the_run_binds_and_both_refuse_in_the_same_words(stan
     every = {k: fc for k in proforma.FIT_KEYS}
     typed = [*ECONOMICS, over("titre", 50.0)]
     with pytest.raises(params.ParamRefused) as panel:
-        params.resolve_scope(SCOPE, ParamResolveRequest(fits=every, overrides=typed))
+        params.resolve_scope(SCOPE, resolve_request(SCOPE, fits=every, overrides=typed))
     words = str(panel.value)
     assert "titre is a named person's assumption" in words and "titre binds" not in words, words
     assert "reset titre to its source" in words, words
@@ -244,10 +245,10 @@ def test_the_panel_binds_as_the_run_binds_and_both_refuse_in_the_same_words(stan
         with pytest.raises(proforma.ScenarioRefused) as run:
             proforma.run(ProformaRunRequest(scenarioId=HELD, overrides=typed, fits=fits, samples=4), pool=standin)
         assert str(run.value) == words
-    r = client.post(f"/api/params/{SCOPE}/resolve", json={"fits": every, "overrides": [o.model_dump() for o in typed]})
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={"fits": every, "inputs": resolve_json(SCOPE, typed)})
     assert r.status_code == 422 and r.json()["detail"] == words
     # Reset titre: the resolve binds every input to the forecast, as the run would.
-    ok = params.resolve_scope(SCOPE, ParamResolveRequest(fits=every, overrides=ECONOMICS))
+    ok = params.resolve_scope(SCOPE, resolve_request(SCOPE, fits=every, overrides=ECONOMICS))
     assert {v.key: v.origin for v in ok.values if v.key in proforma.FIT_KEYS} == dict.fromkeys(proforma.FIT_KEYS, "fit")
 
 
@@ -257,20 +258,20 @@ def test_resolve_states_the_interval_and_the_basis_inputs_the_run_takes(standin,
     run; and the basis inputs the resolve says the overrides add are the
     ones the run's basis takes for the same overrides, from one function."""
     typed = [over("titre", 50.0, low=40.0), over("plant_scale", 100000.0), over("glucose_price", 0.4, 0.3, 0.5)]
-    r = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=typed))
+    r = params.resolve_scope(SCOPE, resolve_request(SCOPE, overrides=typed))
     got = {v.key: v for v in r.values}
     held = {a.key: a for a in proforma.named_values(HELD, typed)[0]}
     assert (got["titre"].low, got["titre"].high) == (held["titre"].low, held["titre"].high) == (40.0, 50.0)
     # With neither end it is held at itself: no interval on the panel, both ends the value in the run.
     assert (got["plant_scale"].low, got["plant_scale"].high) == (None, None)
     assert (held["plant_scale"].low, held["plant_scale"].high) == (100000.0, 100000.0)
-    up = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[over("titre", 50.0, high=70.0)]))
+    up = params.resolve_scope(SCOPE, resolve_request(SCOPE, overrides=[over("titre", 50.0, high=70.0)]))
     assert next((v.low, v.high) for v in up.values if v.key == "titre") == (50.0, 70.0)
     run = proforma.run(ProformaRunRequest(scenarioId=HELD, overrides=typed, samples=4), pool=standin)
     added = [i for i in artifacts.get(run.artifactId).inputs if i.source.kind == "assumption" or i.name == proforma.ASSUMPTIONS_READ]
     assert [i.model_dump() for i in r.basisInputs] == [i.model_dump() for i in added]
     assert [i.name for i in r.basisInputs][:3] == ["titre", "titre low", "titre high"]
-    body = client.post(f"/api/params/{SCOPE}/resolve", json={"overrides": [o.model_dump() for o in typed]}).json()
+    body = client.post(f"/api/params/{SCOPE}/resolve", json={"inputs": resolve_json(SCOPE, typed)}).json()
     assert [i["name"] for i in body["basisInputs"]] == [i.name for i in added]
 
 
@@ -279,9 +280,9 @@ def test_an_override_of_a_convention_is_refused_by_the_resolve_as_by_the_run(sta
     convention every run states, which every run refuses."""
     o = over("ethanol_purity", 0.5)
     with pytest.raises(params.ParamRefused, match="ethanol_purity is a convention, fuel grade") as refused:
-        params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[o]))
+        params.resolve_scope(SCOPE, resolve_request(SCOPE, overrides=[o]))
     assert "takes no person's value" in str(refused.value)
-    r = client.post(f"/api/params/{SCOPE}/resolve", json={"overrides": [o.model_dump()]})
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={"inputs": resolve_json(SCOPE, [o])})
     assert r.status_code == 422 and "ethanol_purity is a convention" in r.json()["detail"]
     with pytest.raises(proforma.ScenarioRefused, match="ethanol_purity is a convention"):
         proforma.run(ProformaRunRequest(scenarioId=HELD, overrides=[*ECONOMICS, o], samples=4), pool=standin)
@@ -306,11 +307,18 @@ def test_an_older_field_value_wins_over_the_records_and_moves_the_artifact_id(st
 
 def test_a_run_refuses_an_override_that_does_not_say_when_it_was_typed(standin, client):
     """§2.R finding 5: the resolve refused an override with no `at`, the run
-    kept one, and its basis named no day."""
+    kept one, and its basis named no day. Since alpha 2.2 (D2) the resolve
+    takes each value as a typed input, which is refused as it is read when
+    it says no day."""
+    unit = scope_units(SCOPE)["glucose_price"]
     for at in ("", "   "):
         blank = over("glucose_price", 0.4).model_copy(update={"at": at})
         with pytest.raises(proforma.ScenarioRefused, match="the override of glucose_price says when it was typed"):
             proforma.run(ProformaRunRequest(scenarioId=HELD, overrides=[ECONOMICS[0], blank], samples=4), pool=standin)
-        with pytest.raises(params.ParamRefused, match="the override of glucose_price says when it was typed"):
-            params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[blank]))
+        with pytest.raises(ValidationError, match="glucose_price: a value a run sets says when it was set"):
+            as_input(blank, unit)
+        body = {"name": "glucose_price", "quantity": {"value": 0.4, "unit": unit,
+                                                      "origin": {"kind": "person-assumption", "by": BY, "at": at}}}
+        r = client.post(f"/api/params/{SCOPE}/resolve", json={"inputs": [body]})
+        assert r.status_code == 422 and "says when it was set" in str(r.json()["detail"])
     assert not [a for a in artifacts.all_artifacts() if a.tool == proforma.RUN]

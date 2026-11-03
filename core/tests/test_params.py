@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from openferment_core import basis, intake, params, proforma
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
+from standins import resolve_json, resolve_request
 from openferment_core.models import (
     BasisSource,
     ComputedBasis,
@@ -326,7 +327,7 @@ def test_a_fit_a_person_chose_is_the_first_source_of_titre():
 
 def test_an_override_of_a_proforma_input_is_an_assumption_in_the_basis(standin):
     o = override(key="glucose_price", value=0.4, low=0.3, high=0.5, scope=SCOPE)
-    r = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[o]))
+    r = params.resolve_scope(SCOPE, resolve_request(SCOPE, overrides=[o]))
     values = {v.key: v for v in r.values}
     assert values["glucose_price"].origin == "assumption" and values["glucose_price"].overriddenBy == BY
     assert r.waiting == ["plant_scale"] and r.warnings == []
@@ -335,13 +336,14 @@ def test_an_override_of_a_proforma_input_is_an_assumption_in_the_basis(standin):
                                                proforma.ASSUMPTIONS_READ]
     assert all(i.unit == "USD kg-1" and i.source.kind == "assumption" and i.source.by == BY for i in r.basisInputs[:3])
     # D4: a person may type outside the bounds; it is kept and said.
-    far = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[
+    far = params.resolve_scope(SCOPE, resolve_request(SCOPE, overrides=[
         override(key="titre", value=-5.0, scope=SCOPE)]))
     titre = next(v for v in far.values if v.key == "titre")
     assert titre.value == -5.0 and titre.origin == "assumption" and far.warnings == [titre.outOfBounds]
     assert "no negative ethanol titre at harvest" in titre.outOfBounds
-    with pytest.raises(params.ParamRefused, match=f"sent to {SCOPE}: proforma:sc-other-1"):
-        params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[override(scope="proforma:sc-other-1")]))
+    # A value is laid on the scope the route names (alpha 2.2 D2): it carries no scope of its own to stray to.
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ParamResolveRequest.model_validate({"inputs": [{**resolve_json(SCOPE, [o])[0], "scope": "proforma:sc-other-1"}]})
 
 
 # ── the endpoints ──────────────────────────────────────────────────────
@@ -374,8 +376,8 @@ def test_get_serves_a_scope_and_refuses_in_words(client):
 
 
 def test_post_resolves_overrides_and_runs_nothing(client, store):
-    o = override(key="plant_scale", value=100000.0, scope=SCOPE).model_dump()
-    r = client.post(f"/api/params/{SCOPE}/resolve", json={"overrides": [o]})
+    (o,) = resolve_json(SCOPE, [override(key="plant_scale", value=100000.0, scope=SCOPE)])
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={"inputs": [o]})
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"scope", "values", "waiting", "basisInputs", "warnings", "notes"}
@@ -386,14 +388,20 @@ def test_post_resolves_overrides_and_runs_nothing(client, store):
         (proforma.ASSUMPTIONS_READ, "overrides")]
     assert body["basisInputs"][0]["source"] == {"kind": "assumption", "id": None, "note": "typed on 2026-10-21: a STAND-IN", "by": BY}
     assert not any(store.rglob("*.json")), "the service keeps no override and no artifact"
+    q = o["quantity"]
     for payload, status, words in (
-        ({"overrides": [{**o, "by": "me"}]}, 422, "placeholder"),
-        ({"overrides": [{**o, "key": "sugarFeed"}]}, 422, "there is no parameter sugarFeed here"),
-        ({"overrides": [{**o, "scope": "proforma:sc-other-1"}]}, 422, "names the scope it changes"),
-        ({"overrides": [{**o, "value": "a lot"}]}, 422, "takes a number, not words"),
+        ({"inputs": [{**o, "quantity": {**q, "origin": {**q["origin"], "by": "me"}}}]}, 422, "placeholder"),
+        ({"inputs": [{**o, "name": "sugarFeed"}]}, 422, "there is no parameter sugarFeed here"),
+        ({"inputs": [{**o, "quantity": {**q, "unit": "a-placeholder-unit"}}]}, 422,
+         "plant_scale is set in 'a-placeholder-unit'"),
+        ({"inputs": [{**o, "quantity": {**q, "value": "a lot"}}]}, 422, "takes a number, not words"),
     ):
         r = client.post(f"/api/params/{SCOPE}/resolve", json=payload)
         assert r.status_code == status and words in r.json()["detail"], (payload, r.json())
+    # A value names no scope of its own, and the overrides the route took before alpha 2.2 are refused in words.
+    for payload in ({"inputs": [{**o, "scope": "proforma:sc-other-1"}]}, {"overrides": []}):
+        r = client.post(f"/api/params/{SCOPE}/resolve", json=payload)
+        assert r.status_code == 422 and "Extra inputs are not permitted" in str(r.json()["detail"]), r.json()
     assert client.post("/api/params/proforma:nowhere/resolve", json={}).status_code == 404
     assert client.post("/api/params/bogus/resolve", json={}).status_code == 422
 

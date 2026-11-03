@@ -216,6 +216,18 @@ function BiosteamPlants({ onRan }: { onRan: () => void }) {
   );
 }
 
+/**
+ * Where a person sets the values a thing of the core's kinetics engine waits for, by the thing's kind
+ * (docs/api/engines.md, The core's `kinetics`): a family's parameters on fermOS → Simulate, a vessel's scale on
+ * fermOS → Vessel. Each value set there is the person's assumption, and the run is kept as one row of the engine.
+ */
+const SETS_VALUES: Record<string, Record<string, { to: (thing: string) => string; words: string }>> = {
+  kinetics: {
+    family: { to: (id) => `/fermos/simulate?family=${encodeURIComponent(id)}`, words: 'fermOS → Simulate' },
+    vessel: { to: () => '/fermos/vessel', words: 'fermOS → Vessel' },
+  },
+};
+
 /** Another engine's things (docs/api/engines.md), each run on the engine's own defaults in a configuration it names. */
 function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void }) {
   const reviewer = useStore((s) => s.reviewer).trim();
@@ -296,6 +308,15 @@ function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void
       )}
       {!reviewer && things.length > 0 && (
         <p className="text-caption text-ink-soft mt-2">A run is asked for in a person&rsquo;s name: set yours in Settings first.</p>
+      )}
+      {thing && SETS_VALUES[engine.name]?.[thing.kind ?? ''] && (
+        <p className="text-caption text-ink-soft mt-2" data-testid="run-engine-sets-values">
+          {thing.id} runs with values its parameters have no default for: set them on{' '}
+          <a className="text-accent hover:underline" href={href(SETS_VALUES[engine.name][thing.kind ?? ''].to(thing.id))}>
+            {SETS_VALUES[engine.name][thing.kind ?? ''].words}
+          </a>
+          , each your assumption; that run is one of the {engine.name} engine&rsquo;s, listed with the project&rsquo;s runs.
+        </p>
       )}
       {ran && <Ran ran={ran} />}
       {problem && <p className="text-caption text-signal-warn mt-2" data-testid="run-plant-problem">{problem}</p>}

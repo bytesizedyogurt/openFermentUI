@@ -527,12 +527,16 @@ def fermos_fit(req: FermosFitRequest) -> FermosFitResponse:
 
 @app.post("/api/fermos/forecast", response_model=ForecastResult)
 def fermos_forecast(req: ForecastRequest) -> ForecastResult:
-    """A band for the next run from a fit (§7.3). A refusal says which
-    parameter the run did not identify, and what run would."""
+    """A band for the next run from a fit (§7.3), from the fitted run's own
+    start values and length or the ones the request sets, each a typed
+    quantity with its origin keyed as the scope `fermos:forecast:<fit id>`
+    names it. A forecast of a kept fit is kept as a run of the kinetics
+    engine, in the name of the request's `by`. A refusal says which
+    parameter the run did not identify, and what run would, or why a value
+    set cannot stand."""
     try:
         return fermos.forecast_run(fit_artifact=req.fitArtifactId, fit_inline=req.fit if req.sample else None,
-                                   start=req.start, changed_by=req.changedBy, duration_h=req.durationH, sample=req.sample,
-                                   duration_by=req.durationBy)
+                                   inputs=req.inputs, sample=req.sample, by=req.by)
     except fermos.FitRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -562,10 +566,11 @@ def fermos_family(family_id: str) -> dict:
 def fermos_simulate(req: SimulationRequest) -> dict:
     """Simulate a model family (`SimulationResult`) and keep it as one
     `fermos.simulation` artifact. Each parameter resolves with its source: a
-    person's override (an assumption by name, so the result is `assumed`), else
-    the family's stated convention. 422 in words for a parameter that waits
-    (named with what would bind it), the light socket, a bad override, or a
-    run that cannot end."""
+    value the request sets (a typed quantity with its origin, a person's
+    assumption or a model's estimate by name, so the result is `assumed`),
+    else the family's stated convention. 422 in words for a parameter that
+    waits (named with what would bind it), the light socket, a value set that
+    cannot stand, or a run that cannot end."""
     try:
         return fermos.simulate(req).model_dump(mode="json")
     except fermos.SimulationRefused as e:
@@ -576,18 +581,19 @@ def fermos_simulate(req: SimulationRequest) -> dict:
 def fermos_bind(family: str, strain: str | None = None, product: str | None = None, sugar: str | None = None,
                 fit: str | None = None, startFrom: str = "records",  # noqa: N803 (the wire name)
                 durationPreset: str = "until-sugar-runs-out",  # noqa: N803
-                overrides: str | None = None) -> dict:
+                inputs: str | None = None) -> dict:
     """A family's parameters bound for a strain, product and sugar
     (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
     (`?fit=`), the records of the evidence pool through the aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
     spec's convention, with its source; what waits, each named with the field
-    that would bind it; and notes saying what bound from where. `?overrides=`
-    (a JSON list of the person's overrides of `fermos:family:<family>`, as
-    the simulation would carry them; OF-BLD-020 §3.3) lays them on, so
-    `waiting` is what Simulate would refuse for. Starts no integration and
-    keeps nothing. 404 for a family no one declared; 422 in words for a fit
-    or simulation not on file, a fit of another family, a sugar or id that is
-    not one, or an override of another scope."""
+    that would bind it; and notes saying what bound from where. `?inputs=`
+    (a JSON list of the values a person sets on `fermos:family:<family>`,
+    each a typed quantity with its origin, as the simulation would carry
+    them; OF-BLD-020 §3.3, alpha 2.2 D2) lays them on, so `waiting` is what
+    Simulate would refuse for. Starts no integration and keeps nothing. 404
+    for a family no one declared; 422 in words for a fit or simulation not
+    on file, a fit of another family, a sugar or id that is not one, or a
+    value set that cannot stand."""
     from . import kinetics
 
     if family not in kinetics.FAMILIES:
@@ -597,8 +603,7 @@ def fermos_bind(family: str, strain: str | None = None, product: str | None = No
         raise HTTPException(status_code=422, detail=f"a run-length preset is until-sugar-runs-out or fit-length; "
                                                     f"{durationPreset!r} is neither")
     req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar, fitArtifact=fit,
-                            startFrom=startFrom, durationPreset=durationPreset,
-                            overrides=_overrides_param(overrides))
+                            startFrom=startFrom, durationPreset=durationPreset, inputs=_inputs_param(inputs))
     try:
         return fermos.bind(req).model_dump(mode="json")
     except fermos.SimulationRefused as e:
@@ -698,6 +703,25 @@ def _assumptions_param(raw: str | None) -> list:
     except (ValidationError, RecursionError):
         raise HTTPException(status_code=422, detail="assumptions is a JSON list of assumptions, each with key, value, "
                                                     "low, high, by and at, as a run takes them") from None
+
+
+def _inputs_param(raw: str | None) -> list:
+    """`?inputs=` on GET /api/fermos/bind: a JSON list of the values a person
+    sets, each a parameter's key and a typed quantity with its origin, as
+    SimulationRequest.inputs carries them (alpha 2.2 D2)."""
+    from pydantic import TypeAdapter, ValidationError
+
+    from .models import EngineInput
+
+    if not raw:
+        return []
+    try:
+        return TypeAdapter(list[EngineInput]).validate_json(raw)
+    except (ValidationError, RecursionError) as e:
+        first = next((err.get("msg") for err in e.errors()), "") if isinstance(e, ValidationError) else ""
+        raise HTTPException(status_code=422, detail="inputs is a JSON list of values, each a parameter's key (name) "
+                                                    "and a quantity in its unit with its origin (kind, by, at), as a "
+                                                    "run takes them" + (f": {first}" if first else "")) from None
 
 
 def _overrides_param(raw: str | None) -> list:
@@ -1047,6 +1071,16 @@ def engines_list() -> list[EngineInfo]:
     return _engines.infos()
 
 
+def _worker_failed(name: str, engine: Any, doing: str) -> str:
+    """Whose worker a 503 names: the engine's own, or for an engine with none
+    of its own (`worker` None), the worker its computation called, which the
+    error's words name (the kinetics engine's vessel design calls the
+    Proforma worker)."""
+    if getattr(engine, "worker", None):
+        return f"the {name} engine's worker could not {doing}"
+    return f"the {name} engine computes in the service's process, and the worker its computation called could not {doing}"
+
+
 def _refusals(refused: str) -> dict[int | str, dict[str, Any]]:
     """What an engine's route answers beside its result, each in words
     (`detail`); `refused` says what its 422 refuses."""
@@ -1079,7 +1113,7 @@ def engine_parameters(name: str, thing: str, configuration: str | None = None) -
     except EngineBroken as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
-        raise HTTPException(status_code=503, detail=f"the {name} engine's worker could not answer: {e}") from e
+        raise HTTPException(status_code=503, detail=f"{_worker_failed(name, engine, 'answer')}: {e}") from e
 
 
 @app.post("/api/engines/{name}/run", responses=_refusals(
@@ -1099,7 +1133,7 @@ def engine_run(name: str, req: EngineRunRequest) -> RunReport:
     except EngineBroken as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
-        raise HTTPException(status_code=503, detail=f"the {name} engine's worker could not run it: {e}") from e
+        raise HTTPException(status_code=503, detail=f"{_worker_failed(name, engine, 'run it')}: {e}") from e
 
 
 @app.get("/api/runs")
@@ -1405,14 +1439,16 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
 
 @app.post("/api/params/{scope:path}/resolve")
 def params_resolve(scope: str, req: ParamResolveRequest) -> dict:
-    """A person's overrides laid on a scope's values (`ParamResolveResult`):
-    each override an `assumption` by the person it names, the basis inputs
-    the overrides would add to a run, and every value outside its bounds in
-    words (kept, never clamped). The basis inputs are the ones a run of the
-    scope writes for those overrides (§2.R). Runs nothing and keeps nothing:
-    the service keeps no override (D3). 404, 422, 409 and 503 as the GET
-    answers them; a `fermos:vessel:` scope may start the worker as the GET
-    may."""
+    """The values a person or a model sets laid on a scope's values
+    (`ParamResolveResult`): each a typed quantity with its origin, converted
+    into an override of the scope the route names (in its parameter's unit)
+    and laid on as an `assumption` by the person or an estimate by the model
+    it names, the basis inputs those would add to a run, and every value
+    outside its bounds in words (kept, never clamped). The basis inputs are
+    the ones a run of the scope writes for them (§2.R). Runs nothing and
+    keeps nothing: the service keeps no override (D3). 404, 422, 409 and 503
+    as the GET answers them; a `fermos:vessel:` scope may start the worker as
+    the GET may."""
     from . import artifacts, params
 
     try:
@@ -1466,11 +1502,12 @@ def fermos_vessel_specs(simulation: str | None = None, fit: str | None = None,
 def fermos_vessel(req: VesselRequest) -> VesselDesign:
     """Design the vessel a simulation (or, anaerobic only, a fit) needs, in
     the Proforma worker on BioSTEAM: one `fermos.vessel` artifact, computed
-    or returned as kept for the same basis. 422 in words for a design that
-    cannot be made as asked (no plant scale and no batch volume, a fit asked
-    for an aerobic design, an artifact not on file, an override that cannot
-    stand, BioSTEAM's own refusal); 409 for a file damaged on disk; 503 when
-    the worker cannot answer."""
+    or returned as kept for the same basis. Each value the request sets is a
+    typed quantity with its origin, keyed as the design's scope names it. 422
+    in words for a design that cannot be made as asked (no plant scale and no
+    batch volume, a fit asked for an aerobic design, an artifact not on file,
+    a value set that cannot stand, BioSTEAM's own refusal); 409 for a file
+    damaged on disk; 503 when the worker cannot answer."""
     from . import artifacts, vessel
 
     try:

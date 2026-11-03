@@ -415,6 +415,9 @@ export default function FermOSSimulate() {
   const scope = chosen ? familyScope(chosen.id) : '';
   const overrides = useStore(overridesFor(scope));
   const overridesKey = JSON.stringify(overrides);
+  const reviewer = useStore((s) => s.reviewer).trim();
+  // The family's own specs name the unit each override is sent in (lib/params.ts, `inputsOf`).
+  const specs = chosen?.specs ?? [];
 
   // The fits and kept simulations to start from, asked when that start is chosen.
   useEffect(() => {
@@ -458,7 +461,7 @@ export default function FermOSSimulate() {
     if (!ask || !ready) return;
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => {
-      fermosBind(ask, overrides, ctrl.signal)
+      fermosBind(ask, overrides, specs, ctrl.signal)
         .then(setBinding)
         .catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
     }, BIND_AFTER_MS);
@@ -469,7 +472,6 @@ export default function FermOSSimulate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [askKey, overridesKey, ready]);
 
-  const specs = chosen?.specs ?? [];
   const label = (key: string) => specs.find((s) => s.key === key)?.label ?? key;
   const waiting = binding?.waiting ?? [];
   // §8.R (findings 12, 14): what the family would refuse though nothing
@@ -481,7 +483,7 @@ export default function FermOSSimulate() {
     if (!ask || !canRun) return;
     setBusy(true);
     setRunProblem(null);
-    fermosSimulate(ask, overrides)
+    fermosSimulate(ask, overrides, specs, reviewer)
       .then(setResult)
       .catch((e: unknown) => {
         setResult(null);

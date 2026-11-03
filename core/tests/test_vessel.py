@@ -17,7 +17,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, intake, params, proforma, vessel
-from openferment_core.models import Artifact, BasisInput, BasisSource, Override, ParamResolveRequest, VesselRequest
+from openferment_core.engine import runs
+from openferment_core.models import Artifact, BasisInput, BasisSource, Override, ParamResolveRequest
+from standins import as_inputs, inputs_json, simulation_request, vessel_request
 
 STANDIN = "STAND-IN for this test: invented numbers in §3.1's shape"
 AEROBIC_ID = "a0a0a0a0a0a0a0a1"
@@ -238,26 +240,27 @@ def test_every_declared_spec_has_a_bounds_reason_and_check_seed_says_so(monkeypa
 
 def test_neither_scale_refuses_in_words_and_so_do_both(store, worker):
     with pytest.raises(vessel.VesselRefused, match="needs plant_scale .* or batch_volume"):
-        vessel.design(VesselRequest(simulation=AEROBIC_ID))
+        vessel.design(vessel_request(simulation=AEROBIC_ID))
     both = [override(AEROBIC_ID, "plant_scale", 1000.0), override(AEROBIC_ID, "batch_volume", 50.0)]
     with pytest.raises(vessel.VesselRefused, match="not both"):
-        vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=both))
+        vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=both))
     assert not [c for c in worker.calls if c[0] == "vessel_design"]
+    assert runs.listed() == [], "a design the request's own rules refuse keeps nothing"
 
 
 def test_one_source_exactly_and_a_fit_designs_no_aerated_vessel(store, worker):
     with pytest.raises(vessel.VesselRefused, match="exactly one"):
-        vessel.design(VesselRequest())
+        vessel.design(vessel_request())
     with pytest.raises(vessel.VesselRefused, match="exactly one"):
-        vessel.design(VesselRequest(simulation=AEROBIC_ID, fit=ANAEROBIC_ID))
+        vessel.design(vessel_request(simulation=AEROBIC_ID, fit=ANAEROBIC_ID))
     with pytest.raises(vessel.VesselRefused, match="name it as the simulation"):
-        vessel.design(VesselRequest(fit=AEROBIC_ID))
+        vessel.design(vessel_request(fit=AEROBIC_ID))
     with pytest.raises(vessel.VesselNotFound, match="no artifact"):
-        vessel.design(VesselRequest(simulation="ffffffffffffffff"))
+        vessel.design(vessel_request(simulation="ffffffffffffffff"))
 
 
 def test_the_basis_names_every_parameter_its_source_and_the_person(store, worker):
-    req = VesselRequest(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 1000.0),
+    req = vessel_request(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 1000.0),
                                                            override(AEROBIC_ID, "theta_O2", 0.3)])
     d = vessel.design(req)
     art = artifacts.get(d.artifactId)
@@ -280,6 +283,38 @@ def test_the_basis_names_every_parameter_its_source_and_the_person(store, worker
     # The same request twice is the same artifact, and computes nothing again.
     again = vessel.design(req)
     assert again.artifactId == d.artifactId and len([c for c in worker.calls if c[0] == "vessel_design"]) == 1
+    # Alpha 2.2 D3: the design is one run of the kinetics engine, its configuration the simulation.
+    (run,) = runs.listed("kinetics")
+    assert (run.id, run.plant, run.configuration, run.tool, run.status, run.by) == (
+        d.artifactId, "vessel", AEROBIC_ID, vessel.TOOL, "done", "this browser")
+    assert run.outputs["values"] == [{"name": "design.Vessels", "quantity": {
+        "value": 2.0, "unit": "", "origin": {"kind": "artifact", "ref": d.artifactId}}}]
+
+
+def test_the_workers_refusal_is_kept_as_the_designs_receipt_and_answered_from_it(store, worker, monkeypatch, client):
+    """Alpha 2.2 D3: BioSTEAM's refusal of the values, raised as the worker
+    designs, is a receipt of the kinetics engine in the asker's name; the
+    same request again is answered from it, and the worker is not asked."""
+    from openferment_core.workers import WorkerError
+
+    said = "STAND-IN: the vessel class refuses these values"
+
+    def refuses(op, args):
+        if op == "vessel_design":
+            worker.calls.append((op, args))
+            raise WorkerError(f"Refused: {said}")
+        return worker(op, args)
+
+    monkeypatch.setattr(proforma, "call", refuses)
+    req = vessel_request(simulation=AEROBIC_ID, by=BY, overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)])
+    with pytest.raises(vessel.VesselRefused, match=said) as refused:
+        vessel.design(req)
+    receipt = runs.get(refused.value.run_id)
+    assert (receipt.engine, receipt.plant, receipt.configuration, receipt.status, receipt.refused, receipt.by) == (
+        "kinetics", "vessel", AEROBIC_ID, "refused", said, BY)
+    again = client.post("/api/fermos/vessel", json=req.model_dump(mode="json", exclude_none=True))
+    assert again.status_code == 422 and said in again.json()["detail"]
+    assert len([c for c in worker.calls if c[0] == "vessel_design"]) == 1 and runs.listed() == [receipt]
 
 
 def test_a_fit_designs_the_anaerobic_vessel_from_its_titre_yield_and_batch_time(store, worker, monkeypatch):
@@ -292,13 +327,13 @@ def test_a_fit_designs_the_anaerobic_vessel_from_its_titre_yield_and_batch_time(
                              FitFeed(key="titre", unit="g L-1", value=40.0, derivation=STANDIN),
                              FitFeed(key="yield", unit="g g-1", value=0.4, derivation=STANDIN)])
     monkeypatch.setattr(proforma, "fit_info", lambda art, flowsheet: info)
-    d = vessel.design(VesselRequest(fit=fit_id, overrides=[override(fit_id, "plant_scale", 1000.0)]))
+    d = vessel.design(vessel_request(fit=fit_id, overrides=[override(fit_id, "plant_scale", 1000.0)]))
     [(_, sent)] = [c for c in worker.calls if c[0] == "vessel_design"]
     assert sent["kind"] == "anaerobic" and sent["tau"] == 24.0 and sent["used"] == pytest.approx(100.0)
     assert sent["made"] == {"Yeast": 0.0, "Ethanol": 40.0} and d.oxygen is None and "no air" in d.oxygenNote
     assert by_key(d.parameters)["tau"].origin == "artifact"
     with pytest.raises(vessel.VesselRefused, match="NREL batch fermenter"):
-        vessel.design(VesselRequest(fit=fit_id, vesselType="stirred-tank"))
+        vessel.design(vessel_request(fit=fit_id, vesselType="stirred-tank"))
 
 
 # ── the vessel type in the panel, a correlation by name (§4.2) ─────────
@@ -313,20 +348,21 @@ def test_the_vessel_type_is_a_panel_choice_and_a_persons_choice_is_named(store, 
     assert v.value == "Stirred tank" and v.origin == "library-default" and v.libraryDefault == "Stirred tank"
     # A person's choice of a bubble column is an assumption by them, and the scope is the bubble column's.
     chosen = [override(AEROBIC_ID, "design", "Bubble column")]
-    r = params.resolve_scope(scope, ParamResolveRequest(overrides=chosen, vesselType="bubble-column"))
+    r = params.resolve_scope(scope, ParamResolveRequest(inputs=as_inputs(chosen, vessel.UNITS), vesselType="bubble-column"))
     got = by_key(r.values)
     assert got["design"].origin == "assumption" and got["design"].overriddenBy == BY
     assert got["method"].value == "Dewes" and got["kW_per_m3"].origin == "convention"
     assert [b.name for b in r.basisInputs] == ["design"]
     # The same choice with no vesselType reads the same; a request that disagrees is refused in words.
-    assert by_key(params.resolve_scope(scope, ParamResolveRequest(overrides=chosen)).values)["method"].value == "Dewes"
+    assert by_key(params.resolve_scope(scope, ParamResolveRequest(inputs=as_inputs(chosen, vessel.UNITS))).values)[
+        "method"].value == "Dewes"
     with pytest.raises(params.ParamRefused, match="differ"):
-        params.resolve_scope(scope, ParamResolveRequest(overrides=chosen, vesselType="stirred-tank"))
+        params.resolve_scope(scope, ParamResolveRequest(inputs=as_inputs(chosen, vessel.UNITS), vesselType="stirred-tank"))
     # A request naming the type without a person's choice is a convention of that request.
     asked = by_key(vessel.scope(AEROBIC_ID, "bubble-column").values)["design"]
     assert asked.origin == "convention" and asked.value == "Bubble column" and "vesselType" in asked.detail
     # Designed: the worker builds the bubble column, and the basis names who chose it.
-    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[*chosen, override(AEROBIC_ID, "plant_scale", 1000.0)]))
+    d = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[*chosen, override(AEROBIC_ID, "plant_scale", 1000.0)]))
     [(_, sent)] = [c for c in worker.calls if c[0] == "vessel_design"]
     assert sent["design"] == "Bubble column" and "design" not in sent["params"] and d.vesselType == "bubble-column"
     named = {i.name: i for i in artifacts.get(d.artifactId).inputs}
@@ -334,23 +370,23 @@ def test_the_vessel_type_is_a_panel_choice_and_a_persons_choice_is_named(store, 
     assert by_key(d.parameters)["design"].overriddenBy == BY
     # An anaerobic vessel takes no vessel type, from the panel or the request.
     with pytest.raises(vessel.VesselRefused, match="NREL batch fermenter"):
-        vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[override(ANAEROBIC_ID, "design", "Bubble column"),
+        vessel.design(vessel_request(simulation=ANAEROBIC_ID, overrides=[override(ANAEROBIC_ID, "design", "Bubble column"),
                                                                           override(ANAEROBIC_ID, "plant_scale", 1000.0)]))
 
 
 def test_a_kla_correlation_named_by_the_request_is_its_convention(store, worker):
-    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, klaMethod="Riet",
+    d = vessel.design(vessel_request(simulation=AEROBIC_ID, klaMethod="Riet",
                                     overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)]))
     m = by_key(d.parameters)["method"]
     assert m.value == "Riet" and m.origin == "convention" and m.source.kind == "convention"
     [(_, sent)] = [c for c in worker.calls if c[0] == "vessel_design"]
     assert sent["params"]["method"] == "Riet"
     with pytest.raises(vessel.VesselRefused, match="'Galaction' is not one"):
-        vessel.design(VesselRequest(simulation=AEROBIC_ID, klaMethod="Galaction",
+        vessel.design(vessel_request(simulation=AEROBIC_ID, klaMethod="Galaction",
                                     overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)]))
     # A person's choice in the panel and the request's must agree.
     with pytest.raises(vessel.VesselRefused, match="differ"):
-        vessel.design(VesselRequest(simulation=AEROBIC_ID, vesselType="bubble-column", klaMethod="Dewes", overrides=[
+        vessel.design(vessel_request(simulation=AEROBIC_ID, vesselType="bubble-column", klaMethod="Dewes", overrides=[
             override(AEROBIC_ID, "plant_scale", 1000.0), override(AEROBIC_ID, "method", "Shah")]))
 
 
@@ -366,11 +402,10 @@ def real_simulation(aerobic: bool, **more):
     """A batch_v1 run through the real fermos.simulate (scipy, no BioSTEAM),
     on STAND-IN overrides: aerobic with Yx/o set, anaerobic without."""
     from openferment_core import fermos
-    from openferment_core.models import SimulationRequest
 
     values = {**SIM_STANDIN, **({"yxo": 1.0} if aerobic else {}), **more}
     scope = "fermos:family:batch_v1"
-    return fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose", overrides=[
+    return fermos.simulate(simulation_request(family="batch_v1", product="ethanol", sugar="glucose", overrides=[
         Override(scope=scope, key=k, value=v, by=BY, at=AT, note=STANDIN) for k, v in values.items()]))
 
 
@@ -427,13 +462,14 @@ def test_a_vessel_count_is_whole_and_at_least_the_classes_own_minimum(store, wor
     the spec says so, and the service refuses in words before the worker is
     asked, as it does a V_max the class cannot use: never a 503 for a
     person's value."""
-    aer = lambda *more: VesselRequest(simulation=AEROBIC_ID, overrides=[  # noqa: E731
+    aer = lambda *more: vessel_request(simulation=AEROBIC_ID, overrides=[  # noqa: E731
         override(AEROBIC_ID, "plant_scale", 2000.0), *(override(AEROBIC_ID, k, v) for k, v in more)])
     with pytest.raises(vessel.VesselRefused, match=r"N is a number of vessels, a whole number; 2\.5 is not"):
         vessel.design(aer(("N", 2.5)))
     # The panel's resolve says the same, before any design.
     with pytest.raises(params.ParamRefused, match="whole number"):
-        params.resolve_scope(f"fermos:vessel:{AEROBIC_ID}", ParamResolveRequest(overrides=[override(AEROBIC_ID, "N", 2.5)]))
+        params.resolve_scope(f"fermos:vessel:{AEROBIC_ID}", ParamResolveRequest(
+            inputs=as_inputs([override(AEROBIC_ID, "N", 2.5)], vessel.UNITS)))
     # One aerated vessel at a plant scale needs a loading time, said before BioSTEAM divides by zero.
     with pytest.raises(vessel.VesselRefused, match="loading time"):
         vessel.design(aer(("N", 1.0)))
@@ -446,12 +482,12 @@ def test_a_vessel_count_is_whole_and_at_least_the_classes_own_minimum(store, wor
     assert {sp.key: sp for sp in vessel.scope(AEROBIC_ID).specs}["N"].min == 1
     before = len([c for c in worker.calls if c[0] == "vessel_design"])
     for key, value in (("N", 1.0), ("N", 2.5), ("V_max", 0.5)):
-        r = client.post("/api/fermos/vessel", json={"simulation": ANAEROBIC_ID, "overrides": [
-            override(ANAEROBIC_ID, "plant_scale", 50000.0).model_dump(), override(ANAEROBIC_ID, key, value).model_dump()]})
+        r = client.post("/api/fermos/vessel", json={"simulation": ANAEROBIC_ID, "inputs": inputs_json([
+            override(ANAEROBIC_ID, "plant_scale", 50000.0), override(ANAEROBIC_ID, key, value)], vessel.UNITS)})
         assert r.status_code == 422 and r.json()["detail"].startswith(key), (key, value, r.json())
     assert len([c for c in worker.calls if c[0] == "vessel_design"]) == before  # the worker was never asked
-    ok = client.post("/api/fermos/vessel", json={"simulation": ANAEROBIC_ID, "overrides": [
-        override(ANAEROBIC_ID, "plant_scale", 50000.0).model_dump(), override(ANAEROBIC_ID, "N", 2.0).model_dump()]})
+    ok = client.post("/api/fermos/vessel", json={"simulation": ANAEROBIC_ID, "inputs": inputs_json([
+        override(ANAEROBIC_ID, "plant_scale", 50000.0), override(ANAEROBIC_ID, "N", 2.0)], vessel.UNITS)})
     assert ok.status_code == 200
 
 
@@ -462,14 +498,14 @@ def test_a_batch_volume_design_names_no_v_max_it_did_not_use(store, worker):
     use."""
     bv = [override(AEROBIC_ID, "batch_volume", 400.0), override(AEROBIC_ID, "loading_time", 2.0)]
     with pytest.raises(vessel.VesselRefused, match="V_max does not apply"):
-        vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[*bv, override(AEROBIC_ID, "V_max", 100.0)]))
-    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=bv))
+        vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[*bv, override(AEROBIC_ID, "V_max", 100.0)]))
+    d = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=bv))
     named = {i.name for i in artifacts.get(d.artifactId).inputs}
     assert "V_max" not in named and "batch_volume" in named
     p = by_key(d.parameters)["V_max"]
     assert p.value is None and p.source is None and "does not apply" in p.detail
     # A plant scale still designs under V_max, and its basis names it.
-    scaled = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)]))
+    scaled = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)]))
     assert "V_max" in {i.name for i in artifacts.get(scaled.artifactId).inputs}
 
 
@@ -477,7 +513,7 @@ def test_the_kept_parameters_carry_the_built_designs_library_defaults(store, wor
     """Finding 10: a kept design's parameters carry BioSTEAM's defaults for
     the class and design it built, as the scope serves them."""
     for vtype, method, power in (("bubble-column", "Dewes", "false"), ("stirred-tank", "Riet", "true")):
-        d = vessel.design(VesselRequest(simulation=AEROBIC_ID, vesselType=vtype,
+        d = vessel.design(vessel_request(simulation=AEROBIC_ID, vesselType=vtype,
                                         overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)]))
         p, served = by_key(d.parameters), by_key(vessel.scope(AEROBIC_ID, vtype).values)
         assert p["method"].libraryDefault == method == served["method"].libraryDefault
@@ -500,8 +536,8 @@ def test_the_endpoints_answer_and_refuse_in_words(store, worker, client):
     missing = client.post("/api/fermos/vessel", json={"simulation": AEROBIC_ID})
     assert missing.status_code == 422 and "plant_scale" in missing.json()["detail"]
     assert client.post("/api/fermos/vessel", json={"simulation": "ffffffffffffffff"}).status_code == 422
-    made = client.post("/api/fermos/vessel", json={"simulation": ANAEROBIC_ID, "overrides": [
-        override(ANAEROBIC_ID, "plant_scale", 1000.0).model_dump()]})
+    made = client.post("/api/fermos/vessel", json={"simulation": ANAEROBIC_ID, "inputs": inputs_json([
+        override(ANAEROBIC_ID, "plant_scale", 1000.0)], vessel.UNITS)})
     assert made.status_code == 200 and made.json()["unitClass"] == "NRELAnaerobicBatchBioreactor"
     listed = client.get("/api/fermos/vessels").json()
     assert [v["artifactId"] for v in listed] == [made.json()["artifactId"]] and listed[0]["source"] == ANAEROBIC_ID
@@ -561,7 +597,7 @@ def _row(d, label):
 @pytest.mark.sim
 def test_an_aerobic_simulation_designs_a_stirred_tank_sized_for_its_peak(real):
     scale = [override(AEROBIC_ID, "plant_scale", 2000.0)]
-    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=scale))
+    d = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=scale))
     assert d.unitClass == "AeratedBioreactor" and d.vesselType == "stirred-tank"
     N, V = _row(d, "Vessels"), _row(d, "Volume of each vessel")
     assert N >= 1 and float(N).is_integer() and 0 < V <= by_key(d.parameters)["V_max"].value
@@ -574,25 +610,25 @@ def test_an_aerobic_simulation_designs_a_stirred_tank_sized_for_its_peak(real):
     assert d.heat.bst < 0 and d.heat.convention is not None and d.heat.convention < 0
     assert d.cost.costIndex > 0 and d.provenance == "assumed"
     # Sized for the batch average, as BioSTEAM sizes of itself, the peak is short.
-    mean = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+    mean = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[
         *scale, override(AEROBIC_ID, "oxygen_basis", "batch-average")]))
     assert mean.oxygen.short and mean.oxygen.kLaNeededAtPeak > mean.oxygen.kLa
     t0, t1 = mean.oxygen.short[0]
     peak_at = mean.oxygen.t[mean.oxygen.our.index(max(mean.oxygen.our))]
     assert t0 < peak_at < t1 and any("rises above" in f for f in mean.flags)
     # The same request twice returns the same artifact.
-    assert vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=scale)).artifactId == d.artifactId
+    assert vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=scale)).artifactId == d.artifactId
     # A batch volume designs one vessel of that working volume (with a loading time).
-    one = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+    one = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[
         override(AEROBIC_ID, "batch_volume", 50.0), override(AEROBIC_ID, "loading_time", 2.0)]))
     assert _row(one, "Vessels") == 1 and _row(one, "Working volume of each vessel") == pytest.approx(50.0, rel=1e-9)
     with pytest.raises(vessel.VesselRefused, match="needs a loading time"):
-        vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "batch_volume", 50.0)]))
+        vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "batch_volume", 50.0)]))
 
 
 @pytest.mark.sim
 def test_a_bubble_column_by_dewes_costs_no_agitator_and_the_worker_answers_after(real):
-    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, vesselType="bubble-column",
+    d = vessel.design(vessel_request(simulation=AEROBIC_ID, vesselType="bubble-column",
                                     overrides=[override(AEROBIC_ID, "plant_scale", 2000.0)]))
     assert d.oxygen.method == "Dewes" and d.oxygen.kLa > 0 and d.vesselType == "bubble-column"
     assert not any("Agitator" in k for k in d.cost.byItem) and _row(d, "Agitator power, each vessel") == 0
@@ -601,7 +637,7 @@ def test_a_bubble_column_by_dewes_costs_no_agitator_and_the_worker_answers_after
 
 @pytest.mark.sim
 def test_an_anaerobic_simulation_designs_the_nrel_vessel_with_no_compressor(real):
-    d = vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[override(ANAEROBIC_ID, "plant_scale", 50000.0)]))
+    d = vessel.design(vessel_request(simulation=ANAEROBIC_ID, overrides=[override(ANAEROBIC_ID, "plant_scale", 50000.0)]))
     art = artifacts.get(d.artifactId)
     assert d.unitClass == "NRELAnaerobicBatchBioreactor" and d.oxygen is None and d.oxygenNote
     assert "compressor" not in art.output["auxiliaries"] and not any("Compressor" in k for k in d.cost.byItem)
@@ -629,16 +665,16 @@ def test_the_real_scope_reads_the_class_defaults_from_biosteam(real):
 def test_a_vessel_is_designed_for_each_real_simulation(real):
     """§3.1's real simulation, aerobic and anaerobic, designed on BioSTEAM."""
     aer, ana = real_simulation(True), real_simulation(False)
-    d = vessel.design(VesselRequest(simulation=aer.artifactId, overrides=[override(aer.artifactId, "plant_scale", 2000.0)]))
+    d = vessel.design(vessel_request(simulation=aer.artifactId, overrides=[override(aer.artifactId, "plant_scale", 2000.0)]))
     assert d.unitClass == "AeratedBioreactor" and d.oxygen.method == "Riet" and d.oxygen.kLa > 0
     assert _row(d, "Vessels") >= 1 and _row(d, "Batch time (reacting)") == pytest.approx(aer.harvestH)
     # Sized for the peak the simulation states (§4.R, finding 11), which the display grid lies under.
     assert d.oxygen.otr == pytest.approx(d.oxygen.targetUptake, rel=1e-6) and d.oxygen.short == []
     assert d.oxygen.otr >= max(d.oxygen.our)
-    bubble = vessel.design(VesselRequest(simulation=aer.artifactId, overrides=[
+    bubble = vessel.design(vessel_request(simulation=aer.artifactId, overrides=[
         override(aer.artifactId, "plant_scale", 2000.0), override(aer.artifactId, "design", "Bubble column")]))
     assert bubble.vesselType == "bubble-column" and bubble.oxygen.method == "Dewes" and bubble.oxygen.kLa > 0
-    n = vessel.design(VesselRequest(simulation=ana.artifactId, overrides=[override(ana.artifactId, "plant_scale", 50000.0)]))
+    n = vessel.design(vessel_request(simulation=ana.artifactId, overrides=[override(ana.artifactId, "plant_scale", 50000.0)]))
     assert n.unitClass == "NRELAnaerobicBatchBioreactor" and n.oxygen is None and _row(n, "Vessels") >= 2
     assert not any("Compressor" in k for k in n.cost.byItem) and n.evidence.id == n.artifactId
 
@@ -655,7 +691,7 @@ def test_the_heat_cross_check_rests_on_the_simulated_uptake_and_flags_a_gap(real
     cycle), beside BioSTEAM's duty; when the reaction's balanced oxygen and
     the simulation's differ beyond the stated tolerance, a flag names both."""
     keep(YXO_ID, standin_simulation(True, yxo=12.0))
-    d = vessel.design(VesselRequest(simulation=YXO_ID, overrides=[override(YXO_ID, "plant_scale", 2000.0)]))
+    d = vessel.design(vessel_request(simulation=YXO_ID, overrides=[override(YXO_ID, "plant_scale", 2000.0)]))
     ox, q = d.oxygen, vessel.worker_specs(vessel.AEROBIC)["heatPerO2"]
     area = sum((ox.t[i + 1] - ox.t[i]) * (ox.our[i] + ox.our[i + 1]) / 2 for i in range(len(ox.t) - 1))  # mol m⁻³
     flow = _row(d, "Working volume of each vessel") * _row(d, "Vessels") / _row(d, "Cycle time")  # m³ h⁻¹
@@ -676,13 +712,13 @@ def test_a_small_aerated_vessel_is_sized_for_the_peak_whatever_the_floor(real):
     or not its balanced oxygen is above the floor BioSTEAM aerates from; no
     aeration is reported only when the scaled reaction is still under it,
     in terms of the target uptake."""
-    small = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+    small = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[
         override(AEROBIC_ID, "batch_volume", 5.0), override(AEROBIC_ID, "loading_time", 2.0)]))
     ox = small.oxygen
     assert ox.aerated and ox.scale != pytest.approx(1.0) and ox.balancedUptake is not None
     assert ox.otr == pytest.approx(max(ox.our), rel=1e-6) and ox.short == []
     assert ox.scaledO2KmolPerH > ox.floorKmolPerH > ox.reactionO2KmolPerH  # the balanced reaction alone was under it
-    tiny = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+    tiny = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[
         override(AEROBIC_ID, "batch_volume", 1.0), override(AEROBIC_ID, "loading_time", 2.0)]))
     t = tiny.oxygen
     assert not t.aerated and t.scale != pytest.approx(1.0) and t.scaledO2KmolPerH <= t.floorKmolPerH
@@ -697,9 +733,9 @@ def test_a_persons_heat_per_oxygen_is_what_the_duty_says_it_is(real):
     the words say so, naming the person; without one, the heats of
     formation."""
     q = vessel.worker_specs(vessel.AEROBIC)["heatPerO2"]
-    base = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 2000.0)]))
+    base = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 2000.0)]))
     assert base.heat.method == "heats-of-formation" and "heats of formation" in base.heat.dutyNote
-    forced = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+    forced = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[
         override(AEROBIC_ID, "plant_scale", 2000.0), override(AEROBIC_ID, "Q_O2_consumption", q, by=WHO)]))
     h, ox = forced.heat, forced.oxygen
     assert h.method == "forced-per-oxygen" and "heats of formation" not in h.dutyNote
@@ -712,7 +748,7 @@ def test_a_persons_heat_per_oxygen_is_what_the_duty_says_it_is(real):
 def test_a_batch_volume_vessel_says_what_it_does_with_v_max(real):
     """Finding 5: one vessel holds the batch volume over V_wf whatever V_max,
     and the design says so (here larger than the class's own V_max)."""
-    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[
+    d = vessel.design(vessel_request(simulation=AEROBIC_ID, overrides=[
         override(AEROBIC_ID, "batch_volume", 400.0), override(AEROBIC_ID, "loading_time", 2.0)]))
     V = _row(d, "Volume of each vessel")
     default = vessel.worker_specs(vessel.AEROBIC)["parameters"]["V_max"]["default"]
@@ -750,10 +786,10 @@ def _requests(real_dir) -> dict[str, dict]:
     """The worker's requests for three designs, from their bases."""
     out = {}
     for name, req in {
-        "aerobic": VesselRequest(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 2000.0)]),
-        "bubble": VesselRequest(simulation=AEROBIC_ID, vesselType="bubble-column",
+        "aerobic": vessel_request(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 2000.0)]),
+        "bubble": vessel_request(simulation=AEROBIC_ID, vesselType="bubble-column",
                                 overrides=[override(AEROBIC_ID, "plant_scale", 2000.0)]),
-        "anaerobic": VesselRequest(simulation=ANAEROBIC_ID, overrides=[override(ANAEROBIC_ID, "plant_scale", 50000.0)]),
+        "anaerobic": vessel_request(simulation=ANAEROBIC_ID, overrides=[override(ANAEROBIC_ID, "plant_scale", 50000.0)]),
     }.items():
         inputs, *_ = vessel.basis_inputs(req)
         out[name] = vessel.worker_request(inputs)[0]

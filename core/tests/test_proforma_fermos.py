@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, basis, fermos, intake, proforma
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
+from test_fermos import forecast_inputs
 from openferment_core.models import (
     ComputedBasis,
     FermosPoint,
@@ -203,7 +204,7 @@ def test_a_chosen_fit_binds_titre_yield_and_productivity_and_the_run_names_it(st
     assert run.provenance == "assumed"
     # A forecast a person changed is an assumption, so a run fed by it is assumed by its own inputs.
     changed = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=LONG_H,
-                                  start=fermos.StartValues(S0=55.0), changed_by="Sean Creighton")
+                                  inputs=forecast_inputs(fit.kineticArtifactId, s0=55.0))
     assert proforma.fit_info(artifacts.get(changed.artifactId), ETHANOL).provenance == "assumed"
 
 

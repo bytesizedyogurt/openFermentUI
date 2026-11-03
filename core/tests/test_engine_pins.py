@@ -19,8 +19,9 @@ that moves one stops there and says why it moved, and the literal stays as
 captured.
 
 What each pin computes through, owned by other test files: test_fermos'
-`typed_for`, `batch`, `T`, `SD`, `BY`, `STANDIN_TYPED`, `CHEMO` and
-`STANDIN_CHEMOSTAT_TYPED`; test_kinetics' `STANDIN_FED`, `STANDIN_FED_START`
+`typed_for` (as `inputs_for` and `forecast_inputs` send it), `batch`, `T`,
+`SD`, `BY`, `STANDIN_TYPED`, `CHEMO` and `STANDIN_CHEMOSTAT_TYPED`;
+standins' `as_inputs`; test_kinetics' `STANDIN_FED`, `STANDIN_FED_START`
 and `STANDIN_FED_RUN_H`; test_vessel's `StandInWorker`, `keep`, `override`,
 `standin_simulation` and `AEROBIC_ID`; test_train's `TrainWorker`, `spec_of`,
 `AT` and `STANDIN`; standins' `_standin_call` and `_standin_yeast_records`;
@@ -52,10 +53,15 @@ computes in the test (test_fermos' `batch`).
 
 D1's amendment at C.2 (the forecast): fermOS's forecast takes each start
 value and its length as a typed quantity with its origin, and its basis then
-writes the day a value was set, as every other typed value's basis does. The
-forecast with a changed start value therefore gains a new id at C.2, and its
-output hash holds; the pin then names both ids and that decision. The
-forecast that changes nothing keeps its id.
+writes the day a value was set and the unit it is typed in, as every other
+typed value's basis does. The forecast with a changed start value therefore
+gained a new id at C.2, and its output hash held; its pin names both ids and
+that decision. The forecast that changes nothing kept its id.
+
+From C.2 every fermOS request here takes its values as typed inputs (alpha
+2.2 D2), built from the same Overrides the tests typed before
+(`standins.as_inputs`), and fermOS converts each back into that Override at
+its door, so every other pin holds as captured.
 
 One pin was captured at C.1 itself: a comparison of two runs of the sample
 engine. From C.1 on, a comparison that holds a run of an engine beside
@@ -87,9 +93,10 @@ from openferment_core.engine.sample import SAMPLE
 from openferment_core.models import ComparisonCreate, Override, ProformaRunRequest, SimulationRequest, VesselRequest
 from openferment_core.pureos import catalogue, train_spec
 from openferment_core.studies import comparisons
+from standins import as_inputs
 from test_comparisons import PricedStandIn
 from test_engines import given
-from test_fermos import BY, CHEMO, SD, STANDIN_CHEMOSTAT_TYPED, STANDIN_TYPED, T, batch, typed_for
+from test_fermos import CHEMO, SD, STANDIN_CHEMOSTAT_TYPED, STANDIN_TYPED, T, batch, forecast_inputs, inputs_for
 from test_kinetics import STANDIN_FED, STANDIN_FED_RUN_H, STANDIN_FED_START
 from test_library import over
 from test_proforma_runs import ASSUMED, ETHANOL, MADE_HERE
@@ -132,9 +139,12 @@ PINS: dict[str, tuple[str, str]] = {
         "da66a3d1c22027a6", "905045fddf738d41c8c438af0ad7da999b53b1eff7f1cfda4115e22ecadf283f"),
     "growth_forecast": (
         "9e26015a728860bd", "5cb631e5e0ae170e9b15346173a974888a3319f4053ec63cda54846bc44de93e"),
-    # Under D1's amendment at C.2: this id moves there, and the output hash holds.
+    # D1's amendment at C.2 (the forecast): its typed start value writes the
+    # day it was set and the unit of the fitted run's series in the basis, so
+    # the id moved from ed33c02's 611bd4b34eed98fd to this one; the output
+    # hash is ed33c02's.
     "growth_forecast with a changed start": (
-        "611bd4b34eed98fd", "859f488203c5439f5b4c943a186ed684742703fdd4e9923b7659114d7c254d35"),
+        "80ef18a4b9924dba", "859f488203c5439f5b4c943a186ed684742703fdd4e9923b7659114d7c254d35"),
     "fermos.vessel": (
         "748146b8afbc21a1", "892d4c0bcbb7cf5d4d855fce3d1b3ff07f75ec0cd1745ccd64e0ae0c1e6fd35a"),
     "pureos.train_run": (
@@ -217,17 +227,17 @@ def no_records(monkeypatch):
 
 
 def test_a_batch_v1_simulation_holds_its_pin(no_records):
-    r = fermos.simulate(SimulationRequest(family=BATCH, overrides=typed_for(BATCH, **STANDIN_TYPED)))
+    r = fermos.simulate(SimulationRequest(family=BATCH, inputs=inputs_for(BATCH, **STANDIN_TYPED)))
     pinned("fermos.simulation batch_v1", artifacts.get(r.artifactId))
 
 
 def test_a_fedbatch_v1_simulation_holds_its_pin(no_records):
-    r = fermos.simulate(SimulationRequest(family=FED, overrides=typed_for(FED, **FED_TYPED)))
+    r = fermos.simulate(SimulationRequest(family=FED, inputs=inputs_for(FED, **FED_TYPED)))
     pinned("fermos.simulation fedbatch_v1", artifacts.get(r.artifactId))
 
 
 def test_a_chemostat_v1_simulation_holds_its_pin(no_records):
-    r = fermos.simulate(SimulationRequest(family=CHEMO, overrides=typed_for(CHEMO, **STANDIN_CHEMOSTAT_TYPED)))
+    r = fermos.simulate(SimulationRequest(family=CHEMO, inputs=inputs_for(CHEMO, **STANDIN_CHEMOSTAT_TYPED)))
     pinned("fermos.simulation chemostat_v1", artifacts.get(r.artifactId))
 
 
@@ -236,7 +246,8 @@ def test_a_growth_forecast_and_the_fit_it_rests_on_hold_their_pins(no_records):
     pinned("kinetic_fit", artifacts.get(fit.kineticArtifactId))
     plain = fermos.forecast_run(fit_artifact=fit.kineticArtifactId)
     pinned("growth_forecast", artifacts.get(plain.artifactId))
-    changed = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, start=fermos.StartValues(S0=60.0), changed_by=BY)
+    changed = fermos.forecast_run(fit_artifact=fit.kineticArtifactId,
+                                  inputs=forecast_inputs(fit.kineticArtifactId, s0=60.0))
     pinned("growth_forecast with a changed start", artifacts.get(changed.artifactId))
 
 
@@ -251,8 +262,8 @@ def vessel_worker(monkeypatch):
 
 
 def test_a_vessel_design_on_the_stand_in_worker_holds_its_pin(vessel_worker):
-    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[override(AEROBIC_ID, "plant_scale", 1000.0),
-                                                                     override(AEROBIC_ID, "theta_O2", 0.3)]))
+    typed = [override(AEROBIC_ID, "plant_scale", 1000.0), override(AEROBIC_ID, "theta_O2", 0.3)]
+    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, inputs=as_inputs(typed, vessel.UNITS)))
     pinned("fermos.vessel", artifacts.get(d.artifactId))
 
 

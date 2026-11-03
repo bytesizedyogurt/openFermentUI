@@ -94,7 +94,8 @@ rule found.
 SIMULATION. `simulate(SimulationRequest)` binds a family's specs
 (bind_parameters), refuses in words naming every parameter that waits and
 what would bind it, integrates (kinetics.py), and keeps one
-`fermos.simulation` artifact (`SIMULATION`): the parameters and start values
+`fermos.simulation` artifact (`SIMULATION`), and one runs row of the
+kinetics engine beside it (fermos_engine.py; alpha 2.2 D3): the parameters and start values
 with their sources, the time course by state, OUR(t), the end state, the
 hour the sugar runs out, the harvest, the mass balance, Yp/s beside the
 newest stored geneOS ceiling of the strain's host models (read, never
@@ -107,17 +108,18 @@ from __future__ import annotations
 import json
 import math
 import re
-from typing import Any
+from typing import Any, Iterable, Sequence
 
 import numpy as np
 from scipy.optimize import least_squares, lsq_linear
 from scipy.stats import t as student_t
 
 from . import artifacts, binding, kinetics, params, units
-from .basis import ASSUMED_KINDS
+from .basis import ASSUMED_KINDS, override_source
 from .models import (
     BasisInput,
     BasisSource,
+    EngineInput,
     Evidence,
     FamilyInfo,
     FermosBinding,
@@ -810,9 +812,18 @@ def forecast(fit_: KineticFit, start: StartValues | None = None, duration_h: flo
             "substrateRunsOutH": runs_out, "draws": DRAWS, "seed": seed}
 
 
-def _forecast_inputs(fit_artifact: str | None, fit_inline: KineticFit | None, start: StartValues,
-                     changed_by: str | None, duration_h: float | None, deposition_id: str | None,
-                     duration_by: str | None = None) -> list[BasisInput]:
+def _forecast_inputs(fit_artifact: str | None, fit_inline: KineticFit | None, start: dict[str, Override],
+                     length: Override | None, duration_h: float | None,
+                     start_units: dict[str, str] | None = None) -> list[BasisInput]:
+    """A forecast's basis: the fit it draws from, each start value a person
+    or a model set (`start`, by the fit's own name for it: `start X0`,
+    `start P0`, `start S0`, each in the unit of the fitted run's series,
+    `start_units`) and the length one set (`length`, `duration` in hours),
+    each written as every typed value is (basis.override_source: who set it,
+    the day it was set and what it rests on), so the forecast is assumed
+    (OF-BLD-020 §3.R; D3, E.2‴; alpha 2.2 D1's amendment at C.2). A length
+    the calling code asks for as its own setting (`duration_h`: a stand-in,
+    a fixed check), with nobody named for it, is a convention, as asked."""
     inputs: list[BasisInput] = []
     if fit_artifact:
         inputs.append(BasisInput(name="kinetic fit", value=fit_artifact, unit="", source=BasisSource(kind="artifact", id=fit_artifact)))
@@ -822,24 +833,54 @@ def _forecast_inputs(fit_artifact: str | None, fit_inline: KineticFit | None, st
             name="kinetic fit", value=fit_inline.model_dump_json(), unit="",
             source=BasisSource(kind="assumption", by="openFerment sample", note="the sample run's fit, an invented time course")))
     for key in ("X0", "P0", "S0"):
-        v = getattr(start, key)
-        if v is None:
-            continue
-        if not (changed_by or "").strip():
-            raise FitRefused(f"a changed starting value ({key}) is an assumption, and needs the name of the person who set it")
-        inputs.append(BasisInput(name=f"start {key}", value=float(v), unit="",
-                                 source=BasisSource(kind="assumption", by=changed_by.strip(), note=f"{key} set on screen")))
-    if duration_h is not None:
-        # A length a person typed is that person's assumption, named, and
-        # makes the forecast assumed (OF-BLD-020 §3.R, findings 7 and 11; D3,
-        # E.2‴): the person who set it (`duration_by`), else the one who
-        # changed a start value. A length nobody is named for is the caller's
-        # convention, as asked (a test, a stand-in, a fixed check).
-        who = (duration_by or changed_by or "").strip()
-        source = (BasisSource(kind="assumption", by=who, note="how long the forecast runs, set on screen") if who
-                  else BasisSource(kind="convention", note="how long the forecast runs, as asked"))
-        inputs.append(BasisInput(name="duration", value=float(duration_h), unit="h", source=source))
+        o = start.get(key)
+        if o is not None:
+            inputs.append(BasisInput(name=f"start {key}", value=float(o.value), unit=(start_units or {}).get(key, ""),
+                                     source=override_source(o)))
+    if length is not None:
+        inputs.append(BasisInput(name="duration", value=float(length.value), unit="h", source=override_source(length)))
+    elif duration_h is not None:
+        inputs.append(BasisInput(name="duration", value=float(duration_h), unit="h",
+                                 source=BasisSource(kind="convention", note="how long the forecast runs, as asked")))
     return inputs
+
+
+def start_units(fit_: KineticFit) -> dict[str, str]:
+    """The unit each start value of a forecast of `fit_` is typed in, by the
+    fit's own name for it (X0, S0, P0): the unit of the fitted run's series
+    of that role, as the scope `fermos:forecast:<fit id>` serves it."""
+    roles = series_by_role(fit_)
+    return {name: roles[role].unit for _, name, role in FORECAST_KEYS if role in roles}
+
+
+def _forecast_values(fit_id: str | None, fit_: KineticFit,
+                     inputs: Sequence[EngineInput]) -> tuple[dict[str, Override], Override | None]:
+    """The start values and the length a forecast request sets: each a typed
+    quantity with its origin, keyed as the scope `fermos:forecast:<fit id>`
+    names it (FORECAST_KEYS and t_end), converted at fermOS's door into that
+    scope's Override (params.overrides_of, in its parameter's unit) and held
+    to the scope's rules as the panel's resolve holds it (params.checked).
+    The start values come back by the fit's own names (X0, S0, P0), with the
+    length beside them; `start_units` gives each start value's unit, its
+    series'. Refused in words (FitRefused): a value set on the sample run's
+    forecast, which starts from its own values, a start value for a series
+    the fit lacks, and a value its parameter cannot take."""
+    if not inputs:
+        return {}, None
+    if fit_id is None:
+        raise FitRefused("the sample run's forecast starts from its own values and runs its own length; a start "
+                         "value or a length is set on a forecast of a kept fit (fitArtifactId)")
+    roles = series_by_role(fit_)
+    for key, name, role in FORECAST_KEYS:
+        if any(i.name == key for i in inputs) and (role not in roles or param(fit_, name) is None):
+            raise FitRefused(f"the fit has no {role} series, so a starting {name} has nothing to start")
+    specs = _forecast_specs({key: roles[role].unit for key, name, role in FORECAST_KEYS
+                             if role in roles and param(fit_, name)})
+    try:
+        given = params.checked(specs, params.overrides_of(forecast_scope(fit_id), inputs, params.units_of(specs)))
+    except params.ParamRefused as e:
+        raise FitRefused(str(e)) from None
+    return {name: given[key] for key, name, _ in FORECAST_KEYS if key in given}, given.get(LENGTH_KEY)
 
 
 def _fit_from(inputs: list[BasisInput]) -> KineticFit:
@@ -863,10 +904,21 @@ artifacts.register(FORECAST, VERSION, _run_forecast)
 
 
 def forecast_run(*, fit_artifact: str | None = None, fit_inline: KineticFit | None = None,
-                 start: StartValues | None = None, changed_by: str | None = None,
-                 duration_h: float | None = None, sample: bool = False,
-                 duration_by: str | None = None) -> ForecastResult:
-    start = start or StartValues()
+                 inputs: Sequence[EngineInput] = (), sample: bool = False,
+                 duration_h: float | None = None, by: str = "") -> ForecastResult:
+    """A band for the next run from a kept kinetic fit (`fit_artifact`), kept
+    as a `growth_forecast` artifact and as a run of the kinetics engine
+    (fermos_engine.keep_forecast: one runs row, its configuration the fit,
+    its created_by `by`, the person or the model asking), or from the sample
+    run's fit inline, kept nowhere. It starts from the fitted run's own
+    values and runs its own length unless the request sets others (`inputs`:
+    x0, s0, p0 and t_end of the scope `fermos:forecast:<fit id>`, each a
+    typed quantity with its origin, `_forecast_values`); a start value equal
+    to the run's own is no change. `duration_h` is a length the calling code
+    asks for as its own setting, a convention in the basis (a stand-in, a
+    fixed check); the route and the tools set a length as a typed value.
+    Refused in words (FitRefused); a refusal the draws raise is kept as the
+    run's receipt and raised again."""
     if not fit_artifact and fit_inline is None:
         raise FitRefused("name a kept kinetic fit, or send the sample run's fit inline")
     if fit_artifact:
@@ -879,20 +931,20 @@ def forecast_run(*, fit_artifact: str | None = None, fit_inline: KineticFit | No
     # A starting value equal to the run's own is no change, and a start for a
     # series the run lacks is refused (§7.R).
     source = KineticFit.model_validate(artifacts.get(fit_artifact).output) if fit_artifact else fit_inline
-    kept = {}
-    for key, role in (("X0", "biomass"), ("P0", "product"), ("S0", "substrate")):
-        v = getattr(start, key)
-        if v is None:
-            continue
-        own = param(source, key)
-        if own is None:
-            raise FitRefused(f"the fit has no {role} series, so a starting {key} has nothing to start")
-        if not math.isclose(v, own.value, rel_tol=1e-9, abs_tol=1e-12):
-            kept[key] = v
-    start = StartValues(**kept)
-    inputs = _forecast_inputs(fit_artifact, fit_inline, start, changed_by, duration_h, None, duration_by)
-    check_forecastable(_fit_from(inputs))
-    art = artifacts.compute(FORECAST, inputs, seed=SEED, keep=not sample)
+    start, length = _forecast_values(fit_artifact, source, inputs)
+    if length is not None and duration_h is not None:
+        raise FitRefused("a forecast's length is set in one place: as a typed value (t_end), or as the calling "
+                         "code's own setting")
+    kept = {name: o for name, o in start.items()
+            if not math.isclose(float(o.value), param(source, name).value, rel_tol=1e-9, abs_tol=1e-12)}
+    basis = _forecast_inputs(fit_artifact, fit_inline, kept, length, duration_h, start_units(source))
+    check_forecastable(_fit_from(basis))
+    if sample or not fit_artifact:
+        art = artifacts.compute(FORECAST, basis, seed=SEED, keep=not sample)
+    else:
+        from .fermos_engine import keep_forecast
+
+        art = keep_forecast(fit_artifact, basis, by=by, seed=SEED)
     out = art.output
     lead = next((f for f in out["finals"] if f["role"] == "product"), out["finals"][0])
     ev = Evidence(
@@ -1094,7 +1146,7 @@ def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Pr
     """The `fermos-family` scope (`fermos:family:<id>`): the family's specs,
     bound as a simulation binds them (bind_parameters) from the request's
     strain, product, sugar, fit, kept simulation and run-length preset over
-    the evidence pool; a person's overrides lie on
+    the evidence pool; the values a person sets lie on
     them (params.resolve), and a person's X0 rescales a gauged fit's Yx/s,
     α and β here as in the run (§3.R), so the panel shows what runs."""
     (fid,) = ids
@@ -1104,10 +1156,10 @@ def family_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Pr
     sim = SimulationRequest(family=fid, strain=req.strain, product=req.product, sugar=req.sugar,
                             fitArtifact=req.fit, startFrom=req.startFrom or "records",
                             durationPreset=req.durationPreset or UNTIL_RUN_OUT_PRESET,
-                            overrides=list(req.overrides))
+                            inputs=list(req.inputs))
     try:
         _check_request(sim)
-        got = _bound(fam, sim, _load_pool())
+        got = _bound(fam, sim, _load_pool(), overrides_of(fam, sim.inputs))
     except SimulationRefused as e:
         raise params.ParamRefused(str(e)) from None
     return params.Provided(title=f"{fam.title} ({fam.id})", specs=got.specs, sources=got.sources, notes=got.notes,
@@ -1146,10 +1198,12 @@ def _family_static():
 # family's scope (`fermos:family:batch_v1`), started from the fit.
 
 FORECAST_KEYS = (("x0", "X0", "biomass"), ("s0", "S0", "substrate"), ("p0", "P0", "product"))
+# The forecast's length, by the key the batch family declares it under.
+LENGTH_KEY = "t_end"
 FORECAST_SCOPE_NOTES = [
-    "A forecast starts from the fitted run's own values and runs its own length unless a person names others here: "
-    "a changed start value or length is that person's assumption, named in the forecast's basis, and the forecast it "
-    "makes is assumed.",
+    "A forecast starts from the fitted run's own values and runs its own length unless a person or a model names "
+    "others here: a changed start value or length is that person's assumption or that model's estimate, named in the "
+    "forecast's basis with the day it was set, and the forecast it makes is assumed.",
     "A low and a high typed here are not read: a forecast starts from one value, and its band comes from the fit.",
 ]
 
@@ -1172,7 +1226,7 @@ def _forecast_specs(unit_of: dict[str, str]) -> list[ParameterSpec]:
             "gloss": f"{b.gloss}, in the unit of the run's {role} series",
             "note": f"The fitted run's own {b.symbol} unless a person names another (a forecast's start value).",
             "convention": None}))
-    t = base["t_end"]
+    t = base[LENGTH_KEY]
     out.append(t.model_copy(update={
         "label": "forecast length", "gloss": "how long the forecast runs", "sourceRule": ["fit", "assumption"],
         "note": "The length of the run the fit was made on, its last reading, unless a person names another.",
@@ -1187,7 +1241,7 @@ def _forecast_static():
 def forecast_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
     """The `fermos-forecast` scope (`fermos:forecast:<kinetic fit id>`):
     a logistic_v0 fit's start values and run length, each bound to the
-    fitted run's own, a person's overrides laid on them (params.resolve).
+    fitted run's own, the values a person sets laid on them (params.resolve).
     A fit not on file is a 404; a fit of a family, a forecast or another
     artifact, or a fit that holds no parameters, a 422 in words."""
     (fit_id,) = ids
@@ -1221,9 +1275,9 @@ def forecast_provided(ids: tuple[str, ...], req: ParamResolveRequest) -> params.
     hours = [pt.t for sr in fit_.series for pt in sr.points]
     if hours and max(hours) > 0:
         note = f"the length of the run kinetic fit {fit_id} was made on: its last reading"
-        sources["t_end"] = {"fit": ParameterValue(key="t_end", value=float(max(hours)), origin="fit",
-                                                  source=BasisSource(kind="artifact", id=fit_id, note=note),
-                                                  detail=note)}
+        sources[LENGTH_KEY] = {"fit": ParameterValue(key=LENGTH_KEY, value=float(max(hours)), origin="fit",
+                                                     source=BasisSource(kind="artifact", id=fit_id, note=note),
+                                                     detail=note)}
     dep = deposition_of(art)
     title = f"Forecast of kinetic fit {fit_id}" + (f", fitted to deposition {dep}" if dep else "")
     return params.Provided(title=title, specs=_forecast_specs(unit_of), sources=sources, notes=list(FORECAST_SCOPE_NOTES))
@@ -1840,13 +1894,13 @@ def _simulation_candidates(sim_id: str, specs: dict[str, ParameterSpec]) -> tupl
                  "does, before a person's (D6)."]
 
 
-def _persons_x0(fam: kinetics.Family, req: SimulationRequest) -> float | None:
-    """The X0 a person gave in this request's overrides of the family's
+def _persons_x0(fam: kinetics.Family, overrides: Iterable[Override]) -> float | None:
+    """The X0 a person gave among a request's values set on the family's
     scope, when it is a number above zero: what a gauged fit's Yx/s, α and β
     are rescaled to (§3.R). Anything else rescales nothing, and the
     override's own check refuses it where it cannot stand."""
     scope = family_scope(fam.id)
-    x = next((o.value for o in req.overrides if o.key == "x0" and o.scope == scope), None)
+    x = next((o.value for o in overrides if o.key == "x0" and o.scope == scope), None)
     return float(x) if kinetics._finite(x) and x > 0 else None
 
 
@@ -1860,9 +1914,10 @@ class _Binding:
         self.named: frozenset[str] = frozenset(named)
 
 
-def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any) -> _Binding:
+def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any, overrides: Iterable[Override] = ()) -> _Binding:
     """Each spec's candidates by sourceRule entry (params.Provided's
-    `sources`), and the notes that say what was bound from where."""
+    `sources`), and the notes that say what was bound from where; a
+    person's X0 among the request's `overrides` rescales a gauged fit."""
     specs = fam.specs()
     by_key = {s.key: s for s in specs}
     ctx = _Context(fam, req)
@@ -1872,7 +1927,7 @@ def _bound(fam: kinetics.Family, req: SimulationRequest, pool: Any) -> _Binding:
     fits: dict[str, ParameterValue] = {}
     if req.fitArtifact:
         fits, said = _fit_candidates(req.fitArtifact, fam, by_key, ctx, req.durationPreset,
-                                     _persons_x0(fam, req))
+                                     _persons_x0(fam, overrides))
         notes += said
     start = req.startFrom or "records"
     kept: dict[str, ParameterValue] = {}
@@ -1946,12 +2001,13 @@ def bind_parameters(family: str, strain: str | None, product: str | None, sugar:
     not in the pool, of another field, kept out by the aggregate gate or in a
     unit units.py does not convert."""
     fam = kinetics.family(family)
-    req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar, overrides=list(overrides or []),
+    req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar,
                             fitArtifact=fit, startFrom=f"{SIM_PREFIX}{simulation}" if simulation else "records",
                             durationPreset=duration_preset, recordsByParam=dict(records_by_param or {}))
     _check_request(req)
-    got = _bound(fam, req, pool)
-    return _resolved(fam, got, req.overrides, by)
+    given = list(overrides or [])
+    got = _bound(fam, req, pool, given)
+    return _resolved(fam, got, given, by)
 
 
 def _resolved(fam: kinetics.Family, got: _Binding, overrides: list[Override],
@@ -1982,21 +2038,25 @@ def bind(req: SimulationRequest, *, pool: Any = None) -> FermosBinding:
     say what bound from where. Starts no integration and keeps nothing."""
     fam = kinetics.family(req.family)
     _check_request(req)
-    _own_scope(fam, req.overrides)
-    got = _bound(fam, req, pool if pool is not None else _load_pool())
-    values, waiting = _resolved(fam, got, req.overrides, None)
+    overrides = overrides_of(fam, req.inputs)
+    got = _bound(fam, req, pool if pool is not None else _load_pool(), overrides)
+    values, waiting = _resolved(fam, got, overrides, None)
     refused = None if waiting else run_refusal(fam, got.specs, values)
     return FermosBinding(values=values, waiting=waiting, refused=refused, notes=got.notes)
 
 
-def _own_scope(fam: kinetics.Family, overrides: list[Override]) -> None:
-    """An override names the scope it changes; one of another scope is
-    refused in words, never laid on."""
-    scope = family_scope(fam.id)
-    stray = sorted({o.scope for o in overrides if o.scope != scope})
-    if stray:
-        raise SimulationRefused(f"an override names the scope it changes, and these were sent to {scope}: "
-                                f"{', '.join(stray)}")
+def overrides_of(fam: kinetics.Family, inputs: Iterable[EngineInput]) -> list[Override]:
+    """The values a simulation request sets, each a typed quantity with its
+    origin, as the Overrides of the family's scope `fermos:family:<id>` its
+    resolver takes (params.overrides_of, basis.override_of), each in its
+    parameter's unit: fermOS's door, where every value set is converted
+    once. A key the family lacks, a unit its parameter is not in and a value
+    no person or model is named for are refused in words
+    (SimulationRefused)."""
+    try:
+        return params.overrides_of(family_scope(fam.id), inputs, params.units_of(fam.specs()))
+    except params.ParamRefused as e:
+        raise SimulationRefused(str(e)) from None
 
 
 def _binding_inputs(got: _Binding, values: list[ParameterValue]) -> list[BasisInput]:
@@ -2026,23 +2086,27 @@ def _binding_inputs(got: _Binding, values: list[ParameterValue]) -> list[BasisIn
 
 
 def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult:
-    """One simulation, kept as a `fermos.simulation` artifact. The family's
+    """One simulation, kept as a `fermos.simulation` artifact and as a run of
+    the kinetics engine (fermos_engine.keep_simulation: one runs row, its
+    thing the family, its created_by the request's `by`). The family's
     specs bind as `bind_parameters` binds them (D6): a fit a person chose,
     the records of the evidence pool (`by_pool`, else
     evidence_pool.load), a kept simulation, a person's override (an
     `assumption` by name, which wins), the spec's stated convention; a
     parameter with none refuses the run naming it and the record field that
-    would bind it (SimulationRefused, a 422). The basis names every value's
-    source, the records each one rests on, and whose records they were."""
+    would bind it (SimulationRefused, a 422), and keeps nothing. A refusal
+    the integration raises is kept as the run's receipt and raised again.
+    The basis names every value's source, the records each one rests on,
+    and whose records they were."""
     fam = kinetics.family(req.family)
     if fam.socket:
         raise SimulationRefused(fam.refusal())
     _check_request(req)
-    _own_scope(fam, req.overrides)
+    overrides = overrides_of(fam, req.inputs)
     pool = by_pool if by_pool is not None else _load_pool()
-    got = _bound(fam, req, pool)
+    got = _bound(fam, req, pool, overrides)
     specs = got.specs
-    values, _ = _resolved(fam, got, req.overrides, None)
+    values, _ = _resolved(fam, got, overrides, None)
     _numbers(fam, specs, values)
     why = run_refusal(fam, specs, values)
     if why:
@@ -2056,7 +2120,9 @@ def simulate(req: SimulationRequest, *, by_pool: Any = None) -> SimulationResult
     ceilings, _ = _ceiling_inputs(req)
     inputs = (named + params.basis_inputs(specs, values) + _binding_inputs(got, values) + _solver_inputs()
               + ceilings)
-    art = artifacts.compute(SIMULATION, inputs, records_by_id=getattr(pool, "records_by_id", None))
+    from .fermos_engine import keep_simulation
+
+    art = keep_simulation(fam.id, inputs, by=req.by, records_by_id=getattr(pool, "records_by_id", None))
     return result_of(art)
 
 

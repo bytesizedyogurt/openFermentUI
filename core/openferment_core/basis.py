@@ -18,17 +18,25 @@ value as records replace the assumptions.
 
 A model's estimate never enters a record store (ADR-006): `refuse_estimates`
 is what each store runs on what it is asked to keep.
+
+A value a request sets arrives as a typed quantity with its origin (an
+`EngineInput`), and a resolver takes it as an `Override` of its scope:
+`override_of` is the one converter between the two (alpha 2.2 D2).
 """
 from __future__ import annotations
 
 import re
 from typing import Any, Mapping
 
-from .models import BasisSource, ComputedBasis, Origin, Override, weakest_provenance
+from .models import BasisSource, ComputedBasis, EngineInput, Origin, Override, weakest_provenance
 
 # The sources whatever rests on is `assumed`: a named person's value and a
 # model's estimate.
 ASSUMED_KINDS = ("assumption", "model-estimate")
+# The origins of a value a run sets, as an Override names them: a person's
+# assumption and a model's estimate. A record, an artifact, a library
+# default and a convention are bound by the module that runs.
+SET_ORIGINS = ("person-assumption", "model-estimate")
 
 # A provenance `weakest_provenance` does not know sorts as the weakest there
 # is. A record or artifact the caller cannot find gets this, so a missing
@@ -70,6 +78,40 @@ def override_source(o: Override) -> BasisSource:
     if o.origin == "model-estimate":
         return estimate_source(o.by, o.at, o.note)
     return assumption_source(o.by, o.at, o.note)
+
+
+class InputRefused(ValueError):
+    """A value a request sets that its parameter cannot take, in words."""
+
+
+def override_of(scope: str, value: EngineInput, unit: str) -> Override:
+    """The Override of `scope` a resolver takes for a value a request sets:
+    the one converter from a typed quantity with its origin (alpha 2.2 D2).
+    Its key is the input's name; its value, low and high are the
+    quantity's; its by, at and note are the origin's; its origin is the
+    person's assumption or the model's estimate the quantity names.
+
+    An Override holds its value in the parameter's own unit and names no
+    basis of its own, so the quantity is set in `unit`, the parameter's, and
+    carries no basis. A quantity in another unit, one carrying a basis, one
+    whose origin is a record, an artifact, a library default or a
+    convention (the module that runs binds those itself), and one that does
+    not say when it was set are each refused in words (InputRefused)."""
+    name, q = value.name, value.quantity
+    origin = q.origin
+    if origin is None or origin.kind not in SET_ORIGINS:
+        said = f"a {origin.kind} value" if origin is not None else "a value with no origin"
+        raise InputRefused(f"{name}: a value a run sets is a person's assumption or a model's estimate, its origin "
+                           f"naming who set it; {said} is bound by the module that runs")
+    if not (origin.at or "").strip():
+        raise InputRefused(f"{name}: a value a run sets says when it was set (quantity.origin.at)")
+    if q.unit != unit:
+        raise InputRefused(f"{name} is set in {q.unit!r}, and the parameter's unit is {unit!r}")
+    if q.basis is not None:
+        raise InputRefused(f"{name}: a value a run sets is in its parameter's own unit, which says what it is "
+                           f"reckoned on; this quantity also carries the basis {q.basis!r}")
+    return Override(scope=scope, key=name, value=q.value, low=q.low, high=q.high, by=origin.by or "", at=origin.at,
+                    note=origin.note, origin=origin.kind)
 
 
 # "typed on <at>" or "estimated on <at>", then ": <note>" when there is one;

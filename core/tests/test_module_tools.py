@@ -263,11 +263,11 @@ def _kept_simulation(tmp_path, monkeypatch):
     in a throwaway store: test_fermos_bind's typed values, none a result."""
     from openferment_core import artifacts, fermos, intake
     from openferment_core.models import SimulationRequest
-    from test_fermos_bind import TYPED, pool_of, typed
+    from test_fermos_bind import TYPED, pool_of, typed_in
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
     r = fermos.simulate(SimulationRequest(family="batch_v1", strain="s-cerevisiae-cenpk113-7d", product="ethanol",
-                                          sugar="glucose", overrides=typed(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3,
+                                          sugar="glucose", inputs=typed_in(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3,
                                                                            s0=50.0, **TYPED)), by_pool=pool_of())
     return artifacts.get(r.artifactId)
 

@@ -198,6 +198,31 @@ def all_artifacts() -> list[Artifact]:
     return db.run(_all(projects.current()))
 
 
+async def _of_tools(project_id: str, tools: tuple[str, ...]) -> list[Artifact]:
+    async with db.session() as s:
+        found = (await s.execute(select(t.artifacts.c.body).where(
+            t.artifacts.c.project_id == project_id, t.artifacts.c.tool.in_(tools)))).scalars()
+        bodies = list(found)
+    out: list[Artifact] = []
+    for raw in bodies:
+        try:
+            out.append(Artifact.model_validate(raw))
+        except ValueError:
+            continue
+    out.sort(key=lambda a: (a.createdAt, a.id), reverse=True)
+    return out
+
+
+def of_tools(*tools: str) -> list[Artifact]:
+    """The current project's artifacts of the tools named, newest first, read
+    by the table's tool column (its index with the project): a reader that
+    lists one kind of artifact reads no other body. A row that does not read
+    as an artifact is skipped, as `all_artifacts` skips one."""
+    if not tools:
+        return []
+    return db.run(_of_tools(projects.current(), tuple(tools)))
+
+
 async def _count() -> int:
     async with db.session() as s:
         return int((await s.execute(select(func.count()).select_from(t.artifacts))).scalar_one())

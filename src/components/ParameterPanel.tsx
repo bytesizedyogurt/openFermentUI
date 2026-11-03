@@ -19,7 +19,11 @@
 //                reviewer name every edit control is disabled and the row
 //                says where to set one;
 //   the service  is asked after each change, debounced, to lay the scope's
-//                overrides on (`POST /api/params/{scope}/resolve`), and its
+//                overrides on, each sent as a typed input in its spec's unit
+//                (`POST /api/params/{scope}/resolve`, lib/params.ts; a caller
+//                that shows fewer specs than its scope holds passes the
+//                scope's own as `unitSpecs`, so a value typed elsewhere on
+//                the scope goes in its unit too), and its
 //                answer, its out-of-bounds warnings included, is what each
 //                row shows. A value outside the bounds is kept, never clamped.
 //                The service binds the scope with the overrides as a run of
@@ -55,6 +59,8 @@ export interface ParameterPanelProps {
   readOnly?: boolean;
   /** What a record-bound value's link opens, by key (Proforma passes the records chooser it had); by default the records as citation chips. */
   recordsOf?: (key: string, value: ParameterValue) => ReactNode;
+  /** The specs that name each override's unit when `data` shows fewer than the scope holds (FermOSForecast's batch fit shows its start values and run length); by default `data`'s own. */
+  unitSpecs?: ParameterSpec[];
 }
 
 /** How long the panel waits after a change before asking the service to resolve it. */
@@ -88,7 +94,7 @@ export function groupOrder(specs: ParameterSpec[], groups: string[] = []): strin
 /** The time an override is kept at: now, to the second, in UTC. */
 const nowStamp = () => `${new Date().toISOString().slice(0, 19)}Z`;
 
-export function ParameterPanel({ scope, data, request, onChange, onResolved, onRefused, groups, readOnly, recordsOf }: ParameterPanelProps) {
+export function ParameterPanel({ scope, data, request, onChange, onResolved, onRefused, groups, readOnly, recordsOf, unitSpecs }: ParameterPanelProps) {
   const overrides = useStore(overridesFor(scope));
   const reviewer = useStore((s) => s.reviewer).trim();
   const setOverride = useStore((s) => s.setOverride);
@@ -115,7 +121,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
     }
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => {
-      resolveParams(scope, overrides, JSON.parse(askKey) as ParamAsk, ctrl.signal)
+      resolveParams(scope, overrides, unitSpecs ?? data.specs, JSON.parse(askKey) as ParamAsk, ctrl.signal)
         .then((result) => {
           setResolved({ asked, result });
           resolvedRef.current?.(result);

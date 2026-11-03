@@ -510,7 +510,7 @@ def test_a_stand_in_run_asks_for_a_simulation_cites_its_artifact_and_a_claim_sta
         fermos_store):  # noqa: F811
     from openferment_core import fermos
     from openferment_core.models import SimulationRequest
-    from test_fermos_bind import TYPED, pool_of, typed
+    from test_fermos_bind import TYPED, pool_of, typed_in
     from test_tools import _kept_start, _sim
 
     start = _kept_start(fermos_store)
@@ -519,7 +519,7 @@ def test_a_stand_in_run_asks_for_a_simulation_cites_its_artifact_and_a_claim_sta
     aid = tools.run("fermos_simulate", _sim(start), tools.ToolContext(pool_factory=lambda: fermos_store)).summary[
         "artifactId"]
     other = fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose",
-                                              overrides=typed(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3, s0=50.0,
+                                              inputs=typed_in(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3, s0=50.0,
                                                               **TYPED)), by_pool=pool_of()).artifactId
     script = Script(
         [("fermos_simulate", _sim(start))],

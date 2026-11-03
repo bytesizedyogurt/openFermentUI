@@ -415,13 +415,14 @@ export interface paths {
          *     (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
          *     (`?fit=`), the records of the evidence pool through the aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
          *     spec's convention, with its source; what waits, each named with the field
-         *     that would bind it; and notes saying what bound from where. `?overrides=`
-         *     (a JSON list of the person's overrides of `fermos:family:<family>`, as
-         *     the simulation would carry them; OF-BLD-020 §3.3) lays them on, so
-         *     `waiting` is what Simulate would refuse for. Starts no integration and
-         *     keeps nothing. 404 for a family no one declared; 422 in words for a fit
-         *     or simulation not on file, a fit of another family, a sugar or id that is
-         *     not one, or an override of another scope.
+         *     that would bind it; and notes saying what bound from where. `?inputs=`
+         *     (a JSON list of the values a person sets on `fermos:family:<family>`,
+         *     each a typed quantity with its origin, as the simulation would carry
+         *     them; OF-BLD-020 §3.3, alpha 2.2 D2) lays them on, so `waiting` is what
+         *     Simulate would refuse for. Starts no integration and keeps nothing. 404
+         *     for a family no one declared; 422 in words for a fit or simulation not
+         *     on file, a fit of another family, a sugar or id that is not one, or a
+         *     value set that cannot stand.
          */
         get: operations["fermos_bind_api_fermos_bind_get"];
         put?: never;
@@ -529,8 +530,13 @@ export interface paths {
         put?: never;
         /**
          * Fermos Forecast
-         * @description A band for the next run from a fit (§7.3). A refusal says which
-         *     parameter the run did not identify, and what run would.
+         * @description A band for the next run from a fit (§7.3), from the fitted run's own
+         *     start values and length or the ones the request sets, each a typed
+         *     quantity with its origin keyed as the scope `fermos:forecast:<fit id>`
+         *     names it. A forecast of a kept fit is kept as a run of the kinetics
+         *     engine, in the name of the request's `by`. A refusal says which
+         *     parameter the run did not identify, and what run would, or why a value
+         *     set cannot stand.
          */
         post: operations["fermos_forecast_api_fermos_forecast_post"];
         delete?: never;
@@ -579,10 +585,11 @@ export interface paths {
          * Fermos Simulate
          * @description Simulate a model family (`SimulationResult`) and keep it as one
          *     `fermos.simulation` artifact. Each parameter resolves with its source: a
-         *     person's override (an assumption by name, so the result is `assumed`), else
-         *     the family's stated convention. 422 in words for a parameter that waits
-         *     (named with what would bind it), the light socket, a bad override, or a
-         *     run that cannot end.
+         *     value the request sets (a typed quantity with its origin, a person's
+         *     assumption or a model's estimate by name, so the result is `assumed`),
+         *     else the family's stated convention. 422 in words for a parameter that
+         *     waits (named with what would bind it), the light socket, a value set that
+         *     cannot stand, or a run that cannot end.
          */
         post: operations["fermos_simulate_api_fermos_simulate_post"];
         delete?: never;
@@ -625,11 +632,12 @@ export interface paths {
          * Fermos Vessel
          * @description Design the vessel a simulation (or, anaerobic only, a fit) needs, in
          *     the Proforma worker on BioSTEAM: one `fermos.vessel` artifact, computed
-         *     or returned as kept for the same basis. 422 in words for a design that
-         *     cannot be made as asked (no plant scale and no batch volume, a fit asked
-         *     for an aerobic design, an artifact not on file, an override that cannot
-         *     stand, BioSTEAM's own refusal); 409 for a file damaged on disk; 503 when
-         *     the worker cannot answer.
+         *     or returned as kept for the same basis. Each value the request sets is a
+         *     typed quantity with its origin, keyed as the design's scope names it. 422
+         *     in words for a design that cannot be made as asked (no plant scale and no
+         *     batch volume, a fit asked for an aerobic design, an artifact not on file,
+         *     a value set that cannot stand, BioSTEAM's own refusal); 409 for a file
+         *     damaged on disk; 503 when the worker cannot answer.
          */
         post: operations["fermos_vessel_api_fermos_vessel_post"];
         delete?: never;
@@ -1501,14 +1509,16 @@ export interface paths {
         put?: never;
         /**
          * Params Resolve
-         * @description A person's overrides laid on a scope's values (`ParamResolveResult`):
-         *     each override an `assumption` by the person it names, the basis inputs
-         *     the overrides would add to a run, and every value outside its bounds in
-         *     words (kept, never clamped). The basis inputs are the ones a run of the
-         *     scope writes for those overrides (§2.R). Runs nothing and keeps nothing:
-         *     the service keeps no override (D3). 404, 422, 409 and 503 as the GET
-         *     answers them; a `fermos:vessel:` scope may start the worker as the GET
-         *     may.
+         * @description The values a person or a model sets laid on a scope's values
+         *     (`ParamResolveResult`): each a typed quantity with its origin, converted
+         *     into an override of the scope the route names (in its parameter's unit)
+         *     and laid on as an `assumption` by the person or an estimate by the model
+         *     it names, the basis inputs those would add to a run, and every value
+         *     outside its bounds in words (kept, never clamped). The basis inputs are
+         *     the ones a run of the scope writes for them (§2.R). Runs nothing and
+         *     keeps nothing: the service keeps no override (D3). 404, 422, 409 and 503
+         *     as the GET answers them; a `fermos:vessel:` scope may start the worker as
+         *     the GET may.
          */
         post: operations["params_resolve_api_params__scope__resolve_post"];
         delete?: never;
@@ -3456,8 +3466,13 @@ export interface components {
          * @description One parameter a thing takes: a `ParameterSpec` (the panel's shape,
          *     its bounds with their written reason) with its default value and where
          *     the default comes from, `library-default` naming the package it was read
-         *     from or a `convention` saying what the setting is. The panel's fields an
-         *     engine may leave unset default here; `sourceRule` is the origin's kind.
+         *     from or a `convention` saying what the setting is. A parameter with no
+         *     default has `value` and `origin` null: a run sets it, or the engine binds
+         *     it from what the project holds (the kinetics engine binds a family's
+         *     parameter from the project's records), and a run that leaves it with
+         *     neither is refused in words, keeping nothing. The panel's fields an
+         *     engine may leave unset default here; `sourceRule` is the origin's kind,
+         *     and `assumption` (a run's value) for a parameter with no default.
          */
         EngineParameter: {
             /** Boundsreason */
@@ -3491,7 +3506,7 @@ export interface components {
             min?: number | null;
             /** Note */
             note?: string | null;
-            origin: components["schemas"]["Origin"];
+            origin: components["schemas"]["Origin"] | null;
             /**
              * Scale
              * @default linear
@@ -3510,7 +3525,7 @@ export interface components {
             /** Unit */
             unit: string;
             /** Value */
-            value: number | string;
+            value: number | string | null;
         };
         /**
          * EnginePrecision
@@ -3882,23 +3897,32 @@ export interface components {
             /** Value */
             value: number;
         };
-        /** ForecastRequest */
+        /**
+         * ForecastRequest
+         * @description POST /api/fermos/forecast: a band for the next run, drawn from a fit.
+         *     Its start values and length are the values of the forecast's scope
+         *     `fermos:forecast:<fit id>`, each keyed as the scope names it (x0, s0, p0
+         *     and t_end, fermos.FORECAST_KEYS) and typed as a quantity with its
+         *     origin, the person or the model that set it and the day it was set;
+         *     the ones left unset are the fitted run's own. It holds these fields and
+         *     no other: a field it does not name is refused.
+         */
         ForecastRequest: {
-            /** Changedby */
-            changedBy?: string | null;
-            /** Durationby */
-            durationBy?: string | null;
-            /** Durationh */
-            durationH?: number | null;
+            /**
+             * By
+             * @default
+             */
+            by: string;
             fit?: components["schemas"]["KineticFit"] | null;
             /** Fitartifactid */
             fitArtifactId?: string | null;
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /**
              * Sample
              * @default false
              */
             sample: boolean;
-            start?: components["schemas"]["StartValues"];
         };
         /** ForecastResult */
         ForecastResult: {
@@ -4724,7 +4748,8 @@ export interface components {
         };
         /**
          * ParamResolveRequest
-         * @description POST /api/params/{scope}/resolve. Runs nothing.
+         * @description POST /api/params/{scope}/resolve. Runs nothing. It holds these
+         *     fields alone: a field it does not name is refused.
          */
         ParamResolveRequest: {
             /** Durationpreset */
@@ -4739,8 +4764,8 @@ export interface components {
             flowsheet?: string | null;
             /** Host */
             host?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /** Product */
             product?: string | null;
             /** Startfrom */
@@ -6025,9 +6050,15 @@ export interface components {
         };
         /**
          * SimulationRequest
-         * @description POST /api/fermos/simulate.
+         * @description POST /api/fermos/simulate. It holds these fields alone: a field it
+         *     does not name is refused.
          */
         SimulationRequest: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
             /**
              * Durationpreset
              * @default until-sugar-runs-out
@@ -6038,8 +6069,8 @@ export interface components {
             family: string;
             /** Fitartifact */
             fitArtifact?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /** Product */
             product?: string | null;
             /** Recordsbyparam */
@@ -6055,18 +6086,6 @@ export interface components {
             strain?: string | null;
             /** Sugar */
             sugar?: string | null;
-        };
-        /**
-         * StartValues
-         * @description A forecast's starting values; unset ones are the fitted run's own.
-         */
-        StartValues: {
-            /** P0 */
-            P0?: number | null;
-            /** S0 */
-            S0?: number | null;
-            /** X0 */
-            X0?: number | null;
         };
         /**
          * StateWrite
@@ -6610,15 +6629,21 @@ export interface components {
         };
         /**
          * VesselRequest
-         * @description POST /api/fermos/vessel. Exactly one of `simulation` and `fit`.
+         * @description POST /api/fermos/vessel. Exactly one of `simulation` and `fit`. It
+         *     holds these fields alone: a field it does not name is refused.
          */
         VesselRequest: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
             /** Fit */
             fit?: string | null;
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /** Klamethod */
             klaMethod?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
             /** Simulation */
             simulation?: string | null;
             /** Vesseltype */
@@ -7326,7 +7351,7 @@ export interface operations {
                 fit?: string | null;
                 startFrom?: string;
                 durationPreset?: string;
-                overrides?: string | null;
+                inputs?: string | null;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */

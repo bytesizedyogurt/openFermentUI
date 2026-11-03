@@ -2,7 +2,8 @@
 
 A kept simulation feeds a Proforma scenario's titre, yield and batch time
 (the §5.1 bridge, now over simulations), what waits is asked with the
-person's overrides laid on (GET /api/fermos/bind?overrides=), and a
+person's overrides laid on (GET /api/fermos/bind?inputs=, each a typed
+input since alpha 2.2), and a
 forecast's start values and length are a parameter scope
 (`fermos:forecast:<kinetic fit id>`), so the Forecast tab types no number of
 its own (E.1‴).
@@ -22,6 +23,7 @@ from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, fermos, intake, params, proforma
 from openferment_core.models import FermosPoint, FermosSeries, Override, ParamResolveRequest, SimulationRequest
+from standins import as_inputs, family_units, inputs_json, scope_units
 
 BY = "openFerment test fixture"
 BATCH = "batch_v1"
@@ -37,6 +39,11 @@ def typed(scope=SCOPE, **values):
             for k, v in values.items()]
 
 
+def typed_in(family=BATCH, **values):
+    """`typed`'s values on a family's scope as the typed inputs a request takes, each in its unit (alpha 2.2 D2)."""
+    return as_inputs(typed(scope=fermos.family_scope(family), **values), family_units(family))
+
+
 EMPTY = SimpleNamespace(records=[], records_by_id={}, hidden={})
 
 
@@ -50,7 +57,7 @@ def store(monkeypatch, tmp_path):
 def simulate(family=BATCH, product="ethanol", **over):
     values = {**TYPED, **over}
     return fermos.simulate(SimulationRequest(family=family, product=product, sugar="glucose",
-                                             overrides=typed(scope=f"fermos:family:{family}", **values)),
+                                             inputs=typed_in(family, **values)),
                            by_pool=EMPTY)
 
 
@@ -102,8 +109,8 @@ def test_a_simulation_of_another_product_or_a_chemostat_feeds_nothing_and_says_w
     info = proforma.fit_info(artifacts.get(nameless.artifactId), ETHANOL)
     assert info.refused is None
     assert any("names no product" in w for w in info.flags)
-    chemo = fermos.simulate(SimulationRequest(family="chemostat_v1", product="ethanol", sugar="glucose", overrides=typed(
-        scope="fermos:family:chemostat_v1", **TYPED, dilution_rate=0.1, feed_conc=50.0, t_end=100.0)), by_pool=EMPTY)
+    chemo = fermos.simulate(SimulationRequest(family="chemostat_v1", product="ethanol", sugar="glucose", inputs=typed_in(
+        "chemostat_v1", **TYPED, dilution_rate=0.1, feed_conc=50.0, t_end=100.0)), by_pool=EMPTY)
     info = proforma.fit_info(artifacts.get(chemo.artifactId), ETHANOL)
     assert info.refused and "chemostat" in info.refused and "no batch" in info.refused
     with pytest.raises(proforma.ScenarioRefused, match="cannot feed titre"):
@@ -120,16 +127,20 @@ def test_bind_lays_the_persons_overrides_on_so_waiting_is_what_simulate_would_re
     some = {k: v for k, v in TYPED.items() if k != "p_max"}
     r = client.get("/api/fermos/bind", params={
         "family": BATCH, "product": "ethanol", "sugar": "glucose",
-        "overrides": json.dumps([o.model_dump() for o in typed(**some)])})
+        "inputs": json.dumps(inputs_json(typed(**some), family_units(BATCH)))})
     assert r.status_code == 200 and r.json()["waiting"] == ["p_max"]
     mu = next(v for v in r.json()["values"] if v["key"] == "mu_max")
     assert mu["origin"] == "assumption" and mu["overriddenBy"] == BY
-    # Another scope's override is refused in words, never laid on; a list
-    # that is not one is the 422 Proforma's binding gives.
+    # A value the family has no parameter for is refused in words;
+    # an input that names a scope of its own, and a list that is not one, are
+    # the 422 the request's shape gives.
     stray = client.get("/api/fermos/bind", params={
-        "family": BATCH, "overrides": json.dumps([o.model_dump() for o in typed(scope="proforma:sc-yeast-1", titre=1.0)])})
-    assert stray.status_code == 422 and "proforma:sc-yeast-1" in stray.json()["detail"]
-    assert client.get("/api/fermos/bind", params={"family": BATCH, "overrides": "{"}).status_code == 422
+        "family": BATCH, "inputs": json.dumps(inputs_json(typed(titre=1.0), {"titre": "g L⁻¹"}))})
+    assert stray.status_code == 422 and "there is no parameter titre here" in stray.json()["detail"]
+    scoped = [{**i, "scope": "proforma:sc-yeast-1"} for i in inputs_json(typed(ks=0.2), family_units(BATCH))]
+    named = client.get("/api/fermos/bind", params={"family": BATCH, "inputs": json.dumps(scoped)})
+    assert named.status_code == 422 and named.json()["detail"].startswith("inputs is a JSON list of values")
+    assert client.get("/api/fermos/bind", params={"family": BATCH, "inputs": "{"}).status_code == 422
 
 
 def _api():
@@ -175,7 +186,7 @@ def test_a_forecasts_start_values_and_length_are_a_scope_bound_to_the_fitted_run
         assert by[key].origin == "fit" and by[key].value == own.value and by[key].source.id == fit.kineticArtifactId
     assert by["t_end"].value == pytest.approx(30.0) and got.waiting == []
     # A person's value is an assumption by name, and nothing else moves.
-    res = params.resolve_scope(scope, ParamResolveRequest(overrides=typed(scope=scope, s0=80.0)))
+    res = params.resolve_scope(scope, ParamResolveRequest(inputs=as_inputs(typed(scope=scope, s0=80.0), scope_units(scope))))
     s0 = next(v for v in res.values if v.key == "s0")
     assert s0.origin == "assumption" and s0.overriddenBy == BY and s0.value == 80.0
     assert next(v for v in res.values if v.key == "x0").origin == "fit"
@@ -199,15 +210,18 @@ def test_a_forecast_scope_takes_the_runs_own_units_and_refuses_what_is_not_a_log
 
 
 def test_a_forecast_from_the_panels_values_names_the_person_as_it_did_before(store):
-    # The Forecast tab sends the scope's overrides as the forecast's start
-    # values and length (src/lib/fermos.ts forecastAsk); the service keeps
-    # a changed start an assumption by name, and the length one too, by the
-    # person who set it, else the one who changed a start (OF-BLD-020 §3.R,
-    # findings 7 and 11; test_fermos_3r holds the length alone).
+    # The Forecast tab sends the scope's overrides as the forecast's typed
+    # inputs (src/lib/fermos.ts fermosForecast, through lib/params.ts
+    # inputsOf); the service keeps a changed start an assumption by name,
+    # and the length one too, each by the person who set it, with the day
+    # (OF-BLD-020 §3.R, findings 7 and 11; alpha 2.2 D1, D2; test_fermos_3r
+    # holds the length alone).
     fit = _logistic_fit(store)
+    scope = fermos.forecast_scope(fit.kineticArtifactId)
     fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId,
-                             start=fermos.StartValues(S0=80.0), changed_by=BY, duration_h=40.0)
+                             inputs=as_inputs(typed(scope=scope, s0=80.0, t_end=40.0), scope_units(scope)))
     names = {i.name: i for i in artifacts.get(fc.artifactId).inputs}
     assert names["start S0"].source.kind == "assumption" and names["start S0"].source.by == BY
     assert names["duration"].value == 40.0 and fc.evidence.provenance == "assumed"
     assert names["duration"].source.kind == "assumption" and names["duration"].source.by == BY
+    assert names["start S0"].source.note == names["duration"].source.note == "typed on 2026-10-21: a STAND-IN for a test"

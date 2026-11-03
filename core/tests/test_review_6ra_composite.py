@@ -35,7 +35,8 @@ import pytest
 
 from openferment_core import artifacts, composite, proforma, pureos, vessel
 from openferment_core.flowsheets import shelf
-from openferment_core.models import Override, VesselRequest
+from openferment_core.models import Override
+from standins import resolve_json, vessel_request
 from test_custom_train import (  # noqa: F401 (the fixtures, by name)
     AT,
     BY,
@@ -65,7 +66,7 @@ def vessel_override(aid: str, key: str, value) -> Override:
 
 
 def batch_volume_design(aid: str):
-    return vessel.design(VesselRequest(simulation=aid, overrides=[
+    return vessel.design(vessel_request(simulation=aid, overrides=[
         vessel_override(aid, "batch_volume", BATCH_VOLUME), vessel_override(aid, "loading_time", LOADING)]))
 
 
@@ -102,7 +103,7 @@ def test_a_vessel_value_a_person_typed_names_them_in_the_composites_basis(store,
     from test_vessel import ANAEROBIC_ID
 
     sean = "Sean Creighton"
-    d = vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[
+    d = vessel.design(vessel_request(simulation=ANAEROBIC_ID, overrides=[
         vessel_override(ANAEROBIC_ID, "plant_scale", PLANT),
         Override(scope=f"fermos:vessel:{ANAEROBIC_ID}", key="V_wf", value=0.8, by=sean, at=AT, note=STANDIN)]))
     run = pureos.run_train(spec_of())
@@ -167,8 +168,8 @@ def test_a_depreciation_schedule_longer_than_the_plants_life_is_refused_in_words
     with pytest.raises(params.ParamRefused, match=words):
         composite.finance_values([over("depreciation", longer)])
     assert composite.finance_values([over("depreciation", fits)])  # one that fits stands
-    ask = {"flowsheet": FLOWSHEET, "vessel": parts.vessel, "trainRun": parts.train,
-           "overrides": [over("depreciation", longer).model_dump()]}
+    fields = {"flowsheet": FLOWSHEET, "vessel": parts.vessel, "trainRun": parts.train}
+    ask = {**fields, "inputs": resolve_json(SCOPE, [over("depreciation", longer)], **fields)}
     r = client.post(f"/api/params/{SCOPE}/resolve", json=ask)
     assert r.status_code == 422 and f"the depreciation schedule {longer} writes the capital off" in r.json()["detail"]
     with pytest.raises(proforma.ScenarioRefused, match=words):

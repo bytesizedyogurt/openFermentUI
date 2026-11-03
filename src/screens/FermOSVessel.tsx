@@ -334,6 +334,7 @@ export default function FermOSVessel() {
 
   const scope = chosen ? vesselScope(chosen.id) : '';
   const overrides = useStore(overridesFor(scope));
+  const reviewer = useStore((s) => s.reviewer).trim();
   const vesselType = vesselTypeOf(overrides);
   const ask = useMemo(() => ({ vesselType }), [vesselType]);
   const [panel, setPanel] = useState<ParamScope | null>(null);
@@ -387,7 +388,9 @@ export default function FermOSVessel() {
     const mine = asked;
     setBusy(true);
     setRefused(null);
-    designVessel(vesselRequest(chosen.kind === 'simulation' ? { simulation: chosen.id } : { fit: chosen.id }, overrides), ctrl.signal)
+    // The panel's specs name the unit each override is sent in (lib/params.ts, `inputsOf`).
+    const source = chosen.kind === 'simulation' ? { simulation: chosen.id } : { fit: chosen.id };
+    designVessel(vesselRequest(source, overrides, panel?.specs ?? [], reviewer), ctrl.signal)
       .then((d) => {
         if (ctrl.signal.aborted) return;
         setDesign({ asked: mine, design: d });

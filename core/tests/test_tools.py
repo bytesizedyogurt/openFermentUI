@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, evidence_pool, intake, tools
+from openferment_core.engine import runs
 from openferment_core.models import Candidate, Quantity, ReviewDecision
 
 STAND_IN = "STAND-IN for test_tools: invented records, not a paper's values."
@@ -211,7 +212,7 @@ def test_the_tools_that_keep_something_say_so_and_every_tool_acts_in_one_project
 
     assert {n for n, t in tools.REGISTRY.items() if t.writes} == {f"{m}_write" for m in module_stores.MODULES} | {
         "run_flowsheet", "fermos_simulate", "fermos_vessel", "pureos_build", "engine_run", "study_scenario",
-        "study_compare", "flowsheet_import", "catalogue_write"}
+        "study_compare", "flowsheet_import", "catalogue_write", "growth_forecast"}
     assert {t.scope for t in tools.REGISTRY.values()} == {"project"}
 
 
@@ -570,10 +571,10 @@ def _kept_start(pool_):
     service holds no person's assumption, and x0 and p0 bind from no record."""
     from openferment_core import fermos
     from openferment_core.models import SimulationRequest
-    from test_fermos_bind import typed
+    from test_fermos_bind import typed_in
 
     return fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose",
-                                             overrides=typed(x0=0.2, p0=0.0)), by_pool=pool_).artifactId
+                                             inputs=typed_in(x0=0.2, p0=0.0)), by_pool=pool_).artifactId
 
 
 def _sim(start, **over):
@@ -613,6 +614,9 @@ def test_fermos_simulate_runs_a_family_from_record_ids_keeps_one_simulation_and_
     assert (line.agent, line.who, line.module, line.action, line.state, line.target, line.askId, line.effort) == (
         "model", "claude-haiku-5-5", "fermos", "simulate", "open", "batch_v1", "ask-61", "medium")
     assert line.detail["tool"] == "fermos_simulate" and line.detail["artifactId"] == ev.id
+    # Alpha 2.2 D3: the simulation is one run of the kinetics engine, created by the model that asked.
+    run = runs.get(ev.id)
+    assert (run.engine, run.plant, run.tool, run.by) == ("kinetics", "batch_v1", fermos.SIMULATION, "claude-haiku-5-5")
     # At no gate: nothing was proposed.
     assert proposals.read().proposals == []
     # fermos_write's simulate is the same run, marked with its own name.
@@ -621,6 +625,7 @@ def test_fermos_simulate_runs_a_family_from_record_ids_keeps_one_simulation_and_
                                               "startFrom": f"simulation:{start}"}}, _pcx(fermos_store))
     assert w.error is None and w.evidence[0].id == ev.id
     assert audit.read()[-1].detail["tool"] == "fermos_write" and audit.read()[-1].detail["note"] == "again"
+    assert [r.by for r in runs.listed("kinetics") if r.id == ev.id] == ["claude-haiku-5-5"], "the same run, one row"
 
 
 def test_fermos_simulate_with_a_parameter_waiting_returns_the_refusals_words_and_keeps_nothing(fermos_store):
@@ -631,10 +636,43 @@ def test_fermos_simulate_with_a_parameter_waiting_returns_the_refusals_words_and
     assert r.error and r.error.startswith("fermos_simulate refused: batch_v1 cannot run yet")
     assert "x0 (cells at the start)" in r.error and "p0 (product at the start)" in r.error
     assert "a model never supplies one" in r.error and "recordsByParam" in r.error
-    assert r.evidence == [] and audit.read() == [] and artifacts.all_artifacts() == []
+    assert r.evidence == [] and audit.read() == [] and artifacts.all_artifacts() == [] and runs.listed() == []
     w = tools.run("fermos_write", {"action": "simulate", "target": "batch_v1", "note": "",
                                    "fields": {"product": "ethanol", "sugar": "glucose"}}, _pcx(fermos_store))
     assert w.error == r.error.replace("fermos_simulate", "fermos_write", 1)
+
+
+def test_growth_forecast_keeps_its_forecast_as_a_run_in_its_callers_name_and_audits_it(fermos_store):
+    """Alpha 2.2 D3: a forecast of a kept fit through either tool is one run
+    of the kinetics engine, created by the caller `_actor` names; it is a
+    write, audited, and at the HTTP door it runs for a person ?by= names."""
+    import numpy as np
+
+    from openferment_core import api, audit, fermos
+    from test_fermos import SD, T, batch
+
+    fit = fermos.fit("dep-t", batch(T, np.random.default_rng(4), SD))
+    r = tools.run("growth_forecast", {"fitArtifactId": fit.kineticArtifactId}, _pcx(fermos_store))
+    assert r.error is None, r.error
+    run = runs.get(r.summary["artifactId"])
+    assert (run.engine, run.plant, run.configuration, run.tool, run.by) == (
+        "kinetics", "forecast", fit.kineticArtifactId, fermos.FORECAST, "claude-haiku-5-5")
+    [line] = audit.read()
+    assert (line.agent, line.who, line.module, line.action, line.state, line.target) == (
+        "model", "claude-haiku-5-5", "fermos", "forecast", "open", fit.kineticArtifactId)
+    assert line.detail["tool"] == "growth_forecast" and line.detail["artifactId"] == run.id
+    w = tools.run("fermos_write", {"action": "forecast", "target": "", "note": "again",
+                                   "fields": {"fitArtifactId": fit.kineticArtifactId}}, _pcx(fermos_store))
+    assert w.error is None and w.summary["artifactId"] == run.id and runs.listed("kinetics") == [run]
+    assert audit.read()[-1].detail["tool"] == "fermos_write"
+    refused = tools.run("growth_forecast", {"fitArtifactId": fit.growthArtifactId}, _pcx(fermos_store))
+    assert refused.error.startswith("growth_forecast refused: ") and runs.listed("kinetics") == [run]
+    client = TestClient(api.app)
+    nobody = client.post("/api/tools/growth_forecast", json={"fitArtifactId": fit.kineticArtifactId})
+    assert nobody.status_code == 422 and "this call names nobody" in nobody.json()["detail"]
+    named = client.post("/api/tools/growth_forecast", params={"by": "Ada Moreno"},
+                        json={"fitArtifactId": fit.kineticArtifactId}).json()
+    assert named["error"] is None and named["summary"]["artifactId"] == run.id
 
 
 @pytest.mark.parametrize("named, words", [
@@ -665,7 +703,9 @@ def test_a_number_in_fermos_simulates_input_is_refused_and_its_schema_holds_none
     for raw in (_sim(start, recordsByParam={"mu_max": [0.4]}), _sim(start, mu_max=0.4), _sim(start, family=1)):
         r = tools.run("fermos_simulate", raw, _pcx(fermos_store))
         assert r.error and "a number was typed" in r.error and r.evidence == []
-    assert "refused its input" in tools.run("fermos_simulate", _sim(start, overrides=[]), _pcx(fermos_store)).error
+    # The values a request sets reach fermOS at the routes the screens use; the tool takes ids and words (E.4‴).
+    for stale in ("overrides", "inputs", "values"):
+        assert "refused its input" in tools.run("fermos_simulate", _sim(start, **{stale: []}), _pcx(fermos_store)).error
     schema = json.dumps(tools.REGISTRY["fermos_simulate"].info().inputSchema)
     assert '"number"' not in schema and '"integer"' not in schema
     assert tools.REGISTRY["fermos_simulate"].strict is False

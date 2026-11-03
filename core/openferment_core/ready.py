@@ -286,6 +286,24 @@ def check_models() -> Check:
     return Check("models", worst, "; ".join(said))
 
 
+# What a row adds for the core's own kinetics engine (docs/api/engines.md,
+# The core's `kinetics`): its things wait for values no default gives, so
+# its conformance run reads a file of them, which this builder writes; and it
+# computes in the service's process, its vessel design in the Proforma worker.
+CONFORM_INPUTS = {"kinetics": "openferment_core.fermos_engine.write_placeholder_inputs(<file>, by=<your name>)"}
+CALLS_WORKER = {"kinetics": "a vessel design runs in the Proforma worker"}
+
+
+def conform_command(name: str) -> str:
+    """The command that checks an engine here, in words: with `--inputs
+    <file>` and the builder that writes the file, for an engine whose things
+    wait for values (CONFORM_INPUTS)."""
+    command = f"python -m openferment_core.engine.conform {name}"
+    if name in CONFORM_INPUTS:
+        return f"{command} --inputs <file>, the file {CONFORM_INPUTS[name]} writes"
+    return command
+
+
 def check_engines() -> list[Check]:
     """One row per engine registered here (docs/api/engines.md): its version,
     its worker, and its last conformance verdict at that version. An engine
@@ -304,9 +322,11 @@ def check_engines() -> list[Check]:
         except Exception as ex:  # a version that cannot be read is said, and the row stands
             rows.append(Check(f"engine {name}", "warn", f"its version could not be read: {type(ex).__name__}: {ex}"))
             continue
-        worker = f"worker {e.worker} ({registry.status_of(e)})" if e.worker else "no worker: it computes in the service's process"
+        worker = (f"worker {e.worker} ({registry.status_of(e)})" if e.worker else
+                  "no worker: it computes in the service's process" + (f"; {CALLS_WORKER[name]}"
+                                                                       if name in CALLS_WORKER else ""))
         verdict = conform.latest(name)
-        again = f"python -m openferment_core.engine.conform {name}"
+        again = conform_command(name)
         if verdict is None:
             mark, said = "warn", f"never checked here: {again}"
         elif verdict.version != version:

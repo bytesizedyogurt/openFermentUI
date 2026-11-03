@@ -2029,7 +2029,7 @@
         "type": "object"
       },
       "EngineParameter": {
-        "description": "One parameter a thing takes: a `ParameterSpec` (the panel's shape,\nits bounds with their written reason) with its default value and where\nthe default comes from, `library-default` naming the package it was read\nfrom or a `convention` saying what the setting is. The panel's fields an\nengine may leave unset default here; `sourceRule` is the origin's kind.",
+        "description": "One parameter a thing takes: a `ParameterSpec` (the panel's shape,\nits bounds with their written reason) with its default value and where\nthe default comes from, `library-default` naming the package it was read\nfrom or a `convention` saying what the setting is. A parameter with no\ndefault has `value` and `origin` null: a run sets it, or the engine binds\nit from what the project holds (the kinetics engine binds a family's\nparameter from the project's records), and a run that leaves it with\nneither is refused in words, keeping nothing. The panel's fields an\nengine may leave unset default here; `sourceRule` is the origin's kind,\nand `assumption` (a run's value) for a parameter with no default.",
         "properties": {
           "boundsReason": {
             "title": "Boundsreason",
@@ -2122,7 +2122,14 @@
             "title": "Note"
           },
           "origin": {
-            "$ref": "#/components/schemas/Origin"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Origin"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "scale": {
             "default": "linear",
@@ -2167,6 +2174,9 @@
               },
               {
                 "type": "string"
+              },
+              {
+                "type": "null"
               }
             ],
             "title": "Value"
@@ -3125,39 +3135,14 @@
         "type": "object"
       },
       "ForecastRequest": {
+        "additionalProperties": false,
+        "description": "POST /api/fermos/forecast: a band for the next run, drawn from a fit.\nIts start values and length are the values of the forecast's scope\n`fermos:forecast:<fit id>`, each keyed as the scope names it (x0, s0, p0\nand t_end, fermos.FORECAST_KEYS) and typed as a quantity with its\norigin, the person or the model that set it and the day it was set;\nthe ones left unset are the fitted run's own. It holds these fields and\nno other: a field it does not name is refused.",
         "properties": {
-          "changedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Changedby"
-          },
-          "durationBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Durationby"
-          },
-          "durationH": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Durationh"
+          "by": {
+            "default": "",
+            "maxLength": 200,
+            "title": "By",
+            "type": "string"
           },
           "fit": {
             "anyOf": [
@@ -3180,13 +3165,17 @@
             ],
             "title": "Fitartifactid"
           },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/EngineInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
           "sample": {
             "default": false,
             "title": "Sample",
             "type": "boolean"
-          },
-          "start": {
-            "$ref": "#/components/schemas/StartValues"
           }
         },
         "title": "ForecastRequest",
@@ -5329,7 +5318,8 @@
         "type": "object"
       },
       "ParamResolveRequest": {
-        "description": "POST /api/params/{scope}/resolve. Runs nothing.",
+        "additionalProperties": false,
+        "description": "POST /api/params/{scope}/resolve. Runs nothing. It holds these\nfields alone: a field it does not name is refused.",
         "properties": {
           "durationPreset": {
             "anyOf": [
@@ -5386,11 +5376,11 @@
             ],
             "title": "Host"
           },
-          "overrides": {
+          "inputs": {
             "items": {
-              "$ref": "#/components/schemas/Override"
+              "$ref": "#/components/schemas/EngineInput"
             },
-            "title": "Overrides",
+            "title": "Inputs",
             "type": "array"
           },
           "product": {
@@ -8755,8 +8745,15 @@
         "type": "object"
       },
       "SimulationRequest": {
-        "description": "POST /api/fermos/simulate.",
+        "additionalProperties": false,
+        "description": "POST /api/fermos/simulate. It holds these fields alone: a field it\ndoes not name is refused.",
         "properties": {
+          "by": {
+            "default": "",
+            "maxLength": 200,
+            "title": "By",
+            "type": "string"
+          },
           "durationPreset": {
             "default": "until-sugar-runs-out",
             "enum": [
@@ -8781,11 +8778,11 @@
             ],
             "title": "Fitartifact"
           },
-          "overrides": {
+          "inputs": {
             "items": {
-              "$ref": "#/components/schemas/Override"
+              "$ref": "#/components/schemas/EngineInput"
             },
-            "title": "Overrides",
+            "title": "Inputs",
             "type": "array"
           },
           "product": {
@@ -8841,46 +8838,6 @@
           "family"
         ],
         "title": "SimulationRequest",
-        "type": "object"
-      },
-      "StartValues": {
-        "description": "A forecast's starting values; unset ones are the fitted run's own.",
-        "properties": {
-          "P0": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "P0"
-          },
-          "S0": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "S0"
-          },
-          "X0": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "X0"
-          }
-        },
-        "title": "StartValues",
         "type": "object"
       },
       "StateWrite": {
@@ -10321,8 +10278,15 @@
         "type": "object"
       },
       "VesselRequest": {
-        "description": "POST /api/fermos/vessel. Exactly one of `simulation` and `fit`.",
+        "additionalProperties": false,
+        "description": "POST /api/fermos/vessel. Exactly one of `simulation` and `fit`. It\nholds these fields alone: a field it does not name is refused.",
         "properties": {
+          "by": {
+            "default": "",
+            "maxLength": 200,
+            "title": "By",
+            "type": "string"
+          },
           "fit": {
             "anyOf": [
               {
@@ -10334,6 +10298,13 @@
             ],
             "title": "Fit"
           },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/EngineInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
           "klaMethod": {
             "anyOf": [
               {
@@ -10344,13 +10315,6 @@
               }
             ],
             "title": "Klamethod"
-          },
-          "overrides": {
-            "items": {
-              "$ref": "#/components/schemas/Override"
-            },
-            "title": "Overrides",
-            "type": "array"
           },
           "simulation": {
             "anyOf": [
@@ -11439,7 +11403,7 @@
     },
     "/api/fermos/bind": {
       "get": {
-        "description": "A family's parameters bound for a strain, product and sugar\n(`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose\n(`?fit=`), the records of the evidence pool through the aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the\nspec's convention, with its source; what waits, each named with the field\nthat would bind it; and notes saying what bound from where. `?overrides=`\n(a JSON list of the person's overrides of `fermos:family:<family>`, as\nthe simulation would carry them; OF-BLD-020 §3.3) lays them on, so\n`waiting` is what Simulate would refuse for. Starts no integration and\nkeeps nothing. 404 for a family no one declared; 422 in words for a fit\nor simulation not on file, a fit of another family, a sugar or id that is\nnot one, or an override of another scope.",
+        "description": "A family's parameters bound for a strain, product and sugar\n(`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose\n(`?fit=`), the records of the evidence pool through the aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the\nspec's convention, with its source; what waits, each named with the field\nthat would bind it; and notes saying what bound from where. `?inputs=`\n(a JSON list of the values a person sets on `fermos:family:<family>`,\neach a typed quantity with its origin, as the simulation would carry\nthem; OF-BLD-020 §3.3, alpha 2.2 D2) lays them on, so `waiting` is what\nSimulate would refuse for. Starts no integration and keeps nothing. 404\nfor a family no one declared; 422 in words for a fit or simulation not\non file, a fit of another family, a sugar or id that is not one, or a\nvalue set that cannot stand.",
         "operationId": "fermos_bind_api_fermos_bind_get",
         "parameters": [
           {
@@ -11537,7 +11501,7 @@
           },
           {
             "in": "query",
-            "name": "overrides",
+            "name": "inputs",
             "required": false,
             "schema": {
               "anyOf": [
@@ -11548,7 +11512,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Overrides"
+              "title": "Inputs"
             }
           },
           {
@@ -11785,7 +11749,7 @@
     },
     "/api/fermos/forecast": {
       "post": {
-        "description": "A band for the next run from a fit (§7.3). A refusal says which\nparameter the run did not identify, and what run would.",
+        "description": "A band for the next run from a fit (§7.3), from the fitted run's own\nstart values and length or the ones the request sets, each a typed\nquantity with its origin keyed as the scope `fermos:forecast:<fit id>`\nnames it. A forecast of a kept fit is kept as a run of the kinetics\nengine, in the name of the request's `by`. A refusal says which\nparameter the run did not identify, and what run would, or why a value\nset cannot stand.",
         "operationId": "fermos_forecast_api_fermos_forecast_post",
         "parameters": [
           {
@@ -11904,7 +11868,7 @@
     },
     "/api/fermos/simulate": {
       "post": {
-        "description": "Simulate a model family (`SimulationResult`) and keep it as one\n`fermos.simulation` artifact. Each parameter resolves with its source: a\nperson's override (an assumption by name, so the result is `assumed`), else\nthe family's stated convention. 422 in words for a parameter that waits\n(named with what would bind it), the light socket, a bad override, or a\nrun that cannot end.",
+        "description": "Simulate a model family (`SimulationResult`) and keep it as one\n`fermos.simulation` artifact. Each parameter resolves with its source: a\nvalue the request sets (a typed quantity with its origin, a person's\nassumption or a model's estimate by name, so the result is `assumed`),\nelse the family's stated convention. 422 in words for a parameter that\nwaits (named with what would bind it), the light socket, a value set that\ncannot stand, or a run that cannot end.",
         "operationId": "fermos_simulate_api_fermos_simulate_post",
         "parameters": [
           {
@@ -11993,7 +11957,7 @@
     },
     "/api/fermos/vessel": {
       "post": {
-        "description": "Design the vessel a simulation (or, anaerobic only, a fit) needs, in\nthe Proforma worker on BioSTEAM: one `fermos.vessel` artifact, computed\nor returned as kept for the same basis. 422 in words for a design that\ncannot be made as asked (no plant scale and no batch volume, a fit asked\nfor an aerobic design, an artifact not on file, an override that cannot\nstand, BioSTEAM's own refusal); 409 for a file damaged on disk; 503 when\nthe worker cannot answer.",
+        "description": "Design the vessel a simulation (or, anaerobic only, a fit) needs, in\nthe Proforma worker on BioSTEAM: one `fermos.vessel` artifact, computed\nor returned as kept for the same basis. Each value the request sets is a\ntyped quantity with its origin, keyed as the design's scope names it. 422\nin words for a design that cannot be made as asked (no plant scale and no\nbatch volume, a fit asked for an aerobic design, an artifact not on file,\na value set that cannot stand, BioSTEAM's own refusal); 409 for a file\ndamaged on disk; 503 when the worker cannot answer.",
         "operationId": "fermos_vessel_api_fermos_vessel_post",
         "parameters": [
           {
@@ -14320,7 +14284,7 @@
     },
     "/api/params/{scope}/resolve": {
       "post": {
-        "description": "A person's overrides laid on a scope's values (`ParamResolveResult`):\neach override an `assumption` by the person it names, the basis inputs\nthe overrides would add to a run, and every value outside its bounds in\nwords (kept, never clamped). The basis inputs are the ones a run of the\nscope writes for those overrides (§2.R). Runs nothing and keeps nothing:\nthe service keeps no override (D3). 404, 422, 409 and 503 as the GET\nanswers them; a `fermos:vessel:` scope may start the worker as the GET\nmay.",
+        "description": "The values a person or a model sets laid on a scope's values\n(`ParamResolveResult`): each a typed quantity with its origin, converted\ninto an override of the scope the route names (in its parameter's unit)\nand laid on as an `assumption` by the person or an estimate by the model\nit names, the basis inputs those would add to a run, and every value\noutside its bounds in words (kept, never clamped). The basis inputs are\nthe ones a run of the scope writes for them (§2.R). Runs nothing and\nkeeps nothing: the service keeps no override (D3). 404, 422, 409 and 503\nas the GET answers them; a `fermos:vessel:` scope may start the worker as\nthe GET may.",
         "operationId": "params_resolve_api_params__scope__resolve_post",
         "parameters": [
           {

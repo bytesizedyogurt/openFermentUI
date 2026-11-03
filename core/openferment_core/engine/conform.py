@@ -7,6 +7,8 @@ Conformance; ADR-015).
                                is refused in words
         [--inputs <file>]      a JSON list of EngineInputs the run is made with, for an
                                engine whose thing waits for values no default gives
+                               (the kinetics engine's families: fermos_engine's
+                               write_placeholder_inputs writes such a file)
 
 The checks run on a database of their own, made on the server that
 OPENFERMENT_DATABASE_URL names (core/.env) and dropped after, in a project made
@@ -38,7 +40,8 @@ from .contract import version_string
 
 CHECKS: dict[int, str] = {
     1: "a JSON number outside a quantity is refused in words before the worker is reached",
-    2: "every parameter of every thing carries an origin: library-default with ref, or convention with note",
+    2: "every default carries an origin, library-default with ref or convention with note, and a parameter with "
+       "none says a run sets it",
     3: "a run writes one runs row keyed by its basis, and the same request twice is that one row",
     4: "a replay holds every output within the precision the thing states",
     5: "the run's SFF file validates and scores, or sffRefused holds words",
@@ -135,19 +138,31 @@ def _bare_number(engine: Any, thing: str, by: str) -> tuple[bool, str]:
 
 
 def _origins(engine: Any, things: list[Any]) -> tuple[bool, str]:
-    count, wrong = 0, []
+    """Check 2. Every default carries an origin naming what it rests on: a
+    library-default its package and version (ref), a convention what it is
+    (note). A parameter with no default (value and origin null) says that a
+    run sets it: `assumption` stands in its source rule."""
+    count, unset, wrong = 0, 0, []
     for th in things:
         for p in engine.parameters(th.id, _configuration_of(th)):
             count += 1
             o = p.origin
-            if not ((o.kind == "library-default" and (o.ref or "").strip())
-                    or (o.kind == "convention" and (o.note or "").strip())):
+            if p.value is None and o is None:
+                if "assumption" in p.sourceRule:
+                    unset += 1
+                else:
+                    wrong.append(f"{th.id}:{p.key}")
+                continue
+            if not (o is not None and ((o.kind == "library-default" and (o.ref or "").strip())
+                                       or (o.kind == "convention" and (o.note or "").strip()))):
                 wrong.append(f"{th.id}:{p.key}")
     names = ", ".join(th.id for th in things)
     if wrong:
-        return False, f"{len(wrong)} of {count} parameters lack an origin with what it names: {', '.join(wrong[:6])}"
+        return False, (f"{len(wrong)} of {count} parameters lack an origin with what it names, or a run's value where "
+                       f"they have no default: {', '.join(wrong[:6])}")
     return True, (f"{count} parameters of {len(things)} things ({names}), each in its default configuration or "
-                  "its first")
+                  f"its first: {count - unset} default{'s' if count - unset != 1 else ''}, each with its origin, and "
+                  f"{unset} a run sets")
 
 
 def _row_count(run_id: str) -> int:
@@ -346,7 +361,7 @@ def checks(engine: Any, *, by: str, things: list[str] | None = None, entry: str 
         keyed = False
         if a.artifactId is not None:
             art = artifacts.get(a.artifactId)
-            keyed = artifacts.artifact_id(art.tool, art.toolVersion, art.inputs) == a.id
+            keyed = artifacts.artifact_id(art.tool, art.toolVersion, art.inputs, art.seed) == a.id
         ok = a.id == b.id and rows == 1 and a.status == "done" and a.engine == engine.name and keyed
         run = a if a.status == "done" else None
         add(3, ok, f"run {a.id} of {first.id}" + (f" with {len(inputs)} value{'s' if len(inputs) != 1 else ''} set"

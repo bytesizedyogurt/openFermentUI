@@ -6,9 +6,13 @@
 //
 //   the run         its plant and configuration, its status and provenance,
 //                   who asked and when, the study scenario that asked for it;
-//   its outputs     a contract engine's run (docs/api/engines.md): each output
-//                   its name, value and unit, its origin the run's artifact;
-//                   a BioSTEAM run's numbers are in its sections below;
+//   its outputs     a contract engine's or a kinetics run (docs/api/engines.md,
+//                   docs/api/runs.md): each output its name, value and unit,
+//                   with its interval where it carries one (a forecast's
+//                   median between its 5th and 95th percentiles), its origin
+//                   the run's artifact; each number shown to a few digits,
+//                   in full in its title and the CSV; a BioSTEAM run's numbers
+//                   are in its sections below;
 //   its parameters  every value the run was bound with, in the parameter panel,
 //                   read-only: a person's assumption or a model's estimate where
 //                   the run set one, the library's own default elsewhere, each
@@ -46,6 +50,7 @@ import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
 import { RunReport } from '@/screens/ProformaBiosteam';
 import { regressionTable } from '@/screens/ProformaReference';
+import { fmt } from '@/engine/units';
 
 const problemOf = (e: unknown) => (e instanceof StudiesDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
 
@@ -93,6 +98,18 @@ interface RunOutput {
   quantity: Quantity;
 }
 
+/** The artifact tools whose run builds no plant, so it keeps no SFF file by design: the kinetics engine's (docs/api/runs.md). */
+const NO_PLANT_TOOLS = new Set(['fermos.simulation', 'growth_forecast', 'fermos.vessel']);
+
+/** A value as a page shows it: a number to a few significant digits (its full value in the title and the CSV), words as they are. */
+const shown = (v: unknown) => (typeof v === 'number' ? fmt(v) : String(v));
+
+/** A run's time in words: milliseconds under a tenth of a second, seconds above. */
+const took = (ms: number) => (ms < 100 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
+
+/** Words a sentence follows on: a full stop added when they end with none. */
+const ended = (words: string) => (/[.!?]$/.test(words.trim()) ? words.trim() : `${words.trim()}.`);
+
 /** The outputs a contract engine's run kept. A library run keeps its `outputs.values` too, and its page shows them in its artifact's own sections. */
 function runOutputs(run: EngineRunReport['run']): RunOutput[] {
   if (run.tool === 'library.run') return [];
@@ -104,13 +121,23 @@ function runOutputs(run: EngineRunReport['run']): RunOutput[] {
   );
 }
 
-/** A contract engine's run (docs/api/engines.md): each output with its value, its unit and its origin, the run's artifact. */
+/**
+ * A contract engine's or a kinetics run (docs/api/engines.md): each output with its value, its interval where it
+ * carries one, its unit and its origin, the run's artifact. A forecast's value is its median, and its interval the
+ * 5th to the 95th percentile.
+ */
 function Outputs({ report }: { report: EngineRunReport }) {
   const values = runOutputs(report.run);
   if (!values.length) return null;
-  const headers = ['Output', 'Value', 'Unit', 'Origin'];
+  const forecast = report.run.tool === 'growth_forecast';
+  const banded = values.some((v) => v.quantity.low != null || v.quantity.high != null);
+  const headers = ['Output', forecast ? 'Median' : 'Value', ...(banded ? [forecast ? '5th percentile' : 'Low', forecast ? '95th percentile' : 'High'] : []), 'Unit', 'Origin'];
   const originOf = (q: Quantity) => (q.origin?.kind === 'artifact' ? `the run's artifact ${q.origin.ref ?? ''}`.trim() : (ORIGIN_WORDS[q.origin?.kind ?? ''] ?? q.origin?.kind ?? '—'));
-  const rows = values.map((v) => [v.name, String(v.quantity.value), v.quantity.unit || '—', originOf(v.quantity)]);
+  const ends = (q: Quantity) => (banded ? [q.low == null ? '' : String(q.low), q.high == null ? '' : String(q.high)] : []);
+  // The CSV keeps every number in full; the table shows each to a few digits, in full in its title.
+  const rows = values.map((v) => [v.name, String(v.quantity.value), ...ends(v.quantity), v.quantity.unit || '—', originOf(v.quantity)]);
+  const band = (q: Quantity) =>
+    q.low == null && q.high == null ? '—' : `${q.low == null ? '…' : shown(q.low)} to ${q.high == null ? '…' : shown(q.high)}`;
   return (
     <Card className="p-4" data-testid="run-outputs" data-engine={report.run.engine}>
       <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
@@ -122,12 +149,13 @@ function Outputs({ report }: { report: EngineRunReport }) {
       <p className="text-caption text-ink-soft mb-2">
         Each output the {report.run.engine} engine computed, in its unit, its origin the run&rsquo;s artifact: a replay computes it again from the
         basis below.
+        {forecast && ' Each is the band’s median, between its 5th and 95th percentiles: a band for readings of a run like the fitted one.'}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-caption">
           <thead>
             <tr className="border-b border-line text-ink-soft">
-              {headers.map((h) => (
+              {['Output', forecast ? 'Median' : 'Value', ...(banded ? [forecast ? '5th to 95th percentile' : 'Low to high'] : []), 'Unit', 'Origin'].map((h) => (
                 <th key={h} className="text-left py-1 pr-2 font-medium">
                   {h}
                 </th>
@@ -135,18 +163,25 @@ function Outputs({ report }: { report: EngineRunReport }) {
             </tr>
           </thead>
           <tbody>
-            {values.map((v, i) => (
+            {values.map((v) => (
               <tr key={v.name} className="border-b border-line/50 align-top" data-testid="run-output" data-origin={v.quantity.origin?.kind}>
-                <td className="py-1 pr-2 font-num">{rows[i][0]}</td>
-                <td className="py-1 pr-2 font-num">{rows[i][1]}</td>
-                <td className="py-1 pr-2 font-num">{rows[i][2]}</td>
+                <td className="py-1 pr-2 font-num">{v.name}</td>
+                <td className="py-1 pr-2 font-num" title={String(v.quantity.value)} data-testid="run-output-value">
+                  {shown(v.quantity.value)}
+                </td>
+                {banded && (
+                  <td className="py-1 pr-2 font-num" title={`${v.quantity.low ?? ''} to ${v.quantity.high ?? ''}`} data-testid="run-output-band">
+                    {band(v.quantity)}
+                  </td>
+                )}
+                <td className="py-1 pr-2 font-num">{v.quantity.unit || '—'}</td>
                 <td className="py-1 pr-2">
                   {v.quantity.origin?.kind === 'artifact' && v.quantity.origin.ref ? (
                     <a className="text-accent hover:underline" href={href(`/biorepo/artifacts/${v.quantity.origin.ref}`)}>
-                      {rows[i][3]}
+                      {originOf(v.quantity)}
                     </a>
                   ) : (
-                    rows[i][3]
+                    originOf(v.quantity)
                   )}
                 </td>
               </tr>
@@ -189,11 +224,11 @@ function Inputs({ report }: { report: EngineRunReport }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r[0]} className="border-b border-line/50 align-top" data-testid="run-input" data-origin={report.run.inputs.find((i) => i.name === r[0])?.quantity.origin?.kind}>
+            {rows.map((r, i) => (
+              <tr key={r[0]} className="border-b border-line/50 align-top" data-testid="run-input" data-origin={report.run.inputs[i]?.quantity.origin?.kind}>
                 {r.map((c, j) => (
-                  <td key={j} className={cx('py-1 pr-2', j < 3 && 'font-num')}>
-                    {c}
+                  <td key={j} className={cx('py-1 pr-2', j < 3 && 'font-num')} title={j === 1 ? c : undefined}>
+                    {j === 1 ? shown(report.run.inputs[i]?.quantity.value ?? c) : c}
                   </td>
                 ))}
               </tr>
@@ -259,7 +294,11 @@ function FlowsheetCard({ report }: { report: EngineRunReport }) {
     return report.run.sffRefused ? (
       <Card className="p-4" data-testid="run-sff">
         <h2 className="font-serif text-section-title font-semibold mb-1">Its SFF file</h2>
-        <p className="text-body text-signal-warn">No SFF file could be written: {report.run.sffRefused}</p>
+        {NO_PLANT_TOOLS.has(report.run.tool) ? (
+          <p className="text-body text-ink-soft" data-testid="run-sff-none">This run keeps no SFF file: {ended(report.run.sffRefused)}</p>
+        ) : (
+          <p className="text-body text-signal-warn">No SFF file could be written: {report.run.sffRefused}</p>
+        )}
       </Card>
     ) : null;
   const earned = Object.entries(f.tags)
@@ -577,7 +616,7 @@ export default function ProformaRun({ runId }: { runId: string }) {
               {run.provenance && <ProvenanceBadge p={run.provenance} />}
               <span>
                 {run.status === 'done' ? 'Run' : 'Refused'} for {run.by}, {stamp(run.at)}
-                {run.durationMs != null && <>, in {(run.durationMs / 1000).toFixed(1)} s</>}
+                {run.durationMs != null && <>, in {took(run.durationMs)}</>}
                 {run.scenarioId && (
                   <>
                     {' '}
@@ -612,8 +651,8 @@ export default function ProformaRun({ runId }: { runId: string }) {
       {report && run && (
         <div className="space-y-4">
           {run.status === 'refused' && (
-            <Callout kind="warn" title="The plant refused these values">
-              <span data-testid="run-refused">{run.refused}</span> The receipt is kept with the run, and no artifact or SFF file was written.
+            <Callout kind="warn" title={run.engine === 'biosteam' ? 'The plant refused these values' : `The ${run.engine} engine refused these values`}>
+              <span data-testid="run-refused">{ended(run.refused ?? '')}</span> The receipt is kept with the run, and no artifact or SFF file was written.
             </Callout>
           )}
           {report.parameters && <Parameters runId={run.id} data={report.parameters} />}

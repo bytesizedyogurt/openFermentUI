@@ -2,8 +2,12 @@
 
 BioSTEAM, thermosteam, biorefineries, the vendored SFF toolkit and cobra run in worker processes
 (execution prompt §7.1, §7.3): a cold BioSTEAM import takes about thirty seconds, and the
-service stays light. An engine registered through the contract (`docs/api/engines.md`) runs in a
-worker of its own, which speaks this protocol too. The service's side is `SimWorker` (`core/openferment_core/workers/__init__.py`);
+service stays light. An engine registered through the contract (`docs/api/engines.md`) with a
+worker runs in a worker of its own, which speaks this protocol too; an engine whose `worker` is
+`None` computes in the service's process, and its computation may call a worker of the core's
+own: the core's `kinetics` integrates fermOS's families with SciPy in the service, and its vessel
+design runs in the Proforma worker (`vessel_specs`, `vessel_design`). The service's side is
+`SimWorker` (`core/openferment_core/workers/__init__.py`);
 the worker's side is `serve`. The Proforma worker is reached through
 `core/openferment_core/engine/simulator.py`, which starts it on first use (or with the service
 when `OPENFERMENT_WARM_PROFORMA=1`) and reports `cold`, `starting`, `ready` or `failed`.
@@ -70,17 +74,20 @@ asks it once per process and keeps the answer.
 
 `{"thing", "configuration"}` → `{"parameters": [EngineParameter, …]}`: what the thing takes, each a
 `ParameterSpec` with its default `value` and the default's `origin` (`library-default` with `ref`,
-or `convention` with `note`). The service sends the configuration a run of the thing would use:
-the one named, else the thing's default, and `null` for a thing that takes none. An unknown thing
-is refused in words.
+or `convention` with `note`), or, for a parameter with no default, `value` and `origin` null and
+a `sourceRule` naming `assumption`: a run sets it. The service sends the configuration a run of
+the thing would use: the one named, else the thing's default, and `null` for a thing that takes
+none. An unknown thing is refused in words.
 
 ### `run`
 
 `{"thing", "configuration", "inputs": [{"name", "value", "unit"}, …]}` → `{"outputs": [{"name",
 "value", "unit"}, …]}`. The inputs are the values the run sets, already checked by the service
-against the thing's parameters; each output is a finite number or a string in a unit, each name
-its own and at most 200 characters, and every output a function of the request alone, in the same
-order on every run of it, since a replay compares the outputs in order. A run the engine cannot
+against the thing's parameters, a value for every parameter with no default among them: the
+service refuses in words, keeping nothing, a run that leaves one unset. Each output is a finite
+number or a string in a unit, each name its own and at most 200 characters, and every output a
+function of the request alone, in the same order on every run of it, since a replay compares the
+outputs in order. A run the engine cannot
 make, an unknown thing among them, is refused in words (`Refused: …`), and the service keeps the
 refusal as the run's receipt.
 

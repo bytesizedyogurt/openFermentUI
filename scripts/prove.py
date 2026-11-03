@@ -54,7 +54,8 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
    10  every engine of the entry-point group `openferment.engines` listed by the service with its
        version and worker, none with an error; the eight conformance checks of docs/api/engines.md
        made on each (`python -m openferment_core.engine.conform <name>`, on a scratch database of
-       its own), and each verdict kept and listed
+       its own; the kinetics engine's with `--inputs`, the placeholders its builder writes as the
+       proof's person's assumptions), and each verdict kept and listed
 """
 from __future__ import annotations
 
@@ -128,6 +129,10 @@ TITLES = {
 }
 # How long the conformance checks of one engine may take (BioSTEAM's: a cold import and nine plants' parameters).
 CONFORM_TIMEOUT_S = 1800.0
+# The engines whose things wait for values no default gives, each with the module and the function that
+# write the file `conform --inputs` reads (docs/api/engines.md, Conformance): the core's kinetics engine.
+PLACEHOLDERS = {"kinetics": ("openferment_core.fermos_engine", "write_placeholder_inputs")}
+WRITE_PLACEHOLDERS = "import importlib, sys; getattr(importlib.import_module(sys.argv[1]), sys.argv[2])(sys.argv[3], by=sys.argv[4])"
 RUN_TIMEOUT_S = 1800.0
 
 # Opens the export package with the standard library alone (run with -I -S, from a directory of its own).
@@ -706,8 +711,19 @@ def step_10(proof: Proof) -> None:
                 + ("; with errors: " + "; ".join(f"{e['name']}: {e['error']}" for e in broken) if broken else ""))
     env = environment(proof, int(proof.origin.rsplit(":", 1)[1]))
     for e in usable:
-        done = subprocess.run([sys.executable, "-m", "openferment_core.engine.conform", e["name"]], cwd=CORE,
-                              text=True, capture_output=True, env=env, timeout=CONFORM_TIMEOUT_S)
+        command = [sys.executable, "-m", "openferment_core.engine.conform", e["name"]]
+        if e["name"] in PLACEHOLDERS:
+            module, writer = PLACEHOLDERS[e["name"]]
+            path = proof.data_dir / f"{e['name']}-inputs.json"
+            wrote = subprocess.run([sys.executable, "-c", WRITE_PLACEHOLDERS, module, writer, str(path), BY], cwd=CORE,
+                                   text=True, capture_output=True, env=env, timeout=RUN_TIMEOUT_S)
+            values = json.loads(path.read_text(encoding="utf-8")) if wrote.returncode == 0 and path.exists() else []
+            proof.check(wrote.returncode == 0 and bool(values),
+                        f"the {e['name']} engine's placeholders written by {module}.{writer}: {len(values)} values, "
+                        f"each {BY}'s assumption" if values else
+                        f"the {e['name']} engine's placeholders could not be written: {wrote.stderr.strip()[-300:]}")
+            command += ["--inputs", str(path)]
+        done = subprocess.run(command, cwd=CORE, text=True, capture_output=True, env=env, timeout=CONFORM_TIMEOUT_S)
         rows = [line for line in done.stdout.splitlines() if line.startswith(("✓", "✗"))]
         failed = [line for line in rows if line.startswith("✗")]
         said = (done.stdout.strip().splitlines() or [done.stderr.strip()[-300:]])[0]

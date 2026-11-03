@@ -5,7 +5,11 @@
 kept kinetic fit's artifact id. The forecast runs under the fitted run's own
 starting values and length; one `Evidence` comes back with the hint
 `trajectory`. A fit whose growth rate or ceiling the run did not identify is
-refused, and the refusal says what run would identify it.
+refused, and the refusal says what run would identify it. It is a free
+write, the same forecast as `fermos_write`'s `forecast` (`tools/writes.py`'s
+`run_forecast`, the one call to `fermos.forecast_run`), audited with its
+caller as agent: the forecast is kept as a run of the kinetics engine in its
+caller's name (alpha 2.2 D3), as a simulation and a vessel design are.
 
 `fermos_simulate` (D13): ids and words in, a kept simulation out. A model
 family's id, a strain, a product and a sugar by their ids, the records that
@@ -15,9 +19,10 @@ run-length preset. A number anywhere refuses the call, as the registry does
 for every tool, and no field of its schema is numeric (E.4‴, `check:tools`).
 It is a free write, the same run as `fermos_write`'s `simulate`
 (`tools/writes.py`'s `run_simulation`, the one call to `fermos.simulate`, so
-`check:tools` reads it there), at no gate, audited with the model as agent.
-The service holds no person's assumption, so a parameter nothing binds
-waits, and the call returns the refusal's words. It returns the simulation
+`check:tools` reads it there), at no gate, audited with the model as agent,
+and kept as a run of the kinetics engine in its caller's name (alpha 2.2
+D3). A person sets a value at fermOS → Simulate, so a parameter nothing
+binds waits here, and the call returns the refusal's words. It returns the simulation
 as one `Evidence` whose id is the artifact's, and a summary that names the
 family, what bound each parameter (in words and counts; the values are in
 the artifact) and the artifact id.
@@ -27,8 +32,9 @@ BioSTEAM. Ids and words in: a kept simulation's artifact id (or, anaerobic, a
 kept kinetic fit's), the vessel type (`stirred-tank` or `bubble-column`) and a
 kLa correlation by BioSTEAM's own name; every field is a string (E.4‴). It is
 a free write, offered loose like the module tools: it keeps one
-`fermos.vessel` artifact through `writes.design_vessel`, the function
-`fermos_write`'s `design_vessel` runs, audited with the model as agent. A
+`fermos.vessel` artifact and its run of the kinetics engine through
+`writes.design_vessel`, the function `fermos_write`'s `design_vessel` runs,
+audited with the model as agent. A
 design needs a plant scale or one vessel's batch volume, which only a named
 person types (in fermOS → Vessel); the service holds none, so without one the
 tool returns the refusal's words. A design comes back as one `Evidence` whose
@@ -40,7 +46,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import fermos, kinetics
+from .. import kinetics
 from ..models import SimulationRequest, ToolResult
 from . import Tool, ToolContext, register
 
@@ -54,10 +60,11 @@ class GrowthForecastInput(BaseModel):
 
 
 def _run(inp: GrowthForecastInput, ctx: ToolContext) -> ToolResult:
-    try:
-        r = fermos.forecast_run(fit_artifact=inp.fitArtifactId)
-    except fermos.FitRefused as e:
-        return ToolResult(error=f"{NAME} refused: {e}")
+    from .writes import run_forecast
+
+    r = run_forecast(NAME, inp.fitArtifactId, "", ctx)
+    if isinstance(r, ToolResult):
+        return r
     return ToolResult(
         summary={
             "evidenceId": r.evidence.id,
@@ -83,6 +90,8 @@ TOOL = register(
         ),
         input_model=GrowthForecastInput,
         run=_run,
+        # It keeps the forecast as a run of the kinetics engine, in its caller's name (alpha 2.2 D3).
+        writes=True,
     )
 )
 

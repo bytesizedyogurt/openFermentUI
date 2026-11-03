@@ -84,6 +84,9 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
 
   const c = report?.comparison ?? null;
   const out = report ? comparedOf(report) : null;
+  // A comparison of library runs alone is `study comparison 1`; one holding another engine's run is version 2
+  // (studies/comparisons.py), whose outputs each come in the unit their run's artifact states.
+  const libraryOnly = report?.artifact.toolVersion === 'study comparison 1';
   const names = (out?.runs ?? []).map((_, i) => `Run ${i + 1}`);
   const moved = out ? changeRows(out.rows) : [];
   const still = moved.filter((r) => r.values.every((v) => v === 0));
@@ -169,7 +172,11 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
                 <Download size={12} aria-hidden /> CSV
               </button>
             </div>
-            <p className="text-caption text-ink-soft mb-2">The price block in BioSTEAM&rsquo;s TEA units and a flowsheet&rsquo;s outputs in theirs, read from each run&rsquo;s artifact.</p>
+            <p className="text-caption text-ink-soft mb-2" data-testid="comparison-rows-units">
+              {libraryOnly
+                ? 'The price block in BioSTEAM’s TEA units and a flowsheet’s outputs in theirs, read from each run’s artifact.'
+                : 'Each output in the unit its run’s artifact states, a library run’s price block in BioSTEAM’s TEA units, read from each run’s artifact.'}
+            </p>
             <div className="overflow-x-auto">
               <table className="w-full text-caption">
                 <thead>

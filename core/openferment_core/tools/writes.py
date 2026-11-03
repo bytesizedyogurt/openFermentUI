@@ -40,7 +40,13 @@ at no gate, audited with the model as agent. So with a vessel (OF-BLD-020
 the registry's `pureos_build` (tools/pureos.py) share one function an action
 below, so the calls to `pureos.kept.keep_train` (the one write to the store of
 the trains a model built) and to `pureos.train_spec.run_train` stay in this
-file; each is free, at no gate, and audited with the model as agent.
+file; each is free, at no gate, and audited with the model as agent. So with
+a forecast (alpha 2.2 D3): `fermos_write`'s `forecast` and the registry's
+`growth_forecast` (tools/fermos.py) both forecast through `run_forecast`
+below, the one call to `fermos.forecast_run`, whose kept forecast is a run of
+the kinetics engine in its caller's name. A simulation, a vessel design and a
+kept forecast each keep one runs row (fermos_engine.py), its created_by the
+caller `_actor` names.
 
 THE STUDY TOOLS (alpha 2.0 stage 6). `engine_run` (tools/engine.py) runs
 through `run_engine` below, the one call to `engine.runs.run` and to
@@ -289,18 +295,33 @@ def _geneos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     )
 
 
-def _fermos_forecast(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
+def run_forecast(tool: str, fit: str, note: str, ctx: ToolContext) -> Any:
+    """A band for the next run from a kept kinetic fit, under the fitted
+    run's own start values and length, kept as one `growth_forecast` artifact
+    and as a run of the kinetics engine in its caller's name (`_actor`), and
+    audited as its caller's (alpha 2.2 D3). `growth_forecast` and
+    `fermos_write`'s `forecast` both forecast here, so the one call to
+    `fermos.forecast_run` stays in this file. Ids in: the fit's artifact id;
+    a start value or a length of a person's own is set at fermOS → Forecast.
+    Answers the forecast, or the refusal in words as the tool's result."""
     from .. import artifacts, fermos
 
+    try:
+        r = fermos.forecast_run(fit_artifact=fit, by=_actor(ctx)[1])
+    except (fermos.FitRefused, artifacts.ArtifactNotFound, artifacts.ArtifactDamaged) as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    _audit(ctx, "fermos", "forecast", "open", fit, {"artifactId": r.artifactId, "evidenceId": r.evidence.id,
+                                                    "tool": tool, "note": note})
+    return r
+
+
+def _fermos_forecast(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     need = _need(inp, "fitArtifactId")
     if need:
         return ToolResult(error=f"fermos_write refused: {need}")
-    try:
-        r = fermos.forecast_run(fit_artifact=inp.fields["fitArtifactId"])
-    except (fermos.FitRefused, artifacts.ArtifactNotFound, artifacts.ArtifactDamaged) as e:
-        return ToolResult(error=f"fermos_write refused: {e}")
-    _audit(ctx, "fermos", "forecast", "open", inp.fields["fitArtifactId"], {"artifactId": r.artifactId, "evidenceId": r.evidence.id,
-                                                                            "note": inp.note})
+    r = run_forecast("fermos_write", inp.fields["fitArtifactId"], inp.note, ctx)
+    if isinstance(r, ToolResult):
+        return r
     return ToolResult(summary={"state": "open", "artifactId": r.artifactId, "evidenceId": r.evidence.id,
                                "provenance": r.evidence.provenance,
                                "meaning": "kept as an artifact in the open lane, marked as its caller's; cite the evidence id"},
@@ -314,7 +335,8 @@ VESSEL_WAITS = ("A named person types the plant scale (or one vessel's batch vol
 def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_method: str, note: str,
                   ctx: ToolContext) -> ToolResult:
     """Design the vessel a kept simulation (or, anaerobic, a kept fit) needs
-    on BioSTEAM, keep it as one `fermos.vessel` artifact, and mark it as the
+    on BioSTEAM, keep it as one `fermos.vessel` artifact and as a run of the
+    kinetics engine in its caller's name (alpha 2.2 D3), and mark it as the
     model's (OF-BLD-020 §4.2, D13). `fermos_vessel` and `fermos_write`'s
     `design_vessel` both run here, so the one call to `vessel.design` stays
     in this file. Ids and words in: the artifact, the vessel type, the kLa
@@ -335,7 +357,7 @@ def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_me
         return ToolResult(error=f"{tool} refused: a vessel type is {' or '.join(vessel.VESSEL_TYPES)}; {kind!r} is neither")
     try:
         d = vessel.design(VesselRequest(simulation=sim or None, fit=fitted or None, vesselType=kind,
-                                        klaMethod=(kla_method or "").strip() or None))
+                                        klaMethod=(kla_method or "").strip() or None, by=_actor(ctx)[1]))
     except vessel.VesselRefused as e:
         waits = f" {VESSEL_WAITS}" if "plant_scale" in str(e) else ""
         return ToolResult(error=f"{tool} refused: {e}.{waits}")
@@ -701,8 +723,9 @@ def _sig(x: Any) -> Any:
 
 
 def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResult:
-    """Simulate one model family as the service binds it, keep it and mark it
-    as the model's (OF-BLD-020 §3.4). The request carries ids and words: a
+    """Simulate one model family as the service binds it, keep it as a run of
+    the kinetics engine in its caller's name and mark it as the model's
+    (OF-BLD-020 §3.4; alpha 2.2 D3). The request carries ids and words: a
     family, a strain, a product, a sugar, the records named for a parameter,
     a fit, a start and a run-length preset. A person's assumptions are the
     project's overrides, and this call reads none: a parameter nothing binds
@@ -713,7 +736,7 @@ def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResu
     family = (req.family or "").strip()
     if not family:
         return ToolResult(error=f"{tool} refused: name the model family to simulate by its id ({', '.join(kinetics.FAMILIES)})")
-    req = req.model_copy(update={"family": family, "overrides": []})
+    req = req.model_copy(update={"family": family, "inputs": [], "by": _actor(ctx)[1]})
     try:
         r = fermos.simulate(req, by_pool=ctx.pool)
     except fermos.SimulationRefused as e:

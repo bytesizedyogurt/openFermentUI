@@ -19,7 +19,12 @@ workers/sample_worker.py, which computes nothing), its verdict kept for `GET
 rule and one configuration length at every door, a value with a range or a
 basis refused, every module the service keeps out held out whatever order the
 engines load in, a replay naming a moved version, and the things checked in
-the order named.
+the order named. Stage C (D4): a parameter with no default, said so and
+waited for; the kinetics engine registered by the core's own entry point,
+listed with no worker, each of its things run as one row at every door, a
+parameter that waits refused with nothing kept, a refusal inside the
+integration kept as a receipt, and the eight checks holding on it with the
+placeholders conformance builds, in the test's database and on a scratch one.
 """
 from __future__ import annotations
 
@@ -30,6 +35,7 @@ import sys
 from importlib.metadata import EntryPoint
 from pathlib import Path
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -1188,3 +1194,377 @@ def test_the_routes_declare_the_refusals_they_answer_and_a_quantity_is_typed_bot
     assert client.get("/api/runs/0000000000000000").status_code == 404
     assert client.post("/api/biorepo/artifacts/0000000000000000/replay").status_code == 404
     assert client.post("/api/tools/nosuch", json={}).status_code == 404
+
+
+# ── a parameter with no default (alpha 2.2 D4; docs/api/engines.md) ─────
+
+
+def test_a_parameter_with_no_default_has_value_and_origin_null_and_says_a_run_sets_it():
+    p = EngineParameter(key="a-parameter", label="A placeholder", unit="placeholder-unit", value=None, origin=None,
+                        boundsReason="none stated")
+    assert p.sourceRule == ["assumption"], "a parameter with no default is one a run's value sets"
+    for bad, says in [({"value": 1.0}, "a default carries its origin"),
+                      ({"origin": {"kind": "library-default", "ref": "a-package@0.1.0"}}, "a default carries its origin")]:
+        with pytest.raises(ValidationError, match=says):
+            EngineParameter(**{**p.model_dump(exclude={"sourceRule"}), **bad})
+    words = EngineParameter(key="a-setting", label="A placeholder", unit="", value=None, origin=None,
+                            choices=["one", "another"], boundsReason="a setting chosen from its words")
+    assert words.value is None and words.choices == ["one", "another"]
+
+
+def test_a_value_is_a_number_or_words_as_its_parameter_is_declared():
+    def declared(**fields):
+        base = {"key": "a-parameter", "label": "A placeholder", "unit": "placeholder-unit", "boundsReason": "none"}
+        if fields.get("value") is not None:
+            base["origin"] = {"kind": "convention", "note": "a placeholder setting"}
+        return EngineParameter(**{"value": None, "origin": None, **base, **fields})
+
+    assert runs.takes_number(declared(value=1.5)) and runs.takes_number(declared())
+    # A convention's words in a unit (a term left off) take a number; words in no unit take words.
+    assert runs.takes_number(declared(value="off"))
+    assert not runs.takes_number(declared(value="words", unit=""))
+    assert not runs.takes_number(declared(choices=["one", "another"], unit=""))
+    runs.check_inputs("a-thing", [declared(value="off")], [given("a-parameter", 2.0)], bounds=False)
+    with pytest.raises(EngineRefused, match="takes a number"):
+        runs.check_inputs("a-thing", [declared()], [given("a-parameter", "words")], bounds=False)
+
+
+def test_a_contract_engines_parameter_with_no_default_waits_for_the_run_to_set_it(engines, monkeypatch):
+    real = SAMPLE.parameters
+
+    def no_default(thing, configuration):
+        return [p.model_copy(update={"value": None, "origin": None, "sourceRule": ["assumption"]})
+                if p.key == "a-parameter" else p for p in real(thing, configuration)]
+
+    monkeypatch.setattr(SAMPLE, "parameters", no_default)
+    computed = []
+    monkeypatch.setattr(SAMPLE, "compute", lambda *a, **k: computed.append(a) or [])
+    client = TestClient(api.app)
+    waits = client.post("/api/engines/sample/run", json={"thing": "placeholder", "by": "Ada Moreno"})
+    assert waits.status_code == 422, waits.text
+    assert "placeholder cannot run yet: 1 parameter waits for the run to set it, having no default: a-parameter" in \
+        waits.json()["detail"]
+    assert runs.listed("sample") == [] and computed == [], "a run that leaves it unset keeps nothing and reaches no worker"
+    set_here = client.post("/api/engines/sample/run", json={
+        "thing": "placeholder", "by": "Ada Moreno", "inputs": [{"name": "a-parameter", "quantity": person(2.5)}]})
+    assert set_here.status_code == 200 and len(computed) == 1
+    # Check 2 holds a parameter with no default that a run sets, and names one that says nothing of who sets it.
+    held, said = conform._origins(SAMPLE, [t for t in SAMPLE.things() if t.id == "placeholder"])
+    assert held and "1 a run sets" in said
+    monkeypatch.setattr(SAMPLE, "parameters", lambda thing, configuration: [
+        p.model_copy(update={"sourceRule": ["library-default"]}) for p in no_default(thing, configuration)])
+    held, said = conform._origins(SAMPLE, [t for t in SAMPLE.things() if t.id == "placeholder"])
+    assert not held and "placeholder:a-parameter" in said
+
+
+# ── the kinetics engine (alpha 2.2 D4; fermos_engine.py, ADR-015) ───────
+#
+# Every value a kinetics run sets here is test_fermos' and test_vessel's own
+# STAND-IN, typed as those tests type it, or conformance's placeholder.
+
+from openferment_core import evidence_pool, fermos, fermos_engine, intake, kinetics, proforma, vessel  # noqa: E402
+from openferment_core.models import VesselRequest  # noqa: E402
+from standins import as_inputs  # noqa: E402
+
+KINETICS_ENTRY = "openferment_core.fermos_engine:ENGINE"
+KINETICS = fermos_engine.ENGINE
+FAMILIES = ["batch_v1", "fedbatch_v1", "chemostat_v1"]
+
+
+@pytest.fixture
+def kinetics_engines(monkeypatch, tmp_path):
+    """A registry of BioSTEAM and the kinetics engine, as core/pyproject.toml
+    registers them, over a project whose evidence pool holds no record (as
+    test_fermos' `store` holds it): each value is the one the test types."""
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(registry, "entry_points", lambda: _points(("biosteam", BIOSTEAM_ENTRY),
+                                                                  ("kinetics", KINETICS_ENTRY)))
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: SimpleNamespace(records=[], records_by_id={}))
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    registry.reset()
+    yield KINETICS
+    registry.reset()
+
+
+def _typed(family="batch_v1"):
+    """test_fermos' STAND-IN values for a family, as the inputs a request sends."""
+    from test_fermos import STANDIN_CHEMOSTAT_TYPED, STANDIN_TYPED, inputs_for
+
+    return inputs_for(family, **(STANDIN_CHEMOSTAT_TYPED if family == "chemostat_v1" else STANDIN_TYPED))
+
+
+def _sent(inputs) -> list[dict]:
+    return [i.model_dump(mode="json", exclude_none=True) for i in inputs]
+
+
+def test_the_service_registers_kinetics_through_its_own_entry_point():
+    registry.reset()
+    try:
+        found = registry.found()["kinetics"]
+        assert (found.entry, found.engine, found.error) == (KINETICS_ENTRY, KINETICS, None)
+        assert (KINETICS.worker, KINETICS.heavy) == (None, ())
+        rows = {r.name.removeprefix("engine "): r for r in ready.check_engines()}
+        # pnpm ready names the worker a vessel design runs in, and a conform command that can pass: its file of values.
+        said = rows["kinetics"].detail
+        assert "no worker: it computes in the service's process; a vessel design runs in the Proforma worker" in said
+        assert ("python -m openferment_core.engine.conform kinetics --inputs <file>, the file "
+                "openferment_core.fermos_engine.write_placeholder_inputs(<file>, by=<your name>) writes") in said
+        assert ready.conform_command("biosteam") == "python -m openferment_core.engine.conform biosteam"
+    finally:
+        registry.reset()
+
+
+def test_get_api_engines_lists_kinetics_with_the_families_that_simulate_and_no_worker(kinetics_engines):
+    listed = {e["name"]: e for e in TestClient(api.app).get("/api/engines").json()}
+    k = listed["kinetics"]
+    assert (k["entryPoint"], k["error"], k["worker"], k["workerStatus"], k["heavy"]) == (
+        KINETICS_ENTRY, None, None, "none", [])
+    assert k["version"] == {**kinetics.versions(), "biosteam": library._installed("biosteam"),
+                            "thermosteam": library._installed("thermosteam")}
+    # light_v1 is a socket, and the contract has no kinetics socket; a project holding no fit and no
+    # simulation lists no forecast and no vessel.
+    assert [(t["id"], t["configurations"], t["defaultConfiguration"], t["precision"]) for t in k["things"]] == [
+        (f, [], None, {"rtol": 0.0, "atol": 0.0}) for f in FAMILIES]
+
+
+def test_a_familys_parameters_keep_each_convention_and_leave_the_rest_to_the_run(kinetics_engines):
+    got = {p["key"]: p for p in TestClient(api.app).get("/api/engines/kinetics/parameters",
+                                                        params={"thing": "batch_v1"}).json()}
+    specs = {s.key: s for s in kinetics.family("batch_v1").specs()}
+    assert list(got) == list(specs)
+    for key, spec in specs.items():
+        p = got[key]
+        if spec.convention is not None and "convention" in spec.sourceRule:
+            assert (p["value"], p["origin"]["kind"]) == (spec.convention, "convention") and p["origin"]["note"], key
+        else:
+            assert p["value"] is None and p["origin"] is None and "assumption" in p["sourceRule"], key
+    assert got["mu_max"]["unit"] == specs["mu_max"].unit and got["ki_substrate"]["value"] == "off"
+    read = tools.run("engine_parameters", {"engine": "kinetics", "plant": "batch_v1", "words": "mu_max"},
+                     tools.ToolContext(model=llm.DEFAULT_PRIMARY))
+    assert read.error is None and read.summary["parameters"][0]["origin"] is None
+
+
+def test_a_run_of_a_family_is_one_row_at_every_door_and_the_same_request_twice_is_that_row(kinetics_engines):
+    client = TestClient(api.app)
+    asked = {"thing": "batch_v1", "by": "Ada Moreno", "inputs": _sent(_typed())}
+    first = client.post("/api/engines/kinetics/run", json=asked)
+    assert first.status_code == 200, first.text
+    run = first.json()["run"]
+    assert (run["engine"], run["plant"], run["configuration"], run["tool"], run["status"], run["provenance"],
+            run["by"]) == ("kinetics", "batch_v1", None, fermos.SIMULATION, "done", "assumed", "Ada Moreno")
+    assert run["sffRefused"] == fermos_engine.SFF_WORDS["family"] and run["sff"] is None
+    # A family's simulation runs on numpy and scipy alone: its row names those, and BioSTEAM stays the vessel's.
+    assert run["versions"] == kinetics.versions()
+    names = [v["name"] for v in run["outputs"]["values"]]
+    assert names == ["end.X", "end.S", "end.P", "end.t", "harvestH", "sugarRunsOutH"]
+    assert all(v["quantity"]["origin"] == {"kind": "artifact", "ref": run["artifactId"]} for v in run["outputs"]["values"])
+    assert client.post("/api/engines/kinetics/run", json=asked).json()["run"] == run
+    # fermOS's own route and its tool make the same run: one row, its first asker kept.
+    simulated = client.post("/api/fermos/simulate", json={"family": "batch_v1", "inputs": _sent(_typed()),
+                                                          "by": "Grace Hopper"})
+    assert simulated.status_code == 200 and simulated.json()["artifactId"] == run["artifactId"]
+    assert [(r.id, r.by) for r in runs.listed("kinetics")] == [(run["id"], "Ada Moreno")]
+    report = client.get(f"/api/runs/{run['id']}").json()
+    assert report["artifact"]["tool"] == fermos.SIMULATION and report["parameters"] is None
+    # The engine tools read it as any engine's run: each output an evidence id on its artifact.
+    read = tools.run("engine_report", {"run": run["id"]}, tools.ToolContext(model=llm.DEFAULT_PRIMARY))
+    assert read.error is None and [e.id for e in read.evidence] == [f"{run['artifactId']}:values.{n}" for n in names]
+    replayed = KINETICS.replay(runs.get(run["id"]))
+    assert replayed.identical and KINETICS.export_sff(runs.get(run["id"])) == fermos_engine.SFF_WORDS["family"]
+
+
+def test_a_kinetics_run_that_leaves_a_parameter_waiting_is_refused_in_words_and_keeps_nothing(kinetics_engines):
+    client = TestClient(api.app)
+    waits = client.post("/api/engines/kinetics/run", json={"thing": "batch_v1", "by": "Ada Moreno"})
+    assert waits.status_code == 422 and "batch_v1 cannot run yet" in waits.json()["detail"], waits.text
+    (mu,) = [i for i in _sent(_typed()) if i["name"] == "mu_max"]
+    for inputs, says in [([mu | {"quantity": mu["quantity"] | {"unit": "placeholder-unit"}}],
+                          "mu_max is set in 'placeholder-unit', and the parameter's unit is 'h⁻¹'"),
+                         ([mu | {"name": "mu_maks"}], "batch_v1 has no parameter 'mu_maks'; of its 18 parameters"),
+                         ([mu, mu], "mu_max is set twice")]:
+        answer = client.post("/api/engines/kinetics/run", json={"thing": "batch_v1", "inputs": inputs})
+        assert answer.status_code == 422 and says in answer.json()["detail"], (says, answer.text)
+    assert "the kinetics engine runs no thing 'light_v1'" in client.post(
+        "/api/engines/kinetics/run", json={"thing": "light_v1"}).json()["detail"]
+    assert runs.listed("kinetics") == [] and artifacts.all_artifacts() == []
+
+
+def test_a_refusal_inside_the_integration_is_kept_as_a_receipt_and_answered_from_it(kinetics_engines, monkeypatch):
+    integrated = []
+
+    def refuses(inputs):
+        integrated.append(len(inputs))
+        raise fermos.SimulationRefused("the integration stopped, in the placeholder's words")
+
+    monkeypatch.setattr(fermos, "_trajectory", refuses)
+    with pytest.raises(runs.RunRefused, match="in the placeholder's words") as refused:
+        KINETICS.run("batch_v1", None, _typed(), "Ada Moreno")
+    receipt = runs.get(refused.value.run_id)
+    assert (receipt.engine, receipt.status, receipt.artifactId, receipt.by) == ("kinetics", "refused", None, "Ada Moreno")
+    assert receipt.refused == "the integration stopped, in the placeholder's words" and receipt.sffRefused is None
+    again = TestClient(api.app).post("/api/fermos/simulate", json={"family": "batch_v1", "inputs": _sent(_typed())})
+    assert again.status_code == 422 and "in the placeholder's words" in again.json()["detail"]
+    assert len(integrated) == 1, "the same request is answered from its receipt, integrating nothing"
+    assert runs.listed("kinetics") == [receipt]
+
+
+def test_a_forecast_and_a_vessel_are_things_while_the_project_holds_what_they_take(kinetics_engines):
+    from test_fermos import SD, T, batch
+
+    fit = fermos.fit("dep-f", batch(T, np.random.default_rng(4), SD))
+    things = {t.id: t for t in KINETICS.things()}
+    assert things["forecast"].configurations == [fit.kineticArtifactId] and things["forecast"].defaultConfiguration is None
+    # A logistic fit designs the anaerobic vessel, so it is a configuration of the vessel too.
+    assert things["vessel"].configurations == [fit.kineticArtifactId]
+    params_ = {p.key: p for p in KINETICS.parameters("forecast", fit.kineticArtifactId)}
+    assert set(params_) == {"x0", "s0", "p0", "t_end"} and all(p.value is None for p in params_.values())
+    with pytest.raises(EngineRefused, match="forecast is run in one of its configurations, named in the request"):
+        KINETICS.run("forecast", None, [], "Ada Moreno")
+    run = KINETICS.run("forecast", fit.kineticArtifactId, [], "Ada Moreno")
+    assert (run.plant, run.configuration, run.tool, run.status, run.provenance, run.by) == (
+        "forecast", fit.kineticArtifactId, fermos.FORECAST, "done", "computed", "Ada Moreno")
+    finals = {v["name"]: v["quantity"] for v in run.outputs["values"]}
+    assert list(finals) == ["finals.biomass", "finals.product", "finals.substrate"]
+    assert all(q["low"] <= q["value"] <= q["high"] for q in finals.values())
+    kept = TestClient(api.app).post("/api/fermos/forecast", json={"fitArtifactId": fit.kineticArtifactId,
+                                                                  "by": "Grace Hopper"}).json()
+    assert kept["artifactId"] == run.artifactId and [r.id for r in runs.listed("kinetics")] == [run.id]
+    assert KINETICS.replay(run).identical and run.versions == kinetics.versions()
+    # GET /api/engines lists them in the request's project, read afresh: the fit, and the forecast made of it.
+    listed = {e["name"]: e for e in TestClient(api.app).get("/api/engines").json()}["kinetics"]
+    served = {t["id"]: t["configurations"] for t in listed["things"]}
+    assert served["forecast"] == [fit.kineticArtifactId]
+    assert set(served["vessel"]) == {fit.kineticArtifactId, run.artifactId}
+
+
+def test_a_run_reads_only_the_artifact_its_configuration_names(kinetics_engines, monkeypatch):
+    """A family is fermOS's own, and a forecast's configuration is the one
+    fit it names: a run of either reads no listing of the project's
+    artifacts. A configuration the thing cannot take is refused in the
+    listing's words, naming what the project holds."""
+    from test_fermos import SD, T, batch
+
+    fit = fermos.fit("dep-f", batch(T, np.random.default_rng(4), SD))
+
+    def listed():
+        raise AssertionError("a run read the project's listing")
+
+    monkeypatch.setattr(fermos_engine, "_kept", listed)
+    ran = KINETICS.run("forecast", fit.kineticArtifactId, [], "Ada Moreno")
+    assert (ran.plant, ran.configuration, ran.status) == ("forecast", fit.kineticArtifactId, "done")
+    assert [p.key for p in KINETICS.parameters("batch_v1", None)] == [s.key for s in kinetics.family("batch_v1").specs()]
+    with pytest.raises(EngineRefused, match="batch_v1 takes no configuration, and 'a-placeholder' was named"):
+        KINETICS.run("batch_v1", "a-placeholder", [], "Ada Moreno")
+    monkeypatch.setattr(fermos_engine, "_kept", lambda: ([fit.kineticArtifactId], [fit.kineticArtifactId]))
+    with pytest.raises(EngineRefused, match=f"forecast runs in {fit.kineticArtifactId}; '0000000000000000' is none"):
+        KINETICS.run("forecast", "0000000000000000", [], "Ada Moreno")
+
+
+def test_a_vessel_design_is_a_run_of_its_simulation_and_the_same_request_twice_is_that_row(kinetics_engines,
+                                                                                         monkeypatch):
+    from test_vessel import AEROBIC_ID, StandInWorker, keep, override, standin_simulation
+
+    keep(AEROBIC_ID, standin_simulation(True))
+    monkeypatch.setattr(proforma, "call", StandInWorker())
+    monkeypatch.setattr(vessel, "_SPECS", {})
+    things = {t.id: t for t in KINETICS.things()}
+    assert things["vessel"].configurations == [AEROBIC_ID] and "forecast" not in things
+    params_ = {p.key: p for p in KINETICS.parameters("vessel", AEROBIC_ID)}
+    assert params_["plant_scale"].value is None and params_["plant_scale"].origin is None
+    assert (params_["oxygen_basis"].value, params_["oxygen_basis"].origin.kind) == ("peak", "convention")
+    assert (params_["V_wf"].origin.kind, params_["V_wf"].origin.ref) == ("library-default", "biosteam@0.0-standin")
+    assert params_["tau"].value is None, "the simulation's harvest hour, bound when the design runs"
+    with pytest.raises(EngineRefused, match="needs plant_scale"):
+        KINETICS.run("vessel", AEROBIC_ID, [], "Ada Moreno")
+    assert runs.listed("kinetics") == []
+    scale = as_inputs([override(AEROBIC_ID, "plant_scale", 1000.0)], vessel.UNITS)
+    run = KINETICS.run("vessel", AEROBIC_ID, scale, "Ada Moreno")
+    assert (run.plant, run.configuration, run.tool, run.status, run.provenance) == (
+        "vessel", AEROBIC_ID, vessel.TOOL, "done", "assumed")
+    assert run.outputs["values"] == [{"name": "design.Vessels", "quantity": {
+        "value": 2.0, "unit": "", "origin": {"kind": "artifact", "ref": run.artifactId}}}]
+    again = vessel.design(VesselRequest(simulation=AEROBIC_ID, inputs=scale, by="Grace Hopper"))
+    assert again.artifactId == run.artifactId and [(r.id, r.by) for r in runs.listed("kinetics")] == [
+        (run.id, "Ada Moreno")]
+    # A design's row names what the design ran on: its tool version's BioSTEAM and its chemicals' package.
+    named = dict(part.split(" ", 1) for part in vessel.version().split(" · ")[1:])
+    chemicals = next(i for i in artifacts.get(run.artifactId).inputs if i.name == "chemicals")
+    assert run.versions == {**named, "biorefineries": chemicals.source.id.split("@", 1)[1]}
+    assert set(run.versions) == {"biosteam", "thermosteam", "biorefineries"}
+
+
+def test_a_vessels_refusals_name_the_keys_its_own_scope_lists(kinetics_engines, monkeypatch):
+    """An anaerobic design's scope lists its own keys: a key it lacks, an
+    aerobic design's batch volume among them, is refused naming those, and
+    a design with no scale asks for the plant scale alone."""
+    from test_vessel import ANAEROBIC_ID, StandInWorker, keep, override, standin_simulation
+
+    keep(ANAEROBIC_ID, standin_simulation(False))
+    monkeypatch.setattr(proforma, "call", StandInWorker())
+    monkeypatch.setattr(vessel, "_SPECS", {})
+    listed = [p.key for p in KINETICS.parameters("vessel", ANAEROBIC_ID)]
+    assert "batch_volume" not in listed
+    for key in ("plant_scal", "batch_volume"):
+        stray = as_inputs([override(ANAEROBIC_ID, key, 1000.0)], vessel.UNITS)
+        with pytest.raises(EngineRefused, match=f"there is no parameter {key} here; the parameters are "
+                                                f"{', '.join(listed)}$"):
+            KINETICS.run("vessel", ANAEROBIC_ID, stray, "Ada Moreno")
+    with pytest.raises(EngineRefused) as none:
+        KINETICS.run("vessel", ANAEROBIC_ID, [], "Ada Moreno")
+    assert str(none.value) == ("a vessel design needs plant_scale (tonnes of product a year), a named person's "
+                               "assumption; none was given")
+    assert runs.listed("kinetics") == []
+
+
+def test_a_worker_a_kinetics_thing_calls_that_cannot_answer_is_a_503_naming_it(kinetics_engines, monkeypatch):
+    from openferment_core.workers import WorkerCrashed
+    from test_vessel import AEROBIC_ID, keep, standin_simulation
+
+    keep(AEROBIC_ID, standin_simulation(True))
+
+    def crashed(op, payload):
+        raise WorkerCrashed(f"openferment_core.workers.proforma_worker ended while answering {op!r}", "")
+
+    monkeypatch.setattr(proforma, "call", crashed)
+    monkeypatch.setattr(vessel, "_SPECS", {})
+    r = TestClient(api.app).get("/api/engines/kinetics/parameters", params={"thing": "vessel",
+                                                                          "configuration": AEROBIC_ID})
+    assert r.status_code == 503, r.text
+    assert r.json()["detail"] == ("the kinetics engine computes in the service's process, and the worker its "
+                                  "computation called could not answer: openferment_core.workers.proforma_worker "
+                                  "ended while answering 'vessel_specs'")
+    assert runs.listed("kinetics") == []
+
+
+def test_conformance_holds_all_eight_on_kinetics_with_the_placeholders_it_is_given(kinetics_engines, tmp_path):
+    path = fermos_engine.write_placeholder_inputs(tmp_path / "inputs.json", by="conformance test")
+    values = conform._read_inputs(str(path))
+    assert {i.name: i.quantity.value for i in values} == {"mu_max": 1.0, "ks": 1.0, "yxs": 1.0, "alpha": 1.0,
+                                                          "yps": 1.0, "p_max": 1.0, "x0": 1.0, "s0": 1.0, "p0": 0.0}
+    assert {(i.quantity.origin.kind, i.quantity.origin.by, i.quantity.origin.at) for i in values} == {
+        ("person-assumption", "conformance test", conform._today())}
+    found = conform.checks(KINETICS, by="conformance test", entry=KINETICS_ENTRY, inputs=values)
+    assert [c.number for c in found] == list(range(1, 9))
+    assert all(c.ok for c in found), [(c.number, c.said) for c in found if not c.ok]
+    unset = sum(1 for f in FAMILIES for s in kinetics.family(f).specs()
+                if s.convention is None or "convention" not in s.sourceRule)
+    assert f"{unset} a run sets" in found[1].said and "with 9 values set" in found[2].said
+    # Check 6: an engine with no worker holds the worker libraries out of the service's process.
+    assert "imported none of biorefineries, biosteam, cobra, pisces_sff, thermosteam" in found[5].said
+    # Every family's placeholders compute.
+    for family in FAMILIES[1:]:
+        ran = KINETICS.run(family, None, fermos_engine.placeholder_inputs(family, by="conformance test"),
+                           "conformance test")
+        assert ran.status == "done", (family, ran.refused)
+
+
+def test_the_conform_command_holds_all_eight_on_kinetics_on_a_scratch_database(kinetics_engines, test_database,
+                                                                              monkeypatch, tmp_path, capsys):
+    path = fermos_engine.write_placeholder_inputs(tmp_path / "inputs.json", by="conformance test")
+    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", test_database.server.render_as_string(hide_password=False))
+    assert conform.main(["kinetics", "--inputs", str(path)]) == 0, capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert printed.count("✓") == 8 and "every check holds" in printed
+    held = conform.latest("kinetics")
+    assert held.ok and held.version == contract.version_string(KINETICS)

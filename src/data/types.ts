@@ -2460,22 +2460,19 @@ export interface FermosFitResponse {
   notes: string[];
 }
 
-/** A forecast's starting values; unset ones are the fitted run's own. */
-export interface StartValues {
-  X0: number | null;
-  P0: number | null;
-  S0: number | null;
-}
-
+/**
+ * `POST /api/fermos/forecast`: a band for the next run, drawn from a fit. Its
+ * start values and length are the values set on the scope
+ * `fermos:forecast:<fit id>` (x0, s0, p0 and t_end), each a typed quantity
+ * with its origin; the ones left unset are the fitted run's own.
+ */
 export interface ForecastRequest {
   fitArtifactId: string | null;
   fit: KineticFit | null;
-  start: StartValues;
-  /** Who changed a starting value; a changed one is that person's assumption. */
-  changedBy: string | null;
-  durationH: number | null;
-  /** Who set the length; a length a person set is that person's assumption (OF-BLD-020 §3.R). */
-  durationBy: string | null;
+  /** The start values and the length a person or a model sets (alpha 2.2 D2). */
+  inputs: EngineInput[];
+  /** The person or the model asking. */
+  by?: string;
   sample: boolean;
 }
 
@@ -3290,7 +3287,8 @@ export interface ParamScope {
 
 /** `POST /api/params/{scope}/resolve`. Runs nothing. */
 export interface ParamResolveRequest {
-  overrides: Override[];
+  /** The values a person or a model sets, each laid on the scope the route names (alpha 2.2 D2). */
+  inputs: EngineInput[];
   /** A Proforma scenario not yet saved names the shelf flowsheet it runs. */
   flowsheet?: string | null;
   /** A strain filter on the records, as `/api/proforma/bind` takes it. */
@@ -3317,8 +3315,8 @@ export interface ParamResolveRequest {
   /**
    * pureOS's unit scope (§5.2): the whole train, so per-component keys expand
    * over its chemicals and records bind by its program and product; the scope
-   * `pureos:unit:<train id>:inlet` is its inlet. Its typed values are not laid
-   * on here: the resolve's `overrides` are.
+   * `pureos:unit:<train id>:inlet` is its inlet. A resolve lays on its `inputs`
+   * alone, so a page sends a unit's typed values among them.
    */
   train?: TrainSpec | null;
   /** A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the vessel design and the train run it is built from. */
@@ -3350,8 +3348,10 @@ export interface VesselRequest {
   vesselType?: 'stirred-tank' | 'bubble-column' | null;
   /** A kLa correlation by BioSTEAM's registered name, one its class runs for the design (fermos_vessel's klaMethod); null is the class's own. */
   klaMethod?: string | null;
-  /** A person's changes, each a named assumption, scope `fermos:vessel:<id>`. */
-  overrides: Override[];
+  /** The values a person or a model sets, laid on the scope `fermos:vessel:<id>` (alpha 2.2 D2). */
+  inputs: EngineInput[];
+  /** The person or the model asking. */
+  by?: string;
 }
 
 /** One line of the design table, read from BioSTEAM's objects. */
@@ -3498,8 +3498,10 @@ export interface SimulationRequest {
   strain?: string | null;
   product?: string | null;
   sugar?: string | null;
-  /** A person's changes, each an Override of scope `fermos:family:<family>`. */
-  overrides?: Override[];
+  /** The values a person or a model sets, laid on the scope `fermos:family:<family>` (alpha 2.2 D2). */
+  inputs?: EngineInput[];
+  /** The person or the model asking. */
+  by?: string;
   fitArtifact?: string | null;
   /** 'records', 'fit', or 'simulation:<artifact id>'. */
   startFrom?: string;
@@ -4176,6 +4178,15 @@ export interface RunInput {
   name: string;
   quantity: Quantity;
 }
+
+/**
+ * A value a request sets (alpha 2.2 D2): a parameter's key and a typed
+ * quantity in its unit, whose origin names the person or the model that set it
+ * and the day it was set; the service converts it into an override of the
+ * scope at its door. The browser makes one from an Override in one place
+ * (src/lib/params.ts, `inputsOf`).
+ */
+export type EngineInput = RunInput;
 
 /** The SFF file a run wrote: its flowsheet record and what the toolkit said of it. */
 export interface RunSFF {

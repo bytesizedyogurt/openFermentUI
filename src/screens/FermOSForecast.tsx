@@ -10,10 +10,14 @@
 // start values and length are the scope `fermos:forecast:<fit id>`, served
 // by the service bound to the fitted run's own, in the run's own units; a
 // person's value there is an override under their reviewer name, sent as the
-// forecast's start values and length. A batch_v1 fit is simulated from, not
-// forecast from a covariance: its start values and run length are its
-// family's scope (`fermos:family:batch_v1`, groups Start values and Run
-// length), started from the fit and as long as its run, and the service
+// forecast's start values and length, each a typed input in the unit the
+// scope's specs name (lib/params.ts, `inputsOf`); the run waits for the scope
+// to load, so each goes in its unit. A batch_v1 fit is simulated from its
+// central values: its start values and run length are its family's scope
+// (`fermos:family:batch_v1`, groups Start values and Run length), started
+// from the fit and as long as its run; the panel shows those two groups and
+// resolves with the family's every spec (`unitSpecs`), so a value typed on
+// Simulate for another parameter goes in its own unit too; and the service
 // keeps the run as a `fermos.simulation`, drawn as computed curves with the
 // run's own readings as filled points. Either way this screen renders no
 // number box of its own: every value comes from the service or the person.
@@ -24,7 +28,7 @@
 // overrides of the keys its panel shows, so a value typed on Simulate for the
 // family's other parameters never runs here unseen; Simulate from this fit is
 // held while anything waits, and the keys are named; a forecast's length a
-// person typed goes with that person's name (`durationBy`).
+// person typed goes with that person's name and the day it was typed.
 //
 // Send to Proforma (OF-BLD-019 §5.1, D10): the fit in hand, the forecast
 // just made from it, or the simulation, goes to a Proforma scenario, or to a
@@ -32,7 +36,7 @@
 // page attaches it to the inputs it can feed (titre, yield, productivity);
 // the service computes each value from the artifact there.
 import { useEffect, useMemo, useState } from 'react';
-import type { ForecastResult, ParamScope, SimulationResult } from '@/data/types';
+import type { ForecastResult, ParameterSpec, ParamScope, SimulationResult } from '@/data/types';
 import { overridesFor, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { Button, Callout } from '@/components/ui';
@@ -54,7 +58,6 @@ import {
   fermosSimulate,
   fitFigureSeries,
   fitSeriesOf,
-  forecastAsk,
   forecastScope,
   paramAskOf,
   simulateFromFitPath,
@@ -127,6 +130,8 @@ export default function FermOSForecast() {
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [scopeData, setScopeData] = useState<ParamScope | null>(null);
+  // Every spec of the scope, the ones the panel leaves out among them: what names each override's unit in a resolve.
+  const [scopeSpecs, setScopeSpecs] = useState<ParameterSpec[]>([]);
   const [scopeProblem, setScopeProblem] = useState<string | null>(null);
   // What waits among the family's parameters this panel does not show (a batch fit's simulation).
   const [elsewhere, setElsewhere] = useState<string[]>([]);
@@ -139,11 +144,14 @@ export default function FermOSForecast() {
       : null;
   const scope = !fitId ? '' : model === LOGISTIC ? forecastScope(fitId) : familyScope(model);
   const scoped = useStore(overridesFor(scope));
+  const reviewer = useStore((s) => s.reviewer).trim();
   // A batch fit's simulation sends only the overrides of the keys its panel shows.
   const shownKeys = new Set((scopeData?.specs ?? []).map((s) => s.key));
   const overrides = batchAsk ? scoped.filter((o) => shownKeys.has(o.key)) : scoped;
   const waitingShown = batchAsk ? (scopeData?.waiting ?? []).filter((k) => !overrides.some((o) => o.key === k)) : [];
   const held = batchAsk !== null && (elsewhere.length > 0 || waitingShown.length > 0);
+  // The run sends each override in the unit its scope's spec names, so it waits for the scope to load.
+  const conditionsWait = !!scope && !scopeData;
   const askKey = JSON.stringify(batchAsk);
 
   const seriesFor = (id: string) => {
@@ -155,6 +163,7 @@ export default function FermOSForecast() {
   // The conditions' scope: the forecast's own, or the batch family's from the fit.
   useEffect(() => {
     setScopeData(null);
+    setScopeSpecs([]);
     setScopeProblem(null);
     setElsewhere([]);
     setResult(null);
@@ -163,6 +172,7 @@ export default function FermOSForecast() {
     const ctrl = new AbortController();
     paramScope(scope, batchAsk ? paramAskOf(batchAsk) : {}, ctrl.signal)
       .then((d) => {
+        setScopeSpecs(d.specs);
         if (!batchAsk) return setScopeData(d);
         // A batch fit's forecast shows its family's start values and run length alone.
         const keys = new Set(d.specs.filter((s) => FORECAST_GROUPS.includes(s.group)).map((s) => s.key));
@@ -179,7 +189,7 @@ export default function FermOSForecast() {
     setBusy(true);
     setProblem(null);
     if (batchAsk) {
-      fermosSimulate(batchAsk, overrides)
+      fermosSimulate(batchAsk, overrides, scopeData?.specs ?? [], reviewer)
         .then((r) => {
           setSim(r);
           setResult(null);
@@ -191,8 +201,7 @@ export default function FermOSForecast() {
         .finally(() => setBusy(false));
       return;
     }
-    const a = forecastAsk(overrides);
-    fermosForecast({ fitArtifactId: fitId, fit: null, start: a.start, changedBy: a.changedBy, durationH: a.durationH, durationBy: a.durationBy, sample: false })
+    fermosForecast({ fitArtifactId: fitId, fit: null, overrides, specs: scopeData?.specs ?? [], by: reviewer, sample: false })
       .then((r) => {
         setResult(r);
         setSim(null);
@@ -245,9 +254,14 @@ export default function FermOSForecast() {
             ))}
           </select>
         </label>
-        <Button variant="primary" onClick={run} disabled={busy || !fit || held} data-testid="forecast-run">
+        <Button variant="primary" onClick={run} disabled={busy || !fit || held || conditionsWait} data-testid="forecast-run">
           {busy ? (batchAsk ? 'Simulating…' : 'Forecasting…') : batchAsk ? 'Simulate from this fit' : 'Forecast'}
         </Button>
+        {conditionsWait && (
+          <span className="text-caption text-ink-soft" data-testid="forecast-conditions-wait">
+            {scopeProblem ? 'It waits for its conditions, which the service could not give: see below.' : 'It waits for its conditions to load.'}
+          </span>
+        )}
       </div>
       {batchAsk ? (
         <p className="text-caption text-ink-soft">
@@ -269,7 +283,13 @@ export default function FermOSForecast() {
       {scope && (
         <section aria-label="Conditions" className="card p-3" data-testid="forecast-panel">
           {scopeProblem && <Callout kind="warn">{scopeProblem}</Callout>}
-          <ParameterPanel scope={scope} data={scopeData} request={batchAsk ? paramAskOf(batchAsk) : undefined} groups={FORECAST_GROUPS} />
+          <ParameterPanel
+            scope={scope}
+            data={scopeData}
+            unitSpecs={scopeSpecs}
+            request={batchAsk ? paramAskOf(batchAsk) : undefined}
+            groups={FORECAST_GROUPS}
+          />
         </section>
       )}
       {!fitId && <p className="text-caption text-ink-soft">This fit is not kept as an artifact, so its conditions cannot be changed here.</p>}

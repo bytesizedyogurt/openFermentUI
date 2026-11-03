@@ -411,6 +411,92 @@ def standin_ceiling(model_id: str, product: str, substrate: str, g_per_g: float,
     return plant_artifact(art)
 
 
+# ── A value a request sets (alpha 2.2 D2) ─────────────────────────────
+#
+# fermOS's requests and the panel's resolve take each value set as a typed
+# quantity with its origin (an EngineInput); the browser keeps a person's
+# change as an Override and sends it as an input (src/lib/params.ts,
+# `inputsOf`). A test that types its values as Overrides sends them through
+# these, the server's mirror of that one function.
+
+
+def as_input(o: Any, unit: str) -> Any:
+    """An Override as the input a request sends: its key, and its value, low
+    and high in `unit` (its parameter's), with its person or model, day and
+    note as the quantity's origin."""
+    from openferment_core.models import EngineInput, Origin, Quantity
+
+    origin = Origin(kind=o.origin, by=o.by, at=o.at, note=o.note)
+    return EngineInput(name=o.key, quantity=Quantity(value=o.value, unit=unit, low=o.low, high=o.high, origin=origin))
+
+
+def unit_for(key: str, units: dict[str, str]) -> str:
+    """The unit a key's value is sent in, as the browser reads it from the
+    scope's specs: the key's own, or for a key expanded per item
+    (`<key>.<item>`) its template's; a key the specs do not name goes with
+    none, as the browser sends it, and the service refuses it in words."""
+    if key in units:
+        return units[key]
+    return units.get(key.partition(".")[0], "")
+
+
+def as_inputs(overrides: Any, units: dict[str, str]) -> list[Any]:
+    """Overrides as the inputs a request sends, each in its parameter's unit (`units`, key to unit)."""
+    return [as_input(o, unit_for(o.key, units)) for o in overrides]
+
+
+def inputs_json(overrides: Any, units: dict[str, str]) -> list[dict[str, Any]]:
+    """`as_inputs` as a request's JSON body carries them."""
+    return [i.model_dump(mode="json", exclude_none=True) for i in as_inputs(overrides, units)]
+
+
+def scope_units(scope: str, **ask: Any) -> dict[str, str]:
+    """Each parameter's unit in a scope, as GET /api/params/{scope} serves its
+    specs (`ask` the resolve request's other fields)."""
+    from openferment_core import params
+    from openferment_core.models import ParamResolveRequest
+
+    return params.units_of(params.scope(scope, ParamResolveRequest(**ask)).specs)
+
+
+def family_units(family: str) -> dict[str, str]:
+    """Each parameter's unit in a fermOS family's scope, as it declares them."""
+    from openferment_core import kinetics, params
+
+    return params.units_of(kinetics.family(family).specs())
+
+
+def simulation_request(*, overrides: Any = (), **fields: Any) -> Any:
+    """A simulation request as the browser sends one: a person's overrides
+    as typed inputs in the family's units, with every other field as given."""
+    from openferment_core.models import SimulationRequest
+
+    return SimulationRequest(**fields, inputs=as_inputs(overrides, family_units(fields["family"])))
+
+
+def vessel_request(*, overrides: Any = (), **fields: Any) -> Any:
+    """A vessel design request as the browser sends one: a person's overrides
+    as typed inputs in each design parameter's declared unit (vessel.UNITS)."""
+    from openferment_core import vessel
+    from openferment_core.models import VesselRequest
+
+    return VesselRequest(**fields, inputs=as_inputs(overrides, vessel.UNITS))
+
+
+def resolve_request(scope: str, *, overrides: Any = (), **fields: Any) -> Any:
+    """A panel's resolve request as the browser sends one: a person's
+    overrides as typed inputs in the units the scope's specs name (read with
+    the request's other fields), with every other field as given."""
+    from openferment_core.models import ParamResolveRequest
+
+    return ParamResolveRequest(**fields, inputs=as_inputs(overrides, scope_units(scope, **fields)))
+
+
+def resolve_json(scope: str, overrides: Any, **fields: Any) -> list[dict[str, Any]]:
+    """A panel's overrides as the resolve route's JSON `inputs`, each in the unit its scope's spec names."""
+    return inputs_json(overrides, scope_units(scope, **fields))
+
+
 VESSEL_FIXTURE_RTOL = 1e-6
 
 

@@ -6,8 +6,11 @@
  * overlay a project's pages load (src/lib/intake.ts), where a service that
  * answers and refuses is running and says why; the configurations a plant
  * is offered in (src/lib/library.ts), and the refusals an SFF import answers
- * in the service's words (src/lib/http.ts). Run by `pnpm check:state`,
- * offline: the service is a stand-in for `fetch`.
+ * in the service's words (src/lib/http.ts), a refusal of a request's own
+ * fields among them; and the unit each person's change is sent in
+ * (src/lib/params.ts, `inputsOf`), a panel that shows part of its scope
+ * among them. Run by `pnpm check:state`, offline: the service is a stand-in
+ * for `fetch`.
  */
 import {
   EMPTY_STATE,
@@ -19,10 +22,11 @@ import {
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
-import type { Deposition, LiveConversation, Scenario } from '../src/data/types';
+import type { Deposition, LiveConversation, Override, ParameterSpec, Scenario } from '../src/data/types';
 import { loadOverlay } from '../src/lib/intake';
-import { ServiceDown, ServiceRefused, call } from '../src/lib/http';
+import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
+import { inputsOf } from '../src/lib/params';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -187,6 +191,43 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   check('a source the service could not fetch is its refusal, in its words', unfetched instanceof ServiceRefused && unfetched.status === 502, String(unfetched));
   const proxy = await callAgainst({ status: 502 }, false);
   check('a 502 with no words and no health is the service down', proxy instanceof ServiceDown, String(proxy));
+}
+
+// ── a request's own fields refused, and a page older than the service (alpha 2.2 C.2) ──
+
+{
+  // FastAPI's 422 for a field the request does not hold: a page loaded before the service took inputs.
+  const stale = await callAgainst({
+    status: 422,
+    body: { detail: [{ type: 'extra_forbidden', loc: ['body', 'overrides'], msg: 'Extra inputs are not permitted', input: [] }] },
+  });
+  check(
+    'a refusal of the request’s own fields is said field by field, with what to do when the page is older than the service',
+    stale instanceof ServiceRefused &&
+      stale.message ===
+        "The service refused the request's fields: overrides: Extra inputs are not permitted. This page was loaded before the service changed what it takes: reload the page." &&
+      !stale.message.includes('[object Object]'),
+    String(stale),
+  );
+  const missing = detailWords([{ type: 'missing', loc: ['body', 'inputs', 0, 'quantity'], msg: 'Field required' }]);
+  check('a field the request lacks is named where it stands, and no reload is asked for', missing === "The service refused the request's fields: inputs.0.quantity: Field required.", missing);
+  check('the service’s own words stand as they are', detailWords('a placeholder refusal') === 'a placeholder refusal');
+}
+
+// ── the unit each change is sent in (alpha 2.2 D2; src/lib/params.ts) ──
+
+{
+  const spec = (key: string, unit: string, group: string) => ({ key, unit, group }) as unknown as ParameterSpec;
+  const scope: ParameterSpec[] = [spec('x0', 'placeholder-unit-a', 'Start values'), spec('mu_max', 'placeholder-unit-b', 'Kinetics')];
+  const shownOnly = scope.filter((s) => s.group === 'Start values');
+  const typed = (key: string): Override => ({ scope: 'a-scope', key, value: 1, by: 'Ada', at: '2026-11-03T00:00:00Z' }) as Override;
+  const changes = [typed('x0'), typed('mu_max')];
+  const units = (specs: ParameterSpec[]) => inputsOf(changes, specs).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  // FermOSForecast's batch fit shows part of its family's scope and resolves with all of it (ParameterPanel's unitSpecs).
+  check('a panel that shows part of its scope sends each change in the unit its scope’s every spec names', units(scope) === 'x0 placeholder-unit-a, mu_max placeholder-unit-b', units(scope));
+  check('the shown specs alone would send a change typed elsewhere on the scope with no unit', units(shownOnly) === 'x0 placeholder-unit-a, mu_max ', units(shownOnly));
+  const expanded = inputsOf([typed('split.Water')], [spec('split', 'placeholder-share', 'Separation')]);
+  check('a key expanded per item is sent in its template’s unit', expanded[0]?.quantity.unit === 'placeholder-share', JSON.stringify(expanded));
 }
 
 console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');

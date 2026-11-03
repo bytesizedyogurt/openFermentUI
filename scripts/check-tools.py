@@ -21,8 +21,11 @@ Fails when:
    through `writes.run_scenario`, `writes.run_simulation` and writes.py's
    train functions, so rule 2 reads their calls to `proforma.run`,
    `fermos.simulate`, `pureos.kept.keep_train` and
-   `pureos.train_spec.run_train`. What keeps a run is found, not listed:
-   every function of the service that calls `artifacts.compute` for a
+   `pureos.train_spec.run_train`; `growth_forecast`, whose kept forecast is a
+   run of the kinetics engine (alpha 2.2 D3), forecasts through
+   `writes.run_forecast` and its call to `fermos.forecast_run`. What keeps a
+   run is found by reading the service's code: every function of the service
+   that calls `artifacts.compute` for a
    `proforma.run`, `proforma.reference`, `proforma_benchmark`,
    `fermos.simulation`, `fermos.vessel` or `pureos.train_run` artifact (or for
    a tool it cannot name) or `audit.append`, or that writes a row (`db.rows`'
@@ -838,7 +841,7 @@ if errors:
         print(f"  - {e}")
     sys.exit(1)
 print(f"✓ check:tools  {len(module_stores.MODULES)} modules with a read and a write tool; writes.py calls only "
-      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a run (Proforma's, a simulation, a vessel, a train, an engine run or a comparison), a train or a scenario a model made, or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
+      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a run (Proforma's, a simulation, a forecast, a vessel, a train, an engine run or a comparison), a train or a scenario a model made, or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
       f"{len(coded)} gates in gates.py and docs/TOOLS.md alike; {len(tools.WHITELIST)} tools, each registered, each "
       f"acting in one project, and docs/TOOLS.md as the registry writes it; a number stands only in a quantity or a "
       f"count, and no fermOS or pureOS tool takes one")

@@ -37,7 +37,7 @@ the registry holds, it holds for each of them.
 | `convert_units` | Units | read | project |
 | `search_passages` | Literature | read | project |
 | `yield_ceiling` | geneOS | read | project |
-| `growth_forecast` | fermOS | read | project |
+| `growth_forecast` | fermOS | writes | project |
 | `selling_price` | Proforma | read | project |
 | `draft_runbook` | Runbooks | read | project |
 | `runbooks_read` | Module reads | read | project |
@@ -363,7 +363,7 @@ Read the stream table a kept Proforma run holds: every stream of the base case w
 
 ### `growth_forecast`
 
-*read · scope: project · strict*
+*writes · scope: project · strict*
 
 Forecast a run like a fitted one: biomass, product and substrate as bands for readings, from a kept kinetic fit's artifact id, under the fitted run's own starting values and length. Returns one evidence id to cite and the final values as intervals. A fit whose growth rate or ceiling was not identified is refused with what run would identify it.
 

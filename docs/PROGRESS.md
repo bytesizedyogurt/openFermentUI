@@ -27,9 +27,9 @@ session continues from this file and `git log` alone.
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
 4. **Next step: stage C, every run one shape**, in seven steps (C.1 done: the pins in
-   `core/tests/test_engine_pins.py`, the handler mismatches, `engine/runs.keep_run`): C.2 the
+   `core/tests/test_engine_pins.py`, the handler mismatches, `engine/runs.keep_run`; C.2 done: the
    `kinetics` engine over fermOS's families, fermOS's requests on typed quantities and its runs as
-   rows; C.3 the `train` engine over pureOS with a train's SFF file; C.4 Proforma and the library
+   rows): C.3 the `train` engine over pureOS with a train's SFF file; C.4 Proforma and the library
    door on quantities, Proforma's shelf flowsheets as things of `biosteam`; C.5 the `measurement`
    origin; C.6 the hand-written shelf entries and Proforma's split retired, import from a URL; C.7
    the gate. Every pin holds through each step. Stage B (the engine contract) is done:
@@ -46,7 +46,10 @@ session continues from this file and `git log` alone.
 Alpha 2.2, stage C (2026-11-03): every run one shape. C.1 pinned sixteen computations to their ids
 and output hashes before anything moved, fixed the worker's handler mismatches, and gave every
 engine's computation one keeper, `engine/runs.keep_run`, with `outputs.values` that comparisons
-and runbooks read for a run of any engine.
+and runbooks read for a run of any engine. C.2 registered fermOS as the engine `kinetics`: its
+requests take typed quantities with their origins, each simulation, kept forecast and vessel
+design is one `runs` row at every door, and `conform kinetics --inputs <file>` holds all eight
+checks, which `pnpm prove` step 10 makes with the placeholders it writes.
 
 Alpha 2.2, stage B (2026-11-03): the engine contract. `docs/api/engines.md` is the page a stranger
 builds an engine from, ADR-015 records the registry on the entry-point group `openferment.engines`,
@@ -182,7 +185,8 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-03 01:50 | `pnpm test:core` on B.5 (the contract's defects the design measured) | 2343 passed, 1 skipped, 172 deselected | 5 min 22 s | B.5 |
 | 2026-11-03 04:03 | `pnpm test:core` on B.6 (the critic's defects and the review's) | 2397 passed, 1 skipped, 172 deselected | 5 min 8 s | B.6 |
 | 2026-11-03 04:08 | B.6: `pnpm test:sim`; verify's fast stages (`check:secrets`, `typecheck`, both `--check`s, `check:plan`, `check:licences`, `check:tools`, `check:guild`, `check:state`, `check:figures`, `test:reconcile`); `build`; `smoke` | 136 passed; every stage green; 12 of 12 screens open | 5 min 14 s (`test:sim`) | B.6 |
-| 2026-11-03 06:16 | C.1: `pnpm test:core`; `test:sim` (the fix round's); `typecheck`, both `--check`s, `check:plan`, `check:tools`, `check:state`, `check:figures`, `check:secrets`; `build`; `smoke` | 2422 passed, 1 skipped, 174 deselected; 138 passed; every stage green; 12 of 12 screens open | 6 min 0 s (`test:core`) | C.1 |
+| 2026-11-03 06:10 | C.1: `pnpm test:core`; `test:sim` (the fix round's); `typecheck`, both `--check`s, `check:plan`, `check:tools`, `check:state`, `check:figures`, `check:secrets`; `build`; `smoke` | 2422 passed, 1 skipped, 174 deselected; 138 passed; every stage green; 12 of 12 screens open | 6 min 0 s (`test:core`) | C.1 |
+| 2026-11-03 10:52 | C.2: `pnpm test:core`; `test:sim`; the pins; `typecheck`, the three `--check`s, `check:tools`, `check:plan`, `check:state`; `build`; `smoke`; `pnpm prove --steps 10`; `pnpm prove`, offline, steps 1 to 10 | 2458 passed, 1 skipped, 174 deselected; 138 passed; 13 passed; every stage green; 12 of 12 screens open; 11 of 11 checks, `conform kinetics` and `conform biosteam` 8 of 8 each; 71 of 71 checks | 7 min 38 s (`test:core`); 265 s (the proof) | C.2 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -233,6 +237,14 @@ prompt's §4).
 |---|---|---|
 | alpha 2.2 D1, C.1 | D1's amendment, the dispatch: every pin's output hash is computed under one fixed dispatch (`OPENBLAS_CORETYPE=Haswell`, `OPENBLAS_NUM_THREADS=1`, `NPY_DISABLE_CPU_FEATURES="X86_V4 AVX512_ICL AVX512_SPR"`), in a process `test_engine_pins.py` starts with them, and each id in the suite's own process as well; a host that is not x86-64 with AVX2 and FMA3 skips the pins, saying why (the fit's id rests on readings numpy computes in the test). Four literals were captured again from ed33c02's code under the fixed dispatch, on Python 3.13.17 and 3.12.3 alike: `fermos.simulation chemostat_v1` `ea77840641c03bb5…` (first `0cd4343efc7cbfe5…`), `kinetic_fit` `905045fddf738d41…` (first `1a00f394d4c7a1fa…`), `growth_forecast` `5cb631e5e0ae170e…` (first `dc1cf3ef52dd2cbc…`) and the forecast with a changed start `859f488203c5439f…` (first `5d29ef33c8831f7a…`); every id and the other twelve hashes read as first captured. The step counts as green once a CI run passes | The first capture was this AVX-512 Xeon's own dispatch (numpy's X86_V4 loops, OpenBLAS's SkylakeX kernels). The review measured that OpenBLAS's Haswell or Zen kernels move the chemostat's hash, and numpy's dispatch moves the fit's and the forecasts'; CI's runners include AVX2 hosts. The fixed dispatch is the one such a host takes of itself |
 | alpha 2.2 D3, C.1 | `study.comparison` reads its version from the runs it compares: `study comparison 1` for library runs alone, every row, id and pin as before, and `study comparison 2` for a comparison that holds a run of another engine, which reads outputs.values, names a contract run's thing, and gives a library run the library's default only for a value its plant declares (every other such cell null) | Before C.1 such a comparison set no row of a contract run's outputs and gave every run that set a value none a `library-default` cell; reading the new outputs under the old version would replay a kept comparison differently with nothing to say why. Version 2 makes the replay name the change, and the nightly reads a version-1 artifact over such a run as stale. Before C.1 only `biosteam` registered through an entry point, so test databases alone could hold one |
+| alpha 2.2 §6.1, C.2 | `kinetics` declares `worker` None and `heavy` (): fermOS integrates with SciPy in the service's process, as it always has, and a vessel design runs on BioSTEAM in the Proforma worker; `GET /api/engines` lists the worker's status as `none`, `pnpm ready` names the Proforma worker for a vessel design, and a 503 from an engine route names the worker the computation called | §6.1 has every engine name its worker module. fermOS's integrators are SciPy alone (`test_workers.py` allows it in `kinetics.py` and `fermos.py`) and read the store's ceiling artifacts; moving them into a worker of their own would move every fermOS pin |
+| alpha 2.2 §6.1, C.2 | A parameter with no default reads `value` and `origin` null, its `sourceRule` naming `assumption` (`EngineParameter`); conformance check 2 reads "every default carries an origin, and a parameter with none says a run sets it"; `run_engine` refuses in words, keeping nothing, a contract engine's run that leaves one unset | §6.1 has every parameter carry an origin. A kinetics family's rates and start values have no default, and a default typed in would be science in the code (§1 item 7) |
+| alpha 2.2 D3, C.2 | `growth_forecast` is a write tool: its kept forecast is a run of the kinetics engine in its caller's name, so at the HTTP door (`POST /api/tools/growth_forecast`) it names its caller with `?by=`, and a call naming nobody is a 422 in words | D3 has every door make one row, created by who asked |
+| alpha 2.2 D4, C.2 | `runs.check_inputs` reads whether a parameter takes a number from `takes_number`: a parameter with choices takes one of them, a default of words in no unit takes words, and every other parameter takes a number, one with no default and one whose default is a convention's words in a unit (`ki_substrate` off, in g L⁻¹) among them | The kinetics families state a term left off as words in the parameter's unit, which a run replaces with a number; the rule before C.2 read a number from the default alone |
+| alpha 2.2 D4, C.2 | Conformance check 3 keys the run with its seed (`artifact_id(tool, toolVersion, inputs, seed)`) | A forecast's computation takes a seed, and its id joins it; check 3 keyed the run without the seed, and so held a seeded run to another id |
+| alpha 2.2 D4, C.2 | kinetics' configurations: `forecast` takes a kept logistic_v0 fit, `vessel` a kept batch_v1 simulation, a logistic fit or a forecast, each thing listed while the project holds one, read afresh in the request's project by the artifact store's tool column. Conformance, in a fresh project, checks the three families; `core/tests/test_engines.py` holds the forecast's and the vessel's parameters and runs | The plan left the things' configurations to the step; a thing run on the project's own artifacts has none to list in an empty project |
+| alpha 2.2 D4, C.2 | `version()` reads numpy and scipy from the modules and biosteam and thermosteam from their installed metadata, the versions a vessel design's tool version names, and starts no worker. Each row names what its own thing ran on: numpy and scipy for a family's simulation and a forecast; biosteam, thermosteam and biorefineries for a vessel design | The brief asked for BioSTEAM's version as the simulator reports it, which needs the Proforma worker warm: a listing or a `pnpm ready` row would then start BioSTEAM. A family's simulation and a forecast run on numpy and SciPy alone, and their rows name those |
+| alpha 2.2 D1, C.2 | The forecast that sets a start value moved its id from ed33c02's `611bd4b34eed98fd` to `80ef18a4b9924dba` under D1's amendment: its typed start value writes the day it was set and the unit of the fitted run's series in the basis. Its output hash `859f4882…` holds, and every other pin reads as captured | The amendment; the unit lets a run's page and `GET /api/runs/{id}` read the start value in the unit it was typed in |
 | alpha 2.2 §6.1, B.2 | `run(thing, configuration, inputs, by)` takes `inputs` as a list of `EngineInput`, each a parameter's key and a `Quantity` (the shape a run's inputs have, `RunInput`), where §6.1 writes `inputs: list[Quantity]` | A `Quantity` carries no name, so the parameter each value sets is named beside it |
 | alpha 2.2 §6.1, B.2 and B.6 | An engine declares `heavy` beside `worker`: the modules its worker alone imports. The registry and conformance check 6 keep the worker module, each module `heavy` names (with every module below it) and `workers.WORKER_LIBRARIES` (BioSTEAM, thermosteam, biorefineries, the SFF toolkit, cobra) out of the service's process for every engine; `worker` may be `None` only with `heavy` empty | §6.1's `worker` names one module, and its name alone cannot say which of the libraries it imports are heavy; check 6 needs the list to hold them out |
 | alpha 2.2 §6.1, B.2 | `engine → api` and `engine → tools` join the package map's exceptions (`test_boundaries.py`) | Conformance check 1 sends a bare number through the service's own route and its tool, the two doors a number enters by, and §6.1 names the command `openferment_core.engine.conform` |
@@ -310,7 +322,9 @@ prompt's §4).
 | `test_biorepo.py::test_the_committed_file_is_the_model_and_starts_empty` holds the shape of a tracked file nothing reads | when `core/data/biorepo.json` leaves git (owner action, Blockers) |
 | The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run only as `bash -n` here: this container is not a Mac | the owner's first install on the Mini |
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | the owner's machine |
-| fermOS, pureOS and Proforma take a run's values as `Override`s (a person's assumption or a model's estimate) and name each input's source in the basis, which `basis.origin_of` reads as an `Origin`; their requests are not yet lists of `Quantity` objects, and their runs are artifacts with no row in `runs` (engine runs alone are) | still open: after alpha 2.0 |
+| Paid in part: fermOS's requests take typed quantities with their origins and its runs are rows of the kinetics engine (alpha 2.2 C.2). pureOS and Proforma still take a run's values as `Override`s (a person's assumption or a model's estimate) and name each input's source in the basis, which `basis.origin_of` reads as an `Origin`; their requests are not yet lists of `Quantity` objects, and their runs are artifacts with no row in `runs` | alpha 2.2, C.3 (pureOS) and C.4 (Proforma and the library door) |
+| `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which only the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | when those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
+| Studies' run card names a kinetics forecast's or vessel's configurations by their bare artifact ids; saying each one's kind and when it was kept needs a title per configuration in `EngineThing`, or a read of each artifact | the screens on the generated types (alpha 2.2 stage E) |
 | The shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) serve the reference run and its screen beside the library plants `cornstover` and `corn`, which discovery found | when the UI reads the library shelf alone, after alpha 2.0 |
 | A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and not offered | after alpha 2.0 (4.3 composes the cellulosic plant's pretreatment and fermentation instead) |
 | A second organism's reaction set for the composed flowsheet: the package holds one | when a package or a record gives another |
@@ -1193,3 +1207,47 @@ holds the numbers, the tables and the judgements).
     library runs alone keeps `study comparison 1`, every row and id as before; one holding another
     engine's run is `study comparison 2` (Departures). The studies export prints any engine's
     values.
+  - CI's verify passed on `0c49630` (run 325, 13 min 43 s): the pins hold on GitHub's runners
+    under the fixed dispatch, as the departure asks.
+- C.2. The kinetics engine, fermOS's requests on typed quantities, and fermOS's runs as rows.
+  - fermOS's requests take typed values (D2): `SimulationRequest`, `VesselRequest` and
+    `ForecastRequest` take `inputs`, each a parameter's key and a `Quantity` with its origin and
+    the day it was set, and `by`; the panels' resolve (`ParamResolveRequest`) takes `inputs` for
+    every scope. `basis.override_of` is the one converter into the `Override` each resolver
+    takes, so params, kinetics and vessel compute as they did. The four requests refuse a field
+    they do not name, and the client puts FastAPI's list of field errors into words, asking a
+    page older than the service to reload (`lib/http.ts`). The browser keeps a person's change as
+    an `Override` and sends it as an input in its spec's unit (`lib/params.ts`, `inputsOf`).
+  - fermOS's runs are rows (D3): a simulation, a kept forecast and a vessel design each keep one
+    `runs` row of the engine `kinetics` (`engine/runs.compute_kept`) at every door (the routes,
+    the tools, MCP, the engine), created by the request's `by` or the tool's caller; a refusal
+    inside the computation is a receipt, and a value that waits keeps nothing. `outputs.values`
+    holds a simulation's end state and hours, a forecast's finals with their 5th and 95th
+    percentiles, and a design's rows. A held row's provenance follows its artifact's when a
+    record it rests on is reviewed or demoted.
+  - `kinetics` registered (D4; `core/pyproject.toml`, `fermos_engine.py`): the three simulating
+    families, a forecast of a kept fit and a vessel design, the things read afresh in the
+    project by the artifact store's tool column. `conform kinetics --inputs <file>` holds all
+    eight checks with the placeholders `fermos_engine.write_placeholder_inputs` writes, and
+    `pnpm prove` step 10 writes them for it; `pnpm ready` names that command and the worker a
+    vessel design runs in (Departures).
+  - The tools keep rule E.4‴, as the plan's amendment to D2 decides: `fermos_simulate`,
+    `fermos_vessel` and `growth_forecast` take ids and words, check:tools' strict rule holds for
+    `fermos_` and `pureos_` alike (each negative-tested), and Postdoc's rules 15 and 16 stand. A
+    person sets a fermOS value on the screens' routes or at `POST /api/engines/kinetics/run`.
+    `growth_forecast` becomes a write, keeping its forecast as a run in its caller's name.
+  - A refusal of a key a scope lacks names the scope's own keys: a pureOS unit's as its scope
+    expands them, and for a key no vessel declares, those of the vessel's kind; an anaerobic
+    design with no scale asks for a plant scale alone.
+  - The screens: a run's page shows a forecast's medians with their percentiles, every number to
+    a few digits (in full in its title and the CSV), a kinetics run's missing SFF file as a fact,
+    and a receipt's words ending in a full stop; the Forecast tab resolves with its scope's every
+    spec and waits for the scope to load; Studies' card links fermOS → Simulate or Vessel for a
+    kinetics thing whose values wait; a comparison holding another engine's run says each
+    output's unit is its artifact's.
+  - `pnpm test:core` 2458 passed, 1 skipped, 174 deselected (7 min 38 s); `pnpm test:sim` 138
+    passed (7 min 12 s); the pins 13 passed, every literal as captured but the changed-start
+    forecast's id (Departures, D1); `typecheck`, `gen:api`, `gen:tools` and `gen:components
+    --check`, `check:tools`, `check:plan`, `check:state`, `build` and `smoke` (12 of 12 screens)
+    green; `pnpm prove --steps 10` 11 of 11 checks in 123 s, `conform kinetics` 8 of 8 with the
+    placeholders it wrote; `pnpm prove`, steps 1 to 10 offline, 71 of 71 checks in 265 s.

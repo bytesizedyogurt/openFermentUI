@@ -37,9 +37,12 @@ A module adds capability through a contract and edits nothing in the base:
   `openferment.engines`, runs its heavy computation in a worker process of its own, takes typed
   quantities and gives back one run of the shape every run has (`docs/api/engines.md`). The
   engines in this repository register the same way, from `core/pyproject.toml`: `biosteam`
-  (library plants and openFerment's composed flowsheet). `python -m
-  openferment_core.engine.conform <name>` makes the contract's eight checks on an engine, and
-  `pnpm prove` makes them on every engine registered (step 10).
+  (library plants and openFerment's composed flowsheet) and `kinetics` (fermOS's model families,
+  its forecasts of a kept fit and its vessel designs, computing in the service's process with no
+  worker of its own, a vessel design in the Proforma worker). `python -m
+  openferment_core.engine.conform <name>` makes the contract's eight checks on an engine
+  (`kinetics` with `--inputs <file>`, the values its families wait for), and `pnpm prove` makes
+  them on every engine registered (step 10).
 - **An agent**: a program that acts in a project through the REST API or the MCP server, under
   a name of its own, every write audited under that name (`docs/TOOLS.md`).
 - **The literature layer**: Sci RAG Kit, used as a library, with its REST under `/rag` and an

@@ -204,6 +204,7 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `evidence_pool.py` | What Postdoc may cite: one view over every record the project holds (OF-BLD-014 §3.4). |
 | `extract.py` | Extract — one structured response per document (OF-BLD-012 §6.1; ADR-002). |
 | `fermos.py` | fermOS fits what a run measured (OF-BLD-014 §7.2), and simulates a run from its sources (OF-BLD-020 §3.1). |
+| `fermos_engine.py` | fermOS as the engine `kinetics` (docs/api/engines.md; ADR-015; alpha 2.2 D4). |
 | `geneos.py` | geneOS on the service's side (OF-BLD-014 §6.2). |
 | `geneos_models.py` | geneOS's shelf of published reaction networks (OF-BLD-014 §6.2). |
 | `guard.py` | Which requests may change something (OF-BLD-012 §B.6). |
