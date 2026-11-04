@@ -151,6 +151,9 @@ from .models import (
     SFFUrlImport,
     ToolInfo,
     ToolResult,
+    ProjectState,
+    StateKept,
+    StateTakenBack,
 )
 from . import llm
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
@@ -211,12 +214,17 @@ NO_SUCH_PROJECT = "The project the request names is one the database does not ho
 
 
 # The schemas a response serves as kept, a field its row leaves unset staying
-# out of the answer (ADR-007, implementation note of alpha 2.2 E.0a): a
-# runbook and what it holds, served with `response_model_exclude_unset` for
-# its lock's digest (runbook_lock.py reads an absent field and a null one
-# apart), and a draft of one, which a page keeps as a runbook. Each keeps
-# Pydantic's required list.
-AS_KEPT = frozenset({"Runbook", "RunbookStage", "Prediction", "Measure", "Range", "RunbookDraft"})
+# out of the answer (ADR-007, implementation notes of alpha 2.2 E.0a and
+# E.0b): a runbook and what it holds, served with
+# `response_model_exclude_unset` for its lock's digest (runbook_lock.py reads
+# an absent field and a null one apart), and a draft of one, which a page
+# keeps as a runbook; and the rows a project keeps of its pages, which
+# `GET /api/state` serves as the page sent them (project_state.py). Each
+# keeps Pydantic's required list.
+AS_KEPT = frozenset({"Runbook", "RunbookStage", "Prediction", "Measure", "Range", "RunbookDraft",
+                     "Deposition", "DepositionEntry", "DepositionObservation", "Reconciliation",
+                     "ReconciliationDelta", "MeasuredEvidence", "MeasuredConditions", "ProformaScenario",
+                     "TrainMade", "Override"})
 SCHEMA_REF = "#/components/schemas/"
 
 
@@ -2724,33 +2732,53 @@ class StateWrite(BaseModel):
     value: Any
 
 
-@app.get("/api/state")
-def state_load() -> dict[str, Any]:
-    """Everything the project keeps of its pages, keyed as the page keeps it."""
+@app.get("/api/state", response_model=ProjectState, response_model_exclude_unset=True)
+def state_load() -> ProjectState:
+    """Everything the project keeps of its pages, keyed as the page keeps it
+    (project_state.state): each row read as its kind's model and served as
+    kept, a field the page left out staying out of the answer, and each row
+    that does not read named in `refused` with why. A Live conversation is
+    served whole."""
     from . import project_state
 
-    return project_state.load()
+    return project_state.state()
 
 
-@app.put("/api/state/{kind}/{item_id}")
-def state_put(kind: str, item_id: str, write: StateWrite) -> dict[str, Any]:
+def _state_refused(said: str) -> dict[str, Any]:
+    return {422: {"description": f"{said}, in words (a list of field errors when the request's own fields are "
+                                 "refused).",
+                  "content": {"application/json": {"schema": {"anyOf": [
+                      {"$ref": "#/components/schemas/Refusal"},
+                      {"$ref": "#/components/schemas/HTTPValidationError"}]}}}}}
+
+
+@app.put("/api/state/{kind}/{item_id}", response_model=StateKept, responses=_state_refused(
+    "A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read "
+    "as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or "
+    "measures changed, or a kept deposition rewritten: nothing kept"))
+def state_put(kind: str, item_id: str, write: StateWrite) -> StateKept:
+    """One row kept whole, read as its kind's model first (project_state.py)."""
     from . import project_state
 
     try:
-        return {"kind": kind, "id": item_id, "value": project_state.put(kind, item_id, write.value, write.by)}
+        return StateKept(kind=kind, id=item_id, value=project_state.put(kind, item_id, write.value, write.by))
     except project_state.StateRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-@app.delete("/api/state/{kind}/{item_id}")
-def state_remove(kind: str, item_id: str, by: str = "") -> dict[str, Any]:
+@app.delete("/api/state/{kind}/{item_id}", response_model=StateTakenBack, responses=_state_refused(
+    "A kind the project does not keep, an id of another shape, or a row kept as it was made (a deposition, a "
+    "measurement, a lock, a conversation)"))
+def state_remove(kind: str, item_id: str, by: str = "") -> StateTakenBack:
+    """One row taken back, a person's own undo; a deposition, a measurement,
+    a lock and a conversation stay as they were made."""
     from . import project_state
 
     try:
         project_state.remove(kind, item_id, by)
     except project_state.StateRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
-    return {"kind": kind, "id": item_id, "removed": True}
+    return StateTakenBack(kind=kind, id=item_id, removed=True)
 
 
 @app.get("/api/audit", response_model=list[AuditEntry])

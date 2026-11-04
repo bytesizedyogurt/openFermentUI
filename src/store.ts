@@ -943,6 +943,22 @@ export const useStore = create<OFState>()((set, get) => ({
       set({ stateProblem: e instanceof Error ? e.message : String(e) });
       return;
     }
+    // A row the service keeps that does not read as its kind stays out of what
+    // the page holds, and the page names it with the service's words.
+    const unread = held.refused ?? [];
+    for (const r of unread)
+      get().logActivity({
+        at: stamp(),
+        icon: 'alert',
+        text: `The service keeps ${r.kind} ${r.id}, which does not read as its kind, so this page leaves it out: ${r.why}`,
+        href: '#/',
+        provenance: 'user',
+      });
+    if (unread.length)
+      get().toast({
+        text: `The service keeps ${unread.length} row${unread.length === 1 ? '' : 's'} this page cannot read; the activity feed names ${unread.length === 1 ? 'it' : 'each'}: ${unread[0].why}`,
+        kind: 'error',
+      });
     // Rows this browser kept before alpha 2.0 go to the open project, once.
     const legacy = get().stateLegacy;
     const outbox = legacy ? enqueue(get().stateOutbox, changes(EMPTY_STATE, legacy, project, decidedBy())) : get().stateOutbox;

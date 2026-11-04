@@ -30,6 +30,7 @@ from openferment_core.workers import WorkerError
 
 from test_comparisons import PricedStandIn
 from test_engines import given
+from test_project_state import kept_before_its_model
 from test_runbook_lock import cases
 from test_studies import asked
 
@@ -151,11 +152,15 @@ def test_what_cannot_be_a_runbook_or_locked_is_refused_in_words(worker, monkeypa
         runbooks.lock("rb-1")
     with pytest.raises(runbooks.RunbookNotFound):
         runbooks.lock("rb-none")
-    project_state.put("runbooks", "rb-2", {**PAGE_ROW, "id": "rb-2", "status": "shelved"}, "Ada Moreno")
+    shelved = {**PAGE_ROW, "id": "rb-2", "status": "shelved"}
+    with pytest.raises(project_state.StateRefused, match="this runbooks row does not read as a runbook: status"):
+        project_state.put("runbooks", "rb-2", shelved, "Ada Moreno")
+    # A row an earlier page kept, before a runbook's row was read as its model (alpha 2.2 E.0b), is refused where
+    # a study reads it.
+    kept_before_its_model("runbooks", "rb-2", shelved)
     with pytest.raises(runbooks.RunbookRefused, match="status"):
         runbooks.get("rb-2")
-    project_state.put("runbooks", "rb-study-000000000000", {**PAGE_ROW, "id": "rb-study-000000000000",
-                                                            "status": "shelved"}, "Ada Moreno")
+    kept_before_its_model("runbooks", "rb-study-000000000000", {**shelved, "id": "rb-study-000000000000"})
     with pytest.raises(runbooks.RunbookRefused, match="rb-study-000000000000 is not kept in the runbook page's shape"):
         runbooks.listed()
 

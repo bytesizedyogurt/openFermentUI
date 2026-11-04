@@ -2387,7 +2387,11 @@ export interface paths {
         };
         /**
          * State Load
-         * @description Everything the project keeps of its pages, keyed as the page keeps it.
+         * @description Everything the project keeps of its pages, keyed as the page keeps it
+         *     (project_state.state): each row read as its kind's model and served as
+         *     kept, a field the page left out staying out of the answer, and each row
+         *     that does not read named in `refused` with why. A Live conversation is
+         *     served whole.
          */
         get: operations["state_load_api_state_get"];
         put?: never;
@@ -2406,10 +2410,17 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** State Put */
+        /**
+         * State Put
+         * @description One row kept whole, read as its kind's model first (project_state.py).
+         */
         put: operations["state_put_api_state__kind___item_id__put"];
         post?: never;
-        /** State Remove */
+        /**
+         * State Remove
+         * @description One row taken back, a person's own undo; a deposition, a measurement,
+         *     a lock and a conversation stay as they were made.
+         */
         delete: operations["state_remove_api_state__kind___item_id__delete"];
         options?: never;
         head?: never;
@@ -3719,6 +3730,99 @@ export interface components {
             rule: string | null;
             /** Why */
             why: string | null;
+        };
+        /**
+         * Deposition
+         * @description The bench's record of a run against a runbook (mirrors `Deposition` in
+         *     src/data/types.ts): its readings and observations, appended as they are
+         *     taken, its state from staged to running to closed, and its
+         *     reconciliation. A write to one the project keeps is held to what the
+         *     bench does (`project_state.deposition_refusal`).
+         */
+        Deposition: {
+            /** Closedat */
+            closedAt: string | null;
+            /** Entries */
+            entries: components["schemas"]["DepositionEntry"][];
+            /** Id */
+            id: string;
+            /** Observations */
+            observations: components["schemas"]["DepositionObservation"][];
+            /** Operatorid */
+            operatorId: string | null;
+            /** Protocolid */
+            protocolId: string | null;
+            reconciliation: components["schemas"]["Reconciliation"] | null;
+            /** Runbookid */
+            runbookId: string;
+            /** Sampletimes */
+            sampleTimes?: {
+                [key: string]: number;
+            };
+            /** Seriesroles */
+            seriesRoles?: {
+                [key: string]: "biomass" | "product" | "substrate";
+            };
+            /** Startedat */
+            startedAt: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "staged" | "running" | "closed";
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * DepositionEntry
+         * @description One reading taken at the bench against a runbook's measure (mirrors
+         *     `DepositionEntry` in src/data/types.ts): the words the operator said or
+         *     typed (`raw`), the number read from them, and whether a person read it
+         *     back. A correction is a new entry on the same measure, keeping the `at`
+         *     of the reading it corrects and saying when it was typed
+         *     (`correctedAt`).
+         */
+        DepositionEntry: {
+            /** At */
+            at: string;
+            /** Confirmed */
+            confirmed: boolean;
+            /** Correctedat */
+            correctedAt?: string | null;
+            /** Id */
+            id: string;
+            /** Measureid */
+            measureId: string;
+            /** Raw */
+            raw: string;
+            /** Stepid */
+            stepId: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * DepositionObservation
+         * @description Something the operator reported that fits no measure (mirrors
+         *     `Observation` in src/data/types.ts): the words kept as they were said,
+         *     and a structured reading of them, None until a person adds one.
+         */
+        DepositionObservation: {
+            /** At */
+            at: string;
+            /** Id */
+            id: string;
+            /** Raw */
+            raw: string;
+            /** Stepid */
+            stepId: string;
+            /** Structured */
+            structured: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /**
          * DepositionReading
@@ -5264,6 +5368,61 @@ export interface components {
             /** Unit */
             unit: string;
         };
+        /**
+         * MeasuredConditions
+         * @description What a measured value was true under: the protocol it was run under
+         *     (None for readings taken with no protocol's steps), the scale and the
+         *     strain the runbook names.
+         */
+        MeasuredConditions: {
+            /** Protocolid */
+            protocolId: string | null;
+            /** Scale */
+            scale: number;
+            /** Strainid */
+            strainId: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * MeasuredEvidence
+         * @description A measured value a reconciliation released (mirrors `MeasuredEvidence`
+         *     in src/data/types.ts): evidence about the run that produced it, kept with
+         *     its conditions and the run's deviations, and linked to the prediction it
+         *     tests.
+         */
+        MeasuredEvidence: {
+            /** At */
+            at: string;
+            conditions: components["schemas"]["MeasuredConditions"];
+            /** Confirmed */
+            confirmed: boolean;
+            /** Depositionid */
+            depositionId: string;
+            /** Deviations */
+            deviations: string[];
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Predictionid */
+            predictionId: string;
+            /** Productid */
+            productId: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Runbookid */
+            runbookId: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        } & {
+            [key: string]: unknown;
+        };
         /** MixRequest */
         MixRequest: {
             /** A */
@@ -5447,6 +5606,40 @@ export interface components {
             url: string | null;
             /** Year */
             year: number | null;
+        };
+        /**
+         * Override
+         * @description A change to one parameter of one scope for a run (D3): a named
+         *     person's assumption, a model's estimate (ADR-006), `by` naming the
+         *     person or the model, or a deposition's reading (a measurement), `by` the
+         *     person who deposited it, `at` the time it was taken and `ref` the
+         *     reading, `<deposition id>/<entry id>`.
+         */
+        Override: {
+            /** At */
+            at: string;
+            /** By */
+            by: string;
+            /** High */
+            high?: number | null;
+            /** Key */
+            key: string;
+            /** Low */
+            low?: number | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Origin
+             * @default person-assumption
+             * @enum {string}
+             */
+            origin: "person-assumption" | "model-estimate" | "measurement";
+            /** Ref */
+            ref?: string | null;
+            /** Scope */
+            scope: string;
+            /** Value */
+            value: number | string;
         };
         /**
          * OxygenUptake
@@ -6108,6 +6301,46 @@ export interface components {
             units: components["schemas"]["UnitRow"][];
             utilities: components["schemas"]["UtilityDuties"] | null;
         };
+        /**
+         * ProformaScenario
+         * @description A scenario a person made in Proforma (mirrors `Scenario` in
+         *     src/data/types.ts): the shelf flowsheet it runs (`modelId`), its name,
+         *     whether it is pinned, and, on `custom_train_v1`, the kept vessel design
+         *     and train run it is built from. A row an earlier page wrote keeps the
+         *     fields it carried beside these, alpha 1.0's `dims`, `point` and
+         *     `assumptions` among them.
+         */
+        ProformaScenario: {
+            /** Createdat */
+            createdAt?: string | null;
+            /** Description */
+            description: string;
+            /** Flowsheetid */
+            flowsheetId?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "biosteam";
+            /** Lastrunid */
+            lastRunId?: string | null;
+            /** Modelid */
+            modelId: string;
+            /** Name */
+            name: string;
+            /** Pinned */
+            pinned: boolean;
+            /** Product */
+            product: string;
+            /** Trainrun */
+            trainRun?: string | null;
+            /** Vessel */
+            vessel?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** ProformaScenarioInfo */
         ProformaScenarioInfo: {
             /** Flowsheet */
@@ -6197,6 +6430,49 @@ export interface components {
             id?: string | null;
             /** Name */
             name: string;
+        };
+        /**
+         * ProjectState
+         * @description GET /api/state: everything the project keeps of the work done in its
+         *     pages, keyed as the page keeps it (src/lib/projectState.ts), each row read
+         *     as its kind's model. A row that does not read is named in `refused` with
+         *     why, and every other row is served beside it.
+         */
+        ProjectState: {
+            /** Conversations */
+            conversations: components["schemas"]["LiveConversation"][];
+            /** Depositedby */
+            depositedBy: {
+                [key: string]: string;
+            };
+            /** Depositions */
+            depositions: components["schemas"]["Deposition"][];
+            /** Fits */
+            fits: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            /** Measuredevidence */
+            measuredEvidence: components["schemas"]["MeasuredEvidence"][];
+            /** Overrides */
+            overrides: {
+                [key: string]: components["schemas"]["Override"][];
+            };
+            /** Refused */
+            refused: components["schemas"]["RefusedRow"][];
+            /** Runbooklocks */
+            runbookLocks: {
+                [key: string]: components["schemas"]["RunbookLock"];
+            };
+            /** Runbooks */
+            runbooks: components["schemas"]["Runbook"][];
+            /** Scenarios */
+            scenarios: components["schemas"]["ProformaScenario"][];
+            /** Trains */
+            trains: {
+                [key: string]: components["schemas"]["TrainMade"];
+            };
         };
         /**
          * Proposal
@@ -6341,6 +6617,46 @@ export interface components {
             low: number;
         };
         /**
+         * Reconciliation
+         * @description A deposition's readings set beside the runbook's predictions (mirrors
+         *     `Reconciliation` in src/data/types.ts), made once and kept as it was
+         *     made.
+         */
+        Reconciliation: {
+            /** At */
+            at: string;
+            /** Deltas */
+            deltas: components["schemas"]["ReconciliationDelta"][];
+            /** Note */
+            note: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "confirmed" | "refuted" | "inconclusive";
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * ReconciliationDelta
+         * @description One prediction of a runbook beside the reading that tests it, in the
+         *     measure's unit, and the change in percent.
+         */
+        ReconciliationDelta: {
+            /** Observed */
+            observed: number;
+            /** Pctdelta */
+            pctDelta: number;
+            /** Predicted */
+            predicted: number;
+            /** Predictionid */
+            predictionId: string;
+            /** Unit */
+            unit: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
          * Refusal
          * @description The body of a refusal the service answers in words: a 404 for what is
          *     not here, a 422 for what cannot be run, a 503 for an engine or a worker
@@ -6349,6 +6665,19 @@ export interface components {
         Refusal: {
             /** Detail */
             detail: string;
+        };
+        /**
+         * RefusedRow
+         * @description A row the project keeps that does not read as its kind: the kind, the
+         *     id the page wrote it under, and why, in words.
+         */
+        RefusedRow: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Why */
+            why: string;
         };
         /**
          * RegressionCheck
@@ -6615,6 +6944,17 @@ export interface components {
             strainId: string;
             /** Title */
             title: string;
+        };
+        /**
+         * RunbookLock
+         * @description A runbook's lock as the project keeps it: when its predictions and
+         *     measures were frozen, and their digest (runbook_lock.py).
+         */
+        RunbookLock: {
+            /** Lockhash */
+            lockHash: string;
+            /** Lockedat */
+            lockedAt: string;
         };
         /**
          * RunbookStage
@@ -7273,6 +7613,32 @@ export interface components {
             status: "cold" | "starting" | "ready" | "failed";
         };
         /**
+         * StateKept
+         * @description PUT /api/state/{kind}/{id}: the row the project keeps now, as the page
+         *     sent it, under its kind and id.
+         */
+        StateKept: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Value */
+            value: unknown;
+        };
+        /**
+         * StateTakenBack
+         * @description DELETE /api/state/{kind}/{id}: the row a person took back, by its kind
+         *     and id; `removed` says the project holds no such row now.
+         */
+        StateTakenBack: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Removed */
+            removed: boolean;
+        };
+        /**
          * StateWrite
          * @description PUT /api/state/{kind}/{id}: the row as the page keeps it, and who.
          */
@@ -7858,6 +8224,21 @@ export interface components {
             water: number | null;
             /** Waternote */
             waterNote: string | null;
+        };
+        /**
+         * TrainMade
+         * @description A train a person built in pureOS's Builder and saved (mirrors
+         *     `TrainMade` in src/lib/durable.ts): the train as data, when it was saved,
+         *     and the name it was saved under.
+         */
+        TrainMade: {
+            /** By */
+            by: string;
+            /** Savedat */
+            savedAt: string;
+            train: components["schemas"]["TrainSpec"];
+        } & {
+            [key: string]: unknown;
         };
         /**
          * TrainParam
@@ -13523,9 +13904,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ProjectState"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -13567,9 +13946,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StateKept"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -13581,13 +13958,13 @@ export interface operations {
                     "application/json": components["schemas"]["Refusal"];
                 };
             };
-            /** @description Validation Error */
+            /** @description A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or measures changed, or a kept deposition rewritten: nothing kept, in words (a list of field errors when the request's own fields are refused). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -13617,9 +13994,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StateTakenBack"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -13631,13 +14006,13 @@ export interface operations {
                     "application/json": components["schemas"]["Refusal"];
                 };
             };
-            /** @description Validation Error */
+            /** @description A kind the project does not keep, an id of another shape, or a row kept as it was made (a deposition, a measurement, a lock, a conversation), in words (a list of field errors when the request's own fields are refused). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };

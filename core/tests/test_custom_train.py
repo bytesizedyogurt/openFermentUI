@@ -61,6 +61,12 @@ def over(key, value, *, scope=SCOPE, by=BY) -> Override:
     return Override(scope=scope, key=key, value=value, by=by, at=AT, note=STANDIN)
 
 
+def kept_scenario(sid: str, flowsheet: str, name: str, **parts) -> dict:
+    """A scenario as New scenario keeps it in the project's rows (src/store.ts `createScenario`)."""
+    return {"id": sid, "modelId": flowsheet, "flowsheetId": flowsheet, "kind": "biosteam", "name": name,
+            "description": "", "product": "", "pinned": False, **parts}
+
+
 def inputs_typed(**more) -> list[Override]:
     return [over(k, v) for k, v in {**INPUTS_STANDIN, **more}.items()]
 
@@ -516,9 +522,8 @@ def test_the_biosteam_engine_runs_the_composite_in_each_pair_its_kept_scenarios_
     registry.reset()
     biosteam = registry.get("biosteam")
     assert FLOWSHEET not in {t.id for t in biosteam.things()}, "listed while the project keeps a scenario of it"
-    project_state.put("scenarios", SCENARIO, {"id": SCENARIO, "kind": "biosteam", "modelId": FLOWSHEET,
-                                              "name": "A STAND-IN composite", "vessel": parts.vessel,
-                                              "trainRun": parts.train}, by=BY)
+    project_state.put("scenarios", SCENARIO, kept_scenario(SCENARIO, FLOWSHEET, "A STAND-IN composite",
+                                                           vessel=parts.vessel, trainRun=parts.train), by=BY)
     configuration = proforma.parts_configuration(parts.vessel, parts.train)
     (thing,) = [t for t in biosteam.things() if t.id == FLOWSHEET]
     assert (thing.kind, thing.configurations, thing.defaultConfiguration) == ("scenario", [configuration], None)
@@ -546,11 +551,10 @@ def test_every_kept_scenario_is_the_projects_and_a_kept_composite_binds_with_the
     listed with its refusal in words, so one scenario never stops the list."""
     from openferment_core import project_state
 
-    project_state.put("scenarios", SCENARIO, {"id": SCENARIO, "kind": "biosteam", "modelId": FLOWSHEET,
-                                              "name": "A STAND-IN composite", "vessel": parts.vessel,
-                                              "trainRun": parts.train}, by=BY)
-    project_state.put("scenarios", "sc-ethanol-test", {"id": "sc-ethanol-test", "kind": "biosteam",
-                                                       "modelId": proforma.ETHANOL, "name": "A STAND-IN ethanol"}, by=BY)
+    project_state.put("scenarios", SCENARIO, kept_scenario(SCENARIO, FLOWSHEET, "A STAND-IN composite",
+                                                           vessel=parts.vessel, trainRun=parts.train), by=BY)
+    project_state.put("scenarios", "sc-ethanol-test", kept_scenario("sc-ethanol-test", proforma.ETHANOL,
+                                                                    "A STAND-IN ethanol"), by=BY)
     got = client.get("/api/proforma/scenarios")
     assert got.status_code == 200, got.text
     listed = {s["id"]: s for s in got.json()}
@@ -562,16 +566,16 @@ def test_every_kept_scenario_is_the_projects_and_a_kept_composite_binds_with_the
     assert by_key["plant_scale"]["binding"] == "artifact" and by_key["plant_scale"]["value"] == PLANT_STANDIN
     assert listed["sc-ethanol-test"]["refused"] is None and listed["sc-ethanol-test"]["flowsheet"] == proforma.ETHANOL
     # A kept composite whose parts cannot stand is listed, refused in words, beside the rest.
-    project_state.put("scenarios", "sc-composite-missing", {"id": "sc-composite-missing", "kind": "biosteam",
-                                                            "modelId": FLOWSHEET, "name": "No parts"}, by=BY)
+    project_state.put("scenarios", "sc-composite-missing", kept_scenario("sc-composite-missing", FLOWSHEET, "No parts"),
+                      by=BY)
     again = client.get("/api/proforma/scenarios")
     assert again.status_code == 200, again.text
     missing = {s["id"]: s for s in again.json()}["sc-composite-missing"]
     assert "no vessel design (vessel) and no train run (trainRun)" in missing["refused"] and missing["inputs"] == []
     assert {s["id"] for s in again.json()} == {SCENARIO, "sc-ethanol-test", "sc-composite-missing"}
     # A kept scenario on a flowsheet the shelf no longer holds (a retired entry's id, alpha 2.2 D8) is listed too.
-    project_state.put("scenarios", "sc-retired-entry", {"id": "sc-retired-entry", "kind": "biosteam",
-                                                        "modelId": "cornstover_benchmark", "name": "Retired"}, by=BY)
+    project_state.put("scenarios", "sc-retired-entry", kept_scenario("sc-retired-entry", "cornstover_benchmark",
+                                                                     "Retired"), by=BY)
     third = client.get("/api/proforma/scenarios")
     assert third.status_code == 200, third.text
     retired = {s["id"]: s for s in third.json()}["sc-retired-entry"]

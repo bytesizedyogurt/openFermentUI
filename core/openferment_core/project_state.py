@@ -11,12 +11,21 @@ is now rows of its table under the project; a page loads them all from
 writes the service has not yet acknowledged.
 
 A row holds what the page sent, in the shape the page's types give it
-(`src/data/types.ts`; stage 7 generates those types from Pydantic models).
-What is checked here is what makes a row a row: a known kind, an id of the
-right shape that the value repeats, a value of the kind's shape, a size a
-page can send, and, once a runbook is locked, predictions and measures that
-are the ones its lock froze (runbook_lock.py computes the digest the page
-writes). The rules that act on the content run where they always ran.
+(`src/data/types.ts`), and each kind has its model in models.py (alpha 2.2
+E.0b): a deposition, measured evidence, a runbook, a Proforma scenario, a
+train the Builder saved, an override, a lock, a Live conversation. What is
+checked here is what makes a row a row: a known kind, an id of the right
+shape that the value repeats, a value that reads as its kind's model, a size
+a page can send, and, once a runbook is locked, predictions and measures
+that are the ones its lock froze (runbook_lock.py computes the digest the
+page writes). The rules that act on the content run where they always ran.
+
+`GET /api/state` answers a `ProjectState` (`state`): every row read as its
+kind's model one at a time, so a row kept before its kind had a model, and
+that does not read, is named in `refused` with why while the rest are
+served. A row is served as kept: a field the page left out stays out, and a
+deposition, measured evidence, a scenario and a saved train keep the fields
+their models do not name.
 
 What a person made, locked, measured or asked stays: a deposition, a
 measurement, a lock and a conversation are never taken back through here.
@@ -46,6 +55,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,6 +63,18 @@ from . import audit, db, projects
 from .basis import EstimateRefused, refuse_estimates
 from .db import models as t
 from .db import rows
+from .models import (
+    Deposition,
+    LiveConversation,
+    MeasuredEvidence,
+    Override,
+    ProformaScenario,
+    ProjectState,
+    RefusedRow,
+    Runbook,
+    RunbookLock,
+    TrainMade,
+)
 from .postdoc import conversations as _conversations
 from .runbook_lock import frozen_as
 
@@ -135,6 +157,53 @@ NAMES = (*KINDS, LOCKS, OVERRIDES, CONVERSATIONS)
 # The service writes it from the rows' makers; no page sends it.
 MAKERS = "depositedBy"
 
+# What each kind's row reads as (models.py), and the row in words. A write
+# is held to its kind's model before it is kept, and a load reads each row
+# by it (`state`). A lock and a scenario's fits are held whole by
+# `_checked`'s own words; a Live conversation by Postdoc's (`merge`).
+READERS: dict[str, tuple[TypeAdapter[Any], str]] = {
+    "depositions": (TypeAdapter(Deposition), "a deposition"),
+    "measuredEvidence": (TypeAdapter(MeasuredEvidence), "measured evidence"),
+    "runbooks": (TypeAdapter(Runbook), "a runbook"),
+    "fits": (TypeAdapter(dict[str, str]), "a scenario's fits"),
+    "scenarios": (TypeAdapter(ProformaScenario), "a Proforma scenario"),
+    "trains": (TypeAdapter(TrainMade), "a train the Builder saved"),
+    LOCKS: (TypeAdapter(RunbookLock), "a lock"),
+    OVERRIDES: (TypeAdapter(Override), "an override"),
+    CONVERSATIONS: (TypeAdapter(LiveConversation), "a Live conversation"),
+}
+# How many of a row's validation errors its refusal names.
+SAID = 3
+
+
+def _where(loc: tuple[Any, ...]) -> str:
+    """A field's place in a row, as `_non_finite` writes one
+    (`entries[0].unit`); `the row` for the row itself."""
+    out = ""
+    for part in loc:
+        out += f"[{part}]" if isinstance(part, int) else (f".{part}" if out else str(part))
+    return out or "the row"
+
+
+def _said(e: ValidationError) -> str:
+    """Why a row does not read as its kind's model, in words: each field that
+    does not read, where it stands and what it lacks, the first few."""
+    errors = e.errors()
+    said = [f"{_where(tuple(err.get('loc', ())))}: {str(err.get('msg', '')).removeprefix('Value error, ')}"
+            for err in errors[:SAID]]
+    return "; ".join(said) + (f"; and {len(errors) - SAID} more" if len(errors) > SAID else "")
+
+
+def _reads_as(kind: str, value: Any, subject: str | None = None) -> None:
+    """Refuse in words a row that does not read as its kind's model; nothing
+    is kept."""
+    reader, named = READERS[kind]
+    try:
+        reader.validate_python(value)
+    except ValidationError as e:
+        raise StateRefused(f"{subject or f'this {kind} row'} does not read as {named}: {_said(e)}; nothing was "
+                           "kept") from None
+
 
 def _checked(kind: str, item_id: str, value: Any) -> Any:
     if kind not in NAMES:
@@ -158,6 +227,8 @@ def _checked(kind: str, item_id: str, value: Any) -> Any:
         if not isinstance(value, list) or not all(isinstance(o, dict) and o.get("scope") == item_id and
                                                   isinstance(o.get("key"), str) and o["key"] for o in value):
             raise StateRefused(f"the overrides of {item_id} are a list, each naming this scope and its key")
+        for o in value:
+            _reads_as(kind, o, f"the override of {o['key']} in {item_id}")
         return value
     if kind == LOCKS:
         if not isinstance(value, dict) or not all(isinstance(value.get(k), str) and value[k] for k in ("lockedAt", "lockHash")):
@@ -176,6 +247,9 @@ def _checked(kind: str, item_id: str, value: Any) -> Any:
     named = value.get("train", {}).get("id") if kind == "trains" and isinstance(value.get("train"), dict) else value.get("id")
     if named != item_id:
         raise StateRefused(f"the {kind} row says it is {named!r}, and was sent as {item_id!r}")
+    if kind != CONVERSATIONS:
+        # A Live conversation is held to its model where Postdoc lays it on (`merge`).
+        _reads_as(kind, value)
     return value
 
 
@@ -265,17 +339,25 @@ async def _overrides(s: AsyncSession, project_id: str, scope: str | None = None)
     return out
 
 
-async def _load(project_id: str) -> dict[str, Any]:
+async def _pairs(s: AsyncSession, project_id: str, kind: Kind) -> list[tuple[str, Any]]:
+    """Each row of a kind the project keeps, as its id and its body, oldest first."""
+    table = kind.table
+    q = select(table.c.id, table.c.body).where(table.c.project_id == project_id, *kind.where())
+    return [(r.id, r.body) for r in (await s.execute(q.order_by(table.c.created_at, table.c.id))).all()]
+
+
+async def _rows_of(project_id: str) -> dict[str, Any]:
+    """What the project keeps of its pages as its tables hold it: each kind's
+    rows as (id, body), oldest first; the locks by runbook and the overrides
+    by scope; each Live conversation whole, as Postdoc keeps it; and who
+    deposited each deposition."""
     out: dict[str, Any] = {}
     async with db.session() as s:
         for name, kind in KINDS.items():
-            out[name] = await rows.bodies(s, kind.table, project_id, *kind.where())
+            out[name] = await _pairs(s, project_id, kind)
         out[LOCKS] = await _locks(s, project_id)
         out[OVERRIDES] = await _overrides(s, project_id)
     out[CONVERSATIONS] = [c.model_dump(mode="json") for c in await _conversations._listed(project_id)]
-    # Fits and trains are keyed in the page by scenario and by train.
-    out["fits"] = {f["id"]: f["byInput"] for f in out["fits"]}
-    out["trains"] = {tr["train"]["id"]: tr for tr in out["trains"]}
     # Who deposited each deposition (its row's maker, who first kept it): the
     # person a measurement resting on one of its readings names.
     out[MAKERS] = {str(body.get("id")): maker for body, maker in await _deposited(project_id, None)
@@ -283,10 +365,66 @@ async def _load(project_id: str) -> dict[str, Any]:
     return out
 
 
+async def _load(project_id: str) -> dict[str, Any]:
+    held = await _rows_of(project_id)
+    out = {**held, **{name: [body for _, body in held[name]] for name in KINDS}}
+    # Fits and trains are keyed in the page by scenario and by train, the id
+    # each row is kept under.
+    out["fits"] = {rid: body.get("byInput") if isinstance(body, dict) else body for rid, body in held["fits"]}
+    out["trains"] = dict(held["trains"])
+    return out
+
+
 def load() -> dict[str, Any]:
     """Everything the current project keeps of its pages, keyed as the page
-    keeps it, and who deposited each deposition (`depositedBy`)."""
+    keeps it, and who deposited each deposition (`depositedBy`): each row's
+    body as it was kept, what the service's own readers read."""
     return db.run(_load(projects.current()))
+
+
+def state() -> ProjectState:
+    """GET /api/state: everything the current project keeps of its pages,
+    each row read as its kind's model (READERS) one at a time. A row that
+    does not read, one kept before its kind had a model, is left out and
+    named in `refused` with why, so one row never stops the rest from
+    loading. A row read from what a page sent is served as kept (api.AS_KEPT);
+    a Live conversation, read from the whole of what Postdoc keeps, is
+    served whole."""
+    held = db.run(_rows_of(projects.current()))
+    refused: list[RefusedRow] = []
+
+    def read(kind: str, row_id: str, body: Any, subject: str = "") -> Any:
+        try:
+            return READERS[kind][0].validate_python(body)
+        except ValidationError as e:
+            refused.append(RefusedRow(kind=kind, id=row_id, why=f"{subject}{_said(e)}"))
+            return None
+
+    def read_all(kind: str) -> list[tuple[str, Any]]:
+        return [(rid, row) for rid, body in held[kind] if (row := read(kind, rid, body)) is not None]
+
+    def override(scope: str, n: int, body: Any) -> Any:
+        key = body.get("key") if isinstance(body, dict) else None
+        return read(OVERRIDES, scope, body, f"the override of {key if isinstance(key, str) else f'entry {n}'}: ")
+
+    overrides = {scope: kept_ones for scope, listed in held[OVERRIDES].items()
+                 if (kept_ones := [o for n, body in enumerate(listed) if (o := override(scope, n, body)) is not None])}
+    fits = {rid: f for rid, body in held["fits"]
+            if (f := read("fits", rid, body.get("byInput") if isinstance(body, dict) else body)) is not None}
+    return ProjectState(
+        depositions=[row for _, row in read_all("depositions")],
+        measuredEvidence=[row for _, row in read_all("measuredEvidence")],
+        runbooks=[row for _, row in read_all("runbooks")],
+        runbookLocks={rid: lock for rid, body in held[LOCKS].items() if (lock := read(LOCKS, rid, body)) is not None},
+        overrides=overrides,
+        fits=fits,
+        scenarios=[row for _, row in read_all("scenarios")],
+        trains=dict(read_all("trains")),
+        conversations=[c for body in held[CONVERSATIONS]
+                       if (c := read(CONVERSATIONS, str(body.get("id")), body)) is not None],
+        depositedBy=held[MAKERS],
+        refused=refused,
+    )
 
 
 async def _kept(project_id: str, kind: str) -> list[Any]:

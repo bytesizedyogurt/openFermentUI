@@ -236,6 +236,7 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-04 17:32 | The stage D gate: `pnpm verify`, all sixteen stages, with both examples in the tree and the mirror installed | every stage green: `test:core` 2865 passed, 1 skipped, 175 deselected; `test:sim` 142 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 17 min 25 s | `bde178d` and stage D |
 | 2026-11-04 17:44 | CI on `37e6bd0` (the stage D gate), run 41878467102: `pnpm verify`, then `pnpm prove` | every stage green; every proof check holds | 8 min 36 s (verify); 2 min 14 s (the proof) | `37e6bd0` |
 | 2026-11-04 18:44 | E.0a: `pnpm test:core`, twice, the second on the final tree; `pnpm test:sim`; the new and changed tests with the database address empty and on Python 3.12; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:tools`, `check:secrets`; `build`; `smoke` with no key; `pnpm prove`, offline, steps 1 to 10 | 2876 passed, 1 skipped, 175 deselected each time; 142 passed; 64 passed each way; every check green; 12 of 12 screens; 86 of 86 checks, no call in the proof's spend table | 7 min 36 s (`test:core`); 7 min 29 s (`test:sim`); 275 s (the proof) | E.0a |
+| 2026-11-04 19:48 | E.0b: `pnpm test:core` on the final tree; `pnpm test:sim`; the new and changed tests with the database address empty and on Python 3.12; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:tools`, `check:secrets`; `build`; `smoke` with no key; `pnpm prove --steps 5,9`, offline | 2889 passed, 1 skipped, 175 deselected; 142 passed; 124 passed each way; every check green; 12 of 12 screens; 45 of 45 checks, no call in the proof's spend table | 7 min 47 s (`test:core`); 7 min 30 s (`test:sim`); 139 s (the proof) | E.0b |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -272,7 +273,7 @@ prompt's §4).
 | [004](decisions/ADR-004-biosteam-adapter.md) | BioSTEAM through one adapter | accepted, stage 4 |
 | [005](decisions/ADR-005-projects.md) | Projects replace programs | accepted |
 | [006](decisions/ADR-006-quantities-and-estimates.md) | Typed quantities with origins replace Rule 1 | accepted, stages 4 and 6 |
-| [007](decisions/ADR-007-schema-source.md) | Types generated from OpenAPI | accepted, stage 7 (alpha 2.2 E.0a: a schema the service only writes lists every property as required) |
+| [007](decisions/ADR-007-schema-source.md) | Types generated from OpenAPI | accepted, stage 7 (alpha 2.2 E.0a: a schema the service only writes lists every property as required; E.0b: the rows a project keeps of its pages read as their models and served as kept) |
 | [008](decisions/ADR-008-postdoc-memory-routing.md) | Postdoc memory on the server; model routes | accepted, stage 6 |
 | [009](decisions/ADR-009-ui.md) | The UI is kept and wired | accepted, stage 7 |
 | [010](decisions/ADR-010-deletions.md) | Deletions | accepted, stage 1 |
@@ -378,7 +379,7 @@ prompt's §4).
 | §5.5, stage 2 | The fetched full texts (`core/data/fulltext/`) and the fetched genome-scale models (`core/data/models/`) stay files | They are caches of documents fetched from outside, fetched again when gone; stage 3 hands documents to Sci RAG Kit's tables |
 | §5.5, stage 2 | The browser keeps an outbox: review decisions, Guild changes and project rows the service has not yet acknowledged, saved in IndexedDB until sent; and three preferences, who is deciding, who is acting in Guild, and the lessons finished here | A deposition at the bench must survive a reload while the service is away (the reason Durable state existed); the outbox holds nothing the service already has |
 | §7.4, stage 2 | A Live conversation is kept whole in `conversations.body`; `turns` and `tool_calls` wait for stage 6 | Stage 6 gives Postdoc its memory on the server and fills them |
-| §7.4, stage 2 | `project_state.py` checks a page's row for kind, id and shape, and keeps its content as sent | The content's rules run where they always ran; stage 7 generates the page's types from Pydantic models |
+| §7.4, stage 2 | `project_state.py` checks a page's row for kind, id and shape, and keeps its content as sent (since alpha 2.2 E.0b each kind reads as its model in `models.py` first, and `GET /api/state` names a kept row that does not read in `refused`) | The content's rules run where they always ran; stage 7 generates the page's types from Pydantic models |
 | §5.5, stage 2 | `core/data/biorepo.json` stays tracked, and nothing reads it | Removing it from git would delete a live instance's working copy on its next pull, decisions and all, before they could be carried into a project (§11.1). `pnpm db:import-alpha1` carries it; it leaves git once the owner says the live instance's import read right |
 | §5.4, stage 8.5 | The evidence pool keeps BM25 as its ranker: it loads the project's candidates and decisions from PostgreSQL and ranks them in memory for one question, with the coverage rule, the filters and the cap of ten | A project's records are few, and the ranking rules are tested on their own (`test_evidence_pool.py`); a ranking in SQL would change what Postdoc cites without a measurement to say it is better |
 | §6.2, stage 8.5 | `src/engine/units.ts` stays the browser's unit engine, mirroring `units.py` on the same tables (`schema/units.json`), held equal by the fixture `pnpm export:unit-fixtures` writes and `test_units.py` asserts | Every screen formats and converts with it; serving each conversion from the service is a change to every caller, after alpha 2.0 |
@@ -411,7 +412,7 @@ prompt's §4).
 | Paid: Proforma's screens read every scenario as the project's (`createdScenarioIds`, the index's `needsBinding` and the held path gone); `GET /api/proforma/scenarios` binds a kept `custom_train_v1` scenario with the parts it names and lists one whose parts cannot stand with its refusal in words, where it answered 500; pureOS's choosers list each scenario once | alpha 2.2, C.6 |
 | `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's research funnel, whose words still speak of a clearance reading and a molecule | after alpha 2.0 (stage 7 left the module screens as they were, now views inside a project) |
 | `src/data/types.ts` is still hand-kept beside the generated `src/api/types.gen.ts`, held to the service by `check:plan`'s pairs; the screens read the hand-kept types | the screens move to the generated types one by one, after alpha 2.0 |
-| The project state's three routes (`GET /api/state`, `PUT` and `DELETE /api/state/{kind}/{id}`) answer the rows as the page sent them, in a dict with no model; `core/tests/test_route_models.py` names them as the routes that wait (alpha 2.2 E.0a) | alpha 2.2 stage E: E.0b gives `GET /api/state` its `ProjectState`, and `PUT` and `DELETE` need a model each before the test's waiting set empties |
+| Paid: the project state's three routes answered the rows in a dict with no model; `GET /api/state` answers a `ProjectState`, each row read as its kind's model and served as kept, `PUT` a `StateKept` and `DELETE` a `StateTakenBack`, and `core/tests/test_route_models.py` keeps no waiting set | alpha 2.2, E.0b |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, §9.3) are not built; the walk and the smoke run against the real service | after alpha 2.0 |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | still open: after alpha 2.0 |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.0 |
@@ -2036,3 +2037,44 @@ holds the numbers, the tables and the judgements).
   `--check`, `docs/TOOLS.md` and `COMPONENTS.md` as they were; `typecheck`, `check:plan`,
   `check:state`, `check:figures`, `check:tools`, `check:secrets`; `build`; `pnpm smoke` with no
   key, 12 of 12 screens; `pnpm prove`, offline, steps 1 to 10, 86 of 86 checks.
+- E.0b. `GET /api/state` answers a `ProjectState`: the rows a project keeps of its pages get
+  models (the stage plan's E.0b; ADR-007's implementation note of E.0b). Measured first, on this
+  container's `openferment_dev`: the Ethanol project keeps one runbook with its lock and 51 Live
+  conversations, and no deposition, measured evidence, Proforma scenario, train, fit or override;
+  every row reads, nothing is refused, and the route answers in 0.19 s. models.py gains
+  `Deposition` with `DepositionEntry`, `DepositionObservation`, `Reconciliation` and
+  `ReconciliationDelta`, `MeasuredEvidence` with `MeasuredConditions`, `ProformaScenario`,
+  `TrainMade`, `RunbookLock`, `RefusedRow`, `ProjectState`, `StateKept` and `StateTakenBack`; each
+  row model is written from the page's hand type, its required fields the hand type's, and keeps
+  the fields it does not name (`extra="allow"`, alpha 1.0's `dims`, `point` and `assumptions` of a
+  scenario among them). `project_state.state` reads each row as its kind's model one at a time
+  and the route serves it as kept (`response_model_exclude_unset`): a row kept before its kind had
+  a model that does not read is left out and named in `refused` with its kind, id and why, and the
+  rest load; a Live conversation is read from the whole of what Postdoc keeps and served whole.
+  A write is read as its kind's model before it is kept, a 422 naming the fields
+  (`project_state._reads_as`); `PUT` answers `StateKept` and `DELETE` `StateTakenBack`, so every
+  JSON route answers a model and the Known debts row is paid. `api.AS_KEPT` gains the ten row
+  schemas; `test_route_models.py` adds the state's route to `SERVED_AS_KEPT`, names the
+  conversation family in `SERVED_WHOLE`, and holds every schema an as-kept route serves to
+  AS_KEPT, Pydantic's own list or that family. The store names each refused row in its activity
+  feed and says so once in a toast (`lib/projectState.ts` reads `refused`). The document holds 270
+  schemas, 15 of them new, 182 marked, none split. Tests (`test_project_state.py`): every kind
+  comes back through the route byte for byte as the page writes JSON, a field left out staying
+  out, a null staying null and a field the model does not name kept (an integral number in a
+  float field is written with a point and read back as the number sent); a row kept before its
+  model that does not read is named with its words while the rest load; lock.ts's ten fixture
+  digests hold over the runbooks read back, each lock holding the row sent back; a write that
+  does not read is refused in words, nothing kept; a conversation is served whole, a turn kept
+  before a field existed among them. Seven test files write their rows as the page writes them,
+  and a row a test keeps that does not read is kept straight into its table
+  (`kept_before_its_model`), where the reader that refuses it is tested. Checks: `pnpm test:core`
+  2889 passed, 1 skipped, 175 deselected (7 min 47 s, on the final tree; the run before it found
+  two of `test_engines.py`'s rows in their earlier shape, now written as the page writes them); `pnpm
+  test:sim` 142 passed (7 min 30 s), the kept-scenario runs through `run_request` and the
+  composite's kept scenarios among them; the new and changed tests with the database address empty
+  and on Python 3.12, 124 passed each way; `gen:api`, `gen:tools` and `gen:components` with each
+  `--check`, `docs/TOOLS.md` and `COMPONENTS.md` as they were; `typecheck`, `check:plan`,
+  `check:state`, `check:figures`, `check:tools`, `check:secrets`; `build`; `pnpm smoke` with no
+  key, 12 of 12 screens; `pnpm prove --steps 5,9`, offline, 45 of 45 checks, the walk's
+  deposition, its scenario on the reading and the measured run among them, no call in the proof's
+  spend table.

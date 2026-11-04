@@ -1663,6 +1663,7 @@ from test_train import AT as TRAIN_AT  # noqa: E402
 from test_train import BY as TRAIN_BY  # noqa: E402
 from test_train import VERSIONS as TRAIN_VERSIONS  # noqa: E402
 from test_train import TrainWorker, spec_of, typed  # noqa: E402
+from test_project_state import kept_before_its_model  # noqa: E402
 
 TRAIN_ENTRY = "openferment_core.pureos.engine:ENGINE"
 TRAIN = train_engine.ENGINE
@@ -1844,15 +1845,17 @@ def test_a_kept_trains_defaults_each_name_one_of_the_five_default_origins_by_eve
     for key in ("inlet.broth_flow", "C1.split.Yeast", "F1.P", "F1.V"):
         assert (made[key].origin.kind, made[key].origin.by, made[key].origin.at) == ("person-assumption", TRAIN_BY,
                                                                                     TRAIN_AT), key
-    # A typed value naming an origin of its own is no train's: refused as a train, and a row holding one is no thing.
+    # A typed value naming an origin of its own is no train's: refused as a train, refused as the project's row (alpha
+    # 2.2 E.0b), and a row an earlier page kept holding one is no thing.
     raw = spec_of().model_dump(mode="json")
     raw["units"][0]["params"]["split.Yeast"]["origin"] = "model-estimate"
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         TrainSpec.model_validate(raw)
-    stray = {**raw, "id": "t-estimated"}
-    put = TestClient(api.app).put("/api/state/trains/t-estimated", json={"by": "Ada Moreno", "value": {
-        "train": stray, "savedAt": f"{DAY}T00:00:00Z", "by": "Ada Moreno"}})
-    assert put.status_code == 200, put.text
+    stray = {"train": {**raw, "id": "t-estimated"}, "savedAt": f"{DAY}T00:00:00Z", "by": "Ada Moreno"}
+    put = TestClient(api.app).put("/api/state/trains/t-estimated", json={"by": "Ada Moreno", "value": stray})
+    assert put.status_code == 422 and "does not read as a train the Builder saved: train.units[0].params" in (
+        put.json()["detail"]), put.text
+    kept_before_its_model("trains", "t-estimated", stray)
     assert "t-estimated" not in {t.id for t in TRAIN.things()}
     with pytest.raises(EngineRefused, match="runs no thing 't-estimated'"):
         TRAIN.parameters("t-estimated", None)
@@ -2285,7 +2288,8 @@ def test_the_copy_holds_every_row_a_trains_resolution_reads_and_resolves_each_tr
     newest = _keep("bbbbbbbbbbbbbbb3", scenario=None)
     plant_artifact(newest.model_copy(update={"createdAt": "2026-10-22T10:00:00Z"}))
     project_state.put("scenarios", "sc-k3x9q-1", {"id": "sc-k3x9q-1", "kind": "biosteam", "modelId": "ethanol_glucose_v0",
-                                                  "name": "A test scenario"}, by="Ada Moreno")
+                                                  "name": "A test scenario", "description": "", "product": "",
+                                                  "pinned": False}, by="Ada Moreno")
     _saved(spec_of())
     mine = TestClient(api.app).post("/api/pureos/train/run", json={"train": spec_of().model_dump(mode="json"),
                                                                    "by": "A. Stranger"}).json()["artifactId"]

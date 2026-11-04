@@ -9,7 +9,9 @@
 // time. The browser keeps only the rows the service has not yet acknowledged:
 // an outbox, saved with the preferences (durable.ts), so a deposition at the
 // bench survives a reload while the service is away and is sent when it
-// answers again.
+// answers again. The service reads each row as its kind's model (alpha 2.2
+// E.0b): a write that does not read is refused in words, and a row kept
+// before, that does not read, is named in `refused` while the rest load.
 import type { Deposition, LiveConversation, MeasuredEvidence, Override, Runbook, Scenario } from '@/data/types';
 import type { TrainMade } from './durable';
 import { ServiceDown, ServiceRefused, call } from './http';
@@ -24,6 +26,13 @@ export type StateKind =
   | 'scenarios'
   | 'trains'
   | 'conversations';
+
+/** A row the service keeps that does not read as its kind, and why, in words. */
+export interface RefusedRow {
+  kind: string;
+  id: string;
+  why: string;
+}
 
 /** Everything a project keeps of its pages, keyed as the page keeps it. */
 export interface ProjectState {
@@ -46,6 +55,8 @@ export interface ProjectState {
    * rows' makers and no page sends it (project_state.py `MAKERS`).
    */
   depositedBy?: Record<string, string>;
+  /** The rows the service keeps that do not read as their kind, each with why; the store says each in words. */
+  refused?: RefusedRow[];
 }
 
 export const EMPTY_STATE: ProjectState = {

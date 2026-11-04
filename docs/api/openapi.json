@@ -2618,6 +2618,226 @@
         "title": "DecisionCheck",
         "type": "object"
       },
+      "Deposition": {
+        "additionalProperties": true,
+        "description": "The bench's record of a run against a runbook (mirrors `Deposition` in\nsrc/data/types.ts): its readings and observations, appended as they are\ntaken, its state from staged to running to closed, and its\nreconciliation. A write to one the project keeps is held to what the\nbench does (`project_state.deposition_refusal`).",
+        "properties": {
+          "closedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closedat"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DepositionEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/DepositionObservation"
+            },
+            "title": "Observations",
+            "type": "array"
+          },
+          "operatorId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatorid"
+          },
+          "protocolId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocolid"
+          },
+          "reconciliation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reconciliation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runbookId": {
+            "title": "Runbookid",
+            "type": "string"
+          },
+          "sampleTimes": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Sampletimes",
+            "type": "object"
+          },
+          "seriesRoles": {
+            "additionalProperties": {
+              "enum": [
+                "biomass",
+                "product",
+                "substrate"
+              ],
+              "type": "string"
+            },
+            "title": "Seriesroles",
+            "type": "object"
+          },
+          "startedAt": {
+            "title": "Startedat",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "staged",
+              "running",
+              "closed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "runbookId",
+          "protocolId",
+          "operatorId",
+          "startedAt",
+          "closedAt",
+          "state",
+          "entries",
+          "observations",
+          "reconciliation"
+        ],
+        "title": "Deposition",
+        "type": "object"
+      },
+      "DepositionEntry": {
+        "additionalProperties": true,
+        "description": "One reading taken at the bench against a runbook's measure (mirrors\n`DepositionEntry` in src/data/types.ts): the words the operator said or\ntyped (`raw`), the number read from them, and whether a person read it\nback. A correction is a new entry on the same measure, keeping the `at`\nof the reading it corrects and saying when it was typed\n(`correctedAt`).",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "correctedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correctedat"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "measureId": {
+            "title": "Measureid",
+            "type": "string"
+          },
+          "raw": {
+            "title": "Raw",
+            "type": "string"
+          },
+          "stepId": {
+            "title": "Stepid",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "measureId",
+          "stepId",
+          "at",
+          "value",
+          "unit",
+          "raw",
+          "confirmed"
+        ],
+        "title": "DepositionEntry",
+        "type": "object"
+      },
+      "DepositionObservation": {
+        "additionalProperties": true,
+        "description": "Something the operator reported that fits no measure (mirrors\n`Observation` in src/data/types.ts): the words kept as they were said,\nand a structured reading of them, None until a person adds one.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "raw": {
+            "title": "Raw",
+            "type": "string"
+          },
+          "stepId": {
+            "title": "Stepid",
+            "type": "string"
+          },
+          "structured": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured"
+          }
+        },
+        "required": [
+          "id",
+          "stepId",
+          "at",
+          "raw",
+          "structured"
+        ],
+        "title": "DepositionObservation",
+        "type": "object"
+      },
       "DepositionReading": {
         "description": "GET /api/depositions/readings: one reading a run may take as a\nmeasurement (measurements.py): an entry of one of the project's\ndepositions that a person confirmed and that stands for its measure,\nwith the runbook and the measure it was recorded against, the person\nwho deposited it and the time it was taken. Asked with a unit, a reading\nwhose unit is that unit or converts into it, its value in that unit\nbeside its own. A scenario's value names it as `{\"value\": value, \"unit\":\nunit, \"origin\": {\"kind\": \"measurement\", \"ref\": ref}}`.",
         "properties": {
@@ -6670,6 +6890,140 @@
         "title": "Measure",
         "type": "object"
       },
+      "MeasuredConditions": {
+        "additionalProperties": true,
+        "description": "What a measured value was true under: the protocol it was run under\n(None for readings taken with no protocol's steps), the scale and the\nstrain the runbook names.",
+        "properties": {
+          "protocolId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocolid"
+          },
+          "scale": {
+            "title": "Scale",
+            "type": "number"
+          },
+          "strainId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strainid"
+          }
+        },
+        "required": [
+          "protocolId",
+          "scale",
+          "strainId"
+        ],
+        "title": "MeasuredConditions",
+        "type": "object"
+      },
+      "MeasuredEvidence": {
+        "additionalProperties": true,
+        "description": "A measured value a reconciliation released (mirrors `MeasuredEvidence`\nin src/data/types.ts): evidence about the run that produced it, kept with\nits conditions and the run's deviations, and linked to the prediction it\ntests.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/MeasuredConditions"
+          },
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "depositionId": {
+            "title": "Depositionid",
+            "type": "string"
+          },
+          "deviations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Deviations",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "predictionId": {
+            "title": "Predictionid",
+            "type": "string"
+          },
+          "productId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productid"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "runbookId": {
+            "title": "Runbookid",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "depositionId",
+          "runbookId",
+          "productId",
+          "predictionId",
+          "label",
+          "value",
+          "unit",
+          "provenance",
+          "conditions",
+          "deviations",
+          "confirmed",
+          "at"
+        ],
+        "title": "MeasuredEvidence",
+        "type": "object"
+      },
       "MixRequest": {
         "properties": {
           "a": {
@@ -7185,6 +7539,101 @@
           "extraction"
         ],
         "title": "OverlayPaper",
+        "type": "object"
+      },
+      "Override": {
+        "description": "A change to one parameter of one scope for a run (D3): a named\nperson's assumption, a model's estimate (ADR-006), `by` naming the\nperson or the model, or a deposition's reading (a measurement), `by` the\nperson who deposited it, `at` the time it was taken and `ref` the\nreading, `<deposition id>/<entry id>`.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "origin": {
+            "default": "person-assumption",
+            "enum": [
+              "person-assumption",
+              "model-estimate",
+              "measurement"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "scope",
+          "key",
+          "value",
+          "by",
+          "at"
+        ],
+        "title": "Override",
         "type": "object"
       },
       "OxygenUptake": {
@@ -9213,6 +9662,107 @@
         "title": "ProformaRunResult",
         "type": "object"
       },
+      "ProformaScenario": {
+        "additionalProperties": true,
+        "description": "A scenario a person made in Proforma (mirrors `Scenario` in\nsrc/data/types.ts): the shelf flowsheet it runs (`modelId`), its name,\nwhether it is pinned, and, on `custom_train_v1`, the kept vessel design\nand train run it is built from. A row an earlier page wrote keeps the\nfields it carried beside these, alpha 1.0's `dims`, `point` and\n`assumptions` among them.",
+        "properties": {
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Createdat"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "flowsheetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flowsheetid"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "biosteam",
+            "title": "Kind",
+            "type": "string"
+          },
+          "lastRunId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastrunid"
+          },
+          "modelId": {
+            "title": "Modelid",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pinned": {
+            "title": "Pinned",
+            "type": "boolean"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "trainRun": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trainrun"
+          },
+          "vessel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vessel"
+          }
+        },
+        "required": [
+          "id",
+          "modelId",
+          "kind",
+          "name",
+          "description",
+          "product",
+          "pinned"
+        ],
+        "title": "ProformaScenario",
+        "type": "object"
+      },
       "ProformaScenarioInfo": {
         "properties": {
           "flowsheet": {
@@ -9488,6 +10038,109 @@
           "by"
         ],
         "title": "ProjectCreate",
+        "type": "object"
+      },
+      "ProjectState": {
+        "description": "GET /api/state: everything the project keeps of the work done in its\npages, keyed as the page keeps it (src/lib/projectState.ts), each row read\nas its kind's model. A row that does not read is named in `refused` with\nwhy, and every other row is served beside it.",
+        "properties": {
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/LiveConversation"
+            },
+            "title": "Conversations",
+            "type": "array"
+          },
+          "depositedBy": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Depositedby",
+            "type": "object"
+          },
+          "depositions": {
+            "items": {
+              "$ref": "#/components/schemas/Deposition"
+            },
+            "title": "Depositions",
+            "type": "array"
+          },
+          "fits": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Fits",
+            "type": "object"
+          },
+          "measuredEvidence": {
+            "items": {
+              "$ref": "#/components/schemas/MeasuredEvidence"
+            },
+            "title": "Measuredevidence",
+            "type": "array"
+          },
+          "overrides": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/Override"
+              },
+              "type": "array"
+            },
+            "title": "Overrides",
+            "type": "object"
+          },
+          "refused": {
+            "items": {
+              "$ref": "#/components/schemas/RefusedRow"
+            },
+            "title": "Refused",
+            "type": "array"
+          },
+          "runbookLocks": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RunbookLock"
+            },
+            "title": "Runbooklocks",
+            "type": "object"
+          },
+          "runbooks": {
+            "items": {
+              "$ref": "#/components/schemas/Runbook"
+            },
+            "title": "Runbooks",
+            "type": "array"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ProformaScenario"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "trains": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrainMade"
+            },
+            "title": "Trains",
+            "type": "object"
+          }
+        },
+        "required": [
+          "depositions",
+          "measuredEvidence",
+          "runbooks",
+          "runbookLocks",
+          "overrides",
+          "fits",
+          "scenarios",
+          "trains",
+          "conversations",
+          "depositedBy",
+          "refused"
+        ],
+        "title": "ProjectState",
         "type": "object"
       },
       "Proposal": {
@@ -9867,6 +10520,79 @@
         "title": "Range",
         "type": "object"
       },
+      "Reconciliation": {
+        "additionalProperties": true,
+        "description": "A deposition's readings set beside the runbook's predictions (mirrors\n`Reconciliation` in src/data/types.ts), made once and kept as it was\nmade.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "deltas": {
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationDelta"
+            },
+            "title": "Deltas",
+            "type": "array"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "confirmed",
+              "refuted",
+              "inconclusive"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "outcome",
+          "deltas",
+          "note"
+        ],
+        "title": "Reconciliation",
+        "type": "object"
+      },
+      "ReconciliationDelta": {
+        "additionalProperties": true,
+        "description": "One prediction of a runbook beside the reading that tests it, in the\nmeasure's unit, and the change in percent.",
+        "properties": {
+          "observed": {
+            "title": "Observed",
+            "type": "number"
+          },
+          "pctDelta": {
+            "title": "Pctdelta",
+            "type": "number"
+          },
+          "predicted": {
+            "title": "Predicted",
+            "type": "number"
+          },
+          "predictionId": {
+            "title": "Predictionid",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "predictionId",
+          "predicted",
+          "observed",
+          "unit",
+          "pctDelta"
+        ],
+        "title": "ReconciliationDelta",
+        "type": "object"
+      },
       "Refusal": {
         "description": "The body of a refusal the service answers in words: a 404 for what is\nnot here, a 422 for what cannot be run, a 503 for an engine or a worker\nthat cannot answer (the engine routes declare each).",
         "properties": {
@@ -9879,6 +10605,30 @@
           "detail"
         ],
         "title": "Refusal",
+        "type": "object"
+      },
+      "RefusedRow": {
+        "description": "A row the project keeps that does not read as its kind: the kind, the\nid the page wrote it under, and why, in words.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "why"
+        ],
+        "title": "RefusedRow",
         "type": "object"
       },
       "RegressionCheck": {
@@ -10549,6 +11299,25 @@
           "measures"
         ],
         "title": "RunbookDraft",
+        "type": "object"
+      },
+      "RunbookLock": {
+        "description": "A runbook's lock as the project keeps it: when its predictions and\nmeasures were frozen, and their digest (runbook_lock.py).",
+        "properties": {
+          "lockHash": {
+            "title": "Lockhash",
+            "type": "string"
+          },
+          "lockedAt": {
+            "title": "Lockedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lockedAt",
+          "lockHash"
+        ],
+        "title": "RunbookLock",
         "type": "object"
       },
       "RunbookStage": {
@@ -12335,6 +13104,53 @@
         "title": "SimulatorStatus",
         "type": "object"
       },
+      "StateKept": {
+        "description": "PUT /api/state/{kind}/{id}: the row the project keeps now, as the page\nsent it, under its kind and id.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "value"
+        ],
+        "title": "StateKept",
+        "type": "object"
+      },
+      "StateTakenBack": {
+        "description": "DELETE /api/state/{kind}/{id}: the row a person took back, by its kind\nand id; `removed` says the project holds no such row now.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "removed"
+        ],
+        "title": "StateTakenBack",
+        "type": "object"
+      },
       "StateWrite": {
         "description": "PUT /api/state/{kind}/{id}: the row as the page keeps it, and who.",
         "properties": {
@@ -14080,6 +14896,30 @@
           "notes"
         ],
         "title": "TrainInletRead",
+        "type": "object"
+      },
+      "TrainMade": {
+        "additionalProperties": true,
+        "description": "A train a person built in pureOS's Builder and saved (mirrors\n`TrainMade` in src/lib/durable.ts): the train as data, when it was saved,\nand the name it was saved under.",
+        "properties": {
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "savedAt": {
+            "title": "Savedat",
+            "type": "string"
+          },
+          "train": {
+            "$ref": "#/components/schemas/TrainSpec"
+          }
+        },
+        "required": [
+          "train",
+          "savedAt",
+          "by"
+        ],
+        "title": "TrainMade",
         "type": "object"
       },
       "TrainParam": {
@@ -24345,7 +25185,7 @@
     },
     "/api/state": {
       "get": {
-        "description": "Everything the project keeps of its pages, keyed as the page keeps it.",
+        "description": "Everything the project keeps of its pages, keyed as the page keeps it\n(project_state.state): each row read as its kind's model and served as\nkept, a field the page left out staying out of the answer, and each row\nthat does not read named in `refused` with why. A Live conversation is\nserved whole.",
         "operationId": "state_load_api_state_get",
         "parameters": [
           {
@@ -24372,9 +25212,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response State Load Api State Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectState"
                 }
               }
             },
@@ -24397,6 +25235,7 @@
     },
     "/api/state/{kind}/{item_id}": {
       "delete": {
+        "description": "One row taken back, a person's own undo; a deposition, a measurement,\na lock and a conversation stay as they were made.",
         "operationId": "state_remove_api_state__kind___item_id__delete",
         "parameters": [
           {
@@ -24451,9 +25290,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response State Remove Api State  Kind   Item Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StateTakenBack"
                 }
               }
             },
@@ -24473,17 +25310,25 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "A kind the project does not keep, an id of another shape, or a row kept as it was made (a deposition, a measurement, a lock, a conversation), in words (a list of field errors when the request's own fields are refused)."
           }
         },
         "summary": "State Remove",
         "x-openferment-scope": "project"
       },
       "put": {
+        "description": "One row kept whole, read as its kind's model first (project_state.py).",
         "operationId": "state_put_api_state__kind___item_id__put",
         "parameters": [
           {
@@ -24538,9 +25383,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response State Put Api State  Kind   Item Id  Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StateKept"
                 }
               }
             },
@@ -24560,11 +25403,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or measures changed, or a kept deposition rewritten: nothing kept, in words (a list of field errors when the request's own fields are refused)."
           }
         },
         "summary": "State Put",

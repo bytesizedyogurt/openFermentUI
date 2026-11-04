@@ -235,7 +235,8 @@ def test_a_proforma_runs_scenario_is_named_in_the_package(monkeypatch, tmp_path)
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     sid = "sc-export-1"
     project_state.put("scenarios", sid, {"id": sid, "kind": "biosteam", "modelId": ETHANOL,
-                                         "name": "A STAND-IN scenario"}, by="Ada Moreno")
+                                         "name": "A STAND-IN scenario", "description": "", "product": "",
+                                         "pinned": False}, by="Ada Moreno")
     ran = proforma.run(ProformaRunRequest(scenarioId=sid, inputs=assumed_inputs(ASSUMED), samples=8, by="Ada Moreno"),
                        pool=pool)
     files = exports.files()

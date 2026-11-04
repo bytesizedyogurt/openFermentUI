@@ -4710,3 +4710,243 @@ class RunbookCreate(BaseModel):
     runId: str = Field(min_length=1, max_length=64)
     predict: list[PredictedOutput] = Field(min_length=1, max_length=24)
     by: str = Field(default="", max_length=200)
+
+
+# ── What a project keeps of its pages (project_state.py; alpha 2.2 E.0b) ─
+#
+# Each kind of row a page writes through `PUT /api/state/{kind}/{id}`, as the
+# page's types write it (src/data/types.ts until the screens move to the
+# generated types). A row keeps every field the page sent, those named here
+# and any other (`extra="allow"`), and `GET /api/state` serves it as kept
+# (`response_model_exclude_unset`, api.AS_KEPT): a field the page left out
+# stays out of the answer. A field a row may leave out defaults to None or to
+# an empty collection, so the generated type names it as one a row may lack.
+
+
+class DepositionEntry(BaseModel):
+    """One reading taken at the bench against a runbook's measure (mirrors
+    `DepositionEntry` in src/data/types.ts): the words the operator said or
+    typed (`raw`), the number read from them, and whether a person read it
+    back. A correction is a new entry on the same measure, keeping the `at`
+    of the reading it corrects and saying when it was typed
+    (`correctedAt`)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    measureId: str
+    stepId: str
+    at: str
+    value: float
+    unit: str
+    raw: str
+    confirmed: bool
+    correctedAt: str | None = None
+
+
+class DepositionObservation(BaseModel):
+    """Something the operator reported that fits no measure (mirrors
+    `Observation` in src/data/types.ts): the words kept as they were said,
+    and a structured reading of them, None until a person adds one."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    stepId: str
+    at: str
+    raw: str
+    structured: str | None
+
+
+class ReconciliationDelta(BaseModel):
+    """One prediction of a runbook beside the reading that tests it, in the
+    measure's unit, and the change in percent."""
+
+    model_config = ConfigDict(extra="allow")
+
+    predictionId: str
+    predicted: float
+    observed: float
+    unit: str
+    pctDelta: float
+
+
+class Reconciliation(BaseModel):
+    """A deposition's readings set beside the runbook's predictions (mirrors
+    `Reconciliation` in src/data/types.ts), made once and kept as it was
+    made."""
+
+    model_config = ConfigDict(extra="allow")
+
+    at: str
+    outcome: Literal["confirmed", "refuted", "inconclusive"]
+    deltas: list[ReconciliationDelta]
+    note: str
+
+
+DepositionState = Literal["staged", "running", "closed"]
+
+
+class Deposition(BaseModel):
+    """The bench's record of a run against a runbook (mirrors `Deposition` in
+    src/data/types.ts): its readings and observations, appended as they are
+    taken, its state from staged to running to closed, and its
+    reconciliation. A write to one the project keeps is held to what the
+    bench does (`project_state.deposition_refusal`)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    runbookId: str
+    # The protocol whose steps the bench walks; None for readings taken
+    # against the runbook's measures alone.
+    protocolId: str | None
+    operatorId: str | None
+    startedAt: str
+    closedAt: str | None
+    state: DepositionState
+    entries: list[DepositionEntry]
+    observations: list[DepositionObservation]
+    reconciliation: Reconciliation | None
+    # Hours into the run, by entry id: an entry with a time is a reading in a series.
+    sampleTimes: dict[str, float] = Field(default_factory=dict)
+    # What each measure's series is, by measure id, as a person named it.
+    seriesRoles: dict[str, SeriesRole] = Field(default_factory=dict)
+
+
+class MeasuredConditions(BaseModel):
+    """What a measured value was true under: the protocol it was run under
+    (None for readings taken with no protocol's steps), the scale and the
+    strain the runbook names."""
+
+    model_config = ConfigDict(extra="allow")
+
+    protocolId: str | None
+    scale: float
+    strainId: str | None
+
+
+class MeasuredEvidence(BaseModel):
+    """A measured value a reconciliation released (mirrors `MeasuredEvidence`
+    in src/data/types.ts): evidence about the run that produced it, kept with
+    its conditions and the run's deviations, and linked to the prediction it
+    tests."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    depositionId: str
+    runbookId: str
+    productId: str | None
+    predictionId: str
+    label: str
+    value: float
+    unit: str
+    provenance: Provenance
+    conditions: MeasuredConditions
+    deviations: list[str]
+    # False while the operator has not read the value back.
+    confirmed: bool
+    at: str
+
+
+class ProformaScenario(BaseModel):
+    """A scenario a person made in Proforma (mirrors `Scenario` in
+    src/data/types.ts): the shelf flowsheet it runs (`modelId`), its name,
+    whether it is pinned, and, on `custom_train_v1`, the kept vessel design
+    and train run it is built from. A row an earlier page wrote keeps the
+    fields it carried beside these, alpha 1.0's `dims`, `point` and
+    `assumptions` among them."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    modelId: str
+    kind: Literal["biosteam"]
+    name: str
+    description: str
+    product: str
+    pinned: bool
+    # The shelf flowsheet New scenario made it on (GET /api/proforma/shelf).
+    flowsheetId: str | None = None
+    # The newest run the page saw of it; None while it has none.
+    lastRunId: str | None = None
+    createdAt: str | None = None
+    # What a scenario on `custom_train_v1` is built from, by artifact id: a
+    # kept `fermos.vessel` design and a kept `pureos.train_run`.
+    vessel: str | None = None
+    trainRun: str | None = None
+
+
+class TrainMade(BaseModel):
+    """A train a person built in pureOS's Builder and saved (mirrors
+    `TrainMade` in src/lib/durable.ts): the train as data, when it was saved,
+    and the name it was saved under."""
+
+    model_config = ConfigDict(extra="allow")
+
+    train: TrainSpec
+    savedAt: str
+    by: str
+
+
+class RunbookLock(BaseModel):
+    """A runbook's lock as the project keeps it: when its predictions and
+    measures were frozen, and their digest (runbook_lock.py)."""
+
+    lockedAt: str
+    lockHash: str
+
+
+class RefusedRow(BaseModel):
+    """A row the project keeps that does not read as its kind: the kind, the
+    id the page wrote it under, and why, in words."""
+
+    kind: str
+    id: str
+    why: str
+
+
+class ProjectState(BaseModel):
+    """GET /api/state: everything the project keeps of the work done in its
+    pages, keyed as the page keeps it (src/lib/projectState.ts), each row read
+    as its kind's model. A row that does not read is named in `refused` with
+    why, and every other row is served beside it."""
+
+    depositions: list[Deposition]
+    measuredEvidence: list[MeasuredEvidence]
+    # The runbooks a page adopted from a draft and those studies made; a
+    # page's lock rides in runbookLocks.
+    runbooks: list[Runbook]
+    runbookLocks: dict[str, RunbookLock]
+    # The parameter panel's overrides, by scope.
+    overrides: dict[str, list[Override]]
+    # The fermOS fits chosen for a scenario's inputs: scenario id, then input
+    # key, then the fit's artifact id.
+    fits: dict[str, dict[str, str]]
+    scenarios: list[ProformaScenario]
+    # The trains built in pureOS's Builder, by train id.
+    trains: dict[str, TrainMade]
+    # Postdoc's Live conversations, each served whole (postdoc/conversations.py).
+    conversations: list[LiveConversation]
+    # Who deposited each deposition, by id: its row's maker, which no page sends.
+    depositedBy: dict[str, str]
+    refused: list[RefusedRow]
+
+
+class StateKept(BaseModel):
+    """PUT /api/state/{kind}/{id}: the row the project keeps now, as the page
+    sent it, under its kind and id."""
+
+    kind: str
+    id: str
+    value: Any
+
+
+class StateTakenBack(BaseModel):
+    """DELETE /api/state/{kind}/{id}: the row a person took back, by its kind
+    and id; `removed` says the project holds no such row now."""
+
+    kind: str
+    id: str
+    removed: bool

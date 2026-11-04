@@ -136,8 +136,9 @@ def test_a_refused_run_is_kept_with_its_scenario_as_a_receipt(worker, monkeypatc
 
 
 def test_the_proforma_screens_scenarios_stay_theirs_in_the_same_table(worker):
-    project_state.put("scenarios", "sc-made-1", {"id": "sc-made-1", "kind": "biosteam", "name": "n", "pinned": False},
-                      "Ada Moreno")
+    project_state.put("scenarios", "sc-made-1", {"id": "sc-made-1", "modelId": "a-placeholder-flowsheet",
+                                                 "kind": "biosteam", "name": "n", "description": "", "product": "",
+                                                 "pinned": False}, "Ada Moreno")
     made = scenarios.make(asked())
     assert [s["id"] for s in project_state.load()["scenarios"]] == ["sc-made-1"]
     assert [s.id for s in scenarios.listed()] == [made.id]

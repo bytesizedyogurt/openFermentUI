@@ -55,3 +55,33 @@ Never; this is how the drift stops recurring.
 - Consequences: an answer that does not fit its model is a 500 whose log names the field, so a
   handler returns the model itself; a response-only model a request later takes keeps Pydantic's
   list from then on, which `pnpm gen:api --check` shows as drift in the generated files.
+
+### Alpha 2.2, E.0b (2026-11-04): the rows a project keeps of its pages
+
+- Each kind of row a page writes through `PUT /api/state/{kind}/{id}` has its model in
+  `models.py`: `Deposition` (with `DepositionEntry`, `DepositionObservation`, `Reconciliation`,
+  `ReconciliationDelta`), `MeasuredEvidence` (with `MeasuredConditions`), `ProformaScenario`,
+  `TrainMade` and `RunbookLock` are new, and `Runbook`, `Override` and `LiveConversation` read as
+  they stood. Each new one is written from the page's hand type, its required fields the hand
+  type's, and a row of one keeps the fields its model does not name (`extra="allow"`, written into
+  the generated type as an index signature beside the named fields; alpha 1.0's `dims`, `point`
+  and `assumptions` of a scenario among them). A field a row may leave out defaults to None or to
+  an empty collection, so the generated type names it as optional: openapi-typescript writes a
+  field with any other default as one the answer holds.
+- `GET /api/state` answers a `ProjectState` with `response_model_exclude_unset`: each row read as
+  its kind's model one at a time (`project_state.state`) and served as the page sent it, a field
+  it left out staying out of the answer; a row kept before its kind had a model, that does not
+  read, is left out and named in `refused` (`RefusedRow`: kind, id, why), and the rest load. The
+  rows' schemas join `api.AS_KEPT`, so each keeps Pydantic's required list. A Live conversation is
+  read from the whole of what Postdoc keeps, every field set, so it is served whole and its family
+  stays marked; `core/tests/test_route_models.py` names it in `SERVED_WHOLE`, and a schema an
+  as-kept route serves is in AS_KEPT, keeps Pydantic's list, or is in that family.
+- A write is read as its kind's model before it is kept, and refused in words naming the fields
+  (`project_state._reads_as`), after the checks that were there. `PUT` answers `StateKept` and
+  `DELETE` `StateTakenBack`, so every JSON route answers a model; the test's waiting set is gone.
+- The rows come back byte for byte as the page writes JSON (`JSON.stringify`): an integral
+  number in a float field is written with a point by the service and read back by the page as the
+  number it sent, so the lock's digest over a row read back is the digest over the row sent.
+- Measured on the document this commit writes: 270 schemas, 15 of them new, 182 marked, none
+  split; the client typechecks against it, reading `refused` alone (the store names each refused
+  row in its activity feed and says so once).

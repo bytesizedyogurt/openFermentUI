@@ -1,9 +1,10 @@
-"""The service answers a model on every JSON route (alpha 2.2 E.0a; ADR-007,
-implementation note): each route declares the model it writes and its handler
-returns that model, and the OpenAPI document lists every property of a schema
-the service only writes as required, so the browser's generated type reads
-each such field as one the service sends. A schema a request takes keeps
-Pydantic's own required list, and so does the runbook family, served as kept.
+"""The service answers a model on every JSON route (alpha 2.2 E.0a and E.0b;
+ADR-007, implementation notes): each route declares the model it writes and
+its handler returns that model, and the OpenAPI document lists every property
+of a schema the service only writes as required, so the browser's generated
+type reads each such field as one the service sends. A schema a request takes
+keeps Pydantic's own required list, and so does every schema served as kept:
+the runbook family and the rows a project keeps of its pages.
 """
 from __future__ import annotations
 
@@ -24,13 +25,16 @@ from test_library import StandInWorker
 # export package.
 STREAMS = {("POST", "/api/ask/stream"), ("GET", "/api/events"), ("POST", "/api/literature/answer")}
 FILES = {("GET", "/api/flowsheets/{record_id}/file"), ("GET", "/api/studies/export")}
-# The rows a project keeps of its pages answer as the page sent them until the
-# row models land, in the commit after this one (E.0b), which gives GET
-# /api/state its ProjectState. This set empties as each route gains its model.
-STATE = {("GET", "/api/state"), ("PUT", "/api/state/{kind}/{item_id}"), ("DELETE", "/api/state/{kind}/{item_id}")}
-# The four routes that serve a runbook as kept (`response_model_exclude_unset`).
+# The routes that serve their rows as kept (`response_model_exclude_unset`):
+# the four that serve a runbook, and the project's state (E.0b).
 SERVED_AS_KEPT = {("GET", "/api/studies/runbooks"), ("POST", "/api/studies/runbooks"),
-                  ("GET", "/api/studies/runbooks/{runbook_id}"), ("POST", "/api/studies/runbooks/{runbook_id}/lock")}
+                  ("GET", "/api/studies/runbooks/{runbook_id}"), ("POST", "/api/studies/runbooks/{runbook_id}/lock"),
+                  ("GET", "/api/state")}
+# What a route served as kept serves whole, by the schema each family starts
+# from: the project's state reads each Live conversation from the whole of
+# what Postdoc keeps, every field set (project_state.state), and
+# test_project_state.py holds each one to its whole dump.
+SERVED_WHOLE = {("GET", "/api/state"): {"LiveConversation"}}
 
 
 def routes():
@@ -95,15 +99,15 @@ def marked(doc: dict) -> set[str]:
 
 def test_every_json_route_declares_the_model_it_writes():
     bare = {(method, path) for method, path, r in routes() if not models_named(r.response_model)}
-    assert bare == STREAMS | FILES | STATE, (
-        f"routes answering no model beyond the named ones: {sorted(bare - STREAMS - FILES - STATE)}; named ones that "
-        f"now answer a model, to take out of this file's sets: {sorted((STREAMS | FILES | STATE) - bare)}")
+    assert bare == STREAMS | FILES, (
+        f"routes answering no model beyond the named ones: {sorted(bare - STREAMS - FILES)}; named ones that now "
+        f"answer a model, to take out of this file's sets: {sorted((STREAMS | FILES) - bare)}")
 
 
 def test_the_document_names_a_schema_for_every_json_answer():
     doc = api.app.openapi()
     for method, path, _ in routes():
-        if (method, path) in STREAMS | FILES | STATE:
+        if (method, path) in STREAMS | FILES:
             continue
         answers = {s: r for s, r in doc["paths"][path][method.lower()]["responses"].items() if s.startswith("2")}
         assert answers, f"{method} {path}"
@@ -166,9 +170,13 @@ def test_the_runbook_family_served_as_kept_keeps_its_optional_fields():
 
 def test_every_schema_a_route_serves_as_kept_is_in_the_family():
     """A route that leaves a model's unset fields out of its answer serves
-    schemas whose fields a reader may find absent: each is in AS_KEPT."""
+    schemas whose fields a reader may find absent: each is in AS_KEPT, keeps
+    Pydantic's own required list (a schema a request takes, or one whose
+    every field is required, which no answer leaves out), or is one the route
+    serves whole (SERVED_WHOLE)."""
     doc = api.app.openapi()
     schemas = doc["components"]["schemas"]
+    found = classes()
     as_kept = set()
     for method, path, r in routes():
         if r.response_model_exclude_unset or r.response_model_exclude_none or r.response_model_exclude_defaults:
@@ -176,8 +184,35 @@ def test_every_schema_a_route_serves_as_kept_is_in_the_family():
             named: set[str] = set()
             answers = {s: a for s, a in doc["paths"][path][method.lower()]["responses"].items() if s.startswith("2")}
             api._named_in(answers, named)
-            assert api._reached(named, schemas) <= api.AS_KEPT, f"{method} {path}"
+            whole = api._reached(SERVED_WHOLE.get((method, path), set()), schemas)
+            loose = [n for n in api._reached(named, schemas) - whole - api.AS_KEPT
+                     if schemas[n].get("required", []) != pydantic_required(found[n])]
+            assert loose == [], f"{method} {path} serves as kept schemas that list a field it may leave out: {loose}"
     assert as_kept == SERVED_AS_KEPT
+
+
+def test_the_rows_a_project_keeps_are_served_as_kept_and_keep_their_optional_fields():
+    """The rows of GET /api/state are in AS_KEPT, each listing the fields a
+    row may leave out as optional, and the state itself lists every field."""
+    doc = api.app.openapi()
+    schemas = doc["components"]["schemas"]
+    found = classes()
+    rows = {"Deposition", "DepositionEntry", "DepositionObservation", "Reconciliation", "ReconciliationDelta",
+            "MeasuredEvidence", "MeasuredConditions", "ProformaScenario", "TrainMade", "Override"}
+    assert rows <= api.AS_KEPT
+    for name in rows:
+        assert schemas[name].get("required", []) == pydantic_required(found[name]), name
+    # A row keeps the fields its model does not name; an override is the panel's, which writes its own fields alone.
+    assert all(schemas[name].get("additionalProperties") is True for name in rows - {"Override"})
+    assert "additionalProperties" not in schemas["Override"]
+    assert {"correctedAt"}.isdisjoint(schemas["DepositionEntry"]["required"])
+    assert {"sampleTimes", "seriesRoles"}.isdisjoint(schemas["Deposition"]["required"])
+    assert {"origin", "ref", "low", "high", "note"}.isdisjoint(schemas["Override"]["required"])
+    assert {"flowsheetId", "lastRunId", "createdAt", "vessel", "trainRun"}.isdisjoint(
+        schemas["ProformaScenario"]["required"])
+    state = schemas["ProjectState"]
+    assert state["required"] == list(state["properties"]) and "refused" in state["required"]
+    assert schemas["LiveConversation"]["required"] == list(schemas["LiveConversation"]["properties"])
 
 
 def test_a_model_that_writes_itself_keeps_pydantics_required_list():

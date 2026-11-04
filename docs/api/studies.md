@@ -95,6 +95,16 @@ stops new readings, observations and sample times; every other write is refused 
 at `PUT /api/state/depositions/{id}`. A run looks its readings up again each time it runs, and
 refuses in words one corrected since.
 
+Each row a page keeps reads as its kind's model in `models.py` (alpha 2.2 E.0b): a deposition
+as `Deposition` with its `DepositionEntry` readings, `DepositionObservation` observations and
+`Reconciliation`, measured evidence as `MeasuredEvidence`, a Proforma scenario as
+`ProformaScenario`, a saved train as `TrainMade`, an override as `Override`, a runbook as
+`Runbook`. A write that does not read is a 422 naming the fields, nothing kept. `GET /api/state`
+answers a `ProjectState`: each row as the page sent it, a field the page left out staying out (a
+deposition, measured evidence, a scenario and a saved train keep the fields their models do not
+name), and a row kept before its kind had a model that does not read named in `refused` with its
+kind, its id and why, while every other row loads.
+
 ## Comparisons
 
 `StudyComparison`, a row of `comparisons` under the id of the `study.comparison` artifact that
