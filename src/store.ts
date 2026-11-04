@@ -18,7 +18,6 @@ import type {
   Protocol,
   Runbook,
   SeriesRole,
-  FermosFitResponse,
   TrainProposal,
   TrainFromRun,
   TrainRun,
@@ -41,6 +40,7 @@ import type {
   Skill,
   TrainSpec,
 } from '@/data/types';
+import type { FermosFitResponse } from '@/lib/fermos';
 import type { Override } from '@/lib/params';
 import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/postdoc';
 import type { Scenario } from '@/lib/proforma';

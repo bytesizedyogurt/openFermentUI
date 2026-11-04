@@ -14,28 +14,50 @@
 // words and the scope's overrides, each a typed input in its parameter's unit
 // (lib/params.ts, `inputsOf`), and draws what comes back; it computes no value
 // of a simulation.
-import type {
-  Deposition,
-  FamilyInfo,
-  FermosBinding,
-  FermosFitResponse,
-  FermosHarvest,
-  FermosSeries,
-  ForecastResult,
-  KineticFit,
-  ParameterSpec,
-  Runbook,
-  SimulationResult,
-  SimulationSummary,
-  VesselDesign,
-  VesselRequest,
-} from '@/data/types';
+//
+// Every shape the service answers or takes here is generated from its models
+// into src/api/types.gen.ts (ADR-007) and named below: a fit and its series,
+// a forecast, a family, a binding, a simulation, a harvest and a vessel. A
+// deposition and the runbook it was taken on are the store's own shapes.
+import type { components } from '@/api/types.gen';
+import type { Deposition, Runbook } from '@/data/types';
 import { seriesOf } from '@/engine/series';
 import type { TimeCourseProps, TrajectorySeries } from '@/components/figures';
 import { ServiceDown, ServiceRefused, call } from './http';
-import { inputsOf, type Override } from './params';
+import { inputsOf, type Override, type ParameterSpec } from './params';
 
 export { ServiceDown as FermosDown, ServiceRefused as FermosRefused };
+
+type S = components['schemas'];
+
+/** One measure's readings in time order, as `seriesOf` makes them and a fit takes them. */
+export type FermosSeries = S['FermosSeries'];
+/** One fitted parameter, its 95 % interval and its unit, with why a fit reports it unidentified. */
+export type FitParam = S['FitParam'];
+/** Why a fitted parameter is unidentified: the gauge X0 of a run with no biomass series, the no-biomass rule on μmax, the optimizer's budget, the Jacobian's null space, the interval reaching zero. */
+export type UnidentifiedReason = NonNullable<FitParam['unidentifiedBy']>[number];
+/** A kinetic model fitted to a run's series: the closed-form logistic, or a kinetics family. */
+export type KineticFit = S['KineticFit'];
+/** `POST /api/fermos/fit`: the growth rate and the kinetic fit of a run's series, each with the artifact it is kept as; the sample run's are kept nowhere. */
+export type FermosFitResponse = S['FermosFitResponse'];
+/** One role's forecast band over the forecast's times. */
+export type Band = S['Band'];
+/** `POST /api/fermos/forecast`: a band for the next run, drawn from a fit. */
+export type ForecastResult = S['ForecastResult'];
+/** `GET /api/fermos/families`: a model family as the panel shows it. */
+export type FamilyInfo = S['FamilyInfo'];
+/** `GET /api/fermos/bind`: a family's parameters bound as a simulation would bind them, starting no integration. */
+export type FermosBinding = S['FermosBinding'];
+/** One kept `fermos.simulation` artifact as every reader reads it, and a chemostat's steady state within it. */
+export type SimulationResult = S['SimulationResult'];
+export type SteadyState = S['SteadyState'];
+/** `GET /api/fermos/simulations`: one kept simulation, newest first. */
+export type SimulationSummary = S['SimulationSummary'];
+/** `GET /api/fermos/harvest`: a kept simulation's broth at an hour. */
+export type FermosHarvest = S['FermosHarvest'];
+/** `POST /api/fermos/vessel`: what a design is asked with, and the one `fermos.vessel` artifact it answers, read. */
+export type VesselRequest = S['VesselRequest'];
+export type VesselDesign = S['VesselDesign'];
 
 const post = <T>(path: string, body: unknown, signal?: AbortSignal) =>
   call<T>(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
@@ -214,7 +236,7 @@ export function qualifies(dep: Deposition, runbook: Runbook | undefined): boolea
   return seriesOf(dep, runbook).some((s) => s.role === 'biomass' && s.points.length >= 4);
 }
 
-const value = (fit: KineticFit, name: string) => fit.params.find((p) => p.name === name)?.value;
+const value = (fit: KineticFit, name: string) => fit.params?.find((p) => p.name === name)?.value;
 
 /** The fitted closed form for one role at `t` hours, or null when the fit lacks it. */
 export function curveAt(fit: KineticFit, role: string, t: number): number | null {
@@ -248,17 +270,17 @@ export function curve(fit: KineticFit, role: string, tmax: number, n = 60): { t:
 
 /** The figure for one run: readings, residuals and the fitted curves. */
 export function fitFigureSeries(series: FermosSeries[], fit: KineticFit | null): TrajectorySeries[] {
-  const tmax = Math.max(1e-9, ...series.flatMap((s) => s.points.map((p) => p.t)));
+  const tmax = Math.max(1e-9, ...series.flatMap((s) => (s.points ?? []).map((p) => p.t)));
   return series
     .filter((s) => s.role)
     .map((s) => {
-      const q = fit?.quality.find((x) => x.measureId === s.measureId);
+      const q = fit?.quality?.find((x) => x.measureId === s.measureId);
       return {
         role: s.role!,
         label: s.label,
         unit: s.unit,
-        readings: s.points.map((p, i) => ({ t: p.t, value: p.value, residual: q?.residuals[i] ?? null })),
-        fitted: fit && fit.params.length ? curve(fit, s.role!, tmax) : undefined,
+        readings: (s.points ?? []).map((p, i) => ({ t: p.t, value: p.value, residual: q?.residuals?.[i] ?? null })),
+        fitted: fit?.params?.length ? curve(fit, s.role!, tmax) : undefined,
       };
     });
 }

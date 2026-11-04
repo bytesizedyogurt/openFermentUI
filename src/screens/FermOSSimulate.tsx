@@ -39,7 +39,6 @@
 // the person's override; the CSVs export the artifact's own numbers. No
 // numeric control is rendered here: every parameter is the panel's (E.1‴).
 import { useEffect, useMemo, useState } from 'react';
-import type { FamilyInfo, FermosBinding, ParameterSpec, ParameterValue, ParamScope, SimulationResult, SimulationSummary, SteadyState } from '@/data/types';
 import type { FermosFitInfo } from '@/lib/proforma';
 import { overridesFor, useStore } from '@/store';
 import { href, useRoute } from '@/router';
@@ -51,7 +50,7 @@ import { SourceChip, shown } from '@/components/ParameterRow';
 import { TimeCourse } from '@/components/figures';
 import { CARBON_SOURCES } from '@/data/vocabulary';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
-import { paramScope } from '@/lib/params';
+import { paramScope, type ParameterSpec, type ParameterValue, type ParamScope } from '@/lib/params';
 import { FIT_TOOL_WORDS, fermosFits, proformaShelf } from '@/lib/proforma';
 import { exportCSV } from '@/lib/csv';
 import { fmt } from '@/engine/units';
@@ -69,7 +68,12 @@ import {
   paramAskOf,
   timeCourseOf,
   vesselPath,
+  type FamilyInfo,
+  type FermosBinding,
   type SimulateAsk,
+  type SimulationResult,
+  type SimulationSummary,
+  type SteadyState,
 } from '@/lib/fermos';
 import { builderInletPath } from '@/lib/pureos';
 import { SendToProforma } from './FermOSForecast';

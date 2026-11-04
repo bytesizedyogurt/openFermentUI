@@ -36,7 +36,6 @@
 // page attaches it to the inputs it can feed (titre, yield, productivity);
 // the service computes each value from the artifact there.
 import { useEffect, useMemo, useState } from 'react';
-import type { ForecastResult, ParameterSpec, ParamScope, SimulationResult } from '@/data/types';
 import { overridesFor, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { EngineRunLink } from '@/components/EngineRunLink';
@@ -44,7 +43,7 @@ import { Button, Callout } from '@/components/ui';
 import { NewScenarioDialog } from '@/components/NewScenarioDialog';
 import { ParameterPanel } from '@/components/ParameterPanel';
 import { FIT_TOOL_WORDS, sendFitPath } from '@/lib/proforma';
-import { paramScope } from '@/lib/params';
+import { paramScope, type ParameterSpec, type ParamScope } from '@/lib/params';
 import { EvidenceCard } from '@/components/EvidenceCard';
 import { TimeCourse, TrajectoryBand } from '@/components/figures';
 import { fmt, normalizeUnit } from '@/engine/units';
@@ -63,7 +62,9 @@ import {
   paramAskOf,
   simulateFromFitPath,
   timeCourseOf,
+  type ForecastResult,
   type SimulateAsk,
+  type SimulationResult,
 } from '@/lib/fermos';
 
 /** The groups a batch fit's forecast shows of its family's scope. */
@@ -124,7 +125,7 @@ export default function FermOSForecast() {
   const fits = useStore((s) => s.fermosFits);
   const depositions = useStore((s) => s.depositions);
   const runbooks = useStore((s) => s.runbooks);
-  const usable = Object.entries(fits).filter(([, f]) => f.kinetic?.params.length);
+  const usable = Object.entries(fits).filter(([, f]) => f.kinetic?.params?.length);
   const [chosen, setChosen] = useState<string>(usable[0]?.[0] ?? '');
   const [result, setResult] = useState<ForecastResult | null>(null);
   const [sim, setSim] = useState<SimulationResult | null>(null);
@@ -220,7 +221,7 @@ export default function FermOSForecast() {
     if (!sim || !fit) return [];
     return seriesFor(fit.depositionId)
       .filter((s) => s.role && STATE_OF_ROLE[s.role] && normalizeUnit(s.unit) !== null && normalizeUnit(s.unit) === normalizeUnit(sim.units[STATE_OF_ROLE[s.role]] ?? ''))
-      .map((s) => ({ key: STATE_OF_ROLE[s.role!], points: s.points.map((p) => ({ t: p.t, value: p.value })), provenance: 'measured' as const }));
+      .map((s) => ({ key: STATE_OF_ROLE[s.role!], points: (s.points ?? []).map((p) => ({ t: p.t, value: p.value })), provenance: 'measured' as const }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sim, fit, depositions, runbooks]);
 

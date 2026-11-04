@@ -136,9 +136,9 @@ def test_a_schema_the_service_only_writes_lists_every_property_as_required():
     doc = api.app.openapi()
     schemas = doc["components"]["schemas"]
     only = marked(doc)
-    assert {"Health", "SimulatorStatus", "ScenarioRunsResponse", "ThermoPropsStored", "StoredAnswer", "GridDim",
-            "LiteratureStats", "ProformaRunResult", "ProformaTables", "RegressionCheck", "ToolResult",
-            "AnswerPlan"} <= only
+    assert {"Health", "SimulatorStatus", "ScenarioRunsResponse", "ThermoPropsStored", "ThermoPropsAnswer",
+            "StoredAnswer", "GridDim", "LiteratureStats", "ProformaRunResult", "ProformaTables", "RegressionCheck",
+            "ToolResult", "AnswerPlan"} <= only
     for name in only:
         properties = schemas[name].get("properties")
         if properties:

@@ -14013,6 +14013,23 @@
         "title": "ThermoProps",
         "type": "object"
       },
+      "ThermoPropsAnswer": {
+        "description": "POST /api/thermo/props: thermosteam's answer to the question, its\nartifact beside what the artifact holds, read as `ThermoProps`, the same\npair a later GET reads back as `ThermoPropsStored`.",
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/Artifact"
+          },
+          "props": {
+            "$ref": "#/components/schemas/ThermoProps"
+          }
+        },
+        "required": [
+          "artifact",
+          "props"
+        ],
+        "title": "ThermoPropsAnswer",
+        "type": "object"
+      },
       "ThermoPropsRequest": {
         "description": "`POST /api/thermo/props`: a run's stream, or a preset (with its\nrecord for `beer-at-titre-of`). Ids and words only.",
         "properties": {
@@ -26336,7 +26353,7 @@
         "x-openferment-scope": "project"
       },
       "post": {
-        "description": "thermosteam's density, heat capacity, viscosity and bubble and dew\npoints for a run's stream, or a preset: one `thermo_props` artifact,\ncomputed in the Proforma worker or returned as stored. 404 for a run,\nstream or record not on file; 409 for a run or an answer whose file is\ndamaged on disk; 422 for a question that cannot be asked, a chemical the\nlibrary lacks among them, in words; 503 when the worker cannot answer.",
+        "description": "thermosteam's density, heat capacity, viscosity and bubble and dew\npoints for a run's stream, or a preset (`ThermoPropsAnswer`): one\n`thermo_props` artifact, computed in the Proforma worker or returned as\nstored, beside what it holds, read as `ThermoProps`. 404 for a run,\nstream or record not on file; 409 for a run or an answer whose file is\ndamaged on disk; 422 for a question that cannot be asked, a chemical the\nlibrary lacks among them, in words; 503 when the worker cannot answer.",
         "operationId": "thermo_props_api_thermo_props_post",
         "parameters": [
           {
@@ -26373,7 +26390,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Artifact"
+                  "$ref": "#/components/schemas/ThermoPropsAnswer"
                 }
               }
             },

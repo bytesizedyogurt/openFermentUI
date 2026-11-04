@@ -60,6 +60,7 @@ from .models import (
     SimulationSummary,
     SimulatorStatus,
     StoredAnswer,
+    ThermoPropsAnswer,
     ThermoPropsStored,
     Train,
     TrainFromRun,
@@ -1796,11 +1797,12 @@ def _thermo_answer(fn, req: ThermoPropsRequest):
         raise HTTPException(status_code=409, detail=str(e)) from None
 
 
-@app.post("/api/thermo/props", response_model=Artifact)
-def thermo_props(req: ThermoPropsRequest) -> Artifact:
+@app.post("/api/thermo/props", response_model=ThermoPropsAnswer)
+def thermo_props(req: ThermoPropsRequest) -> ThermoPropsAnswer:
     """thermosteam's density, heat capacity, viscosity and bubble and dew
-    points for a run's stream, or a preset: one `thermo_props` artifact,
-    computed in the Proforma worker or returned as stored. 404 for a run,
+    points for a run's stream, or a preset (`ThermoPropsAnswer`): one
+    `thermo_props` artifact, computed in the Proforma worker or returned as
+    stored, beside what it holds, read as `ThermoProps`. 404 for a run,
     stream or record not on file; 409 for a run or an answer whose file is
     damaged on disk; 422 for a question that cannot be asked, a chemical the
     library lacks among them, in words; 503 when the worker cannot answer."""
@@ -1808,9 +1810,10 @@ def thermo_props(req: ThermoPropsRequest) -> Artifact:
     from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 
     try:
-        return _thermo_answer(thermo.props, req)
+        art = _thermo_answer(thermo.props, req)
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator, where thermosteam runs, could not answer: {e}") from e
+    return ThermoPropsAnswer(artifact=art, props=thermo.output_of(art))
 
 
 @app.get("/api/thermo/props", response_model=ThermoPropsStored)

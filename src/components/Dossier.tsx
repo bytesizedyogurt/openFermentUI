@@ -8,17 +8,14 @@
 // uses sit between the figures. With the service down the band says the
 // artifacts need it.
 import { useEffect, useState } from 'react';
-import type { components } from '@/api/types.gen';
 import { useStore } from '@/store';
 import { ArtifactsDown, getArtifact } from '@/lib/artifacts';
 import { productOfBasis, productWords, yieldsOnSugar } from '@/lib/geneos';
 import { INFEASIBLE_WORDS, LIBRARY_RUN_TOOL, RUN_TOOL, runViewOfRun, type HistogramBin } from '@/lib/proforma';
+import type { Band } from '@/lib/fermos';
 import type { Artifact, ComputedBasis, Runbook } from '@/lib/studies';
 import { CeilingGap, CostWaterfall, Distribution, TrajectoryBand } from '@/components/figures';
 import { Card } from './ui';
-
-/** One band of a fermOS forecast, as its `growth_forecast` artifact keeps it. */
-type Band = components['schemas']['Band'];
 
 /** The order of the chain, by the tool that kept each artifact. */
 export const DOSSIER_ORDER = ['geneos.ceiling', 'growth_forecast', RUN_TOOL, LIBRARY_RUN_TOOL] as const;

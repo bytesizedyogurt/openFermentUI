@@ -318,11 +318,14 @@ def test_post_answers_get_reads_and_neither_takes_a_number(store, worker, client
     assert client.get("/api/thermo/props", params=q).json() == {"artifact": None, "props": None}
     assert worker.calls == []
     made = client.post("/api/thermo/props", json=q)
-    assert made.status_code == 200 and made.json()["tool"] == "thermo_props"
-    ThermoProps.model_validate(made.json()["output"])
+    assert made.status_code == 200 and list(made.json()) == ["artifact", "props"]
+    answer = made.json()
+    assert answer["artifact"]["tool"] == "thermo_props"
+    assert answer["props"] == ThermoProps.model_validate(answer["artifact"]["output"]).model_dump(mode="json")
     kept = client.get("/api/thermo/props", params=q).json()
-    assert kept["artifact"]["id"] == made.json()["id"] and len(worker.calls) == 1
-    assert kept["props"] == ThermoProps.model_validate(made.json()["output"]).model_dump(mode="json")
+    assert kept == answer and len(worker.calls) == 1
+    # Asked again, the stored answer comes back as the same pair, and nothing is asked of thermosteam.
+    assert client.post("/api/thermo/props", json=q).json() == answer and len(worker.calls) == 1
 
 
 @pytest.mark.parametrize("body, status, words", [

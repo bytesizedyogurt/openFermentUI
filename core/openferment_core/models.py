@@ -2571,6 +2571,15 @@ class ThermoPropsStored(BaseModel):
     props: ThermoProps | None
 
 
+class ThermoPropsAnswer(BaseModel):
+    """POST /api/thermo/props: thermosteam's answer to the question, its
+    artifact beside what the artifact holds, read as `ThermoProps`, the same
+    pair a later GET reads back as `ThermoPropsStored`."""
+
+    artifact: Artifact
+    props: ThermoProps
+
+
 # ── a product's properties (OF-BLD-020 §7.1, D12) ───────────────────────
 #
 # What pureOS's proposer reads about a product: from its sequence, through

@@ -2647,8 +2647,9 @@ export interface paths {
         /**
          * Thermo Props
          * @description thermosteam's density, heat capacity, viscosity and bubble and dew
-         *     points for a run's stream, or a preset: one `thermo_props` artifact,
-         *     computed in the Proforma worker or returned as stored. 404 for a run,
+         *     points for a run's stream, or a preset (`ThermoPropsAnswer`): one
+         *     `thermo_props` artifact, computed in the Proforma worker or returned as
+         *     stored, beside what it holds, read as `ThermoProps`. 404 for a run,
          *     stream or record not on file; 409 for a run or an answer whose file is
          *     damaged on disk; 422 for a question that cannot be asked, a chemical the
          *     library lacks among them, in words; 503 when the worker cannot answer.
@@ -7937,6 +7938,16 @@ export interface components {
             } | null;
             /** Viscosity */
             viscosity: number | null;
+        };
+        /**
+         * ThermoPropsAnswer
+         * @description POST /api/thermo/props: thermosteam's answer to the question, its
+         *     artifact beside what the artifact holds, read as `ThermoProps`, the same
+         *     pair a later GET reads back as `ThermoPropsStored`.
+         */
+        ThermoPropsAnswer: {
+            artifact: components["schemas"]["Artifact"];
+            props: components["schemas"]["ThermoProps"];
         };
         /**
          * ThermoPropsRequest
@@ -14620,7 +14631,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Artifact"];
+                    "application/json": components["schemas"]["ThermoPropsAnswer"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */

@@ -35,9 +35,10 @@ names the library and its version, every input with its source, and its
 provenance is `basis_provenance`'s: `computed` for a preset of conventions,
 the weakest of that and the record or the run otherwise.
 
-    POST /api/thermo/props   computes (or returns the stored answer)
-    GET  /api/thermo/props   the stored answer for the same question, or none;
-                             it starts no simulator
+    POST /api/thermo/props   computes (or returns the stored answer): the
+                             artifact beside what it holds (ThermoPropsAnswer)
+    GET  /api/thermo/props   the stored answer for the same question, as the
+                             same pair, or none; it starts no simulator
 
 A PRODUCT'S VOLATILITY (OF-BLD-020 §7.1, D12) is its own question and its
 own artifact tool, `volatility`, beside `thermo_props`, so the contract above

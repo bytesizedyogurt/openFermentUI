@@ -168,3 +168,25 @@ Never; this is how the drift stops recurring.
 - The browser's own types move to their owners: `FieldId`, `ParameterFamily` and `ParameterDef` to
   `data/ontology.ts`, and `Job` and `JobStage` to `store.ts`. `src/data/types.ts` re-exports each
   until E.15, and a file a later commit moves reads them there until then.
+
+### Alpha 2.2, E.6 (2026-11-04): fermOS's lib, and thermosteam's answer as a pair
+
+- `lib/fermos.ts` names the generated schemas fermOS answers and takes: a fit and its series
+  (`FermosSeries`, `FitParam`, `UnidentifiedReason`, read from the parameter's `unidentifiedBy`,
+  `KineticFit`, `FermosFitResponse`), a forecast (`Band`, `ForecastResult`), a family, a binding,
+  a simulation with its steady state, the kept simulations, a harvest and a vessel (`FamilyInfo`,
+  `FermosBinding`, `SimulationResult`, `SteadyState`, `SimulationSummary`, `FermosHarvest`,
+  `VesselRequest`, `VesselDesign`). `lib/thermo.ts` names thermosteam's (`ThermoPropsRequest`,
+  `ThermoProps`, `ThermoPropsAnswer`, `ThermoPropsStored`). The four fermOS views, PropertiesPanel
+  and the figures TimeCourse, TrajectoryBand and OxygenBalance read them there, Dossier its `Band`
+  and the store its kept fits; a deposition and its runbook stay the store's hand-kept shapes until
+  E.11, and a train until E.7.
+- `POST /api/thermo/props` answers `ThermoPropsAnswer`: the `thermo_props` artifact beside what it
+  holds, read by the service as `ThermoProps`, the pair `GET /api/thermo/props` answers as
+  `ThermoPropsStored` once the answer is stored. A page reads each property as typed, and the cast
+  of an artifact's output (`propsOf`) goes.
+- A fit and its series go back to the service in a forecast's and a fit's request, so the
+  generated `KineticFit`, `FermosSeries`, `FitParam` and `SeriesFitQuality` keep Pydantic's
+  required lists (E.0a's rule) and name each field with a default as one a request may leave out.
+  The service writes every field of a fit it answers; the readers default the ones a request may
+  leave out (a fit's parameters and quality, a series' points, a quality's residuals), nine reads.

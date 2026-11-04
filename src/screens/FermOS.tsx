@@ -50,7 +50,6 @@
 // This screen may be extended. Keep this header's reasoning with it.
 import { useEffect, useMemo, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
-import type { FermosFitResponse, FermosSeries, FitParam, UnidentifiedReason } from '@/data/types';
 import { useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState, PageHeader, SectionTitle } from '@/components/ui';
@@ -75,6 +74,10 @@ import {
   isFitFamily,
   qualifies,
   simulateFromFitPath,
+  type FermosFitResponse,
+  type FermosSeries,
+  type FitParam,
+  type UnidentifiedReason,
 } from '@/lib/fermos';
 import FermOSForecast from './FermOSForecast';
 import FermOSSimulate from './FermOSSimulate';
@@ -286,7 +289,7 @@ function Fits() {
               <p className="text-ink-soft">No growth rate: {result.growth?.reason}.</p>
             )}
           </section>
-          {result.kinetic?.params.length ? (
+          {result.kinetic?.params?.length ? (
             <ParamTable params={result.kinetic.params} />
           ) : (
             <p className="text-body text-ink-soft">No kinetic fit: {result.kinetic?.reason}.</p>
