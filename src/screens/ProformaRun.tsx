@@ -55,7 +55,9 @@
 import { SffGraph } from '@/components/SffGraph';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BookOpen, Download, ListChecks, Play } from 'lucide-react';
-import type { FlowsheetInfo, ParamScope, Quantity, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
+import type { ParamScope } from '@/lib/params';
+import type { FlowsheetInfo, RegressionCheck } from '@/lib/proforma';
+import type { Quantity, RunReport as EngineRunReport } from '@/lib/studies';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';

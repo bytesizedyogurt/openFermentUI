@@ -12,8 +12,10 @@
 // answers again. The service reads each row as its kind's model (alpha 2.2
 // E.0b): a write that does not read is refused in words, and a row kept
 // before, that does not read, is named in `refused` while the rest load.
-import type { Deposition, LiveConversation, MeasuredEvidence, Override, Runbook, Scenario } from '@/data/types';
+import type { Deposition, LiveConversation, MeasuredEvidence, Runbook } from '@/data/types';
 import type { TrainMade } from './durable';
+import type { Override } from './params';
+import type { Scenario } from './proforma';
 import { ServiceDown, ServiceRefused, call } from './http';
 
 export type StateKind =

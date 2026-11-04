@@ -20,6 +20,7 @@ import {
   PageHeader,
   cx,
 } from '@/components/ui';
+import { namesStrain } from './StrainPage';
 
 // ── coverage model ─────────────────────────────────────────────────────
 
@@ -248,17 +249,12 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
     return strains.map((strain) => {
       const recs = recordsFor(records, paperById, strain.id);
       const live = recs.filter((r) => r.status !== 'rejected');
-      const ids = new Set(recs.map((r) => r.id));
       const gold = live.filter((r) => !!r.gold).length;
       const verified = live.filter((r) => r.status === 'verified').length;
       const unverified = live.filter((r) => r.status === 'unverified').length;
       const paperCount = papers.filter((p) => p.organisms.includes(strain.id)).length;
       const protocolCount = protocols.filter((p) => p.organisms.includes(strain.id)).length;
-      const scenarioCount = scenarios.filter(
-        (sc) =>
-          sc.assumptions.some((a) => a.recordId && ids.has(a.recordId)) ||
-          sc.dims.some((d) => d.sourceRecordId && ids.has(d.sourceRecordId)),
-      ).length;
+      const scenarioCount = scenarios.filter((sc) => namesStrain(sc, [strain.designation, strain.binomial])).length;
       const prov: ProvKind = gold > 0 ? 'gold' : verified > 0 ? 'verified' : 'unverified';
       return {
         strain,
@@ -399,7 +395,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           <Explain label="How coverage is counted">
             Four counts, each derived live from the session store: papers whose organism list names
             the strain; extraction records for it that a reviewer has verified; protocols listing it;
-            and scenarios whose assumptions or swept dimensions are sourced from one of its records.
+            and scenarios that name it in their name, description or product.
             A record with its own organism tag counts only for that organism; an untagged record
             inherits its paper&rsquo;s organism list. Bars are drawn relative to the best-covered
             strain in this corpus, so they compare strains to each other and to nothing else.

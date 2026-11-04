@@ -5,7 +5,7 @@
 // in name the depositor in a column of their own, and `by` adds it here
 // where none does. The service filled each from the deposition's rows when
 // the value was set (measurements.py); nothing here reads a deposition.
-import type { Origin } from '@/data/types';
+import type { Origin } from '@/lib/studies';
 import { href } from '@/router';
 
 /** The deposition and the entry a reading's ref names. */

@@ -6,7 +6,7 @@
 // figure says what would fill it and which screen produces that (rule 6).
 import { useState, type ReactNode } from 'react';
 import { Download, Table2 } from 'lucide-react';
-import type { ComputedBasis, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { exportCSV } from '@/lib/csv';
 import { href } from '@/router';
 import { cx } from '@/components/ui';

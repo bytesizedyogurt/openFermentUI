@@ -9,7 +9,8 @@
  * in the service's words (src/lib/http.ts), a refusal of a request's own
  * fields among them; and the unit each person's change is sent in
  * (src/lib/params.ts, `inputsOf`), a panel that shows part of its scope
- * among them and a deposition's reading sent as the reading it names; the
+ * among them, a deposition's reading sent as the reading it names and a
+ * change kept with no origin sent as a person's assumption; the
  * bench's readings as the service's lookup reads them (src/engine/readings.ts:
  * a correction, the numbers that wait to be read back, a series); a
  * train's changes named by their place (src/lib/pureos.ts,
@@ -21,7 +22,8 @@
  * runs kept from the retired reference entries it lists (`keptRunsOf`), and a
  * run's grid read where it holds a dimension at one value
  * (src/engine/interp.ts). Run by `pnpm check:state`, offline: the service is
- * a stand-in for `fetch`.
+ * a stand-in for `fetch`. A fixture of a shape the service's models define is
+ * a whole value of its generated type (src/api/types.gen.ts).
  */
 import {
   EMPTY_STATE,
@@ -33,18 +35,10 @@ import {
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
-import type {
-  Artifact,
-  Deposition,
-  EngineRun,
-  FlowsheetInfo,
-  LiveConversation,
-  Override,
-  ParameterSpec,
-  ProformaScenarioInfo,
-  Scenario,
-  TrainSpec,
-} from '../src/data/types';
+import type { Deposition, LiveConversation, TrainSpec } from '../src/data/types';
+import type { Override, ParameterSpec } from '../src/lib/params';
+import type { FlowsheetInfo, ProformaScenarioInfo, Scenario, ScenarioInput } from '../src/lib/proforma';
+import type { Artifact, BasisSource, EngineRun } from '../src/lib/studies';
 import { loadOverlay } from '../src/lib/intake';
 import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
@@ -60,8 +54,30 @@ const check = (label: string, ok: boolean, extra = '') => {
   if (!ok) fails++;
 };
 
+// ── whole values of the service's shapes (src/api/types.gen.ts) ────────
+// A fixture of a shape the service's models define is a whole value of its
+// generated type, each field a placeholder, so the typecheck holds every
+// fixture to the service's shape; a check reads the fields it names.
+
+const AT = '2026-11-03T00:00:00Z';
+const aScenario = (id: string, more: Partial<Scenario> = {}): Scenario => ({
+  id, modelId: 'placeholder-flowsheet', kind: 'biosteam', name: 'S', description: '', product: '', pinned: false, ...more,
+});
+const aSpec = (key: string, unit: string, group = 'parameters'): ParameterSpec => ({
+  key, label: key, symbol: '', gloss: '', dimension: '', unit, min: null, max: null, step: null, scale: 'linear', group,
+  sourceRule: ['assumption'], note: null, boundsReason: 'a placeholder bound', choices: null, convention: null,
+});
+const anOverride = (scope: string, key: string, value: number | string, more: Partial<Override> = {}): Override => ({
+  scope, key, value, by: 'Ada', at: AT, origin: 'person-assumption', ...more,
+});
+const aShelfInput = (key: string, unit: string): FlowsheetInfo['inputs'][number] => ({ key, name: key, unit, dimension: '', kind: 'process', fields: [], note: '' });
+const aFlowsheet = (inputs: FlowsheetInfo['inputs']): FlowsheetInfo => ({
+  id: 'placeholder-flowsheet', title: 'A placeholder flowsheet', description: '', source: '', inputs, outputs: [], gridInputs: [],
+  leavesOut: [], priceBasis: null, priceOutput: null, program: null, brothStream: null, builtFrom: [],
+});
+
 const dep = { id: 'dep-1', runbookId: 'rb-1' } as unknown as Deposition;
-const scenario = { id: 'sc-1', name: 'S', pinned: false } as unknown as Scenario;
+const scenario = aScenario('sc-1');
 const talk = { id: 'lc-1', turns: [] } as unknown as LiveConversation;
 const before: ProjectState = { ...EMPTY_STATE, depositions: [dep], scenarios: [scenario], conversations: [talk], fits: { 'sc-1': { mu: 'a'.repeat(16) } } };
 
@@ -69,7 +85,7 @@ const before: ProjectState = { ...EMPTY_STATE, depositions: [dep], scenarios: [s
 
 check('nothing changed is nothing to send', changes(before, { ...before }, 'p', 'Ada').length === 0);
 const moved = { ...dep, entries: [] } as unknown as Deposition;
-const pinned = { ...scenario, pinned: true } as Scenario;
+const pinned: Scenario = { ...scenario, pinned: true };
 const after: ProjectState = { ...before, depositions: [moved], scenarios: [pinned], fits: {} };
 const sent = changes(before, after, 'p', 'Ada');
 check(
@@ -243,19 +259,18 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
 // ── the unit each change is sent in (alpha 2.2 D2; src/lib/params.ts) ──
 
 {
-  const spec = (key: string, unit: string, group: string) => ({ key, unit, group }) as unknown as ParameterSpec;
-  const scope: ParameterSpec[] = [spec('x0', 'placeholder-unit-a', 'Start values'), spec('mu_max', 'placeholder-unit-b', 'Kinetics')];
+  const scope: ParameterSpec[] = [aSpec('x0', 'placeholder-unit-a', 'Start values'), aSpec('mu_max', 'placeholder-unit-b', 'Kinetics')];
   const shownOnly = scope.filter((s) => s.group === 'Start values');
-  const typed = (key: string): Override => ({ scope: 'a-scope', key, value: 1, by: 'Ada', at: '2026-11-03T00:00:00Z' }) as Override;
+  const typed = (key: string): Override => anOverride('a-scope', key, 1);
   const changes = [typed('x0'), typed('mu_max')];
   const units = (specs: ParameterSpec[]) => inputsOf(changes, specs).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
   // FermOSForecast's batch fit shows part of its family's scope and resolves with all of it (ParameterPanel's unitSpecs).
   check('a panel that shows part of its scope sends each change in the unit its scope’s every spec names', units(scope) === 'x0 placeholder-unit-a, mu_max placeholder-unit-b', units(scope));
   check('the shown specs alone would send a change typed elsewhere on the scope with no unit', units(shownOnly) === 'x0 placeholder-unit-a, mu_max ', units(shownOnly));
-  const expanded = inputsOf([typed('split.Water')], [spec('split', 'placeholder-share', 'Separation')]);
+  const expanded = inputsOf([typed('split.Water')], [aSpec('split', 'placeholder-share', 'Separation')]);
   check('a key expanded per item is sent in its template’s unit', expanded[0]?.quantity.unit === 'placeholder-share', JSON.stringify(expanded));
   // alpha 2.2 C.5: a deposition's reading travels as the reading it is, its ref beside its depositor and its time.
-  const reading = { ...typed('x0'), origin: 'measurement', ref: 'dep-1/de-1' } as Override;
+  const reading: Override = { ...typed('x0'), origin: 'measurement', ref: 'dep-1/de-1' };
   const [sentReading, sentTyped] = inputsOf([reading, typed('mu_max')], scope);
   check(
     'a reading is sent as a measurement naming its reading; a typed value is sent as a person’s assumption',
@@ -266,6 +281,11 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
       !('ref' in (sentTyped.quantity.origin ?? {})),
     JSON.stringify([sentReading, sentTyped]),
   );
+  // alpha 2.2 E.1: the service serves a change as the page kept it, so a change kept before the page wrote its origin
+  // comes back with none, and the generated type names an origin on every change.
+  const keptBefore = { scope: 'a-scope', key: 'x0', value: 1, by: 'Ada', at: AT } as Override;
+  const [sentKept] = inputsOf([keptBefore], scope);
+  check('a change kept with no origin is sent as a person’s assumption, as the service reads it', sentKept?.quantity.origin?.kind === 'person-assumption', JSON.stringify(sentKept));
 }
 
 // ── the bench's readings, read as the service's lookup reads them (alpha 2.2 C.5; src/engine/readings.ts) ──
@@ -315,14 +335,12 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
 // ── a train's changes, each named by its place (alpha 2.2 D2; src/lib/pureos.ts) ──
 
 {
-  const spec = (key: string, unit: string) => ({ key, unit, group: 'parameters' }) as unknown as ParameterSpec;
   const train = { id: 'tr-1', units: [{ id: 'U1' }, { id: 'U2' }] } as unknown as TrainSpec;
-  const typed = (place: string, key: string, trainId = 'tr-1'): Override =>
-    ({ scope: unitScope(trainId, place), key, value: 1, by: 'Ada', at: '2026-11-03T00:00:00Z' }) as Override;
+  const typed = (place: string, key: string, trainId = 'tr-1'): Override => anOverride(unitScope(trainId, place), key, 1);
   const overrides = [typed('U2', 'b'), typed('inlet', 'a'), typed('U1', 'c'), typed('U1', 'a', 'tr-2')];
   const read = {
-    [unitScope('tr-1', 'inlet')]: [spec('a', 'placeholder-unit-a')],
-    [unitScope('tr-1', 'U2')]: [spec('b', 'placeholder-unit-b')],
+    [unitScope('tr-1', 'inlet')]: [aSpec('a', 'placeholder-unit-a')],
+    [unitScope('tr-1', 'U2')]: [aSpec('b', 'placeholder-unit-b')],
   };
   const named = trainInputs(train, overrides, read).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
   check(
@@ -336,11 +354,10 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
 // ── a Proforma scenario's run, its changes sent as typed inputs (alpha 2.2 D2; src/lib/proforma.ts) ──
 
 {
-  const typed = (key: string, value: number, low?: number): Override =>
-    ({ scope: 'proforma:sc-1', key, value, ...(low != null ? { low } : {}), by: 'Ada', at: '2026-11-03T00:00:00Z', origin: 'person-assumption' }) as Override;
+  const typed = (key: string, value: number, low?: number): Override => anOverride('proforma:sc-1', key, value, low != null ? { low } : {});
   const changes = [typed('a', 1, 0.5), typed('b', 2)];
-  const panel = { specs: [{ key: 'a', unit: 'placeholder-unit-a' }, { key: 'b', unit: 'placeholder-unit-b' }] as ParameterSpec[] };
-  const shelfOnly = { inputs: [{ key: 'a', unit: 'placeholder-unit-c' }] } as unknown as FlowsheetInfo;
+  const panel = { specs: [aSpec('a', 'placeholder-unit-a'), aSpec('b', 'placeholder-unit-b')] };
+  const shelfOnly = aFlowsheet([aShelfInput('a', 'placeholder-unit-c')]);
   const ask = { scenarioId: 'sc-1', overrides: changes, by: 'Ada', host: null };
   const body = runBody({ ...ask, specs: runSpecs(panel, shelfOnly) }) as unknown as Record<string, unknown>;
   const sent = (body.inputs as { name: string; quantity: { unit: string; low?: number } }[]) ?? [];
@@ -361,7 +378,7 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   const neither = (runBody({ ...ask, specs: runSpecs(null, null, { inputs: [bound.inputs[1]] }) }).inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
   check('with no shelf yet, the inputs as bound still name theirs', neither === 'a , b placeholder-unit-d', neither);
   // A composite's Finance value goes in the unit its panel names (OF-BLD-020 §6.1).
-  const composite = { specs: [{ key: 'a', unit: 'placeholder-unit-a' }, { key: 'fin', unit: 'placeholder-unit-per-year' }] as ParameterSpec[] };
+  const composite = { specs: [aSpec('a', 'placeholder-unit-a'), aSpec('fin', 'placeholder-unit-per-year')] };
   const fin = runBody({ ...ask, overrides: [typed('a', 1), typed('fin', 3)], specs: runSpecs(composite, shelfOnly, bound) });
   const finSent = (fin.inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
   check('a composite’s Finance value goes in the unit its panel names', finSent === 'a placeholder-unit-a, fin placeholder-unit-per-year', finSent);
@@ -381,15 +398,21 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
 {
   // A custom_train_v1 scenario's plant scale, bound from the vessel design it names, is counted by what binds it;
   // an input with a fit chosen is counted as a fit (alpha 2.2 C.6, the screens' review).
-  const scenario = { id: 'sc-2', modelId: 'custom_train_v1', kind: 'biosteam' } as unknown as Scenario;
-  const info = {
-    id: 'sc-2',
+  const scenario = aScenario('sc-2', { modelId: 'custom_train_v1' });
+  const fromArtifact = (id: string, note: string): BasisSource => ({ kind: 'artifact', id, note, by: null });
+  const input = (key: string, binding: ScenarioInput['binding'], source: BasisSource | null): ScenarioInput => ({
+    key, label: key, unit: '', binding, value: null, low: null, high: null, sampling: null, source,
+    recordIds: [], records: [], leftOutNoCarbon: 0, leftOutOtherCarbon: 0, flags: [],
+  });
+  const info: ProformaScenarioInfo = {
+    id: 'sc-2', name: 'S', product: '', flowsheet: 'custom_train_v1', host: null, hosts: [], waiting: [], leavesOut: [],
+    priceBasis: '', refused: null,
     inputs: [
-      { key: 'plant_scale', binding: 'artifact', source: { kind: 'artifact', id: 'v'.repeat(16), note: 'the plant scale vessel design vvvv was designed at' } },
-      { key: 'titre', binding: 'artifact', source: { kind: 'artifact', id: 'f'.repeat(16), note: 'a fit' } },
-      { key: 'glucose_price', binding: 'assumption', source: null },
+      input('plant_scale', 'artifact', fromArtifact('v'.repeat(16), 'the plant scale vessel design vvvv was designed at')),
+      input('titre', 'artifact', fromArtifact('f'.repeat(16), 'a fit')),
+      input('glucose_price', 'assumption', null),
     ],
-  } as unknown as ProformaScenarioInfo;
+  };
   const c = inputCounts(scenario, info, [], [], { titre: 'f'.repeat(16) });
   check(
     'a plant scale the vessel design binds is counted by what binds it, and a chosen fit as a fit',
@@ -400,15 +423,21 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   check('with no fit chosen, no input is counted as a fit', !!none && none.computed === 0 && none.kept === 1, JSON.stringify(none));
 
   // A plant that takes configurations is run in its default, and its page finds that run on a reload.
-  const run = (configuration: string | null, plant = 'placeholder-plant'): EngineRun =>
-    ({ id: `run-${configuration}`, tool: 'library.run', plant, configuration, status: 'done', artifactId: 'a'.repeat(16), inputs: [] }) as unknown as EngineRun;
+  const run = (configuration: string | null, plant = 'placeholder-plant'): EngineRun => ({
+    id: `run-${configuration}`, engine: 'biosteam', tool: 'library.run', toolVersion: '', plant, configuration, status: 'done',
+    artifactId: 'a'.repeat(16), inputs: [], outputs: {}, provenance: null, refused: null, scenarioId: null, sff: null,
+    sffRefused: null, versions: {}, diagnostics: [], by: 'Ada', at: AT, durationMs: null,
+  });
   const runs = [run('S2'), run('S1'), run(null, 'other')];
   check('a plant’s reference run is its run in the default configuration', referenceRunOf('placeholder-plant', runs, 'S1')?.id === 'run-S1');
   check('and a plant that takes none is found with none', referenceRunOf('other', runs)?.id === 'run-null' && referenceRunOf('placeholder-plant', runs) === null);
 
   // The runs kept from the retired reference entries map to the library plant each entry built.
-  const art = (tool: string, flowsheet?: string): Artifact =>
-    ({ id: `${tool}-${flowsheet ?? ''}`, tool, inputs: flowsheet ? [{ name: 'flowsheet', value: flowsheet }] : [], output: {} }) as unknown as Artifact;
+  const art = (tool: string, flowsheet?: string): Artifact => ({
+    id: `${tool}-${flowsheet ?? ''}`, tool, toolVersion: '', output: {}, outputHash: '', provenance: 'assumed', createdAt: AT,
+    durationMs: 0, seed: null,
+    inputs: flowsheet ? [{ name: 'flowsheet', value: flowsheet, unit: '', source: { kind: 'convention', id: null, note: null, by: null } }] : [],
+  });
   const kept = [art('proforma.reference', 'corn_drygrind'), art('proforma_benchmark'), art('proforma.reference', 'cornstover_benchmark'), art('library.run')];
   check('a kept reference run names its retired entry, the benchmark the corn stover entry', retiredEntryOf(kept[0]) === 'corn_drygrind' && retiredEntryOf(kept[1]) === 'cornstover_benchmark' && retiredEntryOf(kept[3]) === null);
   check(

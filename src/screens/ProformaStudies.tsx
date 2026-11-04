@@ -35,7 +35,7 @@
 // each a labelled estimate.
 import { useEffect, useState } from 'react';
 import { BookOpen, Download, GitCompare, Network, Play } from 'lucide-react';
-import type { EngineRun, RunReport, Runbook, StudyComparison, StudyScenario } from '@/data/types';
+import type { EngineRun, RunReport, Runbook, StudyComparison, StudyScenario } from '@/lib/studies';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { stamp } from '@/lib/proforma';
@@ -770,7 +770,7 @@ export default function ProformaStudies() {
                       {b.title}
                     </a>
                     <span className="text-caption text-ink-soft">
-                      {b.predictions.length} prediction{b.predictions.length === 1 ? '' : 's'} ·{' '}
+                      {b.predictions?.length ?? 0} prediction{b.predictions?.length === 1 ? '' : 's'} ·{' '}
                       {b.lockedAt ? (
                         <>
                           locked {stamp(b.lockedAt)} under <span className="font-num">{b.lockHash}</span>

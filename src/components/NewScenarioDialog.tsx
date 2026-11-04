@@ -41,7 +41,6 @@
 // resting on readings and the package's defaults alone is `measured`.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play } from 'lucide-react';
-import type { FlowsheetInfo, RunReport, ScenarioValue, TrainSummary, VesselSummary } from '@/data/types';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { fmt } from '@/engine/units';
@@ -56,8 +55,19 @@ import {
   sendFitPath,
   trainRunWords,
   vesselWords,
+  type FlowsheetInfo,
+  type TrainSummary,
+  type VesselSummary,
 } from '@/lib/proforma';
-import { StudiesDown, depositionReadings, makeScenario, runScenario, type DepositionReading } from '@/lib/studies';
+import {
+  StudiesDown,
+  depositionReadings,
+  makeScenario,
+  runScenario,
+  type DepositionReading,
+  type RunReport,
+  type ScenarioValue,
+} from '@/lib/studies';
 
 /** The line a shelf with nothing to start a scenario from shows, here and on the index. */
 export function NoFlowsheetLine() {

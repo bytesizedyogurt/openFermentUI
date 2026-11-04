@@ -23,7 +23,6 @@ import type {
   FermosSeries,
   ForecastResult,
   KineticFit,
-  Override,
   ParameterSpec,
   Runbook,
   SimulationResult,
@@ -34,7 +33,7 @@ import type {
 import { seriesOf } from '@/engine/series';
 import type { TimeCourseProps, TrajectorySeries } from '@/components/figures';
 import { ServiceDown, ServiceRefused, call } from './http';
-import { inputsOf } from './params';
+import { inputsOf, type Override } from './params';
 
 export { ServiceDown as FermosDown, ServiceRefused as FermosRefused };
 

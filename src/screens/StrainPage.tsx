@@ -26,7 +26,8 @@ import {
   Table2,
   X,
 } from 'lucide-react';
-import type { ExtractionRecord, FieldId, ParameterDef, Product, Protocol, Scenario } from '@/data/types';
+import type { ExtractionRecord, FieldId, ParameterDef, Product, Protocol } from '@/data/types';
+import type { Scenario } from '@/lib/proforma';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import {
   useStore,
@@ -65,10 +66,14 @@ interface SPoint {
   canonical: number | null;
 }
 
-interface ScenarioLink {
-  sc: Scenario;
-  via: 'record' | 'named';
-  recordId?: string;
+/**
+ * Whether a scenario names a strain: one of `names` (its designation, its binomial), longer than two letters, in the
+ * scenario's name, description or product. The service binds a scenario's inputs to records each time it runs, and the
+ * scenario's row holds its name, its description and its product, so a strain links to a scenario by name.
+ */
+export function namesStrain(sc: Pick<Scenario, 'name' | 'description' | 'product'>, names: string[]): boolean {
+  const text = `${sc.name} ${sc.description} ${sc.product}`.toLowerCase();
+  return names.some((n) => n.length > 2 && text.includes(n.toLowerCase()));
 }
 
 const STATUS_FACET_LABEL: Record<string, string> = {
@@ -678,24 +683,10 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   const currentVersionOf = (p: Protocol) =>
     p.versions.find((v) => v.version === p.currentVersion) ?? p.versions[p.versions.length - 1];
 
-  const linkedScenarios = useMemo<ScenarioLink[]>(() => {
-    const needles = strain
-      ? [strain.designation.toLowerCase(), strain.binomial.toLowerCase()]
-      : [strainId.toLowerCase()];
-    const out: ScenarioLink[] = [];
-    for (const sc of scenarios) {
-      const viaRecord =
-        sc.assumptions.find((a) => a.recordId && recordIds.has(a.recordId))?.recordId ??
-        sc.dims.find((d) => d.sourceRecordId && recordIds.has(d.sourceRecordId))?.sourceRecordId;
-      if (viaRecord) {
-        out.push({ sc, via: 'record', recordId: viaRecord });
-        continue;
-      }
-      const text = `${sc.name} ${sc.description} ${sc.product}`.toLowerCase();
-      if (needles.some((n) => n.length > 2 && text.includes(n))) out.push({ sc, via: 'named' });
-    }
-    return out;
-  }, [scenarios, recordIds, strain, strainId]);
+  const linkedScenarios = useMemo<Scenario[]>(() => {
+    const names = strain ? [strain.designation, strain.binomial] : [strainId];
+    return scenarios.filter((sc) => namesStrain(sc, names));
+  }, [scenarios, strain, strainId]);
 
   // ── products made in this host (OF-BLD-005 §6) ───────────────────────
   //
@@ -1421,7 +1412,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             </div>
             {linkedScenarios.length === 0 ? (
               <div className="text-body text-ink-soft">
-                No scenario draws on a record for this strain or names it.{' '}
+                No scenario names this strain.{' '}
                 <a className="text-accent hover:underline" href={href('/proforma')}>
                   Open the simulation index
                 </a>
@@ -1429,7 +1420,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               </div>
             ) : (
               <ul className="space-y-2">
-                {linkedScenarios.map(({ sc, via, recordId }) => (
+                {linkedScenarios.map((sc) => (
                   <li key={sc.id} className="border-b border-line/70 last:border-b-0 pb-2 last:pb-0">
                     <a
                       href={href(`/proforma/scenario/${sc.id}`)}
@@ -1440,15 +1431,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                     <div className="text-caption text-ink-soft font-num">
                       {sc.modelId} · {sc.product}
                     </div>
-                    <div className="text-caption text-ink-soft mt-0.5 flex flex-wrap items-center gap-1.5">
-                      {via === 'record' && recordId ? (
-                        <>
-                          assumption sourced from <CitationChip recordId={recordId} label={recordId} />
-                        </>
-                      ) : (
-                        <>named in the scenario description — no record link</>
-                      )}
-                    </div>
+                    <div className="text-caption text-ink-soft mt-0.5">named in the scenario&rsquo;s name, description or product</div>
                   </li>
                 ))}
               </ul>

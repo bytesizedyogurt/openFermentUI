@@ -11,7 +11,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Download, GitCompare, Pin, PinOff, Play, Route } from 'lucide-react';
 import { overrideEnds, overridesFor, proformaScope, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
-import type { Artifact, BasisInput, CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, ParamScope, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
+import type { ParamScope } from '@/lib/params';
+import type { CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/lib/proforma';
+import type { Artifact, BasisInput } from '@/lib/studies';
 import {
   FIT_TOOL_WORDS,
   ProformaDown,

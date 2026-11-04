@@ -30,20 +30,50 @@
 // Nothing here computes: each screen shows what the service answered. With the
 // service down a call says so (ServiceDown); a refusal comes back in the
 // service's words (ServiceRefused).
+//
+// Every shape here is the service's own, generated from its models into
+// src/api/types.gen.ts (ADR-007); the screens read a run, its artifact and
+// the values it rests on by these names.
 import type { components } from '@/api/types.gen';
 import type { LibraryShelf } from './library';
-import type {
-  ComparisonCreate,
-  ComparisonReport,
-  EngineRun,
-  RunReport,
-  Runbook,
-  RunbookCreate,
-  SFFFlowsheet,
-  ScenarioCreate,
-  StudyComparison,
-  StudyScenario,
-} from '@/data/types';
+
+type S = components['schemas'];
+
+/** The provenance classes the service computes (models.py `Provenance`), the strongest first in `PROVENANCE_ORDER`. */
+export type Provenance = S['Artifact']['provenance'];
+/** Where a value came from (ADR-006): a record, an artifact, a person, a model, a reading, the library or a convention. */
+export type Origin = S['Origin'];
+/** A value and its unit, with its range and its origin (ADR-006). */
+export type Quantity = S['Quantity'];
+/** One value a request sets or a run took: a name and its quantity (src/lib/params.ts `inputsOf` makes one from a person's change). */
+export type EngineInput = S['EngineInput'];
+/** Where one input of a computation came from, as its basis names it. */
+export type BasisSource = S['BasisSource'];
+export type BasisInput = S['BasisInput'];
+/** The calculation behind a computed value: its tool and version, every input with its source, its artifact. */
+export type ComputedBasis = S['ComputedBasis'];
+/** What the service computed and keeps, read and replayed by its id (BioRepo's artifact store). */
+export type Artifact = S['Artifact'];
+/** One engine run in a project: a row of `runs` (GET /api/runs). */
+export type EngineRun = S['EngineRun'];
+/** A value a run's computation reports about itself, kept on the run beside its outputs. */
+export type RunDiagnostic = S['RunDiagnostic'];
+/** GET /api/runs/{id}: a run with its computation, its SFF record and its parameters as the panel reads them. */
+export type RunReport = S['RunReport'];
+/** An SFF file as the project keeps it, and the graph drawn from it (docs/api/sff.md). */
+export type SFFFlowsheet = S['SFFFlowsheet'];
+export type SFFGraph = S['SFFGraph'];
+/** A scenario's value as a person or a reading sets it, and the scenario a person makes (POST /api/studies/scenarios). */
+export type ScenarioValue = S['ScenarioValue'];
+export type ScenarioCreate = S['ScenarioCreate'];
+export type StudyScenario = S['StudyScenario'];
+/** Runs set side by side and kept, and what a comparison answers (docs/api/studies.md). */
+export type ComparisonCreate = S['ComparisonCreate'];
+export type StudyComparison = S['StudyComparison'];
+export type ComparisonReport = S['ComparisonReport'];
+/** A runbook predicting a run's outputs, as studies make it and as the service keeps it. */
+export type RunbookCreate = S['RunbookCreate'];
+export type Runbook = S['Runbook'];
 
 /** One of the toolkit's reference SFF files at the pinned commit. */
 export type SFFLibraryEntry = components['schemas']['SFFLibraryEntry'];

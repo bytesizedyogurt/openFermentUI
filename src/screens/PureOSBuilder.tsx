@@ -89,14 +89,13 @@ import type {
   TrainValidation,
   UnitSpecs,
   UnitType,
-  VesselSummary,
 } from '@/data/types';
 import { href, navigate, useRoute } from '@/router';
 import { overridesFor, timeId, useStore } from '@/store';
 import { paramScope, type ParamAsk } from '@/lib/params';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
 import { STATE_WORDS, fermosHarvest, fermosSimulations } from '@/lib/fermos';
-import { NO_DIAGRAM, compositeVessels, diagramSrc, scenarioFromVesselAndTrain, stamp, vesselWords } from '@/lib/proforma';
+import { NO_DIAGRAM, compositeVessels, diagramSrc, scenarioFromVesselAndTrain, stamp, vesselWords, type VesselSummary } from '@/lib/proforma';
 import { exportCSV } from '@/lib/csv';
 import {
   INLET,

@@ -85,3 +85,30 @@ Never; this is how the drift stops recurring.
 - Measured on the document this commit writes: 270 schemas, 15 of them new, 182 marked, none
   split; the client typechecks against it, reading `refused` alone (the store names each refused
   row in its activity feed and says so once).
+
+### Alpha 2.2, E.1 (2026-11-04): the screens read the generated types through their libs
+
+- Each `src/lib` module names the generated schemas of the answers it reads
+  (`export type X = components['schemas']['X']`), and a screen or a component imports a name from
+  the lib that answers it: `lib/studies.ts` a run and what it rests on (`EngineRun`, `RunReport`,
+  `RunDiagnostic`, `Artifact`, `ComputedBasis`, `BasisInput`, `BasisSource`, `Quantity`, `Origin`,
+  `EngineInput`, `Provenance`), the studies and the SFF record; `lib/params.ts` the parameter
+  panel's (`ParameterSpec`, `ParameterValue`, `Override`, `ParamScope` and the resolve's pair);
+  `lib/proforma.ts` Proforma's (`Scenario`, the generated `ProformaScenario`; the shelf, the
+  binding, the run with its tables, grid and package test, the ceiling check, `SimulatorStatus`,
+  `ScenarioRunsResponse`, and the fits, vessels and train runs a composite scenario names). A name
+  whose lib moves in a later commit is read from `src/api/types.gen.ts` where it is used
+  (`Dossier`'s `Band`, `lib/params.ts`'s `TrainSpec`). `Provenance` is the union every schema
+  writes, read from `Artifact`.
+- The sliders' grid (`CostLine`, `SensitivityRow`, `ResultGrid`) is the browser's own and lives in
+  `lib/proforma.ts`; `src/data/types.ts` re-exports it until the file goes.
+- openapi-typescript writes a field with a default as one every request body carries; a body that
+  leaves such a field to the service's default is typed `Body<T, K>` (`lib/proforma.ts`), the
+  fields `K` optional: `runBody` leaves `samples` to the service.
+- openapi-typescript writes a field with a default as one an answer holds, and an answer served as
+  kept leaves out a field its row never set: the generated types name `Override.origin`,
+  `Runbook.note` and `Runbook.progressPct` as present. A runbook a study makes or a page adopts
+  writes its note and its progress; the page kept every change before this commit with no origin,
+  so an override read back may carry none (Known debts). The page writes a person's change with
+  its origin from here on, and `inputsOf` reads a change with none as a person's assumption, as the
+  service does; `pnpm check:state` holds it.

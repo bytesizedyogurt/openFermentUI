@@ -9,7 +9,6 @@ import { create } from 'zustand';
 import type {
   Project,
   InputAssumption,
-  Override,
   RunbookDraft,
   ReviewDecision,
   ActivityEvent,
@@ -37,7 +36,6 @@ import type {
   KeptTrain,
   RunOutput,
   RunState,
-  Scenario,
   Strain,
   TimerState,
   Overlay,
@@ -56,6 +54,8 @@ import type {
   Skill,
   TrainSpec,
 } from '@/data/types';
+import type { Override } from '@/lib/params';
+import type { Scenario } from '@/lib/proforma';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
@@ -2121,7 +2121,8 @@ export const useStore = create<OFState>()((set, get) => ({
   // nothing else. Its id is time-based, because nextId restarts on a reload
   // and this outlives one (as adopted runbooks and Live conversations do).
   // It holds no input value: the service binds records, and a named person
-  // types an assumption on its page, kept in proformaAssumptions under its id.
+  // types an assumption on its page, kept as an override of its scope
+  // (`proforma:<id>`).
   createScenario: (flowsheetId, name, parts) => {
     const id = timeId('sc');
     const made: Scenario = {
@@ -2132,9 +2133,6 @@ export const useStore = create<OFState>()((set, get) => ({
       name: name.trim() || flowsheetId,
       description: '',
       product: '',
-      dims: [],
-      point: {},
-      assumptions: [],
       pinned: false,
       // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
       ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun } : {}),
@@ -3264,6 +3262,7 @@ export function overrideOfAssumption(scenarioId: string, a: InputAssumption): Ov
     by: a.by,
     at: a.at,
     note: a.note ?? null,
+    origin: 'person-assumption',
   };
 }
 

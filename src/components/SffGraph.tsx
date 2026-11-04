@@ -5,7 +5,7 @@
 // runs back, dashed. Feeds enter from the left edge and products leave by the
 // right, each named as the file's metadata names it. Nothing is laid out from
 // a number this page computes beyond the drawing itself.
-import type { SFFGraph } from '@/data/types';
+import type { SFFGraph } from '@/lib/studies';
 
 const BOX_W = 132;
 const BOX_H = 34;

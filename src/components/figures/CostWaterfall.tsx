@@ -9,7 +9,7 @@
 // per-unit value draws no bar and says so. Bars take the stroke the run's
 // provenance gives them, so a run that rests on an assumption reads as
 // modeled.
-import type { ComputedBasis, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { DASH_ARRAY, ENCODING, markColor } from './encoding';
 import { FigureFrame, type FigureTable } from './FigureFrame';

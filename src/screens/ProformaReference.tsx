@@ -41,7 +41,8 @@
 // `compat`) is said in words.
 import { useEffect, useState } from 'react';
 import { BookOpen, Play } from 'lucide-react';
-import type { Artifact, EngineRun, PackageRegression, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
+import type { PackageRegression, RegressionCheck } from '@/lib/proforma';
+import type { Artifact, EngineRun, RunReport as EngineRunReport } from '@/lib/studies';
 import { href } from '@/router';
 import { useStore } from '@/store';
 import { fmt } from '@/engine/units';

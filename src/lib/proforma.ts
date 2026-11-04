@@ -4,48 +4,67 @@
 // the reference runs, which the library shelf's plants give (alpha 2.2 D8).
 // The service runs BioSTEAM and keeps every run as an artifact; with it down
 // this says so, and nothing stands in for a result (E.2). Shares lib/http.ts's
-// call.
-import type {
-  Artifact,
-  BasisInput,
-  BasisSource,
-  CeilingCheck,
-  ComputedBasis,
-  CostLine,
-  EngineRun,
-  FermosFitInfo,
-  FlowsheetInfo,
-  HistogramBin,
-  Override,
-  InputSensitivity,
-  PackageRegression,
-  ParameterSpec,
-  ProformaGrid,
-  ProformaRunRequest,
-  ProformaRunResult,
-  ProformaScenarioInfo,
-  ProformaTables,
-  Provenance,
-  RegressionCheck,
-  ResultGrid,
-  Scenario,
-  ScenarioInput,
-  StreamRow,
-  TeaBreakdown,
-  TrainSummary,
-  UnitRow,
-  UtilityDuties,
-  VesselSummary,
-} from '@/data/types';
+// call. The shapes the service answers are generated from its models into
+// src/api/types.gen.ts (ADR-007); the sliders' grid (`ResultGrid`) is kept here.
+import type { components } from '@/api/types.gen';
 import { useStore } from '@/store';
 import { ServiceDown, ServiceRefused, call } from './http';
-import { inputsOf } from './params';
+import { inputsOf, type Override, type ParameterSpec } from './params';
+import type { Artifact, BasisInput, BasisSource, ComputedBasis, EngineRun, Provenance } from './studies';
 
 export { ServiceDown as ProformaDown, ServiceRefused as ProformaRefused };
 
-export interface SimulatorStatus {
-  status: 'cold' | 'starting' | 'ready' | 'failed';
-  error: string | null;
+type S = components['schemas'];
+
+/** `GET /api/proforma/status`: the simulator worker's state, with its error when it failed to start. */
+export type SimulatorStatus = S['SimulatorStatus'];
+/** A scenario made in Proforma, kept whole in the project's rows (`GET /api/state`, `scenarios`). */
+export type Scenario = S['ProformaScenario'];
+/** A flowsheet on the shelf, with the inputs it declares and what it leaves out (`GET /api/proforma/shelf`). */
+export type FlowsheetInfo = S['FlowsheetInfo'];
+/** A scenario bound by the service, each input with its source (`GET /api/proforma/scenarios`, `/bind`). */
+export type ProformaScenarioInfo = S['ProformaScenarioInfo'];
+export type ScenarioInput = S['ScenarioInput'];
+/** `POST /api/proforma/run`: what a run is asked with, and what it answers. */
+export type ProformaRunRequest = S['ProformaRunRequest'];
+export type ProformaRunResult = S['ProformaRunResult'];
+export type HistogramBin = S['HistogramBin'];
+export type InputSensitivity = S['InputSensitivity'];
+export type ProformaGrid = S['ProformaGrid'];
+/** A run's flowsheet and its tables, as a `proforma.run` artifact keeps them. */
+export type ProformaTables = S['ProformaTables'];
+export type StreamRow = S['StreamRow'];
+export type UnitRow = S['UnitRow'];
+export type UtilityDuties = S['UtilityDuties'];
+export type TeaBreakdown = S['TeaBreakdown'];
+/** A plant's package test (ADR-013), and one value of it held beside a run. */
+export type PackageRegression = S['PackageRegression'];
+export type RegressionCheck = S['RegressionCheck'];
+/** A scenario's yield beside the geneOS ceilings of its organism (`GET /api/proforma/ceiling-check`). */
+export type CeilingCheck = S['CeilingCheck'];
+export type CeilingRow = S['CeilingRow'];
+/** A fermOS fit, forecast or simulation with what it can feed a flowsheet (`GET /api/fermos/fits`). */
+export type FermosFitInfo = S['FermosFitInfo'];
+/** A kept vessel design and a kept train run, as a scenario built from both names them. */
+export type VesselSummary = S['VesselSummary'];
+export type TrainSummary = S['TrainSummary'];
+
+/** The cost lines a run's grid holds, one slider reading each. */
+export type CostLine = 'capex' | 'media' | 'utilities' | 'labor' | 'downstream' | 'other';
+
+export interface SensitivityRow {
+  assumption: string;
+  lowPct: number;
+  hiPct: number;
+}
+
+/** A sweep's prices over its grid, in the arrays the sliders interpolate (`asResultGrid`). */
+export interface ResultGrid {
+  modelId: string;
+  dims: { key: string; values: number[] }[];
+  msp: Float64Array;
+  costLines: Record<CostLine, Float64Array>;
+  sensitivity: SensitivityRow[];
 }
 
 /** The worker's status in words, for the status line beside every Run (OF-BLD-019 §3.1). */
@@ -155,10 +174,7 @@ export const proformaArtifact = (id: string, signal?: AbortSignal) =>
   call<Artifact>(`/api/biorepo/artifacts/${encodeURIComponent(id)}`, { signal });
 
 /** `GET /api/proforma/runs?scenarioId=`: a scenario's newest run on the service, or none. */
-export interface ScenarioRunsResponse {
-  scenarioId: string;
-  artifact: Artifact | null;
-}
+export type ScenarioRunsResponse = S['ScenarioRunsResponse'];
 
 /**
  * The newest run the service holds for a scenario (OF-BLD-019 §3.R,
@@ -499,8 +515,14 @@ export function runSpecs(
   return panel?.specs ?? [...(flowsheet?.inputs ?? []), ...(bound?.inputs ?? [])];
 }
 
-/** The body `runProformaScenario` posts, as the service reads it (`ProformaRunRequest`). */
-export function runBody(ask: RunAsk): ProformaRunRequest {
+/**
+ * A request body as the service reads it, the fields `K` left to the defaults the service holds: the generated type
+ * writes a field with a default as one every body carries, and a body that leaves it out takes the service's own.
+ */
+type Body<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+
+/** The body `runProformaScenario` posts, as the service reads it (`ProformaRunRequest`); the service draws its own number of samples. */
+export function runBody(ask: RunAsk): Body<ProformaRunRequest, 'samples'> {
   // `flowsheet` names the scenario's own (a kept scenario is held to it, one
   // not yet saved binds by it, ADR-014), and `fits` goes only when a person
   // chose one (OF-BLD-019 §2.3, §5.1). A person's values go as typed

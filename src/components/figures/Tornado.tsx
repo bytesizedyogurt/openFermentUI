@@ -4,7 +4,7 @@
 // bar resting on an assumption reads as the question to ask next. The bars
 // take the stroke of the result's provenance: assumed for an authored surface
 // or a run that rests on an assumption.
-import type { Provenance } from '@/data/types';
+import type { Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { DASH_ARRAY, ENCODING, markColor } from './encoding';
 import { FigureFrame, type FigureTable } from './FigureFrame';

@@ -26,7 +26,8 @@
 // disabled because a list is empty: an empty row says why and what fills it.
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, FlaskConical, GitCompare, LineChart, Pin, PinOff, Play, Plus } from 'lucide-react';
-import type { Artifact, EngineRun, FlowsheetInfo, ProformaScenarioInfo, Scenario } from '@/data/types';
+import type { FlowsheetInfo, ProformaScenarioInfo, Scenario } from '@/lib/proforma';
+import type { Artifact, EngineRun } from '@/lib/studies';
 import { overridesFor, proformaScope, useStore } from '@/store';
 import { href } from '@/router';
 import { fmt } from '@/engine/units';

@@ -17,7 +17,7 @@
 // `runViewOfRun`, one case and no samples.
 import { useMemo, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
-import type { CostLine, FlowsheetInfo, ResultGrid, ScenarioInput } from '@/data/types';
+import type { CostLine, FlowsheetInfo, ResultGrid, ScenarioInput } from '@/lib/proforma';
 import { href } from '@/router';
 import { clampPoint, interpolate, type Grid } from '@/engine/interp';
 import { fmt } from '@/engine/units';

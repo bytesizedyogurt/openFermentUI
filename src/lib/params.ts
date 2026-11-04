@@ -30,8 +30,29 @@
 // run, Proforma's run) sends them as typed inputs through `inputsOf`, each in
 // the unit its parameter is in, and the service converts each back into that
 // Override at its door.
-import type { EngineInput, Override, ParameterSpec, ParamResolveRequest, ParamResolveResult, ParamScope, TrainSpec } from '@/data/types';
+import type { components } from '@/api/types.gen';
+import type { EngineInput } from './studies';
 import { ServiceDown, ServiceRefused, call } from './http';
+
+type S = components['schemas'];
+
+/** One parameter as its model, unit or flowsheet declares it, with its bounds and the reason for them. */
+export type ParameterSpec = S['ParameterSpec'];
+/** A parameter's value in one scope, with where it came from. */
+export type ParameterValue = S['ParameterValue'];
+/**
+ * A person's change to one parameter of one scope, kept in the project's rows and sent with every request the scope
+ * makes. The service serves a row as the page kept it, so a row kept before `origin` was written carries none, and it
+ * reads as a person's assumption here as on the service (`inputsOf`).
+ */
+export type Override = S['Override'];
+/** `GET /api/params/{scope}`: a scope's specs with their current values. */
+export type ParamScope = S['ParamScope'];
+/** `POST /api/params/{scope}/resolve`, and what it answers. Runs nothing. */
+export type ParamResolveRequest = S['ParamResolveRequest'];
+export type ParamResolveResult = S['ParamResolveResult'];
+/** pureOS's train, which a unit scope is asked with (src/lib/pureos.ts makes one). */
+type TrainSpec = S['TrainSpec'];
 
 export { ServiceDown as ParamsDown, ServiceRefused as ParamsRefused };
 

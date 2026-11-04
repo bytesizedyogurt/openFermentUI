@@ -9,7 +9,6 @@ import type {
   Artifact,
   EngineInput,
   KeptTrain,
-  Override,
   ParameterSpec,
   ProposeRequest,
   StreamRow,
@@ -30,7 +29,7 @@ import type {
   VesselSummary,
 } from '@/data/types';
 import { ServiceDown, ServiceRefused, call } from './http';
-import { inputsOf } from './params';
+import { inputsOf, type Override } from './params';
 import { keptReferenceRuns, proformaArtifact, proformaNewestRun, proformaScenarios, proformaShelf, retiredEntryOf } from './proforma';
 import { listRuns } from './studies';
 

@@ -39,7 +39,8 @@
 // the person's override; the CSVs export the artifact's own numbers. No
 // numeric control is rendered here: every parameter is the panel's (E.1‴).
 import { useEffect, useMemo, useState } from 'react';
-import type { FamilyInfo, FermosBinding, FermosFitInfo, ParameterSpec, ParameterValue, ParamScope, SimulationResult, SimulationSummary, SteadyState } from '@/data/types';
+import type { FamilyInfo, FermosBinding, ParameterSpec, ParameterValue, ParamScope, SimulationResult, SimulationSummary, SteadyState } from '@/data/types';
+import type { FermosFitInfo } from '@/lib/proforma';
 import { overridesFor, useStore } from '@/store';
 import { href, useRoute } from '@/router';
 import { EngineRunLink } from '@/components/EngineRunLink';

@@ -570,13 +570,9 @@ export interface TimerState {
   startedAt?: number;
 }
 
-export type CostLine =
-  | 'capex'
-  | 'media'
-  | 'utilities'
-  | 'labor'
-  | 'downstream'
-  | 'other';
+// The sliders' grid is the browser's own, kept in src/lib/proforma.ts beside
+// the run it reads (alpha 2.2 E.1); named here until this file goes (E.15).
+export type { CostLine, ResultGrid, SensitivityRow } from '@/lib/proforma';
 
 export interface ScenarioDim {
   /** Cite a paper where a sweep default came from the literature. */
@@ -635,21 +631,6 @@ export interface Scenario {
    */
   vessel?: string;
   trainRun?: string;
-}
-
-export interface SensitivityRow {
-  assumption: string;
-  lowPct: number;
-  hiPct: number;
-}
-
-/** A sweep's prices over its grid (§15 ResultGrid). */
-export interface ResultGrid {
-  modelId: string;
-  dims: { key: string; values: number[] }[];
-  msp: Float64Array;
-  costLines: Record<CostLine, Float64Array>;
-  sensitivity: SensitivityRow[];
 }
 
 export interface CheckpointQuestion {

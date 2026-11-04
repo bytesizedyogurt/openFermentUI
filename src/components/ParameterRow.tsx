@@ -19,7 +19,7 @@
 // the keyboard reaches every control, here and in the records Proforma
 // renders into a row.
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import type { Override, ParameterSpec, ParameterValue } from '@/data/types';
+import type { Override, ParameterSpec, ParameterValue } from '@/lib/params';
 import { href } from '@/router';
 import { fmt } from '@/engine/units';
 import { CitationChip } from './Chip';

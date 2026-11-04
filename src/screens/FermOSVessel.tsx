@@ -40,7 +40,8 @@
 // consumed) and what the cross-check rests on, in the service's words.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Gauge } from 'lucide-react';
-import type { FermosFitInfo, ParamScope, SimulationSummary, VesselDesign } from '@/data/types';
+import type { ParamScope, SimulationSummary, VesselDesign } from '@/data/types';
+import type { FermosFitInfo } from '@/lib/proforma';
 import { overridesFor, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { EngineRunLink } from '@/components/EngineRunLink';

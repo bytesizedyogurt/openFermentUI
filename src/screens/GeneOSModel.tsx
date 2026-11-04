@@ -24,7 +24,8 @@
 // and clamps nothing.
 import { useEffect, useMemo, useState } from 'react';
 import { Calculator } from 'lucide-react';
-import type { CeilingCheck, ExtractionRecord, FlowsheetInfo, GeneosModelInfo, GeneosResult, Scenario } from '@/data/types';
+import type { ExtractionRecord, GeneosModelInfo, GeneosResult } from '@/data/types';
+import type { CeilingCheck, FlowsheetInfo, Scenario } from '@/lib/proforma';
 import { proformaScope, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState } from '@/components/ui';

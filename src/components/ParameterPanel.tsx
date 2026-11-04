@@ -35,9 +35,17 @@
 // The panel COMPUTES NOTHING: every value, source and warning it shows came
 // from the service or the person. A model never sets an override.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Override, ParameterSpec, ParameterValue, ParamResolveResult, ParamScope } from '@/data/types';
 import { overrideEnds, overridesFor, useStore } from '@/store';
-import { ParamsDown, resolveParams, type ParamAsk } from '@/lib/params';
+import {
+  ParamsDown,
+  resolveParams,
+  type Override,
+  type ParamAsk,
+  type ParameterSpec,
+  type ParameterValue,
+  type ParamResolveResult,
+  type ParamScope,
+} from '@/lib/params';
 import { ParameterRow, type ParameterChange } from './ParameterRow';
 
 export interface ParameterPanelProps {
@@ -74,7 +82,7 @@ function asTyped(o: Override, served: ParameterValue | undefined): ParameterValu
     value: o.value,
     low: ends.low,
     high: ends.high,
-    source: { kind: 'assumption', id: null, by: o.by, note: o.note },
+    source: { kind: 'assumption', id: null, by: o.by, note: o.note ?? null },
     origin: 'assumption',
     identified: null,
     overriddenBy: o.by,
@@ -153,7 +161,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
 
   const change = (spec: ParameterSpec, c: ParameterChange) => {
     if (!reviewer) return;
-    setOverride({ scope, key: spec.key, value: c.value, low: c.low, high: c.high, by: reviewer, at: nowStamp(), note: c.note });
+    setOverride({ scope, key: spec.key, value: c.value, low: c.low, high: c.high, by: reviewer, at: nowStamp(), note: c.note, origin: 'person-assumption' });
     onChange?.(useStore.getState().parameterOverrides[scope] ?? []);
   };
   const reset = (spec: ParameterSpec) => {

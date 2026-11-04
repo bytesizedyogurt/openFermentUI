@@ -3,7 +3,8 @@
 // rules, all in the stroke the run's provenance gives it: a run that rests on
 // an assumption is assumed, and draws amber and dashed like every modeled thing.
 // The infeasible samples are counted beside it, never drawn.
-import type { ComputedBasis, HistogramBin, Provenance } from '@/data/types';
+import type { HistogramBin } from '@/lib/proforma';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { DASH_ARRAY, ENCODING, markColor } from './encoding';
 import { FigureFrame, lineStroke, type FigureTable } from './FigureFrame';

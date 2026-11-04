@@ -18,7 +18,7 @@
 //                that holds a run of another engine, `study comparison 2`).
 import { useEffect, useState } from 'react';
 import { BookOpen, Download } from 'lucide-react';
-import type { ComparisonReport, EngineRun } from '@/data/types';
+import type { ComparisonReport, EngineRun } from '@/lib/studies';
 import { href } from '@/router';
 import { exportCSV } from '@/lib/csv';
 import { stamp } from '@/lib/proforma';
