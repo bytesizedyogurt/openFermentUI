@@ -26,30 +26,27 @@ session continues from this file and `git log` alone.
      OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage D's handoff rounds.** D.1 recorded `CORE=6f85338` (the D.0 commit, green on
-   CI): while the strangers work, `git diff --stat 6f85338 -- core/openferment_core core/tests
-   core/pyproject.toml src scripts` prints nothing. Then the two handoff rounds by strangers (the prompt's stage D;
-   Appendix A's mirror engine and Appendix B's record-reader, each built by a builder who reads
-   the contract pages alone, in a worktree made at `CORE`, since the harness cuts an isolated
-   agent's worktree from `origin/main`). D.0 is done: the pages read as the strangers will read
-   them and every gap the pre-read found closed before the core is frozen (the MCP server's
-   `--service` mode, a run's diagnostics, the proof installing every package under
-   `examples/engines/` and walking one thing of each, the installs held to `core/uv.lock`, the
-   pages' fixes; the stage D log). Stage C is done: every run one shape (C.1 the pins, C.2
-   `kinetics`, C.3 and C.3b `train`, C.4 Proforma and the library door on typed inputs, C.5 the
-   `measurement` origin, C.6 the shelf's hand-written entries retired and import from a URL, C.7
-   the gate). Then stage E in the prompt's order (its plan of eighteen commits is drafted outside
-   the tree). `pnpm ready --probe` found the account answering at 23:50 UTC on 2 November, so
-   stage F, the live work, follows E. Alpha 2.1's Ethanol project is in this container's
-   `openferment_dev`; a fresh container makes it again on Home from
+4. **Next step: stage E, the screens on the generated types** (the prompt's §6.5 in order, one
+   commit per screen or lib; its plan of eighteen commits is drafted outside the tree, with two
+   decision records it proposes, ADR-017 and ADR-018, to weigh first). Stage D is done: D.0 sealed
+   the handoff pages before the core's commit was recorded (`CORE=6f85338`, D.1), and both
+   strangers finished in their first round with no core file changed: the mirror engine
+   (`examples/engines/openferment-engine-mirror/`) and the record-reader agent
+   (`examples/agents/record-reader/`), each round in `docs/reports/handoff-2026-11.md`. Stage C is
+   done: every run one shape. `pnpm ready --probe` found the account answering at 23:50 UTC on 2
+   November, so stage F, the live work, follows E. Alpha 2.1's Ethanol project is in this
+   container's `openferment_dev`; a fresh container makes it again on Home from
    `docs/corpus/ethanol-sources.txt` through Intake (about twenty minutes), then extracts.
-5. Files in flight: none; the D.0 commit holds every file of D.0 and its review round.
+5. Files in flight: none; the stage D gate's commit holds both examples, the handoff report and the pages' fixes.
 
 ## Current stage
 
-Alpha 2.2, stage D (2026-11-04, in progress): the handoff by strangers. D.0 read the handoff
-pages as the two strangers will and closed every gap before the core is frozen (the stage D log);
-D.1 records the core's commit, then each stranger builds from the pages alone.
+Alpha 2.2, stage D (2026-11-04, done): the handoff by strangers. D.0 read the handoff pages as
+the two strangers would and closed every gap before the core's commit was recorded (D.1,
+`CORE=6f85338`). Each stranger, given its brief verbatim and a worktree at `CORE`, finished in
+its first round with no core file changed: the mirror engine, installed, listed, conformed 8 of
+8 and run from the Runs screen in the proof's walk; and the record-reader, whose write and
+audit row name `example-agent/0.1` (`docs/reports/handoff-2026-11.md`).
 
 Alpha 2.2, stage C (2026-11-03 to 2026-11-04, done): every run one shape. C.1 pinned sixteen computations to their ids
 and output hashes before anything moved, fixed the worker's handler mismatches, and gave every
@@ -235,6 +232,8 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-04 16:04 | D.0 and its review round, on the final tree: `gen:api`, `gen:tools`, `gen:components`; the touched files and the pins; the changed tests with the database address empty and on Python 3.12; `pnpm test:sim`; `pnpm test:core`; `build`; `pnpm prove`, offline, steps 1 to 10, with no `examples/`; `pnpm verify`, all sixteen stages | regenerated; 868 passed; 530 passed each way; 142 passed; 2865 passed, 1 skipped, 175 deselected; green; 83 of 83 checks, no call in the proof's spend table; every stage green | 459 s; 458 s; 269 s (the proof); 17 min 50 s (verify) | `1243e81` and D.0 |
 | 2026-11-04 16:15 | The D.0 commit: `pnpm test:core` again after the guard in `test_prove_examples.py` names the engine-package form | 2865 passed, 1 skipped, 175 deselected | 7 min 45 s | `1243e81` and D.0 |
 | 2026-11-04 16:35 | CI on `6f85338` (D.0), run 41865693107: `pnpm verify`, then `pnpm prove` | every stage green; every proof check holds | 13 min 27 s (verify); 3 min 23 s (the proof) | `6f85338` |
+| 2026-11-04 17:05 | The stage D rounds: the mirror's own tests in core's environment; `conform mirror`; `pnpm prove`, offline, steps 1 to 10, with the mirror under `examples/engines/`; the record-reader against `pnpm prove --keep`'s service | 30 passed; 8 of 8 checks; 86 of 86 checks, `conform mirror` 8 of 8 in step 10 and `reflect` run from the Runs screen in the walk, no call in the proof's spend table; exit 0, the entry and the audit row naming `example-agent/0.1` | 3 s; 9 s; 297 s; about 30 s | `bde178d` and stage D |
+| 2026-11-04 17:32 | The stage D gate: `pnpm verify`, all sixteen stages, with both examples in the tree and the mirror installed | every stage green: `test:core` 2865 passed, 1 skipped, 175 deselected; `test:sim` 142 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 17 min 25 s | `bde178d` and stage D |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -258,6 +257,7 @@ prompt's §4).
 | A | 1 | 0.000004 | `pnpm ready --probe`: one call on the index route (`claude-haiku-5-5`, 18 tokens in, 4 out) |
 | B | 0 | 0 | none: the contract, the registry and the conformance checks make no model call |
 | C | 0 | 0 | none: every step of stage C and its gate ran offline with no key; each proof's spend table held no call |
+| D | 0 | 0 | none: the pre-read, the fixes, both strangers' rounds and every proof ran offline with no key; the record-reader's run against the kept proof made no model call |
 
 ## Decisions
 
@@ -394,6 +394,7 @@ prompt's §4).
 
 | Debt | Paid at |
 |---|---|
+| The agent builder's interface points (`docs/reports/handoff-2026-11.md`, round 1): "record" reads two ways (`biorepo_read` kind `record` lists none where `search_records` returns the project's record, an approved candidate); no audit id links a write to its row; `GET /api/audit` takes `limit` alone; `docs/TOOLS.md`'s client recipe keeps `VIRTUAL_ENV`, which uv warns of; a module read's `partial` and a ModuleRow's `detail` undescribed, AuditEntry's promised note, the HTTP audit's explicit nulls, the recipe at the page's end with no pointer. `docs/TOOLS.md` is written from the code, so each waits for the core to move | stage E, the first with the code it describes |
 | Paid: the per-request key override and the local-model route (owner question 10 and §3 of the alpha 2.1 prompt): `X-OpenFerment-Key` serves a request's calls and is kept nowhere; `OPENFERMENT_LOCAL_BASE_URL` serves a local model in single calls | alpha 2.1, D.4 |
 | `core/tests/standins.py` (27 test files use it) keeps stand-in records on real strain ids, a closed-form ethanol evaluator and `STANDIN_THEORETICAL`, the theoretical yield on glucose; `test_proforma.py` keeps the package's regression values to test the parser (the benchmark price this build once measured left the tree with the retired shelf entries, alpha 2.2 C.6). A4's `rg` clause finds them (a departure above) | stage 4 (fixtures read from the library plants); still open: after alpha 2.0 |
 | Postdoc's scripted stand-in model and the test pool still speak of PHB, casein and xylose hydrolysate (`test_tools.py`, `test_postdoc_agent.py` and the tests that import their fixtures); §5.3 wants them to speak only of library plants and the kit's demo corpus. The words are test material, and no value of them reaches the service | after alpha 2.0, with the stand-ins above |
@@ -1966,3 +1967,36 @@ holds the numbers, the tables and the judgements).
   path the brief's `<path>`, and is started with the Agent tool's `isolation: "worktree"`: the
   harness cuts that isolated worktree from `origin/main` (alpha 2.1, which holds no
   `docs/api/engines.md`), and the agent receives this checkout's CLAUDE.md, the same as `CORE`'s.
+- D.2. The engine stranger, round 1 (Appendix A verbatim, its `<path>` the worktree
+  `.claude/worktrees/stranger-a1` at `CORE`). It read `docs/api/engines.md`, `workers.md` and
+  `runs.md` and `openapi.json` alone, confirmed the four pages in its own worktree (the harness's,
+  cut from `origin/main`, where its writes are held) were the same blobs as at `CORE`, moved that
+  worktree to `CORE`, and built `examples/engines/openferment-engine-mirror/`: seven files, its
+  worker's four ops through `serve`, one thing `reflect` on two placeholder parameters, the time
+  its run took as the diagnostic `time taken`, a precision of `rtol` 0 and `atol` 0, its SFF file
+  refused in words, 30 tests with no database, no licence and no dependency declared. No core file
+  changed in either worktree or the main tree. Copied into the tree, installed with the page's
+  command held to `core/uv.lock` (the registry lists biosteam, kinetics, mirror and train), its own
+  tests 30 passed, `conform mirror` 8 of 8, and `pnpm prove` 86 of 86 checks with the package under
+  `examples/engines/`: installed, listed, conformed in step 10, and `reflect` run from Studies' run
+  card in the walk, its page reading 3 outputs and 1 diagnostic; question 13, seeded, names the
+  mirror. Its six points on what the contract should have said are on `docs/api/engines.md` now
+  (D.4).
+- D.3. The agent stranger, round 1 (Appendix B verbatim, its `<path>` the worktree
+  `.claude/worktrees/stranger-b1` at `CORE`, its project `proof` and its port the service `pnpm
+  build && pnpm prove --keep` left: 83 of 83 checks). It read `.mcp.json`, `docs/TOOLS.md` and
+  `docs/api/openapi.json` at `CORE`, and, beyond the brief's list, its own worktree's alpha 2.1
+  copies of the same three files, to learn why that worktree could not serve the task. It built
+  `examples/agents/record-reader/` (`record_reader.py` on `mcp` 2.3, a six-line README), which
+  starts `.mcp.json`'s server with `--project` and `--service`, lists records with
+  `biorepo_read`, keeps a placeholder skill with `catalogue_write` as `example-agent/0.1`, and
+  reads back the entry and its audit row. Its first run worked. No core file changed. Run from the
+  main tree against the kept service it exits 0: the entry by `example-agent/0.1`, agent `model`,
+  via `http`, and the newest audit row's who the same. The kept service is stopped and its
+  database dropped. Its interface points are a Known debt for stage E.
+- D.4. The gate's records: `docs/reports/handoff-2026-11.md` (each round: what the stranger read,
+  built, where it stalled, what the page lacked); `docs/BASE.md`'s two handoff tests with their
+  commands; `docs/api/engines.md` takes the engine builder's six points (the install without
+  process substitution, a count's unit, the placeholder rule beside it, `WorkerError`'s words, a
+  worker checking its values again, the models' attribute names). Question 13 needs no core
+  change: seeded with the mirror installed, it expects biosteam, kinetics, mirror and train.

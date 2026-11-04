@@ -59,35 +59,44 @@ A module adds capability through a contract and edits nothing in the base:
 ## The two handoff tests
 
 The claim that a module needs no edit to the base is tested by someone who has read only the
-contract pages. Stage D of alpha 2.2 runs both tests: it adds the mirror engine and the
-record-reader below (`examples/` holds neither yet), and the proof's step that installs the
-engine and checks it. Until then the commands below are the ones those rounds will run.
+contract pages. Stage D of alpha 2.2 ran both tests, each by a builder with none of the base's
+context, in a worktree of its own at the core's commit `6f85338`; both finished in their first
+round with no file of the base changed (`docs/reports/handoff-2026-11.md`), and what they built
+is in `examples/`.
 
 1. **An engine from the contract alone.** A builder who may read `docs/api/engines.md`,
    `docs/api/workers.md`, `docs/api/runs.md` and `docs/api/openapi.json`, and nothing else,
-   builds an installable engine package. Installed into the service's environment, the service
-   lists it, every conformance check passes, and its runs appear on the Runs screen with their
-   provenance, with no file of the base changed:
+   builds an installable engine package: `examples/engines/openferment-engine-mirror/`, the engine
+   `mirror`, which returns the typed quantities a run gives it, their count, and the time its run
+   took as a diagnostic. Installed into the service's environment, the service lists it, every
+   conformance check passes, and its runs appear on the Runs screen with their provenance:
 
    ```
-   cd core && uv pip install -e ../examples/engines/openferment-engine-mirror
+   cd core
+   uv pip install --python .venv/bin/python \
+       -c <(uv export --frozen --all-extras --no-hashes --no-emit-project --quiet) \
+       -e ../examples/engines/openferment-engine-mirror
    uv run python -m openferment_core.engine.conform mirror
+   cd ../examples/engines/openferment-engine-mirror && ../../../core/.venv/bin/python -m pytest
    ```
+
+   `pnpm prove` runs this test on every run: it installs every package under `examples/engines/`
+   held to `core/uv.lock`, step 10 makes the eight checks on each engine the service lists, and
+   step 9's walk runs one thing of each example engine from the Runs screen and reads its run's
+   provenance, outputs and diagnostics; at its end it leaves core's environment as it found it.
 
 2. **An agent from the interface alone.** A builder who may read `docs/TOOLS.md`,
-   `docs/api/openapi.json` and `.mcp.json`, and nothing else, writes a client that starts the
-   `openferment` MCP server in a project, reads the project's records, writes one catalogue
-   entry under its own name, and reads back the audit row that names it:
+   `docs/api/openapi.json` and `.mcp.json`, and nothing else, writes a client
+   (`examples/agents/record-reader/`) that starts the `openferment` MCP server in a project,
+   through a running service, reads the project's records, writes one catalogue entry under its
+   own name, `example-agent/0.1`, and reads back the audit row that names it:
 
    ```
-   pnpm prove --keep        # prints the project and the address of the service it leaves running
-   cd core && uv run python ../examples/agents/record-reader/read.py --project <id>
+   pnpm build && pnpm prove --keep   # prints the service's address, its project and its database
+   uv run examples/agents/record-reader/record_reader.py --project <id> --service http://127.0.0.1:<port>
    ```
 
-Once stage D lands, `pnpm prove` runs the first test on every run, and
-`docs/reports/handoff-2026-11.md` records the builders' rounds, what each read and what the pages
-lacked. Today `pnpm prove` step 10 makes the eight checks on the core's three engines (`biosteam`,
-`kinetics` and `train`) and on any other engine the service lists.
+   It exits 0 when the entry and the audit row both name `example-agent/0.1`.
 
 ## What the base runs on
 

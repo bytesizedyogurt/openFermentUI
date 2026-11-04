@@ -38,6 +38,10 @@ A request for an engine may name the contract in words of its own, which read he
   service keeps each as a typed quantity whose origin is the run's artifact, each value the run
   set keeping its own origin in the run's `inputs` (What the service does with an engine,
   Outputs).
+- "Their count", or any other count a worker answers: a pure number, its unit `""`, as every pure
+  number's is (EngineParameter, below), and what it counts is the engine's to say in the output's
+  name; a request's "every example value a placeholder in a placeholder unit" reads as every value
+  with a unit, so a count keeps `""`.
 - "The time it took": the service measures every run's `durationMs`, and a worker that reports
   its own computation's time answers it as a diagnostic beside its outputs (The worker), since a
   replay compares every output and a clock reading moves on every run.
@@ -88,7 +92,13 @@ example = "openferment_engine_example.engine:ENGINE"
   refused in uv's words and installs nothing; a dependency the lock does not name installs beside
   it. `scripts/engines-local.sh` and `pnpm prove` install the same way. `core/.venv` is uv's and
   holds no pip, so the command is uv's; a bare `pip install -e` installs into the environment that
-  pip belongs to, which the service never reads.
+  pip belongs to, which the service never reads. A shell or a harness that reads no `<(…)` writes
+  the constraints to a file first, with the same effect:
+
+  ```bash
+  cd core && uv export --frozen --all-extras --no-hashes --no-emit-project --quiet --output-file <a file>
+  uv pip install --python .venv/bin/python -c <a file> -e <path to the package>
+  ```
 - An engine package lists no dependency on `openferment-core`: it installs into the service's
   environment, where `uv sync` installed the core from this repository, and its entry module and
   worker import `openferment_core` from there.
@@ -440,8 +450,9 @@ them, each number as a JSON float (a value typed `2` arrives as `2.0`), on the f
 every replay.
 
 The worker receives the values a run sets, already checked against the parameters: each
-`name` a key of the thing, each `unit` the parameter's, each number inside its bounds. A
-parameter a run leaves alone is the worker's default. Every output is a function of the request
+`name` a key of the thing, each `unit` the parameter's, each number inside its bounds. A worker
+may check them again, in its own words; the service's check stands either way. A parameter a
+run leaves alone is the worker's default. Every output is a function of the request
 alone: the same request gives the same outputs, in the same order, within the precision the thing
 states, since a replay compares the outputs in order. The service measures each run's
 `durationMs` itself and keeps it beside the outputs: the run's `durationMs` on `GET
@@ -921,7 +932,10 @@ worker and answer `EngineThing` and `EngineParameter` (`openferment_core.models`
 by its id; `serve(HANDLERS, name=..., stdin=..., stdout=...)` answers the text streams a test hands
 it (both of them, The worker, above); and `SimWorker('<worker module>',
 withhold_secrets=True).call(op, args)` speaks to the worker as the service does, a refusal raising
-`WorkerError` whose words begin `Refused: `. Through `ENGINE`, a worker's refusal raises
+`WorkerError` whose words are the worker's answer's `error` as it stands, `Refused: <the
+handler's words>` for a refusal. The models `ENGINE.things()` and `ENGINE.parameters()` answer
+carry their fields under the names the JSON gives them (`thing.id`, `thing.precision.rtol`,
+`parameter.origin.ref`), each number as the model types it (a precision of `0` reads `0.0`). Through `ENGINE`, a worker's refusal raises
 `EngineRefused` (`openferment_core.engine`) in the words after `Refused: `, and an answer outside
 the protocol raises `EngineBroken`. `WorkerEngine` has no method that stops its worker: the worker
 `ENGINE` starts runs until the test's process ends and its input closes, and a test that wants it
