@@ -36,10 +36,15 @@
 //   its SFF file    the record the run wrote, as the toolkit checked and scored
 //                   it, and the file itself to download.
 //
-// A scenario is made here from the run (alpha 2.1 stage B): parameters found
-// by words, each value set as the person's assumption, the scenario made and
-// run in their name (POST /api/studies/scenarios, then its run), and the new
-// run's page opens. A runbook is made here from the run's numbers: each output
+// A scenario is made here from the run (alpha 2.1 stage B; alpha 2.2 C.5):
+// NewScenarioDialog, opened from the run, finds parameters by words and sets
+// each one to the person's own value or to a reading deposited at the bench,
+// makes the scenario and runs it in their name (POST /api/studies/scenarios,
+// then its run), and the new run's page opens. A value a reading set reads
+// here as a measurement in words, linked to the deposition its reading was
+// recorded in (DepositionDetail); its parameter's chip says measured, and a
+// run resting on readings and the package's defaults alone is `measured`.
+// A runbook is made here from the run's numbers: each output
 // chosen becomes a prediction in the run's unit, measured at harvest
 // (POST /api/studies/runbooks), and opens on the runbook's page, where it is
 // locked.
@@ -52,10 +57,12 @@ import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';
 import { RUN_TOOL, baseCaseRefusal, proformaShelf, runViewOfArtifact, runViewOfRun, stamp } from '@/lib/proforma';
 import { trainOfRun } from '@/lib/pureos';
-import { StudiesDown, downloadFlowsheet, makeRunbook, makeScenario, predictable, runReport, runScenario } from '@/lib/studies';
+import { StudiesDown, downloadFlowsheet, makeRunbook, predictable, runReport } from '@/lib/studies';
 import { Button, Callout, Card, LinkButton, PageHeader, cx } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
+import { NewScenarioDialog } from '@/components/NewScenarioDialog';
+import { ReadingOrigin, readingNote } from '@/components/ReadingOrigin';
 import { RunReport, inputLabels } from '@/screens/ProformaBiosteam';
 import { regressionTable } from '@/screens/ProformaReference';
 import { fmt } from '@/engine/units';
@@ -68,9 +75,13 @@ export const ORIGIN_WORDS: Record<string, string> = {
   artifact: 'an artifact',
   'person-assumption': 'a person’s assumption',
   'model-estimate': 'a model’s estimate',
+  measurement: 'a reading deposited at the bench',
   'library-default': 'the library’s default',
   convention: 'a convention',
 };
+
+/** The origins of a value a run set for itself (basis.SET_PARAM_ORIGINS): a person's, a model's, a deposition's reading. */
+const SET_HERE = new Set(['assumption', 'model-estimate', 'measurement']);
 
 /**
  * The run's parameters in the panel, read-only: the values the run set first,
@@ -79,7 +90,7 @@ export const ORIGIN_WORDS: Record<string, string> = {
  */
 function Parameters({ runId, data }: { runId: string; data: ParamScope }) {
   const [all, setAll] = useState(false);
-  const set = new Set(data.values.filter((v) => v.origin === 'assumption' || v.origin === 'model-estimate').map((v) => v.key));
+  const set = new Set(data.values.filter((v) => SET_HERE.has(v.origin)).map((v) => v.key));
   const shown: ParamScope = all ? data : { ...data, specs: data.specs.filter((s) => set.has(s.key)), values: data.values.filter((v) => set.has(v.key)) };
   return (
     <Card className="p-4" data-testid="run-parameters" data-set={set.size}>
@@ -224,24 +235,35 @@ function TrainInput({ value, train }: { value: unknown; train: { name: string; u
 
 function Inputs({ report }: { report: EngineRunReport }) {
   const train = trainOfRun(report.run);
+  const reading = (i: EngineRunReport['run']['inputs'][number]) => i.quantity.origin?.kind === 'measurement';
   const rows = report.run.inputs.map((i) => [
     i.name,
     String(i.quantity.value),
     i.quantity.unit || '—',
     ORIGIN_WORDS[i.quantity.origin?.kind ?? ''] ?? i.quantity.origin?.kind ?? '—',
     i.quantity.origin?.by ?? i.quantity.origin?.ref ?? '—',
-    i.quantity.origin?.note ?? '',
+    // A reading's time stands in its Origin cell once; the note keeps the conversion and the person's words.
+    reading(i) ? readingNote(i.quantity.origin?.note) : (i.quantity.origin?.note ?? ''),
   ]);
+  // The file names each reading beside its depositor, and keeps the basis's note whole.
+  const csvRows = report.run.inputs.map((i, n) =>
+    reading(i)
+      ? [...rows[n].slice(0, 4), `${i.quantity.origin?.by ?? 'nobody named'}, reading ${i.quantity.origin?.ref ?? ''}`, i.quantity.origin?.note ?? '']
+      : rows[n],
+  );
   const headers = ['Input', 'Value', 'Unit', 'Origin', 'By or from', 'Rests on'];
   return (
     <Card className="p-4" data-testid="run-inputs">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
         <h2 className="font-serif text-section-title font-semibold">Its basis</h2>
-        <button className="chip" onClick={() => exportCSV(`run-${report.run.id}-inputs.csv`, headers, rows)}>
+        <button className="chip" onClick={() => exportCSV(`run-${report.run.id}-inputs.csv`, headers, csvRows)}>
           <Download size={12} aria-hidden /> CSV
         </button>
       </div>
-      <p className="text-caption text-ink-soft mb-2">Every input the run&rsquo;s computation names, each with its origin as the service computed it.</p>
+      <p className="text-caption text-ink-soft mb-2">
+        Every input the run&rsquo;s computation names, each with its origin as the service computed it; a reading deposited at the bench links to
+        the deposition it was recorded in.
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full text-caption">
           <thead>
@@ -266,6 +288,8 @@ function Inputs({ report }: { report: EngineRunReport }) {
                       <TrainInput value={report.run.inputs[i]?.quantity.value} train={train} />
                     ) : j === 1 ? (
                       shown(report.run.inputs[i]?.quantity.value ?? c)
+                    ) : j === 3 && report.run.inputs[i]?.quantity.origin?.kind === 'measurement' ? (
+                      <ReadingOrigin origin={report.run.inputs[i].quantity.origin!} />
                     ) : (
                       c
                     )}
@@ -381,174 +405,30 @@ function FlowsheetCard({ report }: { report: EngineRunReport }) {
   );
 }
 
-/** How many matching parameters the finder lists at once. */
-const FOUND_ROWS = 12;
-
-interface Setting {
-  key: string;
-  label: string;
-  unit: string;
-  /** As the person typed it; read as a number when the scenario is made. */
-  value: string;
-  /** What the value rests on, in the person's words. */
-  note: string;
-}
-
 /**
- * A scenario from this run (alpha 2.1 stage B): the person finds parameters
- * of the run by words, sets each one's value as their own assumption, and the
- * scenario is made (POST /api/studies/scenarios) and run (…/{id}/run) in their
- * name. The plant and its configuration are the run's; every value the person
- * leaves alone stays the package's own.
+ * A scenario from this run (alpha 2.1 stage B; alpha 2.2 C.5): NewScenarioDialog, opened on the run, finds its
+ * parameters by words and sets each one to the person's own value or to a reading deposited at the bench, makes the
+ * scenario (POST /api/studies/scenarios) and runs it (…/{id}/run) in their name. The plant and its configuration
+ * are the run's; every value the person leaves alone stays the package's own.
  */
 function MakeScenario({ report }: { report: EngineRunReport }) {
   const reviewer = useStore((s) => s.reviewer).trim();
+  const [open, setOpen] = useState(false);
   const run = report.run;
-  const scope = report.parameters;
-  const [words, setWords] = useState('');
-  const [settings, setSettings] = useState<Setting[]>([]);
-  const [title, setTitle] = useState('');
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [made, setMade] = useState<string | null>(null);
-  if (run.status !== 'done' || !scope) return null;
-  const valueOf = new Map(scope.values.map((v) => [v.key, v.value]));
-  const numeric = scope.specs.filter((s) => !s.choices && typeof valueOf.get(s.key) === 'number');
-  const wanted = words.toLowerCase().split(/\s+/).filter(Boolean);
-  const taken = new Set(settings.map((s) => s.key));
-  const found = wanted.length
-    ? numeric.filter((s) => !taken.has(s.key) && wanted.every((w) => `${s.key} ${s.label}`.toLowerCase().includes(w)))
-    : [];
-  const add = (key: string) => {
-    const spec = numeric.find((s) => s.key === key);
-    if (!spec) return;
-    setSettings((list) => [...list, { key, label: spec.label, unit: spec.unit, value: String(valueOf.get(key) ?? ''), note: '' }]);
-  };
-  const change = (key: string, patch: Partial<Setting>) => setSettings((list) => list.map((s) => (s.key === key ? { ...s, ...patch } : s)));
-  const make = () => {
-    const at = new Date().toISOString();
-    const bad = settings.find((s) => s.value.trim() === '' || !Number.isFinite(Number(s.value)));
-    if (bad) {
-      setProblem(`${bad.label}: a value is one number, in ${bad.unit || 'the parameter’s own terms'}.`);
-      return;
-    }
-    setBusy(true);
-    setProblem(null);
-    makeScenario({
-      title: title.trim(),
-      plant: run.plant,
-      configuration: run.configuration ?? null,
-      values: settings.map((s) => ({
-        key: s.key,
-        quantity: {
-          value: Number(s.value),
-          unit: s.unit,
-          origin: { kind: 'person-assumption', by: reviewer, at, note: s.note.trim() || note.trim() || null },
-        },
-      })),
-      note: note.trim() || null,
-      by: reviewer,
-    })
-      .then((scenario) => {
-        setMade(scenario.id);
-        return runScenario(scenario.id, reviewer);
-      })
-      .then((rep) => navigate(`/proforma/runs/${rep.run.id}`))
-      .catch((e: unknown) => setProblem(problemOf(e)))
-      .finally(() => setBusy(false));
-  };
+  if (run.status !== 'done' || !report.parameters) return null;
   return (
     <Card className="p-4" data-testid="run-make-scenario">
       <h2 className="font-serif text-section-title font-semibold mb-1">A scenario from this run</h2>
       <p className="text-caption text-ink-soft mb-2">
-        Find a parameter by its words, set its value as your assumption, and the scenario is made on {run.plant}
-        {run.configuration ? ` (${run.configuration})` : ''} and run in your name. Each value starts at this run&rsquo;s; every parameter you leave alone
-        stays the package&rsquo;s own.
+        Set some of this run&rsquo;s parameters, each to your own value or to a reading a person deposited at the bench, and the scenario is made on{' '}
+        {run.plant}
+        {run.configuration ? ` (${run.configuration})` : ''} and run in your name. Every parameter you leave alone stays the package&rsquo;s own.
       </p>
-      <input
-        className="input text-body w-full mb-2"
-        aria-label="Find a parameter"
-        placeholder="Words of a parameter: xylose ethanol, moisture, price…"
-        value={words}
-        onChange={(e) => setWords(e.target.value)}
-        data-testid="scenario-find"
-      />
-      {found.length > 0 && (
-        <ul className="space-y-0.5 mb-2 text-caption" data-testid="scenario-found">
-          {found.slice(0, FOUND_ROWS).map((s) => (
-            <li key={s.key} className="flex flex-wrap items-center gap-2" data-testid="scenario-found-row" data-key={s.key}>
-              <button className="chip" onClick={() => add(s.key)} aria-label={`Set ${s.label}`}>
-                Set
-              </button>
-              <span>{s.label}</span>
-              <span className="font-num text-ink-soft">
-                {String(valueOf.get(s.key))} {s.unit}
-              </span>
-            </li>
-          ))}
-          {found.length > FOUND_ROWS && <li className="text-ink-soft">and {found.length - FOUND_ROWS} more: add words to narrow them.</li>}
-        </ul>
-      )}
-      {wanted.length > 0 && found.length === 0 && <p className="text-caption text-ink-soft mb-2">No parameter of this run left to set matches those words.</p>}
-      {settings.length > 0 && (
-        <table className="w-full text-caption mb-2" data-testid="scenario-settings">
-          <tbody>
-            {settings.map((s) => (
-              <tr key={s.key} className="border-b border-line/50 align-top" data-testid="scenario-setting" data-key={s.key}>
-                <td className="py-1 pr-2">{s.label}</td>
-                <td className="py-1 pr-2">
-                  <input
-                    className="input text-caption font-num w-28"
-                    inputMode="decimal"
-                    aria-label={`Your value for ${s.label}`}
-                    value={s.value}
-                    onChange={(e) => change(s.key, { value: e.target.value })}
-                  />{' '}
-                  <span className="font-num text-ink-soft">{s.unit}</span>
-                </td>
-                <td className="py-1 pr-2">
-                  <input
-                    className="input text-caption w-full"
-                    aria-label={`What ${s.label} rests on`}
-                    placeholder="What it rests on (optional)"
-                    value={s.note}
-                    onChange={(e) => change(s.key, { note: e.target.value })}
-                  />
-                </td>
-                <td className="py-1">
-                  <button className="chip" onClick={() => setSettings((list) => list.filter((x) => x.key !== s.key))} aria-label={`Leave ${s.label} as the run's`}>
-                    Leave
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        <input className="input text-body" aria-label="The scenario's title" placeholder="What the scenario asks" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <input className="input text-body flex-1 min-w-48" aria-label="What the scenario rests on" placeholder="What it rests on, in words" value={note} onChange={(e) => setNote(e.target.value)} />
-        <Button variant="primary" disabled={busy || !reviewer || settings.length === 0 || !title.trim()} onClick={make} data-testid="run-make-scenario-go">
-          <Play size={14} /> {busy ? 'Running…' : 'Make the scenario and run it'}
-        </Button>
-      </div>
+      <Button variant="primary" onClick={() => setOpen(true)} data-testid="run-make-scenario-open">
+        <Play size={14} /> New scenario from this run
+      </Button>
       {!reviewer && <p className="text-caption text-ink-soft mt-1">A scenario is made in a person&rsquo;s name: set yours in Settings first.</p>}
-      {problem && (
-        <p className="text-caption text-signal-warn mt-1" data-testid="run-make-scenario-problem">
-          {problem}
-          {made && (
-            <>
-              {' '}
-              The scenario <span className="font-num">{made}</span> is kept;{' '}
-              <a className="underline underline-offset-2" href={href('/proforma/studies')}>
-                Studies
-              </a>{' '}
-              lists it.
-            </>
-          )}
-        </p>
-      )}
+      <NewScenarioDialog open={open} onClose={() => setOpen(false)} fromRun={report} />
     </Card>
   );
 }
@@ -675,7 +555,11 @@ export default function ProformaRun({ runId }: { runId: string }) {
         subtitle={
           run && (
             <span className="flex flex-wrap items-center gap-2">
-              {run.provenance && <ProvenanceBadge p={run.provenance} />}
+              {run.provenance && (
+                <span data-testid="run-provenance" data-provenance={run.provenance}>
+                  <ProvenanceBadge p={run.provenance} />
+                </span>
+              )}
               <span>
                 {run.status === 'done' ? 'Run' : 'Refused'} for {run.by}, {stamp(run.at)}
                 {run.durationMs != null && <>, in {took(run.durationMs)}</>}

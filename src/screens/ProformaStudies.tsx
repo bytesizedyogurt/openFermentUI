@@ -10,7 +10,8 @@
 //                 set side by side as a comparison (POST /api/studies/comparisons);
 //   scenarios     a plant, its configuration and the values it sets, each a
 //                 person's assumption or a model's estimate with its author,
-//                 and the runs made of it; Run makes one more
+//                 or a reading deposited at the bench, linked to its
+//                 deposition, and the runs made of it; Run makes one more
 //                 (POST /api/studies/scenarios/{id}/run);
 //   comparisons   each a link to its page;
 //   runbooks      the runbooks studies made from a run's outputs, each a link
@@ -30,7 +31,8 @@
 // its error.
 //
 // Nothing here is typed as a number: a scenario's values are set on a run's
-// page, each a person's assumption, or by Postdoc, each a labelled estimate.
+// page, each a person's assumption or a deposition's reading, or by Postdoc,
+// each a labelled estimate.
 import { useEffect, useState } from 'react';
 import { BookOpen, Download, GitCompare, Network, Play } from 'lucide-react';
 import type { EngineRun, RunReport, Runbook, StudyComparison, StudyScenario } from '@/data/types';
@@ -58,6 +60,7 @@ import { runnable, type LibraryPlant } from '@/lib/library';
 import { NEW_TRAIN, builderCopyPath, builderPath, trainOfRun } from '@/lib/pureos';
 import { Button, Callout, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
+import { ReadingOrigin, readingNote } from '@/components/ReadingOrigin';
 import { ORIGIN_WORDS } from '@/screens/ProformaRun';
 
 const problemOf = (e: unknown) => (e instanceof StudiesDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
@@ -574,9 +577,9 @@ function Scenarios({ scenarios }: { scenarios: StudyScenario[] }) {
           title="No study scenario yet"
           body={
             <>
-              A scenario names a plant, its configuration and the values it sets, each a named person&rsquo;s assumption or a model&rsquo;s estimate, checked
-              against the plant&rsquo;s parameters. A run&rsquo;s page makes one from the values that run read back, each set as your assumption, and
-              Postdoc proposes them with each estimate labelled.
+              A scenario names a plant, its configuration and the values it sets, each a named person&rsquo;s assumption, a model&rsquo;s estimate or a
+              reading deposited at the bench, checked against the plant&rsquo;s parameters. A run&rsquo;s page makes one from the values that run read
+              back, each set as your assumption or to a reading, and Postdoc proposes them with each estimate labelled.
             </>
           }
         />
@@ -604,9 +607,13 @@ function Scenarios({ scenarios }: { scenarios: StudyScenario[] }) {
                       <td className="py-0.5 pr-2 font-num">
                         {String(v.quantity.value)} {v.quantity.unit}
                       </td>
-                      <td className="py-0.5 pr-2">{ORIGIN_WORDS[v.quantity.origin?.kind ?? ''] ?? '—'}</td>
+                      <td className="py-0.5 pr-2">
+                        {v.quantity.origin?.kind === 'measurement' ? <ReadingOrigin origin={v.quantity.origin} /> : (ORIGIN_WORDS[v.quantity.origin?.kind ?? ''] ?? '—')}
+                      </td>
                       <td className="py-0.5 pr-2">{v.quantity.origin?.by ?? '—'}</td>
-                      <td className="py-0.5 pr-2 text-ink-soft">{v.quantity.origin?.note ?? ''}</td>
+                      <td className="py-0.5 pr-2 text-ink-soft">
+                        {v.quantity.origin?.kind === 'measurement' ? readingNote(v.quantity.origin.note) : (v.quantity.origin?.note ?? '')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

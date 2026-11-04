@@ -19,7 +19,8 @@
 //   POST /api/engines/{name}/run                one run of an engine's thing, in a person's name
 //   GET  /api/library                           the installed plants and the configurations each built in
 //   POST /api/library/{plant}/run               one engine run of a plant in a configuration, in a person's name
-//   POST /api/studies/scenarios                 a scenario whose values are a person's assumptions
+//   POST /api/studies/scenarios                 a scenario whose values are a person's assumptions or readings
+//   GET  /api/depositions/readings?unit=        the readings a run may take as measurements, in a unit
 //   GET  /api/flowsheets                        the project's SFF records
 //   GET  /api/flowsheets/library                the toolkit's reference files at the pinned commit
 //   POST /api/flowsheets/library/{id}           one reference file kept in the project
@@ -48,6 +49,12 @@ export type SFFLibraryEntry = components['schemas']['SFFLibraryEntry'];
 /** An engine registered here, with its things, its worker and its last conformance verdict (GET /api/engines). */
 export type EngineInfo = components['schemas']['EngineInfo'];
 export type EngineThing = components['schemas']['EngineThing'];
+/**
+ * A reading a run may take as a measurement (GET /api/depositions/readings): a confirmed entry of one of the
+ * project's depositions that stands for its measure, with its runbook, its measure, its depositor and its time; asked
+ * in a unit, its value in that unit (`inUnit`) beside its own.
+ */
+export type DepositionReading = components['schemas']['DepositionReading'];
 import { downloadBlob } from './csv';
 import { ServiceDown, ServiceRefused, call } from './http';
 import { apiFetch } from './project';
@@ -95,6 +102,13 @@ export const runEngine = (engine: string, thing: string, configuration: string |
 export const runPlant = (plant: string, configuration: string | null, by: string) =>
   call<RunReport>(`/api/library/${id(plant)}/run`, post({ configuration, inputs: [], by }));
 export const makeScenario = (asked: ScenarioCreate) => call<StudyScenario>('/api/studies/scenarios', post(asked));
+/**
+ * The project's readings a run may take as measurements, the latest taken first; with `unit`, those whose unit is
+ * `unit` or converts into it, each with its value in `unit`. The service's lookup decides, so a reading listed is one
+ * a scenario's value may name: `{value, unit, origin: {kind: 'measurement', ref}}`, its own value and unit.
+ */
+export const depositionReadings = (unit: string | null, signal?: AbortSignal) =>
+  call<DepositionReading[]>(unit === null ? '/api/depositions/readings' : `/api/depositions/readings?unit=${id(unit)}`, { signal });
 
 export const listFlowsheets = (signal?: AbortSignal) => call<SFFFlowsheet[]>('/api/flowsheets', { signal });
 export const flowsheetLibrary = (signal?: AbortSignal) => call<SFFLibraryEntry[]>('/api/flowsheets/library', { signal });

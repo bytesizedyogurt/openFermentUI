@@ -10,7 +10,11 @@ that word.
 Where each module's rows come from:
 
 - the project's own rows (project_state.py): its runbooks, each with its
-  lock, and the BioSTEAM scenarios made with New scenario;
+  lock, the depositions made at the bench on them (read by the runbooks
+  and by fermOS, which fits a deposition's series), each reading a run may
+  take as a measurement (measurements.py), the measured evidence a
+  reconciliation released, and the BioSTEAM scenarios made with New
+  scenario;
 - the module projection (protocols, geneOS's hosts and pathways, Primer's
   lessons): no store holds these catalogues yet, so each list is empty, and
   a test hands its own in;
@@ -19,9 +23,9 @@ Where each module's rows come from:
   pool, artifacts, Guild's ledger and checks, Intake's fetch state, the
   geneOS shelf).
 
-A read leaves part of some modules out: a project's depositions and
-measurements, and review decisions a browser has not posted yet. `PARTIAL`
-names what, and the answer's footer says the module was read in part.
+A read leaves part of a module out where the service cannot see it: the
+review decisions a browser has not posted yet. `PARTIAL` names what, and the
+answer's footer says the module was read in part.
 
 `coverage(question)` is code and calls no model: it finds the rows the
 question names, and the modules it names, before Postdoc's first turn.
@@ -48,17 +52,13 @@ STATES = ("open", "fenced", "approved", "locked", "proposed", "retired")
 
 # What the service cannot see of a module, said once, in the footer's words.
 PARTIAL = {
-    "runbooks": "the project's depositions and measurements are kept with it and shown on the Runbooks page; this "
-                "read lists its runbooks and protocols",
-    "fermos": "the project's depositions are kept with its runbooks; this read lists what the service computed: "
-              "fits, forecasts, simulations and vessel designs",
     "biorepo": "review decisions a browser has not posted yet wait in that browser",
 }
 
 # Words that name a module itself. Common nouns ("record", "host") are left
 # out: they would name a module in nearly every question.
 MODULE_WORDS = {
-    "runbooks": ("runbooks", "runbook", "protocols"),
+    "runbooks": ("runbooks", "runbook", "protocols", "deposition", "depositions", "reading", "readings"),
     "geneos": ("geneos",),
     "fermos": ("fermos",),
     "pureos": ("pureos",),
@@ -154,6 +154,12 @@ def record_state(provenance: str | None, status: str | None) -> str:
     return "proposed"
 
 
+def deposition_state(state: str | None) -> str:
+    """A deposition's state: a closed one is kept as it was made; one staged
+    or running at the bench stands open."""
+    return "locked" if state == "closed" else "open"
+
+
 def check_state(state: str) -> str:
     return {"proposed": "proposed", "scheduled": "open", "done": "locked", "dismissed": "retired"}.get(state, "open")
 
@@ -188,9 +194,14 @@ class Sources:
     # The trains a model built (OF-BLD-020 §5.4, pureos.kept).
     kept_trains: Callable[[], list[Any]] = list
     # The project's own rows (project_state.py): the BioSTEAM scenarios made
-    # with New scenario, and its runbooks, each with its lock.
+    # with New scenario, its runbooks, each with its lock, and its
+    # depositions, each beside the person who deposited it.
     scenarios: Callable[[], list[Any]] = list
     runbooks: Callable[[], list[Any]] = list
+    depositions: Callable[[], list[tuple[dict[str, Any], str]]] = list
+    # The measured evidence a reconciliation released (project_state's
+    # measuredEvidence rows).
+    measured: Callable[[], list[Any]] = list
 
 
 def _kept_trains() -> list[Any]:
@@ -236,6 +247,18 @@ def _project_runbooks() -> list[Any]:
     return project_state.kept("runbooks")
 
 
+def _project_depositions() -> list[tuple[dict[str, Any], str]]:
+    from . import project_state
+
+    return project_state.deposited()
+
+
+def _project_measured() -> list[Any]:
+    from . import project_state
+
+    return project_state.kept("measuredEvidence")
+
+
 def _strain_aliases() -> dict[str, str]:
     """Each strain's other names, and its name, to its id, from the open
     project's strain catalogue (catalogues.py)."""
@@ -261,6 +284,8 @@ def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
         kept_trains=_kept_trains,
         scenarios=_scenarios,
         runbooks=_project_runbooks,
+        depositions=_project_depositions,
+        measured=_project_measured,
     )
 
 
@@ -323,6 +348,98 @@ VESSEL_TOOL = "fermos.vessel"
 TRAIN_RUN = "pureos.train_run"
 
 
+# The fermOS artifacts a deposition's series is fitted into.
+FIT_TOOLS = ("growth_fit", "kinetic_fit")
+
+
+def _deposition_row(module: str, d: dict[str, Any], maker: str, titles: dict[str, str], standing: list[str],
+                    fits: list[str] | None = None) -> Row:
+    """One deposition the project keeps (a record of the bench), kind
+    `deposition`, `<module>/deposition/<id>`: its runbook, its state, how
+    many readings it holds and how many a person confirmed, and the readings
+    a run may take as a measurement (`standing`, each
+    `<deposition id>/<entry id>`, as the lookup's own rules list them,
+    measurements.held_readings), in ids and counts. fermOS's row adds how
+    many of its measures hold a series and the fits made from it. It
+    carries no mark of its own: each of its standing readings is a row of
+    its own (kind `reading`), and a run resting on one carries that run's."""
+    entries = [e for e in d.get("entries") or [] if isinstance(e, dict)]
+    confirmed = [e for e in entries if e.get("confirmed") is True]
+    rb = d.get("runbookId")
+    title = titles.get(str(rb)) or (str(rb) if rb else "no runbook")
+    measures = sorted({str(e.get("measureId")) for e in entries if e.get("measureId")})
+    detail: dict[str, Any] = {
+        "runbookId": rb, "runbook": title, "state": d.get("state"), "readings": len(entries),
+        "confirmed": len(confirmed), "standing": standing, "measures": measures,
+        "observations": len(d.get("observations") or []), "startedAt": d.get("startedAt"),
+        "closedAt": d.get("closedAt"), "depositedBy": maker,
+        "cite": "cite the deposition by its ref; each standing reading is a row of kind reading in runbooks_read, read "
+                "by its id <deposition id>/<entry id>, with its value and unit"}
+    if module == "fermos":
+        times = d.get("sampleTimes") if isinstance(d.get("sampleTimes"), dict) else {}
+        timed: dict[str, int] = {}
+        for e in entries:
+            if e.get("id") in times and e.get("measureId"):
+                timed[str(e["measureId"])] = timed.get(str(e["measureId"]), 0) + 1
+        detail.update({"series": sum(1 for n in timed.values() if n >= 2), "fits": list(fits or []),
+                       "keptWith": f"runbooks/deposition/{d['id']}"})
+    return Row(module, "deposition", str(d["id"]), f"Deposition {d['id']} of runbook {title}",
+               deposition_state(d.get("state")), str(d.get("state") or "staged"),
+               words=" ".join(["deposition readings bench", title, str(d.get("protocolId") or ""), *measures]),
+               detail=detail)
+
+
+def _reading_row(r: Any, d: dict[str, Any], title: str) -> Row:
+    """One reading a run may take as a measurement (measurements.py), kind
+    `reading`, `runbooks/reading/<deposition id>/<entry id>`, read by its
+    id, the ref a measurement names: a confirmed entry of a deposition that
+    stands for its measure, with its value and unit as the bench kept them,
+    the measure and runbook it was recorded against, the person who
+    deposited it and the time it was taken. Marked `measured`: a person
+    read the number back at the bench. A run takes it as the quantity its
+    `cite` spells, with this value and unit, and the service looks it up
+    again when the run is made."""
+    measure = r.measure or r.measureId or "a measure"
+    return Row("runbooks", "reading", r.ref, f"{measure}, read at the bench in deposition {r.depositionId}",
+               deposition_state(d.get("state")), "confirmed", provenance="measured",
+               names=(r.measure,) if r.measure else (),
+               words=" ".join(x for x in ("reading measurement measured bench deposition", measure, r.measureId,
+                                          title, r.depositionId) if x),
+               detail={"reading": r.ref, "depositionId": r.depositionId, "entryId": r.entryId,
+                       "runbookId": r.runbookId, "runbook": r.runbook or title, "measureId": r.measureId,
+                       "measure": r.measure, "value": r.value, "unit": r.unit, "at": r.at, "depositedBy": r.by,
+                       "hours": r.hours, "deposition": f"runbooks/deposition/{r.depositionId}",
+                       "cite": "cite the reading by its ref; a run takes it as the quantity {\"value\": <value>, "
+                               "\"unit\": \"<unit>\", \"origin\": {\"kind\": \"measurement\", \"ref\": "
+                               "\"<reading>\"}}, its value and unit as this row gives them"})
+
+
+def _measured_row(m: dict[str, Any], titles: dict[str, str]) -> Row:
+    """One measured value a reconciliation released (the bench's
+    MeasuredEvidence), kind `measured-evidence`,
+    `runbooks/measured-evidence/<id>`: the prediction it tests, its value
+    and unit, the conditions it was true under and the deviations logged
+    beside it. Marked as the bench marks it (`measured`) where a person read
+    its number back, and `unverified` where nobody did, as the lookup takes
+    no unconfirmed number as a measurement."""
+    rb = m.get("runbookId")
+    title = titles.get(str(rb)) or (str(rb) if rb else "no runbook")
+    label = str(m.get("label") or m.get("predictionId") or m.get("id"))
+    own = m.get("provenance") if m.get("provenance") in ("measured",) else None
+    mark = own if m.get("confirmed") is True else "unverified"
+    conditions = m.get("conditions") if isinstance(m.get("conditions"), dict) else {}
+    return Row("runbooks", "measured-evidence", str(m["id"]), f"{label}, measured in deposition {m.get('depositionId')}",
+               "locked", "released", provenance=mark, names=(label,) if label else (),
+               words=" ".join(x for x in ("measured evidence released reconciliation", label, title,
+                                          str(m.get("productId") or ""), str(conditions.get("strainId") or "")) if x),
+               alt_ids=tuple(x for x in (str(m.get("depositionId") or ""),) if x),
+               detail={"depositionId": m.get("depositionId"), "runbookId": rb, "runbook": title,
+                       "predictionId": m.get("predictionId"), "productId": m.get("productId"), "label": label,
+                       "value": m.get("value"), "unit": m.get("unit"), "confirmed": m.get("confirmed") is True,
+                       "conditions": conditions, "deviations": list(m.get("deviations") or []), "at": m.get("at"),
+                       "deposition": f"runbooks/deposition/{m.get('depositionId')}"})
+
+
 def _vessel_row(a: Any, provenance: str) -> Row:
     from . import vessel
 
@@ -360,6 +477,8 @@ class Stores:
         read of the same question must see. The other sources stay as read."""
         for name in sources:
             self._cache.pop(name, None)
+        # What is worked out from the sources is worked out again.
+        self._cache.pop("_depositions", None)
         self._all.clear()
         self._rows.clear()
         self._errors.clear()
@@ -437,6 +556,38 @@ class Stores:
                       words=" ".join([x["category"], x.get("purpose") or ""] + organisms),
                       detail={"category": x["category"], "organisms": organisms,
                               "currentVersion": x["currentVersion"], "versions": x.get("versions", [])})
+        titles = self._runbook_titles()
+        for d, maker, standing in self._depositions():
+            yield _deposition_row("runbooks", d, maker, titles, [r.ref for r in standing])
+            for r in standing:
+                yield _reading_row(r, d, titles.get(str(d.get("runbookId"))) or str(d.get("runbookId") or ""))
+        for m in self._get("measured"):
+            if isinstance(m, dict) and m.get("id"):
+                yield _measured_row(m, titles)
+
+    def _depositions(self) -> list[tuple[dict[str, Any], str, list[Any]]]:
+        """Each deposition the project keeps, beside the person who deposited
+        it and the readings of it a run may take, the lookup's own rules
+        deciding (measurements.held_readings), oldest first."""
+        if "_depositions" not in self._cache:
+            from .measurements import held_readings
+
+            p = self._get("projection")["runbooks"]
+            books = [*self._get("runbooks"), *p["runbooks"]]
+            out = []
+            for d, maker in self._get("depositions"):
+                if isinstance(d, dict) and d.get("id"):
+                    standing = sorted(held_readings([(d, maker)], books), key=lambda r: [
+                        e.get("id") for e in d.get("entries") or [] if isinstance(e, dict)].index(r.entryId))
+                    out.append((d, maker, standing))
+            self._cache["_depositions"] = out
+        return self._cache["_depositions"]
+
+    def _runbook_titles(self) -> dict[str, str]:
+        """Each runbook's title by its id: the project's and any a test handed in."""
+        p = self._get("projection")["runbooks"]
+        return {str(r["id"]): str(r.get("title") or r["id"]) for r in [*self._get("runbooks"), *p["runbooks"]]
+                if isinstance(r, dict) and r.get("id")}
 
     def _geneos(self) -> Iterable[Row]:
         p = self._get("projection")["geneos"]
@@ -461,6 +612,16 @@ class Stores:
     def _fermos(self) -> Iterable[Row]:
         yield from self._artifacts("fermos")
         yield from self._simulations()
+        # The depositions kept with the project's runbooks, whose series
+        # fermOS fits: each with the fits made from it.
+        fits: dict[str, list[str]] = {}
+        for a in self._get("artifacts"):
+            if a.tool in FIT_TOOLS:
+                for dep in dict.fromkeys(i.source.id for i in a.inputs if i.source.kind == "deposition" and i.source.id):
+                    fits.setdefault(str(dep), []).append(a.id)
+        titles = self._runbook_titles()
+        for d, maker, standing in self._depositions():
+            yield _deposition_row("fermos", d, maker, titles, [r.ref for r in standing], fits.get(str(d["id"])))
         # OF-BLD-020 §4.2 — a kept vessel design, kind `vessel`: what BioSTEAM
         # sized for which simulation, read from the artifact (vessel.summary).
         for a in self._get("artifacts"):
@@ -687,9 +848,9 @@ class Stores:
 # ── reading, for the read tools ───────────────────────────────────────────
 
 KINDS = {
-    "runbooks": ("runbook", "protocol"),
+    "runbooks": ("runbook", "protocol", "deposition", "reading", "measured-evidence"),
     "geneos": ("host", "pathway", "model", "artifact"),
-    "fermos": ("artifact", "simulation", "vessel"),
+    "fermos": ("artifact", "simulation", "vessel", "deposition"),
     "pureos": ("unit-operation", "train", "train-unit", "train-run"),
     "proforma": ("scenario", "artifact"),
     "biorepo": ("record", "candidate", "artifact", "witness-run"),

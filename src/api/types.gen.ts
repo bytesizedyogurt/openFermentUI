@@ -313,6 +313,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/depositions/readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deposition Readings
+         * @description The project's readings a run may take as measurements, the latest
+         *     taken first: each entry of its depositions a person confirmed that
+         *     stands for its measure, with the runbook and the measure it was
+         *     recorded against, the person who deposited it and the time it was
+         *     taken. With `unit`, the readings whose unit is that unit or converts
+         *     into it, each with its value in that unit and the conversion in words
+         *     (an empty `unit` asks for the readings a unitless parameter takes): the
+         *     lookup's own rules decide (measurements.py), so a reading listed is one
+         *     a scenario's value may name by its `ref`.
+         */
+        get: operations["deposition_readings_api_depositions_readings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/engines": {
         parameters: {
             query?: never;
@@ -585,11 +613,12 @@ export interface paths {
          * Fermos Simulate
          * @description Simulate a model family (`SimulationResult`) and keep it as one
          *     `fermos.simulation` artifact. Each parameter resolves with its source: a
-         *     value the request sets (a typed quantity with its origin, a person's
-         *     assumption or a model's estimate by name, so the result is `assumed`),
-         *     else the family's stated convention. 422 in words for a parameter that
-         *     waits (named with what would bind it), the light socket, a value set that
-         *     cannot stand, or a run that cannot end.
+         *     value the request sets (a typed quantity with its origin: a person's
+         *     assumption or a model's estimate by name, so the result is `assumed`, or
+         *     a deposition's reading, looked up in the project's depositions), else the
+         *     family's stated convention. 422 in words for a parameter that waits
+         *     (named with what would bind it), the light socket, a value set that
+         *     cannot stand, a reading the lookup refuses, or a run that cannot end.
          */
         post: operations["fermos_simulate_api_fermos_simulate_post"];
         delete?: never;
@@ -2478,7 +2507,13 @@ export interface paths {
          * Study Scenario Make
          * @description A scenario on a library plant or an openFerment flowsheet, checked
          *     against the plant's parameters and kept; each value a person's
-         *     assumption or a model's estimate (ADR-006).
+         *     assumption, a model's estimate (ADR-006) or a deposition's reading
+         *     (`{"kind": "measurement", "ref": "<deposition id>/<entry id>"}`), which
+         *     the service looks up in the project's depositions and keeps with its
+         *     depositor and time. A reading the project does not hold, one no person
+         *     confirmed, one corrected since, a value or unit other than the
+         *     reading's own, or a unit the parameter cannot be denominated in is a 422
+         *     in words, and nothing is kept.
          */
         post: operations["study_scenario_make_api_studies_scenarios_post"];
         delete?: never;
@@ -3387,6 +3422,47 @@ export interface components {
             why?: string | null;
         };
         /**
+         * DepositionReading
+         * @description GET /api/depositions/readings: one reading a run may take as a
+         *     measurement (measurements.py): an entry of one of the project's
+         *     depositions that a person confirmed and that stands for its measure,
+         *     with the runbook and the measure it was recorded against, the person
+         *     who deposited it and the time it was taken. Asked with a unit, a reading
+         *     whose unit is that unit or converts into it, its value in that unit
+         *     beside its own. A scenario's value names it as `{"value": value, "unit":
+         *     unit, "origin": {"kind": "measurement", "ref": ref}}`.
+         */
+        DepositionReading: {
+            /** At */
+            at: string;
+            /** By */
+            by: string;
+            /** Depositionid */
+            depositionId: string;
+            /** Entryid */
+            entryId: string;
+            /** Hours */
+            hours?: number | null;
+            /** Inunit */
+            inUnit?: number | null;
+            /** Measure */
+            measure?: string | null;
+            /** Measureid */
+            measureId: string;
+            /** Note */
+            note?: string | null;
+            /** Ref */
+            ref: string;
+            /** Runbook */
+            runbook?: string | null;
+            /** Runbookid */
+            runbookId?: string | null;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        };
+        /**
          * DroppedCandidate
          * @description A candidate anchoring refused (§2.4), kept beside the survivors so the
          *     run can be scored honestly (§6.2): a candidate whose value agreed with a
@@ -3484,9 +3560,14 @@ export interface components {
          * @description A value a run sets: a parameter's key and a typed quantity in that
          *     parameter's unit (the shape a run's inputs have), carrying the person or
          *     the model that set it and the day it was set (`origin.at`), as an
-         *     Override and a scenario's value carry theirs. It holds those fields
-         *     alone, and a value, low or high that is true or false is refused, as an
-         *     Override refuses one.
+         *     Override and a scenario's value carry theirs; or a reading a person
+         *     deposited at the bench (a `measurement`, its `ref` the reading's
+         *     `<deposition id>/<entry id>`), its value and unit the reading's own,
+         *     which the service looks up in the project's depositions before anything
+         *     runs, filling the reading's time and its depositor where the request
+         *     leaves them out (measurements.py). It holds those fields alone, and a
+         *     value, low or high that is true or false is refused, as an Override
+         *     refuses one.
          */
         EngineInput: {
             /** Name */
@@ -4643,7 +4724,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "record" | "artifact" | "person-assumption" | "model-estimate" | "library-default" | "convention";
+            kind: "record" | "artifact" | "person-assumption" | "model-estimate" | "measurement" | "library-default" | "convention";
             /** Note */
             note?: string | null;
             /** Ref */
@@ -4868,7 +4949,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "fit" | "record" | "artifact" | "simulation" | "assumption" | "model-estimate" | "convention" | "library-default" | "waiting" | "not-read";
+            origin: "fit" | "record" | "artifact" | "simulation" | "assumption" | "model-estimate" | "measurement" | "convention" | "library-default" | "waiting" | "not-read";
             /** Outofbounds */
             outOfBounds?: string | null;
             /** Overriddenby */
@@ -5979,8 +6060,12 @@ export interface components {
         /**
          * ScenarioValue
          * @description One value a scenario sets on its plant: the parameter's key, and the
-         *     value as a quantity whose origin is a named person's assumption or a
-         *     model's estimate (ADR-006).
+         *     value as a quantity whose origin is a named person's assumption, a
+         *     model's estimate (ADR-006), or a reading a person deposited at the bench
+         *     (a `measurement`: `{"kind": "measurement", "ref": "<deposition id>/<entry
+         *     id>"}`, its value and unit the reading's own, which the service looks up
+         *     in the project's depositions, filling the reading's time and its
+         *     depositor where the value leaves them out, measurements.py).
          */
         ScenarioValue: {
             /** Key */
@@ -7167,6 +7252,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolCallRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deposition_readings_api_depositions_readings_get: {
+        parameters: {
+            query?: {
+                unit?: string | null;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositionReading"][];
                 };
             };
             /** @description Validation Error */

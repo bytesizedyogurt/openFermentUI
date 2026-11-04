@@ -9,7 +9,9 @@ of the `runs` table in the shape every engine's run has (docs/api/runs.md):
     its inputs  each a `Quantity` with its origin (ADR-006): the package's own
                 settings as `library-default`, a person's value as a
                 `person-assumption`, a model's as a `model-estimate`, a
-                convention the run states as a `convention`
+                deposition's reading as a `measurement` (its ref the reading,
+                its `by` the person who deposited it, its `at` the time it
+                was taken), a convention the run states as a `convention`
     its computation  the artifact of its basis (the basis, the output and
                 its hash, replayable within the precision the basis states)
                 and the provenance computed on it
@@ -63,7 +65,8 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 
 from .. import artifacts, db, events, projects
-from ..basis import ASSUMED_KINDS, assumption_source, estimate_source, origin_of
+from ..basis import (InputRefused, assumption_source, estimate_source, is_measurement, is_set, measurement_source,
+                     origin_of, resolved)
 from ..db import models as t
 from ..db import rows
 from ..models import (Artifact, BasisInput, BasisSource, EngineInput, EngineParameter, EngineRun, EngineThing, Origin,
@@ -316,9 +319,10 @@ def listed(engine: str | None = None) -> list[EngineRun]:
 def parameters_of(run: EngineRun, art: Artifact) -> ParamScope | None:
     """The run's parameters as the parameter panel reads them: each as its
     plant declares it (library._spec), its value the run's, a person's
-    assumption or a model's estimate where the run set one and the library's
-    own default elsewhere, read from the run's artifact alone. A library
-    run's alone: a run of any other tool answers None."""
+    assumption, a model's estimate or a deposition's reading where the run
+    set one and the library's own default elsewhere, read from the run's
+    artifact alone. A library run's alone: a run of any other tool answers
+    None."""
     if art.tool != library.LIBRARY_RUN:
         return None
     read = art.output.get("parameters")
@@ -328,7 +332,7 @@ def parameters_of(run: EngineRun, art: Artifact) -> ParamScope | None:
     plant = next((i for i in art.inputs if i.name == "plant"), None)
     own = BasisSource(kind="model", id=plant.source.id if plant else None,
                       note="read back from the plant as the package builds it")
-    set_here = {i.name: i for i in art.inputs if i.source.kind in ASSUMED_KINDS}
+    set_here = {i.name: i for i in art.inputs if is_set(i.source)}
     specs = [library._spec(p) for p in read]
     values = []
     for p, spec in zip(read, specs):
@@ -338,16 +342,18 @@ def parameters_of(run: EngineRun, art: Artifact) -> ParamScope | None:
                                          libraryDefault=defaults.get(p["key"], p["value"]), detail=p["note"]))
             continue
         # A value the run set outside the plant's bounds is kept as set, and flagged (D4).
-        values.append(ParameterValue(key=p["key"], value=i.value, source=i.source,
-                                     origin="model-estimate" if i.source.kind == "model-estimate" else "assumption",
+        origin = ("model-estimate" if i.source.kind == "model-estimate"
+                  else "measurement" if is_measurement(i.source) else "assumption")
+        values.append(ParameterValue(key=p["key"], value=i.value, source=i.source, origin=origin,
                                      overriddenBy=i.source.by, libraryDefault=defaults.get(p["key"]), detail=i.source.note,
                                      outOfBounds=bounds_check(spec, i.value)))
     where = run.plant + (f" ({run.configuration})" if run.configuration else "")
     return ParamScope(scope=library.scope(run.plant, run.configuration), kind="library",
                       title=f"{where}: the values this run was bound with", specs=specs,
                       values=values, waiting=[], notes=[
-                          "Each value is the run's own: a person's assumption or a model's estimate where the run set "
-                          "one, the library's default elsewhere. A different value is a new scenario, and a new run."])
+                          "Each value is the run's own: a person's assumption, a model's estimate or a deposition's "
+                          "reading where the run set one, the library's default elsewhere. A different value is a new "
+                          "scenario, and a new run."])
 
 
 def _report(run: EngineRun, art: Artifact | None, flowsheet) -> RunReport:
@@ -616,15 +622,18 @@ def register_engine_tool(engine: Any) -> None:
 
 def _value_source(name: str, origin: Origin) -> BasisSource:
     """A value's source in the basis, as its origin names it: a person's
-    assumption or a model's estimate, written as a library run's override is
-    (basis.override_source), with the day its origin says it was set. The
-    service stamps no day of its own, so the same request is the same run on
-    any day."""
+    assumption, a model's estimate or a deposition's reading, written as a
+    library run's override is (basis.override_source), with the day its
+    origin says it was set or the time the reading was taken. The service
+    stamps no day of its own, so the same request is the same run on any
+    day."""
     at = (origin.at or "").strip()
     if not at:
         raise EngineRefused(f"{name}: a value a run sets says when it was set (quantity.origin.at)")
     if origin.kind == "model-estimate":
         return estimate_source(origin.by or "", at, origin.note)
+    if origin.kind == "measurement":
+        return measurement_source(origin.ref or "", origin.by or "", at, origin.note)
     return assumption_source(origin.by or "", at, origin.note)
 
 
@@ -660,14 +669,17 @@ def check_inputs(thing: str, parameters: Sequence[EngineParameter], inputs: Sequ
     """The values a run sets, each checked against the thing's parameters
     before anything runs: a key the thing declares, set once, in the
     parameter's unit, a number for a number and one of its choices for words
-    (`takes_number`), and, with `bounds`, inside its bounds. `run_engine`
-    checks a contract engine's values with their bounds; BioSTEAM's engine
-    and the kinetics engine check theirs with `bounds` False: the library
-    flags a value outside a plant's bounds on the run's parameters, kept as
-    set (`parameters_of`), and fermOS flags one on its artifact. A value
-    refused raises EngineRefused in words, and nothing is kept. A key the
-    thing lacks is named with the few keys nearest to it, the same for every
-    engine."""
+    (`takes_number`), and, with `bounds`, inside its bounds. A deposition's
+    reading is in its reading's own unit until the lookup sets it in the
+    parameter's (basis.resolved, which every door calls before anything runs
+    and which refuses a unit that does not convert), so its unit is the
+    lookup's to check. `run_engine` checks a contract engine's values with
+    their bounds, after the lookup; BioSTEAM's engine and the kinetics engine
+    check theirs with `bounds` False: the library flags a value outside a
+    plant's bounds on the run's parameters, kept as set (`parameters_of`),
+    and fermOS flags one on its artifact. A value refused raises
+    EngineRefused in words, and nothing is kept. A key the thing lacks is
+    named with the few keys nearest to it, the same for every engine."""
     params = {p.key: p for p in parameters}
     seen: set[str] = set()
     for i in inputs:
@@ -678,7 +690,8 @@ def check_inputs(thing: str, parameters: Sequence[EngineParameter], inputs: Sequ
             raise EngineRefused(f"{i.name} is set twice")
         seen.add(i.name)
         q = i.quantity
-        if q.unit != p.unit:
+        measured = q.origin is not None and q.origin.kind == "measurement"
+        if q.unit != p.unit and not measured:
             raise EngineRefused(f"{i.name} is set in {q.unit!r}, and the parameter's unit is {p.unit!r}")
         numeric = takes_number(p)
         if numeric != isinstance(q.value, (int, float)):
@@ -697,13 +710,20 @@ def _checked_values(engine: Any, thing: str, configuration: str | None,
     their bounds (`check_inputs`), each as its basis input with its source.
     A contract engine's run sets one value per parameter, its value and unit
     with its origin: a quantity that also carries `low`, `high` or `basis` is
-    refused in words, since its worker receives the value and unit alone."""
+    refused in words, since its worker receives the value and unit alone. A
+    deposition's reading is looked up first and set in its parameter's unit
+    (basis.resolved), so its bounds are checked in that unit."""
     for i in inputs:
         carried = [k for k in ("low", "high", "basis") if getattr(i.quantity, k) is not None]
         if carried:
             raise EngineRefused(f"{i.name}: a run of the {engine.name} engine sets one value in the parameter's "
                                 f"unit, with its origin; this quantity also carries {' and '.join(carried)}")
     parameters = engine.parameters(thing, configuration)
+    units = {p.key: p.unit for p in parameters}
+    try:
+        inputs = [resolved(i, units[i.name]) if i.name in units else i for i in inputs]
+    except InputRefused as e:
+        raise EngineRefused(str(e)) from None
     check_inputs(thing, parameters, inputs, bounds=True)
     waiting = sorted(p.key for p in parameters if p.value is None and p.key not in {i.name for i in inputs})
     if waiting:

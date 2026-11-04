@@ -1806,6 +1806,121 @@
         "title": "DecisionCheck",
         "type": "object"
       },
+      "DepositionReading": {
+        "description": "GET /api/depositions/readings: one reading a run may take as a\nmeasurement (measurements.py): an entry of one of the project's\ndepositions that a person confirmed and that stands for its measure,\nwith the runbook and the measure it was recorded against, the person\nwho deposited it and the time it was taken. Asked with a unit, a reading\nwhose unit is that unit or converts into it, its value in that unit\nbeside its own. A scenario's value names it as `{\"value\": value, \"unit\":\nunit, \"origin\": {\"kind\": \"measurement\", \"ref\": ref}}`.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "depositionId": {
+            "title": "Depositionid",
+            "type": "string"
+          },
+          "entryId": {
+            "title": "Entryid",
+            "type": "string"
+          },
+          "hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours"
+          },
+          "inUnit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inunit"
+          },
+          "measure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measure"
+          },
+          "measureId": {
+            "title": "Measureid",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "runbook": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runbook"
+          },
+          "runbookId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runbookid"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ref",
+          "depositionId",
+          "entryId",
+          "measureId",
+          "value",
+          "unit",
+          "at",
+          "by"
+        ],
+        "title": "DepositionReading",
+        "type": "object"
+      },
       "DroppedCandidate": {
         "description": "A candidate anchoring refused (§2.4), kept beside the survivors so the\nrun can be scored honestly (§6.2): a candidate whose value agreed with a\nvalue a reviewer typed and whose quote failed is a `span_error` in\nWitness — the extractor\nproduced it, and dropping it from BioRepo does not undo that. Never enters\nBioRepo; never repaired.",
         "properties": {
@@ -2020,7 +2135,7 @@
       },
       "EngineInput": {
         "additionalProperties": false,
-        "description": "A value a run sets: a parameter's key and a typed quantity in that\nparameter's unit (the shape a run's inputs have), carrying the person or\nthe model that set it and the day it was set (`origin.at`), as an\nOverride and a scenario's value carry theirs. It holds those fields\nalone, and a value, low or high that is true or false is refused, as an\nOverride refuses one.",
+        "description": "A value a run sets: a parameter's key and a typed quantity in that\nparameter's unit (the shape a run's inputs have), carrying the person or\nthe model that set it and the day it was set (`origin.at`), as an\nOverride and a scenario's value carry theirs; or a reading a person\ndeposited at the bench (a `measurement`, its `ref` the reading's\n`<deposition id>/<entry id>`), its value and unit the reading's own,\nwhich the service looks up in the project's depositions before anything\nruns, filling the reading's time and its depositor where the request\nleaves them out (measurements.py). It holds those fields alone, and a\nvalue, low or high that is true or false is refused, as an Override\nrefuses one.",
         "properties": {
           "name": {
             "maxLength": 200,
@@ -4916,6 +5031,7 @@
               "artifact",
               "person-assumption",
               "model-estimate",
+              "measurement",
               "library-default",
               "convention"
             ],
@@ -5643,6 +5759,7 @@
               "simulation",
               "assumption",
               "model-estimate",
+              "measurement",
               "convention",
               "library-default",
               "waiting",
@@ -8451,7 +8568,7 @@
         "type": "object"
       },
       "ScenarioValue": {
-        "description": "One value a scenario sets on its plant: the parameter's key, and the\nvalue as a quantity whose origin is a named person's assumption or a\nmodel's estimate (ADR-006).",
+        "description": "One value a scenario sets on its plant: the parameter's key, and the\nvalue as a quantity whose origin is a named person's assumption, a\nmodel's estimate (ADR-006), or a reading a person deposited at the bench\n(a `measurement`: `{\"kind\": \"measurement\", \"ref\": \"<deposition id>/<entry\nid>\"}`, its value and unit the reading's own, which the service looks up\nin the project's depositions, filling the reading's time and its\ndepositor where the value leaves them out, measurements.py).",
         "properties": {
           "key": {
             "title": "Key",
@@ -10994,6 +11111,67 @@
         "x-openferment-scope": "project"
       }
     },
+    "/api/depositions/readings": {
+      "get": {
+        "description": "The project's readings a run may take as measurements, the latest\ntaken first: each entry of its depositions a person confirmed that\nstands for its measure, with the runbook and the measure it was\nrecorded against, the person who deposited it and the time it was\ntaken. With `unit`, the readings whose unit is that unit or converts\ninto it, each with its value in that unit and the conversion in words\n(an empty `unit` asks for the readings a unitless parameter takes): the\nlookup's own rules decide (measurements.py), so a reading listed is one\na scenario's value may name by its `ref`.",
+        "operationId": "deposition_readings_api_depositions_readings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "unit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Unit"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DepositionReading"
+                  },
+                  "title": "Response Deposition Readings Api Depositions Readings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deposition Readings",
+        "x-openferment-scope": "project"
+      }
+    },
     "/api/engines": {
       "get": {
         "description": "Every engine registered here (docs/api/engines.md): its version, worker,\nthings and last conformance verdict, or the error that keeps it from use.",
@@ -11744,7 +11922,7 @@
     },
     "/api/fermos/simulate": {
       "post": {
-        "description": "Simulate a model family (`SimulationResult`) and keep it as one\n`fermos.simulation` artifact. Each parameter resolves with its source: a\nvalue the request sets (a typed quantity with its origin, a person's\nassumption or a model's estimate by name, so the result is `assumed`),\nelse the family's stated convention. 422 in words for a parameter that\nwaits (named with what would bind it), the light socket, a value set that\ncannot stand, or a run that cannot end.",
+        "description": "Simulate a model family (`SimulationResult`) and keep it as one\n`fermos.simulation` artifact. Each parameter resolves with its source: a\nvalue the request sets (a typed quantity with its origin: a person's\nassumption or a model's estimate by name, so the result is `assumed`, or\na deposition's reading, looked up in the project's depositions), else the\nfamily's stated convention. 422 in words for a parameter that waits\n(named with what would bind it), the light socket, a value set that\ncannot stand, a reading the lookup refuses, or a run that cannot end.",
         "operationId": "fermos_simulate_api_fermos_simulate_post",
         "parameters": [
           {
@@ -16685,7 +16863,7 @@
         "x-openferment-scope": "project"
       },
       "post": {
-        "description": "A scenario on a library plant or an openFerment flowsheet, checked\nagainst the plant's parameters and kept; each value a person's\nassumption or a model's estimate (ADR-006).",
+        "description": "A scenario on a library plant or an openFerment flowsheet, checked\nagainst the plant's parameters and kept; each value a person's\nassumption, a model's estimate (ADR-006) or a deposition's reading\n(`{\"kind\": \"measurement\", \"ref\": \"<deposition id>/<entry id>\"}`), which\nthe service looks up in the project's depositions and keeps with its\ndepositor and time. A reading the project does not hold, one no person\nconfirmed, one corrected since, a value or unit other than the\nreading's own, or a unit the parameter cannot be denominated in is a 422\nin words, and nothing is kept.",
         "operationId": "study_scenario_make_api_studies_scenarios_post",
         "parameters": [
           {

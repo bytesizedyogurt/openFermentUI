@@ -60,6 +60,7 @@ import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
 import { parseReadingsCsv, placeRow } from '@/engine/series';
+import { correctionOf } from '@/engine/readings';
 import {
   type DurableReviewDecision,
   EMPTY_SNAPSHOT,
@@ -286,6 +287,13 @@ export interface OFState {
    */
   depositions: Deposition[];
   /**
+   * Who deposited each deposition, by id: its row's maker on the service,
+   * the person a measurement resting on one of its readings names
+   * (`GET /api/state`'s `depositedBy`). A deposition the service has not
+   * yet acknowledged has none here.
+   */
+  depositedBy: Record<string, string>;
+  /**
    * First-party measurements released by reconciliation. Durable, and
    * deliberately a separate list from `records`: these are evidence about a
    * run, not extractions from a paper (OF-BLD-006 §5).
@@ -500,8 +508,15 @@ export interface OFState {
   /**
    * Open a Deposition in `staged` and start the run session that writes into
    * it. Staged is the last moment the measurement schema can change (§4.5).
+   * With `protocolId` null the deposition records readings against the
+   * runbook's measures alone, at the bench DepositionBench serves, and no run
+   * session starts (`runId` null).
    */
-  openDeposition: (runbookId: string, protocolId: string, scale: number) => { depositionId: string; runId: string } | null;
+  openDeposition: (
+    runbookId: string,
+    protocolId: string | null,
+    scale: number,
+  ) => { depositionId: string; runId: string | null } | null;
   /** Staged → running. Nothing is recorded before this. */
   beginDeposition: (depositionId: string) => void;
   /**
@@ -774,6 +789,7 @@ const initialState = () => ({
   runbooks: freezeLocked([] as Runbook[]),
   skills: [] as Skill[],
   depositions: [] as Deposition[],
+  depositedBy: {} as Record<string, string>,
   measuredEvidence: [] as MeasuredEvidence[],
   protocols: [] as Protocol[],
   scenarios: [] as Scenario[],
@@ -964,6 +980,7 @@ export const useStore = create<OFState>()((set, get) => ({
       const made = new Set(state.scenarios.map((sc) => sc.id));
       return {
         depositions: state.depositions,
+        depositedBy: state.depositedBy ?? {},
         measuredEvidence: state.measuredEvidence,
         runbooks: freezeLocked(runbooks),
         adoptedRunbookIds: [...adopted],
@@ -1845,13 +1862,19 @@ export const useStore = create<OFState>()((set, get) => ({
 
   openDeposition: (runbookId, protocolId, scale) => {
     const s = get();
-    const protocol = s.protocols.find((p) => p.id === protocolId);
-    if (!protocol) return null;
-    const depositionId = nextId('dep');
+    const protocol = protocolId === null ? null : s.protocols.find((p) => p.id === protocolId);
+    if (protocol === undefined) return null;
+    // The readings alone are measurements a run may rest on, and a
+    // measurement names the person who took it (measurements.py), so they
+    // wait for a person's name in Settings.
+    if (protocol === null && !reviewerName()) return null;
+    // A reading's id names it for good (`<deposition id>/<entry id>`, the ref
+    // a measurement origin carries), so a deposition's id holds across reloads.
+    const depositionId = timeId('dep');
     const deposition: Deposition = {
       id: depositionId,
       runbookId,
-      protocolId,
+      protocolId: protocol?.id ?? null,
       // OF-BLD-013 §2 — Guild's acting person, when the ledger has one who
       // holds skills.
       operatorId: runOperatorDefault(s),
@@ -1862,16 +1885,31 @@ export const useStore = create<OFState>()((set, get) => ({
       observations: [],
       reconciliation: null,
     };
-    const runId = s.startRun(protocolId, protocol.currentVersion, scale);
+    // Its first write names who deposits it (decidedBy), which the service keeps as its maker.
+    const maker = { [depositionId]: decidedBy() };
+    if (protocol === null) {
+      set((st) => ({ depositions: [deposition, ...st.depositions], depositedBy: { ...st.depositedBy, ...maker } }));
+      const runbook = s.runbooks.find((r) => r.id === runbookId);
+      get().logActivity({
+        at: stamp(),
+        icon: 'run',
+        text: `Deposition staged — readings against ${runbook?.title ?? runbookId}`,
+        href: `#/runbooks/depositions/${depositionId}/bench`,
+        provenance: 'user',
+      });
+      return { depositionId, runId: null };
+    }
+    const runId = s.startRun(protocol.id, protocol.currentVersion, scale);
     set((st) => ({
       depositions: [deposition, ...st.depositions],
+      depositedBy: { ...st.depositedBy, ...maker },
       runs: { ...st.runs, [runId]: { ...st.runs[runId], depositionId } },
     }));
     get().logActivity({
       at: stamp(),
       icon: 'run',
       text: `Deposition staged — ${protocol.title}`,
-      href: `#/runbooks/protocols/${protocolId}/run/${runId}`,
+      href: `#/runbooks/protocols/${protocol.id}/run/${runId}`,
       provenance: 'user',
     });
     return { depositionId, runId };
@@ -1895,7 +1933,7 @@ export const useStore = create<OFState>()((set, get) => ({
             entries: [
               ...d.entries,
               {
-                id: nextId('de'),
+                id: timeId('de'),
                 measureId: match.measureId,
                 stepId,
                 at,
@@ -1914,7 +1952,7 @@ export const useStore = create<OFState>()((set, get) => ({
           ...d,
           observations: [
             ...d.observations,
-            { id: nextId('ob'), stepId, at, raw, structured: null },
+            { id: timeId('ob'), stepId, at, raw, structured: null },
           ],
         };
       }),
@@ -1943,23 +1981,15 @@ export const useStore = create<OFState>()((set, get) => ({
         if (d.id !== depositionId || d.state === 'closed') return d;
         const original = d.entries.find((e) => e.id === entryId);
         if (!original) return d;
-        const id = nextId('de');
-        // A correction is the same reading: it keeps the reading's time (§7.1).
+        const id = timeId('de');
+        // A correction is the same reading: it keeps the time the reading was
+        // taken (`at`, the time a measurement names) and its sample time
+        // (§7.1), and says when it was corrected.
         const t = d.sampleTimes?.[entryId];
         return {
           ...d,
           ...(t !== undefined ? { sampleTimes: { ...d.sampleTimes, [id]: t } } : {}),
-          entries: [
-            ...d.entries,
-            {
-              ...original,
-              id,
-              at,
-              value,
-              raw: `${original.raw} → corrected to ${value} ${original.unit}`,
-              confirmed: true,
-            },
-          ],
+          entries: [...d.entries, correctionOf(original, id, value, at)],
         };
       }),
     }));
@@ -1968,7 +1998,9 @@ export const useStore = create<OFState>()((set, get) => ({
   setSampleTime: (depositionId, entryId, hours) =>
     set((s) => ({
       depositions: s.depositions.map((d) => {
-        if (d.id !== depositionId) return d;
+        // A closed deposition keeps the sample times it closed with (the
+        // service refuses a change, project_state.py).
+        if (d.id !== depositionId || d.state === 'closed') return d;
         const times = { ...(d.sampleTimes ?? {}) };
         if (hours === null || !Number.isFinite(hours)) delete times[entryId];
         else times[entryId] = hours;
@@ -1992,7 +2024,8 @@ export const useStore = create<OFState>()((set, get) => ({
     let kept = 0;
     set((s) => ({
       depositions: s.depositions.map((d) => {
-        if (d.id !== depositionId || d.state === 'staged') return d;
+        // Closing stops new readings, as it stops the bench's.
+        if (d.id !== depositionId || d.state !== 'running') return d;
         const rb = s.runbooks.find((r) => r.id === d.runbookId);
         const schema = rb?.measurementSchema ?? [];
         const { rows, unreadable } = parseReadingsCsv(csv);
@@ -2003,17 +2036,17 @@ export const useStore = create<OFState>()((set, get) => ({
         for (const row of rows) {
           const measureId = placeRow(row, schema);
           if (measureId) {
-            const id = nextId('de');
+            const id = timeId('de');
             entries.push({ id, measureId, stepId: 'attached', at, value: row.value, unit: row.unit, raw: row.line, confirmed: false });
             times[id] = row.time;
             attached += 1;
           } else {
-            observations.push({ id: nextId('ob'), stepId: 'attached', at, raw: row.line, structured: null });
+            observations.push({ id: timeId('ob'), stepId: 'attached', at, raw: row.line, structured: null });
             kept += 1;
           }
         }
         for (const line of unreadable) {
-          observations.push({ id: nextId('ob'), stepId: 'attached', at, raw: line, structured: null });
+          observations.push({ id: timeId('ob'), stepId: 'attached', at, raw: line, structured: null });
           kept += 1;
         }
         return { ...d, entries, observations, sampleTimes: times };
@@ -2236,7 +2269,7 @@ export const useStore = create<OFState>()((set, get) => ({
     const deviations = (run?.deviations ?? []).map((x) => x.text);
 
     const evidence: MeasuredEvidence[] = deltas.map((delta) => ({
-      id: nextId('me'),
+      id: timeId('me'),
       depositionId,
       runbookId: runbook.id,
       productId: runbook.productId,
@@ -2812,10 +2845,11 @@ export const useStore = create<OFState>()((set, get) => ({
       return {
         runs: { ...s.runs, [runId]: { ...run, operatorId: personId } },
         // The deposition names whoever is performing now; each step's entry
-        // on the ledger names who performed that step.
+        // on the ledger names who performed that step. A closed deposition
+        // keeps the operator it closed with (project_state.py).
         depositions:
           run.depositionId
-            ? s.depositions.map((d) => (d.id === run.depositionId ? { ...d, operatorId: personId } : d))
+            ? s.depositions.map((d) => (d.id === run.depositionId && d.state !== 'closed' ? { ...d, operatorId: personId } : d))
             : s.depositions,
       };
     }),

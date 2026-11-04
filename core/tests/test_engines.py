@@ -2030,8 +2030,9 @@ def test_a_trains_rest_on_what_its_inlet_reads_the_pool_and_the_strains_and_unre
     """What the copy takes of a project, as the train engine names it: every
     train; each artifact a train's inlet reads, by id, with its run's row (a
     simulation and its vessel design, a run, a scenario's newest run); the
-    scenarios an inlet names; the evidence pool whole; the strains. And what
-    each train the checks leave out is, in its words."""
+    scenarios an inlet names; the evidence pool whole; the strains; the
+    depositions, whose readings a run's values may be. And what each train
+    the checks leave out is, in its words."""
     from test_builder import RUN_ID, _keep
 
     _keep()  # test_builder's STAND-IN run of scenario sc-k3x9q-1, its basis naming the scenario
@@ -2045,7 +2046,7 @@ def test_a_trains_rest_on_what_its_inlet_reads_the_pool_and_the_strains_and_unre
     ids = sorted({simulation, design, RUN_ID})
     assert TRAIN.rests_on() == {"trains": None, "artifacts": {"id": ids}, "runs": {"id": ids},
                                 "scenarios": {"id": ["sc-k3x9q-1"]}, "candidates": None, "decisions": None,
-                                "catalogue": {"kind": ["strain"]}}
+                                "catalogue": {"kind": ["strain"]}, "depositions": None}
     said = {th.id: TRAIN.unready(th.id, []) for th in TRAIN.things()}
     assert said["r1"] is None and said["c1"] is None
     assert said["b0"] == f"{train_engine.DRAFT}: a train holds at least one unit"
@@ -2060,13 +2061,15 @@ def test_the_copy_holds_every_row_a_trains_resolution_reads_and_resolves_each_tr
     reads: records bound from the evidence pool (an extraction, a reviewer's
     rejection of one of its candidates that moves what binds), a simulation
     naming a strain of the catalogue, a person's earlier run of a train that
-    another train stands on, and a scenario whose newest run belongs to it
-    through the scenario's own row. Every table the resolution reads in the
-    project is one the copy takes, and the copy resolves each train as the
-    project does: its parameters, and the artifact a run of it computes (its
-    id, its output and its provenance). A copy that leaves out a table, or
-    the rows of one that a train reads, fails here. Every check then holds on
-    each train, the train a second one stands on among them."""
+    another train stands on, a scenario whose newest run belongs to it
+    through the scenario's own row, and a deposition whose reading a run of a
+    train sets (a measurement, looked up in the project's depositions). Every
+    table the resolution reads in the project is one the copy takes, and the
+    copy resolves each train as the project does: its parameters, and the
+    artifact a run of it computes (its id, its output and its provenance). A
+    copy that leaves out a table, or the rows of one that a train reads,
+    fails here. Every check then holds on each train, the train a second one
+    stands on among them."""
     from sqlalchemy import event
 
     from openferment_core import biorepo, catalogues, extract, project_state, projects
@@ -2105,6 +2108,15 @@ def test_the_copy_holds_every_row_a_trains_resolution_reads_and_resolves_each_tr
                                                            "params": {"broth_flow": typed(1.0)}}))
     _saved(spec_of(id="r1", name="On a person's run", inlet={"kind": "run-stream", "ref": mine, "streamId": "C1_liquid"}))
     _saved(spec_of(id="c1", name="On a scenario", inlet={"kind": "run-stream", "ref": "sc-k3x9q-1"}, units=FLASH))
+    # A placeholder reading of the flash's vapour fraction, deposited and confirmed at the bench, which a run of
+    # t1 sets as F1.V.
+    project_state.put("depositions", "dep-q1", {
+        "id": "dep-q1", "runbookId": "rb-q1", "protocolId": "pr-q1", "operatorId": None, "state": "running",
+        "startedAt": f"{DAY}T08:00:00Z", "closedAt": None, "observations": [], "reconciliation": None,
+        "entries": [{"id": "de-1", "measureId": "m-vapour", "stepId": "s-1", "at": f"{DAY}T09:00:00Z", "value": 0.2,
+                     "unit": "", "raw": "a placeholder reading", "confirmed": True}]}, by="Ada Moreno")
+    measured = [EngineInput.model_validate({"name": "F1.V", "quantity": {
+        "value": 0.2, "unit": "", "origin": {"kind": "measurement", "ref": "dep-q1/de-1"}}})]
 
     def resolved() -> dict[str, object]:
         out = {}
@@ -2114,6 +2126,10 @@ def test_the_copy_holds_every_row_a_trains_resolution_reads_and_resolves_each_tr
             art = artifacts.compute(train_spec.TRAIN_RUN, got.basis, records_by_id=got.pool.records_by_id, keep=False)
             out[th.id] = ([p.model_dump(mode="json") for p in TRAIN.parameters(th.id, None)],
                           (art.id, art.outputHash, art.provenance))
+        got = train_spec._prepared(TRAIN._train("t1", None), measured, None)
+        art = artifacts.compute(train_spec.TRAIN_RUN, got.basis, records_by_id=got.pool.records_by_id, keep=False)
+        reading = next(i for i in got.basis if i.source.kind == "deposition")
+        out["t1, its vapour fraction measured"] = (art.id, art.outputHash, art.provenance, reading.model_dump())
         return out
 
     read: list[str] = []
@@ -2133,13 +2149,15 @@ def test_the_copy_holds_every_row_a_trains_resolution_reads_and_resolves_each_tr
                if i.name == "inlet")
     # The pool reads its documents' titles for its search alone, which no train's value or words read.
     assert set(read) - {"documents_link"} <= set(TRAIN.rests_on()) | {"projects"}, sorted(set(read))
-    assert {"trains", "artifacts", "candidates", "decisions", "catalogue", "scenarios"} <= set(read)
+    assert {"trains", "artifacts", "candidates", "decisions", "catalogue", "scenarios", "depositions"} <= set(read)
+    reading = here["t1, its vapour fraction measured"][3]
+    assert (reading["value"], reading["source"]["id"], reading["source"]["by"]) == (0.2, "dep-q1/de-1", "Ada Moreno")
     _conform_here(test_database, monkeypatch)
     with conform.copy_of(TRAIN, TEST_PROJECT) as copied:
         there = resolved()
     assert there == here
     assert copied == {"projects": 1, "trains": 4, "artifacts": 3, "runs": 0, "scenarios": 1, "candidates": 1,
-                      "decisions": 2, "catalogue": 1}
+                      "decisions": 2, "catalogue": 1, "depositions": 1}
     before = _every_row()
     v = conform.in_project("train", TEST_PROJECT, by=CHECKS_BY)
     assert v.ok, [(c.number, c.said) for c in v.checks if not c.ok]

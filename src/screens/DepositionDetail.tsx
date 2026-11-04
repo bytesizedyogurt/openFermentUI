@@ -7,11 +7,12 @@
 // The page is organised around the one thing that makes the record worth
 // keeping — measured values sit above observations, because the measurements
 // are what can be reconciled and the observations are what nobody predicted.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, Eye, FlaskConical, GitBranch, Ruler, Scale as ScaleIcon } from 'lucide-react';
 import type { Deposition } from '@/data/types';
 import { useStore } from '@/store';
-import { href } from '@/router';
+import { href, useRoute } from '@/router';
+import { awaitingReadBack, correctedBy } from '@/engine/readings';
 import { ComponentTag } from '@/components/ComponentTag';
 import { TimeSeriesPanel } from '@/components/TimeSeriesPanel';
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
@@ -212,6 +213,17 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
   const deposition = depositions.find((d) => d.id === depositionId);
   // The operator as Guild's ledger names them (OF-BLD-013 §2).
   const operatorName = useStore((s) => s.guild.people.find((p) => p.id === deposition?.operatorId)?.name);
+  // The person who deposited it, as the service keeps its row's maker: the one a measurement on its readings names.
+  const depositor = useStore((s) => s.depositedBy[depositionId]);
+  // The project's rows still on their way from the service.
+  const loading = useStore((s) => s.projectId !== null && s.stateSeen === null && s.stateProblem === null);
+  // A link to one reading (a run's measurement origin) opens the record at it, marked.
+  const marked = useRoute().query.get('entry');
+  const markedHere = Boolean(deposition && marked && deposition.entries.some((e) => e.id === marked));
+  useEffect(() => {
+    if (!markedHere || !marked) return;
+    document.querySelector(`[data-entry="${CSS.escape(marked)}"]`)?.scrollIntoView({ block: 'center' });
+  }, [markedHere, marked]);
   const evidence = useStore((s) => s.measuredEvidence).filter(
     (e) => e.depositionId === depositionId,
   );
@@ -223,6 +235,16 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
     [runbook],
   );
 
+  if (!deposition && loading) {
+    return (
+      <>
+        <PageHeader eyebrow="Assay · Deposition" title={depositionId} />
+        <p className="text-body text-ink" role="status">
+          Loading the project&rsquo;s depositions from the service&hellip;
+        </p>
+      </>
+    );
+  }
   if (!deposition) {
     return (
       <>
@@ -244,20 +266,34 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
   }
 
   const state = STATE_COPY[deposition.state];
-  const unconfirmed = deposition.entries.filter((e) => !e.confirmed).length;
+  // A number a later entry corrects waits for nothing: the correction stands (engine/readings.ts).
+  const unconfirmed = awaitingReadBack(deposition).length;
 
   return (
     <>
       <PageHeader
         eyebrow="Assay · Deposition"
-        title={protocol?.title ?? 'Bench run'}
+        title={protocol?.title ?? (deposition.protocolId === null ? 'The readings alone' : 'Bench run')}
         subtitle={state.note}
+        wrap
         actions={
-          runbook && (
-            <LinkButton to={`/runbooks/${runbook.id}`}>
-              <GitBranch size={14} /> {runbook.title}
-            </LinkButton>
-          )
+          <>
+            {/* The readings alone are recorded at their own bench, which resumes from the record (alpha 2.2 C.5). */}
+            {deposition.protocolId === null && deposition.state !== 'closed' && (
+              <LinkButton
+                to={`/runbooks/depositions/${encodeURIComponent(deposition.id)}/bench`}
+                variant="primary"
+                className="min-h-[44px]"
+              >
+                <Ruler size={14} /> Continue at the bench
+              </LinkButton>
+            )}
+            {runbook && (
+              <LinkButton to={`/runbooks/${runbook.id}`}>
+                <GitBranch size={14} /> {runbook.title}
+              </LinkButton>
+            )}
+          </>
         }
       />
 
@@ -271,6 +307,11 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
           <span className="chip text-ink-soft">
             closed{' '}
             <span className="font-num">{deposition.closedAt.slice(0, 16).replace('T', ' ')}</span>
+          </span>
+        )}
+        {depositor && (
+          <span className="chip text-ink-soft" data-testid="deposition-depositor">
+            deposited by {depositor}
           </span>
         )}
         {deposition.operatorId === null ? (
@@ -312,25 +353,53 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
             />
           ) : (
             <ul className="space-y-3">
-              {deposition.entries.map((e) => (
-                <li key={e.id}>
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-body">
-                      {measureById[e.measureId]?.label ?? e.measureId}
-                    </span>
-                    <span className="font-num text-body shrink-0">
-                      {e.value} <span className="text-ink-soft text-caption">{e.unit}</span>
-                      {!e.confirmed && (
-                        <span className="text-signal-warn text-caption"> · unconfirmed</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="text-caption text-ink-soft mt-0.5">
-                    <span className="font-num">{e.at.slice(11, 16)}</span> · reported as &ldquo;
-                    {e.raw}&rdquo;
-                  </div>
-                </li>
-              ))}
+              {deposition.entries.map((e) => {
+                const newer = correctedBy(deposition, e);
+                const linked = markedHere && e.id === marked;
+                return (
+                  <li
+                    key={e.id}
+                    data-testid="deposition-entry"
+                    data-entry={e.id}
+                    data-confirmed={e.confirmed ? 'true' : 'false'}
+                    data-stands={newer === null && e.confirmed ? 'true' : 'false'}
+                    data-marked={linked ? 'true' : undefined}
+                    className={cx(linked && 'rounded-input border border-accent bg-accent-wash/40 p-2 -m-2')}
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="text-body">
+                        {measureById[e.measureId]?.label ?? e.measureId}{' '}
+                        {/* The reading's id: a measurement names it as <deposition id>/<entry id>. */}
+                        <span className="font-num text-caption text-ink-soft whitespace-nowrap">{e.id}</span>
+                        {linked && <span className="text-caption text-accent"> · the reading the link names</span>}
+                      </span>
+                      <span className="font-num text-body shrink-0">
+                        {e.value} <span className="text-ink-soft text-caption">{e.unit}</span>
+                        {newer !== null ? (
+                          <span className="text-ink-soft text-caption">
+                            {' '}
+                            · corrected by <span className="whitespace-nowrap">{newer}</span>
+                          </span>
+                        ) : e.confirmed ? (
+                          <span className="text-accent text-caption"> · stands for its measure</span>
+                        ) : (
+                          <span className="text-signal-warn text-caption"> · unconfirmed</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="text-caption text-ink-soft mt-0.5">
+                      <span className="font-num">{e.at.slice(11, 16)}</span>
+                      {e.correctedAt && (
+                        <>
+                          {' '}
+                          · corrected at <span className="font-num">{e.correctedAt.slice(11, 16)}</span>
+                        </>
+                      )}{' '}
+                      · reported as &ldquo;{e.raw}&rdquo;
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
@@ -451,8 +520,13 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
                       </span>
                     </div>
                     <div className="text-caption text-ink-soft mt-0.5">
-                      under {e.conditions.protocolId} at{' '}
-                      <span className="font-num">{e.conditions.scale}×</span> scale
+                      {e.conditions.protocolId === null ? (
+                        'with no protocol’s steps'
+                      ) : (
+                        <>
+                          under {e.conditions.protocolId} at <span className="font-num">{e.conditions.scale}×</span> scale
+                        </>
+                      )}
                       {e.conditions.strainId && ` · ${e.conditions.strainId}`}
                       {e.deviations.length > 0 &&
                         ` · ${e.deviations.length} deviation${e.deviations.length === 1 ? '' : 's'} logged`}

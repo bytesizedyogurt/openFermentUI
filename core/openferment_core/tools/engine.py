@@ -20,10 +20,12 @@ and of a Proforma scenario's run (its outputs.values) is one whose id is
 `<artifact id>:values.<name>`. Each one's
 basis is the run's artifact, its provenance the artifact's
 (`assumed` when a value the run set is a person's assumption or a model's
-estimate). `engine_report` also gives, by words, the parameters the run read
-back from the plant (`<artifact id>:parameters.<key>`), each with its origin:
-computed where the package set it, assumed where a person or a model did. A
-claim cites those ids, and a value a claim states is read from one by its id.
+estimate, `measured` when the values it set are deposited readings beside
+records and defaults). `engine_report` also gives, by words, the parameters
+the run read back from the plant (`<artifact id>:parameters.<key>`), each
+with its origin: computed where the package set it, assumed where a person
+or a model did, measured where a deposition's reading did. A claim cites
+those ids, and a value a claim states is read from one by its id.
 """
 from __future__ import annotations
 
@@ -31,6 +33,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ..basis import SET_ORIGINS
 from ..models import CONFIGURATION_MAX, ComputedBasis, Evidence, RunReport, ToolResult
 from . import Tool, ToolContext, register
 
@@ -106,15 +109,23 @@ def run_evidence(report: RunReport) -> list[Evidence]:
     return out[:MAX_ROWS]
 
 
-# What a parameter's origin is, in words, as a claim's label says it.
-ORIGIN_WORDS = {"library-default": "the package's own value", "person-assumption": "a person's assumption",
-                "model-estimate": "a model's estimate", "record": "read from a record", "artifact": "read from an artifact"}
+# What a parameter's origin is, in words, as a claim's label says it: each
+# a ParamOrigin, the word a run's parameters (runs.parameters_of) give a
+# value for where it came from.
+ORIGIN_WORDS = {"library-default": "the package's own value", "assumption": "a person's assumption",
+                "model-estimate": "a model's estimate", "measurement": "a deposition's reading",
+                "record": "read from a record", "artifact": "read from an artifact"}
+# The provenance a parameter's own evidence carries, by its ParamOrigin: a
+# value a person or a model set is assumed, a deposition's reading measured,
+# and the package's own value computed.
+ORIGIN_PROVENANCE = {"assumption": "assumed", "model-estimate": "assumed", "measurement": "measured"}
 
 
 def parameter_evidence(report: RunReport, words: str, limit: int) -> list[Evidence]:
     """The parameters a kept run read back from the plant whose key, label or
     group hold every one of `words`, as evidence on the run's artifact: computed
-    where the package set the value, assumed where a person or a model did."""
+    where the package set the value, assumed where a person or a model did,
+    measured where a deposition's reading did."""
     art, run = report.artifact, report.run
     held = report.parameters
     if hasattr(held, "model_dump"):
@@ -136,7 +147,7 @@ def parameter_evidence(report: RunReport, words: str, limit: int) -> list[Eviden
         source = (v.get("source") or {}).get("id")
         label = f"{name}: {spec.get('label') or v.get('key')}, {ORIGIN_WORDS.get(origin, origin)}" + (f" ({source})" if source else "")
         out.append(Evidence(id=f"{art.id}:parameters.{v.get('key')}", label=label, value=v["value"],
-                            unit=spec.get("unit") or "", provenance="assumed" if origin in ("person-assumption", "model-estimate") else "computed",
+                            unit=spec.get("unit") or "", provenance=ORIGIN_PROVENANCE.get(origin, "computed"),
                             basis=basis))
         if len(out) >= limit:
             break
@@ -151,9 +162,9 @@ def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
                                    "status": "refused", "refused": run.refused, "scenarioId": run.scenarioId})
     evidence = run_evidence(report)
     own = [{"key": i.name, "value": i.quantity.value, "unit": i.quantity.unit, "origin": i.quantity.origin.kind,
-            "by": i.quantity.origin.by}
-           for i in run.inputs if i.quantity.origin is not None
-           and i.quantity.origin.kind in ("person-assumption", "model-estimate")]
+            "by": i.quantity.origin.by, **({"reading": i.quantity.origin.ref} if i.quantity.origin.kind == "measurement"
+                                           else {})}
+           for i in run.inputs if i.quantity.origin is not None and i.quantity.origin.kind in SET_ORIGINS]
     return ToolResult(
         summary={
             "state": state,
@@ -398,7 +409,8 @@ RUN_TOOL = register(Tool(
         "Run a plant from the library shelf at the library's defaults, or a study scenario (by its id) with the "
         "values it sets, as an engine run: kept in the project, marked as yours, with the SFF file it writes. "
         "Returns the run's id, its artifact id, its provenance (assumed when a value it set is an estimate or an "
-        "assumption), the values it set with their origins, and each number its price and its flowsheet's "
+        "assumption; measured when a value it set is a deposition's reading and none is either), the values it "
+        "set with their origins (a reading with its ref), and each number its price and its flowsheet's "
         "outputs hold as an evidence id to cite. The same plant and values asked again answer from the run kept. "
         "A plant that refuses the values is kept as a receipt and refused in the plant's words."
     ),

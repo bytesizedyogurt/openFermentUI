@@ -32,7 +32,7 @@ Documented exceptions, each with its reason:
 | `literature/` | `projects` | every read and write of a project's documents is scoped to the current project (ADR-005) |
 | `literature/` | `migrations` | the retrieval report (literature/report.py) migrates a disposable database of its own |
 | `engine/` | `artifacts` | a run's computation is kept as an artifact, replayable, with the existing semantics (§7.4) |
-| `engine/` | `basis` | provenance and origins are computed by the basis rules alone (ADR-006) |
+| `engine/` | `basis` | provenance and origins are computed by the basis rules alone (ADR-006), and a value that is a deposition's reading is looked up through basis.resolved, the one door (measurements.py) |
 | `engine/` | `flowsheets` | the package-test reader in flowsheets/shelf.py, which imports no BioSTEAM (§8.4: the regression check reads the package's own test by ast) |
 | `engine/` | `projects` | a run and a flowsheet record belong to the current project (ADR-005) |
 | `engine/` | `events` | a run is a job the project's event stream says as it happens (§7.3 item 2) |
@@ -40,7 +40,7 @@ Documented exceptions, each with its reason:
 | `engine/` | `tools` | conformance check 1 sends a bare number through the engine_run tool as well, the second door a number enters by (docs/api/engines.md) |
 | `studies/` | `projects` | a scenario, a comparison and a runbook belong to the current project (ADR-005) |
 | `studies/` | `artifacts` | a comparison is computed as an artifact over the runs' artifacts, replayable (§7.4) |
-| `studies/` | `basis` | a value's origin and a comparison's provenance are the basis rules' (ADR-006) |
+| `studies/` | `basis` | a value's origin and a comparison's provenance are the basis rules' (ADR-006), and a value that is a deposition's reading is looked up through basis.resolved, the one door (measurements.py) |
 | `studies/` | `project_state` | a study's runbook is a row of the project's runbooks beside a person's, kept and its lock audited by the store the runbook page writes to |
 | `studies/` | `runbook_lock` | a runbook is locked under the digest the browser writes (src/engine/lock.ts) |
 | `postdoc/` | `projects` | a conversation and its turns belong to the current project (ADR-005) |
@@ -216,6 +216,7 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `literature_mcp.py` | Sci RAG Kit's MCP server, over stdio, for one project (ADR-002). |
 | `llm.py` | The one place openFerment calls a Claude model (Postdoc, Extract). |
 | `mcp_server.py` | openFerment's tools for assistants outside the app (OF-BLD-014 §10.1). |
+| `measurements.py` | A deposition's reading as a value a run sets (ADR-006's measurement; alpha 2.2 §6.3, D7). |
 | `migrations.py` | `python -m openferment_core.migrations` — both schemas' migrations, and the database commands (execution prompt §8.1, §8.2). |
 | `models.py` | AnswerPlan (OF-BLD-007 §3). |
 | `module_stores.py` | Every module's store, read the same way (OF-BLD-015 §7.1, §7.2). |
@@ -243,8 +244,8 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | Folder | Files |
 |---|---|
 | `src/api/` | 1: `types.gen.ts` |
-| `src/components/` | 53: `AnswerPlanView.tsx`, `CeilingGap.tsx`, `Chip.tsx`, `CollectCard.tsx`, `CommandPalette.tsx`, `ComponentTag.tsx`, `CostWaterfall.tsx`, `DataTable.tsx`, `DepositionPanel.tsx`, `Distribution.tsx`, `Dossier.tsx`, `EvidenceCard.tsx`, `EvidenceStrip.tsx`, `FigureFrame.tsx`, `Frontier.tsx`, `GuidedTour.tsx`, `GuildBits.tsx`, `GuildGate.tsx`, `HomeStart.tsx`, `IntervalLedger.tsx`, `JobsTray.tsx`, `LessonEmbeds.tsx`, `LevelGlyph.tsx`, `Markdown.tsx`, `MixLine.tsx`, `NewScenarioDialog.tsx`, `OwnerTabs.tsx`, `OxygenBalance.tsx`, `ParameterPanel.tsx`, `ParameterRow.tsx`, `PassageQuote.tsx`, `PlanTrace.tsx`, `ProcessTrain.tsx`, `ProjectSwitch.tsx`, `PropertiesPanel.tsx`, `ProposalsCard.tsx`, `ProposedTrain.tsx`, `Provenance.tsx`, `PurityByStream.tsx`, `QuantityField.tsx`, `RecoveryByUnit.tsx`, `ReferenceView.tsx`, `RunbookBits.tsx`, `SffGraph.tsx`, `TimeCourse.tsx`, `TimeSeriesPanel.tsx`, `Tornado.tsx`, `TraceCards.tsx`, `TrajectoryBand.tsx`, `Unbuilt.tsx`, `encoding.ts`, `index.ts`, `ui.tsx` |
+| `src/components/` | 54: `AnswerPlanView.tsx`, `CeilingGap.tsx`, `Chip.tsx`, `CollectCard.tsx`, `CommandPalette.tsx`, `ComponentTag.tsx`, `CostWaterfall.tsx`, `DataTable.tsx`, `DepositionPanel.tsx`, `Distribution.tsx`, `Dossier.tsx`, `EvidenceCard.tsx`, `EvidenceStrip.tsx`, `FigureFrame.tsx`, `Frontier.tsx`, `GuidedTour.tsx`, `GuildBits.tsx`, `GuildGate.tsx`, `HomeStart.tsx`, `IntervalLedger.tsx`, `JobsTray.tsx`, `LessonEmbeds.tsx`, `LevelGlyph.tsx`, `Markdown.tsx`, `MixLine.tsx`, `NewScenarioDialog.tsx`, `OwnerTabs.tsx`, `OxygenBalance.tsx`, `ParameterPanel.tsx`, `ParameterRow.tsx`, `PassageQuote.tsx`, `PlanTrace.tsx`, `ProcessTrain.tsx`, `ProjectSwitch.tsx`, `PropertiesPanel.tsx`, `ProposalsCard.tsx`, `ProposedTrain.tsx`, `Provenance.tsx`, `PurityByStream.tsx`, `QuantityField.tsx`, `ReadingOrigin.tsx`, `RecoveryByUnit.tsx`, `ReferenceView.tsx`, `RunbookBits.tsx`, `SffGraph.tsx`, `TimeCourse.tsx`, `TimeSeriesPanel.tsx`, `Tornado.tsx`, `TraceCards.tsx`, `TrajectoryBand.tsx`, `Unbuilt.tsx`, `encoding.ts`, `index.ts`, `ui.tsx` |
 | `src/data/` | 10: `components.ts`, `labels.ts`, `nav.ts`, `ontology.ts`, `shortcuts.ts`, `skillFamilies.ts`, `subsystems.ts`, `tabs.ts`, `types.ts`, `vocabulary.ts` |
-| `src/engine/` | 14: `capture.ts`, `checks.ts`, `competence.ts`, `diff.ts`, `enumeration.ts`, `interp.ts`, `ledger.ts`, `lock.ts`, `metrics.ts`, `path.ts`, `reconcile.ts`, `scale.ts`, `series.ts`, `units.ts` |
+| `src/engine/` | 15: `capture.ts`, `checks.ts`, `competence.ts`, `diff.ts`, `enumeration.ts`, `interp.ts`, `ledger.ts`, `lock.ts`, `metrics.ts`, `path.ts`, `readings.ts`, `reconcile.ts`, `scale.ts`, `series.ts`, `units.ts` |
 | `src/lib/` | 24: `artifacts.ts`, `checks.ts`, `csv.ts`, `durable.ts`, `events.ts`, `fermos.ts`, `geneos.ts`, `guild.ts`, `http.ts`, `intake.ts`, `library.ts`, `literature.ts`, `params.ts`, `postdoc.ts`, `practice.ts`, `proforma.ts`, `project.ts`, `projectState.ts`, `proposals.ts`, `pureos.ts`, `review.ts`, `studies.ts`, `thermo.ts`, `viz.ts` |
 | `src/screens/` | 54: `Architecture.tsx`, `BenchCheck.tsx`, `BioRepo.tsx`, `BioRepoArtifacts.tsx`, `BioRepoSearch.tsx`, `Compare.tsx`, `Deposition.tsx`, `DepositionDetail.tsx`, `Depositions.tsx`, `FermOS.tsx`, `FermOSForecast.tsx`, `FermOSSimulate.tsx`, `FermOSVessel.tsx`, `FlowsheetPage.tsx`, `Flowsheets.tsx`, `GeneOS.tsx`, `GeneOSModel.tsx`, `Guild.tsx`, `GuildChecks.tsx`, `GuildMatrix.tsx`, `GuildPeople.tsx`, `GuildSkills.tsx`, `Home.tsx`, `Intake.tsx`, `IntakeIngest.tsx`, `Organisms.tsx`, `PaperReader.tsx`, `Postdoc.tsx`, `Primer.tsx`, `PrimerLesson.tsx`, `PrimerPath.tsx`, `PrimerPractice.tsx`, `Proforma.tsx`, `ProformaBiosteam.tsx`, `ProformaComparison.tsx`, `ProformaReference.tsx`, `ProformaRun.tsx`, `ProformaScenario.tsx`, `ProformaStudies.tsx`, `ProjectHome.tsx`, `ProtocolDetail.tsx`, `ProtocolEditor.tsx`, `Protocols.tsx`, `PureOS.tsx`, `PureOSBuilder.tsx`, `PureOSPropose.tsx`, `PureOSTrain.tsx`, `RunbookDetail.tsx`, `RunbookLedger.tsx`, `Runbooks.tsx`, `Settings.tsx`, `SettingsFigures.tsx`, `StrainPage.tsx`, `Witness.tsx` |

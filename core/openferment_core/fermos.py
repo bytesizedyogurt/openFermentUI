@@ -115,7 +115,7 @@ from scipy.optimize import least_squares, lsq_linear
 from scipy.stats import t as student_t
 
 from . import artifacts, binding, kinetics, params, units
-from .basis import ASSUMED_KINDS, override_source
+from .basis import is_measurement, is_set, override_source
 from .models import (
     BasisInput,
     BasisSource,
@@ -1339,6 +1339,10 @@ def _numbers(fam: kinetics.Family, specs: list[ParameterSpec],
 def _source_words(v: ParameterValue) -> str:
     """Where a value came from, in a few words, for a refusal naming it."""
     src = v.source
+    if v.origin == "measurement":
+        return f"reading {src.id if src is not None else 'unnamed'}, deposited by {v.overriddenBy or 'nobody named'}"
+    if v.origin == "model-estimate":
+        return f"estimated by {v.overriddenBy or 'no model named'}"
     if v.overriddenBy:
         return f"typed by {v.overriddenBy}"
     if v.origin == "fit" and src is not None and src.id:
@@ -2152,12 +2156,13 @@ def _values_of(specs: list[ParameterSpec], inputs: list[BasisInput]) -> list[Par
         identified = ORIGIN_WORDS.get(word) if word in ORIGIN_WORDS else None
         origin = ("record" if records else "assumption" if kind == "assumption"
                   else "model-estimate" if kind == "model-estimate"
+                  else "measurement" if is_measurement(i.source)
                   else "fit" if word in ORIGIN_WORDS or kind == "deposition"
                   else "simulation" if word == "simulation" else "artifact" if kind == "artifact" else "convention")
         v = ParameterValue(key=spec.key, value=i.value, low=float(low.value) if low else None,
                            high=float(high.value) if high else None, source=i.source, origin=origin,
                            identified=identified if origin == "fit" else None,
-                           overriddenBy=i.source.by if kind in ASSUMED_KINDS else None, recordIds=records,
+                           overriddenBy=i.source.by if is_set(i.source) else None, recordIds=records,
                            detail=i.source.note)
         v.outOfBounds = params.bounds_check(spec, v.value, v.low, v.high)
         out.append(v)

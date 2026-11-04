@@ -47,7 +47,7 @@ export default function Depositions() {
           <EmptyState
             icon={<ClipboardList size={22} />}
             title="No depositions in this project yet"
-            body="Depositions are written at the bench and kept with the project on the service; one written while the service is away waits in this browser until it is sent. Open a runbook and stage a run against one of its protocols, and the record appears here. With no runbook on the board yet, ask Postdoc to draft one and turn it into a runbook."
+            body="Depositions are written at the bench and kept with the project on the service; one written while the service is away waits in this browser until it is sent. Open a locked runbook and start a deposition, against one of its protocols or against its measures alone, and the record appears here. With no runbook on the board yet, ask Postdoc to draft one and turn it into a runbook."
             action={
               <div className="flex flex-wrap gap-2 justify-center">
                 <LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>
@@ -79,7 +79,7 @@ export default function Depositions() {
                     </span>
                   </div>
                   <div className="text-body text-ink-soft mt-0.5">
-                    {pr ?? d.protocolId}
+                    {pr ?? d.protocolId ?? 'Readings against the runbook’s measures, with no protocol’s steps'}
                     {rb && <> · testing {rb}</>}
                   </div>
                 </li>

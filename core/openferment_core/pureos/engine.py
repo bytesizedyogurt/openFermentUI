@@ -61,7 +61,8 @@ production one among them), with two declarations of its own:
                 which conformance reads and copies into a database of its own:
                 every train, each artifact a train's inlet reads with its
                 run's row, the scenarios a run-stream inlet names, the
-                evidence pool and the project's strains
+                evidence pool, the project's strains, and its depositions,
+                whose readings a run's values may be
     unready     why a train cannot be checked as it stands, in words saying
                 what it is (a saved draft, a train whose values wait for a
                 source, a train whose run is refused before it computes), or
@@ -138,7 +139,7 @@ def _trains() -> list[tuple[str, TrainSpec, str]]:
 def _origin(v: ParameterValue, spec: ParameterSpec) -> Origin | None:
     """Where a resolved value comes from, as the contract states a default's
     origin; None for a value that waits or that the class reads for itself."""
-    from ..basis import origin_of
+    from ..basis import SET_PARAM_ORIGINS, origin_of
 
     if v.value is None or v.source is None or v.origin in ("waiting", "not-read"):
         return None
@@ -150,7 +151,7 @@ def _origin(v: ParameterValue, spec: ParameterSpec) -> Origin | None:
         return Origin(kind="record", ref=", ".join(v.recordIds) or None, note=v.detail)
     if v.origin in ("artifact", "simulation"):
         return Origin(kind="artifact", ref=v.source.id or None, note=v.detail)
-    if v.origin == "assumption":
+    if v.origin in SET_PARAM_ORIGINS:
         return origin_of(v.source)
     return None
 
@@ -274,6 +275,9 @@ class TrainEngine:
                         strain, and pureOS reads that strain's species, and the
                         one species of its chemical set, from all of them
                         (vessel._organism_read, proforma._strain_labels)
+            depositions every deposition the project keeps: a value a run of a
+                        train sets may be a deposition's reading, which the
+                        run looks up in them (measurements.py)
 
         The pool reads the titles of the project's documents too, for its
         search alone; no train's value or words read them, so the copy
@@ -296,7 +300,7 @@ class TrainEngine:
                         held.add(newest.id)
         ids = sorted(held)
         return {"trains": None, "artifacts": {"id": ids}, "runs": {"id": ids}, "scenarios": {"id": sorted(scenarios)},
-                "candidates": None, "decisions": None, "catalogue": {"kind": ["strain"]}}
+                "candidates": None, "decisions": None, "catalogue": {"kind": ["strain"]}, "depositions": None}
 
     def unready(self, thing: str, inputs: list[EngineInput]) -> str | None:
         """Why a train cannot be checked as it stands, in words that say what

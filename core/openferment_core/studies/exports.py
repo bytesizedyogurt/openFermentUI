@@ -6,8 +6,11 @@ out every installed package). It holds
 
     study.json          every engine run with its inputs and their origins,
                         its outputs, versions and SFF record; every study
-                        scenario, comparison and runbook; and, whole, the
-                        artifacts that computed the runs and comparisons
+                        scenario, comparison and runbook; whole, the
+                        artifacts that computed the runs and comparisons;
+                        and each deposition a run's or a scenario's reading
+                        rests on, as the bench kept it, with the person who
+                        deposited it
     study.md            the same in words and tables
     sff/<run>.sff.json  each run's flowsheet, byte for byte as the project
                         holds it
@@ -110,7 +113,32 @@ def study() -> dict[str, Any]:
         # As kept: the lock's digest reads a prediction's absent field and a null one differently.
         "runbooks": [b.model_dump(mode="json", exclude_unset=True) for b in reversed(runbooks.listed())],
         "artifacts": artifacts,
+        "depositions": _depositions(reports),
     }
+
+
+def _read_refs(reports: list[Any]) -> list[str]:
+    """The readings the runs and the study scenarios rest on (each a
+    measurement's ref, `<deposition id>/<entry id>`), in the order named."""
+    refs: list[str] = []
+    origins = [i.quantity.origin for rep in reports for i in rep.run.inputs]
+    origins += [v.quantity.origin for s in scenarios.listed() for v in s.values]
+    for o in origins:
+        if o is not None and o.kind == "measurement" and o.ref and o.ref not in refs:
+            refs.append(o.ref)
+    return refs
+
+
+def _depositions(reports: list[Any]) -> list[dict[str, Any]]:
+    """Each deposition the runs' and the scenarios' readings name, oldest
+    first, as the bench kept it (its readings' raw words, their
+    confirmations and their times), with the person who deposited it: what
+    a measured value rests on, so it can be read without the service."""
+    from .. import project_state
+
+    named = {ref.partition("/")[0] for ref in _read_refs(reports)}
+    return [{"id": body.get("id"), "depositedBy": maker, "record": body}
+            for body, maker in project_state.deposited() if isinstance(body, dict) and body.get("id") in named]
 
 
 def _proforma_scenarios(named: set[str]) -> list[dict[str, Any]]:
@@ -164,10 +192,22 @@ NO_SUCH_VALUE = f"{NONE} (this run holds no such value)"
 
 
 def _set_cell(x: dict[str, Any]) -> str:
-    """One run's cell of a comparison's values: its value, unit and origin, and who set it."""
+    """One run's cell of a comparison's values: its value, unit and origin,
+    and who set it; a reading with its ref."""
     if x.get("origin") is None:
         return NO_SUCH_VALUE
-    return f"{_cell(x['value'])} {x['unit']} ({x['origin']}, {_cell(x.get('by'))})"
+    who = _cell(x.get("by")) + (f", reading {x['ref']}" if x.get("ref") else "")
+    return f"{_cell(x['value'])} {x['unit']} ({x['origin']}, {who})"
+
+
+def _who(origin: dict[str, Any] | None) -> str | None:
+    """Who or what a value's origin names: a reading's depositor and the
+    reading itself, a person's or a model's name, or the record or artifact
+    it was read from."""
+    o = origin or {}
+    if o.get("kind") == "measurement":
+        return f"{o.get('by') or 'nobody named'}, reading {o.get('ref')}"
+    return o.get("by") or o.get("ref")
 
 
 def _library_run(run: dict[str, Any]) -> bool:
@@ -195,8 +235,7 @@ def _run_section(run: dict[str, Any], art: dict[str, Any] | None, scenario_title
     out += ["Its inputs, each with its origin:", ""]
     out += _table(["Input", "Value", "Unit", "Origin", "By", "Rests on"], [
         [i["name"], i["quantity"]["value"], i["quantity"]["unit"], (i["quantity"].get("origin") or {}).get("kind"),
-         (i["quantity"].get("origin") or {}).get("by") or (i["quantity"].get("origin") or {}).get("ref"),
-         (i["quantity"].get("origin") or {}).get("note")] for i in run["inputs"]])
+         _who(i["quantity"].get("origin")), (i["quantity"].get("origin") or {}).get("note")] for i in run["inputs"]])
     if not _library_run(run):
         values = (run.get("outputs") or {}).get("values") or []
         if values:
@@ -258,7 +297,7 @@ def markdown(held: dict[str, Any], vers: dict[str, Any]) -> str:
                 f"On {where}, made by {_cell(s['by'])}, {s['at']}." + (f" {_cell(s['note'])}" if s.get("note") else ""),
                 "", *_table(["Parameter", "Value", "Unit", "Origin", "By", "At", "Rests on"], [
                     [v["key"], v["quantity"]["value"], v["quantity"]["unit"], v["quantity"]["origin"]["kind"],
-                     v["quantity"]["origin"].get("by"), v["quantity"]["origin"].get("at"),
+                     _who(v["quantity"]["origin"]), v["quantity"]["origin"].get("at"),
                      v["quantity"]["origin"].get("note")] for v in s["values"]]),
                 "Its runs: " + (", ".join(f"`{r}`" for r in s["runIds"]) or "none yet") + ".", ""]
 
@@ -291,6 +330,20 @@ def markdown(held: dict[str, Any], vers: dict[str, Any]) -> str:
                 *_table(["Prediction", "Value", "Unit", "Confidence", "Measured at", "Basis"], [
                     [p["label"], p["value"], p["unit"], p["confidence"], measured.get(p["id"]), p["basis"]]
                     for p in b["predictions"]])]
+
+    out += ["## Depositions", ""]
+    if not held.get("depositions"):
+        out += ["No run or scenario rests on a deposition's reading.", ""]
+    for d in held.get("depositions") or []:
+        body = d["record"]
+        out += [f"### Deposition `{d['id']}`", "",
+                f"Deposited by {_cell(d.get('depositedBy'))} on runbook `{_cell(body.get('runbookId'))}`, "
+                f"{_cell(body.get('state'))}; started {_cell(body.get('startedAt'))}, closed "
+                f"{_cell(body.get('closedAt'))}. Its readings, as the bench kept them:", "",
+                *_table(["Reading", "Measure", "Value", "Unit", "Taken", "Confirmed", "Said at the bench"], [
+                    [f"`{d['id']}/{e.get('id')}`", e.get("measureId"), e.get("value"), e.get("unit"), e.get("at"),
+                     e.get("confirmed") is True, e.get("raw")]
+                    for e in body.get("entries") or [] if isinstance(e, dict)])]
 
     out += ["## Versions", "", f"openFerment {vers['openferment']} on Python {vers['python']}. A runbook's lock digest: "
             f"{vers['lockDigest']}.", ""]

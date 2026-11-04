@@ -41,6 +41,11 @@ export interface ProjectState {
   /** pureOS's trains built in the Builder, by train id. */
   trains: Record<string, TrainMade>;
   conversations: LiveConversation[];
+  /**
+   * Who deposited each deposition, by id: the service writes it from its
+   * rows' makers and no page sends it (project_state.py `MAKERS`).
+   */
+  depositedBy?: Record<string, string>;
 }
 
 export const EMPTY_STATE: ProjectState = {
@@ -128,6 +133,7 @@ export function applyEntries(state: ProjectState, entries: OutboxEntry[]): Proje
     scenarios: list('scenarios'),
     trains: record('trains'),
     conversations: list('conversations'),
+    depositedBy: state.depositedBy,
   };
 }
 

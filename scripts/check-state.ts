@@ -9,7 +9,10 @@
  * in the service's words (src/lib/http.ts), a refusal of a request's own
  * fields among them; and the unit each person's change is sent in
  * (src/lib/params.ts, `inputsOf`), a panel that shows part of its scope
- * among them, a train's changes named by their place (src/lib/pureos.ts,
+ * among them and a deposition's reading sent as the reading it names; the
+ * bench's readings as the service's lookup reads them (src/engine/readings.ts:
+ * a correction, the numbers that wait to be read back, a series); a
+ * train's changes named by their place (src/lib/pureos.ts,
  * `trainInputs`), a Proforma scenario's run carrying its changes as typed
  * inputs (src/lib/proforma.ts, `runBody`) and its ceiling check its typed
  * yield (`ceilingQuery`), and a run's grid read where it holds a dimension at
@@ -32,8 +35,9 @@ import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http'
 import { runnable, type LibraryPlant } from '../src/lib/library';
 import { inputsOf } from '../src/lib/params';
 import { trainInputs, unitScope } from '../src/lib/pureos';
-import { ceilingQuery, runBody, runSpecs } from '../src/lib/proforma';
+import { ceilingQuery, isReading, runBody, runSpecs } from '../src/lib/proforma';
 import { interpolate } from '../src/engine/interp';
+import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -235,6 +239,62 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   check('the shown specs alone would send a change typed elsewhere on the scope with no unit', units(shownOnly) === 'x0 placeholder-unit-a, mu_max ', units(shownOnly));
   const expanded = inputsOf([typed('split.Water')], [spec('split', 'placeholder-share', 'Separation')]);
   check('a key expanded per item is sent in its template’s unit', expanded[0]?.quantity.unit === 'placeholder-share', JSON.stringify(expanded));
+  // alpha 2.2 C.5: a deposition's reading travels as the reading it is, its ref beside its depositor and its time.
+  const reading = { ...typed('x0'), origin: 'measurement', ref: 'dep-1/de-1' } as Override;
+  const [sentReading, sentTyped] = inputsOf([reading, typed('mu_max')], scope);
+  check(
+    'a reading is sent as a measurement naming its reading; a typed value is sent as a person’s assumption',
+    sentReading?.quantity.origin?.kind === 'measurement' &&
+      sentReading.quantity.origin.ref === 'dep-1/de-1' &&
+      sentReading.quantity.origin.by === 'Ada' &&
+      sentTyped?.quantity.origin?.kind === 'person-assumption' &&
+      !('ref' in (sentTyped.quantity.origin ?? {})),
+    JSON.stringify([sentReading, sentTyped]),
+  );
+}
+
+// ── the bench's readings, read as the service's lookup reads them (alpha 2.2 C.5; src/engine/readings.ts) ──
+
+{
+  const entry = (id: string, value: number, confirmed = false) =>
+    ({ id, measureId: 'm-1', stepId: 'readings', at: '2026-11-03T09:00:00Z', value, unit: 'placeholder-unit', raw: `came in at ${value}`, confirmed });
+  // "came in at 3", fixed to 2 at the bench: the correction appended, the 3 kept with its words.
+  const first = entry('de-1', 3);
+  const fixed = correctionOf(first, 'de-2', 2, '2026-11-03T11:30:00Z');
+  const bench = { id: 'dep-1', entries: [first, fixed], observations: [], sampleTimes: {} } as unknown as Deposition;
+  check(
+    'a correction keeps the time its reading was taken, says when it was typed, and stands confirmed',
+    fixed.at === first.at && fixed.correctedAt === '2026-11-03T11:30:00Z' && fixed.confirmed && fixed.value === 2,
+    JSON.stringify(fixed),
+  );
+  check(
+    'after a correction, only the newest number waits to be read back, and the corrected one waits for nothing',
+    correctedBy(bench, first) === 'de-2' && correctedBy(bench, fixed) === null && awaitingReadBack(bench).length === 0,
+    JSON.stringify(awaitingReadBack(bench)),
+  );
+  // Then "came in at 5" and "came in at 7": the 7 alone waits, the number the person said last.
+  const later = { ...bench, entries: [first, fixed, entry('de-3', 5), entry('de-4', 7)] } as unknown as Deposition;
+  check(
+    'of several numbers on one measure, the read-back box holds the newest alone',
+    JSON.stringify(awaitingReadBack(later).map((e) => e.id)) === '["de-4"]',
+    JSON.stringify(awaitingReadBack(later).map((e) => e.id)),
+  );
+  // A series: each reading at its own hour stands, and a later one at the same hour corrects it.
+  const series = {
+    ...bench,
+    entries: [entry('de-5', 1), entry('de-6', 2), entry('de-7', 1.5)],
+    sampleTimes: { 'de-5': 1, 'de-6': 2, 'de-7': 1 },
+  } as unknown as Deposition;
+  check(
+    'a reading in a series is its own, corrected by a later one at its hour alone',
+    correctedBy(series, series.entries[0]) === 'de-7' && correctedBy(series, series.entries[1]) === null,
+    JSON.stringify(series.entries.map((e) => [e.id, correctedBy(series, e)])),
+  );
+  check(
+    'a basis source is a reading where it names one reading and when it was measured, and a series is no reading',
+    isReading({ kind: 'deposition', id: 'dep-1/de-2', note: 'measured on 2026-11-03T09:00:00Z', by: 'Ada' }) &&
+      !isReading({ kind: 'deposition', id: 'dep-1', note: 'the readings as the browser sent them', by: null }),
+  );
 }
 
 // ── a train's changes, each named by its place (alpha 2.2 D2; src/lib/pureos.ts) ──

@@ -11,6 +11,7 @@ import type { Artifact, BasisSource, ReplayResult } from '@/data/types';
 import { ArtifactRefused, ArtifactsDown, getArtifact, headline, listArtifacts, replayArtifact } from '@/lib/artifacts';
 import { href, navigate } from '@/router';
 import { CitationChip } from '@/components/Chip';
+import { depositionPath } from '@/components/ReadingOrigin';
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
 import { Button, Callout, Card, EmptyState, PageHeader, SectionTitle } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -149,8 +150,18 @@ function SourceChip({ source }: { source: BasisSource }) {
           {source.note ? ` — ${source.note}` : ''}
         </span>
       );
-    case 'deposition':
-      return <span className="chip font-mono">deposition {source.id ?? ''}</span>;
+    case 'deposition': {
+      // A reading (`<deposition id>/<entry id>`, alpha 2.2 C.5) or a whole deposition's series: each opens the deposition's record.
+      const [deposition, entry] = (source.id ?? '').split('/');
+      return deposition ? (
+        <a className="chip font-mono" href={href(depositionPath(deposition, entry))}>
+          deposition {source.id}
+          {source.by ? ` — deposited by ${source.by}` : ''}
+        </a>
+      ) : (
+        <span className="chip font-mono">deposition, unnamed</span>
+      );
+    }
     case 'model':
       return <span className="chip font-mono">model {source.id ?? ''}</span>;
     case 'convention':

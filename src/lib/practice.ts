@@ -84,7 +84,8 @@ export function forDrafting(d: Deposition, runbooks: Runbook[]): PracticeDeposit
   const schema = runbooks.find((r) => r.id === d.runbookId)?.measurementSchema ?? [];
   return {
     id: d.id,
-    protocolId: d.protocolId,
+    // Readings recorded with no protocol's steps name no protocol, and so no step to practise.
+    protocolId: d.protocolId ?? '',
     startedAt: d.startedAt,
     entries: d.entries.map((e) => ({
       id: e.id,

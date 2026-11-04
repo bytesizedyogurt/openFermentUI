@@ -50,7 +50,14 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
     9  the UI walk (scripts/walk.ts, Chromium): Home, the project at its own address with its
        live trace, a document pasted in and searched, the flowsheet run's report and its SFF
        graph, a scenario begun from that run, the plants Studies offers to run, the project's
-       SFF flowsheets, the conversation of step 6 with its estimate marked, the runbook of step 5
+       SFF flowsheets, the conversation of step 6 with its estimate marked, the runbook of step 5;
+       then a reading deposited at the bench on that locked runbook, the readings alone, by the
+       proof's person, in the unit of the scenario parameter step 5 sets, the placeholder the
+       person types; a scenario made from step 5's flowsheet run through NewScenarioDialog with
+       that reading chosen and nothing typed, and run; its run's page read: provenance measured,
+       the reading's origin linked to its deposition. The service then holds each as the walk
+       left it: the deposition, the reading with its depositor and time, the scenario resting
+       on the reading alone, and its run `measured` with the measurement among its inputs
    10  every engine of the entry-point group `openferment.engines` listed by the service with its
        version and worker, none with an error; the eight conformance checks of docs/api/engines.md
        made on each (`python -m openferment_core.engine.conform <name>`, on a scratch database of
@@ -78,7 +85,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import httpx
 
@@ -97,6 +104,14 @@ FLOWSHEET = "cellulosic_ethanol_v0"
 OTHER_PLANT = "sugarcane"
 # One of the toolkit's reference SFF files (engine/sff_library.json): Sugarcane → Ethanol.
 REFERENCE_FILE = "SF_BST_15"
+# The reading the walk deposits at the bench (step 9) on step 5's locked runbook: a placeholder the proof's person
+# types, in the unit of the scenario parameter step 5 sets, the unit the runbook's measure is in; and the parameter a
+# scenario then sets to that reading alone. The pairing is a placeholder chosen by unit: the service holds a reading's
+# unit to the parameter's, and which measure stands for which parameter is the scenario maker's choice (ADR-006's
+# note of 2026-11-03). The value measures nothing.
+READING_PARAMETER = "stream.cornstover.price"
+READING_UNIT = "USD/kg"
+READING_VALUE = 1.0
 # Sci RAG Kit's demo corpus (five fictional documents, CC0), and the one the extraction reads.
 DEMO = CORE / "tests" / "fixtures" / "kit-demo"
 DEMO_LICENCE = "CC0, as the manifest of Sci RAG Kit's demo corpus states (core/tests/fixtures/kit-demo/manifest.jsonl)"
@@ -130,7 +145,7 @@ TITLES = {
        "its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
-    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a conversation, a runbook",
+    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured",
     10: "the engines: each registered one listed, the eight conformance checks made on it, its verdict kept; a train "
         "made on step 4's run for the train engine's",
 }
@@ -721,15 +736,76 @@ def step_9(proof: Proof) -> None:
         raise Stop("dist/ holds no built app: run `pnpm build` before the proof, since the service mounts the app "
                    "it finds when it starts")
     runbook = proof.made.get("runbook")
+    if runbook:
+        # The bench files a reading in its measure's unit, which the scenario parameter must be denominated in.
+        units = {m["unit"] for m in api(proof, "GET", f"/api/studies/runbooks/{runbook[0]}")["measurementSchema"]}
+        if READING_UNIT not in units:
+            raise Stop(f"runbook {runbook[0]} measures in {', '.join(sorted(units))}, and the walk's reading is for "
+                       f"{READING_PARAMETER}, in {READING_UNIT}")
     env = {**os.environ, "WALK_ORIGIN": proof.origin, "WALK_PROJECT": proof.project, "WALK_RUN": proof.made["flowsheet"],
-           "WALK_CONVERSATION": proof.made["conversation"], "WALK_RUNBOOK": runbook[0] if runbook else ""}
+           "WALK_CONVERSATION": proof.made["conversation"], "WALK_RUNBOOK": runbook[0] if runbook else "",
+           "WALK_PERSON": PERSON, "WALK_READING": f"{READING_VALUE:g}", "WALK_READING_UNIT": READING_UNIT,
+           "WALK_READING_PARAMETER": READING_PARAMETER}
     walked = subprocess.run(["npx", "tsx", "scripts/walk.ts"], cwd=ROOT, text=True, capture_output=True, env=env,
-                            timeout=900)
+                            timeout=1500)
     lines = [line.strip() for line in walked.stdout.splitlines() if line.strip().startswith(("✓", "✗"))]
     for line in lines:
         proof.check(line.startswith("✓"), line[1:].strip())
     proof.check(walked.returncode == 0 and bool(lines), "the walk ended clean" if walked.returncode == 0 else
                 f"the walk exited {walked.returncode}: {(walked.stderr or '').strip()[-300:]}")
+    if runbook:
+        measured_by_the_walk(proof, runbook[0])
+
+
+def measured_by_the_walk(proof: Proof, runbook: str) -> None:
+    """What the walk left on the service, read back through the API (alpha 2.2 C.5): the deposition it made at
+    the bench on `runbook` with no protocol's steps, closed, holding the one reading the proof's person typed and
+    read back; that reading listed as one a run takes in the parameter's unit, deposited by the person; the
+    scenario on step 5's flowsheet setting the parameter to that reading alone; and its run, `measured`, the
+    reading among its inputs as a measurement and every other input the library's default or a convention."""
+    deposited = [d for d in api(proof, "GET", "/api/state")["depositions"] if d.get("runbookId") == runbook]
+    readings = [r for r in api(proof, "GET", f"/api/depositions/readings?unit={quote(READING_UNIT)}")
+                if r["runbookId"] == runbook]
+    d = deposited[0] if len(deposited) == 1 else {}
+    r = readings[0] if len(readings) == 1 else {}
+    entries = d.get("entries") or []
+    if not proof.check(bool(d) and d.get("protocolId") is None and d.get("state") == "closed" and len(entries) == 1
+                       and entries[0].get("confirmed") is True and bool(r) and r["ref"] == f"{d['id']}/{entries[0]['id']}"
+                       and (r["value"], r["unit"], r["by"]) == (READING_VALUE, READING_UNIT, PERSON),
+                       f"the walk's deposition on runbook {runbook}: "
+                       + (f"{d['id']}, the readings alone, {d['state']}, holding reading {r['ref']}, {r['value']:g} "
+                          f"{r['unit']} confirmed at the bench, deposited by {r['by']} and taken {r['at']}"
+                          if d and r else f"{len(deposited)} depositions and {len(readings)} readings")):
+        return
+    made = [s for s in api(proof, "GET", "/api/studies/scenarios")
+            if any((v["quantity"].get("origin") or {}).get("kind") == "measurement" for v in s["values"])]
+    scenario = made[0] if len(made) == 1 else {}
+    values = scenario.get("values") or []
+    origin = (values[0]["quantity"].get("origin") or {}) if len(values) == 1 else {}
+    if not proof.check(bool(scenario) and len(values) == 1 and values[0]["key"] == READING_PARAMETER
+                       and scenario.get("plant") == FLOWSHEET and scenario.get("by") == PERSON
+                       and (origin.get("ref"), origin.get("by"), origin.get("at")) == (r["ref"], PERSON, r["at"])
+                       and len(scenario.get("runIds") or []) == 1,
+                       f"the walk's scenario {scenario.get('id')} on {scenario.get('plant')}, made by {scenario.get('by')}: "
+                       + (f"{READING_PARAMETER} set to reading {origin.get('ref')} alone (a placeholder pairing chosen by "
+                          "unit), kept with its depositor and time, nothing assumed, run once" if scenario
+                          else f"{len(made)} scenarios rest on a reading")):
+        return
+    run = api(proof, "GET", f"/api/runs/{scenario['runIds'][0]}")["run"]
+    inputs = {i["name"]: i["quantity"] for i in run["inputs"]}
+    kinds = {q["origin"]["kind"] for q in inputs.values()}
+    set_to = inputs.get(READING_PARAMETER) or {}
+    came = set_to.get("origin") or {}
+    proof.check(run["status"] == "done" and run["provenance"] == "measured" and run["scenarioId"] == scenario["id"]
+                and kinds <= {"library-default", "convention", "measurement"}
+                and (set_to.get("value"), set_to.get("unit")) == (READING_VALUE, READING_UNIT)
+                and (came.get("kind"), came.get("ref"), came.get("by"), came.get("at")) == ("measurement", r["ref"], PERSON,
+                                                                                           r["at"]),
+                f"its run {run['id']}: {run['provenance']}, {READING_PARAMETER} {set_to.get('value')} {set_to.get('unit')} "
+                f"a {came.get('kind')} (reading {came.get('ref')}, deposited by {came.get('by')}, taken {came.get('at')}); "
+                f"its inputs {', '.join(sorted(kinds))}")
+    proof.made["measuredRun"] = run["id"]
+    proof.made["deposition"] = d["id"]
 
 
 def make_train(proof: Proof) -> str:
@@ -864,6 +940,13 @@ def step_8(proof: Proof) -> None:
         locks = api(proof, "GET", "/api/state")["runbookLocks"]
         proof.check(b.get("lockedAt") == at and b.get("lockHash") == digest and locks.get(rid, {}).get("lockHash") == digest,
                     f"runbook {rid} reloads locked under {digest}")
+    if "measuredRun" in m:
+        held = {d["id"] for d in api(proof, "GET", "/api/state")["depositions"]}
+        run = api(proof, "GET", f"/api/runs/{m['measuredRun']}")["run"]
+        kinds = {i["quantity"]["origin"]["kind"] for i in run["inputs"]}
+        proof.check(m["deposition"] in held and run["provenance"] == "measured" and "measurement" in kinds,
+                    f"deposition {m['deposition']} reloads, and run {m['measuredRun']} with it, measured, its reading a "
+                    "measurement")
     records = {f["id"] for f in api(proof, "GET", "/api/flowsheets")}
     want = [m["flowsheetRecord"]] if "flowsheetRecord" in m else []
     want += [f"run-{m[k]}" for k in ("reference", "flowsheet") if k in m]

@@ -36,6 +36,7 @@ import { cachedShare, formatCost } from '@/lib/postdoc';
 import { PassageQuote } from './PassageQuote';
 import { EvidenceCard } from './EvidenceCard';
 import { STOPPED_WORDS } from './PlanTrace';
+import { depositionPath } from './ReadingOrigin';
 
 /** The value, rendered from the record — never from the claim's text. */
 function RecordValue({ record }: { record: ExtractionRecord }) {
@@ -115,6 +116,11 @@ function rowHref(row: ModuleRow): string {
   const at: Record<string, string> = {
     'runbooks/runbook': `/runbooks/${row.id}`,
     'runbooks/protocol': `/runbooks/protocols/${row.id}`,
+    // A deposition's record, and a reading or a released value on it.
+    'runbooks/deposition': depositionPath(row.id),
+    'fermos/deposition': depositionPath(row.id),
+    'runbooks/reading': depositionPath(String(row.detail?.depositionId ?? ''), String(row.detail?.entryId ?? '')),
+    'runbooks/measured-evidence': depositionPath(String(row.detail?.depositionId ?? '')),
     'geneos/host': `/geneos/hosts/${row.id}`,
     'geneos/model': '/geneos/model',
     'proforma/scenario': `/proforma/scenario/${row.id}`,

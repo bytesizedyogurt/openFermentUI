@@ -83,6 +83,8 @@ const problemOf = (e: unknown) =>
 
 /** Each origin in words, for the card that says what a simulation was built from. */
 function originWords(v: ParameterValue): string {
+  if (v.origin === 'measurement') return `readings deposited by ${v.overriddenBy ?? 'nobody named'}`;
+  if (v.origin === 'model-estimate') return `estimates by ${v.overriddenBy ?? 'no model named'}`;
   if (v.overriddenBy) return `values typed by ${v.overriddenBy}`;
   switch (v.origin) {
     case 'record':

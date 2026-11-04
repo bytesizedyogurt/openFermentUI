@@ -42,7 +42,9 @@ plant's parameters (its key, set once, in the parameter's unit, a number
 for a number, `runs.check_inputs`) before the plant is built, and converted
 by the one converter, basis.override_of, into the `Override` of the plant's
 scope the library takes, its origin the person or the model that set it and
-the day its origin names. A value outside a plant's bounds is kept as set
+the day its origin names, or the deposition's reading it is, looked up in
+the project's depositions and set in the parameter's unit (basis.resolved).
+A value outside a plant's bounds is kept as set
 and flagged on the run's parameters (`runs.parameters_of`). A thing neither
 on the library's shelf nor provided is refused in words naming the things
 the engine runs, and keeps nothing.
@@ -177,11 +179,12 @@ def run_plant(thing: str, configuration: str | None, inputs: Sequence[EngineInpu
     set once, in the parameter's unit, a number for a number
     (`runs.check_inputs`, bounds False: a value outside them is kept and
     flagged); then basis.override_of converts it into the Override of the
-    plant's scope (library.scope), the low and high of a quantity reaching
-    the plant as the Override's, which the library takes only equal to the
-    value (a range is a study's to sample). A value refused keeps nothing
-    (EngineRefused). A run a study's scenario asks for names it
-    (`scenario_id`)."""
+    plant's scope (library.scope), a deposition's reading looked up first
+    in the project's depositions (basis.resolved), the low and high of a
+    quantity reaching the plant as the Override's, which the library takes
+    only equal to the value (a range is a study's to sample). A value
+    refused keeps nothing (EngineRefused). A run a study's scenario asks for
+    names it (`scenario_id`)."""
     cfg = default_configuration(thing, configuration)
     inputs = list(inputs)
     for i in inputs:

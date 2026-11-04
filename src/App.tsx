@@ -48,7 +48,7 @@ import RunbookDetail from '@/screens/RunbookDetail';
 import Protocols from '@/screens/Protocols';
 import ProtocolDetail from '@/screens/ProtocolDetail';
 import ProtocolEditor from '@/screens/ProtocolEditor';
-import Deposition from '@/screens/Deposition';
+import Deposition, { DepositionBench } from '@/screens/Deposition';
 import DepositionDetail from '@/screens/DepositionDetail';
 import Proforma from '@/screens/Proforma';
 import ProformaScenario from '@/screens/ProformaScenario';
@@ -240,7 +240,11 @@ function Screen() {
         if (c && d === 'edit') return <ProtocolEditor protocolId={c} />;
         return c ? <ProtocolDetail protocolId={c} /> : <Protocols />;
       }
-      if (b === 'depositions') return c ? <DepositionDetail depositionId={c} /> : <Depositions />;
+      // A deposition's /bench records the readings alone, a full-screen takeover like a protocol's run (alpha 2.2 C.5).
+      if (b === 'depositions') {
+        if (c && d === 'bench') return <DepositionBench key={c} depositionId={c} />;
+        return c ? <DepositionDetail depositionId={c} /> : <Depositions />;
+      }
       // OF-BLD-014 §9.3 — 'ledger' is reserved too: a runbook with that id would be unreachable.
       if (b === 'ledger') return <RunbookLedger />;
       return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
@@ -349,8 +353,8 @@ export default function App() {
 
   const inDeposition =
     route.segments[0] === 'runbooks' &&
-    route.segments[1] === 'protocols' &&
-    route.segments[3] === 'run';
+    ((route.segments[1] === 'protocols' && route.segments[3] === 'run') ||
+      (route.segments[1] === 'depositions' && route.segments[3] === 'bench'));
   // A witnessed check at the bench (OF-BLD-013 §5.4) takes the screen the same way.
   const inBenchCheck = route.segments[0] === 'guild' && route.segments[1] === 'checks' && route.segments[3] === 'run';
 

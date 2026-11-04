@@ -14,6 +14,13 @@
 //
 // A Deposition is the inbound account of what actually happened, against a
 // Runbook's outbound claim. Extend this screen; do not rewrite it.
+//
+// The readings alone (alpha 2.2 C.5): a deposition started from a locked
+// runbook with no protocol has no steps to walk, and DepositionBench, below,
+// records the runbook's measures under every constraint above, with the
+// capture box, the read-back beat and the corrections a protocol's steps
+// carry. A reading a person confirms there is one a scenario's value may
+// name as a measurement (GET /api/depositions/readings).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -32,7 +39,7 @@ import {
   X,
 } from 'lucide-react';
 import { useStore } from '@/store';
-import { navigate } from '@/router';
+import { href, navigate } from '@/router';
 import type { Step } from '@/data/types';
 import { renderStepText, batchLabel, scaleMaterials } from '@/engine/scale';
 import { fmt } from '@/engine/units';
@@ -40,6 +47,7 @@ import { exportText } from '@/lib/csv';
 import { Button, Modal, cx, EmptyState, Callout } from '@/components/ui';
 import { CitationChip } from '@/components/Chip';
 import { DepositionPanel } from '@/components/DepositionPanel';
+import { awaitingReadBack } from '@/engine/readings';
 import { ComponentTag } from '@/components/ComponentTag';
 import { GuildGate, holdText, useGateHold } from '@/components/GuildGate';
 
@@ -1034,6 +1042,236 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
             }}
           >
             End run now
+          </Button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/** The step id the readings alone are recorded at: they stand against the runbook's measures, with no protocol's step. */
+export const BENCH_STEP = 'readings';
+
+/**
+ * The bench for the readings alone (alpha 2.2 C.5): a deposition opened from a
+ * locked runbook with no protocol (store `openDeposition(runbookId, null, …)`),
+ * at `/runbooks/depositions/:id/bench`. Staged, it shows what will be recorded
+ * and waits for Begin; running, each measure with the reading that stands for
+ * it, the capture box (DepositionPanel) and Close. The deposition is the
+ * record, kept on the service as it changes, so the bench resumes after a
+ * reload; a closed one, or one a protocol's steps record, opens its record.
+ */
+export function DepositionBench({ depositionId }: { depositionId: string }) {
+  const deposition = useStore((s) => s.depositions.find((d) => d.id === depositionId) ?? null);
+  const runbook = useStore((s) => (deposition ? (s.runbooks.find((r) => r.id === deposition.runbookId) ?? null) : null));
+  const beginDeposition = useStore((s) => s.beginDeposition);
+  const closeDeposition = useStore((s) => s.closeDeposition);
+  const toast = useStore((s) => s.toast);
+  // A reading names the person who took it (measurements.py refuses one kept with no name).
+  const reviewer = useStore((s) => s.reviewer.trim());
+  // The project's rows still on their way from the service: nothing to say yet, and nothing to tap.
+  const loading = useStore((s) => s.projectId !== null && s.stateSeen === null && s.stateProblem === null);
+  const [closing, setClosing] = useState(false);
+
+  const recordOf = (id: string) => `/runbooks/depositions/${encodeURIComponent(id)}`;
+  if (!deposition && loading) {
+    return (
+      <div className="h-full overflow-y-auto bg-surface-0" data-testid="deposition-bench" data-state="loading">
+        <div className="max-w-[860px] mx-auto p-6">
+          <p className="text-reading text-ink" role="status">
+            Loading the project&rsquo;s depositions from the service&hellip;
+          </p>
+        </div>
+      </div>
+    );
+  }
+  if (!deposition || !runbook || deposition.protocolId !== null || deposition.state === 'closed') {
+    const [title, body] = !deposition
+      ? ['Deposition not found', `This project holds no deposition ${depositionId}, or its rows have not loaded from the service yet.`]
+      : !runbook
+        ? ['Its runbook is not here', `Deposition ${deposition.id} tests runbook ${deposition.runbookId}, which this project does not hold, so there is no measure to record against.`]
+        : deposition.protocolId !== null
+          ? ['A protocol’s steps record this one', `Deposition ${deposition.id} runs protocol ${deposition.protocolId}; its bench opens from that protocol’s run.`]
+          : ['This deposition is closed', `Deposition ${deposition.id} takes no new entries. What is in it is what happened.`];
+    return (
+      <div className="h-full overflow-y-auto bg-surface-0" data-testid="deposition-bench" data-state={deposition?.state ?? 'missing'}>
+        <div className="max-w-[860px] mx-auto p-6">
+          <EmptyState
+            title={title}
+            body={body}
+            action={
+              <Button style={{ minHeight: 44 }} onClick={() => navigate(deposition ? recordOf(deposition.id) : '/runbooks/depositions')}>
+                {deposition ? 'Open its record' : 'The project’s depositions'}
+              </Button>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const schema = runbook.measurementSchema;
+  // The latest entry on each measure, which a correction is appended after (§4.4).
+  const standing = (measureId: string) => [...deposition.entries].reverse().find((e) => e.measureId === measureId) ?? null;
+  const unconfirmed = awaitingReadBack(deposition).length;
+
+  if (deposition.state === 'staged') {
+    return (
+      <div className="h-full overflow-y-auto bg-surface-0" data-testid="deposition-bench" data-deposition={deposition.id} data-state="staged">
+        <div className="max-w-[860px] mx-auto p-6">
+          <div className="text-caption uppercase tracking-wide text-ink-soft">Deposition · staged · the readings alone</div>
+          <h1 className="font-serif text-page-title font-semibold mt-0.5">{runbook.title}</h1>
+          <div className="text-body text-ink mt-1">
+            Deposition <span className="font-num">{deposition.id}</span>, against{' '}
+            <a className="text-accent underline underline-offset-2 inline-flex items-center min-h-[44px]" href={href(`/runbooks/${runbook.id}`)}>
+              the runbook
+            </a>
+            , with no protocol&rsquo;s steps
+          </div>
+          <div className="card p-4 mt-5">
+            <div className="text-caption uppercase tracking-wide text-ink-soft mb-2">What will be recorded</div>
+            {schema.length > 0 ? (
+              <ul className="space-y-2" data-testid="deposition-bench-measures">
+                {schema.map((m) => (
+                  <li key={m.id} className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-reading text-ink">{m.label}</span>
+                    <span className="font-num text-body text-ink">
+                      {m.unit} · {m.timepoint}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-body text-ink">
+                This runbook declares no measurements, so anything recorded here is kept as an observation.
+              </p>
+            )}
+            <p className="text-body text-ink mt-3">
+              The list is the locked runbook&rsquo;s: these are the measures the readings are judged against.
+            </p>
+          </div>
+          {!reviewer && (
+            <p className="text-reading text-ink mt-5" data-testid="deposition-bench-name">
+              A reading names the person who took it: set your name in{' '}
+              <a className="text-accent underline underline-offset-2 inline-flex items-center min-h-[44px]" href={href('/settings/corpus')}>
+                Settings
+              </a>{' '}
+              first, and then begin.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-3 mt-5">
+            <Button
+              variant="primary"
+              style={{ minHeight: 56, fontSize: 17 }}
+              disabled={!reviewer}
+              onClick={() => beginDeposition(deposition.id)}
+              data-testid="deposition-bench-begin"
+            >
+              <Play size={17} /> Begin recording
+            </Button>
+            <Button style={{ minHeight: 56 }} onClick={() => navigate(`/runbooks/${runbook.id}`)}>
+              Not yet
+            </Button>
+            <ComponentTag component="Deposition" action="staged, the readings alone" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col bg-surface-0" data-testid="deposition-bench" data-deposition={deposition.id} data-state="running">
+      <header className="shrink-0 border-b border-line bg-surface-1 px-4 py-2.5 flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="font-serif text-section-title font-semibold truncate">{runbook.title}</div>
+          <div className="text-caption text-ink font-num">
+            Deposition {deposition.id} · the readings alone · {deposition.entries.length} measured · {deposition.observations.length} observed
+          </div>
+        </div>
+        <Button style={{ minHeight: 44 }} onClick={() => navigate(recordOf(deposition.id))}>
+          <X size={16} /> Exit
+        </Button>
+      </header>
+
+      <main className="flex-1 overflow-y-auto p-5 sm:p-8">
+        <div className="max-w-[720px] mx-auto">
+          {/* on ink for ≥7:1 contrast at arm's length */}
+          <p className="text-ink font-medium mb-4" style={{ fontSize: 21, lineHeight: '31px' }}>
+            Read each measure and say what it came to, with its unit. Every number is read back before it is kept.
+          </p>
+          <ul className="card p-4 space-y-2" data-testid="deposition-bench-measures">
+            {schema.map((m) => {
+              const e = standing(m.id);
+              return (
+                <li key={m.id} className="flex flex-wrap items-baseline justify-between gap-x-3" data-testid="deposition-bench-measure" data-measure={m.id}>
+                  <span className="text-reading text-ink">
+                    {m.label}{' '}
+                    <span className="font-num text-body">
+                      ({m.unit} · {m.timepoint})
+                    </span>
+                  </span>
+                  <span className="font-num text-reading text-ink">
+                    {e ? (
+                      <>
+                        {e.value} {e.unit}
+                        {!e.confirmed && <span className="text-ink font-medium"> · to read back</span>}
+                      </>
+                    ) : (
+                      'not yet read'
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <DepositionPanel deposition={deposition} schema={schema} stepId={BENCH_STEP} stepLabel="Recorded here" />
+        </div>
+      </main>
+
+      <footer className="shrink-0 border-t border-line bg-surface-1 px-4 py-3 flex items-center gap-3">
+        <button
+          className="btn btn-primary flex-1 justify-center"
+          style={{ minHeight: 56, fontSize: 17 }}
+          onClick={() => setClosing(true)}
+          data-testid="deposition-bench-close"
+        >
+          <Check size={20} /> Close the deposition
+        </button>
+      </footer>
+
+      <Modal open={closing} onClose={() => setClosing(false)} title="Close this deposition?">
+        <p className="text-body text-ink mb-3">
+          <span className="font-num">{deposition.entries.length}</span> measurement{deposition.entries.length === 1 ? '' : 's'} and{' '}
+          <span className="font-num">{deposition.observations.length}</span> observation{deposition.observations.length === 1 ? '' : 's'} recorded.
+          {unconfirmed > 0 && (
+            <span className="text-signal-warn">
+              {' '}
+              {unconfirmed} value{unconfirmed === 1 ? ' was' : 's were'} never read back and stay{unconfirmed === 1 ? 's' : ''} unconfirmed in the record.
+            </span>
+          )}{' '}
+          Closing stops new entries; the record is append-only either way.
+        </p>
+        <div className="flex justify-end gap-2 flex-wrap">
+          <Button style={{ minHeight: 44 }} onClick={() => setClosing(false)}>
+            Stay here
+          </Button>
+          <Button
+            variant="primary"
+            style={{ minHeight: 44 }}
+            data-testid="deposition-bench-close-confirm"
+            onClick={() => {
+              setClosing(false);
+              closeDeposition(deposition.id);
+              toast({
+                text: 'Deposition closed. Reconcile it against the runbook when you are ready.',
+                kind: 'success',
+                href: `#${recordOf(deposition.id)}`,
+                hrefLabel: 'Open',
+              });
+              navigate(recordOf(deposition.id));
+            }}
+          >
+            <Check size={15} /> Close the deposition
           </Button>
         </div>
       </Modal>

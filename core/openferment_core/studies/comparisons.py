@@ -3,8 +3,9 @@
 Two or more engine runs set side by side: every output the runs answer,
 each in its unit, with each run's value and its relative change from the
 first run's; and every value any of the runs set for itself, with each run's
-value and its origin: a person's assumption, a model's estimate, or the
-library's own default where a library run set none. A library run's outputs
+value and its origin: a person's assumption, a model's estimate, a
+deposition's reading (basis.is_set), or the library's own default where a
+library run set none. A library run's outputs
 are its price block (BioSTEAM's TEA) and a flowsheet's own outputs, read as
 they have always been read; a run of any other engine's, a Proforma
 scenario's run among them, are its outputs.values (engine/runs.py
@@ -37,7 +38,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .. import artifacts, db, projects
-from ..basis import ASSUMED_KINDS, origin_of
+from ..basis import is_set, origin_of
 from ..db import models as t
 from ..db import rows
 from ..engine import library, runs
@@ -148,8 +149,9 @@ NO_VALUE = {"value": None, "unit": None, "origin": None, "by": None}
 
 
 def _set_values(arts: list[Artifact]) -> list[dict[str, Any]]:
-    """Each value any run set for itself, with each run's value and origin.
-    A library run that set none has the library's own default, named so. A
+    """Each value any run set for itself, with each run's value and origin,
+    a deposition's reading with its ref. A library run that set none has the
+    library's own default, named so. A
     comparison that holds a run of another engine (`study comparison 2`)
     gives that default where the library run's plant declares the value
     (`_declares`); every other run's cell there is NO_VALUE, its value,
@@ -158,15 +160,17 @@ def _set_values(arts: list[Artifact]) -> list[dict[str, Any]]:
     engines = _holds_other_engines(arts)
     keys: list[str] = []
     for a in arts:
-        keys += [i.name for i in a.inputs if i.source.kind in ASSUMED_KINDS and i.name not in keys]
+        keys += [i.name for i in a.inputs if is_set(i.source) and i.name not in keys]
     out = []
     for key in keys:
         cells = []
         for a in arts:
-            own = next((i for i in a.inputs if i.name == key and i.source.kind in ASSUMED_KINDS), None)
+            own = next((i for i in a.inputs if i.name == key and is_set(i.source)), None)
             if own is not None:
                 origin = origin_of(own.source)
-                cells.append({"value": own.value, "unit": own.unit, "origin": origin.kind, "by": origin.by})
+                cell = {"value": own.value, "unit": own.unit, "origin": origin.kind, "by": origin.by}
+                # A reading names itself, so the cell traces to its deposition without the runs.
+                cells.append({**cell, "ref": origin.ref} if origin.kind == "measurement" else cell)
                 continue
             if engines and not _declares(a, key):
                 cells.append(dict(NO_VALUE))

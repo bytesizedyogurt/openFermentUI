@@ -18,7 +18,9 @@ served; no screen writes a form for a parameter of its own.
                               quantity with its origin (an EngineInput), as
                               the Overrides of the scope a resolver takes
                               (basis.override_of), each in its parameter's
-                              unit; refused in words where one cannot stand
+                              unit, a deposition's reading looked up in the
+                              project's depositions first (basis.resolved);
+                              refused in words where one cannot stand
     resolve(specs, sources, overrides, by=None)
                               each spec's value: an Override for its key wins
                               over everything (an `assumption` by the person)
@@ -37,7 +39,9 @@ served; no screen writes a form for a parameter of its own.
                               one BasisInput per value with its source; an
                               override is an `assumption` naming the person
                               and what it rests on, so `basis_provenance`
-                              makes the artifact `assumed` (E.2‴)
+                              makes the artifact `assumed` (E.2‴), or a
+                              `deposition` naming the reading it is, so a run
+                              resting on readings and records is `measured`
     register(kind, provider, static=None)
                               a scope kind's provider: given the scope's ids
                               and the resolve request it returns
@@ -287,8 +291,10 @@ def units_of(specs: Iterable[ParameterSpec]) -> dict[str, str]:
 def overrides_of(scope: str, inputs: Iterable[EngineInput], units: Mapping[str, str]) -> list[Override]:
     """The values a request sets, each the Override of `scope` its resolver
     takes (basis.override_of), in the unit of the parameter its name keys
-    (`units`, key to unit). A name the scope has no parameter for, and a
-    value its parameter cannot take as an Override, are refused in words
+    (`units`, key to unit), a deposition's reading looked up in the
+    project's depositions and set in that unit (basis.resolved). A name the
+    scope has no parameter for, a value its parameter cannot take as an
+    Override and a reading the lookup refuses are refused in words
     (ParamRefused); `checked` holds what is left to every rule a person's
     value meets."""
     from .basis import InputRefused, override_of
@@ -391,7 +397,9 @@ def _takes_no_person(spec: ParameterSpec) -> str:
 
 def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
     """An override that can stand, with the person named and its interval
-    as `held` reads it, or the refusal."""
+    as `held` reads it, or the refusal. A deposition's reading stands where
+    a person's value does, a value this run sets (basis.SET_KINDS), named by
+    the person who deposited it."""
     from .biorepo import reviewer_refusal
 
     if "assumption" not in spec.sourceRule:
@@ -402,6 +410,18 @@ def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
         name = (o.by or "").strip()
         if not name or any(not ch.isprintable() for ch in name):
             raise ParamRefused(f"the estimate of {spec.key} names the model that made it, on one line")
+    elif o.origin == "measurement":
+        # A reading names the person who deposited it, as its deposition's
+        # row keeps them (measurements.py), a person's name held as a
+        # person's assumption holds one; the person who sends the run names
+        # someone else.
+        from .measurements import unnamed
+
+        name = (o.by or "").strip()
+        why = unnamed(name) if name and all(ch.isprintable() for ch in name) else "names nobody on one line"
+        if why:
+            raise ParamRefused(f"the measurement of {spec.key} names the person who deposited its reading: its "
+                               f"reading {why}")
     else:
         name = (o.by or "").strip() or (by or "").strip()
         why = reviewer_refusal(name)
@@ -428,13 +448,19 @@ def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
 
 
 def _from_override(spec: ParameterSpec, o: Override) -> ParameterValue:
+    """The value an override sets, with its source (basis.override_source):
+    a person's assumption, a model's estimate or a deposition's reading."""
     from .basis import override_source
 
-    estimate = o.origin == "model-estimate"
+    origin = {"model-estimate": "model-estimate", "measurement": "measurement"}.get(o.origin, "assumption")
+    if origin == "measurement":
+        detail = f"reading {o.ref}, deposited by {o.by.strip()} and taken at {o.at}"
+    else:
+        detail = f"{'estimated' if origin == 'model-estimate' else 'typed'} by {o.by.strip()} on {o.at}"
     return ParameterValue(
         key=spec.key, value=o.value, low=o.low, high=o.high, source=override_source(o),
-        origin="model-estimate" if estimate else "assumption", overriddenBy=o.by.strip(),
-        detail=f"{'estimated' if estimate else 'typed'} by {o.by.strip()} on {o.at}" + (f": {o.note}" if o.note else ""))
+        origin=origin, overriddenBy=o.by.strip(),  # type: ignore[arg-type]
+        detail=detail + (f": {o.note}" if o.note else ""))
 
 
 def _first(spec: ParameterSpec, cands: Mapping[str, ParameterValue | None]) -> ParameterValue:
@@ -503,8 +529,11 @@ def basis_inputs(specs: list[ParameterSpec], values: Iterable[ParameterValue]) -
     """What a run's basis takes from these values (E.2‴): one input a value,
     named by its key, in its spec's unit, with its source; `<key> low` and
     `<key> high` beside it when it has an interval. An override's source is
-    an `assumption` naming the person and what it rests on, so
-    `basis_provenance` makes the artifact `assumed`. A value bound to records
+    the one its origin names (basis.override_source): an `assumption` naming
+    the person and what it rests on, or a model's estimate, either of which
+    makes the artifact `assumed` (`basis_provenance`); or a deposition's
+    reading naming the reading and who deposited it, which makes an artifact
+    resting on no assumption `measured`. A value bound to records
     is the statistic of those records (a `convention`), with one
     `<key> record` input per record naming it as its `record` source, so the
     records' own provenance enters. A waiting value adds nothing."""

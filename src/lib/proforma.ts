@@ -6,6 +6,7 @@
 import type {
   Artifact,
   BasisInput,
+  BasisSource,
   CeilingCheck,
   ComputedBasis,
   CostLine,
@@ -239,10 +240,24 @@ export function runPrice(art: Artifact, shelf: FlowsheetInfo[]): PriceRead | nul
  * the shelf says which inputs can bind to records, and no more (OF-BLD-019
  * §2.R: the card once said four bound where the service bound three).
  */
+/**
+ * Whether a basis source is a deposition's reading a run set (the service's
+ * `basis.is_measurement`): a deposition naming one reading,
+ * `<deposition id>/<entry id>`, its note saying when it was taken. A
+ * deposition naming a whole series is the record a kinetic fit rests on.
+ */
+export function isReading(source: BasisSource | null | undefined): boolean {
+  return (
+    source?.kind === 'deposition' && /^[^/\s]{1,200}\/[^/\s]{1,200}$/.test(source.id ?? '') && /^measured on \S/.test(source.note ?? '')
+  );
+}
+
 export interface InputCounts {
   total: number;
   /** Bound to records by the service, or, with no binding to read, inputs that can bind to records. */
   records: number;
+  /** Set to a deposition's reading: a value the service binds as a named one, its source the reading. */
+  measured: number;
   /**
    * Inputs a person chose a fermOS fit for in this project (OF-BLD-019 §5.1),
    * counted from the choice: the index binds without the fits, so it says
@@ -261,19 +276,21 @@ export function inputCounts(
   info: ProformaScenarioInfo | null,
   shelf: FlowsheetInfo[],
   /** The scenario's overrides (OF-BLD-020 D3): each wins over the records and any fit for its input. */
-  typedValues: { key: string }[],
+  typedValues: { key: string; origin?: string }[],
   fits: Record<string, string> = {},
 ): InputCounts | null {
-  const typed = new Set(typedValues.map((a) => a.key));
+  const typed = new Set(typedValues.filter((a) => a.origin !== 'measurement').map((a) => a.key));
+  const read = new Set(typedValues.filter((a) => a.origin === 'measurement').map((a) => a.key));
   const flowsheet = shelf.find((f) => f.id === (scenario.flowsheetId ?? scenario.modelId));
   if (info) {
     // The binding holds no convention (a run states it in its basis), and the
     // scenario page lists it among the inputs, so the card counts it from the
     // shelf as the page does (OF-BLD-020 §2.R, finding 16).
     const conventions = flowsheet ? flowsheet.inputs.filter((i) => i.kind === 'convention').length : 0;
-    const c = { total: info.inputs.length + conventions, records: 0, computed: 0, assumed: 0, conventions, waiting: 0, bound: true };
+    const c = { total: info.inputs.length + conventions, records: 0, measured: 0, computed: 0, assumed: 0, conventions, waiting: 0, bound: true };
     for (const i of info.inputs) {
-      if (typed.has(i.key) || i.binding === 'assumption') c.assumed++;
+      if (read.has(i.key) || (!typed.has(i.key) && isReading(i.source))) c.measured++;
+      else if (typed.has(i.key) || i.binding === 'assumption') c.assumed++;
       else if (i.binding === 'artifact' || fits[i.key]) c.computed++;
       else if (i.binding === 'records') c.records++;
       else c.waiting++;
@@ -281,9 +298,10 @@ export function inputCounts(
     return c;
   }
   if (!flowsheet) return null;
-  const c = { total: flowsheet.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: false };
+  const c = { total: flowsheet.inputs.length, records: 0, measured: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: false };
   for (const i of flowsheet.inputs) {
     if (i.kind === 'convention') c.conventions++;
+    else if (read.has(i.key)) c.measured++;
     else if (typed.has(i.key)) c.assumed++;
     else if (fits[i.key]) c.computed++;
     else if (i.fields.length > 0) c.records++;
@@ -889,7 +907,8 @@ export function modellerQuestions(
   const rho = new Map((run?.sensitivity ?? []).map((s) => [s.key, s.rho]));
   const own = (flowsheet ? QUESTIONS[flowsheet] : undefined) ?? {};
   return inputs
-    .filter((i) => i.binding === 'assumption' || i.binding === 'waiting')
+    // A reading a person deposited answers where its input comes from.
+    .filter((i) => (i.binding === 'assumption' && !isReading(i.source)) || i.binding === 'waiting')
     .map((i, n) => ({ key: i.key, label: i.label, rho: rho.get(i.key) ?? null, question: own[i.key] ?? `Where should ${i.label} come from?`, n }))
     // An input the run did not rank (held fixed, or no run yet) follows every ranked one.
     .sort((a, b) => (b.rho == null ? -1 : Math.abs(b.rho)) - (a.rho == null ? -1 : Math.abs(a.rho)) || a.n - b.n)

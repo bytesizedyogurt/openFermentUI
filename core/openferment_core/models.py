@@ -14,9 +14,10 @@ structurally incapable of originating a quantity (§5).
 from __future__ import annotations
 
 import math
+import re
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_serializer, model_validator
 
 # Mirrors the Provenance union in src/data/types.ts, weakest last. The order IS
 # the ranking: `weakest_provenance` walks this list, so adding a class in the
@@ -663,32 +664,62 @@ class AuditEvent(BaseModel):
 # `assumed`, it is never averaged into evidence, and no record store takes it
 # (`basis.refuse_estimates`).
 
-OriginKind = Literal["record", "artifact", "person-assumption", "model-estimate", "library-default", "convention"]
-# The origins a value set for one run can have (an `Override`'s `origin`).
-OverrideOrigin = Literal["person-assumption", "model-estimate"]
+OriginKind = Literal["record", "artifact", "person-assumption", "model-estimate", "measurement", "library-default",
+                     "convention"]
+# The origins a value set for one run can have (an `Override`'s `origin`): a
+# named person's assumption, a model's estimate, and a reading a person
+# deposited at the bench (a measurement, ADR-006).
+OverrideOrigin = Literal["person-assumption", "model-estimate", "measurement"]
+# A deposition's reading as a measurement names it: `<deposition id>/<entry id>`.
+READING_REF = re.compile(r"^[^/\s]{1,200}/[^/\s]{1,200}$")
+# The validation context a request form sets (EngineInput, ScenarioValue, a
+# tool's quantity): a measurement there may leave its reading's time and its
+# depositor to the service, which fills both from the deposition before
+# anything runs (measurements.py).
+READING_TO_FILL = "reading-to-fill"
 
 
 class Origin(BaseModel):
     """Where a number came from (ADR-006)."""
 
     kind: OriginKind
-    # The record, the artifact or the library entry it was read from.
+    # The record, the artifact or the library entry it was read from; a
+    # measurement's reading, `<deposition id>/<entry id>`.
     ref: str | None = None
-    # The person who typed it, or the id of the model that estimated it.
+    # The person who typed it, the id of the model that estimated it, or the
+    # person who deposited the reading.
     by: str | None = None
-    # The day it was typed, or the moment it was estimated.
+    # The day it was typed, the moment it was estimated, or the time the
+    # reading was taken.
     at: str | None = None
     # What it rests on, in words.
     note: str | None = None
 
     @model_validator(mode="after")
-    def _names_its_source(self) -> "Origin":
+    def _names_its_source(self, info: ValidationInfo) -> "Origin":
         if self.kind in ("person-assumption", "model-estimate") and not (self.by or "").strip():
             who = "the person who typed it" if self.kind == "person-assumption" else "the model that estimated it"
             raise ValueError(f"a {self.kind} names {who} (by)")
         if self.kind in ("record", "artifact", "library-default") and not (self.ref or "").strip():
             raise ValueError(f"a {self.kind} origin names what it was read from (ref)")
+        if self.kind == "measurement":
+            if not READING_REF.fullmatch((self.ref or "").strip()):
+                raise ValueError("a measurement names the reading it is as <deposition id>/<entry id> (ref)")
+            if not (self.at or "").strip() and not (info.context or {}).get(READING_TO_FILL):
+                raise ValueError("a measurement names the time its reading was taken (at)")
         return self
+
+
+def _reading_may_wait(value: Any, handler: Any, info: ValidationInfo) -> Any:
+    """A request form's quantity (EngineInput, ScenarioValue, a tool's
+    quantity): one whose origin is a measurement is validated with the
+    context that lets its reading's time and its depositor wait for the
+    service, which fills both from the deposition (measurements.py); every
+    other quantity is validated as it stands."""
+    origin = value.get("origin") if isinstance(value, dict) else None
+    if isinstance(origin, dict) and origin.get("kind") == "measurement":
+        return Quantity.model_validate(value, context={**(info.context or {}), READING_TO_FILL: True})
+    return handler(value)
 
 
 class Quantity(BaseModel):
@@ -739,13 +770,23 @@ class EngineInput(RunInput):
     """A value a run sets: a parameter's key and a typed quantity in that
     parameter's unit (the shape a run's inputs have), carrying the person or
     the model that set it and the day it was set (`origin.at`), as an
-    Override and a scenario's value carry theirs. It holds those fields
-    alone, and a value, low or high that is true or false is refused, as an
-    Override refuses one."""
+    Override and a scenario's value carry theirs; or a reading a person
+    deposited at the bench (a `measurement`, its `ref` the reading's
+    `<deposition id>/<entry id>`), its value and unit the reading's own,
+    which the service looks up in the project's depositions before anything
+    runs, filling the reading's time and its depositor where the request
+    leaves them out (measurements.py). It holds those fields alone, and a
+    value, low or high that is true or false is refused, as an Override
+    refuses one."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=200)
+
+    @field_validator("quantity", mode="wrap")
+    @classmethod
+    def _a_reading_may_wait_for_its_time(cls, value: Any, handler: Any, info: ValidationInfo) -> Any:
+        return _reading_may_wait(value, handler, info)
 
     @model_validator(mode="before")
     @classmethod
@@ -767,10 +808,11 @@ class EngineInput(RunInput):
     @model_validator(mode="after")
     def _names_who_set_it(self) -> "EngineInput":
         origin = self.quantity.origin
-        if origin is None or origin.kind not in ("person-assumption", "model-estimate"):
+        if origin is None or origin.kind not in ("person-assumption", "model-estimate", "measurement"):
             raise ValueError(f"{self.name}: a value a run sets is a person's assumption or a model's estimate, its "
-                             "origin naming who set it (person-assumption or model-estimate, with by)")
-        if not (origin.at or "").strip():
+                             "origin naming who set it (person-assumption or model-estimate, with by), or a "
+                             "deposition's reading, its origin naming the reading (measurement, with ref)")
+        if origin.kind != "measurement" and not (origin.at or "").strip():
             raise ValueError(f"{self.name}: a value a run sets says when it was set (quantity.origin.at), and the "
                              "day enters the run's basis")
         return self
@@ -1772,8 +1814,9 @@ class ScenarioInput(BaseModel):
 
 class InputAssumption(BaseModel):
     """A named value of a scenario's input, as the binding lays it on: a
-    person's assumption, or a model's estimate (`by` the model's id), with
-    the range the run's samples draw over."""
+    person's assumption, a model's estimate (`by` the model's id), or a
+    deposition's reading (`by` its depositor, `ref` the reading), with the
+    range the run's samples draw over."""
 
     key: str
     value: float
@@ -1783,6 +1826,8 @@ class InputAssumption(BaseModel):
     at: str
     note: str | None = None
     origin: OverrideOrigin = "person-assumption"
+    # The reading a measurement is, `<deposition id>/<entry id>`.
+    ref: str | None = None
 
 
 class ProformaScenarioInfo(BaseModel):
@@ -2654,9 +2699,9 @@ class Runbook(BaseModel):
 # fed-batch's mu_set under a constant feed), which waits for nothing
 # (OF-BLD-020 §3.R, finding 16).
 # `assumption` is a person's value set by an Override, `model-estimate` a
-# model's (ADR-006).
-ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "model-estimate", "convention",
-                      "library-default", "waiting", "not-read"]
+# model's (ADR-006), `measurement` a reading a person deposited at the bench.
+ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "model-estimate", "measurement",
+                      "convention", "library-default", "waiting", "not-read"]
 # What a scope parameterises: a fermOS model family, a vessel designed for
 # a simulation, one unit of a pureOS train, a Proforma scenario, or a library
 # plant (an engine run's parameters, engine/runs.py `parameters_of`).
@@ -2750,8 +2795,10 @@ class ParameterValue(BaseModel):
 
 class Override(BaseModel):
     """A change to one parameter of one scope for a run (D3): a named
-    person's assumption, or a model's estimate (ADR-006), `by` naming the
-    person or the model."""
+    person's assumption, a model's estimate (ADR-006), `by` naming the
+    person or the model, or a deposition's reading (a measurement), `by` the
+    person who deposited it, `at` the time it was taken and `ref` the
+    reading, `<deposition id>/<entry id>`."""
 
     scope: str
     key: str
@@ -2762,6 +2809,8 @@ class Override(BaseModel):
     at: str
     note: str | None = None
     origin: OverrideOrigin = "person-assumption"
+    # The reading a measurement is; None for a person's or a model's value.
+    ref: str | None = None
 
     @field_validator("value", "low", "high", mode="before")
     @classmethod
@@ -2771,6 +2820,12 @@ class Override(BaseModel):
         if isinstance(v, bool):
             raise ValueError("an override's value, low and high are numbers or words, never true or false")
         return v
+
+    @model_validator(mode="after")
+    def _a_measurement_names_its_reading(self) -> "Override":
+        if self.origin == "measurement" and not READING_REF.fullmatch((self.ref or "").strip()):
+            raise ValueError(f"the measurement of {self.key} names its reading as <deposition id>/<entry id> (ref)")
+        return self
 
 
 class ParamScope(BaseModel):
@@ -4360,25 +4415,68 @@ class EngineInfo(BaseModel):
 
 class ScenarioValue(BaseModel):
     """One value a scenario sets on its plant: the parameter's key, and the
-    value as a quantity whose origin is a named person's assumption or a
-    model's estimate (ADR-006)."""
+    value as a quantity whose origin is a named person's assumption, a
+    model's estimate (ADR-006), or a reading a person deposited at the bench
+    (a `measurement`: `{"kind": "measurement", "ref": "<deposition id>/<entry
+    id>"}`, its value and unit the reading's own, which the service looks up
+    in the project's depositions, filling the reading's time and its
+    depositor where the value leaves them out, measurements.py)."""
 
     key: str
     quantity: Quantity
 
+    @field_validator("quantity", mode="wrap")
+    @classmethod
+    def _a_reading_may_wait_for_its_time(cls, value: Any, handler: Any, info: ValidationInfo) -> Any:
+        return _reading_may_wait(value, handler, info)
+
     @model_validator(mode="after")
     def _a_value_set_for_a_run(self) -> "ScenarioValue":
         q = self.quantity
-        if q.origin is None or q.origin.kind not in ("person-assumption", "model-estimate"):
-            raise ValueError(f"{self.key}: a scenario's value is a person's assumption or a model's estimate, and "
-                             "names which (quantity.origin)")
-        if not (q.origin.at or "").strip():
+        if q.origin is None or q.origin.kind not in ("person-assumption", "model-estimate", "measurement"):
+            raise ValueError(f"{self.key}: a scenario's value is a person's assumption or a model's estimate, or a "
+                             "deposition's reading, and names which (quantity.origin)")
+        if q.origin.kind != "measurement" and not (q.origin.at or "").strip():
             raise ValueError(f"{self.key}: a scenario's value says when it was set (quantity.origin.at)")
         if isinstance(q.value, bool) or not isinstance(q.value, (int, float)) or not math.isfinite(float(q.value)):
             raise ValueError(f"{self.key}: a scenario's value is a finite number")
         if q.low is not None or q.high is not None:
             raise ValueError(f"{self.key}: an engine run sets one value per parameter; a range is for sampling")
         return self
+
+
+class DepositionReading(BaseModel):
+    """GET /api/depositions/readings: one reading a run may take as a
+    measurement (measurements.py): an entry of one of the project's
+    depositions that a person confirmed and that stands for its measure,
+    with the runbook and the measure it was recorded against, the person
+    who deposited it and the time it was taken. Asked with a unit, a reading
+    whose unit is that unit or converts into it, its value in that unit
+    beside its own. A scenario's value names it as `{"value": value, "unit":
+    unit, "origin": {"kind": "measurement", "ref": ref}}`."""
+
+    # What a measurement names: `<deposition id>/<entry id>`.
+    ref: str
+    depositionId: str
+    entryId: str
+    # The runbook the deposition tests, and its title as the project keeps it.
+    runbookId: str | None = None
+    runbook: str | None = None
+    # The measure of the runbook's schema the reading is of, and its label.
+    measureId: str
+    measure: str | None = None
+    # The reading's own value and unit, as the bench kept them.
+    value: float
+    unit: str
+    # The time it was taken, and the person who deposited it (the deposition row's maker).
+    at: str
+    by: str
+    # Hours into the run for a reading in a series; None for a reading with no sample time.
+    hours: float | None = None
+    # Asked with a unit: the value in that unit (units.convert where the reading's own unit differs).
+    inUnit: float | None = None
+    # The conversion in words, as a run's basis writes it; None where the units are one.
+    note: str | None = None
 
 
 class ScenarioCreate(BaseModel):

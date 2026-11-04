@@ -371,17 +371,24 @@ export type ValueBasis =
 
 /** A value and its unit. Categorical fields carry a string value. */
 /** Where a number came from (ADR-006). */
-export type OriginKind = 'record' | 'artifact' | 'person-assumption' | 'model-estimate' | 'library-default' | 'convention';
-/** The origins a value set for one run can have (an Override's origin). */
-export type OverrideOrigin = 'person-assumption' | 'model-estimate';
+export type OriginKind =
+  | 'record'
+  | 'artifact'
+  | 'person-assumption'
+  | 'model-estimate'
+  | 'measurement'
+  | 'library-default'
+  | 'convention';
+/** The origins a value set for one run can have (an Override's origin): a person's, a model's, a deposition's reading. */
+export type OverrideOrigin = 'person-assumption' | 'model-estimate' | 'measurement';
 
 export interface Origin {
   kind: OriginKind;
-  /** The record, the artifact or the library entry it was read from. */
+  /** The record, the artifact or the library entry it was read from; a measurement's reading, `<deposition id>/<entry id>`. */
   ref?: string | null;
-  /** The person who typed it, or the id of the model that estimated it. */
+  /** The person who typed it, the id of the model that estimated it, or the person who deposited the reading. */
   by?: string | null;
-  /** The day it was typed, or the moment it was estimated. */
+  /** The day it was typed, the moment it was estimated, or the time the reading was taken. */
   at?: string | null;
   /** What it rests on, in words. */
   note?: string | null;
@@ -934,6 +941,12 @@ export interface DepositionEntry {
    * schema get one confirmation beat; narrative does not (§4.4).
    */
   confirmed: boolean;
+  /**
+   * When a correction was made (src/store.ts `amendEntry`): a correcting
+   * entry keeps the `at` of the reading it corrects, the time the reading
+   * was taken, and says here when it was typed.
+   */
+  correctedAt?: string;
 }
 
 /**
@@ -1011,7 +1024,8 @@ export interface MeasuredEvidence {
   provenance: Provenance;
   /** What it was true under. Without these the number is not reusable. */
   conditions: {
-    protocolId: string;
+    /** The protocol it was run under; null for readings recorded with no protocol's steps. */
+    protocolId: string | null;
     scale: number;
     strainId: string | null;
   };
@@ -1025,7 +1039,12 @@ export interface MeasuredEvidence {
 export interface Deposition {
   id: string;
   runbookId: string;
-  protocolId: string;
+  /**
+   * The protocol whose steps the bench walks, or null for readings recorded
+   * against the runbook's measures alone (Deposition.tsx's DepositionBench):
+   * a runbook supplies what is measured, and a protocol the steps around it.
+   */
+  protocolId: string | null;
   /** Guild will populate this once people and permissions exist. */
   operatorId: string | null;
   startedAt: string;
@@ -2570,8 +2589,10 @@ export interface InputAssumption {
   by: string;
   at: string;
   note: string | null;
-  /** A person's assumption, or a model's estimate (`by` the model's id); the service reads a person's when it is left out. */
-  origin?: 'person-assumption' | 'model-estimate';
+  /** A person's assumption, a model's estimate (`by` the model's id) or a deposition's reading; the service reads a person's when it is left out. */
+  origin?: OverrideOrigin;
+  /** The reading a measurement is, `<deposition id>/<entry id>`. */
+  ref?: string | null;
 }
 
 export interface ProformaScenarioInfo {
@@ -3197,7 +3218,18 @@ export interface Volatility {
 // kept and flagged in words, never clamped. A model never sets one.
 
 /** The chip a value shows: finer than `BasisSourceKind` (a fit and a simulation are artifacts; a library default is a model source). */
-export type ParamOrigin = 'fit' | 'record' | 'artifact' | 'simulation' | 'assumption' | 'model-estimate' | 'convention' | 'library-default' | 'waiting' | 'not-read';
+export type ParamOrigin =
+  | 'fit'
+  | 'record'
+  | 'artifact'
+  | 'simulation'
+  | 'assumption'
+  | 'model-estimate'
+  | 'measurement'
+  | 'convention'
+  | 'library-default'
+  | 'waiting'
+  | 'not-read';
 
 /** What a scope parameterises. */
 export type ParamScopeKind = 'fermos-family' | 'fermos-vessel' | 'fermos-forecast' | 'pureos-unit' | 'proforma' | 'library';
@@ -3268,8 +3300,10 @@ export interface Override {
   by: string;
   at: string;
   note: string | null;
-  /** A person's assumption unless it says otherwise; a model's estimate names the model in `by` (ADR-006). */
+  /** A person's assumption unless it says otherwise; a model's estimate names the model in `by` (ADR-006), a measurement its depositor. */
   origin?: OverrideOrigin;
+  /** The reading a measurement is, `<deposition id>/<entry id>`; absent for a person's or a model's value. */
+  ref?: string | null;
 }
 
 /** `GET /api/params/{scope}`: a scope's specs with their current values. */
@@ -4242,7 +4276,7 @@ export interface RunReport {
 
 // ── Studies (execution prompt §7.2, §9.1 step 5; studies/) ─────────────
 
-/** One value a scenario sets: the parameter's key, and a quantity whose origin is a person's assumption or a model's estimate. */
+/** One value a scenario sets: the parameter's key, and a quantity whose origin is a person's assumption, a model's estimate or a deposition's reading (a measurement, its own value and unit, `ref` the reading). */
 export interface ScenarioValue {
   key: string;
   quantity: Quantity;

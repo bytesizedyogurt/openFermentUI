@@ -134,9 +134,11 @@ origin:
   count, a tolerance). Every default carries one. A thing the project holds (The core's `train`,
   below) has defaults the project holds too: `record` with `ref` naming the records that bound
   it, its `sourceRule` naming the field it binds from (`record:<field id>`); `artifact` with
-  `ref` naming the run, simulation or design it was read from; or `person-assumption` with `by`
-  naming the person who typed it into the thing, and `at` the day. Those five are a default's
-  origins; a model's estimate reaches a run as a value the run sets (`EngineInput`, below).
+  `ref` naming the run, simulation or design it was read from; `person-assumption` with `by`
+  naming the person who typed it into the thing, and `at` the day; or `measurement` with `ref`
+  naming the reading (`<deposition id>/<entry id>`) and `at` its time, for a thing the project
+  holds whose value a person set to a deposition's reading. Those six are a default's origins; a
+  model's estimate reaches a run as a value the run sets (`EngineInput`, below).
 - A parameter with no default has `value` and `origin` null, and its `sourceRule` names
   `assumption` (given when the parameter names no rule): a run sets it, the engine binds it
   from what the project holds (the kinetics engine binds a family's parameter from the project's
@@ -162,10 +164,17 @@ origin:
 
 - The shape a run's inputs have (`RunInput`): `name` is a parameter's key; `quantity` is a typed
   value in that parameter's unit, carrying its origin: `person-assumption` (`by` the person) or
-  `model-estimate` (`by` the model's id).
-- `at` is the day the value was set, and every value carries one: a value without it is refused
-  in words. The day enters the run's basis, and the service stamps no day of its own, so the same
-  request is one run whatever day it arrives.
+  `model-estimate` (`by` the model's id). A value may also be a reading a person deposited at
+  the bench, `{"kind": "measurement", "ref": "<deposition id>/<entry id>"}`, its value and unit
+  the reading's own: the service looks it up in the project's depositions before the worker
+  sees anything, fills its depositor (`by`) and its time (`at`), and sets it in the parameter's
+  unit where the reading's converts, the conversion stated in its note (`docs/api/studies.md`,
+  Measurements). A reading the project does not hold, one no person confirmed, one corrected
+  since, a value or unit other than the reading's, or a unit that does not convert into the
+  parameter's is refused in words, and nothing runs.
+- `at` is the day the value was set, and every value carries one, a reading's from its
+  deposition: a value without it is refused in words. The day enters the run's basis, and the
+  service stamps no day of its own, so the same request is one run whatever day it arrives.
 - A value set is checked against the thing's parameters before the worker sees it: a key the
   thing declares, set once, in the parameter's unit, a number for a number and one of `choices`
   for words, inside `min` and `max`. A parameter takes words when it has `choices`, or when its
@@ -314,7 +323,8 @@ computation from that artifact and asks `sff_export` for the file again.
   each a source of kind `convention` with the note `engine/runs.py` writes, then `value <key>` for
   each value set, in key order, its source of kind `assumption` with `by` the person and the note
   `typed on <at>: <note>` (`typed on <at>` with no note); a model's estimate is of kind
-  `model-estimate`, its note `estimated on <at>: <note>`. The version string is the contract's
+  `model-estimate`, its note `estimated on <at>: <note>`; a deposition's reading is of kind
+  `deposition`, its `id` the reading, `by` the depositor and its note `measured on <at>: <note>`. The version string is the contract's
   stem, the engine's name and every distribution with its version:
   `engine run 1 · example · openferment-engine-example 0.1.0`. The stem moves when the
   service changes how it keys a run or shapes its outputs; a run kept before then keeps its own
@@ -323,7 +333,8 @@ computation from that artifact and asks `sff_export` for the file again.
   asks again. `created_by` is the request's person or model, and a request naming no `by` is kept
   as `this browser`. Provenance is computed from the inputs' origins (`basis.py`): `computed` for
   a run at the engine's own defaults, `assumed` when any input is a person's assumption or a
-  model's estimate.
+  model's estimate, `measured` when the values it sets are readings and none is a person's or a
+  model's.
 - **Outputs.** Each output is kept as a typed quantity, its origin the run's own artifact:
   `outputs.values` is `[{"name", "quantity": {"value", "unit", "origin": {"kind": "artifact",
   "ref": "<the run's artifact id>"}}}, …]`.
@@ -523,7 +534,8 @@ resolution reads, Conformance, below) and `unready`.
   `pureos:unit:<train>:inlet`, `train_spec.converted`), the one converter every door shares. A
   name of neither form, a place the train lacks, a key its place lacks, a key set twice and a
   value its parameter cannot take (another unit, words for a number, a choice not offered, an
-  origin that is no person's or model's) are refused together with everything else the run would
+  origin that is no person's, no model's and no deposition's reading; a reading in a unit that
+  converts is set in the parameter's) are refused together with everything else the run would
   refuse, the inputs' refusals first, each in words by its place, and keep nothing. A value
   outside its bounds is kept as set and flagged on the run, as pureOS has always flagged one.
 - A run's id is its `pureos.train_run` artifact's (`train run 2 · biosteam <version> · thermosteam
@@ -582,7 +594,9 @@ registered.
     pool whole, every candidate and every decision, since a value binds the records of its field
     that the pool holds and its words count each record the value leaves out; and every strain the
     project keeps, since a simulation names its strain, and pureOS reads that strain's species, and
-    the one species of its chemical set, from all of them. The pool also reads the titles of the
+    the one species of its chemical set, from all of them; and every deposition the project keeps,
+    since a value a run of a train sets may be a deposition's reading, which the run looks up in
+    them (`measurements.py`). The pool also reads the titles of the
     project's documents for its search; the copy leaves them out, and every value and every word of
     a train reads the same in the copy as in the project.
   - **Where the checks run.** A database of the checks' own, made on the configured server and
@@ -632,7 +646,8 @@ registered.
 - Each thing is checked in its default configuration, or in the first it names when it has no
   default.
 - Check 2 holds every default to an origin naming what it rests on (a library-default, a record
-  or an artifact its `ref`, a convention its `note`, a person's assumption its `by`), and every
+  or an artifact its `ref`, a convention its `note`, a person's assumption its `by`, a measurement
+  a reading the project holds, `basis.reading_refusal`), and every
   parameter with no default to a source rule naming `assumption`: it takes a run's value, which a
   run sets, the engine binds or the thing fills itself (`EngineParameter`). Check 3 holds the
   run's id to the artifact id of its basis (its seed joining it where the computation takes
@@ -654,7 +669,7 @@ registered.
 | # | Check |
 |---|---|
 | 1 | A JSON number outside a `quantity` is refused in words before the worker is reached |
-| 2 | Every default carries an origin naming what it rests on (`library-default`, `record` or `artifact` with `ref`, `convention` with `note`, `person-assumption` with `by`), and a parameter with none takes a run's value |
+| 2 | Every default carries an origin naming what it rests on (`library-default`, `record` or `artifact` with `ref`, `convention` with `note`, `person-assumption` with `by`, `measurement` with `ref` naming a reading the project holds), and a parameter with none takes a run's value |
 | 3 | A run writes one `runs` row keyed by its basis, and the same request twice is that one row |
 | 4 | A replay holds every output within the precision the thing states |
 | 5 | The run's SFF file validates and scores, or `sffRefused` holds words |

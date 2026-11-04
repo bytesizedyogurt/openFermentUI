@@ -70,6 +70,7 @@ from typing import Any, Callable
 from pydantic import BaseModel, ConfigDict, Field
 
 from .. import llm, module_stores
+from ..basis import SET_PARAM_ORIGINS
 from ..models import ToolResult
 from . import Tool, ToolContext, register
 from . import gates
@@ -657,16 +658,18 @@ SIM_WAITS = ("A named person types each waiting parameter in fermOS → Simulate
              "for it in recordsByParam. Say in gaps which parameters wait.")
 # How each origin is said, in words: what bound the parameter, never its value.
 BOUND_BY = {"fit": "a fit", "record": "records", "simulation": "a kept simulation", "assumption": "a named person",
-            "model-estimate": "a model's estimate", "convention": "a stated convention",
-            "library-default": "the library's own default", "artifact": "an artifact"}
+            "model-estimate": "a model's estimate", "measurement": "a deposition's reading",
+            "convention": "a stated convention", "library-default": "the library's own default",
+            "artifact": "an artifact"}
 MAX_FLAG_CHARS = 300
 
 
 def _bound_by(v: Any, named: set[str], fields_of: dict[str, str]) -> dict[str, Any]:
     """What bound one parameter, in words and counts: the records by how many
     and of which field, and whether they were named for it; a fit or a kept
-    simulation by its artifact id; a convention by its word when it is one.
-    Never a number of the parameter's, which the artifact holds."""
+    simulation by its artifact id; a deposition's reading by its ref and the
+    person who deposited it; a convention by its word when it is one. Never a
+    number of the parameter's, which the artifact holds."""
     line: dict[str, Any] = {"key": v.key, "origin": v.origin}
     src = v.source
     if v.origin == "record":
@@ -679,7 +682,10 @@ def _bound_by(v: Any, named: set[str], fields_of: dict[str, str]) -> dict[str, A
         line["boundBy"] = f"{BOUND_BY[v.origin]}, {src.id}" if src and src.id else BOUND_BY[v.origin]
         if v.origin == "fit" and v.identified is False:
             line["identified"] = False
-    elif v.origin in ("assumption", "model-estimate"):
+    elif v.origin == "measurement":
+        reading = f", {src.id}" if src and src.id else ""
+        line["boundBy"] = f"{BOUND_BY[v.origin]}{reading}, deposited by {v.overriddenBy}"
+    elif v.origin in SET_PARAM_ORIGINS:
         line["boundBy"] = f"{BOUND_BY[v.origin]}, {v.overriddenBy}"
     elif v.origin == "waiting":
         line["boundBy"] = "nothing: this setting of the family does not read it"

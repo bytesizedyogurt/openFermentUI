@@ -62,12 +62,11 @@ import math
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Annotated, Any, Callable
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
-from pydantic.json_schema import SkipJsonSchema
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, WithJsonSchema, field_validator
 
-from ..models import Origin, Quantity, ToolInfo, ToolResult
+from ..models import READING_TO_FILL, Origin, Quantity, ToolInfo, ToolResult
 
 # The names E.6, OF-BLD-015, OF-BLD-019 §6.1 and OF-BLD-020 allow, whichever have been built.
 WHITELIST = (
@@ -236,11 +235,32 @@ class Tool:
         return ToolInfo(name=self.name, description=self.description, inputSchema=self.input_model.model_json_schema())
 
 
+# What a caller may name as a quantity's origin: a deposition's reading the
+# value is (ADR-006's measurement), which the service looks up; every other
+# origin the registry writes from who called (`stamped`).
+READING_ORIGIN = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["kind", "ref"],
+    "properties": {
+        "kind": {"type": "string", "enum": ["measurement"]},
+        "ref": {"type": "string", "maxLength": 401, "description": (
+            "The reading, <deposition id>/<entry id>: a confirmed reading a person deposited at the bench, the one "
+            "that stands for its measure.")},
+    },
+}
+
+
 # A number as a caller types it into a tool (ADR-006). The registry writes
-# its origin from who called (`stamped`), so the caller's own is never read.
+# each quantity's origin from who called (`stamped`), keeping of the caller's
+# own origin a deposition's reading alone (its kind, ref and note), which the
+# service looks up.
 class QuantityIn(BaseModel):
     """A number you type: a value in a unit, and in words what it rests on.
-    The service marks it with who typed it."""
+    The service marks it with who typed it. A value that is a reading a
+    person deposited names the reading in `origin`, its value and unit the
+    reading's own: the service looks the reading up and marks the value with
+    the reading's depositor and time."""
 
     # A range or any other field is refused in words, never dropped unread.
     model_config = ConfigDict(extra="forbid")
@@ -248,7 +268,9 @@ class QuantityIn(BaseModel):
     value: float
     unit: str = Field(max_length=40, description="The value's unit, as the tool names it.")
     note: str = Field(default="", max_length=600, description="What the value rests on, in words.")
-    origin: SkipJsonSchema[Origin | None] = None
+    origin: Annotated[Origin | None, WithJsonSchema({"anyOf": [READING_ORIGIN, {"type": "null"}], "description": (
+        "Leave it out for a value you type. For a deposition's reading: {\"kind\": \"measurement\", \"ref\": "
+        "\"<deposition id>/<entry id>\"}, the value and unit then the reading's own, which the service checks.")})] = None
 
     @field_validator("value", mode="before")
     @classmethod
@@ -257,8 +279,19 @@ class QuantityIn(BaseModel):
             raise ValueError("a quantity's value is a number, never true or false")
         return v
 
+    @field_validator("origin", mode="wrap")
+    @classmethod
+    def _a_reading_waits_for_its_time(cls, v: Any, handler: Any, info: ValidationInfo) -> Any:
+        # A reading the caller names carries no depositor or time until the
+        # service looks it up (measurements.py).
+        if isinstance(v, dict) and v.get("kind") == "measurement":
+            return Origin.model_validate(v, context={**(info.context or {}), READING_TO_FILL: True})
+        return handler(v)
+
     def quantity(self) -> Quantity:
-        return Quantity(value=self.value, unit=self.unit, origin=self.origin)
+        # A reading's origin waits for the service to fill its depositor and time.
+        return Quantity.model_validate({"value": self.value, "unit": self.unit, "origin": self.origin},
+                                       context={READING_TO_FILL: True})
 
 
 REGISTRY: dict[str, Tool] = {}
@@ -352,11 +385,39 @@ def quantities_in(value: Any, quantities: frozenset[str], path: str = "") -> boo
     return False
 
 
+# What a caller may write in a reading's origin: the reading (READING_ORIGIN),
+# and the note `stamped` reads beside every quantity's value.
+READING_FIELDS = frozenset({"kind", "ref", "note"})
+
+
+def reading_extras(value: Any, quantities: frozenset[str], path: str = "") -> list[str]:
+    """Where a quantity standing where the tool asks for one names a
+    deposition's reading as its origin and writes more than the reading
+    there (READING_FIELDS): each such field's path. The reading's depositor
+    and the time it was taken are the deposition's, which the service fills
+    from it, so a caller naming them is refused in words."""
+    found: list[str] = []
+    if isinstance(value, list):
+        for n, v in enumerate(value):
+            found += reading_extras(v, quantities, f"{path}[{n}]")
+    elif isinstance(value, dict):
+        wrote = value.get("origin")
+        if _shape(path) in quantities and is_quantity(value) and isinstance(wrote, dict) \
+                and wrote.get("kind") == "measurement":
+            found += [f"{path}.origin.{k}" if path else f"origin.{k}" for k in wrote if k not in READING_FIELDS]
+        for k, v in value.items():
+            found += reading_extras(v, quantities, f"{path}.{k}" if path else str(k))
+    return found
+
+
 def stamped(value: Any, origin: Origin, quantities: frozenset[str], path: str = "") -> Any:
     """`value` with the origin of every quantity standing where the tool asks
     for one written by the service: `origin`, with the note the caller wrote
     beside the value (or in its origin), and nothing else the caller wrote
-    there (ADR-006)."""
+    there (ADR-006). A quantity whose origin the caller named a deposition's
+    reading keeps that kind and the reading's ref, with the note, and nothing
+    else: the service looks the reading up and fills its depositor and its
+    time from the deposition (measurements.py)."""
     if isinstance(value, list):
         return [stamped(v, origin, quantities, f"{path}[{n}]") for n, v in enumerate(value)]
     if not isinstance(value, dict):
@@ -366,6 +427,10 @@ def stamped(value: Any, origin: Origin, quantities: frozenset[str], path: str = 
         wrote = value.get("origin")
         note = value.get("note") if isinstance(value.get("note"), str) else (
             wrote.get("note") if isinstance(wrote, dict) and isinstance(wrote.get("note"), str) else None)
+        if isinstance(wrote, dict) and wrote.get("kind") == "measurement":
+            out["origin"] = {"kind": "measurement", "ref": wrote.get("ref"),
+                             **({"note": note.strip()} if (note or "").strip() else {})}
+            return out
         out["origin"] = origin.model_copy(update={"note": (note or "").strip() or None}).model_dump(
             mode="json", exclude_none=True)
     return out
@@ -392,6 +457,12 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
                 "for one, and k and limit are counts."
             )
         )
+    extras = reading_extras(raw, quantities)
+    if extras:
+        return ToolResult(error=(
+            f"{name} refused: a reading's origin names the reading alone, {{\"kind\": \"measurement\", \"ref\": "
+            f"\"<deposition id>/<entry id>\"}}; {', '.join(extras)} {'is' if len(extras) == 1 else 'are'} the "
+            "deposition's to say, and the service fills each from it"))
     if quantities_in(raw, quantities):
         author = ctx.author()
         if author is None:

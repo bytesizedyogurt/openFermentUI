@@ -209,7 +209,13 @@ outputs as evidence ids, each holding the run's artifact id; engine_report \
 reads a kept run; study_compare sets kept runs side by side; study_read lists \
 the project's scenarios, comparisons and study runbooks. A run's numbers are \
 cited by those evidence ids. When a run refuses, say in gaps what the plant \
-refused, in its words.
+refused, in its words. A scenario's value may be a reading a person deposited \
+at the bench: runbooks_read lists each reading a run may take (kind reading, \
+by its id), with its value and unit; send that value and unit as the reading \
+gave them, with origin {"kind": "measurement", "ref": "<the reading's id>"} \
+and nothing else in the origin, and the service looks the reading up and marks \
+the value as the person's measurement. Choose a reading of the quantity the \
+parameter is, and say in the note why it stands for it.
 19. A number you state goes in a claim's values, never in its text: each value \
 has a label in words and one source. Read it from a computed value by its \
 evidenceId or from a record by its recordId, and the service writes the \

@@ -89,6 +89,7 @@ import threading
 from typing import Any, Iterable
 
 from . import params
+from .basis import SET_PARAM_ORIGINS, is_measurement
 from .models import (
     Artifact,
     BasisInput,
@@ -1136,12 +1137,12 @@ def _parameters(inputs: list[BasisInput], kind: str, source_id: str, source_tool
                                       origin="library-default", libraryDefault=lib,
                                       detail=f"{ws['unitClass']}'s default is None: the class decides at run time"))
             continue
-        o = origin.get(i.source.kind) or ("simulation" if i.source.id == source_id and source_tool == SIMULATION
-                                          else "artifact")
+        o = "measurement" if is_measurement(i.source) else origin.get(i.source.kind) or (
+            "simulation" if i.source.id == source_id and source_tool == SIMULATION else "artifact")
         low, high = given.get(f"{d.key} low"), given.get(f"{d.key} high")
         v = ParameterValue(key=d.key, value=i.value, low=float(low.value) if low else None,
                            high=float(high.value) if high else None, source=i.source, origin=o,
-                           overriddenBy=i.source.by if o in ("assumption", "model-estimate") else None,
+                           overriddenBy=i.source.by if o in SET_PARAM_ORIGINS else None,
                            libraryDefault=lib, detail=i.source.note)
         v.outOfBounds = params.bounds_check(_spec(d, [] if d.choice else None, bounds=_class_bounds(d, ws)), v.value,
                                             v.low, v.high)

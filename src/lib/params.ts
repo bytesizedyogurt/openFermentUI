@@ -95,7 +95,8 @@ export const paramScope = (scope: string, ask: ParamAsk = {}, signal?: AbortSign
  * quantity holding its value, low and high in the unit its parameter is in (the
  * scope's `specs`: the key's own spec, or for a key expanded per item,
  * `<key>.<item>`, its template's), with the person or the model that set it,
- * the day and the note as its origin. The one place an Override becomes an
+ * the day and the note as its origin, and a deposition's reading with its ref
+ * and its depositor. The one place an Override becomes an
  * input (core/tests/standins.py's `as_inputs` mirrors it); a key the specs do
  * not name goes with no unit, and the service says why it cannot stand.
  */
@@ -108,7 +109,14 @@ export function inputsOf(overrides: Override[], specs: Pick<ParameterSpec, 'key'
       unit: unit.get(o.key) ?? unit.get(o.key.split('.')[0]) ?? '',
       ...(o.low != null ? { low: o.low } : {}),
       ...(o.high != null ? { high: o.high } : {}),
-      origin: { kind: o.origin ?? 'person-assumption', by: o.by, at: o.at, ...(o.note ? { note: o.note } : {}) },
+      origin: {
+        kind: o.origin ?? 'person-assumption',
+        by: o.by,
+        at: o.at,
+        ...(o.note ? { note: o.note } : {}),
+        // A deposition's reading names itself (`<deposition id>/<entry id>`).
+        ...(o.origin === 'measurement' && o.ref ? { ref: o.ref } : {}),
+      },
     },
   }));
 }

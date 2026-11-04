@@ -36,13 +36,22 @@ MAX_ROWS = 20
 ROW_BUDGET = MAX_SUMMARY_CHARS - 1_500
 
 WHAT = {
-    "runbooks": "the runbooks (their status, lock and what they predict) and the protocols (their versions)",
+    "runbooks": "the runbooks (their status, lock and what they predict), the protocols (their versions), the "
+                "depositions made at the bench (kind deposition: its runbook, state, how many readings it holds and "
+                "how many a person confirmed, and the ids of the readings a run may take), each reading a run may "
+                "take as a measurement (kind reading, read by its id <deposition id>/<entry id>: the measure it is "
+                "of, its value and unit as the bench kept them, who deposited it and when it was taken; a "
+                "scenario's value names it as {\"value\": <value>, \"unit\": \"<unit>\", \"origin\": "
+                "{\"kind\": \"measurement\", \"ref\": \"<its id>\"}}), and the measured evidence a "
+                "reconciliation released (kind measured-evidence: the prediction it tests, its value, unit and "
+                "conditions)",
     "geneos": "the hosts, the pathways, the genome-scale models on the shelf and the ceilings computed on them",
     "fermos": "the growth fits and forecasts computed from deposited runs (kind artifact), the kept simulations "
               "of a model family (kind simulation: its family, strain, product and sugar, and what bound each "
               "parameter, in words; its numbers stay in the artifact, cited by the row's ref or the evidence id "
-              "fermos_simulate returns), and the vessels BioSTEAM designed for kept simulations (kind vessel, read "
-              "by the design's artifact id or the simulation's)",
+              "fermos_simulate returns), the vessels BioSTEAM designed for kept simulations (kind vessel, read "
+              "by the design's artifact id or the simulation's), and the depositions kept with the runbooks, whose "
+              "series fermOS fits (kind deposition: its runbook, its readings and series, and the fits made from it)",
     "pureos": "the downstream unit operations, by stage (each with the BioSTEAM classes it is), and the trains Proforma's "
               "runs simulated (kind train, one a scenario: read by the scenario id or the run's artifact id); kind "
               "train-unit is one unit of a train, in run order, with the product in and out and the recovery read "

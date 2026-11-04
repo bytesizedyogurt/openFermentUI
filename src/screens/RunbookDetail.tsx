@@ -483,11 +483,16 @@ function EnumerationFunnel({ runbook }: { runbook: Runbook }) {
  * Deposition is launched FROM a Runbook, not from a protocol: the runbook is
  * what supplies the predictions and the measurement schema, and without those
  * a run has nothing to be reconciled against. The protocol supplies the steps.
+ * The readings alone need no protocol (alpha 2.2 C.5): each of the runbook's
+ * measures is recorded at the bench DepositionBench serves, and a reading a
+ * person confirms there is one a scenario's value may name.
  */
 function StartDeposition({ runbook }: { runbook: Runbook }) {
   const protocols = useStore((s) => s.protocols);
   const depositions = useStore((s) => s.depositions);
   const openDeposition = useStore((s) => s.openDeposition);
+  // A reading names the person who took it (measurements.py), so the readings alone wait for a name.
+  const reviewer = useStore((s) => s.reviewer.trim());
   const [pick, setPick] = useState(false);
   const [scale, setScale] = useState(1);
 
@@ -537,27 +542,55 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
         </ul>
       )}
 
-      <Modal open={pick} onClose={() => setPick(false)} title="Which protocol will you run?" width={520}>
+      <Modal open={pick} onClose={() => setPick(false)} title="How will you record it?" width={520}>
         <p className="text-body text-ink-soft mb-3">
-          The runbook supplies the predictions and the measurement schema. The protocol supplies the
+          The runbook supplies the predictions and the measurement schema. A protocol, where you run one, supplies the
           steps and the quantities.
         </p>
-        <label className="block text-caption uppercase tracking-wide text-ink-soft mb-1">
-          Scale versus the base batch
-        </label>
-        <input
-          className="input font-num mb-3"
-          type="number"
-          min={0.1}
-          step={0.1}
-          value={scale}
-          onChange={(e) => setScale(Math.max(0.1, Number(e.target.value) || 1))}
-          aria-label="Scale multiplier"
-        />
-        {protocols.length === 0 && (
-          <p className="text-body text-ink-soft mb-2" data-testid="no-protocols">
-            No protocol is on file yet, so none is offered here.
+        <button
+          className="w-full text-left card p-3 mb-2 hover:border-accent/45 hover:bg-accent-wash/40 disabled:opacity-60"
+          style={{ minHeight: 44 }}
+          data-testid="deposition-readings-alone"
+          disabled={!reviewer}
+          onClick={() => {
+            const started = openDeposition(runbook.id, null, scale);
+            setPick(false);
+            if (started) navigate(`/runbooks/depositions/${encodeURIComponent(started.depositionId)}/bench`);
+          }}
+        >
+          <div className="font-medium">The readings alone</div>
+          <div className="text-caption text-ink-soft">
+            Each of this runbook&rsquo;s {runbook.measurementSchema.length} measure{runbook.measurementSchema.length === 1 ? '' : 's'} recorded at the
+            bench, with no protocol&rsquo;s steps around them
+          </div>
+        </button>
+        {!reviewer && (
+          <p className="text-caption text-ink-soft mb-2" data-testid="deposition-needs-name">
+            A reading names the person who took it: set yours in Settings first.
           </p>
+        )}
+        {protocols.length === 0 ? (
+          <p className="text-body text-ink-soft mb-2" data-testid="no-protocols">
+            No protocol is on file yet; the runbook&rsquo;s measures can be recorded alone.
+          </p>
+        ) : (
+          <>
+            <div className="text-caption uppercase tracking-wide text-ink-soft mt-3 mb-1">With a protocol&rsquo;s steps</div>
+            <label className="block text-caption text-ink-soft mb-1" htmlFor="deposition-scale">
+              Scale versus the protocol&rsquo;s base batch
+            </label>
+            <input
+              id="deposition-scale"
+              className="input font-num mb-3"
+              style={{ minHeight: 44 }}
+              type="number"
+              min={0.1}
+              step={0.1}
+              value={scale}
+              onChange={(e) => setScale(Math.max(0.1, Number(e.target.value) || 1))}
+              aria-label="Scale multiplier"
+            />
+          </>
         )}
         <ul className="space-y-1.5 max-h-[320px] overflow-y-auto">
           {protocols.map((p) => (

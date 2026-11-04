@@ -16,6 +16,7 @@ import { AlertTriangle, Check, CornerDownLeft, Eye, Ruler } from 'lucide-react';
 import type { Deposition, Measure } from '@/data/types';
 import { useStore } from '@/store';
 import { matchToSchema, readBackText, type CaptureMatch } from '@/engine/capture';
+import { awaitingReadBack, correctedBy } from '@/engine/readings';
 import { ComponentTag } from './ComponentTag';
 import { Button, cx } from './ui';
 
@@ -23,10 +24,13 @@ export function DepositionPanel({
   deposition,
   schema,
   stepId,
+  stepLabel = 'Recorded at this step',
 }: {
   deposition: Deposition;
   schema: Measure[];
   stepId: string;
+  /** What the list of this step's entries is headed, where a bench walks no protocol's steps. */
+  stepLabel?: string;
 }) {
   const capture = useStore((s) => s.captureDeposition);
   const confirm = useStore((s) => s.confirmEntry);
@@ -49,7 +53,9 @@ export function DepositionPanel({
     [schema],
   );
 
-  const unconfirmed = deposition.entries.filter((e) => !e.confirmed);
+  // A number a later entry corrects is read back no longer: the correction is
+  // the reading that stands (engine/readings.ts, the service's rule).
+  const unconfirmed = awaitingReadBack(deposition);
   const stepEntries = deposition.entries.filter((e) => e.stepId === stepId);
   const stepObs = deposition.observations.filter((o) => o.stepId === stepId);
 
@@ -65,7 +71,7 @@ export function DepositionPanel({
       <div className="flex items-center gap-2 mb-2">
         <Ruler size={16} className="text-accent shrink-0" aria-hidden />
         <span className="font-medium text-reading">Record what happened</span>
-        <span className="ml-auto font-num text-caption text-ink-soft">
+        <span className="ml-auto font-num text-caption text-ink">
           {deposition.entries.length} measured · {deposition.observations.length} observed
         </span>
       </div>
@@ -135,7 +141,8 @@ export function DepositionPanel({
                     {e.value} {e.unit}
                   </span>
                 </div>
-                <div className="text-caption text-ink-soft mt-0.5">
+                {/* The words the number is checked against, on ink at body size for arm's length. */}
+                <div className="text-body text-ink mt-0.5">
                   you said: &ldquo;{e.raw}&rdquo;
                 </div>
                 {amending === e.id ? (
@@ -197,8 +204,8 @@ export function DepositionPanel({
 
       {(stepEntries.length > 0 || stepObs.length > 0) && (
         <div className="mt-4 pt-3 border-t border-line">
-          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
-            Recorded at this step
+          <div className="text-caption uppercase tracking-wide text-ink mb-1.5">
+            {stepLabel}
           </div>
           <ul className="space-y-1.5">
             {stepEntries.map((e) => (
@@ -215,7 +222,11 @@ export function DepositionPanel({
                   <span className="font-num font-medium">
                     {e.value} {e.unit}
                   </span>
-                  {!e.confirmed && <span className="text-signal-warn"> · unconfirmed</span>}
+                  {correctedBy(deposition, e) !== null ? (
+                    <span className="text-ink"> · corrected</span>
+                  ) : (
+                    !e.confirmed && <span className="text-ink"> · to read back</span>
+                  )}
                 </span>
               </li>
             ))}

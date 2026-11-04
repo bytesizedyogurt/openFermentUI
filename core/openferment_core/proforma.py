@@ -12,7 +12,7 @@ import shutil
 from typing import Any
 
 from . import binding as _binding
-from .basis import ASSUMED_KINDS
+from .basis import SET_PARAM_ORIGINS, is_set
 from .binding import exclusion as _exclusion
 from .engine.simulator import (  # noqa: F401  (re-exported: the names callers and tests use)
     CALL_TIMEOUT_S,
@@ -340,15 +340,25 @@ def _in_place_of(inp, bound: list) -> None:
 def _assume(inp, a) -> None:
     """An input bound to a named value: a person's assumption, its source
     naming the person (basis.assumption_source), or a model's estimate, its
-    source naming the model (basis.estimate_source, ADR-006); either makes
-    the run `assumed`."""
-    from .basis import assumption_source, estimate_source
+    source naming the model (basis.estimate_source, ADR-006), either making
+    the run `assumed`; or a deposition's reading, its source naming the
+    reading and its depositor (basis.measurement_source), which makes a run
+    resting on readings and records alone `measured`."""
+    from .basis import assumption_source, estimate_source, measurement_source
     from .biorepo import reviewer_refusal
 
     if a.origin == "model-estimate":
         name = (a.by or "").strip()
         if not name or any(not ch.isprintable() for ch in name):
             raise ScenarioRefused(f"the estimate of {inp.key} names the model that made it, on one line")
+    elif a.origin == "measurement":
+        from .measurements import unnamed
+
+        name = (a.by or "").strip()
+        why = unnamed(name) if name and all(ch.isprintable() for ch in name) else "names nobody on one line"
+        if why:
+            raise ScenarioRefused(f"the measurement of {inp.key} names the person who deposited its reading: its "
+                                  f"reading {why}")
     else:
         why = reviewer_refusal(a.by)
         if why:
@@ -362,6 +372,7 @@ def _assume(inp, a) -> None:
     inp.value, inp.low, inp.high = a.value, a.low, a.high
     inp.sampling = "fixed" if a.low == a.high else "uniform"
     inp.source = (estimate_source(a.by, a.at, a.note) if a.origin == "model-estimate"
+                  else measurement_source(a.ref or "", a.by, a.at, a.note) if a.origin == "measurement"
                   else assumption_source(a.by, a.at, a.note))
 
 
@@ -454,7 +465,7 @@ def named_values(scenario_id: str | None, overrides: list | None = None) -> list
         low, high = params.held(value, o.low, o.high)
         out[o.key] = InputAssumption(key=o.key, value=value, low=value if low is None else low,
                                      high=value if high is None else high, by=o.by, at=o.at, note=o.note,
-                                     origin=o.origin)
+                                     origin=o.origin, ref=o.ref)
     return list(out.values())
 
 
@@ -501,7 +512,8 @@ def inputs_of(flowsheet: str, overrides: list) -> list:
     info = _shelf.info(flowsheet, allow_toy=True)
     units = params.units_of(params.flowsheet_specs(info) + (composite.finance_specs() if info.builtFrom else []))
     return [EngineInput(name=o.key, quantity=Quantity(value=o.value, unit=units.get(o.key, ""), low=o.low, high=o.high,
-                                                      origin=Origin(kind=o.origin, by=o.by, at=o.at, note=o.note)))
+                                                      origin=Origin(kind=o.origin, by=o.by, at=o.at, note=o.note,
+                                                                    ref=o.ref)))
             for o in overrides]
 
 
@@ -609,8 +621,10 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
     import statistics
 
     vals: dict[str, list[float]] = {}
+    # The values the run set, by key: a person's, a model's or a reading,
+    # and the source kind of each that is no person's.
     assumed: dict[str, dict[str, float]] = {}
-    estimated: set[str] = set()
+    estimated: dict[str, str] = {}
     fitted: dict[str, dict[str, float]] = {}
     from . import composite
 
@@ -628,11 +642,11 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
             v = float(i.value)
             key = i.name.removesuffix(" record")
             vals.setdefault(key, []).append(v)
-        elif i.source.kind in ASSUMED_KINDS:
+        elif is_set(i.source):
             key, _, part = i.name.partition(" ")
             assumed.setdefault(key, {})[part or "value"] = float(i.value)
-            if i.source.kind == "model-estimate":
-                estimated.add(key)
+            if i.source.kind != "assumption":
+                estimated[key] = i.source.kind
     specs, base, kinds = {}, {}, {}
     for key, vs in vals.items():
         vs = sorted(vs)
@@ -645,7 +659,7 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
         else:
             specs[key], base[key] = {"kind": "fixed", "value": vs[0]}, vs[0]
     for key, a in assumed.items():
-        kinds[key] = "model-estimate" if key in estimated else "assumption"
+        kinds[key] = estimated.get(key, "assumption")
         base[key] = a["value"]
         specs[key] = ({"kind": "fixed", "value": a["value"]} if a["low"] == a["high"]
                       else {"kind": "uniform", "low": a["low"], "high": a["high"]})
@@ -1461,7 +1475,7 @@ def _engine_parameter(spec: Any, v: Any) -> Any:
             origin = Origin(kind="convention", note=note)
         elif v.origin == "library-default":
             origin = Origin(kind="library-default", ref=ref, note=v.detail) if ref else None
-        elif v.origin == "assumption" and v.source is not None:
+        elif v.origin in SET_PARAM_ORIGINS and v.source is not None:
             origin = origin_of(v.source)
     return EngineParameter(**spec.model_dump(), value=v.value if origin is not None else None, origin=origin)
 
@@ -1829,6 +1843,8 @@ def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
         n = len(t.records) if t else 0
         paired = (f"titre is from {fits['titre']}" if fits.get("titre") else
                   f"titre binds {n} record{'s' if n != 1 else ''}" if t and t.binding == "records" else
+                  f"titre is a deposition's reading ({t.source.id if t.source else ''}), which wins over any fit"
+                  if t and t.binding == "assumption" and _a_reading(t) else
                   "titre is a named person's assumption, which wins over any fit" if t and t.binding == "assumption" else
                   "titre waits for a source")
         # §2.R (finding 13): beside a titre a person typed, choosing the fit
@@ -1993,11 +2009,24 @@ def artifact_tool(aid: str | None) -> str | None:
         return None
 
 
+def _a_reading(inp) -> bool:
+    """Whether a scenario's input is bound to a deposition's reading: bound
+    as a named value is (`_assume`), its source the reading
+    (basis.measurement_source)."""
+    from .basis import is_measurement
+
+    return inp.source is not None and is_measurement(inp.source)
+
+
 def _yield_words(inp, tool: str | None = None) -> str:
     if inp.binding == "records":
         n = len(inp.records)
         return (f"the median of {n} records, with the lowest and the highest" if n >= 3 else
                 f"the middle of {n} records, with both" if n == 2 else "one record, held fixed")
+    if inp.binding == "assumption" and _a_reading(inp):
+        by = inp.source.by if inp.source else None
+        return (f"a deposition's reading ({inp.source.id}), deposited by {by or 'nobody named'}, one value held "
+                "fixed")
     if inp.binding == "assumption":
         by = inp.source.by if inp.source else None
         return f"a named person's assumption{f' ({by})' if by else ''}, with its low and its high"
@@ -2016,6 +2045,8 @@ _CHECK_WHAT = {
     "records": "a reviewer should check the basis of each record above it (another sugar counted, the product "
                "measured otherwise, another organism)",
     "assumption": "a reviewer should check what the assumption rests on, and the basis of the yield it was taken from",
+    "measurement": "a reviewer should check what the reading measured (the measure it was recorded against, its unit "
+                   "and the sugar counted) and the bench's record of it",
     "artifact": "a reviewer should check the basis of the fit's readings (the product and sugar series, and their units)",
     "simulation": "a reviewer should check the sources of the simulation's parameters (its basis names each) and the "
                   "yields it was given",
@@ -2169,7 +2200,8 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, host: str | No
             ceilingMolPerMol=float(mol) if isinstance(mol, (int, float)) else None, conventions=conventions,
             yieldGPerG=value, yieldLowGPerG=low, yieldHighGPerG=high,
             yieldMolPerMol=value * ratio if value is not None and ratio is not None else None,
-            flag=flag, words=_row_words(flag, "simulation" if tool == "fermos.simulation" else inp.binding,
+            flag=flag, words=_row_words(flag, "simulation" if tool == "fermos.simulation" else
+                                        "measurement" if _a_reading(inp) else inp.binding,
                                         value_above), recordsAbove=above))
 
     models = [m.id for m, _, _ in matched]

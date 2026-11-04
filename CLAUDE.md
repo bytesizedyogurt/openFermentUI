@@ -65,7 +65,7 @@
 - C: SFF is the flowsheet record: every engine run writes a validated, scored file, files import as records, and a flowsheet module is an SFF recipe (ADR-003).
 - C: BioSTEAM runs through one adapter (`engine/library.py`) for library plants and openFerment's flowsheets alike, each plant built fresh (ADR-004).
 - C: Projects replace programs: everything a person keeps belongs to one project (ADR-005).
-- C: Typed quantities with origins (`library-default`, `record`, `artifact`, `person-assumption`, `model-estimate`) replace Rule 1; an estimate reaches a scenario and never a record (ADR-006).
+- C: Typed quantities with origins (`library-default`, `record`, `artifact`, `person-assumption`, `model-estimate`, `measurement`: a confirmed bench reading the service looks up) replace Rule 1; an estimate reaches a scenario and never a record (ADR-006).
 - C: The client's types are generated from the service's OpenAPI document into `src/api/types.gen.ts` (ADR-007).
 - C: Postdoc's conversations, turns and tool calls live on the server, and models are routed by family (`plan`, `explain`, `extract`, `index`, `judge`) in one table (ADR-008).
 - C: The UI is the existing React application, kept and wired to the server, with each project at its own address `/p/:project` (ADR-009).

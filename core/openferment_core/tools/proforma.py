@@ -51,7 +51,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from .. import proforma, project_state
-from ..basis import ASSUMED_KINDS
+from ..basis import ASSUMED_KINDS, is_measurement
 from ..models import Evidence, ToolResult
 from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 
@@ -164,6 +164,8 @@ def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
         flowsheet, info = row["modelId"], shelf.info(row["modelId"])
     o = art.output
     assumed = sorted({i.name.split(" ")[0] for i in art.inputs if i.source.kind in ASSUMED_KINDS})
+    # The inputs a deposition's reading set (basis.is_measurement, beside the assumed ones).
+    measured = sorted({i.name.split(" ")[0] for i in art.inputs if is_measurement(i.source)})
     return ToolResult(
         summary={
             "evidenceId": ev.id,
@@ -177,6 +179,7 @@ def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
             "samples": o["samples"],
             "infeasible": o["infeasible"],
             "assumedInputs": assumed,
+            "measuredInputs": measured,
             "leavesOut": info.leavesOut,
             "meaning": f"{info.title}: the minimum selling price across its inputs' ranges, from the newest run kept "
                        f"for {sid}",
@@ -191,7 +194,7 @@ TOOL = register(
         description=(
             "The minimum selling price the most recent kept run of one of the project's BioSTEAM scenarios produced, as one evidence "
             "id to cite: the median with its 5th to 95th percentile, the infeasible share, which inputs rest on an "
-            "assumption, and what the flowsheet leaves out. Refuses when no run is on file, naming the inputs still "
+            "assumption and which on a deposition's reading, and what the flowsheet leaves out. Refuses when no run is on file, naming the inputs still "
             "waiting for a source and how a run is made. With proforma_benchmark it returns the stored benchmark instead: the NREL 2011 "
             "corn stover ethanol design's minimum ethanol selling price as biorefineries.cornstover computes it. "
             "It cannot run a scenario or make an assumption."

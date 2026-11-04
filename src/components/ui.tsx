@@ -17,16 +17,19 @@ export function PageHeader({
   subtitle,
   actions,
   eyebrow,
+  wrap = false,
 }: {
   /** null mounts the screen under an owner's header — see the note below. */
   title: ReactNode | null;
   subtitle?: ReactNode;
   actions?: ReactNode;
   eyebrow?: ReactNode;
+  /** The actions go below the title where the two do not fit side by side (a tablet's 810 px). */
+  wrap?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-6 mb-5">
-      <div className="min-w-0">
+    <div className={cx('flex items-start justify-between mb-5', wrap ? 'flex-wrap gap-x-6 gap-y-3' : 'gap-6')}>
+      <div className={cx('min-w-0', wrap && 'flex-1 basis-[22rem]')}>
         {eyebrow && (
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">{eyebrow}</div>
         )}
@@ -39,7 +42,7 @@ export function PageHeader({
         )}
         {subtitle && <div className="text-body text-ink-soft mt-1 max-w-3xl">{subtitle}</div>}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {actions && <div className={cx('flex items-center gap-2', wrap ? 'flex-wrap' : 'shrink-0')}>{actions}</div>}
     </div>
   );
 }

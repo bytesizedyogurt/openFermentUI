@@ -125,7 +125,7 @@ import threading
 from typing import Any, Iterable, NamedTuple, NoReturn
 
 from .. import params
-from ..basis import ASSUMED_KINDS, InputRefused, override_of
+from ..basis import SET_PARAM_ORIGINS, InputRefused, is_measurement, is_set, override_of
 from ..models import (
     Artifact,
     BasisInput,
@@ -826,7 +826,7 @@ def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, b
     source = got.source
     if spec.inlet.kind == "simulation":
         hv = v["harvest_hour"]
-        persons = hv.origin in ("assumption", "model-estimate")
+        persons = hv.origin in SET_PARAM_ORIGINS
         harvest_hour = float(hv.value)  # type: ignore[arg-type]
         # OF-BLD-020 §6.2: the broth at the scope's harvest hour, read from
         # the series the simulation keeps (fermos.harvest, never integrated
@@ -877,7 +877,7 @@ def inlet_stream(spec: TrainSpec, overrides: Iterable[Override] | None = None, b
         else f"the phase stream {stream_id} of run {art.id} is in")))
     if source is None:
         persons = sorted({str(x.overriddenBy) for x in values
-                          if x.origin in ("assumption", "model-estimate") and x.overriddenBy})
+                          if x.origin in SET_PARAM_ORIGINS and x.overriddenBy})
         source = ("typed", f"each component's concentration typed in the inlet's panel, by {', '.join(persons)}"
                   if persons else "each component's concentration typed in the inlet's panel")
     # OF-BLD-020 §6.2: which source the inlet read, in a word and in words.
@@ -1267,6 +1267,9 @@ def _moisture_set(specs: list[ParameterSpec], sources: dict[str, dict[str, Param
 
 
 def _whose(v: ParameterValue) -> str:
+    if v.origin == "measurement":
+        return (f"reading {v.source.id if v.source is not None else 'unnamed'}, deposited by "
+                f"{v.overriddenBy or 'nobody named'}")
     return {"library-default": "the class's own default", "record": "its records'",
             "assumption": f"{v.overriddenBy}'s", "model-estimate": f"{v.overriddenBy}'s estimate"}.get(
         v.origin, f"its {v.origin}")
@@ -1284,7 +1287,7 @@ def _moisture_refusal(unit_id: str, e: catalogue.Entry, values: list[ParameterVa
     key = _water_key(e)
     by = {v.key: v for v in values}
     v, moisture = by.get(key or ""), by.get("moisture_content")
-    if v is None or v.origin not in ("assumption", "model-estimate") or moisture is None or moisture.value is None:
+    if v is None or v.origin not in SET_PARAM_ORIGINS or moisture is None or moisture.value is None:
         return None
     return (f"unit {unit_id}: {key} is {v.overriddenBy}'s, and the moisture content ({moisture.value:.4g}, "
             f"{_whose(moisture)}) sets the {e.moisture_sets}: BioSTEAM's {e.cls} moves {e.moisture_sets} between its "
@@ -1713,11 +1716,11 @@ def _values(given: list[tuple[str, BasisInput]], spec_of: Any) -> list[Parameter
         low, high = by_name.get(f"{key} low"), by_name.get(f"{key} high")
         kind = i.source.kind
         origin = ("record" if records else "assumption" if kind == "assumption" else
-                  "model-estimate" if kind == "model-estimate" else
+                  "model-estimate" if kind == "model-estimate" else "measurement" if is_measurement(i.source) else
                   "library-default" if kind == "model" else "convention" if kind == "convention" else "artifact")
         v = ParameterValue(key=key, value=i.value, low=float(low.value) if low else None,
                            high=float(high.value) if high else None, source=i.source, origin=origin,  # type: ignore[arg-type]
-                           overriddenBy=i.source.by if kind in ASSUMED_KINDS else None, recordIds=records,
+                           overriddenBy=i.source.by if is_set(i.source) else None, recordIds=records,
                            detail=i.source.note)
         s = spec_of(key)
         if s is not None:
@@ -1944,7 +1947,7 @@ def _run_train(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
     # (OF-BLD-020 §6.2); the same as the train's own for an artifact.
     stream = _named(inputs, "inlet stream")
     hour = given.get("harvest_hour")
-    if hour is not None and hour.source.kind in ASSUMED_KINDS:
+    if hour is not None and is_set(hour.source):
         inlet_notes.append(f"the broth is taken at {float(hour.value):.6g} h, an hour {hour.source.by} named, not the "
                            "simulation's own harvest hour")
     read = TrainInletRead(

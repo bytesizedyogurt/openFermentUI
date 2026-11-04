@@ -21,9 +21,20 @@ writes). The rules that act on the content run where they always ran.
 What a person made, locked, measured or asked stays: a deposition, a
 measurement, a lock and a conversation are never taken back through here.
 Making, locking and taking back are audited; the many saves of one deposition
-while it runs at the bench are the same row moving and are not. A Live
-conversation is Postdoc's own record (postdoc/conversations.py), which a
-page's write is laid onto.
+while it runs at the bench are the same row moving and are not, and every
+write a closed deposition accepts is.
+
+A deposition is the bench's record, and a run may rest on one of its
+readings (measurements.py), so a write to a kept deposition is held to what
+the bench does (`deposition_refusal`): readings and observations are
+appended, each kept as it was taken (a correction is a new reading, the
+bench's `amendEntry`), a read-back moves `confirmed` from false to true, the
+state moves from staged to running to closed, and a reconciliation stays as
+it was made. Closing stops new readings, new observations and new sample
+times. Every other change is refused in words.
+
+A Live conversation is Postdoc's own record (postdoc/conversations.py),
+which a page's write is laid onto.
 """
 from __future__ import annotations
 
@@ -47,6 +58,18 @@ from .runbook_lock import frozen_as
 # An id as the pages make them, and an override scope (`pureos:unit:tr-1:inlet`).
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:|-]{0,199}$")
 MAX_BYTES = 2_000_000
+# Who a row's maker is when the page sent no name: a browser with no person
+# set in Settings (src/store.ts `decidedBy`). A reading kept under it names
+# nobody, and no run takes it as a measurement (measurements.py).
+UNNAMED = "this browser"
+
+# The stages a deposition moves through at the bench, in order (src/store.ts).
+DEPOSITION_STATES = ("staged", "running", "closed")
+# What a deposition, each of its readings and each of its observations keep
+# from the write that first held them (`deposition_refusal`).
+DEPOSITION_FIELDS = ("runbookId", "protocolId", "startedAt")
+ENTRY_FIELDS = ("measureId", "stepId", "at", "value", "unit", "raw")
+OBSERVATION_FIELDS = ("stepId", "at", "raw")
 
 
 class StateRefused(ValueError):
@@ -90,6 +113,9 @@ RECORD_KINDS = ("depositions", "measuredEvidence")
 # whole.
 LOCKS, OVERRIDES, CONVERSATIONS = "runbookLocks", "overrides", "conversations"
 NAMES = (*KINDS, LOCKS, OVERRIDES, CONVERSATIONS)
+# What a load carries beside the rows: who deposited each deposition, by id.
+# The service writes it from the rows' makers; no page sends it.
+MAKERS = "depositedBy"
 
 
 def _checked(kind: str, item_id: str, value: Any) -> Any:
@@ -129,6 +155,71 @@ def _checked(kind: str, item_id: str, value: Any) -> Any:
     return value
 
 
+def _listed(body: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    return [x for x in body.get(key) or [] if isinstance(x, dict)]
+
+
+def _appended(item_id: str, what: str, before: list[dict[str, Any]], after: list[dict[str, Any]],
+              fields: tuple[str, ...]) -> str | None:
+    """Why `after` is no append to `before`, a deposition's readings or its
+    observations: each kept one stays, in the order it was taken, with the
+    fields it was taken with; None when every one does."""
+    held = [x.get("id") for x in before]
+    sent = [x.get("id") for x in after]
+    missing = [str(i) for i in held if i not in sent]
+    if missing:
+        return (f"{item_id} keeps every {what} it was given, and this write leaves out {', '.join(missing)}; a "
+                f"{what} is corrected by a new one")
+    if sent[: len(held)] != held:
+        return f"{item_id} keeps its {what}s in the order they were taken, and this write moves them"
+    for old, new in zip(before, after):
+        for f in fields:
+            if old.get(f) != new.get(f):
+                return (f"{item_id}: {what} {old.get('id')} keeps the {f} it was taken with ({old.get(f)!r}), and this "
+                        f"write sets {new.get(f)!r}; a correction is a new {what}")
+    return None
+
+
+def deposition_refusal(item_id: str, before: dict[str, Any], after: dict[str, Any]) -> str | None:
+    """Why a write of deposition `item_id` cannot stand over the row the
+    project keeps (`before`), in words; None when it can. The write may add
+    readings and observations while the deposition is open, confirm a
+    reading a person read back, give an open deposition's readings their
+    sample times, move its state forward, structure an observation, name
+    each series' role, and reconcile it once. Everything else of the record
+    stays as it was kept (the module's docstring)."""
+    states = DEPOSITION_STATES
+    was, now = before.get("state"), after.get("state")
+    if was in states and (now not in states or states.index(now) < states.index(was)):
+        return (f"{item_id} is {was}, and a deposition moves from staged to running to closed; this write makes it "
+                f"{now!r}")
+    for f in DEPOSITION_FIELDS:
+        if f in before and before.get(f) != after.get(f):
+            return f"{item_id} keeps the {f} it was made with ({before.get(f)!r}), and this write sets {after.get(f)!r}"
+    if before.get("closedAt") is not None and before.get("closedAt") != after.get("closedAt"):
+        return f"{item_id} was closed at {before.get('closedAt')}, and a close stays as it was made"
+    old_entries, new_entries = _listed(before, "entries"), _listed(after, "entries")
+    why = (_appended(item_id, "reading", old_entries, new_entries, ENTRY_FIELDS)
+           or _appended(item_id, "observation", _listed(before, "observations"), _listed(after, "observations"),
+                        OBSERVATION_FIELDS))
+    if why:
+        return why
+    for old, new in zip(old_entries, new_entries):
+        if old.get("confirmed") is True and new.get("confirmed") is not True:
+            return f"{item_id}: reading {old.get('id')} was read back and confirmed, and a confirmation stays"
+    if before.get("reconciliation") is not None and before.get("reconciliation") != after.get("reconciliation"):
+        return f"{item_id} was reconciled, and a reconciliation stays as it was made"
+    if was == "closed":
+        if len(new_entries) > len(old_entries) or len(_listed(after, "observations")) > len(_listed(before, "observations")):
+            return (f"{item_id} is closed, and closing stops new readings and observations; a new reading belongs in "
+                    "a new deposition")
+        if (before.get("sampleTimes") or {}) != (after.get("sampleTimes") or {}):
+            return f"{item_id} is closed, and its readings keep the sample times they had when it closed"
+        if before.get("operatorId") != after.get("operatorId"):
+            return f"{item_id} is closed, and it keeps the operator it closed with"
+    return None
+
+
 # ── reads ──────────────────────────────────────────────────────────────
 
 
@@ -161,11 +252,16 @@ async def _load(project_id: str) -> dict[str, Any]:
     # Fits and trains are keyed in the page by scenario and by train.
     out["fits"] = {f["id"]: f["byInput"] for f in out["fits"]}
     out["trains"] = {tr["train"]["id"]: tr for tr in out["trains"]}
+    # Who deposited each deposition (its row's maker, who first kept it): the
+    # person a measurement resting on one of its readings names.
+    out[MAKERS] = {str(body.get("id")): maker for body, maker in await _deposited(project_id, None)
+                   if isinstance(body, dict) and body.get("id")}
     return out
 
 
 def load() -> dict[str, Any]:
-    """Everything the current project keeps of its pages, keyed as the page keeps it."""
+    """Everything the current project keeps of its pages, keyed as the page
+    keeps it, and who deposited each deposition (`depositedBy`)."""
     return db.run(_load(projects.current()))
 
 
@@ -187,6 +283,23 @@ def kept(kind: str) -> list[Any]:
     if kind not in KINDS:
         raise StateRefused(f"{kind!r} is not a kind of row the project keeps; the kinds are {', '.join(KINDS)}")
     return db.run(_kept(projects.current(), kind))
+
+
+async def _deposited(project_id: str, deposition_id: str | None) -> list[tuple[dict[str, Any], str]]:
+    q = select(t.depositions.c.body, t.depositions.c.created_by).where(t.depositions.c.project_id == project_id)
+    if deposition_id is not None:
+        q = q.where(t.depositions.c.id == deposition_id)
+    async with db.session() as s:
+        found = (await s.execute(q.order_by(t.depositions.c.created_at, t.depositions.c.id))).all()
+    return [(r.body, r.created_by) for r in found]
+
+
+def deposited(deposition_id: str | None = None) -> list[tuple[dict[str, Any], str]]:
+    """The depositions the current project keeps, oldest first, each as its
+    page keeps it beside the person who deposited it (the row's maker, who
+    first kept it); with `deposition_id`, that one alone, or none. What a
+    measurement is looked up in (measurements.py)."""
+    return db.run(_deposited(projects.current(), deposition_id))
 
 
 async def _scope_overrides(project_id: str, scope: str) -> list[dict[str, Any]]:
@@ -249,10 +362,18 @@ async def _frozen(s: AsyncSession, project_id: str, runbook_id: str) -> str | No
     return (await s.execute(q.limit(1))).scalar()
 
 
+async def _stored(s: AsyncSession, project_id: str, deposition_id: str) -> dict[str, Any] | None:
+    """The deposition the project keeps under `deposition_id`, or None."""
+    q = select(t.depositions.c.body).where(t.depositions.c.project_id == project_id, t.depositions.c.id == deposition_id)
+    body = (await s.execute(q.limit(1))).scalar()
+    return body if isinstance(body, dict) else None
+
+
 async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) -> None:
     async with db.session() as s:
         # A runbook and its lock are written one at a time, so a row cannot
-        # slip in between a lock and the content it froze.
+        # slip in between a lock and the content it froze; a deposition's
+        # writes are held against the row they follow the same way.
         await db.lock(s, "state", project_id, "runbooks" if kind == LOCKS else kind, item_id)
         existed = await _held(s, kind, project_id, item_id)
         if kind == "runbooks":
@@ -260,6 +381,14 @@ async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) ->
             if frozen is not None and not frozen_as(value, frozen):
                 raise StateRefused(f"{item_id} is locked: its predictions and measures are kept as they were frozen "
                                    f"under {frozen}, and a change is a new runbook")
+        closed = False
+        if kind == "depositions" and existed:
+            before = await _stored(s, project_id, item_id)
+            if before is not None:
+                why = deposition_refusal(item_id, before, value)
+                if why:
+                    raise StateRefused(why)
+                closed = before.get("state") == "closed"
         if kind == LOCKS:
             if existed:
                 raise StateRefused(f"{item_id} is locked already; a lock is kept as it was made")
@@ -282,6 +411,12 @@ async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) ->
             await audit.add(project_id, agent="person", who=by, module=module,
                             action="lock" if kind == LOCKS else f"keep_{kind}", state="locked" if kind == LOCKS else "kept",
                             target=item_id)
+        elif closed:
+            # A closed deposition changes little (a series' role, an
+            # observation structured, its reconciliation), and each change
+            # is audited.
+            await audit.add(project_id, agent="person", who=by, module="runbooks", action="amend_depositions",
+                            state="kept", target=item_id)
 
 
 def put(kind: str, item_id: str, value: Any, by: str) -> Any:
@@ -293,7 +428,7 @@ def put(kind: str, item_id: str, value: Any, by: str) -> Any:
         except _conversations.ConversationRefused as e:
             raise StateRefused(str(e)) from None
         return checked
-    db.run(_put(projects.current(), kind, item_id, checked, (by or "").strip() or "this browser"))
+    db.run(_put(projects.current(), kind, item_id, checked, (by or "").strip() or UNNAMED))
     return checked
 
 
@@ -322,4 +457,4 @@ def remove(kind: str, item_id: str, by: str) -> None:
         raise StateRefused(f"a {kind[:-1] if kind.endswith('s') else kind} is kept as it was made, and never taken back")
     if not ID.match(item_id):
         raise StateRefused(f"{item_id!r} is not an id")
-    db.run(_remove(projects.current(), kind, item_id, (by or "").strip() or "this browser"))
+    db.run(_remove(projects.current(), kind, item_id, (by or "").strip() or UNNAMED))

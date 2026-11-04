@@ -101,6 +101,7 @@ from .models import (
     ScenarioCreate,
     StudyRequest,
     StudyScenario,
+    DepositionReading,
     ComparisonCreate,
     ComparisonReport,
     Runbook,
@@ -566,11 +567,12 @@ def fermos_family(family_id: str) -> dict:
 def fermos_simulate(req: SimulationRequest) -> dict:
     """Simulate a model family (`SimulationResult`) and keep it as one
     `fermos.simulation` artifact. Each parameter resolves with its source: a
-    value the request sets (a typed quantity with its origin, a person's
-    assumption or a model's estimate by name, so the result is `assumed`),
-    else the family's stated convention. 422 in words for a parameter that
-    waits (named with what would bind it), the light socket, a value set that
-    cannot stand, or a run that cannot end."""
+    value the request sets (a typed quantity with its origin: a person's
+    assumption or a model's estimate by name, so the result is `assumed`, or
+    a deposition's reading, looked up in the project's depositions), else the
+    family's stated convention. 422 in words for a parameter that waits
+    (named with what would bind it), the light socket, a value set that
+    cannot stand, a reading the lookup refuses, or a run that cannot end."""
     try:
         return fermos.simulate(req).model_dump(mode="json")
     except fermos.SimulationRefused as e:
@@ -1168,13 +1170,35 @@ def study_scenarios() -> list[StudyScenario]:
 def study_scenario_make(asked: ScenarioCreate) -> StudyScenario:
     """A scenario on a library plant or an openFerment flowsheet, checked
     against the plant's parameters and kept; each value a person's
-    assumption or a model's estimate (ADR-006)."""
+    assumption, a model's estimate (ADR-006) or a deposition's reading
+    (`{"kind": "measurement", "ref": "<deposition id>/<entry id>"}`), which
+    the service looks up in the project's depositions and keeps with its
+    depositor and time. A reading the project does not hold, one no person
+    confirmed, one corrected since, a value or unit other than the
+    reading's own, or a unit the parameter cannot be denominated in is a 422
+    in words, and nothing is kept."""
     try:
         return _scenarios.make(asked)
     except _scenarios.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not read {asked.plant}: {e}") from e
+
+
+@app.get("/api/depositions/readings")
+def deposition_readings(unit: str | None = None) -> list[DepositionReading]:
+    """The project's readings a run may take as measurements, the latest
+    taken first: each entry of its depositions a person confirmed that
+    stands for its measure, with the runbook and the measure it was
+    recorded against, the person who deposited it and the time it was
+    taken. With `unit`, the readings whose unit is that unit or converts
+    into it, each with its value in that unit and the conversion in words
+    (an empty `unit` asks for the readings a unitless parameter takes): the
+    lookup's own rules decide (measurements.py), so a reading listed is one
+    a scenario's value may name by its `ref`."""
+    from . import measurements
+
+    return measurements.readings(None if unit is None else unit.strip())
 
 
 @app.get("/api/studies/scenarios/{scenario_id}")

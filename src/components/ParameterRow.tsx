@@ -23,7 +23,14 @@ import type { Override, ParameterSpec, ParameterValue } from '@/data/types';
 import { href } from '@/router';
 import { fmt } from '@/engine/units';
 import { CitationChip } from './Chip';
+import { depositionPath, minute, readingOf } from './ReadingOrigin';
 import { Button, cx } from './ui';
+
+/** A reading's basis note as the panel says it: the time it was taken to the minute, and what follows it. */
+function measuredWords(note: string): string {
+  const m = /^measured on (\S+?)(?:: (.*))?$/s.exec(note);
+  return m ? `measured ${minute(m[1])}${m[2] ? `: ${m[2]}` : ''}` : note;
+}
 
 /** What a person typed for a row: the panel keeps it as an Override under the reviewer name, at now. */
 export interface ParameterChange {
@@ -78,7 +85,7 @@ export function ruleWords(entry: string, spec: ParameterSpec): string {
     case 'simulation':
       return 'a kept simulation';
     case 'assumption':
-      return 'a named person’s assumption, or a model’s estimate';
+      return 'a named person’s assumption, a model’s estimate, or a reading deposited at the bench';
     case 'convention':
       return spec.convention != null ? `a stated convention: ${shown(spec.convention)}` : 'a stated convention';
     case 'library-default':
@@ -176,6 +183,21 @@ export function SourceChip({ value, records }: { value: ParameterValue | null; r
           estimate by {value.overriddenBy ?? value.source?.by ?? 'no model named'}
         </span>
       );
+    case 'measurement': {
+      // A deposition's reading (alpha 2.2 C.5): its source names it, `<deposition id>/<entry id>`, and links to the
+      // deposition's record.
+      const who = value.overriddenBy ?? value.source?.by ?? 'nobody named';
+      const reading = readingOf(id);
+      return reading ? (
+        <a className={linkClass} href={href(depositionPath(reading.deposition, reading.entry))} data-testid="param-chip" data-origin="measurement" data-ref={id ?? ''}>
+          measured · deposited by {who} · reading {id}
+        </a>
+      ) : (
+        <span className="chip" data-testid="param-chip" data-origin="measurement">
+          measured · deposited by {who}
+        </span>
+      );
+    }
     case 'convention':
       return (
         <span className="chip" data-testid="param-chip" data-origin="convention">
@@ -231,7 +253,13 @@ function Why({ spec, value }: { spec: ParameterSpec; value: ParameterValue | nul
                 );
               })}
             </ol>
-            {value?.overriddenBy && (
+            {value?.overriddenBy && value.origin === 'measurement' && (
+              <p className="text-ink-soft mt-0.5">
+                A value set for the run wins over every source: this one is a reading {value.overriddenBy} deposited at the bench, and a run&rsquo;s
+                basis names the reading.
+              </p>
+            )}
+            {value?.overriddenBy && value.origin !== 'measurement' && (
               <p className="text-ink-soft mt-0.5">
                 A person&rsquo;s change wins over every source: this value is {value.overriddenBy}&rsquo;s assumption, and a run&rsquo;s basis
                 names it.
@@ -416,7 +444,7 @@ export function ParameterRow({ spec, value, override, reviewer, readOnly, warnin
       </div>
       {value?.detail && value.origin !== 'assumption' && value.origin !== 'model-estimate' && (
         <p className="text-caption text-ink-soft mt-0.5" data-testid="param-detail">
-          {value.detail}
+          {value.origin === 'measurement' ? measuredWords(value.detail) : value.detail}
         </p>
       )}
       {warning && (

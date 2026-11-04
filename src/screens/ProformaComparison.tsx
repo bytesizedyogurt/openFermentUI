@@ -44,7 +44,8 @@ interface ComparedRow {
 }
 interface ComparedValue {
   key: string;
-  values: { value: number | string | null; unit: string | null; origin: string | null; by: string | null }[];
+  /** Each run's value, its origin and who set it; a deposition's reading with its ref. */
+  values: { value: number | string | null; unit: string | null; origin: string | null; by: string | null; ref?: string }[];
 }
 
 /** The artifact's output as the comparison computed it (studies/comparisons.py `_compare`). */
@@ -96,7 +97,9 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
   const valuesBody = (out?.values ?? []).map((v) => [
     v.key,
     ...v.values.map((x) =>
-      x.origin == null ? '— (this run holds no such value)' : `${shown(x.value)} ${x.unit ?? ''} (${ORIGIN_WORDS[x.origin] ?? x.origin}${x.by ? `, ${x.by}` : ''})`,
+      x.origin == null
+        ? '— (this run holds no such value)'
+        : `${shown(x.value)} ${x.unit ?? ''} (${ORIGIN_WORDS[x.origin] ?? x.origin}${x.by ? `, ${x.by}` : ''}${x.ref ? `, reading ${x.ref}` : ''})`,
     ),
   ]);
 

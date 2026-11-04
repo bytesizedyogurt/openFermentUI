@@ -214,7 +214,7 @@ A plant's parameters as the package builds it: each key with its label, its unit
 
 *writes · scope: project · loose*
 
-Run a plant from the library shelf at the library's defaults, or a study scenario (by its id) with the values it sets, as an engine run: kept in the project, marked as yours, with the SFF file it writes. Returns the run's id, its artifact id, its provenance (assumed when a value it set is an estimate or an assumption), the values it set with their origins, and each number its price and its flowsheet's outputs hold as an evidence id to cite. The same plant and values asked again answer from the run kept. A plant that refuses the values is kept as a receipt and refused in the plant's words.
+Run a plant from the library shelf at the library's defaults, or a study scenario (by its id) with the values it sets, as an engine run: kept in the project, marked as yours, with the SFF file it writes. Returns the run's id, its artifact id, its provenance (assumed when a value it set is an estimate or an assumption; measured when a value it set is a deposition's reading and none is either), the values it set with their origins (a reading with its ref), and each number its price and its flowsheet's outputs hold as an evidence id to cite. The same plant and values asked again answer from the run kept. A plant that refuses the values is kept as a receipt and refused in the plant's words.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -279,30 +279,31 @@ Read an SFF flowsheet record the project holds by its id (an imported file, or t
 
 *writes · scope: project · loose*
 
-Keep a study scenario on a plant from the library shelf: a title, the plant and its configuration, and the values it sets, each a parameter's key and a quantity (value and unit, the parameter's own unit) with a note saying in words what the value rests on. Each value is marked as your estimate, with your model id, and a run of the scenario is assumed. Checked against the plant's parameters: a key it does not read, a unit it does not use or a value of the wrong kind is refused before anything is kept. The same plant and values are one scenario. Run it with engine_run.
+Keep a study scenario on a plant from the library shelf: a title, the plant and its configuration, and the values it sets, each a parameter's key and a quantity (value and unit, the parameter's own unit) with a note saying in words what the value rests on. Each value is marked as your estimate, with your model id, and a run of the scenario is assumed. A value may also be a deposition's reading that runbooks_read lists (kind reading): its value and unit as the reading gives them, in the reading's own unit, and origin {"kind": "measurement", "ref": "<the reading's id>"}; the service looks it up and marks it with who deposited it and when it was taken, and a run resting on readings and the library's defaults alone is measured. Checked against the plant's parameters: a key it does not read, a unit it does not use or a value of the wrong kind is refused before anything is kept, as is a reading the project does not hold, one nobody read back, one corrected since, or one in a unit that does not convert into the parameter's. The same plant and values are one scenario. Run it with engine_run.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
 | `title` | string | yes | What the scenario asks, in words. |
 | `plant` | string | yes | A plant's id, as engine_plants gives it. |
 | `configuration` | string | no | One of the plant's configurations; empty for its own. |
-| `values` | list of `ScenarioValueIn` | yes | The parameters it sets, each a quantity in the parameter's own unit with a note saying what the value rests on; every other parameter keeps the library's default. |
+| `values` | list of `ScenarioValueIn` | yes | The parameters it sets, each a quantity in the parameter's own unit with a note saying what the value rests on, or a deposition's reading in its own unit (runbooks_read, kind reading); every other parameter keeps the library's default. |
 | `note` | string | no | Why the scenario, in words. |
 
-`QuantityIn`: A number you type: a value in a unit, and in words what it rests on. The service marks it with who typed it.
+`QuantityIn`: A number you type: a value in a unit, and in words what it rests on. The service marks it with who typed it. A value that is a reading a person deposited names the reading in `origin`, its value and unit the reading's own: the service looks the reading up and marks the value with the reading's depositor and time.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
 | `value` | number | yes | A number of the quantity, marked as its caller's. |
 | `unit` | string | yes | The value's unit, as the tool names it. |
 | `note` | string | no | What the value rests on, in words. |
+| `origin` | object or null | no | Leave it out for a value you type. For a deposition's reading: {"kind": "measurement", "ref": "<deposition id>/<entry id>"}, the value and unit then the reading's own, which the service checks. |
 
 `ScenarioValueIn`
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
 | `key` | string | yes | The parameter's key, as engine_parameters gives it. |
-| `quantity` | `QuantityIn` | yes | The value, in the parameter's own unit, with what it rests on. |
+| `quantity` | `QuantityIn` | yes | The value, in the parameter's own unit, with what it rests on; a deposition's reading in the reading's own unit, which the service converts into the parameter's where it converts. |
 
 ### `study_compare`
 
@@ -333,7 +334,7 @@ List the project's study scenarios (each with the values it sets, their origins 
 
 *read · scope: project · strict*
 
-The minimum selling price the most recent kept run of one of the project's BioSTEAM scenarios produced, as one evidence id to cite: the median with its 5th to 95th percentile, the infeasible share, which inputs rest on an assumption, and what the flowsheet leaves out. Refuses when no run is on file, naming the inputs still waiting for a source and how a run is made. With proforma_benchmark it returns the stored benchmark instead: the NREL 2011 corn stover ethanol design's minimum ethanol selling price as biorefineries.cornstover computes it. It cannot run a scenario or make an assumption.
+The minimum selling price the most recent kept run of one of the project's BioSTEAM scenarios produced, as one evidence id to cite: the median with its 5th to 95th percentile, the infeasible share, which inputs rest on an assumption and which on a deposition's reading, and what the flowsheet leaves out. Refuses when no run is on file, naming the inputs still waiting for a source and how a run is made. With proforma_benchmark it returns the stored benchmark instead: the NREL 2011 corn stover ethanol design's minimum ethanol selling price as biorefineries.cornstover computes it. It cannot run a scenario or make an assumption.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -502,7 +503,7 @@ Draft a runbook from what this run found: a title, a product id and a strain id 
 
 *read · scope: project · loose*
 
-Read Runbooks: the runbooks (their status, lock and what they predict) and the protocols (their versions). Kinds: runbook, protocol. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state. Read in part: the project's depositions and measurements are kept with it and shown on the Runbooks page; this read lists its runbooks and protocols.
+Read Runbooks: the runbooks (their status, lock and what they predict), the protocols (their versions), the depositions made at the bench (kind deposition: its runbook, state, how many readings it holds and how many a person confirmed, and the ids of the readings a run may take), each reading a run may take as a measurement (kind reading, read by its id <deposition id>/<entry id>: the measure it is of, its value and unit as the bench kept them, who deposited it and when it was taken; a scenario's value names it as {"value": <value>, "unit": "<unit>", "origin": {"kind": "measurement", "ref": "<its id>"}}), and the measured evidence a reconciliation released (kind measured-evidence: the prediction it tests, its value, unit and conditions). Kinds: runbook, protocol, deposition, reading, measured-evidence. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -530,7 +531,7 @@ Read geneOS: the hosts, the pathways, the genome-scale models on the shelf and t
 
 *read · scope: project · loose*
 
-Read fermOS: the growth fits and forecasts computed from deposited runs (kind artifact), the kept simulations of a model family (kind simulation: its family, strain, product and sugar, and what bound each parameter, in words; its numbers stay in the artifact, cited by the row's ref or the evidence id fermos_simulate returns), and the vessels BioSTEAM designed for kept simulations (kind vessel, read by the design's artifact id or the simulation's). Kinds: artifact, simulation, vessel. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state. Read in part: the project's depositions are kept with its runbooks; this read lists what the service computed: fits, forecasts, simulations and vessel designs.
+Read fermOS: the growth fits and forecasts computed from deposited runs (kind artifact), the kept simulations of a model family (kind simulation: its family, strain, product and sugar, and what bound each parameter, in words; its numbers stay in the artifact, cited by the row's ref or the evidence id fermos_simulate returns), the vessels BioSTEAM designed for kept simulations (kind vessel, read by the design's artifact id or the simulation's), and the depositions kept with the runbooks, whose series fermOS fits (kind deposition: its runbook, its readings and series, and the fits made from it). Kinds: artifact, simulation, vessel, deposition. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|

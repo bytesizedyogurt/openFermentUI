@@ -14,18 +14,20 @@ Proforma screens' rows in the same table are kind `proforma`):
 | `id` | `ssc-` and the first twelve hex of the sha256 of the plant, the configuration and the values: the same values on the same plant are one scenario |
 | `title`, `note` | A person's words |
 | `plant`, `configuration` | A plant on the library shelf (`/api/library`) and one of its configurations |
-| `values` | `[{key, quantity}]`: each a parameter the plant reads back, in the parameter's own unit, one value (no range), its `quantity.origin` a `person-assumption` or a `model-estimate` with its author (`by`), its moment (`at`) and what it rests on (`note`) |
+| `values` | `[{key, quantity}]`: each a parameter the plant reads back, one value (no range), its `quantity.origin` a `person-assumption` or a `model-estimate` with its author (`by`), its moment (`at`) and what it rests on (`note`), the value in the parameter's own unit; or a `measurement`, a reading a person deposited at the bench (Measurements, below), its value and unit the reading's own and its origin `{kind: "measurement", ref: "<deposition id>/<entry id>"}`, kept with the reading's depositor (`by`) and time (`at`) |
 | `runIds` | The engine runs made of it, oldest first; a refused run's receipt among them |
 | `by`, `at` | Who made it, when |
 
 A scenario is checked against the plant's parameters when it is made: a key the plant does not
 read back, a unit it does not use, a parameter it reads back in words, a quantity carrying a
-basis, or a key set twice is refused in words. Running it makes an engine run on the biosteam
+basis, or a key set twice is refused in words. A reading stands in its own unit where that unit
+converts into the parameter's (Measurements, below), and the run sets it in the parameter's. Running it makes an engine run on the biosteam
 engine's one path for a library plant (`engine/biosteam.py` `run_plant`, the path `POST
 /api/library/{plant}/run` takes): each value is the typed input it was made with, checked against
 the plant's parameters again and converted by `basis.override_of` into the plant's `Override`, so
-the run's basis names each value's author; the run is `assumed` and names the scenario
-(`scenarioId`). A plant that takes a configuration, made with none, is checked against its
+the run's basis names each value's author or reading; the run is `assumed` when a value is a
+person's or a model's, `measured` when its values are readings beside records and the package's
+defaults, and names the scenario (`scenarioId`). A plant that takes a configuration, made with none, is checked against its
 default's parameters (`engine/biosteam.py` `default_configuration`) and runs in its default, its
 `configuration` kept as made. A kept value its plant's parameters refuse when it is run (a key
 the plant no longer reads, a unit it no longer uses) is refused before anything runs, a 422 in
@@ -38,11 +40,67 @@ words at the route and the tool's refusal in words, and keeps nothing.
 | `GET /api/studies/scenarios/{id}` | One scenario; 404 for one the project does not hold |
 | `POST /api/studies/scenarios/{id}/run` | `{by}`: the engine run's report (`{run, artifact, flowsheet}`); a plant's refusal 422 in its words, the receipt kept with the scenario; a kept value the plant's parameters refuse 422 in words, nothing kept |
 
+### Measurements
+
+A value may be a reading a person deposited at the bench (ADR-006, the implementation note of
+2026-11-03): `{"value", "unit", "origin": {"kind": "measurement", "ref": "<deposition id>/<entry
+id>"}}`, the value and unit the reading's own. `study_scenario`'s quantity takes the same origin,
+the reading alone in it (its kind and ref): a tool's caller who writes a depositor or a time
+there is refused in words. Before anything runs, the service looks the reading up in the
+project's depositions (`core/openferment_core/measurements.py`, through `basis.resolved`): every
+door that takes values does so (a study scenario, fermOS, pureOS, Proforma, the library and the
+contract engines), when a scenario is made and again when it runs.
+
+| Rule | Refused in words when |
+|---|---|
+| Held | the project holds no deposition of that id, or the deposition no entry of that id |
+| Confirmed | no person confirmed the entry's number at the bench |
+| Standing | a later entry corrects it: on the same measure with no time of its own, for an entry with none; at its own time, for a reading in a series (each reading in a series is its own). A later entry still waiting to be read back corrects it too, and the refusal says the newer number waits |
+| Named | the deposition was kept with no person's name (a browser with no name set in Settings keeps its rows as `this browser`), or under a placeholder name, as `biorepo.reviewer_refusal` holds a name |
+| A number | the entry holds no number in a unit, or names no time it was taken (an ISO 8601 time) |
+| Its own | the value or the unit sent differs from the entry's, or the quantity carries a low, a high or a basis |
+| Its maker | the value names a depositor other than the person who kept the deposition, or a time other than the entry's; each is filled from the rows when the value leaves it out |
+| Its unit | the entry's unit does not convert into the parameter's through `units.convert`, or converts to no finite number; one that converts is set in the parameter's unit, the conversion stated in the value's note |
+
+A refusal is a 422 at a route and an error from a tool, and nothing runs. A run resting on
+readings, records and the package's defaults is `measured`; one beside a person's assumption or
+a model's estimate stays `assumed`. A record's class and an artifact computed with no assumption
+beside a reading leave the run `measured` (ADR-006's note says what that ranks). Its basis names
+each reading as a `deposition` source, its id the reading, its `by` the depositor and its note
+the time it was taken (`basis.measurement_source`); `GET /api/runs/{id}` reads each back as a
+`measurement` origin.
+
+The service holds a reading's unit to the parameter's. Which measure stands for which parameter
+is the scenario maker's choice, kept as the scenario's `by`: the run's basis names the reading,
+and nothing in it checks that the reading measured the quantity the parameter is.
+
+| Route | What it answers |
+|---|---|
+| `GET /api/depositions/readings` | The readings a run may take, the latest taken first (`DepositionReading`): each confirmed entry that stands for its measure, with its `ref`, the runbook and the measure it was recorded against (`runbookId`, `runbook`, `measureId`, `measure`), its own `value` and `unit`, the time it was taken (`at`), its depositor (`by`, the deposition row's maker) and, for a reading in a series, its `hours` into the run |
+| `GET /api/depositions/readings?unit=<unit>` | Those whose unit is `<unit>` or converts into it, each with its value in `<unit>` (`inUnit`) and the conversion in words (`note`); an empty unit asks for what a unitless parameter takes. The lookup's own rules decide, so a reading listed is one a value may name |
+
+The screens: a run's page opens NewScenarioDialog, which offers these readings beside a typed
+value for each parameter a person sets, each said as what it measured and what it would set; the
+run's page reads a measurement in words, linked to the deposition its reading was recorded in,
+which opens at the reading, marked. A deposition records readings at the bench against a locked
+runbook's measures alone, with no protocol's steps (RunbookDetail, *The readings alone*,
+`/runbooks/depositions/<id>/bench`), once the person has set their name in Settings.
+
+A reading's ref keeps naming one entry: each deposition, entry, observation and measured evidence
+id is unique across page loads (`timeId`), and the service keeps a deposition the bench's way
+(`project_state.deposition_refusal`): readings and observations appended, each kept with the
+value, unit, time and words it was taken with, a read-back moving `confirmed` from false to true,
+the state moving from staged to running to closed, and a reconciliation kept as made; closing
+stops new readings, observations and sample times; every other write is refused in words, a 422
+at `PUT /api/state/depositions/{id}`. A run looks its readings up again each time it runs, and
+refuses in words one corrected since.
+
 ## Comparisons
 
 `StudyComparison`, a row of `comparisons` under the id of the `study.comparison` artifact that
 computes it. Its inputs are the runs' artifacts, in the order given, so its provenance is the
-weakest of theirs (`assumed` when any run rests on an assumption or an estimate) and it replays
+weakest of theirs (`assumed` when any run rests on an assumption or an estimate; `computed` at
+best, a comparison of measured runs included) and it replays
 from them; the same runs in the same order are one comparison. Runs of any engine compare, one
 engine's beside another's. Its version says what it read: `study comparison 1` for library runs
 alone, read as they have been read since stage 5, and `study comparison 2` for a comparison that
@@ -57,7 +115,7 @@ The artifact's output:
 |---|---|
 | `runs` | Each run's artifact id, plant (a contract engine's run names its thing, a Proforma run its flowsheet), configuration and provenance |
 | `rows` | `[{key, unit, values, change}]`: every output any run answers, each run's value (null for a run with no output of that key), and its relative change from the first run's. A library run's are every number of its price block (`price.<key>`, in BioSTEAM's TEA units) and of a flowsheet's outputs (`outputs.<key>`), read from its artifact as they have always been read; a run of any other engine's are its outputs.values (`values.<name>`, each in its unit; `docs/api/runs.md`, Outputs), a value named `price.<key>` or `outputs.<key>` in the library's row of that key |
-| `values` | `[{key, values: [{value, unit, origin, by}]}]`: every value any run set for itself (a contract engine's run's by its basis name, `value <key>`), each run's value with its origin. At version 1, a run that set none has the library's own default (`library-default`, `by` the package module). At version 2, a library run that set none has that default where its plant declares the value, and every other cell of a value its run holds none of has `value`, `unit`, `origin` and `by` null: a contract engine's artifact keeps no default |
+| `values` | `[{key, values: [{value, unit, origin, by}]}]`: every value any run set for itself (`basis.is_set`: a person's assumption, a model's estimate, a deposition's reading; a contract engine's run's by its basis name, `value <key>`), each run's value with its origin, a reading's cell with its `ref` beside. At version 1, a run that set none has the library's own default (`library-default`, `by` the package module). At version 2, a library run that set none has that default where its plant declares the value, and every other cell of a value its run holds none of has `value`, `unit`, `origin` and `by` null: a contract engine's artifact keeps no default |
 
 A run its plant refused has no artifact and is refused here in words; so are one run alone, a run
 named twice, and a run the project does not hold.
@@ -110,8 +168,8 @@ package off the path). The code is `core/openferment_core/studies/exports.py`.
 
 | File | What it holds |
 |---|---|
-| `study.json` | Every engine run (its inputs as quantities with their origins, its outputs, versions and SFF record), every study scenario, comparison and runbook (as kept), and, whole, the artifacts that computed the runs and the comparisons |
-| `study.md` | The same in words and tables: each run's inputs with their origins, its price in BioSTEAM's TEA units and a flowsheet's outputs in theirs, each scenario's values, each comparison's rows and changes, each runbook's predictions and lock, and the versions |
+| `study.json` | Every engine run (its inputs as quantities with their origins, its outputs, versions and SFF record), every study scenario, comparison and runbook (as kept), whole, the artifacts that computed the runs and the comparisons, and each deposition a run's or a scenario's reading rests on (`depositions`: `{id, depositedBy, record}`, the record as the bench kept it) |
+| `study.md` | The same in words and tables: each run's inputs with their origins (a reading named beside its depositor, `<by>, reading <ref>`), its price in BioSTEAM's TEA units and a flowsheet's outputs in theirs, each scenario's values, each comparison's rows and changes, each runbook's predictions and lock, each deposition's readings with their words at the bench and their confirmations, and the versions |
 | `sff/<run>.sff.json` | Each run's flowsheet, byte for byte as the project holds it (its sha256 is the record's) |
 | `versions.json` | openFerment's own version and Python's; each run's tool with its simulator, property engine and package; each SFF file's toolkit and schema; each comparison's version; the lock digest's algorithm |
 | `manifest.json` | The project, when the package was taken and by whom, and every other file's size and sha256 |

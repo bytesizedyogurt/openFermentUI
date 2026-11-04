@@ -196,11 +196,16 @@ def _bare_number(engine: Any, thing: str, by: str) -> tuple[bool, str]:
 
 def _names_its_ground(o: Any) -> bool:
     """Whether a default's origin names what it rests on: a library-default
-    its package and version, a record the records, an artifact the artifact
-    (each `ref`); a convention what it is (`note`); a person's assumption the
-    person who typed it (`by`)."""
+    its package and version, a record the records, an artifact the artifact,
+    a measurement its reading (each `ref`), a reading the project holds
+    (basis.reading_refusal); a convention what it is (`note`); a person's
+    assumption the person who typed it (`by`)."""
     if o is None:
         return False
+    if o.kind == "measurement":
+        from ..basis import reading_refusal
+
+        return reading_refusal(o.ref or "") is None
     if o.kind in ("library-default", "record", "artifact"):
         return bool((o.ref or "").strip())
     if o.kind == "convention":
