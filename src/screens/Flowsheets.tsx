@@ -24,7 +24,6 @@
 // says, and a run is made on Studies.
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { BookOpen, Link2, Upload } from 'lucide-react';
-import type { SFFFlowsheet } from '@/data/types';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { stamp } from '@/lib/proforma';
@@ -35,6 +34,7 @@ import {
   importFlowsheetUrl,
   importLibraryFlowsheet,
   listFlowsheets,
+  type SFFFlowsheet,
   type SFFLibraryEntry,
 } from '@/lib/studies';
 import { Button, Callout, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui';

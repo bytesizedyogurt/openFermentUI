@@ -3,10 +3,9 @@
 // as edges. A run's file, a library plant's, or one a person imported.
 import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
-import type { SFFFlowsheet } from '@/data/types';
 import { SffGraph } from '@/components/SffGraph';
 import { Card, PageHeader } from '@/components/ui';
-import { downloadFlowsheet, getFlowsheet } from '@/lib/studies';
+import { downloadFlowsheet, getFlowsheet, type SFFFlowsheet } from '@/lib/studies';
 import { href } from '@/router';
 
 export function FlowsheetPage({ recordId }: { recordId: string }) {
