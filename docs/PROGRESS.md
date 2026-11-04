@@ -26,8 +26,9 @@ session continues from this file and `git log` alone.
      OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage D's first record, D.1**: write `CORE=$(git rev-parse HEAD)` (the D.0 commit)
-   here and in stage D's log, then the two handoff rounds by strangers (the prompt's stage D;
+4. **Next step: stage D's handoff rounds.** D.1 recorded `CORE=6f85338` (the D.0 commit, green on
+   CI): while the strangers work, `git diff --stat 6f85338 -- core/openferment_core core/tests
+   core/pyproject.toml src scripts` prints nothing. Then the two handoff rounds by strangers (the prompt's stage D;
    Appendix A's mirror engine and Appendix B's record-reader, each built by a builder who reads
    the contract pages alone, in a worktree made at `CORE`, since the harness cuts an isolated
    agent's worktree from `origin/main`). D.0 is done: the pages read as the strangers will read
@@ -233,6 +234,7 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-04 10:43 | CI on `1243e81` (C.7), run 41814877309: `pnpm verify`, then `pnpm prove` | every stage green: `test:core` 2687 passed, `test:sim` 142 passed, `test:lit` 10 passed, `smoke` 12 of 12 screens; every proof check holds | 7 min 44 s (verify); 126 s (the proof) | `1243e81` |
 | 2026-11-04 16:04 | D.0 and its review round, on the final tree: `gen:api`, `gen:tools`, `gen:components`; the touched files and the pins; the changed tests with the database address empty and on Python 3.12; `pnpm test:sim`; `pnpm test:core`; `build`; `pnpm prove`, offline, steps 1 to 10, with no `examples/`; `pnpm verify`, all sixteen stages | regenerated; 868 passed; 530 passed each way; 142 passed; 2865 passed, 1 skipped, 175 deselected; green; 83 of 83 checks, no call in the proof's spend table; every stage green | 459 s; 458 s; 269 s (the proof); 17 min 50 s (verify) | `1243e81` and D.0 |
 | 2026-11-04 16:15 | The D.0 commit: `pnpm test:core` again after the guard in `test_prove_examples.py` names the engine-package form | 2865 passed, 1 skipped, 175 deselected | 7 min 45 s | `1243e81` and D.0 |
+| 2026-11-04 16:35 | CI on `6f85338` (D.0), run 41865693107: `pnpm verify`, then `pnpm prove` | every stage green; every proof check holds | 13 min 27 s (verify); 3 min 23 s (the proof) | `6f85338` |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -1956,3 +1958,11 @@ holds the numbers, the tables and the judgements).
   review ran: a message to the review's fixer while it worked started a second copy of it beside
   the first; the two split the findings by file between them, neither ran a suite while the other
   edited, and one carried every gate on the final tree.
+- D.1. The core's commit for the handoff: `CORE=6f85338` (the D.0 commit; CI run 41865693107
+  green). Until stage D's rounds end, nothing under `core/openferment_core/`, `core/tests/`,
+  `core/pyproject.toml`, `src/` or `scripts/` changes, and `git diff --stat 6f85338 -- …` over
+  those paths prints nothing for a round to count. Each stranger works in a worktree made at
+  `CORE` (`git worktree add --detach .claude/worktrees/stranger-<a|b><n> 6f85338`), its absolute
+  path the brief's `<path>`, and is started with the Agent tool's `isolation: "worktree"`: the
+  harness cuts that isolated worktree from `origin/main` (alpha 2.1, which holds no
+  `docs/api/engines.md`), and the agent receives this checkout's CLAUDE.md, the same as `CORE`'s.
