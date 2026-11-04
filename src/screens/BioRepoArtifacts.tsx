@@ -7,8 +7,8 @@
 // says so and names the command that starts it; it shows no stand-in (E.2).
 import { useEffect, useState } from 'react';
 import { Box, RotateCcw } from 'lucide-react';
-import type { Artifact, BasisSource, ReplayResult } from '@/data/types';
-import { ArtifactRefused, ArtifactsDown, getArtifact, headline, listArtifacts, replayArtifact } from '@/lib/artifacts';
+import type { Artifact, BasisSource } from '@/lib/studies';
+import { ArtifactRefused, ArtifactsDown, getArtifact, headline, listArtifacts, replayArtifact, type ReplayResult } from '@/lib/artifacts';
 import { href, navigate } from '@/router';
 import { CitationChip } from '@/components/Chip';
 import { depositionPath } from '@/components/ReadingOrigin';

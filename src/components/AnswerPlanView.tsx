@@ -14,7 +14,7 @@
 // The provenance tick reuses the existing visual language rather than inventing
 // a fourth one — a claim is evidence, and evidence in this system is ticked.
 import { AlertTriangle, ExternalLink, HelpCircle, Quote, SearchX } from 'lucide-react';
-import type { ExtractionRecord, Paper } from '@/data/types';
+import type { ExtractionRecord, Paper } from '@/lib/review';
 import type { AnswerPlan, Claim, ClaimValue, CoverageMap, Evidence, ModuleRow, Passage, RunbookDraft } from '@/lib/postdoc';
 import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';

@@ -14,7 +14,75 @@
 //   Rule 2 — `expression_pct_tsp` and the titer fields are NOT
 //   interconvertible without cell density and total-protein fraction. The unit
 //   engine refuses and says why (see engine/units.ts `explainRefusal`).
-import type { FieldId, ParameterDef, ParameterFamily } from './types';
+
+export type ParameterFamily =
+  | 'expression'
+  | 'cultivation'
+  | 'downstream'
+  | 'kinetics';
+
+/**
+ * The record fields (`core/openferment_core/schema/fields.yaml`, mirrored in
+ * ONTOLOGY below): thirty-four fields in four families.
+ */
+export type FieldId =
+  // Expression performance
+  | 'expression_pct_tsp'
+  | 'titer_intracellular'
+  | 'titer_secreted'
+  | 'secreted_fraction'
+  | 'fold_improvement'
+  | 'transformation_efficiency'
+  | 'time_to_colony'
+  // Cultivation
+  | 'growth_rate_mu'
+  | 'final_biomass_density'
+  | 'volumetric_productivity'
+  | 'medium_component_conc'
+  // Downstream & economics
+  | 'disruption_protein_yield'
+  | 'disruption_energy'
+  | 'minimum_selling_price'
+  | 'step_recovery'
+  | 'product_purity'
+  | 'partition_coefficient'
+  | 'sieving_coefficient'
+  | 'cake_moisture'
+  // Growth and product kinetics
+  | 'monod_ks'
+  | 'biomass_yield_substrate'
+  | 'ethanol_yield_substrate'
+  | 'ethanol_titre'
+  | 'ethanol_productivity'
+  | 'ethanol_inhibition_ki'
+  | 'ethanol_max_conc'
+  | 'substrate_inhibition_ki'
+  | 'ethanol_lp_alpha'
+  | 'ethanol_lp_beta'
+  | 'ethanol_mesp'
+  | 'maintenance_coefficient'
+  | 'biomass_yield_oxygen'
+  | 'specific_oxygen_uptake'
+  | 'kla_measured';
+
+export interface ParameterDef {
+  id: FieldId;
+  family: ParameterFamily;
+  name: string;
+  definition: string;
+  /** '' for categorical fields (kinase_identity, glycan_species). */
+  canonicalUnit: string;
+  /** A categorical field holds a string value. */
+  categorical?: boolean;
+  /** OF-COR-001 §17 Rule 1: a value without its method is not interpretable. */
+  requiresMethod?: boolean;
+  /**
+   * Unit families this field must NOT be auto-converted into, with the reason.
+   * OF-COR-001 §17 Rule 2: %TSP and g/L are not interconvertible without cell
+   * density and total-protein fraction. The engine refuses and says why.
+   */
+  refuseConversionTo?: { field: FieldId; because: string }[];
+}
 
 export const FAMILY_LABEL: Record<ParameterFamily, string> = {
   expression: 'Expression performance',
@@ -313,8 +381,18 @@ export const ONTOLOGY_BY_ID: Record<FieldId, ParameterDef> = Object.fromEntries(
   ONTOLOGY.map((d) => [d.id, d]),
 ) as Record<FieldId, ParameterDef>;
 
-export function fieldName(id: FieldId): string {
-  return ONTOLOGY_BY_ID[id]?.name ?? id;
+/**
+ * Whether the service's field id is one this list names (alpha 2.2 E.4). The
+ * service writes a record's field as a string; the store keeps a record whose
+ * field passes, and every reader indexes the ontology by it.
+ */
+export function isFieldId(id: string): id is FieldId {
+  return Object.prototype.hasOwnProperty.call(ONTOLOGY_BY_ID, id);
+}
+
+/** A field's name, or its id when this list names no such field (a run's false positive keeps the service's string). */
+export function fieldName(id: string): string {
+  return isFieldId(id) ? ONTOLOGY_BY_ID[id].name : id;
 }
 
 /** Fields where a value without its analytical method is not interpretable. */

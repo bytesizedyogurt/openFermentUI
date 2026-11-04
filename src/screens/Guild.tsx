@@ -17,7 +17,6 @@ import {
   Undo2,
   AlertTriangle,
 } from 'lucide-react';
-import type { DecisionCheck, ExtractionRecord } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf, reviewerName } from '@/store';
 import {
@@ -28,6 +27,8 @@ import {
   refusalOf,
   writeRefusal,
   type Refusal,
+  type DecisionCheck,
+  type ExtractionRecord,
 } from '@/lib/review';
 import { useRoute, href } from '@/router';
 import { checkDecision } from '@/lib/intake';
@@ -298,8 +299,8 @@ export default function Guild() {
     : '';
   const [checked, setChecked] = useState<{ key: string; accept: DecisionCheck; gold: DecisionCheck }>({
     key: '',
-    accept: { ok: true },
-    gold: { ok: true },
+    accept: { ok: true, rule: null, why: null },
+    gold: { ok: true, rule: null, why: null },
   });
   // Read inside the effect rather than depended on: these change identity on
   // every store update, and the question only changes when gateKey does.

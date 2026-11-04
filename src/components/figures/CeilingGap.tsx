@@ -4,7 +4,8 @@
 // the rules is the figure's whole message, so it prints no derived
 // percentage. A point above a rule is ringed, for a reviewer to check its
 // basis.
-import type { ComputedBasis, ExtractionRecord, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
 import { EvidenceStrip, toTable as stripTable, type EvidenceStripProps } from './EvidenceStrip';
 import type { FigureTable } from './FigureFrame';
 

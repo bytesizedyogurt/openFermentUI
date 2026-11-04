@@ -13,7 +13,8 @@ import {
   Send,
   ArrowUpDown,
 } from 'lucide-react';
-import type { Candidate, ExtractionRecord, ExtractorRun, FieldId, ReviewDecision, RunOutput } from '@/data/types';
+import type { Candidate, ExtractionRecord, ExtractorRun, ReviewDecision, RunOutput } from '@/lib/review';
+import type { Quantity } from '@/lib/studies';
 import { fieldName } from '@/data/ontology';
 import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
@@ -185,11 +186,12 @@ function MetricValue({ value, defined }: { value: number | null; defined: boolea
 interface MismatchRow {
   key: string;
   outcome: 'value_mismatch' | 'unit_error' | 'span_error' | 'miss' | 'spurious';
-  field: FieldId;
+  /** A record's field, or the field the service wrote on a false positive (named by `fieldName`). */
+  field: string;
   paperId: string;
   recordId?: string;
-  gold?: { value: number | string; unit: string };
-  extracted?: { value: number; unit: string };
+  gold?: Quantity;
+  extracted?: Quantity;
   note?: string;
 }
 
@@ -290,7 +292,7 @@ export default function Witness() {
         paperId: rec.paperId,
         recordId: rec.id,
         gold: rec.gold,
-        extracted: res.extracted,
+        extracted: res.extracted ?? undefined,
       });
     }
     for (const fp of run.falsePositives) {
@@ -1032,10 +1034,12 @@ function ComparisonBody({
   onFile: () => void;
 }) {
   const goldSI = row.gold && typeof row.gold.value === 'number' ? toSI(row.gold.value, row.gold.unit) : null;
-  const extractedSI = row.extracted ? toSI(row.extracted.value, row.extracted.unit) : null;
+  // A categorical value carries a string, which converts to nothing and compares to nothing.
+  const extracted = row.extracted && typeof row.extracted.value === 'number' ? { value: row.extracted.value, unit: row.extracted.unit } : null;
+  const extractedSI = extracted ? toSI(extracted.value, extracted.unit) : null;
   const gap =
-    row.gold && row.extracted && typeof row.gold.value === 'number'
-      ? relativeGap({ value: row.gold.value, unit: row.gold.unit }, row.extracted)
+    row.gold && extracted && typeof row.gold.value === 'number'
+      ? relativeGap({ value: row.gold.value, unit: row.gold.unit }, extracted)
       : null;
   const showExtractedSpan = row.outcome === 'value_mismatch' || row.outcome === 'unit_error';
 

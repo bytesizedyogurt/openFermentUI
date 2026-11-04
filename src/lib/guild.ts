@@ -10,7 +10,8 @@
 // screen needs to grey out a button it already knows the service would
 // refuse. It is not a second copy of the rules, and it never decides what is
 // stored. While the service is up, the sign-off sheet asks /api/guild/check.
-import type { DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/data/types';
+import type { Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/data/types';
+import type { DecisionCheck } from './review';
 import { IntakeDown } from './intake';
 import { apiFetch } from './project';
 

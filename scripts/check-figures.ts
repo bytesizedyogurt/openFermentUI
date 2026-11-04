@@ -49,7 +49,8 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { ExtractionRecord, Provenance } from '../src/data/types';
+import type { Provenance } from '../src/data/types';
+import type { ExtractionRecord } from '../src/lib/review';
 import { ENCODING, NEVER_EVIDENCE, pointKey } from '../src/components/figures/encoding';
 import { stripPoints, toTable as stripTable } from '../src/components/figures/EvidenceStrip';
 import { toTable as ceilingTable } from '../src/components/figures/CeilingGap';

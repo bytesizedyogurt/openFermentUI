@@ -9,13 +9,8 @@
 // simulation for a real fetch — the ingest board keeps that path, labelled as
 // the offline one, and the choice between them is made in the store where the
 // reader can see which one ran.
-import type {
-  DecisionCheck,
-  ExtractResponse,
-  FetchSource,
-  Overlay,
-  ReviewDecision,
-} from '@/data/types';
+import type { ExtractResponse, FetchSource } from '@/data/types';
+import type { DecisionCheck, Overlay, ReviewDecision } from './review';
 import { START_COMMAND, postdocHealth } from './postdoc';
 import { apiFetch } from './project';
 

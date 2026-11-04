@@ -4,9 +4,13 @@
 // discipline as lib/intake.ts: when the service is unreachable this says so
 // and names the command that starts it, and it never shows stand-in data in
 // the service's place (E.2).
-import type { Artifact, ReplayResult } from '@/data/types';
+import type { components } from '@/api/types.gen';
 import { START_COMMAND, postdocHealth } from './postdoc';
 import { apiFetch } from './project';
+import type { Artifact } from './studies';
+
+/** A replay of an artifact: the output computed again from its kept inputs, set beside the one kept. */
+export type ReplayResult = components['schemas']['ReplayResult'];
 
 export class ArtifactsDown extends Error {
   constructor(

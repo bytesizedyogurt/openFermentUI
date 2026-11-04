@@ -119,7 +119,7 @@ export function CommandPalette() {
         id: `p-${p.id}`,
         group: 'Navigate',
         label: `${p.id} — ${p.title}`,
-        hint: `${p.year} · paper`,
+        hint: p.year !== null ? `${p.year} · paper` : 'paper',
         icon: Library,
         run: () => navigate(`/biorepo/paper/${p.id}`),
       });

@@ -26,7 +26,8 @@ import {
   Table2,
   X,
 } from 'lucide-react';
-import type { ExtractionRecord, FieldId, ParameterDef, Product, Protocol } from '@/data/types';
+import type { FieldId, ParameterDef, Product, Protocol } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
 import type { Scenario } from '@/lib/proforma';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import {
@@ -60,8 +61,6 @@ import { exportCSV } from '@/lib/csv';
 interface SPoint {
   rec: ExtractionRecord;
   prov: ProvKind;
-  /** True when the strain link came from the paper's organism list, not the record. */
-  viaPaper: boolean;
   /** Value converted into the field's canonical unit, or null if incommensurable. */
   canonical: number | null;
 }
@@ -99,7 +98,6 @@ interface FieldGroup {
   verified: number;
   gold: number;
   unverified: number;
-  viaPaper: number;
 }
 
 /** Plain-language reason a set of records sits outside the median and range. */
@@ -388,9 +386,6 @@ function StripPlot({
                   : EXCLUSION_NOTE[activeExclusion]}
               </span>
             )}
-            {activePoint.viaPaper && (
-              <span className="text-ink-soft">attributed via the paper&rsquo;s organism list</span>
-            )}
           </span>
         ) : (
           <span className="text-ink-soft">Hover or arrow through the dots to read a value.</span>
@@ -535,13 +530,6 @@ function FieldRow({
               </span>
             </div>
           )}
-
-          {g.viaPaper > 0 && (
-            <div className="mt-1.5 text-caption text-ink-soft">
-              <span className="font-num">{g.viaPaper}</span> attributed through the paper&rsquo;s
-              organism list rather than a per-record tag.
-            </div>
-          )}
         </div>
 
         <div className="min-w-0">
@@ -575,33 +563,26 @@ export default function StrainPage({ strainId }: { strainId: string }) {
 
   const strain = strains.find((s) => s.id === strainId);
 
-  const paperById = useMemo(() => new Map(papers.map((p) => [p.id, p])), [papers]);
-
-  const strainPapers = useMemo(
-    () => papers.filter((p) => p.organisms.includes(strainId)),
-    [papers, strainId],
-  );
-
-  // A record belongs to this strain when it says so, or — absent a per-record
-  // tag — when its paper's organism list says so. An explicit tag for another
-  // strain always wins.
+  // A record belongs to this strain when its organism tag names it.
   const points = useMemo(() => {
     const out: SPoint[] = [];
     for (const rec of records) {
-      const direct = rec.organism === strainId;
-      const viaPaper =
-        !rec.organism && (paperById.get(rec.paperId)?.organisms.includes(strainId) ?? false);
-      if (!direct && !viaPaper) continue;
+      if (rec.organism !== strainId) continue;
       const def = ONTOLOGY_BY_ID[rec.field];
       out.push({
         rec,
         prov: provOf(rec),
-        viaPaper,
         canonical: def ? toCanonical(rec, def.canonicalUnit) : null,
       });
     }
     return out;
-  }, [records, paperById, strainId]);
+  }, [records, strainId]);
+
+  // The papers this strain's records were read from.
+  const strainPapers = useMemo(() => {
+    const ids = new Set(points.map((pt) => pt.rec.paperId));
+    return papers.filter((paper) => ids.has(paper.id));
+  }, [papers, points]);
 
   const recordIds = useMemo(() => new Set(points.map((p) => p.rec.id)), [points]);
 
@@ -637,7 +618,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         verified: live.filter((p) => p.rec.status === 'verified').length,
         gold: live.filter((p) => !!p.rec.gold).length,
         unverified: live.filter((p) => p.rec.status === 'unverified').length,
-        viaPaper: live.filter((p) => p.viaPaper).length,
       };
     });
   }, [points]);
@@ -796,7 +776,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         'Median (canonical)',
         'Min (canonical)',
         'Max (canonical)',
-        'Attributed via paper organism list',
       ],
       groups.map((g) => [
         strainId,
@@ -814,7 +793,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         g.stats ? g.stats.median : '',
         g.stats ? g.stats.min : '',
         g.stats ? g.stats.max : '',
-        g.viaPaper,
       ]),
     );
   };
@@ -913,16 +891,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         </span>
       ),
       value: ({ rec }) => rec.paperId,
-    },
-    {
-      key: 'attribution',
-      header: 'Attribution',
-      width: '116px',
-      priority: 3,
-      render: ({ viaPaper }) => (
-        <span className="text-ink-soft">{viaPaper ? 'via paper' : 'per record'}</span>
-      ),
-      value: ({ viaPaper }) => (viaPaper ? 'via paper' : 'per record'),
     },
     {
       key: 'quote',
@@ -1126,7 +1094,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             <EmptyState
               icon={<FlaskConical size={22} />}
               title="No extraction records for this strain"
-              body={`Nothing in this project is attributed to ${strain.designation}, either by a per-record organism tag or by a paper's organism list. The extraction table is the place to check what the corpus does cover.`}
+              body={`No record in this project carries an organism tag naming ${strain.designation}. The extraction table is the place to check what the corpus does cover.`}
               action={
                 <div className="flex gap-2">
                   <LinkButton to="/intake">Open Intake</LinkButton>
@@ -1448,7 +1416,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             <div className="text-body text-ink-soft flex flex-wrap items-center gap-2">
               <span>
                 <span className="font-num text-ink">{strainPapers.length}</span> paper
-                {strainPapers.length === 1 ? '' : 's'} list this organism
+                {strainPapers.length === 1 ? ' holds' : 's hold'} its records
               </span>
               <a className="text-accent hover:underline" href={href('/biorepo')}>
                 Open the library

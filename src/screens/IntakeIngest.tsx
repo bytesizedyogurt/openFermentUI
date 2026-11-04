@@ -29,7 +29,8 @@ export default function IntakeIngest() {
   const serviceUp = useStore((s) => s.serviceUp);
   const overlayProblem = useStore((s) => s.overlayProblem);
 
-  const held = useMemo(() => papers.filter((p) => p.held), [papers]);
+  // Every paper the store keeps is a document the project holds (ADR-002).
+  const held = papers;
   const extracted = useMemo(() => {
     const counts = new Map<string, number>();
     for (const c of candidates) counts.set(c.paperId, (counts.get(c.paperId) ?? 0) + 1);
@@ -106,7 +107,7 @@ export default function IntakeIngest() {
                         {p.title}
                       </a>
                       <div className="text-caption text-ink-soft">
-                        {fetchSourceName(p.fetchedFrom)}
+                        {fetchSourceName(p.source)}
                         {p.year ? ` · ${p.year}` : ''} · <span className="font-num">{p.sections.length}</span>{' '}
                         passage{p.sections.length === 1 ? '' : 's'}
                         {p.licenceClass ? ` · ${licenceWords(p.licenceClass)}` : ''}

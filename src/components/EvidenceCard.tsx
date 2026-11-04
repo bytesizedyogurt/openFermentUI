@@ -5,7 +5,7 @@
 // basis on the service, and the basis opens to every input and where each
 // came from, with a link to the stored artifact that replays it.
 import { ExternalLink } from 'lucide-react';
-import type { ExtractionRecord } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
 import type { Evidence } from '@/lib/postdoc';
 import type { BasisInput } from '@/lib/studies';
 import { useStore } from '@/store';

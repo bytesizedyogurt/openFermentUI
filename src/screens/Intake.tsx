@@ -3,7 +3,7 @@
 // its provenance attached. This is the screen that makes the corpus auditable.
 import { useCallback, useMemo, useState } from 'react';
 import { ClipboardCheck, Download, Gauge, Table2 } from 'lucide-react';
-import type { ExtractionRecord } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
 import { fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
 import { href, navigate, useRoute } from '@/router';

@@ -52,7 +52,8 @@ export function CitationChip({
   const copyCitation = () => {
     const doi = paper.doi ? ` https://doi.org/${paper.doi}` : paper.pmcid ? ` PMC${paper.pmcid.replace(/^PMC/, '')}` : '';
     const authors = paper.authors.length ? paper.authors.join(', ') : '(authors pending verification)';
-    const text = `${authors} (${paper.year}). ${paper.title}. ${paper.venue}.${doi}`;
+    const year = paper.year !== null ? ` (${paper.year})` : '';
+    const text = `${authors}${year}. ${paper.title}. ${paper.journal ?? ''}.${doi}`;
     navigator.clipboard?.writeText(text);
     useStore.getState().toast({ text: 'Citation copied', kind: 'info' });
   };
@@ -82,7 +83,7 @@ export function CitationChip({
           <div className="font-serif font-semibold leading-snug">{shortTitle(paper.title, 110)}</div>
           <div className="text-caption text-ink-soft mt-0.5">
             {paper.authors.slice(0, 3).join(', ')}
-            {paper.authors.length > 3 ? ' et al.' : ''} · {paper.year} · {paper.venue}
+            {paper.authors.length > 3 ? ' et al.' : ''} · {paper.year} · {paper.journal}
           </div>
         </div>
 

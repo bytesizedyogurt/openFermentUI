@@ -8,11 +8,10 @@
 // it, and a source the answer did not cite is shown as uncited.
 import { useState, type FormEvent } from 'react';
 import { Loader2, MessageSquareQuote, Search as SearchIcon } from 'lucide-react';
-import type { SearchResponse } from '@/data/types';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { IntakeDown, licenceWords } from '@/lib/intake';
-import { answerFromLiterature, searchLiterature, type AnswerSource } from '@/lib/literature';
+import { answerFromLiterature, searchLiterature, type AnswerSource, type SearchResponse } from '@/lib/literature';
 import { Button, Callout, Card, EmptyState, PageHeader, SectionTitle, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { BIOREPO_TABS } from '@/data/tabs';

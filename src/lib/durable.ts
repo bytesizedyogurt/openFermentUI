@@ -33,7 +33,9 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision, TrainSpec } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Runbook, TrainSpec } from '@/data/types';
+import type { Provenance } from './studies';
+import type { RecordStatus, ReviewDecision } from './review';
 import type { Override } from './params';
 import type { LiveConversation } from './postdoc';
 import type { Scenario } from './proforma';
@@ -48,17 +50,18 @@ const KEY = 'snapshot';
  * A review decision, reduced to the fields review actually changes.
  *
  * Named DurableReviewDecision (OF-BLD-012 §2.1) because the service's
- * ReviewDecision in `src/data/types.ts` is this plus recordId, at, and an
- * optional replacement span. `DecisionMirror` below has the compiler hold the
- * two together: every field here must exist there with the same type.
+ * ReviewDecision (`src/lib/review.ts`, generated) is this plus recordId, at,
+ * and an optional replacement span. Each field reads its type from it, and
+ * `DecisionMirror` below has the compiler hold the two together: every field
+ * here must exist there with the same type.
  */
 export interface DurableReviewDecision {
   status: RecordStatus;
   provenance: Provenance;
-  gold?: { value: number | string; unit: string };
-  corrected?: { value: number; unit: string };
-  rejectReason?: string;
-  reviewer?: string;
+  gold?: ReviewDecision['gold'];
+  corrected?: ReviewDecision['corrected'];
+  rejectReason?: ReviewDecision['rejectReason'];
+  reviewer?: ReviewDecision['reviewer'];
   /**
    * When THIS decision was made, ISO. Compared against the service's
    * decision for the same record — the later wins (OF-BLD-012 §7.3). The
@@ -73,8 +76,8 @@ export interface DurableReviewDecision {
    * still standing on the paper's words after a reload, and is posted with
    * them when the service is back.
    */
-  quote?: string;
-  sectionId?: string;
+  quote?: ReviewDecision['quote'];
+  sectionId?: ReviewDecision['sectionId'];
 }
 
 /**

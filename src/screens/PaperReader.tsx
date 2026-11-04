@@ -17,9 +17,8 @@ import {
   Loader2,
   MessageSquare,
 } from 'lucide-react';
-import type { ExtractionRecord, FieldId, Job, Paper } from '@/data/types';
-import { fieldName } from '@/data/ontology';
-import { useStore, provenanceOf, tickClass } from '@/store';
+import { fieldName, type FieldId } from '@/data/ontology';
+import { useStore, provenanceOf, tickClass, type Job } from '@/store';
 import { href, navigate } from '@/router';
 import { Quantity } from '@/components/QuantityField';
 import { ProvenanceLegend, provMeta, type ProvKind } from '@/components/Provenance';
@@ -32,7 +31,7 @@ import {
   SectionTitle,
   cx,
 } from '@/components/ui';
-import { locateQuote } from '@/lib/review';
+import { locateQuote, type ExtractionRecord, type Paper } from '@/lib/review';
 import { fetchSourceName } from '@/lib/intake';
 
 const STAGE_KEYS = ['fetch', 'parse', 'chunk', 'embed', 'extract'] as const;
@@ -376,36 +375,23 @@ export default function PaperReader({
 
       <h1 className="font-serif text-page-title font-semibold leading-snug">{paper.title}</h1>
 
-      {(paper.authors.length > 0 || paper.year || paper.venue) && (
+      {(paper.authors.length > 0 || paper.year || paper.journal) && (
         <div className="mt-2 text-body text-ink-soft">
           {[
             paper.authors.length > 0 ? <span key="authors">{paper.authors.join(', ')}</span> : null,
             paper.year ? <span key="year" className="font-num">{paper.year}</span> : null,
-            paper.venue ? <span key="venue" className="italic">{paper.venue}</span> : null,
+            paper.journal ? <span key="journal" className="italic">{paper.journal}</span> : null,
           ]
             .filter((part) => part !== null)
             .flatMap((part, i) => (i === 0 ? [part] : [<span key={`sep-${i}`}>{' · '}</span>, part]))}
         </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {paper.organisms.map((o) => (
-          <span key={o} className="chip italic">
-            {o}
-          </span>
-        ))}
-        {paper.topics.map((t) => (
-          <span key={t} className="chip text-ink-soft">
-            {t}
-          </span>
-        ))}
-      </div>
-
       {paper.textSource === 'full-text' && (
         <div className="mt-2 text-caption text-accent flex items-start gap-1.5">
           <span className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px] bg-accent" aria-hidden />
           <span>
-            {paper.fetchedFrom === 'paste' ? 'The full text as it was pasted' : `Full text from ${fetchSourceName(paper.fetchedFrom)}`}
+            {paper.source === 'paste' ? 'The full text as it was pasted' : `Full text from ${fetchSourceName(paper.source)}`}
             {paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
             The sections below are the document&rsquo;s own words; a record whose quote is not found in
             them is listed in the rail as pending verification.
@@ -446,7 +432,6 @@ export default function PaperReader({
           <Callout kind="error" title="Section boundaries not detected — full text unavailable">
             <p className="mb-2">
               The parser could not segment this paper into sections, so extraction spans cannot be anchored.
-              The abstract below is the raw-text fallback.
             </p>
             <div className="flex gap-2">
               <LinkButton to="/intake/ingest" size="sm">
@@ -458,15 +443,6 @@ export default function PaperReader({
       )}
 
       <>
-          {paper.textSource !== 'full-text' && (
-            <section className="mt-6">
-              <h2 className="font-serif text-section-title font-semibold mb-1">Abstract</h2>
-              <div className="prose-reading">
-                <p>{paper.abstract}</p>
-              </div>
-            </section>
-          )}
-
           {quote && sectionId && !paper.sections.some((s) => s.id === sectionId) && (
             <p className="mt-4 text-caption text-signal-warn" data-testid="quote-missing">
               The passage from the search is in section {sectionId} of the fetched text, which this
@@ -484,9 +460,7 @@ export default function PaperReader({
                 extraction spans are anchored here.
               </p>
               <div className="card p-3 bg-surface-0 font-num text-caption leading-relaxed whitespace-pre-line max-h-[420px] overflow-y-auto">
-                {paper.sections.length > 0
-                  ? paper.sections.map((s) => `${s.heading}\n${s.text}`).join('\n\n')
-                  : paper.abstract}
+                {paper.sections.map((s) => `${s.heading}\n${s.text}`).join('\n\n')}
               </div>
             </section>
           ) : (

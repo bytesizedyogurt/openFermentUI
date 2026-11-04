@@ -21,12 +21,12 @@ import {
   X,
 } from 'lucide-react';
 import type {
-  ExtractionRecord,
   Protocol,
   ProtocolCategory,
   ProtocolVersion,
   Strain,
 } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
 import { useStore, provenanceOf } from '@/store';
 import { href, navigate } from '@/router';
 import { DataTable, type Column } from '@/components/DataTable';

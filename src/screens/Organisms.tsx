@@ -8,7 +8,8 @@
 // (alpha 2.0, ADR-010), so the page says so.
 import { useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, FlaskConical, LineChart, BookOpen, ShieldCheck } from 'lucide-react';
-import type { ExtractionRecord, Paper, Strain } from '@/data/types';
+import type { Strain } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
 import { useStore } from '@/store';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 import {
@@ -38,21 +39,9 @@ interface Coverage {
   prov: ProvKind;
 }
 
-/**
- * A record counts for a strain when it is tagged with it, or — absent a tag —
- * when its paper's organism list names it. An explicit tag for a different
- * strain always wins, so a two-organism paper never double-counts a record
- * that already knows which organism it belongs to.
- */
-function recordsFor(
-  records: ExtractionRecord[],
-  paperById: Map<string, Paper>,
-  strainId: string,
-): ExtractionRecord[] {
-  return records.filter((r) => {
-    if (r.organism) return r.organism === strainId;
-    return paperById.get(r.paperId)?.organisms.includes(strainId) ?? false;
-  });
+/** A record counts for a strain when its organism tag names it. */
+function recordsFor(records: ExtractionRecord[], strainId: string): ExtractionRecord[] {
+  return records.filter((r) => r.organism === strainId);
 }
 
 const COUNT_LABEL = {
@@ -149,7 +138,7 @@ function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }
             label={COUNT_LABEL.papers}
             n={c.papers}
             max={maxes.papers}
-            title="Papers whose organism list names this strain"
+            title="Papers holding a record for this strain"
           />
           <CoverageCount
             label={COUNT_LABEL.verified}
@@ -243,16 +232,15 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
 
   const [sort, setSort] = useState<SortKey>('coverage');
 
-  const paperById = useMemo(() => new Map(papers.map((p) => [p.id, p])), [papers]);
-
   const coverage = useMemo<Coverage[]>(() => {
     return strains.map((strain) => {
-      const recs = recordsFor(records, paperById, strain.id);
+      const recs = recordsFor(records, strain.id);
       const live = recs.filter((r) => r.status !== 'rejected');
       const gold = live.filter((r) => !!r.gold).length;
       const verified = live.filter((r) => r.status === 'verified').length;
       const unverified = live.filter((r) => r.status === 'unverified').length;
-      const paperCount = papers.filter((p) => p.organisms.includes(strain.id)).length;
+      // The papers the strain's records were read from.
+      const paperCount = new Set(recs.map((r) => r.paperId)).size;
       const protocolCount = protocols.filter((p) => p.organisms.includes(strain.id)).length;
       const scenarioCount = scenarios.filter((sc) => namesStrain(sc, [strain.designation, strain.binomial])).length;
       const prov: ProvKind = gold > 0 ? 'gold' : verified > 0 ? 'verified' : 'unverified';
@@ -269,7 +257,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
         prov,
       };
     });
-  }, [strains, records, papers, protocols, scenarios, paperById]);
+  }, [strains, records, protocols, scenarios]);
 
   const maxes = useMemo(
     () => ({
@@ -393,11 +381,10 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
         <span className="inline-flex items-center gap-1">
           What counts as coverage?
           <Explain label="How coverage is counted">
-            Four counts, each derived live from the session store: papers whose organism list names
-            the strain; extraction records for it that a reviewer has verified; protocols listing it;
+            Four counts, each derived live from the session store: papers holding a record for the
+            strain; extraction records for it that a reviewer has verified; protocols listing it;
             and scenarios that name it in their name, description or product.
-            A record with its own organism tag counts only for that organism; an untagged record
-            inherits its paper&rsquo;s organism list. Bars are drawn relative to the best-covered
+            A record counts for the organism its tag names. Bars are drawn relative to the best-covered
             strain in this corpus, so they compare strains to each other and to nothing else.
           </Explain>
         </span>

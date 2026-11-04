@@ -8,7 +8,6 @@
 // said it, reason and all; nothing is retried behind the reader's back.
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ClipboardPaste, FileUp, Link2, Loader2 } from 'lucide-react';
-import type { CollectOutcome, LiteratureDocument } from '@/data/types';
 import { useStore } from '@/store';
 import { IntakeDown, licenceWords } from '@/lib/intake';
 import {
@@ -18,6 +17,8 @@ import {
   pasteDocument,
   projectDocuments,
   uploadDocument,
+  type CollectOutcome,
+  type LiteratureDocument,
 } from '@/lib/literature';
 import { Button, Callout, Card, EmptyState, SectionTitle, cx } from '@/components/ui';
 
@@ -90,7 +91,7 @@ export function CollectCard() {
           ? await collect({ identifier: identifier.trim(), by: reviewer, reason })
           : mode === 'file' && file
             ? await uploadDocument(file, { by: reviewer, title, licenceClass, reason })
-            : await pasteDocument({ title, text, url, by: reviewer, licenceClass, reason });
+            : await pasteDocument({ title, text, url, by: reviewer, licenceClass, licence: '', reason });
       setLast(outcome);
       if (outcome.status !== 'failed') {
         setIdentifier('');

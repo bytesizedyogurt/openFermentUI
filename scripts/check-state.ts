@@ -4,7 +4,9 @@
  * wait in, the rows laid over a load, and a flush that drops a refusal and
  * keeps everything from the first write the service did not answer; and the
  * overlay a project's pages load (src/lib/intake.ts), where a service that
- * answers and refuses is running and says why; the configurations a plant
+ * answers and refuses is running and says why, and a candidate it brings
+ * enters the store as a record when the ontology names its field
+ * (src/lib/review.ts, `recordOf`); the configurations a plant
  * is offered in (src/lib/library.ts), and the refusals an SFF import answers
  * in the service's words (src/lib/http.ts), a refusal of a request's own
  * fields among them; and the unit each person's change is sent in
@@ -41,6 +43,8 @@ import type { LiveConversation } from '../src/lib/postdoc';
 import type { FlowsheetInfo, ProformaScenarioInfo, Scenario, ScenarioInput } from '../src/lib/proforma';
 import type { Artifact, BasisSource, EngineRun } from '../src/lib/studies';
 import { loadOverlay } from '../src/lib/intake';
+import { recordOf, type Candidate } from '../src/lib/review';
+import { ONTOLOGY } from '../src/data/ontology';
 import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
 import { inputsOf } from '../src/lib/params';
@@ -187,6 +191,26 @@ async function overlayAgainst(health: Answer, overlay: Answer) {
 {
   const got = await overlayAgainst({ status: 200, body: { ok: true } }, { status: 200, body: { papers: {}, records: {} } });
   check('an overlay that loads is the overlay', 'overlay' in got, JSON.stringify(got));
+}
+
+// A candidate the overlay brings enters the store as a record when its field
+// is one the ontology names (src/lib/review.ts, `recordOf`).
+const aCandidate = (id: string, field: string): Candidate => ({
+  id, paperId: 'placeholder-paper', sectionId: 's1', quote: 'a placeholder sentence', field,
+  value: 1, unit: 'placeholder-unit', si: { value: 1, unit: 'placeholder-unit' }, confidence: 0,
+  status: 'unverified', provenance: 'unverified', extractorRun: 'claude-1', isPrimary: true,
+  carbonSource: null, citesRecordId: null, comparativeBaseline: null, componentTag: null, curationRef: null,
+  goldOnly: null, method: null, negativeResult: null, numbering: null, organism: null, organismText: null,
+  range: null, rejectReason: null, valueBasis: null,
+});
+{
+  const named = ONTOLOGY[0].id;
+  const entered = recordOf(aCandidate('c-1', named));
+  check('a candidate on a field the ontology names enters the store as a record of its values, its audit trail empty',
+    entered !== null && entered.field === named && entered.value === 1 && entered.unit === 'placeholder-unit' && entered.audit.length === 0,
+    JSON.stringify(entered && { field: entered.field, audit: entered.audit }));
+  check('a candidate on a field the ontology does not name stays out of the records',
+    recordOf(aCandidate('c-2', 'placeholder_field')) === null);
 }
 
 // ── what a person may run, and what an import's refusal says (alpha 2.1 stage B) ──

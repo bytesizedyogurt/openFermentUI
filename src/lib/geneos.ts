@@ -4,7 +4,8 @@
 // service computes and keeps each as an artifact; with it down this says so,
 // and nothing stands in for a result (E.2). Shares lib/http.ts's call, so the
 // two failures are the same two: down, or refused in words.
-import type { ExtractionRecord, FieldId, GeneosModelInfo, GeneosResult, ParameterDef } from '@/data/types';
+import type { FieldId, GeneosModelInfo, GeneosResult, ParameterDef } from '@/data/types';
+import type { ExtractionRecord } from './review';
 import { ONTOLOGY_BY_ID } from '@/data/ontology';
 import { carbonSourceId } from '@/data/vocabulary';
 import { ServiceDown, ServiceRefused, call } from './http';

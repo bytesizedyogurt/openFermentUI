@@ -6,7 +6,8 @@
 // latest of each is drawn here beside the records it is held against; with
 // none kept, or no service, the legend stands alone.
 import { useEffect, useMemo, useState } from 'react';
-import type { Artifact, ExtractionRecord } from '@/data/types';
+import type { Artifact } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { listArtifacts } from '@/lib/artifacts';

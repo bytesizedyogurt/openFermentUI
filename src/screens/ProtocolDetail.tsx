@@ -21,7 +21,8 @@ import {
   Timer as TimerIcon,
   Wrench,
 } from 'lucide-react';
-import type { ExtractionRecord, Protocol, ProtocolVersion, RunState, Step } from '@/data/types';
+import type { Protocol, ProtocolVersion, RunState, Step } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
 import { useSkillById, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import {

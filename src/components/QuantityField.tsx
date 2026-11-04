@@ -116,10 +116,10 @@ export function Quantity({
   mode = 'published',
   className,
 }: {
-  /** Categorical records carry a string; fmt() passes it through. */
+  /** Categorical records carry a string, in the value and in its SI form; fmt() passes it through. */
   value: number | string;
   unit: string;
-  si?: { value: number; unit: string };
+  si?: { value: number | string; unit: string };
   mode?: 'published' | 'si';
   className?: string;
 }) {

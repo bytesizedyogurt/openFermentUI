@@ -4,7 +4,8 @@
 // src/screens/Guild.tsx shares only the tab strip.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Download, UserPlus, X } from 'lucide-react';
-import type { Check as GuildCheck, DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Protocol, Skill } from '@/data/types';
+import type { Check as GuildCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Protocol, Skill } from '@/data/types';
+import type { DecisionCheck } from '@/lib/review';
 import { useStore, guildView, actingIdOf, useSkillById } from '@/store';
 import { GUILD_TABS } from '@/data/tabs';
 import { OwnerTabs } from '@/components/OwnerTabs';

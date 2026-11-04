@@ -9,20 +9,13 @@ import { create } from 'zustand';
 import type {
   Project,
   InputAssumption,
-  ReviewDecision,
   ActivityEvent,
   Deposition,
   Deviation,
-  ExtractionRecord,
-  Job,
   MeasuredEvidence,
   LearnModule,
-  OverlayPaper,
-  Paper,
   Product,
   Protocol,
-  Provenance,
-  RecordStatus,
   Runbook,
   SeriesRole,
   FermosFitResponse,
@@ -30,11 +23,9 @@ import type {
   TrainFromRun,
   TrainRun,
   KeptTrain,
-  RunOutput,
   RunState,
   Strain,
   TimerState,
-  Overlay,
   Guild,
   GuildEvidence,
   GuildPerson,
@@ -53,6 +44,8 @@ import type {
 import type { Override } from '@/lib/params';
 import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/postdoc';
 import type { Scenario } from '@/lib/proforma';
+import type { ExtractionRecord, Overlay, OverlayPaper, Paper, RecordStatus, ReviewDecision, RunOutput } from '@/lib/review';
+import type { Provenance } from '@/lib/studies';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
@@ -70,7 +63,8 @@ import {
   type TrainMade,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
-import { blocks, writeRefusal, type ReviewAction } from '@/lib/review';
+import { blocks, recordOf, writeRefusal, type ReviewAction } from '@/lib/review';
+import { isFieldId } from '@/data/ontology';
 import { call } from '@/lib/http';
 import { openProjectId, projectSettled, setOpenProjectId } from '@/lib/project';
 import {
@@ -109,6 +103,29 @@ export interface Toast {
   kind: 'info' | 'success' | 'warn' | 'error';
   href?: string;
   hrefLabel?: string;
+}
+
+export interface JobStage {
+  label: string;
+  ms: number;
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  /**
+   * 'runbook' is a Job that fronts a Runbook: the tray shows the progress bar
+   * while the record it belongs to lives in its own slice (OF-BLD-005 §7).
+   * The two cooperate and stay apart.
+   */
+  kind: 'ingest' | 'extraction' | 'simulation' | 'run' | 'runbook';
+  stages: JobStage[];
+  stageIndex: number;
+  stageProgress: number; // 0-1 within current stage
+  status: 'running' | 'done' | 'failed';
+  failReason?: string;
+  href?: string;
+  startedAt: number;
 }
 
 interface UndoFrame {
@@ -225,7 +242,7 @@ function applyDecision(r: ExtractionRecord, d: DurableReviewDecision | ReviewDec
     provenance: d.provenance,
     gold: d.gold,
     corrected: d.corrected,
-    rejectReason: d.rejectReason,
+    rejectReason: d.rejectReason ?? null,
     reviewer: d.reviewer,
   };
   if ('quote' in d && d.quote) next.quote = d.quote;
@@ -822,43 +839,21 @@ function initialTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'bench';
 }
 
-/** What kind of source a collector serves, for a paper made from the overlay. */
-const SOURCE_TYPES: Partial<Record<NonNullable<OverlayPaper['source']>, Paper['sourceType']>> = {
-  europepmc: 'journal-article',
-  osti: 'industry-report',
-  sgd: 'database-entry',
-};
-
 /**
- * A document the project holds, as a paper (ADR-002): the citation the kit
- * holds, its passages as its sections, its licence. Nothing is filled in
- * that the kit does not hold; a year it does not know stays unset.
+ * A document the project holds, as a paper (ADR-002): the overlay's entry as
+ * the service wrote it, under its id, named by the id when the kit holds no
+ * title. Nothing is filled in that the kit does not hold.
  */
 function paperOf(id: string, o: OverlayPaper): Paper {
-  return {
-    id,
-    title: o.title ?? id,
-    authors: o.authors ?? [],
-    year: o.year ?? undefined,
-    venue: o.journal ?? '',
-    organisms: [],
-    topics: [],
-    abstract: '',
-    sections: o.sections,
-    ingest: o.ingest,
-    textSource: o.textSource,
-    openAccess: o.licenceClass === 'public' || o.licenceClass === 'open_commercial' || o.licenceClass === 'open_noncommercial',
-    doi: o.doi ?? undefined,
-    pmcid: o.pmcid ?? undefined,
-    sourceUrl: o.url ?? undefined,
-    sourceType: o.source ? SOURCE_TYPES[o.source] : undefined,
-    license: o.license ?? undefined,
-    licenceClass: o.licenceClass ?? undefined,
-    extraction: o.extraction ?? undefined,
-    fetchedFrom: o.source,
-    held: true,
-  };
+  return { ...o, id, title: o.title ?? id };
 }
+
+/**
+ * The candidates whose field the ontology does not name that this page has
+ * named in its activity already, so an overlay that brings one again says
+ * nothing new.
+ */
+const unreadCandidates = new Set<string>();
 
 export const useStore = create<OFState>()((set, get) => ({
   ...initialState(),
@@ -1120,7 +1115,7 @@ export const useStore = create<OFState>()((set, get) => ({
           ...rest,
           status: 'rejected' as RecordStatus,
           reviewer: decidedBy(),
-          rejectReason: payload?.reason,
+          rejectReason: payload?.reason ?? null,
           audit,
         };
       }
@@ -2397,7 +2392,7 @@ export const useStore = create<OFState>()((set, get) => ({
 
   // ── service overlay (OF-BLD-012 §2.1) ─────────────────────────────────
 
-  applyOverlay: (overlay) =>
+  applyOverlay: (overlay) => {
     set((s) => {
       const merged: Overlay = {
         papers: { ...(s.overlay?.papers ?? {}), ...overlay.papers },
@@ -2419,25 +2414,7 @@ export const useStore = create<OFState>()((set, get) => ({
       // overlay, all of them every time: the service sends the project's
       // whole set, so a paper the last project held and this one does not
       // leaves with it.
-      const notHeld = s.papers.filter((p) => !p.held);
-      const held = Object.entries(overlay.papers)
-        .filter(([id, o]) => o.title != null && !notHeld.some((p) => p.id === id))
-        .map(([id, o]) => paperOf(id, o));
-      const papers = [...notHeld.map((p) => {
-        const o = overlay.papers[p.id];
-        if (!o) return p;
-        const fetched = o.textSource === 'full-text' && o.sections.length > 0;
-        return {
-          ...p,
-          ingest: o.ingest,
-          textSource: fetched ? 'full-text' : p.textSource,
-          // A fetch that brought no text keeps what the paper held.
-          sections: fetched ? o.sections : p.sections,
-          license: fetched ? (o.license ?? undefined) : p.license,
-          fetchedFrom: fetched ? (o.source ?? 'europepmc') : p.fetchedFrom,
-          ingestReason: o.reason ?? undefined,
-        } as Paper;
-      }), ...held];
+      const papers = Object.entries(overlay.papers).map(([id, o]) => paperOf(id, o));
       // §6.4 — Witness reads runs from the store, and the overlay is where
       // they come from: an overlay run replaces one of the same id, and a run
       // the overlay does not carry stays.
@@ -2468,15 +2445,19 @@ export const useStore = create<OFState>()((set, get) => ({
       const local = s.durableReview;
       const present = new Set(s.records.map((r) => r.id));
       const arrivingIds: string[] = [];
+      // A candidate whose field the ontology does not name stays out of the
+      // records (`recordOf`); `applyOverlay` names it below.
       const arriving: ExtractionRecord[] = currentCandidates
         .filter((c) => !present.has(c.id))
-        .map((c) => {
+        .flatMap((c) => {
+          const entering = recordOf(c);
+          if (!entering) return [];
           arrivingIds.push(c.id);
-          const record: ExtractionRecord = stampOriginal({ ...c, audit: [] });
+          const record = stampOriginal(entering);
           const mine = local?.decisions[c.id];
-          if (!mine) return record;
+          if (!mine) return [record];
           decisionAt[c.id] = mine.at ?? local!.savedAt;
-          return applyDecision(record, mine);
+          return [applyDecision(record, mine)];
         });
       // F3 — what happens to the records earlier candidates became. A
       // candidate nobody decided on is the extractor's current opinion, and
@@ -2517,7 +2498,19 @@ export const useStore = create<OFState>()((set, get) => ({
           ? reviewQueue.indexOf(under)
           : Math.min(s.reviewQueue.slice(0, s.reviewIndex).filter((id) => alive.has(id)).length, reviewQueue.length);
       return { overlay: merged, papers, runOutputs, records, reviewQueue, reviewIndex, decisionAt };
-    }),
+    });
+    // A candidate on a field the ontology does not name stays out of the
+    // records, and the page names it once in its activity, as it names a kept
+    // row it cannot read.
+    const unread = (overlay.candidates ?? []).filter((c) => !isFieldId(c.field) && !unreadCandidates.has(c.id));
+    if (unread.length === 0) return;
+    for (const c of unread) unreadCandidates.add(c.id);
+    const n = unread.length;
+    const fields = [...new Set(unread.map((c) => c.field))];
+    const said = `The service sent ${n} candidate${n === 1 ? '' : 's'} on ${fields.length === 1 ? 'a field' : 'fields'} this page's ontology does not name (${fields.join(', ')}), so this page leaves ${n === 1 ? 'it' : 'them'} out of its records`;
+    get().logActivity({ at: stamp(), icon: 'alert', text: said, href: '#/intake', provenance: 'user' });
+    get().toast({ text: `${said}.`, kind: 'warn' });
+  },
 
   hydrateOverlay: async () => {
     // The overlay acts in one project: with none open there is nothing to load.
@@ -3123,6 +3116,8 @@ export const useStore = create<OFState>()((set, get) => ({
       stateLegacy: null,
     });
     void get().hydrateProjectState();
+    // The activity went with the reset, so a candidate left out is named again.
+    unreadCandidates.clear();
     if (overlay) get().applyOverlay(overlay);
     // Guild's ledger is the service's when there is one, and survives a reset
     // the way the overlay does; what was only ever in this browser goes.

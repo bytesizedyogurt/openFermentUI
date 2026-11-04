@@ -134,3 +134,37 @@ Never; this is how the drift stops recurring.
 - Each reader keeps its default for a field older plans lack (`claim.values ?? []`,
   `plan.stopped ?? 'done'` and their kin): a browser's snapshot from before alpha 2.0 lays such
   plans on the page until a load from the service answers them whole.
+
+### Alpha 2.2, E.4 (2026-11-04): the review family, and a record's field held to the ontology
+
+- `lib/review.ts` names the generated schemas of the review: `Candidate`, `ReviewDecision`,
+  `DecisionCheck`, `RecordStatus` and `ExtractorRun` (read from the candidate), `RunOutput` (the
+  generated `ExtractRun`), `Overlay` and `OverlayPaper`. `lib/literature.ts` names the collection's
+  and the search's (`CollectOutcome`, `CollectRequest`, `PasteRequest`, `LiteratureDocument`,
+  `SearchResponse`), and `lib/artifacts.ts` `ReplayResult`, beside the `Artifact` and `BasisSource`
+  that `lib/studies.ts` names. BioRepo, BioRepoSearch, BioRepoArtifacts, PaperReader, Witness,
+  CollectCard and the run metrics read them there; the store, the Durable snapshot, `lib/intake.ts`
+  and every screen that names a record, a paper or a decision check read the record and the paper
+  from `lib/review.ts`.
+- The record (`ExtractionRecord`) is the store's own shape of a candidate: the generated
+  `Candidate` with the review layer over it, the decision's gold, correction and reviewer typed from
+  the generated `ReviewDecision`, its audit trail (`AuditLine`, the generated `AuditEvent` with
+  `from` and `to` written only when a value changed), what it was published as and whether the
+  current run reads it. The service writes a candidate's field as a string. A candidate enters the
+  store as a record when the ontology names its field (`recordOf`, through the guard `isFieldId`
+  beside `ONTOLOGY`, which test_schema.py holds to fields.yaml); the store names a candidate on any
+  other field once in its activity and a toast, and every reader of a record indexes the ontology
+  by its field as before. A run's false positive keeps the service's string, and `fieldName` names
+  a field the ontology does not hold by its id.
+- The paper (`Paper`) is the overlay's entry under its id, titled by the id when the kit holds no
+  title, with the service's names (`journal`, `url`, `source`, `reason`). The hand-kept paper's
+  organisms, topics and abstract were filled empty by the store, its held flag was set on every
+  paper, and its source type, open-access flag and PMID were read by no screen; they go, with
+  BioRepo's Organism and Topic columns, filters and CSV fields, PaperReader's chips and abstract,
+  and the attribution of a record to a strain through its paper (Departures).
+- The Durable tier's decision reads each field's type from the generated `ReviewDecision`, a null
+  kept as null, so a decision made offline and one the service answers stay the same object
+  (`DecisionMirror`); a decision with no reject reason gives its record a null one.
+- The browser's own types move to their owners: `FieldId`, `ParameterFamily` and `ParameterDef` to
+  `data/ontology.ts`, and `Job` and `JobStage` to `store.ts`. `src/data/types.ts` re-exports each
+  until E.15, and a file a later commit moves reads them there until then.

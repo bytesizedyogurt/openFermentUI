@@ -6,8 +6,8 @@ import {
   Download,
   Loader2,
 } from 'lucide-react';
-import type { Job, Paper } from '@/data/types';
-import { useStore } from '@/store';
+import type { Paper } from '@/lib/review';
+import { useStore, type Job } from '@/store';
 import { href, navigate } from '@/router';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
@@ -87,26 +87,6 @@ function authorLabel(authors: string[]): string {
   return `${authors[0]}, ${authors[1]} et al.`;
 }
 
-function TagList({ items, max = 2 }: { items: string[]; max?: number }) {
-  if (items.length === 0) return <span className="text-ink-soft">—</span>;
-  const shown = items.slice(0, max);
-  const rest = items.length - shown.length;
-  return (
-    <span className="flex flex-nowrap items-center gap-1 overflow-hidden">
-      {shown.map((t) => (
-        <span key={t} className="chip text-caption text-ink-soft max-w-[110px]" title={t}>
-          <span className="truncate">{t}</span>
-        </span>
-      ))}
-      {rest > 0 && (
-        <span className="text-caption text-ink-soft font-num shrink-0" title={items.join(', ')}>
-          +{rest}
-        </span>
-      )}
-    </span>
-  );
-}
-
 export default function BioRepo() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
@@ -169,9 +149,7 @@ export default function BioRepo() {
         'Title',
         'Authors',
         'Year',
-        'Venue',
-        'Organisms',
-        'Topics',
+        'Journal',
         'Extractions',
         'Gold records',
         'Ingest status',
@@ -181,9 +159,7 @@ export default function BioRepo() {
         r.paper.title,
         r.paper.authors.join('; '),
         r.paper.year,
-        r.paper.venue,
-        r.paper.organisms.join('; '),
-        r.paper.topics.join('; '),
+        r.paper.journal ?? '',
         r.extractions,
         r.goldCount,
         r.paper.ingest,
@@ -254,22 +230,6 @@ export default function BioRepo() {
       value: (r) => r.paper.year ?? '',
     },
     {
-      key: 'organisms',
-      header: 'Organisms',
-      width: '124px',
-      priority: 2,
-      render: (r) => <TagList items={r.paper.organisms} />,
-      value: (r) => r.paper.organisms.join('; '),
-    },
-    {
-      key: 'topics',
-      header: 'Topics',
-      width: '124px',
-      priority: 3,
-      render: (r) => <TagList items={r.paper.topics} max={1} />,
-      value: (r) => r.paper.topics.join('; '),
-    },
-    {
       key: 'extractions',
       header: 'Extractions',
       width: '82px',
@@ -331,9 +291,7 @@ export default function BioRepo() {
   ];
 
   const facets: FacetDef<LibRow>[] = [
-    { key: 'organism', label: 'Organism', valuesOf: (r) => r.paper.organisms },
-    { key: 'topic', label: 'Topic', valuesOf: (r) => r.paper.topics },
-    { key: 'year', label: 'Year', valuesOf: (r) => [String(r.paper.year)] },
+    { key: 'year', label: 'Year', valuesOf: (r) => (r.paper.year === null ? [] : [String(r.paper.year)]) },
     {
       key: 'ingest',
       label: 'Ingest status',
@@ -474,7 +432,7 @@ export default function BioRepo() {
         onOpen={(r) => navigate(`/biorepo/paper/${r.paper.id}`)}
         facets={facets}
         searchOf={(r) =>
-          `${r.paper.id} ${r.paper.title} ${r.paper.authors.join(' ')} ${r.paper.topics.join(' ')}`
+          `${r.paper.id} ${r.paper.title} ${r.paper.authors.join(' ')}`
         }
         exportName="openferment-library"
         exportNote="CSV exports carry the provenance disclosure header — the citations are real, and a per-class note says what each provenance value is worth."

@@ -43,55 +43,11 @@ export type Provenance =
   | 'industry-estimate'
   | 'assumed';
 
-export type ParameterFamily =
-  | 'expression'
-  | 'cultivation'
-  | 'downstream'
-  | 'kinetics';
-
-/**
- * The record fields (`core/openferment_core/schema/fields.yaml`, mirrored in
- * data/ontology.ts): thirty-four fields in four families.
- */
-export type FieldId =
-  // Expression performance
-  | 'expression_pct_tsp'
-  | 'titer_intracellular'
-  | 'titer_secreted'
-  | 'secreted_fraction'
-  | 'fold_improvement'
-  | 'transformation_efficiency'
-  | 'time_to_colony'
-  // Cultivation
-  | 'growth_rate_mu'
-  | 'final_biomass_density'
-  | 'volumetric_productivity'
-  | 'medium_component_conc'
-  // Downstream & economics
-  | 'disruption_protein_yield'
-  | 'disruption_energy'
-  | 'minimum_selling_price'
-  | 'step_recovery'
-  | 'product_purity'
-  | 'partition_coefficient'
-  | 'sieving_coefficient'
-  | 'cake_moisture'
-  // Growth and product kinetics
-  | 'monod_ks'
-  | 'biomass_yield_substrate'
-  | 'ethanol_yield_substrate'
-  | 'ethanol_titre'
-  | 'ethanol_productivity'
-  | 'ethanol_inhibition_ki'
-  | 'ethanol_max_conc'
-  | 'substrate_inhibition_ki'
-  | 'ethanol_lp_alpha'
-  | 'ethanol_lp_beta'
-  | 'ethanol_mesp'
-  | 'maintenance_coefficient'
-  | 'biomass_yield_oxygen'
-  | 'specific_oxygen_uptake'
-  | 'kla_measured';
+// The record fields and their families are the browser's own mirror of
+// fields.yaml, kept in src/data/ontology.ts beside the list itself (alpha 2.2
+// E.4); named here until this file goes (E.15).
+import type { FieldId } from './ontology';
+export type { FieldId, ParameterDef, ParameterFamily } from './ontology';
 
 /**
  * Analytical method behind a PTM or functional measurement (OF-COR-001 §17
@@ -130,25 +86,6 @@ export type AnalysisMethod =
 
 /** Residue-numbering convention (OF-COR-001 §19, first trap). */
 export type NumberingConvention = 'precursor' | 'mature';
-
-export interface ParameterDef {
-  id: FieldId;
-  family: ParameterFamily;
-  name: string;
-  definition: string;
-  /** '' for categorical fields (kinase_identity, glycan_species). */
-  canonicalUnit: string;
-  /** Categorical fields hold a string value, not a number. */
-  categorical?: boolean;
-  /** OF-COR-001 §17 Rule 1: a value without its method is not interpretable. */
-  requiresMethod?: boolean;
-  /**
-   * Unit families this field must NOT be auto-converted into, with the reason.
-   * OF-COR-001 §17 Rule 2: %TSP and g/L are not interconvertible without cell
-   * density and total-protein fraction. The engine refuses and says why.
-   */
-  refuseConversionTo?: { field: FieldId; because: string }[];
-}
 
 export type IngestStage = 'fetch' | 'parse' | 'chunk' | 'embed' | 'extract';
 export type IngestStatus =
@@ -693,28 +630,9 @@ export interface ActivityEvent {
   provenance: Provenance;
 }
 
-export interface JobStage {
-  label: string;
-  ms: number;
-}
-
-export interface Job {
-  id: string;
-  title: string;
-  /**
-   * 'runbook' is a Job that fronts a Runbook, not a Runbook itself — the tray
-   * shows the progress bar while the record it belongs to lives in its own
-   * slice (OF-BLD-005 §7). The two cooperate; they never merge.
-   */
-  kind: 'ingest' | 'extraction' | 'simulation' | 'run' | 'runbook';
-  stages: JobStage[];
-  stageIndex: number;
-  stageProgress: number; // 0-1 within current stage
-  status: 'running' | 'done' | 'failed';
-  failReason?: string;
-  href?: string;
-  startedAt: number;
-}
+// A job the tray shows is the store's own (src/store.ts, alpha 2.2 E.4); named
+// here until this file goes (E.15).
+export type { Job, JobStage } from '@/store';
 
 // ── OF-BLD-005 · molecules, vocabulary and runbooks ────────────────────
 //
